@@ -85,7 +85,7 @@ impl VarSelectIF for AssignStack {
     }
     fn force_rephase(&mut self, phase: RephaseMode) {
         debug_assert!(self.use_rephase);
-        #[cfg(temp_order)]
+        #[cfg(feature = "temp_order")]
         {
             self.temp_order.clear();
         }
@@ -99,7 +99,7 @@ impl VarSelectIF for AssignStack {
                             // v.set(Flag::PHASE, v.is(Flag::BEST_PHASE));
                             v.best_phase_reward = self.best_phase_reward_value;
                         }
-                        #[cfg(temp_order)]
+                        #[cfg(feature = "temp_order")]
                         {
                             self.temp_order
                                 .push(Lit::from_assign(v, v.is(Flag::BEST_PHASE)));
@@ -113,8 +113,8 @@ impl VarSelectIF for AssignStack {
                 }
             }
             RephaseMode::Clear => (),
-            #[cfg(explore_timestamp)]
-            #[cfg(temp_order)]
+            #[cfg(feature = "explore_timestamp")]
+            #[cfg(feature = "temp_order")]
             RephaseMode::Explore(since) => {
                 for vi in self.var_order.heap[1..].iter() {
                     let v = &mut self.var[*vi];

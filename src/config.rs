@@ -103,7 +103,7 @@ pub struct Config {
     /// Blocking restart threshold. Originally this was the Glucose's R.
     pub rst_asg_thr: f64,
 
-    #[cfg(progress_ACC)]
+    #[cfg(feature = "progress_ACC")]
     /// Conflict Correlation threshold
     pub rst_ccc_thr: f64,
 
@@ -145,14 +145,14 @@ pub struct Config {
     //
     pub vrw_bst_phs: f64,
 
-    #[cfg(not(moving_var_reward_rate))]
+    #[cfg(not(feature = "moving_var_reward_rate"))]
     pub vrw_dcy_rat: f64,
 
-    #[cfg(moving_var_reward_rate)]
+    #[cfg(feature = "moving_var_reward_rate")]
     /// Initial var reward decay
     pub vrw_dcy_beg: f64,
 
-    #[cfg(moving_var_reward_rate)]
+    #[cfg(feature = "moving_var_reward_rate")]
     /// Maximum var reward decay
     pub vrw_dcy_end: f64,
 
@@ -196,7 +196,7 @@ impl Default for Config {
             rst_asg_slw: 10000,
             rst_asg_thr: 0.25,
 
-            #[cfg(progress_ACC)]
+            #[cfg(feature = "progress_ACC")]
             rst_ccc_thr: 0.7,
 
             rst_lbd_len: 20,
@@ -212,11 +212,11 @@ impl Default for Config {
             viv_scale: 1.2,
             vrw_bst_phs: 1.0,
 
-            #[cfg(not(moving_var_reward_rate))]
+            #[cfg(not(feature = "moving_var_reward_rate"))]
             vrw_dcy_rat: 0.96,
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             vrw_dcy_beg: 0.90,
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             vrw_dcy_end: 0.96,
             vrw_occ_cmp: 0.50,
         }
@@ -244,12 +244,12 @@ impl Config {
                     "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
                     "vii",
                 ];
-                #[cfg(not(moving_var_reward_rate))]
+                #[cfg(not(feature = "moving_var_reward_rate"))]
                 let options_f64 = [
                     "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "vib", "vie", "vis",
                     "vdr", "vrb", "vro",
                 ];
-                #[cfg(moving_var_reward_rate)]
+                #[cfg(feature = "moving_var_reward_rate")]
                 let options_f64 = [
                     "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "vib", "vie", "vis",
                     "vri", "vrm", "vro",
@@ -332,7 +332,7 @@ impl Config {
                                         "timeout" => self.c_tout = val,
                                         "rat" => self.rst_asg_thr = val,
 
-                                        #[cfg(progress_ACC)]
+                                        #[cfg(feature = "progress_ACC")]
                                         "rct" => self.rst_ccc_thr = val,
 
                                         "rlt" => self.rst_lbd_thr = val,
@@ -343,11 +343,11 @@ impl Config {
                                         "vie" => self.viv_end = val,
                                         "vis" => self.viv_scale = val,
                                         "vrb" => self.vrw_bst_phs = val,
-                                        #[cfg(not(oving_var_reward_rate))]
+                                        #[cfg(not(feature = "moving_var_reward_rate"))]
                                         "vdr" => self.vrw_dcy_rat = val,
-                                        #[cfg(moving_var_reward_rate)]
+                                        #[cfg(feature = "moving_var_reward_rate")]
                                         "vri" => self.vrw_dcy_beg = val,
-                                        #[cfg(moving_var_reward_rate)]
+                                        #[cfg(feature = "moving_var_reward_rate")]
                                         "vrm" => self.vrw_dcy_end = val,
                                         "vro" => self.vrw_occ_cmp = val,
                                         _ => panic!("invalid option: {}", name),
@@ -496,11 +496,11 @@ ARGS:
         config.rst_asg_slw,
         config.rst_asg_thr,
         {
-            #[cfg(not(progress_ACC))]
+            #[cfg(not(feature = "progress_ACC"))]
             {
                 0.0
             }
-            #[cfg(progress_ACC)]
+            #[cfg(feature = "progress_ACC")]
             {
                 config.rst_ccc_thr
             }
@@ -518,31 +518,31 @@ ARGS:
         config.viv_scale,
         config.vrw_bst_phs,
         {
-            #[cfg(not(moving_var_reward_rate))]
+            #[cfg(not(feature = "moving_var_reward_rate"))]
             {
                 0.0
             }
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             {
                 config.vrw_dcy_beg
             }
         },
         {
-            #[cfg(not(moving_var_reward_rate))]
+            #[cfg(not(feature = "moving_var_reward_rate"))]
             {
                 0.0
             }
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             {
                 config.vrw_dcy_end
             }
         },
         {
-            #[cfg(not(moving_var_reward_rate))]
+            #[cfg(not(feature = "moving_var_reward_rate"))]
             {
                 0.0
             }
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             {
                 config.vrw_occ_cmp
             }

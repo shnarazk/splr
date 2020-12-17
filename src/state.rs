@@ -57,7 +57,7 @@ pub enum RephaseMode {
     Best,
     /// a dummy
     Clear,
-    #[cfg(explore_timestamp)]
+    #[cfg(feature = "explore_timestamp")]
     #[cfg(feature = "temp_order")]
     /// seek unchecked vars.
     Explore(usize),
@@ -77,7 +77,7 @@ impl fmt::Display for RephaseMode {
             match self {
                 RephaseMode::Best => "RP_Best",
                 RephaseMode::Clear => "RP_Clear",
-                #[cfg(explore_timestamp)]
+                #[cfg(feature = "explore_timestamp")]
                 #[cfg(feature = "temp_order")]
                 RephaseMode::Explore(_) => "RP_Reverse",
                 #[cfg(feature = "temp_order")]
@@ -497,11 +497,11 @@ impl StateIF for State {
         let (rst_num_blk, rst_num_rst, rst_num_span, rst_num_shift) = rst.exports();
         // let rst_num_stb = rst.mode().1;
 
-        #[cfg(not(progress_ACC))]
-        let (rst_asg, rst_lbd, _rst_mld) = *rst.exports_box();
+        #[cfg(not(feature = "progress_ACC"))]
+        let (rst_asg, rst_lbd) = *rst.exports_box();
 
-        #[cfg(progress_ACC)]
-        let (_rst_acc, rst_asg, rst_lbd, _rst_mld) = *rst.exports_box();
+        #[cfg(feature = "progress_ACC")]
+        let (_rst_acc, rst_asg, rst_lbd) = *rst.exports_box();
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -793,11 +793,11 @@ impl State {
             e.0 + e.2
         };
 
-        #[cfg(not(progress_ACC))]
-        let (rst_asg, rst_lbd, _) = *rst.exports_box();
+        #[cfg(not(feature = "progress_ACC"))]
+        let (rst_asg, rst_lbd) = *rst.exports_box();
 
-        #[cfg(progress_ACC)]
-        let (_, rst_asg, rst_lbd, _) = *rst.exports_box();
+        #[cfg(feature = "progress_ACC")]
+        let (_, rst_asg, rst_lbd) = *rst.exports_box();
 
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\

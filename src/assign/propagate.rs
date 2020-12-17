@@ -65,7 +65,7 @@ macro_rules! set_assign {
             l => unsafe {
                 let vi = l.vi();
                 *$asg.assign.get_unchecked_mut(vi) = Some(bool::from(l));
-                #[cfg(explore_timestamp)]
+                #[cfg(feature = "explore_timestamp")]
                 {
                     $asg.var.get_unchecked_mut(vi).assign_timestamp = $asg.num_conflict;
                 }

@@ -290,15 +290,9 @@ fn search(
             if state.config.c_ip_int <= elim.to_simplify as usize {
                 elim.to_simplify = 0.0;
                 if elim.enable {
-                    #[cfg(not(progress_ACC))]
+                    #[cfg(feature = "progress_MLD")]
                     {
-                        elim.subsume_literal_limit =
-                            (rst.exports_box().2.get_slow() * 2.0) as usize;
-                    }
-                    #[cfg(progress_ACC)]
-                    {
-                        elim.subsume_literal_limit =
-                            (rst.exports_box().3.get_slow() * 2.0) as usize;
+                        elim.subsume_literal_limit = (rst.mld.get_slow() * 2.0) as usize;
                     }
                     elim.activate();
                 }

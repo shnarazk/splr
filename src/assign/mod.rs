@@ -42,7 +42,7 @@ pub trait VarRewardIF {
     fn reward_at_unassign(&mut self, vi: VarId);
     /// update internal counter.
     fn reward_update(&mut self);
-    #[cfg(moving_var_reward_rate)]
+    #[cfg(feature = "moving_var_reward_rate")]
     /// update reward setting as a part of module adoptation.
     fn adjust_reward(&mut self, state: &State);
 }
@@ -106,7 +106,7 @@ pub struct Var {
     best_phase_reward: f64,
     /// the number of conflicts at which this var was assigned an rewarded lastly.
     timestamp: usize,
-    #[cfg(explore_timestamp)]
+    #[cfg(feature = "explore_timestamp")]
     /// the number of conflicts at which this var was assigend lastly
     assign_timestamp: usize,
     /// the `Flag`s
@@ -169,13 +169,13 @@ pub struct AssignStack {
     /// Bonus value for vars involed in best phase
     best_phase_reward_value: f64,
 
-    #[cfg(moving_var_reward_rate)]
+    #[cfg(feature = "moving_var_reward_rate")]
     /// maximum var activity decay
     activity_decay_max: f64,
-    #[cfg(moving_var_reward_rate)]
+    #[cfg(feature = "moving_var_reward_rate")]
     /// minimum var activity decay
     activity_decay_min: f64,
-    #[cfg(moving_var_reward_rate)]
+    #[cfg(feature = "moving_var_reward_rate")]
     /// ONLY used in feature EVSIDS
     reward_step: f64,
 

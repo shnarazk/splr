@@ -12,7 +12,7 @@ impl VarRewardIF for AssignStack {
         v.reward + v.best_phase_reward
     }
     fn initialize_reward(&mut self, iterator: Iter<'_, usize>) {
-        #[cfg(moving_var_reward_rate)]
+        #[cfg(feature = "moving_var_reward_rate")]
         {
             self.reward_step = (self.activity_decay_max - self.activity_decay).abs() / 10_000.0;
         }
@@ -22,7 +22,7 @@ impl VarRewardIF for AssignStack {
             self.var[*vi].reward = v;
             v *= 0.99;
         }
-        #[cfg(moving_var_reward_rate)]
+        #[cfg(feature = "moving_var_reward_rate")]
         {
             self.activity_decay = self.activity_decay_max;
         }
@@ -62,7 +62,7 @@ impl VarRewardIF for AssignStack {
     }
     fn reward_update(&mut self) {
         self.ordinal += 1;
-        #[cfg(moving_var_reward_rate)]
+        #[cfg(feature = "moving_var_reward_rate")]
         {
             self.activity_decay = self
                 .activity_decay_max
@@ -70,7 +70,7 @@ impl VarRewardIF for AssignStack {
             // self.activity_decay = 1.0 - 1.0 / (1.0 + 0.5 * (self.num_restart as f64)).sqrt();
         }
     }
-    #[cfg(moving_var_reward_rate)]
+    #[cfg(feature = "moving_var_reward_rate")]
     fn adjust_reward(&mut self, state: &State) {
         if state.strategy.1 == self.num_conflict {
             match state.strategy.0 {

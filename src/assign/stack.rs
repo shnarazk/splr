@@ -62,11 +62,11 @@ impl Default for AssignStack {
             var: Vec::new(),
             activity_decay: 0.0,
             best_phase_reward_value: 1.0,
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             activity_decay_max: 0.9,
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             activity_decay_min: 0.8,
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             reward_step: 0.0,
             occurrence_compression_rate: 0.5,
             vivify_sandbox: (0, 0, 0),
@@ -100,14 +100,14 @@ impl Instantiate for AssignStack {
             num_vars: cnf.num_of_variables,
             use_rephase: config.use_rephase(),
             var: Var::new_vars(nv),
-            #[cfg(not(moving_var_reward_rate))]
+            #[cfg(not(feature = "moving_var_reward_rate"))]
             activity_decay: config.vrw_dcy_rat,
             best_phase_reward_value: config.vrw_bst_phs,
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             activity_decay: config.vrw_dcy_beg,
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             activity_decay_max: config.vrw_dcy_end,
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             activity_decay_min: config.vrw_dcy_beg,
             occurrence_compression_rate: config.vrw_occ_cmp,
             ..AssignStack::default()

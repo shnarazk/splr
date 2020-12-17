@@ -15,7 +15,7 @@ impl Default for Var {
             reward: 0.0,
             best_phase_reward: 0.0,
             timestamp: 0,
-            #[cfg(explore_timestamp)]
+            #[cfg(feature = "explore_timestamp")]
             assign_timestamp: 0,
             flags: Flag::empty(),
             participated: 0,
