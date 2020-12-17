@@ -3,7 +3,7 @@ use {
     crate::{
         assign::AssignIF,
         cdb::ClauseDBIF,
-        solver::{RestartIF, RestartMode, SolverEvent},
+        solver::{RestartIF, RestartMode, RestarterEMAs, SolverEvent},
         types::*,
     },
     std::{
@@ -43,7 +43,7 @@ pub trait StateIF {
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
             + Export<(usize, usize, usize, usize), (RestartMode, usize)>
-            + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>;
+            + ExportBox<'r, RestarterEMAs<'r>>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
     /// write a one-line message as log.
@@ -468,7 +468,7 @@ impl StateIF for State {
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
             + Export<(usize, usize, usize, usize), (RestartMode, usize)>
-            + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>,
+            + ExportBox<'r, RestarterEMAs<'r>>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
             return;
@@ -496,6 +496,11 @@ impl StateIF for State {
 
         let (rst_num_blk, rst_num_rst, rst_num_span, rst_num_shift) = rst.exports();
         // let rst_num_stb = rst.mode().1;
+
+        #[cfg(not(progress_ACC))]
+        let (rst_asg, rst_lbd, _rst_mld) = *rst.exports_box();
+
+        #[cfg(progress_ACC)]
         let (_rst_acc, rst_asg, rst_lbd, _rst_mld) = *rst.exports_box();
 
         if self.config.use_log {
@@ -759,7 +764,7 @@ impl State {
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         R: RestartIF
             + Export<(usize, usize, usize, usize), (RestartMode, usize)>
-            + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>,
+            + ExportBox<'r, RestarterEMAs<'r>>,
     {
         self.progress_cnt += 1;
         let msg = match mes {
@@ -787,7 +792,13 @@ impl State {
             let e = rst.exports();
             e.0 + e.2
         };
+
+        #[cfg(not(progress_ACC))]
+        let (rst_asg, rst_lbd, _) = *rst.exports_box();
+
+        #[cfg(progress_ACC)]
         let (_, rst_asg, rst_lbd, _) = *rst.exports_box();
+
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
              {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\

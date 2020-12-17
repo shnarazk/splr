@@ -14,7 +14,7 @@ mod vivify;
 
 pub use self::{
     build::SatSolverIF,
-    restart::{RestartIF, RestartMode, Restarter},
+    restart::{RestartIF, RestartMode, Restarter, RestarterEMAs},
     search::SolveIF,
     validate::ValidateIF,
 };

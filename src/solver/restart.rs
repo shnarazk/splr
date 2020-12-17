@@ -21,7 +21,10 @@ trait ProgressEvaluator {
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum ProgressUpdate {
     Counter,
+
+    #[cfg(progress_ACC)]
     ACC(f64),
+
     ASG(usize),
     LBD(u16),
     Luby,
@@ -222,6 +225,7 @@ impl ProgressEvaluator for ProgressMLD {
     fn shift(&mut self) {}
 }
 
+#[cfg(progress_ACC)]
 /// An EMA of Activity-based Conflict Correlation, used for forcing restart.
 #[derive(Debug)]
 struct ProgressACC {
@@ -240,6 +244,7 @@ struct ProgressACC {
     threshold: f64,
 }
 
+#[cfg(progress_ACC)]
 impl Default for ProgressACC {
     fn default() -> ProgressACC {
         ProgressACC {
@@ -255,6 +260,7 @@ impl Default for ProgressACC {
     }
 }
 
+#[cfg(progress_ACC)]
 impl Instantiate for ProgressACC {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressACC {
@@ -265,6 +271,7 @@ impl Instantiate for ProgressACC {
     }
 }
 
+#[cfg(progress_ACC)]
 impl EmaIF for ProgressACC {
     type Input = f64;
     fn update(&mut self, d: Self::Input) {
@@ -279,6 +286,7 @@ impl EmaIF for ProgressACC {
     }
 }
 
+#[cfg(progress_ACC)]
 impl ProgressEvaluator for ProgressACC {
     // Smaller core, larger value
     fn is_active(&self) -> bool {
@@ -678,7 +686,9 @@ impl ProgressEvaluator for ProgressBucket {
 /// `Restarter` provides restart API and holds data about restart conditions.
 #[derive(Debug)]
 pub struct Restarter {
+    #[cfg(progress_ACC)]
     acc: ProgressACC,
+
     asg: ProgressASG,
     // bkt: ProgressBucket,
     lbd: ProgressLBD,
@@ -703,7 +713,9 @@ pub struct Restarter {
 impl Default for Restarter {
     fn default() -> Restarter {
         Restarter {
+            #[cfg(progress_ACC)]
             acc: ProgressACC::default(),
+
             asg: ProgressASG::default(),
             // bkt: ProgressBucket::default(),
             lbd: ProgressLBD::default(),
@@ -726,7 +738,9 @@ impl Default for Restarter {
 impl Instantiate for Restarter {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
         Restarter {
+            #[cfg(progress_ACC)]
             acc: ProgressACC::instantiate(config, cnf),
+
             asg: ProgressASG::instantiate(config, cnf),
             // bkt: ProgressBucket::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
@@ -824,7 +838,10 @@ impl RestartIF for Restarter {
                 self.after_restart += 1;
                 self.luby.update(self.after_restart);
             }
+
+            #[cfg(progress_ACC)]
             ProgressUpdate::ACC(_) => (), // self.acc.update(fval),
+
             ProgressUpdate::ASG(val) => self.asg.update(val),
             ProgressUpdate::LBD(val) => self.lbd.update(val),
             ProgressUpdate::Luby => self.luby.update(0),
@@ -871,8 +888,18 @@ impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
     }
 }
 
-impl<'a> ExportBox<'a, (&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> for Restarter {
-    fn exports_box(&'a self) -> Box<(&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> {
+#[cfg(not(progress_ACC))]
+pub type RestarterEMAs<'a> = (&'a Ema2, &'a Ema2, &'a Ema2);
+#[cfg(progress_ACC)]
+pub type RestarterEMAs<'a> = (&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2);
+
+impl<'a> ExportBox<'a, RestarterEMAs<'a>> for Restarter {
+    #[cfg(not(progress_ACC))]
+    fn exports_box(&'a self) -> Box<RestarterEMAs<'a>> {
+        Box::from((&self.asg.ema, &self.lbd.ema, &self.mld.ema))
+    }
+    #[cfg(progress_ACC)]
+    fn exports_box(&'a self) -> Box<RestarterEMAs<'a>> {
         Box::from((&self.acc.ema, &self.asg.ema, &self.lbd.ema, &self.mld.ema))
     }
 }
