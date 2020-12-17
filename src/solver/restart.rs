@@ -838,9 +838,9 @@ impl RestartIF for Restarter {
         if self.asg.is_active() {
             self.num_block += 1;
             self.after_restart = 0;
-            // self.luby_blocking.update(0);
-            self.restart_step = self.initial_restart_step * self.stb.span();
-            // self.restart_step = self.initial_restart_step;
+            self.luby_blocking.update(0);
+            // self.restart_step = self.initial_restart_step * self.stb.span();
+            self.restart_step = self.initial_restart_step * self.luby_blocking.span();
             return Some(RestartDecision::Block);
         }
 
