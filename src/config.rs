@@ -455,7 +455,7 @@ OPTIONS (green opitons depends on compile-time flags):
       --ral <rst-asg-len>  Length of assign. fast EMA     {:>10}
       --ras <rst-asg-slw>  Length of assign. slow EMA     {:>10}
       --rat <rst-asg-thr>  Blocking restart threshold        {:>10.2}
-      \x1B[001m\x1B[032m--rct <rst-ccc-thr>  Conflict Correlation threshold   {:>10.2}\x1B[000m
+      \x1B[001m\x1B[032m--rct <rst-ccc-thr>  Conflict Correlation threshold    {:>10.2}\x1B[000m
       --rll <rst-lbd-len>  Length of LBD fast EMA         {:>10}
       --rls <rst-lbd-slw>  Length of LBD slow EMA         {:>10}
       --rlt <rst-lbd-thr>  Forcing restart threshold         {:>10.2}
@@ -468,9 +468,9 @@ OPTIONS (green opitons depends on compile-time flags):
       --vii <viv-int>      Vivification interval          {:>10}
       --vis <viv-scale>    #reduction to vivify              {:>10.2}
       --vrb <vrw-bst-phs>  Var reward for vars in best phase {:>10.2}
-      \x1B[001m\x1B[032m--vri <vrw-dcy-beg>  Initial var reward decay         {:>10.2}\x1B[000m
-      \x1B[001m\x1B[032m--vrm <vrw-dcy-end>  Maximum var reward decay         {:>10.2}\x1B[000m
-      \x1B[001m\x1B[032m--vro <vrw-occ-cmp>  Occ. compression rate in LR      {:>10.2}\x1B[000m
+      \x1B[001m\x1B[032m--vri <vrw-dcy-beg>  Initial var reward decay          {:>10.2}\x1B[000m
+      \x1B[001m\x1B[032m--vrm <vrw-dcy-end>  Maximum var reward decay          {:>10.2}\x1B[000m
+      \x1B[001m\x1B[032m--vro <vrw-occ-cmp>  Occ. compression rate in LR       {:>10.2}\x1B[000m
 ARGS:
   <cnf-file>    DIMACS CNF file
 ",
