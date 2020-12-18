@@ -1,6 +1,6 @@
 use {super::ClauseId, crate::types::*};
 
-/// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
+/// API for 'watcher list' like [`register`](`crate::cdb::WatchDBIF::register`), [`detach`](`crate::cdb::WatchDBIF::detach`), [`update_blocker`](`crate::cdb::WatchDBIF::update_blocker`) and so on.
 pub trait WatchDBIF {
     /// make a new 'watch', and add it to this watcher list.
     fn register(&mut self, blocker: Lit, c: ClauseId);

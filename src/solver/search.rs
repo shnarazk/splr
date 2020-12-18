@@ -15,7 +15,7 @@ use {
     },
 };
 
-/// API for SAT solver like `build`, `solve` and so on.
+/// API to [`solve`](`crate::solver::SolveIF::solve`) SAT problems.
 pub trait SolveIF {
     /// search an assignment.
     ///

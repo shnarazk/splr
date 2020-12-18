@@ -679,7 +679,7 @@ pub trait FlagIF {
 }
 
 bitflags! {
-    /// Misc flags used by `Clause` and `Var`.
+    /// Misc flags used by [`Clause`](`crate::cdb::Clause`) and [`Var`](`crate::assign::Var`).
     pub struct Flag: u16 {
 
         //

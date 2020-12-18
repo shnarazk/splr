@@ -34,11 +34,11 @@ pub trait VarRewardIF {
     fn expand_reward(&mut self, boost: bool);
     /// clear var's activity
     fn clear_reward(&mut self, vi: VarId);
-    /// modify var's activity at conflict analysis in `analyze`.
+    /// modify var's activity at conflict analysis in `conflict_analyze` in [`solver`](`crate::solver`).
     fn reward_at_analysis(&mut self, vi: VarId);
-    /// modify var's activity at value assignment in `uncheck_{assume, enqueue, fix}`.
+    /// modify var's activity at value assignment in unit propagation.
     fn reward_at_assign(&mut self, vi: VarId);
-    /// modify var's activity at value unassigment in `cancel_until`.
+    /// modify var's activity at value unassigment in [`cancel_until`](`crate::assign::PropagateIF::cancel_until`).
     fn reward_at_unassign(&mut self, vi: VarId);
     /// update internal counter.
     fn reward_update(&mut self);
@@ -47,7 +47,7 @@ pub trait VarRewardIF {
     fn adjust_reward(&mut self, state: &State);
 }
 
-/// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
+/// API about assignment like [`decision_level`](`crate::assign::AssignIF::decision_level`), [`stack`](`crate::assign::AssignIF::stack`), [`best_assigned`](`crate::assign::AssignIF::best_assigned`), and so on.
 pub trait AssignIF: ClauseManipulateIF + PropagateIF + VarManipulateIF + VarRewardIF {
     /// return a literal in the stack.
     fn stack(&self, i: usize) -> Lit;

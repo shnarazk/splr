@@ -8,7 +8,7 @@ use {
     },
 };
 
-/// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
+/// API for Boolean Constraint Propagation like [`propagate`](`crate::assign::PropagateIF::propagate`), [`assign_by_decision`](`crate::assign::PropagateIF::assign_by_decision`), [`cancel_until`](`crate::assign::PropagateIF::cancel_until`), and so on.
 pub trait PropagateIF {
     /// add an assignment at level 0 as a precondition.
     ///

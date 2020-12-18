@@ -49,7 +49,7 @@ pub enum RestartMode {
     Bucket,
 }
 
-/// API for restart like `block_restart`, `force_restart` and so on.
+/// API for [`restart`](`crate::solver::RestartIF::restart`) and [`stabilize`](`crate::solver::RestartIF::stabilize`).
 pub trait RestartIF {
     /// check blocking and forcing restart condition.
     fn restart(&mut self) -> Option<RestartDecision>;

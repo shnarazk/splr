@@ -15,7 +15,7 @@ use {
     },
 };
 
-/// API for state/statistics management, providing `progress`.
+/// API for state/statistics management, providing [`progress`](`crate::state::StateIF::progress`).
 pub trait StateIF {
     /// return `true` if it is timed out.
     fn is_timeout(&self) -> bool;
@@ -183,7 +183,7 @@ impl IndexMut<Stat> for [usize] {
     }
 }
 
-/// Data storage for `Solver`.
+/// Data storage for [`Solver`](`crate::solver::Solver`).
 #[derive(Debug)]
 pub struct State {
     /// solver configuration
@@ -825,7 +825,7 @@ impl State {
     }
 }
 
-/// Index for `Usize` data, used in `ProgressRecord`.
+/// Index for `Usize` data, used in [`ProgressRecord`](`crate::state::ProgressRecord`).
 pub enum LogUsizeId {
     Propagate = 0,
     Decision,
@@ -848,7 +848,7 @@ pub enum LogUsizeId {
     End,
 }
 
-/// Index for `f64` data, used in `ProgressRecord`.
+/// Index for `f64` data, used in [`ProgressRecord`](`crate::state::ProgressRecord`).
 pub enum LogF64Id {
     Progress = 0,
     EmaASG,

@@ -52,7 +52,7 @@ This document covers extra functions only if you built it with `cargo doc --feat
 */
 /// Crate `assign` implements Boolean Constraint Propagation and decision var selection.
 pub mod assign;
-/// Crate `cdb` provides `Clause` object and its manager `ClauseDB`
+/// Crate `cdb` provides [`Clause`](`crate::cdb::Clause`) object and its manager [`ClauseDB`](`crate::cdb::ClauseDB`).
 pub mod cdb;
 /// Crate `config` provides solver's configuration and CLI.
 pub mod config;
@@ -67,7 +67,7 @@ pub mod types;
 
 pub use {
     config::Config,
-    solver::{Certificate, SatSolverIF, SolveIF, Solver, ValidateIF},
+    solver::{Certificate, SatSolverIF, Solver, ValidateIF},
     types::SolverError,
 };
 
