@@ -936,7 +936,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_ProgressLuby() {
+    fn test_progress_luby() {
         let mut luby = ProgressLuby {
             enable: true,
             active: true,
@@ -951,7 +951,7 @@ mod tests {
         }
     }
     #[test]
-    fn test_LubySeries() {
+    fn test_luby_series() {
         let mut luby = LubySeries::default();
         let v = vec![1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8];
         let mut l: Vec<usize> = vec![];
