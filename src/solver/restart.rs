@@ -824,7 +824,11 @@ impl RestartIF for Restarter {
         if self.after_restart < self.restart_step {
             return None;
         }
-        // self.acc.shift();
+
+        #[cfg(feature = "progress_ACC")]
+        {
+            self.acc.shift();
+        }
 
         // Branching based on sizes of learnt clauses comparing with the average of
         // maximum LBDs used in conflict analysis.
@@ -861,7 +865,7 @@ impl RestartIF for Restarter {
             }
 
             #[cfg(feature = "progress_ACC")]
-            ProgressUpdate::ACC(_) => (), // self.acc.update(fval),
+            ProgressUpdate::ACC(_) => self.acc.update(fval),
 
             ProgressUpdate::ASG(val) => self.asg.update(val),
             ProgressUpdate::LBD(val) => self.lbd.update(val),
