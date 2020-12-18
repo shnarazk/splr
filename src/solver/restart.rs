@@ -44,7 +44,9 @@ pub enum RestartMode {
     Luby,
     /// Controlled by CaDiCal-like Geometric Stabilizer
     Stabilize,
-    // Bucket,
+
+    #[cfg(feature = "progress_Bucket")]
+    Bucket,
 }
 
 /// API for restart like `block_restart`, `force_restart` and so on.
@@ -353,59 +355,6 @@ impl ProgressEvaluator for ProgressLVL {
     fn shift(&mut self) {}
 }
 
-/// An EMA of recurring conflict complexity (unused now).
-#[derive(Debug)]
-struct ProgressRCC {
-    heat: Ema2,
-    threshold: f64,
-}
-
-impl Default for ProgressRCC {
-    fn default() -> Self {
-        ProgressRCC {
-            heat: Ema2::new(100).with_slow(8000),
-            threshold: 0.0,
-        }
-    }
-}
-
-impl Instantiate for ProgressRCC {
-    fn instantiate(_: &Config, _: &CNFDescription) -> Self {
-        ProgressRCC::default()
-    }
-}
-
-impl fmt::Display for ProgressRCC {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "ProgressRCC[heat:{}, thr:{}]",
-            self.get(),
-            self.threshold
-        )
-    }
-}
-
-impl EmaIF for ProgressRCC {
-    type Input = f64;
-    fn update(&mut self, foc: Self::Input) {
-        self.heat.update(foc);
-    }
-    fn get(&self) -> f64 {
-        self.heat.get()
-    }
-    fn trend(&self) -> f64 {
-        self.heat.trend()
-    }
-}
-
-impl ProgressEvaluator for ProgressRCC {
-    fn is_active(&self) -> bool {
-        self.threshold < self.heat.get()
-    }
-    fn shift(&mut self) {}
-}
-
 /// An implementation of Luby series.
 #[derive(Debug)]
 struct ProgressLuby {
@@ -617,7 +566,7 @@ impl GeometricStabilizer {
     }
 }
 
-/*
+#[cfg(feature = "progress_Bucket")]
 /// Restart when LBD's sum is over a limit.
 #[derive(Debug)]
 struct ProgressBucket {
@@ -631,6 +580,7 @@ struct ProgressBucket {
     threshold: f64,
 }
 
+#[cfg(feature = "progress_Bucket")]
 impl Default for ProgressBucket {
     fn default() -> ProgressBucket {
         ProgressBucket {
@@ -646,6 +596,7 @@ impl Default for ProgressBucket {
     }
 }
 
+#[cfg(feature = "progress_Bucket")]
 impl Instantiate for ProgressBucket {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressBucket {
@@ -659,6 +610,7 @@ impl Instantiate for ProgressBucket {
     }
 }
 
+#[cfg(feature = "progress_Bucket")]
 impl EmaIF for ProgressBucket {
     type Input = usize;
     fn update(&mut self, d: usize) {
@@ -672,6 +624,7 @@ impl EmaIF for ProgressBucket {
     }
 }
 
+#[cfg(feature = "progress_Bucket")]
 impl ProgressEvaluator for ProgressBucket {
     fn is_active(&self) -> bool {
         self.enable && self.threshold < self.sum
@@ -696,7 +649,6 @@ impl ProgressEvaluator for ProgressBucket {
         }
     }
 }
- */
 
 /// `Restarter` provides restart API and holds data about restart conditions.
 #[derive(Debug)]
@@ -705,13 +657,15 @@ pub struct Restarter {
     acc: ProgressACC,
 
     asg: ProgressASG,
-    // bkt: ProgressBucket,
+
+    #[cfg(feature = "progress_Bucket")]
+    bkt: ProgressBucket,
+
     lbd: ProgressLBD,
 
     #[cfg(feature = "progress_MLD")]
     pub mld: ProgressMLD,
 
-    // pub rcc: ProgressRCC,
     // pub blvl: ProgressLVL,
     // pub clvl: ProgressLVL,
     luby: ProgressLuby,
@@ -735,13 +689,15 @@ impl Default for Restarter {
             acc: ProgressACC::default(),
 
             asg: ProgressASG::default(),
-            // bkt: ProgressBucket::default(),
+
+            #[cfg(feature = "progress_Bucket")]
+            bkt: ProgressBucket::default(),
+
             lbd: ProgressLBD::default(),
 
             #[cfg(feature = "progress_MLD")]
             mld: ProgressMLD::default(),
 
-            // rcc: ProgressRCC::default(),
             // blvl: ProgressLVL::default(),
             // clvl: ProgressLVL::default(),
             luby: ProgressLuby::default(),
@@ -763,13 +719,15 @@ impl Instantiate for Restarter {
             acc: ProgressACC::instantiate(config, cnf),
 
             asg: ProgressASG::instantiate(config, cnf),
-            // bkt: ProgressBucket::instantiate(config, cnf),
+
+            #[cfg(feature = "progress_Bucket")]
+            bkt: ProgressBucket::instantiate(config, cnf),
+
             lbd: ProgressLBD::instantiate(config, cnf),
 
             #[cfg(feature = "progress_MLD")]
             mld: ProgressMLD::instantiate(config, cnf),
 
-            // rcc: ProgressRCC::instantiate(config, cnf),
             // blvl: ProgressLVL::instantiate(config, cnf),
             // clvl: ProgressLVL::instantiate(config, cnf),
             luby: ProgressLuby::instantiate(config, cnf),
