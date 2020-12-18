@@ -844,10 +844,7 @@ impl RestartIF for Restarter {
             return Some(RestartDecision::Block);
         }
 
-        let threshold = self.lbd.threshold; // (1.0 + self.stb.span() as f64).log(2.0);
-        if threshold < self.lbd.trend()
-        /* .lbd.is_active() */
-        {
+        if self.lbd.is_active() {
             self.restart_step = self.initial_restart_step;
             return Some(RestartDecision::Force);
         }
