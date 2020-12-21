@@ -248,12 +248,6 @@ fn search(
                         RESTART!(asg, rst);
                     }
                     asg.expand_reward(false);
-                    // if stabilize /* && rst.exports().2 */ {
-                    //     asg.force_rephase(RephaseMode::Best)
-                    // }
-                    // if span == 1 {
-                    //     asg.expand_reward(false);
-                    // }
                 }
             }
             if a_decision_was_made {

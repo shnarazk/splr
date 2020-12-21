@@ -4,8 +4,10 @@ use std::collections::BinaryHeap;
 use {
     super::{AssignStack, Var, VarHeapIF, VarOrderIF, VarRewardIF},
     crate::{state::RephaseMode, types::*},
-    std::slice::Iter,
 };
+
+#[cfg(feature = "temp_order")]
+use std::slice::Iter;
 
 /// ```
 /// let x: Lbool = var_assign!(self, lit.vi());
@@ -18,6 +20,7 @@ macro_rules! var_assign {
 
 /// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
+    #[cfg(feature = "temp_order")]
     /// force assignments
     fn force_select_iter(&mut self, iterator: Option<Iter<'_, usize>>);
     /// force assignments
@@ -50,9 +53,9 @@ impl From<&Var> for VarTimestamp {
 }
 
 impl VarSelectIF for AssignStack {
+    #[cfg(feature = "temp_order")]
     #[allow(unused_variables)]
     fn force_select_iter(&mut self, iterator: Option<Iter<'_, usize>>) {
-        #[cfg(feature = "temp_order")]
         {
             if let Some(iter) = iterator {
                 for vi in iter.rev() {
@@ -96,7 +99,6 @@ impl VarSelectIF for AssignStack {
                     if v.is(Flag::REPHASE) {
                         #[cfg(not(feature = "temp_order"))]
                         {
-                            // v.set(Flag::PHASE, v.is(Flag::BEST_PHASE));
                             v.best_phase_reward = self.best_phase_reward_value;
                         }
                         #[cfg(feature = "temp_order")]
