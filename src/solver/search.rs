@@ -233,9 +233,10 @@ fn search(
                     if new_cycle {
                         let v = asg.var_stats();
                         state.log(
-                            rst.exports().3,
+                            asg.num_conflict,
                             format!(
-                                "remain: {:>6}, unreachable: {:>6}, cpr: {:>8.2}",
+                                "cycle:{:>7}, remain:{:>9}, core:{:>9}, cpr:{:>9.2}",
+                                rst.exports().3,
                                 v.3,
                                 v.4,
                                 asg.num_conflict as f64 / asg.exports().2 as f64,

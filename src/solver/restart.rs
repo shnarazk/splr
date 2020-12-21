@@ -467,6 +467,7 @@ struct GeometricStabilizer {
     active: bool,
     longest_span: usize,
     luby: LubySeries,
+    num_cycle: usize,
     num_shift: usize,
     next_trigger: usize,
     reset_requested: bool,
@@ -482,6 +483,7 @@ impl Default for GeometricStabilizer {
             active: false,
             longest_span: 1,
             luby: LubySeries::default(),
+            num_cycle: 0,
             num_shift: 0,
             next_trigger: STEP,
             reset_requested: false,
@@ -532,6 +534,7 @@ impl GeometricStabilizer {
                 self.reset_requested = false;
             } else if self.longest_span < self.step {
                 new_cycle = true;
+                self.num_cycle += 1;
                 self.longest_span = self.step;
                 if self.reset_requested {
                     self.reset_requested = false;
@@ -557,6 +560,7 @@ impl GeometricStabilizer {
             active: false,
             longest_span: 1,
             luby: LubySeries::default(),
+            num_cycle: 0,
             num_shift: 0,
             next_trigger: step,
             reset_requested: false,
@@ -788,11 +792,6 @@ impl RestartIF for Restarter {
             self.acc.shift();
         }
 
-        // Branching based on sizes of learnt clauses comparing with the average of
-        // maximum LBDs used in conflict analysis.
-        // let _good_path = self.lbd.get()
-        //     < self.mld.get() + (self.stb.span() as f64) * self.mld.scaling + self.mld.threshold;
-
         if self.stb.active {
             return Some(RestartDecision::Stabilize);
         }
@@ -846,7 +845,7 @@ impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
     ///  1. the number of blocking in non-stabilization
     ///  1. the number of forcing restart non-stabilization
     ///  1. the index of span of stabilization phase
-    ///  1. the number of stabilization flips
+    ///  1. the number of stabilization cycle shifts
     ///
     ///```
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
@@ -860,7 +859,7 @@ impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
             self.num_block,
             self.num_restart,
             self.stb.span(),
-            self.stb.num_shift,
+            self.stb.num_cycle,
         )
     }
     fn mode(&self) -> (RestartMode, usize) {

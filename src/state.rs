@@ -15,6 +15,8 @@ use {
     },
 };
 
+const PROGRESS_REPORT_ROWS: usize = 9;
+
 /// API for state/statistics management, providing [`progress`](`crate::state::StateIF::progress`).
 pub trait StateIF {
     /// return `true` if it is timed out.
@@ -431,8 +433,9 @@ impl StateIF for State {
         if 0 == self.progress_cnt {
             self.progress_cnt = 1;
             println!("{}", self);
-            let repeat = 8;
-            for _i in 0..repeat {
+
+            //## PROGRESS REPORT ROWS
+            for _i in 0..PROGRESS_REPORT_ROWS - 1 {
                 println!("                                                  ");
             }
         }
@@ -494,7 +497,7 @@ impl StateIF for State {
 
         let rst_mode = rst.mode().0;
 
-        let (rst_num_blk, rst_num_rst, rst_num_span, rst_num_shift) = rst.exports();
+        let (rst_num_blk, rst_num_rst, rst_num_span, rst_num_cycle) = rst.exports();
         // let rst_num_stb = rst.mode().1;
 
         #[cfg(not(feature = "progress_ACC"))]
@@ -508,9 +511,13 @@ impl StateIF for State {
             return;
         }
         self.progress_cnt += 1;
-        print!("\x1B[9A\x1B[1G");
+        // print!("\x1B[9A\x1B[1G");
+        print!("\x1B[");
+        print!("{}", PROGRESS_REPORT_ROWS);
+        print!("A\x1B[1G");
+
         while let Some(m) = self.log_messages.pop() {
-            println!("\x1B[2K{}", m);
+            println!("\x1B[2K\x1B[000m\x1B[036m{}\x1B[000m", m);
         }
         println!("\x1B[2K{}", self);
         println!(
@@ -549,7 +556,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K {}|#BLK:{}, #RST:{}, span:{}, shft:{} ",
+            "\x1B[2K {}|#BLK:{}, #RST:{}, span:{}, cycl:{} ",
             match rst_mode {
                 RestartMode::Dynamic => "    Restart",
                 RestartMode::Luby if self.config.no_color => "LubyRestart",
@@ -560,24 +567,22 @@ impl StateIF for State {
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
             im!("{:>9}", self, LogUsizeId::End, rst_num_span),
-            im!("{:>9}", self, LogUsizeId::End, rst_num_shift),
+            im!("{:>9}", self, LogUsizeId::End, rst_num_cycle),
         );
-        /*
-        println!(
-            "\x1B[2K {}|#BLK:{}, #CNC:{}, #RST:{}, #STB:{} ",
-            match rst_mode {
-                RestartMode::Dynamic => "    Restart",
-                RestartMode::Luby if self.config.no_color => "LubyRestart",
-                RestartMode::Luby => "\x1B[001m\x1B[035mLubyRestart\x1B[000m",
-                RestartMode::Stabilize if self.config.no_color => "  Stabilize",
-                RestartMode::Stabilize => "  \x1B[001m\x1B[030mStabilize\x1B[000m",
-            },
+        /* println!(
+            "     Restart|#BLK:{}, #RST:{}, span:{}, cycl:{} ",
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
-            im!("{:>9}", self, LogUsizeId::RestartCancel, rst_num_sblk),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-            im!("{:>9}", self, LogUsizeId::RestartStabilize, rst_num_srst),
+            im!("{:>9}", self, LogUsizeId::End, rst_num_span),
+            im!("{:>9}", self, LogUsizeId::End, rst_num_cycle),
         );
-         */
+        println!(
+            "   Stabilize|#BLK:{}, #RST:{}, span:{}, cycl:{} ",
+            im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
+            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
+            im!("{:>9}", self, LogUsizeId::End, rst_num_span),
+            im!("{:>9}", self, LogUsizeId::End, rst_num_cycle),
+        ); */
         println!(
             "\x1B[2K         EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{} ",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
