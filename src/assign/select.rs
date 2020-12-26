@@ -92,6 +92,7 @@ impl VarSelectIF for AssignStack {
         {
             self.temp_order.clear();
         }
+        self.best_phase_reward_value = self.best_phase_reward_value.sqrt();
         match phase {
             RephaseMode::Best => {
                 for vi in self.var_order.heap[1..].iter().rev() {

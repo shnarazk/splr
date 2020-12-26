@@ -62,6 +62,7 @@ impl Default for AssignStack {
             var: Vec::new(),
             activity_decay: 0.0,
             best_phase_reward_value: 1.0,
+            best_phase_reward_decay: 0.9,
             #[cfg(feature = "moving_var_reward_rate")]
             activity_decay_max: 0.9,
             #[cfg(feature = "moving_var_reward_rate")]
@@ -102,7 +103,8 @@ impl Instantiate for AssignStack {
             var: Var::new_vars(nv),
             #[cfg(not(feature = "moving_var_reward_rate"))]
             activity_decay: config.vrw_dcy_rat,
-            best_phase_reward_value: config.vrw_bst_phs,
+            best_phase_reward_decay: config.vrw_bst_dcy,
+            best_phase_reward_value: config.vrw_bst_rwd,
             #[cfg(feature = "moving_var_reward_rate")]
             activity_decay: config.vrw_dcy_beg,
             #[cfg(feature = "moving_var_reward_rate")]

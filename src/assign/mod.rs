@@ -166,6 +166,8 @@ pub struct AssignStack {
     /// var activity decay
     activity_decay: f64,
 
+    /// Decay rate for best phase reward
+    best_phase_reward_decay: f64,
     /// Bonus value for vars involed in best phase
     best_phase_reward_value: f64,
 

@@ -35,7 +35,7 @@ impl VarRewardIF for AssignStack {
             if v.is(Flag::REPHASE) {
                 // v.reward = v.reward.powf(scale);
                 v.set(Flag::PHASE, v.is(Flag::BEST_PHASE));
-                v.best_phase_reward *= 0.9;
+                v.best_phase_reward *= self.best_phase_reward_decay;
             }
         }
     }
