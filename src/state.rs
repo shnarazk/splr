@@ -522,26 +522,46 @@ impl StateIF for State {
         println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
-            i!("{:>11}", self, LogUsizeId::Conflict, asg_num_conflict),
-            i!("{:>13}", self, LogUsizeId::Decision, self[Stat::Decision]),
-            i!("{:>15}", self, LogUsizeId::Propagate, asg_num_propagation),
+            i!("{:>11}", self, LogUsizeId::NumConflict, asg_num_conflict),
+            i!(
+                "{:>13}",
+                self,
+                LogUsizeId::NumDecision,
+                self[Stat::Decision]
+            ),
+            i!(
+                "{:>15}",
+                self,
+                LogUsizeId::NumPropagate,
+                asg_num_propagation
+            ),
         );
         println!(
             "\x1B[2K  Assignment|#rem:{}, #ass:{}, #elm:{}, prg%:{} ",
-            im!("{:>9}", self, LogUsizeId::Remain, asg_num_unasserted_vars),
-            im!("{:>9}", self, LogUsizeId::Assert, asg_num_asserted_vars),
             im!(
                 "{:>9}",
                 self,
-                LogUsizeId::Eliminated,
+                LogUsizeId::RemainingVar,
+                asg_num_unasserted_vars
+            ),
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::AssertedVar,
+                asg_num_asserted_vars
+            ),
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::EliminatedVar,
                 asg_num_eliminated_vars
             ),
             fm!("{:>9.4}", self, LogF64Id::Progress, rate * 100.0),
         );
         println!(
             "\x1B[2K      Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
-            im!("{:>9}", self, LogUsizeId::Removable, cdb_num_learnt),
-            im!("{:>9}", self, LogUsizeId::LBD2, cdb_num_lbd2),
+            im!("{:>9}", self, LogUsizeId::RemovableClause, cdb_num_learnt),
+            im!("{:>9}", self, LogUsizeId::LBD2Clause, cdb_num_lbd2),
             im!(
                 "{:>9}",
                 self,
@@ -551,12 +571,12 @@ impl StateIF for State {
             im!(
                 "{:>9}",
                 self,
-                LogUsizeId::Permanent,
+                LogUsizeId::PermanentClause,
                 cdb_num_active - cdb_num_learnt
             ),
         );
         println!(
-            "\x1B[2K {}|#BLK:{}, #RST:{}, span:{}, cycl:{} ",
+            "\x1B[2K {}|#BLK:{}, #RST:{}, Lspn:{}, Lcyc:{} ",
             match rst_mode {
                 RestartMode::Dynamic => "    Restart",
                 RestartMode::Luby if self.config.no_color => "LubyRestart",
@@ -566,34 +586,18 @@ impl StateIF for State {
             },
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-            im!("{:>9}", self, LogUsizeId::End, rst_num_span),
-            im!("{:>9}", self, LogUsizeId::End, rst_num_cycle),
+            im!("{:>9}", self, LogUsizeId::LubySpan, rst_num_span),
+            im!("{:>9}", self, LogUsizeId::LubyCycle, rst_num_cycle),
         );
-        /* println!(
-            "     Restart|#BLK:{}, #RST:{}, span:{}, cycl:{} ",
-            im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
-            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-            im!("{:>9}", self, LogUsizeId::End, rst_num_span),
-            im!("{:>9}", self, LogUsizeId::End, rst_num_cycle),
-        );
-        println!(
-            "   Stabilize|#BLK:{}, #RST:{}, span:{}, cycl:{} ",
-            im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
-            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-            im!("{:>9}", self, LogUsizeId::End, rst_num_span),
-            im!("{:>9}", self, LogUsizeId::End, rst_num_cycle),
-        ); */
         println!(
             "\x1B[2K         EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{} ",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
-            // fm!("{:>9.4}", self, LogF64Id::EmaMLD, rst_mld.get()),
-            // fm!("{:>9.4}", self, LogF64Id::EmaCCC, rst_acc.get()),
-            im!("{:>9}", self, LogUsizeId::End, asg_unreachables),
+            im!("{:>9}", self, LogUsizeId::UnreachableCore, asg_unreachables),
             fm!(
                 "{:>9.2}",
                 self,
-                LogF64Id::End,
+                LogF64Id::DecisionPerConflict,
                 self[Stat::Decision] as f64 / asg_num_conflict as f64
             ),
         );
@@ -832,24 +836,48 @@ impl State {
 
 /// Index for `Usize` data, used in [`ProgressRecord`](`crate::state::ProgressRecord`).
 pub enum LogUsizeId {
-    Propagate = 0,
-    Decision,
-    Conflict,
-    Remain,
-    Assert,
-    Eliminated,
-    Removable,
-    LBD2,
+    //
+    //## primary stats
+    //
+    NumConflict = 0,
+    NumPropagate,
+    NumDecision,
+
+    //
+    //## vars
+    //
+    RemainingVar,
+    AssertedVar,
+    EliminatedVar,
+    UnreachableCore,
+
+    //
+    //## clause
+    //
+    RemovableClause,
+    LBD2Clause,
     Binclause,
-    Permanent,
+    PermanentClause,
+
+    //
+    // stabilization and restart
+    //
+    LubySpan,
+    LubyCycle,
     Restart,
     RestartBlock,
     RestartCancel,
     RestartStabilize,
+
+    //
+    //## pre-in proccessor
+    //
     Simplify,
     Stabilize,
     Vivify,
     VivifiedVar,
+
+    // the sentinel
     End,
 }
 
@@ -862,10 +890,9 @@ pub enum LogF64Id {
     EmaMLD,
     TrendASG,
     TrendLBD,
-    TrendMLD,
-    TrendMVA,
     BLevel,
     CLevel,
+    DecisionPerConflict,
     ConflictPerRestart,
     PropagationPerConflict,
     End,
