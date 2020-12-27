@@ -1,4 +1,4 @@
-## 0.6.0, 2020-12-18
+## 0.6.0, 2020-12-29
 
 - delete dependencies on 'libc' and 'structopt'
 - make Splr *monotonous*, by removing timer based decision makers. Monotonous means that if a solver solves a problem within T timeout, it solves the problem within any timeout longer than T.
@@ -9,7 +9,7 @@
 - add an extra reward to vars involved in best phase
 - make the learning rate of var rewarding an constant
 - change the definition of restart blocker and its default threshold
-- add or modify command line options: `--rct`, `--vrb`, `--vri`, `--vrm`, `--vro`
+- add or modify command line options: `--rct`, `--vbd`, `--vbr`, `--vri`, `--vrm`, `--vro`
 
 ## 0.5.0, 2020-08-30
 

@@ -27,9 +27,9 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 *Warning: Version 0.6.0 might not be the best version. It changed var reward mechanism, restart policy and in-processor timing.*
 
 * all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
-* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.6.0 RC(6e9aaa6) solved with a 200 sec (soft) timeout:
-  * 39 satisfiable problems: all the solutions were correct.
-  * 3 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.6.0 RC(20201226) solved with a 300 sec (soft) timeout:
+  * 45 satisfiable problems: all the solutions were correct.
+  * 6 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
 
 figure FIXME
 
@@ -57,7 +57,6 @@ defined by [SAT competition 2011 rules](http://www.satcompetition.org/2011/rules
 
 ```plain
 $ splr tests/sample.cnf
-sample.cnf                                         250,1065 |time:     0.14
 sample.cnf                                         250,1065 |time:     0.10
  #conflict:        938, #decision:         1446, #propagate:          43301 
   Assignment|#rem:      243, #ass:        1, #elm:        6, prg%:   2.8000 
