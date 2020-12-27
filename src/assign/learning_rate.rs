@@ -28,12 +28,9 @@ impl VarRewardIF for AssignStack {
         }
     }
     fn expand_reward(&mut self, _: bool) {
-        // const SCALE: f64 = 2.0;
-        // let scale: f64 = if boost { 1.0 / SCALE } else { SCALE };
         for vi in 1..self.var.len() {
             let v = &mut self.var[vi];
             if v.is(Flag::REPHASE) {
-                // v.reward = v.reward.powf(scale);
                 v.set(Flag::PHASE, v.is(Flag::BEST_PHASE));
                 v.best_phase_reward *= self.best_phase_reward_decay;
             }
@@ -67,7 +64,6 @@ impl VarRewardIF for AssignStack {
             self.activity_decay = self
                 .activity_decay_max
                 .min(self.activity_decay + self.reward_step);
-            // self.activity_decay = 1.0 - 1.0 / (1.0 + 0.5 * (self.num_restart as f64)).sqrt();
         }
     }
     #[cfg(feature = "moving_var_reward_rate")]

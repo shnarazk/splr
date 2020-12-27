@@ -960,10 +960,5 @@ mod tests {
             }
         }
         assert_eq!(l, v);
-        // for v in vec![1, 1, 2, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8] {
-        //     if let Some(n) = luby.next() {
-        //         assert_eq!(v, n);
-        //     }
-        // }
     }
 }

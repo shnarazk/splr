@@ -155,7 +155,7 @@ impl VarManipulateIF for AssignStack {
             self.num_asserted_vars <= self.num_vars,
             format!("nav.{}, nv.{}", self.num_asserted_vars, self.num_vars)
         );
-        assert!(self.num_eliminated_vars <= self.num_vars);
+        debug_assert!(self.num_eliminated_vars <= self.num_vars);
         (
             self.num_vars,
             self.num_asserted_vars,

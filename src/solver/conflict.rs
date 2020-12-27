@@ -591,8 +591,10 @@ impl Lit {
                 }
                 AssignReason::Implication(cid, _) => {
                     let c = &cdb[cid];
+
                     #[cfg(feature = "boundary_check")]
                     assert!(0 < c.len());
+
                     for q in &(*c)[1..] {
                         let vi = q.vi();
                         let lv = asg.level(vi);
