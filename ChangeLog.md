@@ -11,6 +11,15 @@
 - change the definition of restart blocker and its default threshold
 - add or modify command line options: `--rct`, `--vbd`, `--vbr`, `--vri`, `--vrm`, `--vro`
 
+#### Verification
+
+* all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.6.0 RC(20201226) solved with a 300 sec (soft) timeout:
+  * 45 satisfiable problems: all the solutions were correct.
+  * 6 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+
+![Benchmark result(2020-12-27)](https://user-images.githubusercontent.com/997855/103163156-9f6f2b80-483d-11eb-90d3-29d076792c13.png)
+
 ## 0.5.0, 2020-08-30
 
 - massive changes on the default parameters about restart
@@ -26,6 +35,16 @@
 - fix the certification symbol used by removing clauses
 - fix a wrong initial value for `Config::rst_lbd_thr` which should be larger than 1.0
 - revise the timeout for pre-processor
+
+#### Verification
+
+* all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.5.0(3e68efc) solved with a 500 sec (soft) timeout:
+  * 67 satisfiable problems: all the solutions were correct.
+  * 7 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+
+![](https://user-images.githubusercontent.com/997855/91648473-42d44d80-eaa3-11ea-83d8-5a52e02621d0.png)
+
 
 ## 0.4.1, 2020-05-28
 
