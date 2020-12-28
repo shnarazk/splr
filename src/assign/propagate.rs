@@ -47,9 +47,9 @@ macro_rules! var_assign {
 macro_rules! lit_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
-            l => {
+            l =>
+            {
                 #[allow(unused_unsafe)]
-                // unsafe { *$asg.asgvec.get_unchecked(l.vi()) ^ (l as u8 & 1) }
                 match unsafe { *$asg.assign.get_unchecked(l.vi()) } {
                     Some(x) if !bool::from(l) => Some(!x),
                     x => x,
@@ -100,7 +100,7 @@ impl PropagateIF for AssignStack {
             }
             Some(x) if x == bool::from(l) => {
                 // Vivification tries to assign a var by propagation then can assert it.
-                // To make sure the var is asserted, we need to nullfy its reason.
+                // To make sure the var is asserted, we need to nullify its reason.
                 self.reason[vi] = AssignReason::None;
                 //self.make_var_asserted(vi);
                 Ok(())
@@ -109,7 +109,7 @@ impl PropagateIF for AssignStack {
         }
     }
     fn assign_by_implication(&mut self, l: Lit, reason: AssignReason, lv: DecisionLevel) {
-        debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
+        debug_assert!(usize::from(l) != 0, "Null literal is about to be enqueued");
         debug_assert!(l.vi() < self.var.len());
         // The following doesn't hold anymore by using chronoBT.
         // assert!(self.trail_lim.is_empty() || !cid.is_none());
@@ -137,7 +137,6 @@ impl PropagateIF for AssignStack {
         self.level[vi] = dl;
         let v = &mut self.var[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
-        // debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
         set_assign!(self, l);
         self.reason[vi] = AssignReason::default();
         self.reward_at_assign(vi);
@@ -153,7 +152,7 @@ impl PropagateIF for AssignStack {
         self.reason[vi] = AssignReason::default();
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
-        // NOTE: sychronize the following with handle(SolverEvent::Assert)
+        // NOTE: synchronize the following with handle(SolverEvent::Assert)
         self.make_var_asserted(vi);
     }
     fn cancel_until(&mut self, lv: DecisionLevel) {
@@ -188,7 +187,7 @@ impl PropagateIF for AssignStack {
             .all(|l| var_assign!(self, l.vi()).is_some()));
         debug_assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
         self.trail_lim.truncate(lv as usize);
-        // assert!(lim < self.q_head) dosen't hold sometimes in chronoBT.
+        // assert!(lim < self.q_head) doesn't hold sometimes in chronoBT.
         self.q_head = self.q_head.min(lim);
         if lv == self.root_level {
             self.num_restart += 1;

@@ -38,12 +38,12 @@ pub trait VarRewardIF {
     fn reward_at_analysis(&mut self, vi: VarId);
     /// modify var's activity at value assignment in unit propagation.
     fn reward_at_assign(&mut self, vi: VarId);
-    /// modify var's activity at value unassigment in [`cancel_until`](`crate::assign::PropagateIF::cancel_until`).
+    /// modify var's activity at value un-assignment in [`cancel_until`](`crate::assign::PropagateIF::cancel_until`).
     fn reward_at_unassign(&mut self, vi: VarId);
     /// update internal counter.
     fn reward_update(&mut self);
     #[cfg(feature = "moving_var_reward_rate")]
-    /// update reward setting as a part of module adoptation.
+    /// update reward setting as a part of module adaptation.
     fn adjust_reward(&mut self, state: &State);
 }
 
@@ -69,11 +69,11 @@ pub trait AssignIF: ClauseManipulateIF + PropagateIF + VarManipulateIF + VarRewa
     fn decision_level(&self) -> DecisionLevel;
     ///return the decision var's id at that level.
     fn decision_vi(&self, lv: DecisionLevel) -> VarId;
-    /// return `true` if there are unpropagated assignments.
+    /// return `true` if there are un-propagated assignments.
     fn remains(&self) -> bool;
     /// return `true` if subsequential propagations emit the same conflict.
     fn recurrent_conflicts(&self) -> bool;
-    /// return a reference to `aasign`.
+    /// return a reference to `assign`.
     fn assign_ref(&self) -> &[Option<bool>];
     /// return a reference to `level`.
     fn level_ref(&self) -> &[DecisionLevel];
@@ -102,12 +102,12 @@ pub struct Var {
     participated: u32,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
     reward: f64,
-    /// a special reaward assigned to vars included in the best phase.
+    /// a special reward assigned to vars included in the best phase.
     best_phase_reward: f64,
     /// the number of conflicts at which this var was assigned an rewarded lastly.
     timestamp: usize,
     #[cfg(feature = "explore_timestamp")]
-    /// the number of conflicts at which this var was assigend lastly
+    /// the number of conflicts at which this var was assigned lastly
     assign_timestamp: usize,
     /// the `Flag`s
     flags: Flag,
@@ -168,7 +168,7 @@ pub struct AssignStack {
 
     /// Decay rate for best phase reward
     best_phase_reward_decay: f64,
-    /// Bonus value for vars involed in best phase
+    /// Bonus value for vars involved in best phase
     best_phase_reward_value: f64,
 
     #[cfg(feature = "moving_var_reward_rate")]

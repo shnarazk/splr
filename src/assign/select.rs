@@ -10,7 +10,7 @@ use {
 use std::slice::Iter;
 
 /// ```
-/// let x: Lbool = var_assign!(self, lit.vi());
+/// let x: Option<bool> = var_assign!(self, lit.vi());
 /// ```
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {

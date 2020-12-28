@@ -100,7 +100,7 @@ pub trait VarManipulateIF {
     /// * the number of vars
     /// * the number of asserted vars
     /// * the number of eliminated vars
-    /// * the number of unasserted vars
+    /// * the number of un-asserted vars
     /// * the number of unreachable unassigned vars
     fn var_stats(&self) -> (usize, usize, usize, usize, usize);
 }

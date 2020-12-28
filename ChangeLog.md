@@ -13,10 +13,10 @@
 
 #### Verification
 
-* all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
-* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.6.0 RC(20201226) solved with a 300 sec (soft) timeout:
-  * 45 satisfiable problems: all the solutions were correct.
-  * 6 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+- all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+- [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.6.0 RC(20201226) solved with a 300 sec (soft) timeout:
+  - 45 satisfiable problems: all the solutions were correct.
+  - 6 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
 
 ![Benchmark result(2020-12-27)](https://user-images.githubusercontent.com/997855/103163156-9f6f2b80-483d-11eb-90d3-29d076792c13.png)
 
@@ -38,13 +38,12 @@
 
 #### Verification
 
-* all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
-* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.5.0(3e68efc) solved with a 500 sec (soft) timeout:
-  * 67 satisfiable problems: all the solutions were correct.
-  * 7 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+- all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+- [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.5.0(3e68efc) solved with a 500 sec (soft) timeout:
+  - 67 satisfiable problems: all the solutions were correct.
+  - 7 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
 
 ![](https://user-images.githubusercontent.com/997855/91648473-42d44d80-eaa3-11ea-83d8-5a52e02621d0.png)
-
 
 ## 0.4.1, 2020-05-28
 
@@ -57,9 +56,9 @@
 
 #### Verification
 
-* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.4.1(be30d17, 7064c9) solved with a 400 sec (soft) timeout:
-  * 48 satisfiable problems: all the solutions were correct.
-  * 7 unsatisfiable problems: all were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+- [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip), splr-0.4.1(be30d17, 7064c9) solved with a 400 sec (soft) timeout:
+  - 48 satisfiable problems: all the solutions were correct.
+  - 7 unsatisfiable problems: all were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
 
 ![](https://user-images.githubusercontent.com/997855/82614843-c14b6480-9c03-11ea-9fe9-1a4d367d7290.png)
 
@@ -81,9 +80,9 @@
 
 #### Verification
 
-* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.4.0(e0461bd) solved with a 300 sec (soft) timeout:
-  * 43 satisfiable problems: all the solutions were correct.
-  * 4 unsatisfiable problems: all were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+- [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip), splr-0.4.0(e0461bd) solved with a 300 sec (soft) timeout:
+  - 43 satisfiable problems: all the solutions were correct.
+  - 4 unsatisfiable problems: all were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
 
 ![](https://user-images.githubusercontent.com/997855/81140412-32eca700-8fa4-11ea-9067-8369fba31c6b.png)
 
@@ -113,12 +112,11 @@
 
 #### Verification
 
-* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.3.1 solved with a 200 sec (soft) timeout:
-  * 35 satisfiable problems: all the solutions were correct.
-  * 4 unsatisfiable problems:
-    * 3 were verified with Grad.
-    * Verifying gto_p60c238-sc2018.cnf was timed out due to the size of the drat file (1.3 GB).
-
+- [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip), splr-0.3.1 solved with a 200 sec (soft) timeout:
+  - 35 satisfiable problems: all the solutions were correct.
+  - 4 unsatisfiable problems:
+    - 3 were verified with Grad.
+    - Verifying gto_p60c238-sc2018.cnf was timed out due to the size of the drat file (1.3 GB).
 
 ## 0.3.0, 2020-02-10
 
@@ -135,7 +133,7 @@
   - VarSelectionIF
 - adopt learning rate based branch with with reason side rewarding
 - better decay parameters
-- better tests in src/*.rs
+- better tests in src/\*.rs
 - drop adaptive_restart
 - add more ProgressEvaluators
 - implement Index and IndexMut traits for several structs
@@ -164,7 +162,7 @@
 
 - fix wrong computations about `State::{c_lvl, b_lvl}`, `Clause::activity`
 - add '--stat' option to dump a history of internal state
-- add new structs for better modulality: `ProgressEvaluator`, `RestartExecutor`, `VarDB`
+- add new structs for better modularity: `ProgressEvaluator`, `RestartExecutor`, `VarDB`
 
 ## 0.1.3, 2019-05-07
 
@@ -188,21 +186,22 @@
 - Answers were verified with Glucose and Lingeling.
 
 #### Verification
-* The first 100 problems from
+
+- The first 100 problems from
   [SATLIB](https://www.cs.ubc.ca/~hoos/SATLIB/benchm.html),
   [250 variables uniform random satisfiable 3-SAT](https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uf250-1065.tar.gz)
   : all the solutions were correct.
-* The first 100 problems from
+- The first 100 problems from
   [SATLIB](https://www.cs.ubc.ca/~hoos/SATLIB/benchm.html),
   [250 variables uniform random unsatisfiable 3-SAT](https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uuf250-1065.tar.gz)
   : all the solutions were correct and verified with [drat-trim](http://www.cs.utexas.edu/~marijn/drat-trim/).
-* [SAT Competition 2017](https://baldur.iti.kit.edu/sat-competition-2017/index.php?cat=tracks),
+- [SAT Competition 2017](https://baldur.iti.kit.edu/sat-competition-2017/index.php?cat=tracks),
   [Main track](https://baldur.iti.kit.edu/sat-competition-2017/benchmarks/Main.zip)
   : with a 2000 sec timeout, splr-0.1.0 solved:
-  * 72 satisfiable problems: all the solutions were correct.
-  * 51 unsatisfiable problems: [Lingeling](http://fmv.jku.at/lingeling/) or Glucose completely returns the same result. And,
-     * 37 certificates generated by splr-0.1.1 were verified with drat-trim.
-     * The remaining 14 certificates weren't able to be verified due to [timeout](https://gitlab.com/satisfiability01/splr/issues/74#note_142021555) by drat-trim.
+  - 72 satisfiable problems: all the solutions were correct.
+  - 51 unsatisfiable problems: [Lingeling](http://fmv.jku.at/lingeling/) or Glucose completely returns the same result. And,
+    - 37 certificates generated by splr-0.1.1 were verified with drat-trim.
+    - The remaining 14 certificates weren't able to be verified due to [timeout](https://gitlab.com/satisfiability01/splr/issues/74#note_142021555) by drat-trim.
 
 ## Technology Preview 13
 

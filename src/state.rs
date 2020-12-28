@@ -870,7 +870,7 @@ pub enum LogUsizeId {
     RestartStabilize,
 
     //
-    //## pre-in proccessor
+    //## pre-in processor
     //
     Simplify,
     Stabilize,

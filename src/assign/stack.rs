@@ -119,7 +119,7 @@ impl Instantiate for AssignStack {
     fn handle(&mut self, e: SolverEvent) {
         match e {
             SolverEvent::Adapt(_, _) => (),
-            // called only by assertion on choroBT
+            // called only by assertion on chronoBT
             // So execute everything of `assign_by_unitclause` but cancel_until(root_level)
             SolverEvent::Assert(vi) => {
                 self.make_var_asserted(vi);
@@ -412,7 +412,7 @@ impl fmt::Display for AssignStack {
         } else {
             write!(
                 f,
-                "ASG:: trail({}):[(0, {:?})]\n      level: {}, asserted: {}, elimed: {}",
+                "ASG:: trail({}):[(0, {:?})]\n      level: {}, asserted: {}, eliminated: {}",
                 self.trail.len(),
                 &v,
                 levels,

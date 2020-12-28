@@ -13,7 +13,7 @@ pub struct Config {
     /// Eliminator switch
     a_elim: i32,
 
-    /// Use Luby series forcely
+    /// Use Luby series forcibly
     a_luby: i32,
 
     /// Re-phase switch
@@ -438,7 +438,7 @@ FLAGS:
   -c, --certify            Writes a DRAT UNSAT certification file
   -l, --log                Uses Glucose-like progress report
   -V, --version            Prints version information
-OPTIONS (green opitons depends on compile-time flags):
+OPTIONS (green options depends on compile-time flags):
       --ADP <a-adaptive>   Strategy adaptation switch     {:>10}
       --ELI <a-elim>       Eliminator switch              {:>10}
       --LBY <a-luby>       Use Luby series for restart    {:>10}
