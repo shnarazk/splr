@@ -197,7 +197,7 @@ impl Default for Config {
             rst_step: 20,
             rst_asg_len: 20,
             rst_asg_slw: 10000,
-            rst_asg_thr: 0.25,
+            rst_asg_thr: 0.20,
 
             #[cfg(feature = "progress_ACC")]
             rst_ccc_thr: 0.7,
