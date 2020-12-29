@@ -95,15 +95,16 @@ impl VarSelectIF for AssignStack {
         self.best_phase_reward_value = self.best_phase_reward_value.sqrt();
         match phase {
             RephaseMode::Best => {
-                for (vi, b) in self.rephasing_vars.iter() {
-                    let v = &mut self.var[*vi];
-                    #[cfg(not(feature = "temp_order"))]
-                    {
-                        v.best_phase_reward = self.best_phase_reward_value;
+                #[cfg(not(feature = "temp_order"))]
+                {
+                    for vi in self.rephasing_vars.keys() {
+                        self.var[*vi].best_phase_reward = self.best_phase_reward_value;
                     }
-                    #[cfg(feature = "temp_order")]
-                    {
-                        self.temp_order.push(Lit::from_assign(v, b));
+                }
+                #[cfg(feature = "temp_order")]
+                {
+                    for (vi, b) in self.rephasing_vars.iter() {
+                        self.temp_order.push(Lit::from_assign(vi, b));
                     }
                 }
             }
