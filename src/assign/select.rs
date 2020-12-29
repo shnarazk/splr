@@ -95,23 +95,15 @@ impl VarSelectIF for AssignStack {
         self.best_phase_reward_value = self.best_phase_reward_value.sqrt();
         match phase {
             RephaseMode::Best => {
-                for vi in self.var_order.heap[1..].iter().rev() {
+                for vi in self.rephasing_vars.iter() {
                     let v = &mut self.var[*vi];
-                    if v.is(Flag::REPHASE) {
-                        #[cfg(not(feature = "temp_order"))]
-                        {
-                            v.best_phase_reward = self.best_phase_reward_value;
-                        }
-                        #[cfg(feature = "temp_order")]
-                        {
-                            self.temp_order
-                                .push(Lit::from_assign(v, v.is(Flag::BEST_PHASE)));
-                        }
-                    } else {
-                        #[cfg(not(feature = "temp_order"))]
-                        {
-                            v.best_phase_reward = 0.0;
-                        }
+                    #[cfg(not(feature = "temp_order"))]
+                    {
+                        v.best_phase_reward = self.best_phase_reward_value;
+                    }
+                    #[cfg(feature = "temp_order")]
+                    {
+                        self.temp_order.push(Lit::from_assign(v, v.is(Flag::BEST_PHASE)));
                     }
                 }
             }
@@ -162,16 +154,24 @@ impl VarSelectIF for AssignStack {
         Lit::from_assign(vi, p)
     }
     fn save_phases(&mut self) {
-        for (vi, v) in self.var.iter_mut().enumerate().skip(1) {
-            if !v.is(Flag::ELIMINATED) {
-                if let Some(b) = self.assign[vi] {
-                    v.turn_on(Flag::REPHASE);
-                    v.set(Flag::BEST_PHASE, b);
-                    v.best_phase_reward = self.best_phase_reward_value;
-                    continue;
+        for vi in self.rephasing_vars.iter() {
+            let mut v = &mut self.var[*vi];
+            v.turn_off(Flag::REPHASE);
+            v.best_phase_reward = 0.0;
+        }
+        self.rephasing_vars.clear();
+        for l in self.trail.iter() {
+            if let AssignReason::Implication(_, lit) = self.reason[l.vi()] {
+                let vi = lit.vi();
+                if self.root_level < self.level[vi] {
+                    if let Some(b) = self.assign[vi] {
+                        let v = &mut self.var[vi];
+                        v.turn_on(Flag::REPHASE);
+                        v.set(Flag::BEST_PHASE, b);
+                        v.best_phase_reward = self.best_phase_reward_value;
+                        self.rephasing_vars.insert(vi);
+                    }
                 }
-                v.turn_off(Flag::REPHASE);
-                v.best_phase_reward = 0.0;
             }
         }
         self.build_best_at = self.num_propagation;

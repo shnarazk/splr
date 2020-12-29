@@ -5,6 +5,7 @@ use {
     std::{fmt, ops::Range, slice::Iter},
 };
 
+use std::collections::HashSet;
 #[cfg(not(feature = "no_IO"))]
 use std::{
     fs::File,
@@ -55,6 +56,7 @@ impl Default for AssignStack {
             best_assign: false,
             build_best_at: 0,
             num_best_assign: 0,
+            rephasing_vars: HashSet::new(),
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,
