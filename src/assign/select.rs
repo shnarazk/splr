@@ -26,8 +26,8 @@ pub trait VarSelectIF {
     /// force assignments
     fn force_rephase(&mut self, phase: RephaseMode);
     /// select a new decision variable.
-    fn select_decision_literal(&mut self, select_best: bool) -> Lit;
-    /// save the current assignments to BEST_PHASE
+    fn select_decision_literal(&mut self, rephase: bool) -> Lit;
+    /// save the current assignments as BEST_PHASE
     fn save_phases(&mut self);
     /// update the internal heap on var order.
     fn update_order(&mut self, v: VarId);
@@ -136,7 +136,7 @@ impl VarSelectIF for AssignStack {
             }
         }
     }
-    fn select_decision_literal(&mut self, select_best: bool) -> Lit {
+    fn select_decision_literal(&mut self, rephase: bool) -> Lit {
         #[cfg(feature = "temp_order")]
         {
             while let Some(lit) = self.temp_order.pop() {

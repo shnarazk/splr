@@ -202,6 +202,7 @@ fn search(
     state: &mut State,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
+    let mut rephashing: bool = false;
     let use_vivify = state.config.use_vivify();
     rst.update(ProgressUpdate::Luby);
     rst.update(ProgressUpdate::Remain(asg.num_vars - asg.num_asserted_vars));
@@ -229,7 +230,8 @@ fn search(
                 if decision == RestartDecision::Force {
                     RESTART!(asg, rst);
                 }
-                if let Some((_stabilize, new_cycle)) = rst.stabilize(asg.num_conflict) {
+                if let Some((stabilize, new_cycle)) = rst.stabilize(asg.num_conflict) {
+                    rephashing = stabilize;
                     if new_cycle {
                         let v = asg.var_stats();
                         state.log(
@@ -299,7 +301,7 @@ fn search(
             }
         }
         if !asg.remains() {
-            let lit = asg.select_decision_literal(false);
+            let lit = asg.select_decision_literal(rephashing);
             asg.assign_by_decision(lit);
             state[Stat::Decision] += 1;
             a_decision_was_made = true;
