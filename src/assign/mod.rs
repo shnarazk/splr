@@ -21,7 +21,7 @@ pub use self::{
 use {
     self::heap::{VarHeapIF, VarOrderIF},
     super::{cdb::ClauseDBIF, types::*},
-    std::{collections::HashSet, ops::Range, slice::Iter},
+    std::{collections::HashMap, ops::Range, slice::Iter},
 };
 
 /// API for var rewarding.
@@ -138,7 +138,7 @@ pub struct AssignStack {
     best_assign: bool,
     build_best_at: usize,
     num_best_assign: usize,
-    rephasing_vars: HashSet<VarId>,
+    rephasing_vars: HashMap<VarId, bool>,
 
     //
     //## Statistics

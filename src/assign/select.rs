@@ -95,7 +95,7 @@ impl VarSelectIF for AssignStack {
         self.best_phase_reward_value = self.best_phase_reward_value.sqrt();
         match phase {
             RephaseMode::Best => {
-                for vi in self.rephasing_vars.iter() {
+                for (vi, b) in self.rephasing_vars.iter() {
                     let v = &mut self.var[*vi];
                     #[cfg(not(feature = "temp_order"))]
                     {
@@ -103,7 +103,7 @@ impl VarSelectIF for AssignStack {
                     }
                     #[cfg(feature = "temp_order")]
                     {
-                        self.temp_order.push(Lit::from_assign(v, v.is(Flag::BEST_PHASE)));
+                        self.temp_order.push(Lit::from_assign(v, b));
                     }
                 }
             }
@@ -146,17 +146,17 @@ impl VarSelectIF for AssignStack {
             }
         }
         let vi = self.select_var();
-        let p = self.var[vi].is(if select_best && self.var[vi].is(Flag::REPHASE) {
-            Flag::BEST_PHASE
-        } else {
-            Flag::PHASE
-        });
-        Lit::from_assign(vi, p)
+
+        if rephase {
+            if let Some(b) = self.rephasing_vars.get(&vi) {
+                return Lit::from_assign(vi, *b);
+            }
+        }
+        Lit::from_assign(vi, self.var[vi].is(Flag::PHASE))
     }
     fn save_phases(&mut self) {
-        for vi in self.rephasing_vars.iter() {
+        for vi in self.rephasing_vars.keys() {
             let mut v = &mut self.var[*vi];
-            v.turn_off(Flag::REPHASE);
             v.best_phase_reward = 0.0;
         }
         self.rephasing_vars.clear();
@@ -165,11 +165,8 @@ impl VarSelectIF for AssignStack {
                 let vi = lit.vi();
                 if self.root_level < self.level[vi] {
                     if let Some(b) = self.assign[vi] {
-                        let v = &mut self.var[vi];
-                        v.turn_on(Flag::REPHASE);
-                        v.set(Flag::BEST_PHASE, b);
-                        v.best_phase_reward = self.best_phase_reward_value;
-                        self.rephasing_vars.insert(vi);
+                        self.rephasing_vars.insert(vi, b);
+                        self.var[vi].best_phase_reward = self.best_phase_reward_value;
                     }
                 }
             }
@@ -204,18 +201,24 @@ impl AssignStack {
             }
         }
     }
-    /// check usability of the saved best phase
+    /// check usability of the saved best phase.
+    /// return `true` if the current best phase got invalid.
     fn check_best_phase(&mut self, vi: VarId) -> bool {
         if self.var[vi].is(Flag::ELIMINATED) {
             return false;
         }
-        if self.level[vi] == self.root_level && self.var[vi].is(Flag::REPHASE) {
-            if let Some(phase) = self.assign[vi] {
-                if phase != self.var[vi].is(Flag::BEST_PHASE) {
-                    self.num_best_assign = 0;
-                    self.var[vi].best_phase_reward = 0.0;
-                    return true;
+        if self.level[vi] == self.root_level {
+            return false;
+        }
+        if let Some(b) = self.rephasing_vars.get(&vi) {
+            assert!(self.assign[vi].is_some());
+            if self.assign[vi] != Some(*b) {
+                for vj in self.rephasing_vars.keys() {
+                    self.var[*vj].best_phase_reward = 0.0;
                 }
+                self.rephasing_vars.clear();
+                self.num_best_assign = 0;
+                return true;
             }
         }
         false

@@ -2,10 +2,9 @@
 use {
     super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF, VarSelectIF},
     crate::{cdb::ClauseDBIF, solver::SolverEvent, types::*},
-    std::{fmt, ops::Range, slice::Iter},
+    std::{collections::HashMap, fmt, ops::Range, slice::Iter},
 };
 
-use std::collections::HashSet;
 #[cfg(not(feature = "no_IO"))]
 use std::{
     fs::File,
@@ -56,7 +55,7 @@ impl Default for AssignStack {
             best_assign: false,
             build_best_at: 0,
             num_best_assign: 0,
-            rephasing_vars: HashSet::new(),
+            rephasing_vars: HashMap::new(),
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,

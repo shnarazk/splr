@@ -28,10 +28,9 @@ impl VarRewardIF for AssignStack {
         }
     }
     fn expand_reward(&mut self, _: bool) {
-        for vi in self.rephasing_vars.iter() {
+        for (vi, b) in self.rephasing_vars.iter() {
             let v = &mut self.var[*vi];
-            debug_assert!(v.is(Flag::REPHASE));
-            v.set(Flag::PHASE, v.is(Flag::BEST_PHASE));
+            v.set(Flag::PHASE, *b);
             v.best_phase_reward *= self.best_phase_reward_decay;
         }
     }
