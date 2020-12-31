@@ -116,9 +116,11 @@ pub struct Config {
     /// Forcing restart threshold
     pub rst_lbd_thr: f64,
 
+    #[cfg(feature = "progress_MLD")]
     /// Scaling for Maximum LBD of a Dep. graph
     pub rst_mld_scl: f64,
 
+    #[cfg(feature = "progress_MLD")]
     /// Threshold for Maximum LBD of a Dep. graph
     pub rst_mld_thr: f64,
 
@@ -204,9 +206,13 @@ impl Default for Config {
 
             rst_lbd_len: 20,
             rst_lbd_slw: 8192,
-            rst_lbd_thr: 1.40,
+            rst_lbd_thr: 1.25,
+
+            #[cfg(feature = "progress_MLD")]
             rst_mld_scl: 0.10,
+            #[cfg(feature = "progress_MLD")]
             rst_mld_thr: 0.80,
+
             rst_stb_scl: 2.0,
 
             viv_beg: 1.0,
@@ -340,8 +346,12 @@ impl Config {
                                         "rct" => self.rst_ccc_thr = val,
 
                                         "rlt" => self.rst_lbd_thr = val,
+
+                                        #[cfg(feature = "progress_MLD")]
                                         "rms" => self.rst_mld_scl = val,
+                                        #[cfg(feature = "progress_MLD")]
                                         "rmt" => self.rst_mld_thr = val,
+
                                         "rss" => self.rst_stb_scl = val,
                                         "vib" => self.viv_beg = val,
                                         "vie" => self.viv_end = val,
@@ -438,7 +448,7 @@ FLAGS:
   -c, --certify            Writes a DRAT UNSAT certification file
   -l, --log                Uses Glucose-like progress report
   -V, --version            Prints version information
-OPTIONS (green options depends on compile-time flags):
+OPTIONS (red options depends on compile-time flags):
       --ADP <a-adaptive>   Strategy adaptation switch     {:>10}
       --ELI <a-elim>       Eliminator switch              {:>10}
       --LBY <a-luby>       Use Luby series for restart    {:>10}
@@ -464,8 +474,8 @@ OPTIONS (green options depends on compile-time flags):
       --rll <rst-lbd-len>  Length of LBD fast EMA         {:>10}
       --rls <rst-lbd-slw>  Length of LBD slow EMA         {:>10}
       --rlt <rst-lbd-thr>  Forcing restart threshold         {:>10.2}
-      --rms <rst-mld-scl>  Scaling for Max LBD of Dep.       {:>10.2}
-      --rmt <rst-mld-thr>  Threshold for Max LBD of Dep.     {:>10.2}
+      \x1B[000m\x1B[031m--rms <rst-mld-scl>  Scaling for Max LBD of Dep.       {:>10.2}\x1B[000m
+      \x1B[000m\x1B[031m--rmt <rst-mld-thr>  Threshold for Max LBD of Dep.     {:>10.2}\x1B[000m
       --rss <rst-stb-scl>  Stabilizer scaling                {:>10.2}
       --rs <rst-step>      #conflicts between restarts    {:>10}
       --vib <viv-beg>      Lower bound of vivify loop        {:>10.2}
@@ -514,8 +524,26 @@ ARGS:
         config.rst_lbd_len,
         config.rst_lbd_slw,
         config.rst_lbd_thr,
-        config.rst_mld_scl,
-        config.rst_mld_thr,
+        {
+            #[cfg(feature = "progress_MLD")]
+            {
+                config.rst_mld_scl
+            }
+            #[cfg(not(feature = "progress_MLD"))]
+            {
+                0.0
+            }
+        },
+        {
+            #[cfg(feature = "progress_MLD")]
+            {
+                config.rst_mld_thr
+            }
+            #[cfg(not(feature = "progress_MLD"))]
+            {
+                0.0
+            }
+        },
         config.rst_stb_scl,
         config.rst_step,
         config.viv_beg,
