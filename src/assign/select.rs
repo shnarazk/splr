@@ -26,7 +26,7 @@ pub trait VarSelectIF {
     /// force assignments
     fn force_rephase(&mut self, phase: RephaseMode);
     /// select a new decision variable.
-    fn select_decision_literal(&mut self, rephase: bool) -> Lit;
+    fn select_decision_literal(&mut self) -> Lit;
     /// save the current assignments as BEST_PHASE
     fn save_phases(&mut self);
     /// update the internal heap on var order.
@@ -137,7 +137,7 @@ impl VarSelectIF for AssignStack {
             }
         }
     }
-    fn select_decision_literal(&mut self, rephase: bool) -> Lit {
+    fn select_decision_literal(&mut self) -> Lit {
         #[cfg(feature = "temp_order")]
         {
             while let Some(lit) = self.temp_order.pop() {
@@ -148,12 +148,23 @@ impl VarSelectIF for AssignStack {
         }
         let vi = self.select_var();
 
-        if rephase {
+        #[cfg(feature = "prefer_best_phase")]
+        {
             if let Some(b) = self.rephasing_vars.get(&vi) {
                 return Lit::from_assign(vi, *b);
             }
+            Lit::from_assign(vi, self.var[vi].is(Flag::PHASE))
         }
-        Lit::from_assign(vi, self.var[vi].is(Flag::PHASE))
+
+        #[cfg(not(feature = "prefer_best_phase"))]
+        {
+            if self.rephasing {
+                if let Some(b) = self.rephasing_vars.get(&vi) {
+                    return Lit::from_assign(vi, *b);
+                }
+            }
+            Lit::from_assign(vi, self.var[vi].is(Flag::PHASE))
+        }
     }
     fn save_phases(&mut self) {
         for vi in self.rephasing_vars.keys() {
@@ -162,12 +173,23 @@ impl VarSelectIF for AssignStack {
         }
         self.rephasing_vars.clear();
         for l in self.trail.iter() {
-            if let AssignReason::Implication(_, lit) = self.reason[l.vi()] {
-                let vi = lit.vi();
-                if self.root_level < self.level[vi] {
-                    if let Some(b) = self.assign[vi] {
-                        self.rephasing_vars.insert(vi, b);
-                        self.var[vi].best_phase_reward = self.best_phase_reward_value;
+            #[cfg(not(feature = "rephase_only_reason_vars"))]
+            {
+                let vi = l.vi();
+                if let Some(b) = self.assign[vi] {
+                    self.rephasing_vars.insert(vi, b);
+                    self.var[vi].best_phase_reward = self.best_phase_reward_value;
+                }
+            }
+            #[cfg(feature = "rephase_only_reason_vars")]
+            {
+                if let AssignReason::Implication(_, lit) = self.reason[l.vi()] {
+                    let vi = lit.vi();
+                    if self.root_level < self.level[vi] {
+                        if let Some(b) = self.assign[vi] {
+                            self.rephasing_vars.insert(vi, b);
+                            self.var[vi].best_phase_reward = self.best_phase_reward_value;
+                        }
                     }
                 }
             }

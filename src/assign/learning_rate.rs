@@ -9,25 +9,46 @@ impl VarRewardIF for AssignStack {
     #[inline]
     fn activity(&self, vi: VarId) -> f64 {
         let v = &self.var[vi];
-        v.reward + v.best_phase_reward
+        #[cfg(feature = "prefer_best_phase")]
+        {
+            v.reward + v.best_phase_reward
+        }
+        #[cfg(not(feature = "prefer_best_phase"))]
+        {
+            if self.rephasing {
+                v.reward + v.best_phase_reward
+            } else {
+                v.reward
+            }
+        }
     }
-    fn initialize_reward(&mut self, iterator: Iter<'_, usize>) {
+    fn initialize_reward(&mut self, _iterator: Iter<'_, usize>) {
         #[cfg(feature = "moving_var_reward_rate")]
         {
             self.reward_step = (self.activity_decay_max - self.activity_decay).abs() / 10_000.0;
         }
-        // start with a small reward to explore many vars
-        let mut v = 0.05;
-        for vi in iterator {
-            self.var[*vi].reward = v;
-            v *= 0.99;
-        }
+        // // start with a small reward to explore many vars (big-bang initialization)
+        // let mut v = 0.2;
+        // for vi in iterator {
+        //     self.var[*vi].reward = v;
+        //     v *= 0.99;
+        // }
         #[cfg(feature = "moving_var_reward_rate")]
         {
             self.activity_decay = self.activity_decay_max;
         }
     }
-    fn expand_reward(&mut self, _: bool) {
+    #[cfg(not(feature = "prefer_best_phase"))]
+    fn update_best_phase_reward(&mut self, rephasing: bool) {
+        self.rephasing = rephasing;
+        for (vi, b) in self.rephasing_vars.iter() {
+            let v = &mut self.var[*vi];
+            v.set(Flag::PHASE, *b);
+            v.best_phase_reward *= self.best_phase_reward_decay;
+        }
+    }
+    #[cfg(feature = "prefer_best_phase")]
+    fn update_best_phase_reward(&mut self, _: bool) {
         for (vi, b) in self.rephasing_vars.iter() {
             let v = &mut self.var[*vi];
             v.set(Flag::PHASE, *b);

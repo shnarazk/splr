@@ -30,8 +30,8 @@ pub trait VarRewardIF {
     fn activity(&self, vi: VarId) -> f64;
     /// initialize rewards based on an order of vars.
     fn initialize_reward(&mut self, iterator: Iter<'_, usize>);
-    /// expand var rewards.
-    fn expand_reward(&mut self, boost: bool);
+    /// update reward for best phase
+    fn update_best_phase_reward(&mut self, rephasing: bool);
     /// clear var's activity
     fn clear_reward(&mut self, vi: VarId);
     /// modify var's activity at conflict analysis in `conflict_analyze` in [`solver`](`crate::solver`).
@@ -138,6 +138,10 @@ pub struct AssignStack {
     best_assign: bool,
     build_best_at: usize,
     num_best_assign: usize,
+
+    #[cfg(not(feature = "prefer_best_phase"))]
+    rephasing: bool,
+
     rephasing_vars: HashMap<VarId, bool>,
 
     //

@@ -55,6 +55,10 @@ impl Default for AssignStack {
             best_assign: false,
             build_best_at: 0,
             num_best_assign: 0,
+
+            #[cfg(not(feature = "prefer_best_phase"))]
+            rephasing: false,
+
             rephasing_vars: HashMap::new(),
             num_conflict: 0,
             num_propagation: 0,
