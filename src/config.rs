@@ -448,7 +448,7 @@ FLAGS:
   -c, --certify            Writes a DRAT UNSAT certification file
   -l, --log                Uses Glucose-like progress report
   -V, --version            Prints version information
-OPTIONS (red options depends on compile-time flags):
+OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m):
       --ADP <a-adaptive>   Strategy adaptation switch     {:>10}
       --ELI <a-elim>       Eliminator switch              {:>10}
       --LBY <a-luby>       Use Luby series for restart    {:>10}
