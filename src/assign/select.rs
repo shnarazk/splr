@@ -23,12 +23,14 @@ pub trait VarSelectIF {
     #[cfg(feature = "temp_order")]
     /// force assignments
     fn force_select_iter(&mut self, iterator: Option<Iter<'_, usize>>);
-    /// force assignments
-    fn force_rephase(&mut self, phase: RephaseMode);
+    /// decay staging setting
+    fn step_down_from_stage(&mut self, phasing: bool);
+    /// force staging
+    fn take_stage(&mut self, phase: RephaseMode);
     /// select a new decision variable.
     fn select_decision_literal(&mut self) -> Lit;
-    /// save the current assignments as BEST_PHASE
-    fn save_phases(&mut self);
+    /// stage the vars is current assignments
+    fn set_on_stage(&mut self);
     /// update the internal heap on var order.
     fn update_order(&mut self, v: VarId);
     /// rebuild the internal var_order
@@ -86,30 +88,66 @@ impl VarSelectIF for AssignStack {
             }
         }
     }
-    fn force_rephase(&mut self, phase: RephaseMode) {
+    fn step_down_from_stage(&mut self, _rephasing: bool) {
+        // self.rephasing = rephasing;
+        for (vi, b) in self.staged_vars.iter() {
+            let v = &mut self.var[*vi];
+            v.set(Flag::PHASE, *b);
+
+            #[cfg(feature = "extra_var_reward")]
+            #[cfg(feature = "staging")]
+            {
+                v.extra_reward *= self.staging_reward_decay;
+            }
+        }
+    }
+    fn take_stage(&mut self, phase: RephaseMode) {
         debug_assert!(self.use_rephase);
         #[cfg(feature = "temp_order")]
         {
             self.temp_order.clear();
         }
-        self.best_phase_reward_value = self.best_phase_reward_value.sqrt();
+        self.staging_reward_value = self.staging_reward_value.sqrt();
         match phase {
             RephaseMode::Best => {
                 #[cfg(not(feature = "temp_order"))]
+                #[cfg(feature = "staging")]
                 {
-                    for (vi, b) in self.rephasing_vars.iter() {
-                        self.var[*vi].best_phase_reward = self.best_phase_reward_value;
+                    for (vi, b) in self.staged_vars.iter() {
+                        #[cfg(feature = "extra_var_reward")]
+                        {
+                            self.var[*vi].extra_reward = self.staging_reward_value;
+                        }
                         self.var[*vi].set(Flag::PHASE, *b);
                     }
                 }
                 #[cfg(feature = "temp_order")]
+                #[cfg(feature = "staging")]
                 {
-                    for (vi, b) in self.rephasing_vars.iter() {
+                    for (vi, b) in self.staged_vars.iter() {
                         self.temp_order.push(Lit::from_assign(vi, b));
                     }
                 }
             }
-            RephaseMode::Clear => (),
+            RephaseMode::Clear => {
+                #[cfg(not(feature = "temp_order"))]
+                #[cfg(feature = "staging")]
+                {
+                    for vi in self.staged_vars.keys() {
+                        #[cfg(feature = "extra_var_reward")]
+                        {
+                            self.var[*vi].extra_reward = self.staging_reward_value;
+                        }
+                    }
+                }
+                #[cfg(feature = "temp_order")]
+                #[cfg(feature = "staging")]
+                {
+                    for (vi, b) in self.staged_vars.iter() {
+                        self.temp_order.push(Lit::from_assign(vi, b));
+                    }
+                }
+            }
             #[cfg(feature = "explore_timestamp")]
             #[cfg(feature = "temp_order")]
             RephaseMode::Explore(since) => {
@@ -148,38 +186,34 @@ impl VarSelectIF for AssignStack {
             }
         }
         let vi = self.select_var();
-
-        #[cfg(feature = "prefer_best_phase")]
-        {
-            if let Some(b) = self.rephasing_vars.get(&vi) {
+        if self.rephasing {
+            if let Some(b) = self.staged_vars.get(&vi) {
                 return Lit::from_assign(vi, *b);
             }
-            Lit::from_assign(vi, self.var[vi].is(Flag::PHASE))
         }
-
-        #[cfg(not(feature = "prefer_best_phase"))]
-        {
-            if self.rephasing {
-                if let Some(b) = self.rephasing_vars.get(&vi) {
-                    return Lit::from_assign(vi, *b);
-                }
-            }
-            Lit::from_assign(vi, self.var[vi].is(Flag::PHASE))
-        }
+        Lit::from_assign(vi, self.var[vi].is(Flag::PHASE))
     }
-    fn save_phases(&mut self) {
-        for vi in self.rephasing_vars.keys() {
-            let mut v = &mut self.var[*vi];
-            v.best_phase_reward = 0.0;
+    fn set_on_stage(&mut self) {
+        #[cfg(feature = "extra_var_reward")]
+        #[cfg(feature = "staging")]
+        {
+            for vi in self.staged_vars.keys() {
+                self.var[*vi].extra_reward = 0.0;
+            }
         }
-        self.rephasing_vars.clear();
+        self.staged_vars.clear();
         for l in self.trail.iter() {
             #[cfg(not(feature = "rephase_only_reason_vars"))]
             {
                 let vi = l.vi();
                 if let Some(b) = self.assign[vi] {
-                    self.rephasing_vars.insert(vi, b);
-                    self.var[vi].best_phase_reward = self.best_phase_reward_value;
+                    self.staged_vars.insert(vi, b);
+
+                    #[cfg(feature = "extra_var_reward")]
+                    #[cfg(feature = "staging")]
+                    {
+                        self.var[vi].extra_reward = self.staging_reward_value;
+                    }
                 }
             }
             #[cfg(feature = "rephase_only_reason_vars")]
@@ -189,7 +223,12 @@ impl VarSelectIF for AssignStack {
                     if self.root_level < self.level[vi] {
                         if let Some(b) = self.assign[vi] {
                             self.rephasing_vars.insert(vi, b);
-                            self.var[vi].best_phase_reward = self.best_phase_reward_value;
+
+                            #[cfg(feature = "extra_var_reward")]
+                            #[cfg(feature = "staging")]
+                            {
+                                self.var[vi].extra_reward = self.staging_reward_value;
+                            }
                         }
                     }
                 }
@@ -234,13 +273,18 @@ impl AssignStack {
         if self.level[vi] == self.root_level {
             return false;
         }
-        if let Some(b) = self.rephasing_vars.get(&vi) {
+        if let Some(b) = self.staged_vars.get(&vi) {
             assert!(self.assign[vi].is_some());
             if self.assign[vi] != Some(*b) {
-                for vj in self.rephasing_vars.keys() {
-                    self.var[*vj].best_phase_reward = 0.0;
+                #[cfg(feature = "extra_var_reward")]
+                #[cfg(feature = "staging")]
+                {
+                    for vj in self.staged_vars.keys() {
+                        self.var[*vj].extra_reward = 0.0;
+                    }
                 }
-                self.rephasing_vars.clear();
+
+                self.staged_vars.clear();
                 self.num_best_assign = 0;
                 return true;
             }

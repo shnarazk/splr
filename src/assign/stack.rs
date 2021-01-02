@@ -47,35 +47,42 @@ impl Default for AssignStack {
             root_level: 0,
             conflicts: (0, 0),
             var_order: VarIdHeap::default(),
-            temp_order: Vec::new(),
-            num_vars: 0,
-            num_asserted_vars: 0,
-            num_eliminated_vars: 0,
+
             use_rephase: true,
             best_assign: false,
             build_best_at: 0,
             num_best_assign: 0,
-
-            #[cfg(not(feature = "prefer_best_phase"))]
             rephasing: false,
 
-            rephasing_vars: HashMap::new(),
+            staging_reward_value: 1.0,
+            staging_reward_decay: 0.9,
+            staged_vars: HashMap::new(),
+
+            num_vars: 0,
+            num_asserted_vars: 0,
+            num_eliminated_vars: 0,
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,
+
             ordinal: 0,
             var: Vec::new(),
+
             activity_decay: 0.0,
-            best_phase_reward_value: 1.0,
-            best_phase_reward_decay: 0.9,
+
             #[cfg(feature = "moving_var_reward_rate")]
             activity_decay_max: 0.9,
             #[cfg(feature = "moving_var_reward_rate")]
             activity_decay_min: 0.8,
             #[cfg(feature = "moving_var_reward_rate")]
             reward_step: 0.0,
+
             occurrence_compression_rate: 0.5,
+
             vivify_sandbox: (0, 0, 0),
+
+            #[cfg(feature = "temp_order")]
+            temp_order: Vec::new(),
         }
     }
 }
@@ -103,13 +110,13 @@ impl Instantiate for AssignStack {
             reason: vec![AssignReason::default(); nv + 1],
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
-            num_vars: cnf.num_of_variables,
             use_rephase: config.use_rephase(),
+            staging_reward_decay: config.stg_rwd_dcy,
+            staging_reward_value: config.stg_rwd_val,
+            num_vars: cnf.num_of_variables,
             var: Var::new_vars(nv),
             #[cfg(not(feature = "moving_var_reward_rate"))]
             activity_decay: config.vrw_dcy_rat,
-            best_phase_reward_decay: config.vrw_bst_dcy,
-            best_phase_reward_value: config.vrw_bst_rwd,
             #[cfg(feature = "moving_var_reward_rate")]
             activity_decay: config.vrw_dcy_beg,
             #[cfg(feature = "moving_var_reward_rate")]

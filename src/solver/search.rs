@@ -242,12 +242,13 @@ fn search(
                                 asg.num_conflict as f64 / asg.exports().2 as f64,
                             ),
                         );
-                        asg.force_rephase(RephaseMode::Best);
+                        asg.take_stage(RephaseMode::Best);
+                    } else {
+                        asg.step_down_from_stage(stabilize);
                     }
                     if decision != RestartDecision::Force {
                         RESTART!(asg, rst);
                     }
-                    asg.update_best_phase_reward(stabilize);
                 }
             }
             if a_decision_was_made {

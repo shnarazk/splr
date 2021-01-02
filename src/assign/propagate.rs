@@ -160,7 +160,7 @@ impl PropagateIF for AssignStack {
             return;
         }
         if self.best_assign {
-            self.save_phases();
+            self.set_on_stage();
             self.best_assign = false;
         }
         let lim = self.trail_lim[lv as usize];

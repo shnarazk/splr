@@ -143,13 +143,16 @@ pub struct Config {
     pub viv_scale: f64,
 
     //
+    //## staging
+    //
+    /// Decay rate for Extra reward for vars on stage
+    pub stg_rwd_dcy: f64,
+    /// Initial value for the extra reward for vars on stage
+    pub stg_rwd_val: f64,
+
+    //
     //## var rewarding
     //
-    /// Var reward for vars in best phase
-    pub vrw_bst_dcy: f64,
-    /// Decay rate for Best phase var reward
-    pub vrw_bst_rwd: f64,
-
     #[cfg(not(feature = "moving_var_reward_rate"))]
     pub vrw_dcy_rat: f64,
 
@@ -196,15 +199,15 @@ impl Default for Config {
             elm_grw_lim: 0,
             elm_var_occ: 8192,
 
-            rst_step: 20,
-            rst_asg_len: 20,
+            rst_step: 32,
+            rst_asg_len: 32,
             rst_asg_slw: 10000,
             rst_asg_thr: 0.05,
 
             #[cfg(feature = "progress_ACC")]
             rst_ccc_thr: 0.7,
 
-            rst_lbd_len: 20,
+            rst_lbd_len: 32,
             rst_lbd_slw: 8192,
             rst_lbd_thr: 1.25,
 
@@ -215,12 +218,13 @@ impl Default for Config {
 
             rst_stb_scl: 2.0,
 
+            stg_rwd_dcy: 0.94,
+            stg_rwd_val: 0.10,
+
             viv_beg: 1.0,
             viv_end: 8.0,
             viv_int: 4,
             viv_scale: 1.2,
-            vrw_bst_dcy: 0.94,
-            vrw_bst_rwd: 0.10,
 
             #[cfg(not(feature = "moving_var_reward_rate"))]
             vrw_dcy_rat: 0.96,
@@ -256,13 +260,13 @@ impl Config {
                 ];
                 #[cfg(not(feature = "moving_var_reward_rate"))]
                 let options_f64 = [
-                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "vbd", "vbr", "vib",
+                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "srd", "srv", "vib",
                     "vie", "vis", "vdr", "vro",
                 ];
                 #[cfg(feature = "moving_var_reward_rate")]
                 let options_f64 = [
-                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "vib", "vie", "vis",
-                    "vri", "vrm", "vro",
+                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "srd", "srv", "vib",
+                    "vie", "vis", "vri", "vrm", "vro",
                 ];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
@@ -356,8 +360,8 @@ impl Config {
                                         "vib" => self.viv_beg = val,
                                         "vie" => self.viv_end = val,
                                         "vis" => self.viv_scale = val,
-                                        "vbd" => self.vrw_bst_dcy = val,
-                                        "vbr" => self.vrw_bst_rwd = val,
+                                        "srd" => self.stg_rwd_dcy = val,
+                                        "srv" => self.stg_rwd_val = val,
                                         #[cfg(not(feature = "moving_var_reward_rate"))]
                                         "vdr" => self.vrw_dcy_rat = val,
                                         #[cfg(feature = "moving_var_reward_rate")]
@@ -477,16 +481,16 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       \x1B[000m\x1B[031m--rms <rst-mld-scl>  Scaling for Max LBD of Dep.       {:>10.2}\x1B[000m
       \x1B[000m\x1B[031m--rmt <rst-mld-thr>  Threshold for Max LBD of Dep.     {:>10.2}\x1B[000m
       --rss <rst-stb-scl>  Stabilizer scaling                {:>10.2}
-      --rs <rst-step>      #conflicts between restarts    {:>10}
+      --rs  <rst-step>     #conflicts between restarts    {:>10}
       --vib <viv-beg>      Lower bound of vivify loop        {:>10.2}
       --vie <viv-end>      Upper bound of vivify loop        {:>10.2}
       --vii <viv-int>      Vivification interval          {:>10}
       --vis <viv-scale>    #reduction to vivify              {:>10.2}
-      --vbd <vrw-bst-dcy>  Decay rate for best phase reward  {:>10.2}
-      --vbr <vrw-bst-rwd>  Var reward for vars in best phase {:>10.2}
       \x1B[000m\x1B[031m--vri <vrw-dcy-beg>  Initial var reward decay          {:>10.2}\x1B[000m
       \x1B[000m\x1B[031m--vrm <vrw-dcy-end>  Maximum var reward decay          {:>10.2}\x1B[000m
       \x1B[000m\x1B[031m--vro <vrw-occ-cmp>  Occ. compression rate in LR       {:>10.2}\x1B[000m
+      --srd <stg-rwd-dcy>  Decay rate for staged vare reward {:>10.2}
+      --srv <stg-rwd-val>  Extra reward for staged vars      {:>10.2}
 ARGS:
   <cnf-file>    DIMACS CNF file
 ",
@@ -550,8 +554,6 @@ ARGS:
         config.viv_end,
         config.viv_int,
         config.viv_scale,
-        config.vrw_bst_dcy,
-        config.vrw_bst_rwd,
         {
             #[cfg(not(feature = "moving_var_reward_rate"))]
             {
@@ -582,6 +584,8 @@ ARGS:
                 config.vrw_occ_cmp
             }
         },
+        config.stg_rwd_dcy,
+        config.stg_rwd_val,
     )
 }
 

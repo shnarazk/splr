@@ -30,8 +30,6 @@ pub trait VarRewardIF {
     fn activity(&self, vi: VarId) -> f64;
     /// initialize rewards based on an order of vars.
     fn initialize_reward(&mut self, iterator: Iter<'_, usize>);
-    /// update reward for best phase
-    fn update_best_phase_reward(&mut self, rephasing: bool);
     /// clear var's activity
     fn clear_reward(&mut self, vi: VarId);
     /// modify var's activity at conflict analysis in `conflict_analyze` in [`solver`](`crate::solver`).
@@ -102,15 +100,18 @@ pub struct Var {
     participated: u32,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
     reward: f64,
-    /// a special reward assigned to vars included in the best phase.
-    best_phase_reward: f64,
     /// the number of conflicts at which this var was assigned an rewarded lastly.
     timestamp: usize,
+    /// the `Flag`s
+    flags: Flag,
+
     #[cfg(feature = "explore_timestamp")]
     /// the number of conflicts at which this var was assigned lastly
     assign_timestamp: usize,
-    /// the `Flag`s
-    flags: Flag,
+
+    #[cfg(feature = "extra_var_reward")]
+    /// a special reward given by aux rewarding mechanism
+    extra_reward: f64,
 }
 
 /// A record of assignment. It's called 'trail' in Glucose.
@@ -129,7 +130,6 @@ pub struct AssignStack {
     pub root_level: DecisionLevel,
     conflicts: (VarId, VarId),
     var_order: VarIdHeap, // Variable Order
-    temp_order: Vec<Lit>,
 
     //
     //## Phase handling
@@ -138,11 +138,16 @@ pub struct AssignStack {
     best_assign: bool,
     build_best_at: usize,
     num_best_assign: usize,
-
-    #[cfg(not(feature = "prefer_best_phase"))]
     rephasing: bool,
 
-    rephasing_vars: HashMap<VarId, bool>,
+    //
+    //## Stage handling
+    //
+    /// Decay rate for staging reward
+    staging_reward_decay: f64,
+    /// Bonus reward for vars on stage
+    staging_reward_value: f64,
+    staged_vars: HashMap<VarId, bool>,
 
     //
     //## Statistics
@@ -171,11 +176,6 @@ pub struct AssignStack {
     /// var activity decay
     activity_decay: f64,
 
-    /// Decay rate for best phase reward
-    best_phase_reward_decay: f64,
-    /// Bonus value for vars involved in best phase
-    best_phase_reward_value: f64,
-
     #[cfg(feature = "moving_var_reward_rate")]
     /// maximum var activity decay
     activity_decay_max: f64,
@@ -194,6 +194,9 @@ pub struct AssignStack {
     //
     /// save old num_conflict, num_propagation, num_restart
     vivify_sandbox: (usize, usize, usize),
+
+    #[cfg(feature = "temp_order")]
+    temp_order: Vec<Lit>,
 }
 
 /// Heap of VarId, based on var activity.
