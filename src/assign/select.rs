@@ -97,8 +97,9 @@ impl VarSelectIF for AssignStack {
             RephaseMode::Best => {
                 #[cfg(not(feature = "temp_order"))]
                 {
-                    for vi in self.rephasing_vars.keys() {
+                    for (vi, b) in self.rephasing_vars.iter() {
                         self.var[*vi].best_phase_reward = self.best_phase_reward_value;
+                        self.var[*vi].set(Flag::PHASE, *b);
                     }
                 }
                 #[cfg(feature = "temp_order")]
