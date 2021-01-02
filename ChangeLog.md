@@ -1,5 +1,9 @@
-## 0.6.0, 2021-01-01
+## 0.6.0, 2021-01-03
 
+- reorganize with redefined terminology
+   - _stabilizing_ to stop restart periodically (extention of static restart blocking)
+   - _staging_ to restrict search space
+   - _rephasing_ to reuse a good assignment set (so it means 'rephasing to good phases').
 - delete dependencies on 'libc' and 'structopt'
 - make Splr *monotonous*, by removing timer based decision makers. Monotonous means that if a solver solves a problem within T timeout, it solves the problem within any timeout longer than T.
 - Solver::restart provides both of `restart` and `stabilize`
