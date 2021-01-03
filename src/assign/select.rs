@@ -88,8 +88,8 @@ impl VarSelectIF for AssignStack {
             }
         }
     }
-    fn step_down_from_stage(&mut self, _rephasing: bool) {
-        // self.rephasing = rephasing;
+    fn step_down_from_stage(&mut self, rephasing: bool) {
+        self.rephasing = rephasing;
         for (vi, b) in self.staged_vars.iter() {
             let v = &mut self.var[*vi];
             v.set(Flag::PHASE, *b);
