@@ -69,7 +69,7 @@ struct ProgressASG {
     /// For block restart based on average assignments: 1.40.
     /// This is called `R` in Glucose
     threshold: f64,
-    nvar: usize,
+    num_var: usize,
 }
 
 impl Default for ProgressASG {
@@ -78,7 +78,7 @@ impl Default for ProgressASG {
             enable: true,
             ema: Ema2::new(1),
             threshold: 1.4,
-            nvar: 1,
+            num_var: 1,
         }
     }
 }
@@ -88,7 +88,7 @@ impl Instantiate for ProgressASG {
         ProgressASG {
             ema: Ema2::new(config.rst_asg_len).with_slow(config.rst_asg_slw),
             threshold: config.rst_asg_thr,
-            nvar: cnf.num_of_variables,
+            num_var: cnf.num_of_variables,
             ..ProgressASG::default()
         }
     }
@@ -104,7 +104,7 @@ impl EmaIF for ProgressASG {
     }
     fn trend(&self) -> f64 {
         // self.ema.trend()
-        let nv = self.nvar as f64;
+        let nv = self.num_var as f64;
         // (nv - self.ema.get_slow()) / (nv - self.ema.get())
         (self.ema.get() - self.ema.get_slow()) / nv
     }
@@ -571,7 +571,7 @@ impl GeometricStabilizer {
 }
 
 #[cfg(feature = "progress_Bucket")]
-/// Restart when LBD's sum is over a limit.
+/// Restart when the sum of LBDs is over a limit.
 #[derive(Debug)]
 struct ProgressBucket {
     enable: bool,
@@ -822,7 +822,7 @@ impl RestartIF for Restarter {
             }
 
             #[cfg(feature = "progress_ACC")]
-            ProgressUpdate::ACC(_) => self.acc.update(fval),
+            ProgressUpdate::ACC(val) => self.acc.update(val),
 
             ProgressUpdate::ASG(val) => self.asg.update(val),
             ProgressUpdate::LBD(val) => self.lbd.update(val),
@@ -832,7 +832,7 @@ impl RestartIF for Restarter {
             ProgressUpdate::MLD(val) => self.mld.update(val),
 
             ProgressUpdate::Remain(val) => {
-                self.asg.nvar = val;
+                self.asg.num_var = val;
             }
         }
     }

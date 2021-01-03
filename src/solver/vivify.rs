@@ -31,10 +31,10 @@ pub fn vivify(
         (state.vivify_thr * (nv.powf(0.5) + nc.powf(0.3))) as usize
     };
     let display_step: usize = 250.max(check_thr / 5);
-    let mut ncheck = 0;
-    let mut npurge = 0;
-    let mut nshrink = 0;
-    let mut nassert = 0;
+    let mut num_check = 0;
+    let mut num_purge = 0;
+    let mut num_shrink = 0;
+    let mut num_assert = 0;
     let mut to_display = display_step;
     let mut clauses: Vec<ClauseId> = Vec::new();
     for (i, c) in cdb.iter_mut().enumerate().skip(1) {
@@ -70,17 +70,17 @@ pub fn vivify(
         let mut copied: Vec<Lit> = Vec::new();
         let mut flipped = true;
         // elim.eliminate_satisfied_clauses(asg, cdb, false);
-        ncheck += clits.len();
+        num_check += clits.len();
         'this_clause: for l in clits.iter() {
             debug_assert_eq!(0, asg.decision_level());
-            seen[0] = ncheck;
-            if to_display <= ncheck {
+            seen[0] = num_check;
+            if to_display <= num_check {
                 state.flush("");
                 state.flush(format!(
                     "vivifying(assert:{}, purge:{} shorten:{}, check:{}/{})...",
-                    nassert, npurge, nshrink, ncheck, check_thr,
+                    num_assert, num_purge, num_shrink, num_check, check_thr,
                 ));
-                to_display = ncheck + display_step;
+                to_display = num_check + display_step;
             }
             match asg.assigned(*l) {
                 // Rule 1
@@ -163,7 +163,7 @@ pub fn vivify(
                 if !cdb[ci].is(Flag::DEAD) {
                     cdb.detach(ci);
                     cdb.garbage_collect();
-                    npurge += 1;
+                    num_purge += 1;
                 }
             }
             1 => {
@@ -171,7 +171,7 @@ pub fn vivify(
                 debug_assert_ne!(asg.assigned(l0), Some(false));
                 debug_assert_eq!(asg.decision_level(), asg.root_level);
                 if asg.assigned(l0) == None {
-                    nassert += 1;
+                    num_assert += 1;
                     cdb.certificate_add(&copied);
                     asg.assign_at_rootlevel(l0)?;
                     if !asg.propagate(cdb).is_none() {
@@ -187,10 +187,10 @@ pub fn vivify(
             n if n == clits.len() => (),
             n => {
                 if n == 2 && cdb.registered_bin_clause(copied[0], copied[1]) {
-                    npurge += 1;
+                    num_purge += 1;
                     elim.to_simplify += 1.0;
                 } else {
-                    nshrink += 1;
+                    num_shrink += 1;
                     cdb.certificate_add(&copied);
                     cdb.handle(SolverEvent::Vivify(true));
                     let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
@@ -203,7 +203,7 @@ pub fn vivify(
                 }
             }
         }
-        if check_thr <= ncheck {
+        if check_thr <= num_check {
             break;
         }
         clauses.retain(|ci| !cdb[ci].is(Flag::DEAD));
@@ -213,11 +213,11 @@ pub fn vivify(
     } else {
         state.vivify_thr *= state.config.viv_scale;
     }
-    // if 0 < nassert || 0 < npurge || 0 < nshrink {
+    // if 0 < num_assert || 0 < num_purge || 0 < num_shrink {
     //     state.flush("");
     //     state.flush(format!(
     //         "vivified(assert:{}, purge:{}, shorten:{})...",
-    //         nassert, npurge, nshrink,
+    //         num_assert, num_purge, num_shrink,
     //     ));
     // }
     asg.handle(SolverEvent::Vivify(false));
