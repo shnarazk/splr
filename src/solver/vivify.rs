@@ -136,7 +136,7 @@ pub fn vivify(
                     }
                     asg.cancel_until(asg.root_level);
                     if let Some(cj) = cid {
-                        debug_assert!(cdb[cj].is(Flag::VIV_ASSUMP));
+                        debug_assert!(cdb[cj].is(Flag::VIV_ASSUMED));
                         cdb.detach(cj);
                         debug_assert!(!asg.locked(&cdb[cj], cj));
                         cdb.garbage_collect();

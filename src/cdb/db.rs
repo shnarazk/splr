@@ -391,7 +391,7 @@ impl ClauseDBIF for ClauseDB {
                     if c.is(Flag::LEARNT) {
                         self.num_learnt -= 1;
                     }
-                    if !certified.is_empty() && !c.is(Flag::VIV_ASSUMP) {
+                    if !certified.is_empty() && !c.is(Flag::VIV_ASSUMED) {
                         let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
                         debug_assert!(!temp.is_empty());
                         certified.push((CertifiedRecord::DELETE, temp));
@@ -428,7 +428,7 @@ impl ClauseDBIF for ClauseDB {
                     if c.is(Flag::LEARNT) {
                         self.num_learnt -= 1;
                     }
-                    if !certified.is_empty() && !c.is(Flag::VIV_ASSUMP) {
+                    if !certified.is_empty() && !c.is(Flag::VIV_ASSUMED) {
                         let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
                         debug_assert!(!temp.is_empty());
                         certified.push((CertifiedRecord::DELETE, temp));
@@ -534,7 +534,7 @@ impl ClauseDBIF for ClauseDB {
             self.clause.push(c);
         };
         if self.during_vivification {
-            self[cid].turn_on(Flag::VIV_ASSUMP);
+            self[cid].turn_on(Flag::VIV_ASSUMED);
         }
         let c = &mut self[cid];
         // assert!(0 < c.rank);
