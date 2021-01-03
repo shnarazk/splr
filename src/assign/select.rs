@@ -179,9 +179,8 @@ impl VarSelectIF for AssignStack {
                     }
                 }
             }
-            StageMode::Clear =>
             #[cfg(feature = "temp_order")]
-            {
+            StageMode::Clear => {
                 for (vi, b) in self.staged_vars.iter() {
                     self.temp_order.push(Lit::from_assign(vi, b));
                 }
@@ -227,7 +226,7 @@ impl VarSelectIF for AssignStack {
                     self.temp_order.push(Lit::from_assign(*vi, b));
                 }
             }
-            StageMode::Scheduled => (),
+            _ => (),
         }
     }
     fn select_decision_literal(&mut self) -> Lit {
