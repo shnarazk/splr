@@ -53,10 +53,12 @@ impl Default for AssignStack {
             build_best_at: 0,
             num_best_assign: 0,
             rephasing: false,
+            best_phases: HashMap::new(),
 
             staging_reward_value: 1.0,
             staging_reward_decay: 0.9,
             staged_vars: HashMap::new(),
+            stage_index: 0,
 
             num_vars: 0,
             num_asserted_vars: 0,

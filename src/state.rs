@@ -54,11 +54,19 @@ pub trait StateIF {
 
 /// Phase saving modes.
 #[derive(Debug, Eq, PartialEq)]
-pub enum RephaseMode {
+pub enum StageMode {
     /// use the best phase so far.
     Best,
     /// a dummy
     Clear,
+    ///
+    Top3,
+    Middle3,
+    Bottom3,
+    ///
+    Explore,
+    ///
+    LastAssigned,
     #[cfg(feature = "explore_timestamp")]
     #[cfg(feature = "temp_order")]
     /// seek unchecked vars.
@@ -69,25 +77,32 @@ pub enum RephaseMode {
     /// use random values.
     #[cfg(feature = "temp_order")]
     Random,
+    Scheduled,
 }
 
-impl fmt::Display for RephaseMode {
+impl fmt::Display for StageMode {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(
             formatter,
             "{}",
             match self {
-                RephaseMode::Best => "RP_Best",
-                RephaseMode::Clear => "RP_Clear",
+                StageMode::Best => "StageMode_Best",
+                StageMode::Clear => "StageMode_Clear",
+                StageMode::Bottom3 => "StageMode_btm",
+                StageMode::Middle3 => "StageMode_mid",
+                StageMode::Top3 => "StageMode_top",
+                StageMode::Scheduled => "StageMode",
+                StageMode::Explore => "StageMode_Exp",
+                StageMode::LastAssigned => "StageMode_LA",
                 #[cfg(feature = "explore_timestamp")]
                 #[cfg(feature = "temp_order")]
-                RephaseMode::Explore(_) => "RP_Reverse",
+                StageMode::Explore(_) => "Stage_Reverse",
                 #[cfg(feature = "temp_order")]
-                RephaseMode::Force(false) => "RP_False",
+                StageMode::Force(false) => "Stage_False",
                 #[cfg(feature = "temp_order")]
-                RephaseMode::Force(true) => "RP_True",
+                StageMode::Force(true) => "Stage_True",
                 #[cfg(feature = "temp_order")]
-                RephaseMode::Random => "RP_Random",
+                StageMode::Random => "Stage_Random",
             }
         )
     }

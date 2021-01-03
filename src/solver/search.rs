@@ -10,7 +10,7 @@ use {
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
-        state::{RephaseMode, Stat, State, StateIF},
+        state::{StageMode, Stat, State, StateIF},
         types::*,
     },
 };
@@ -242,9 +242,15 @@ fn search(
                                 asg.num_conflict as f64 / asg.exports().2 as f64,
                             ),
                         );
-                        asg.take_stage(RephaseMode::Best);
+                        #[cfg(feature = "staging")]
+                        {
+                            asg.take_stage(StageMode::Scheduled);
+                        }
                     } else {
-                        asg.step_down_from_stage(stabilize);
+                        #[cfg(feature = "staging")]
+                        {
+                            asg.step_down_from_stage(stabilize);
+                        }
                     }
                     if decision != RestartDecision::Force {
                         RESTART!(asg, rst);
