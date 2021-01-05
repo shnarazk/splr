@@ -60,7 +60,7 @@ pub enum StageMode {
     /// a dummy
     Clear,
     ///
-    Top3,
+    Top(usize),
     Middle3,
     Bottom3,
     ///
@@ -90,7 +90,7 @@ impl fmt::Display for StageMode {
                 StageMode::Clear => "StageMode_Clear",
                 StageMode::Bottom3 => "StageMode_btm",
                 StageMode::Middle3 => "StageMode_mid",
-                StageMode::Top3 => "StageMode_top",
+                StageMode::Top(_) => "StageMode_top",
                 StageMode::Scheduled => "StageMode",
                 StageMode::Explore => "StageMode_Exp",
                 StageMode::LastAssigned => "StageMode_LA",
