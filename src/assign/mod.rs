@@ -196,9 +196,6 @@ pub struct AssignStack {
     //
     /// save old num_conflict, num_propagation, num_restart
     vivify_sandbox: (usize, usize, usize),
-
-    #[cfg(feature = "temp_order")]
-    temp_order: Vec<Lit>,
 }
 
 /// Heap of VarId, based on var activity.

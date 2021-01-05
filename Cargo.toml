@@ -29,7 +29,6 @@ no_IO = []
 progress_ACC = []
 progress_MLD = []
 rephase_only_reason_vars = []
-temp_order = []
 trace_analysis = []
 trace_elimination = []
 

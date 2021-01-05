@@ -101,8 +101,6 @@ impl SolveIF for Solver {
                     elim.enqueue_var(asg, vi, false);
                 }
             }
-            #[cfg(feature = "temp_order")]
-            asg.force_select_iter(Some(elim.sorted_iterator()));
             //
             //## Run eliminator
             //

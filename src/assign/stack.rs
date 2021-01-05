@@ -82,9 +82,6 @@ impl Default for AssignStack {
             occurrence_compression_rate: 0.5,
 
             vivify_sandbox: (0, 0, 0),
-
-            #[cfg(feature = "temp_order")]
-            temp_order: Vec::new(),
         }
     }
 }

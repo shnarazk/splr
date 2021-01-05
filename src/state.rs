@@ -54,55 +54,40 @@ pub trait StateIF {
 
 /// Phase saving modes.
 #[derive(Debug, Eq, PartialEq)]
-pub enum StageMode {
+pub enum StagingTarget {
+    /// select some targets cyclicly.
+    AutoSelect,
     /// use the best phase so far.
     Best,
-    /// a dummy
+    /// unstage all vars.
     Clear,
-    ///
-    Top(usize),
-    Middle3,
-    Bottom3,
-    ///
-    Explore,
+    /// use best phases with some unsettled vars
+    Extend(usize),
     ///
     LastAssigned,
-    #[cfg(feature = "explore_timestamp")]
-    #[cfg(feature = "temp_order")]
-    /// seek unchecked vars.
-    Explore(usize),
-    /// force an assignment
-    #[cfg(feature = "temp_order")]
-    Force(bool),
-    /// use random values.
-    #[cfg(feature = "temp_order")]
+    /// select random vars.
     Random,
-    Scheduled,
+
+    #[cfg(feature = "explore_timestamp")]
+    /// seek unchecked vars.
+    Explore,
 }
 
-impl fmt::Display for StageMode {
+impl fmt::Display for StagingTarget {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(
             formatter,
             "{}",
             match self {
-                StageMode::Best => "StageMode_Best",
-                StageMode::Clear => "StageMode_Clear",
-                StageMode::Bottom3 => "StageMode_btm",
-                StageMode::Middle3 => "StageMode_mid",
-                StageMode::Top(_) => "StageMode_top",
-                StageMode::Scheduled => "StageMode",
-                StageMode::Explore => "StageMode_Exp",
-                StageMode::LastAssigned => "StageMode_LA",
+                StagingTarget::AutoSelect => "StageMode",
+                StagingTarget::Best => "StageMode_Best",
+                StagingTarget::Clear => "StageMode_Clear",
+                StagingTarget::Extend(_) => "StageMode_top",
+                StagingTarget::LastAssigned => "StageMode_LA",
+                StagingTarget::Random => "Stage_Random",
+
                 #[cfg(feature = "explore_timestamp")]
-                #[cfg(feature = "temp_order")]
-                StageMode::Explore(_) => "Stage_Reverse",
-                #[cfg(feature = "temp_order")]
-                StageMode::Force(false) => "Stage_False",
-                #[cfg(feature = "temp_order")]
-                StageMode::Force(true) => "Stage_True",
-                #[cfg(feature = "temp_order")]
-                StageMode::Random => "Stage_Random",
+                StagingTarget::Explore => "StageMode_Exp",
             }
         )
     }

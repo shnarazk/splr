@@ -1,13 +1,8 @@
-#[cfg(feature = "temp_order")]
-use std::collections::BinaryHeap;
 /// Decision var selection
 use {
     super::{AssignIF, AssignStack, Var, VarHeapIF, VarOrderIF, VarRewardIF},
-    crate::{state::StageMode, types::*},
+    crate::{state::StagingTarget, types::*},
 };
-
-#[cfg(feature = "temp_order")]
-use std::slice::Iter;
 
 /// ```
 /// let x: Option<bool> = var_assign!(self, lit.vi());
@@ -20,10 +15,6 @@ macro_rules! var_assign {
 
 /// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
-    #[cfg(feature = "temp_order")]
-    /// force assignments
-    fn force_select_iter(&mut self, iterator: Option<Iter<'_, usize>>);
-
     #[cfg(feature = "staging")]
     /// decay staging setting
     fn step_down_from_stage(&mut self, phasing: bool);
@@ -61,39 +52,6 @@ impl From<&Var> for VarTimestamp {
 }
 
 impl VarSelectIF for AssignStack {
-    #[cfg(feature = "temp_order")]
-    #[allow(unused_variables)]
-    fn force_select_iter(&mut self, iterator: Option<Iter<'_, usize>>) {
-        {
-            if let Some(iter) = iterator {
-                for vi in iter.rev() {
-                    let lit = Lit::from_assign(*vi, self.var[*vi].is(Flag::PHASE));
-                    self.temp_order.push(lit);
-                }
-            } else {
-                let mut heap: BinaryHeap<VarTimestamp> = BinaryHeap::new();
-                let remains = self.num_unreachables();
-                let size = (remains as f64).sqrt() as usize; //remains.count_ones() as usize;
-                for v in self.var.iter().skip(1) {
-                    if self.assign[v.index].is_some() {
-                        continue;
-                    }
-                    if let Some(top) = heap.peek() {
-                        if v.timestamp < top.timestamp {
-                            heap.push(VarTimestamp::from(v));
-                            if size < heap.len() {
-                                heap.pop();
-                            }
-                        }
-                    }
-                }
-                for v in heap.iter() {
-                    let lit = Lit::from_assign(v.vi, self.var[v.vi].is(Flag::PHASE));
-                    self.temp_order.push(lit);
-                }
-            }
-        }
-    }
     #[cfg(feature = "staging")]
     fn step_down_from_stage(&mut self, rephasing: bool) {
         self.rephasing = rephasing;
@@ -152,48 +110,25 @@ impl VarSelectIF for AssignStack {
                 }
             }
         }
-        {
-            for vi in self.staged_vars.keys() {
-                self.var[*vi].extra_reward = 0.0;
-            }
+        for vi in self.staged_vars.keys() {
+            self.var[*vi].extra_reward = 0.0;
         }
         self.staged_vars.clear();
-        #[cfg(feature = "temp_order")]
-        {
-            self.temp_order.clear();
-        }
         // self.staging_reward_value = self.staging_reward_value.sqrt();
-        match mode {
-            StageMode::Bottom3 => {
-                let len = self.var_order.idxs[0];
-                // for vi in self.var_order.heap[(len * 2) / 3..len].iter() {
-                for vi in self.var_order.heap[1..len].iter() {
-                    if !self.best_phases.get(vi).is_some() {
-                        let mut v = &mut self.var[*vi];
-                        self.staged_vars.insert(*vi, v.is(Flag::PHASE));
-                        v.extra_reward = self.staging_reward_value;
-                    }
+        match target {
+            StagingTarget::Best => {
+                for (vi, b) in self.best_phases.iter() {
+                    self.staged_vars.insert(*vi, *b);
+                    self.var[*vi].extra_reward = self.staging_reward_value;
+                    self.var[*vi].set(Flag::PHASE, *b);
                 }
             }
-            StageMode::Middle3 => {
-                // let len = self.var_order.idxs[0];
-                // for vi in self.var_order.heap[len / 3..len].iter() {
-                //     if self.best_phases.get(vi).is_some() {
-                //         let mut v = &mut self.var[*vi];
-                //         self.staged_vars.insert(*vi, v.is(Flag::PHASE));
-                //         v.extra_reward = self.staging_reward_value;
-                //     }
-                // }
-            }
-            StageMode::Top(n) => {
-                {
-                    for (vi, b) in self.best_phases.iter() {
-                        {
-                            self.staged_vars.insert(*vi, *b);
-                            self.var[*vi].extra_reward = self.staging_reward_value;
-                        }
-                        self.var[*vi].set(Flag::PHASE, *b);
-                    }
+            StagingTarget::Clear => (),
+            StagingTarget::Extend(n) => {
+                for (vi, b) in self.best_phases.iter() {
+                    self.staged_vars.insert(*vi, *b);
+                    self.var[*vi].extra_reward = self.staging_reward_value;
+                    self.var[*vi].set(Flag::PHASE, *b);
                 }
                 let len = self.var_order.idxs[0];
                 let mut limit = n; // self.num_unreachable();
@@ -210,84 +145,38 @@ impl VarSelectIF for AssignStack {
                     }
                 }
             }
-            StageMode::Best => {
-                #[cfg(not(feature = "temp_order"))]
-                {
-                    for (vi, b) in self.best_phases.iter() {
-                        {
-                            self.staged_vars.insert(*vi, *b);
-                            self.var[*vi].extra_reward = self.staging_reward_value;
-                        }
-                        self.var[*vi].set(Flag::PHASE, *b);
-                    }
-                }
-                #[cfg(feature = "temp_order")]
-                {
-                    for (vi, b) in self.staged_vars.iter() {
-                        self.temp_order.push(Lit::from_assign(vi, b));
-                    }
-                }
-            }
-            StageMode::Clear =>
-            #[cfg(feature = "temp_order")]
-            {
-                for (vi, b) in self.staged_vars.iter() {
-                    self.temp_order.push(Lit::from_assign(vi, b));
-                }
-            }
-            StageMode::Explore => {
-                let len = self.var_order.idxs[0];
-                for vi in self.var_order.heap[len / 2..len].iter() {
-                    let mut v = &mut self.var[*vi];
-                    self.staged_vars.insert(*vi, v.is(Flag::PHASE));
-                    v.extra_reward = self.staging_reward_value;
-                }
-            }
-            StageMode::LastAssigned => {
+            StagingTarget::LastAssigned => {
                 for vi in self.trail.iter().map(|l| l.vi()) {
                     let mut v = &mut self.var[vi];
                     self.staged_vars.insert(vi, v.is(Flag::PHASE));
                     v.extra_reward = self.staging_reward_value;
                 }
             }
-            #[cfg(feature = "explore_timestamp")]
-            #[cfg(feature = "temp_order")]
-            StageMode::Explore(since) => {
-                for vi in self.var_order.heap[1..].iter() {
-                    let v = &mut self.var[*vi];
-                    if v.assign_timestamp < since {
-                        self.temp_order
-                            .push(Lit::from_assign(*vi, v.timestamp % 2 == 0));
-                    }
-                }
-            }
-            #[cfg(feature = "temp_order")]
-            StageMode::Force(on) => {
-                for vi in self.var_order.heap[1..].iter().rev() {
-                    self.temp_order.push(Lit::from_assign(*vi, on));
-                }
-            }
-            #[cfg(feature = "temp_order")]
-            StageMode::Random => {
+            StagingTarget::Random => {
                 let limit = 10000;
-                let len = self.var_order.idxs[0].min(limit);
+                let _len = self.var_order.idxs[0].min(limit);
                 for vi in self.var_order.heap[1..].iter().rev() {
                     let b = self.var[*vi].timestamp % 2 == 0;
-                    self.temp_order.push(Lit::from_assign(*vi, b));
+                    self.staged_vars.insert(*vi, b);
+                    self.var[*vi].extra_reward = self.staging_reward_value;
+                }
+            }
+            #[cfg(feature = "explore_timestamp")]
+            StagingTarget::Explore => {
+                let since = self.best_phases.iter().map(|v| self.var[*v.0].assign_timestamp).min().unwrap_or(1);
+                let len = self.var_order.idxs[0];
+                for vi in self.var_order.heap[1..=len].iter() {
+                    let v = &mut self.var[*vi];
+                    if v.assign_timestamp < since {
+                        self.staged_vars.insert(*vi, v.assign_timestamp % 2 == 0);
+                        v.extra_reward = self.staging_reward_value;
+                    }
                 }
             }
             _ => (),
         }
     }
     fn select_decision_literal(&mut self) -> Lit {
-        #[cfg(feature = "temp_order")]
-        {
-            while let Some(lit) = self.temp_order.pop() {
-                if self.assign[lit.vi()].is_none() && !self.var[lit.vi()].is(Flag::ELIMINATED) {
-                    return lit;
-                }
-            }
-        }
         let vi = self.select_var();
         if self.use_rephase && self.rephasing {
             if let Some(b) = self.staged_vars.get(&vi) {
