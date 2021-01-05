@@ -233,13 +233,13 @@ fn search(
                         state.log(
                             asg.num_conflict,
                             format!(
-                                "Lcyc:{:>5}, #rem:{:>8}, core:{:>8}, cpr:{:>8.2}, off:{:>8}",
+                                "Lcyc:{:>4}, #rem:{:>8}, core:{:>8}, cpr:{:>8.2}, off:{:>7}",
                                 // "Lcycle:{:>6}, remain:{:>9}, core:{:>9}, cpr:{:>9.2}, stage:{}",
                                 rst.exports().3,
                                 v.3,
                                 v.4,
                                 asg.num_conflict as f64 / asg.exports().2 as f64,
-                                asg.stage_stat()
+                                asg.num_staging_cands()
                             ),
                         );
                         #[cfg(feature = "staging")]
@@ -249,7 +249,7 @@ fn search(
                     } else {
                         #[cfg(feature = "staging")]
                         {
-                            asg.step_down_from_stage(stabilize);
+                            asg.dissolve_stage(stabilize);
                         }
                     }
                     if decision != RestartDecision::Force {

@@ -17,7 +17,7 @@ macro_rules! var_assign {
 pub trait VarSelectIF {
     #[cfg(feature = "staging")]
     /// decay staging setting
-    fn step_down_from_stage(&mut self, phasing: bool);
+    fn dissolve_stage(&mut self, phasing: bool);
 
     #[cfg(feature = "staging")]
     /// select staged vars
@@ -25,7 +25,7 @@ pub trait VarSelectIF {
 
     #[cfg(feature = "staging")]
     /// return the number of forgotton vars.
-    fn stage_stat(&self) -> usize;
+    fn num_staging_cands(&self) -> usize;
 
     /// select a new decision variable.
     fn select_decision_literal(&mut self) -> Lit;
@@ -56,21 +56,16 @@ impl From<&Var> for VarTimestamp {
 
 impl VarSelectIF for AssignStack {
     #[cfg(feature = "staging")]
-    fn step_down_from_stage(&mut self, rephasing: bool) {
+    fn dissolve_stage(&mut self, rephasing: bool) {
         self.rephasing = rephasing;
         for (vi, b) in self.staged_vars.iter() {
             let v = &mut self.var[*vi];
             v.set(Flag::PHASE, *b);
-
-            #[cfg(feature = "extra_var_reward")]
-            #[cfg(feature = "staging")]
-            {
-                v.extra_reward *= self.staging_reward_decay;
-            }
+            v.extra_reward *= self.staging_reward_decay;
         }
     }
     #[cfg(feature = "staging")]
-    fn stage_stat(&self) -> usize {
+    fn num_staging_cands(&self) -> usize {
         let mut best_act_min: f64 = 100_000_000.0;
         for vi in self.best_phases.iter() {
             best_act_min = best_act_min.min(self.var[*vi.0].reward);
@@ -89,21 +84,18 @@ impl VarSelectIF for AssignStack {
     #[cfg(feature = "staging")]
     fn take_stage(&mut self, mut target: StagingTarget) {
         if target == StagingTarget::AutoSelect {
-            let n = self.stage_stat();
+            let n = self.num_staging_cands();
             if 0 < n {
                 target = StagingTarget::Extend((n as f64).sqrt() as usize)
             } else {
-                self.stage_mode_select += 1;
+                // self.stage_mode_select += 1;
                 match self.stage_mode_select % 3 {
-                    // 1 => mode = StageMode::Bottom3,
-                    //  => mode = StageMode::Middle3,
-                    // 1 => mode = StageMode::Top(4),
-                    // 1 => mode = StageMode::Top((self.num_unreachable() as f64).sqrt() as usize),
+                    // 1 => mode = StageMode::Extend((self.num_unreachable() as f64).sqrt() as usize),
                     // 2 => mode = StageMode::Best,
                     _ => {
                         for vi in self.best_phases.keys() {
-                            let r = self.var[*vi].reward;
-                            self.var[*vi].reward = 1.0 - (1.0 - r).sqrt();
+                            let mut v = &mut self.var[*vi];
+                            v.reward = 1.0 - (1.0 - v.reward).sqrt();
                         }
                         target = StagingTarget::Best;
                     }
@@ -124,14 +116,13 @@ impl VarSelectIF for AssignStack {
                 }
             }
             StagingTarget::Clear => (),
-            StagingTarget::Extend(n) => {
+            StagingTarget::Extend(mut limit) => {
                 for (vi, b) in self.best_phases.iter() {
                     self.staged_vars.insert(*vi, *b);
                     self.var[*vi].extra_reward = self.staging_reward_value;
                     self.var[*vi].set(Flag::PHASE, *b);
                 }
                 let len = self.var_order.idxs[0];
-                let mut limit = n; // self.num_unreachable();
                 for vi in self.var_order.heap[1..=len].iter() {
                     if self.root_level < self.level[*vi] && self.best_phases.get(&vi).is_none() {
                         assert!(!self.var[*vi].is(Flag::ELIMINATED));
@@ -233,14 +224,6 @@ impl VarSelectIF for AssignStack {
 }
 
 impl AssignStack {
-    fn select_var(&mut self) -> VarId {
-        loop {
-            let vi = self.get_heap_root();
-            if var_assign!(self, vi).is_none() && !self.var[vi].is(Flag::ELIMINATED) {
-                return vi;
-            }
-        }
-    }
     /// check usability of the saved best phase.
     /// return `true` if the current best phase got invalid.
     fn check_best_phase(&mut self, vi: VarId) -> bool {
@@ -253,19 +236,20 @@ impl AssignStack {
         if let Some(b) = self.staged_vars.get(&vi) {
             assert!(self.assign[vi].is_some());
             if self.assign[vi] != Some(*b) {
-                #[cfg(feature = "extra_var_reward")]
-                #[cfg(feature = "staging")]
-                {
-                    for vj in self.staged_vars.keys() {
-                        self.var[*vj].extra_reward = 0.0;
-                    }
-                }
-
                 self.best_phases.clear();
                 self.num_best_assign = 0;
                 return true;
             }
         }
         false
+    }
+    /// select a decision var
+    fn select_var(&mut self) -> VarId {
+        loop {
+            let vi = self.get_heap_root();
+            if var_assign!(self, vi).is_none() && !self.var[vi].is(Flag::ELIMINATED) {
+                return vi;
+            }
+        }
     }
 }
