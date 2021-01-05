@@ -247,7 +247,7 @@ impl VarSelectIF for AssignStack {
         Lit::from_assign(vi, self.var[vi].is(Flag::PHASE))
     }
     fn save_best_phases(&mut self) {
-        for l in self.trail.iter() {
+        for l in self.trail.iter().skip(self.len_upto(0)) {
             #[cfg(not(feature = "rephase_only_reason_vars"))]
             {
                 let vi = l.vi();
