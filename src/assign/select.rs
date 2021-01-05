@@ -20,8 +20,11 @@ pub trait VarSelectIF {
     fn step_down_from_stage(&mut self, phasing: bool);
 
     #[cfg(feature = "staging")]
-    /// force staging
-    fn take_stage(&mut self, phase: StageMode);
+    /// select staged vars
+    fn take_stage(&mut self, target: StagingTarget);
+
+    #[cfg(feature = "staging")]
+    /// return the number of forgotton vars.
     fn stage_stat(&self) -> usize;
 
     /// select a new decision variable.
@@ -66,47 +69,44 @@ impl VarSelectIF for AssignStack {
             }
         }
     }
+    #[cfg(feature = "staging")]
     fn stage_stat(&self) -> usize {
         let mut best_act_min: f64 = 100_000_000.0;
-        let mut best_act_max: f64 = 0.0;
         for vi in self.best_phases.iter() {
-            best_act_max = best_act_max.max(self.var[*vi.0].reward);
-            best_act_min = best_act_max.min(self.var[*vi.0].reward);
+            best_act_min = best_act_min.min(self.var[*vi.0].reward);
         }
-        // let len = self.var_order.idxs[0];
-        self.var_order
-            .heap
+        self.var
             .iter()
             .skip(1)
-            // .take(len)
-            .filter(|vi| {
-                self.best_phases.get(vi).is_none() && best_act_min <= self.var[**vi].reward
+            .filter(|v| {
+                !v.is(Flag::ELIMINATED)
+                    && self.root_level < self.level[v.index]
+                    && self.best_phases.get(&v.index).is_none()
+                    && best_act_min <= v.reward
             })
             .count()
-        // */
-        // best_act_min
     }
     #[cfg(feature = "staging")]
-    fn take_stage(&mut self, mut mode: StageMode) {
-        let n = self.stage_stat();
-        if 0 < n {
-            mode = StageMode::Top((n as f64).sqrt() as usize)
-        } else if mode == StageMode::Scheduled {
-            self.stage_mode_select += 1;
-            match self.stage_mode_select % 3 {
-                // 1 => mode = StageMode::Bottom3,
-                //  => mode = StageMode::Middle3,
-                // 1 => mode = StageMode::Top(4),
-                // 1 => mode = StageMode::Top((self.num_unreachable() as f64).sqrt() as usize),
-                // 2 => mode = StageMode::Best,
-                _ => {
-                    for vi in self.best_phases.keys() {
-                        let r = self.var[*vi].reward;
-                        self.var[*vi].reward = r.sqrt();
-                        // self.var[*vi].reward = 1.0 - (1.0 - r).sqrt();
+    fn take_stage(&mut self, mut target: StagingTarget) {
+        if target == StagingTarget::AutoSelect {
+            let n = self.stage_stat();
+            if 0 < n {
+                target = StagingTarget::Extend((n as f64).sqrt() as usize)
+            } else {
+                self.stage_mode_select += 1;
+                match self.stage_mode_select % 3 {
+                    // 1 => mode = StageMode::Bottom3,
+                    //  => mode = StageMode::Middle3,
+                    // 1 => mode = StageMode::Top(4),
+                    // 1 => mode = StageMode::Top((self.num_unreachable() as f64).sqrt() as usize),
+                    // 2 => mode = StageMode::Best,
+                    _ => {
+                        for vi in self.best_phases.keys() {
+                            let r = self.var[*vi].reward;
+                            self.var[*vi].reward = 1.0 - (1.0 - r).sqrt();
+                        }
+                        target = StagingTarget::Best;
                     }
-                    // mode = StageMode::Clear;
-                    mode = StageMode::Best;
                 }
             }
         }
@@ -132,8 +132,8 @@ impl VarSelectIF for AssignStack {
                 }
                 let len = self.var_order.idxs[0];
                 let mut limit = n; // self.num_unreachable();
-                for vi in self.var_order.heap[1..len].iter() {
-                    if self.root_level < self.level[*vi] && !self.best_phases.get(&vi).is_some() {
+                for vi in self.var_order.heap[1..=len].iter() {
+                    if self.root_level < self.level[*vi] && self.best_phases.get(&vi).is_none() {
                         assert!(!self.var[*vi].is(Flag::ELIMINATED));
                         if limit == 0 {
                             break;
@@ -163,7 +163,12 @@ impl VarSelectIF for AssignStack {
             }
             #[cfg(feature = "explore_timestamp")]
             StagingTarget::Explore => {
-                let since = self.best_phases.iter().map(|v| self.var[*v.0].assign_timestamp).min().unwrap_or(1);
+                let since = self
+                    .best_phases
+                    .iter()
+                    .map(|v| self.var[*v.0].assign_timestamp)
+                    .min()
+                    .unwrap_or(1);
                 let len = self.var_order.idxs[0];
                 for vi in self.var_order.heap[1..=len].iter() {
                     let v = &mut self.var[*vi];

@@ -10,7 +10,7 @@ use {
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
-        state::{StageMode, Stat, State, StateIF},
+        state::{StagingTarget, Stat, State, StateIF},
         types::*,
     },
 };
@@ -233,7 +233,7 @@ fn search(
                         state.log(
                             asg.num_conflict,
                             format!(
-                                "Lcyc:{:>5}, #rem:{:>8}, core:{:>8}, cpr:{:>8.2}, stg:{:>8}",
+                                "Lcyc:{:>5}, #rem:{:>8}, core:{:>8}, cpr:{:>8.2}, off:{:>8}",
                                 // "Lcycle:{:>6}, remain:{:>9}, core:{:>9}, cpr:{:>9.2}, stage:{}",
                                 rst.exports().3,
                                 v.3,
@@ -244,7 +244,7 @@ fn search(
                         );
                         #[cfg(feature = "staging")]
                         {
-                            asg.take_stage(StageMode::Scheduled);
+                            asg.take_stage(StagingTarget::AutoSelect);
                         }
                     } else {
                         #[cfg(feature = "staging")]
