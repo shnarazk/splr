@@ -2,7 +2,7 @@
 
 - reorganize with redefined terminology
    - _stabilizing_ to stop restart periodically (extention of static restart blocking)
-   - _staging_ to restrict search space
+   - _staging_ to restrict search space by adding extra var activity
    - _rephasing_ to reuse a good assignment set (so it means 'rephasing to good phases').
 - delete dependencies on 'libc' and 'structopt'
 - make Splr *monotonous*, by removing timer based decision makers. Monotonous means that if a solver solves a problem within T timeout, it solves the problem within any timeout longer than T.
