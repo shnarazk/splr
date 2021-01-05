@@ -136,10 +136,10 @@ pub struct AssignStack {
     //
     use_rephase: bool,
     best_assign: bool,
+    best_phases: HashMap<VarId, bool>,
     build_best_at: usize,
     num_best_assign: usize,
     rephasing: bool,
-    best_phases: HashMap<VarId, bool>,
 
     //
     //## Stage handling
@@ -149,7 +149,7 @@ pub struct AssignStack {
     /// Bonus reward for vars on stage
     staging_reward_value: f64,
     staged_vars: HashMap<VarId, bool>,
-    stage_index: usize,
+    stage_mode_select: usize,
 
     //
     //## Statistics
