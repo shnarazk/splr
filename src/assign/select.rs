@@ -31,6 +31,7 @@ pub trait VarSelectIF {
     #[cfg(feature = "staging")]
     /// force staging
     fn take_stage(&mut self, phase: StageMode);
+    fn stage_stat(&self) -> usize;
 
     /// select a new decision variable.
     fn select_decision_literal(&mut self) -> Lit;
@@ -106,6 +107,26 @@ impl VarSelectIF for AssignStack {
                 v.extra_reward *= self.staging_reward_decay;
             }
         }
+    }
+    fn stage_stat(&self) -> usize {
+        let mut best_act_min: f64 = 100_000_000.0;
+        let mut best_act_max: f64 = 0.0;
+        for vi in self.best_phases.iter() {
+            best_act_max = best_act_max.max(self.var[*vi.0].reward);
+            best_act_min = best_act_max.min(self.var[*vi.0].reward);
+        }
+        // let len = self.var_order.idxs[0];
+        self.var_order
+            .heap
+            .iter()
+            .skip(1)
+            // .take(len)
+            .filter(|vi| {
+                self.best_phases.get(vi).is_none() && best_act_min <= self.var[**vi].reward
+            })
+            .count()
+        // */
+        // best_act_min
     }
     #[cfg(feature = "staging")]
     fn take_stage(&mut self, mut mode: StageMode) {

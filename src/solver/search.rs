@@ -235,11 +235,13 @@ fn search(
                         state.log(
                             asg.num_conflict,
                             format!(
-                                "Lcycle:{:>6}, remain:{:>9}, core:{:>9}, cpr:{:>9.2}",
+                                "Lcyc:{:>5}, #rem:{:>8}, core:{:>8}, cpr:{:>8.2}, stg:{:>8}",
+                                // "Lcycle:{:>6}, remain:{:>9}, core:{:>9}, cpr:{:>9.2}, stage:{}",
                                 rst.exports().3,
                                 v.3,
                                 v.4,
                                 asg.num_conflict as f64 / asg.exports().2 as f64,
+                                asg.stage_stat()
                             ),
                         );
                         #[cfg(feature = "staging")]
