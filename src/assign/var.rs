@@ -163,7 +163,7 @@ impl VarManipulateIF for AssignStack {
             self.num_vars,
             self.num_asserted_vars,
             self.num_eliminated_vars,
-            self.num_vars - self.num_asserted_vars - self.num_eliminated_vars,
+            self.num_unreachables(),
             self.num_vars - self.num_best_assign,
         )
     }

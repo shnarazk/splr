@@ -340,6 +340,11 @@ impl AssignIF for AssignStack {
 }
 
 impl AssignStack {
+    /// return the number of vars in `the unreachable core'
+    #[inline]
+    pub fn num_unreachables(&self) -> usize {
+        self.num_vars - self.num_asserted_vars - self.num_eliminated_vars
+    }
     #[cfg(feature = "boundary_check")]
     pub fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
         &mut self,
