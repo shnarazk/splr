@@ -16,6 +16,9 @@ pub struct Config {
     /// Use Luby series forcibly
     a_luby: i32,
 
+    /// Clause reduction switch
+    a_reduce: i32,
+
     /// Re-phase switch
     a_rephase: i32,
 
@@ -25,8 +28,8 @@ pub struct Config {
     /// Stabilization switch
     a_stabilize: i32,
 
-    /// Clause reduction switch
-    a_reduce: i32,
+    /// Staging
+    a_stage: i32,
 
     /// Vivification switch
     a_vivify: i32,
@@ -178,6 +181,7 @@ impl Default for Config {
             a_rephase: 1,
             a_rsr: 1,
             a_stabilize: 1,
+            a_stage: 1,
             a_vivify: 1,
 
             c_cbt_thr: 100,
@@ -252,7 +256,9 @@ impl Config {
         while let Some(arg) = iter.next() {
             if let Some(stripped) = arg.strip_prefix("--") {
                 let flags = ["no-color", "quiet", "certify", "log", "help", "version"];
-                let options_i32 = ["ADP", "ELI", "LBY", "RDC", "RPH", "RSR", "STB", "VIV"];
+                let options_i32 = [
+                    "ADP", "ELI", "LBY", "RDC", "RPH", "RSR", "STB", "STG", "VIV",
+                ];
                 let options_u32 = ["cbt"];
                 let options_usize = [
                     "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
@@ -294,6 +300,7 @@ impl Config {
                                         "RPH" => self.a_rephase = val,
                                         "RSR" => self.a_rsr = val,
                                         "STB" => self.a_stabilize = val,
+                                        "STG" => self.a_stage = val,
                                         "VIV" => self.a_vivify = val,
                                         _ => panic!("invalid option: {}", name),
                                     }
@@ -460,6 +467,7 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --RPH <a-rephase>    Re-phase switch                {:>10}
       --RSR <a-rsr>        Reason-Side Rewarding switch   {:>10}
       --STB <a-stabilize>  Stabilization switch           {:>10}
+      --STG <a-stage>      Stage switch                   {:>10}
       --VIV <a-vivify>     Vivification switch            {:>10}
       --cbt <c-cbt-thr>    Dec. lvl to use chronoBT       {:>10}
       --cl <c-cls-lim>     Soft limit of #clauses (6MC/GB){:>10}
@@ -501,6 +509,7 @@ ARGS:
         config.a_rephase,
         config.a_rsr,
         config.a_stabilize,
+        config.a_stage,
         config.a_vivify,
         config.c_cbt_thr,
         config.c_cls_lim,
@@ -640,6 +649,9 @@ impl Config {
     }
     pub fn use_stabilize(&self) -> bool {
         dispatch!(self.a_stabilize)
+    }
+    pub fn use_stage(&self) -> bool {
+        dispatch!(self.a_stage)
     }
     pub fn use_adaptive(&self) -> bool {
         dispatch!(self.a_adaptive)

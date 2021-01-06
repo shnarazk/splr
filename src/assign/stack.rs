@@ -55,10 +55,12 @@ impl Default for AssignStack {
             num_best_assign: 0,
             rephasing: false,
 
+            use_stage: true,
             staging_reward_value: 1.0,
             staging_reward_decay: 0.9,
             staged_vars: HashMap::new(),
             stage_mode_select: 0,
+            last_staging_targets: 0,
 
             num_vars: 0,
             num_asserted_vars: 0,
@@ -110,8 +112,10 @@ impl Instantiate for AssignStack {
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
             use_rephase: config.use_rephase(),
+            use_stage: config.use_stage(),
             staging_reward_decay: config.stg_rwd_dcy,
             staging_reward_value: config.stg_rwd_val,
+            last_staging_targets: cnf.num_of_variables,
             num_vars: cnf.num_of_variables,
             var: Var::new_vars(nv),
             #[cfg(not(feature = "moving_var_reward_rate"))]

@@ -144,12 +144,14 @@ pub struct AssignStack {
     //
     //## Stage handling
     //
+    use_stage: bool,
     /// Decay rate for staging reward
     staging_reward_decay: f64,
     /// Bonus reward for vars on stage
     staging_reward_value: f64,
     staged_vars: HashMap<VarId, bool>,
     stage_mode_select: usize,
+    last_staging_targets: usize,
 
     //
     //## Statistics
