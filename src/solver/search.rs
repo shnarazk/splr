@@ -244,7 +244,7 @@ fn search(
                         );
                         #[cfg(feature = "staging")]
                         {
-                            asg.take_stage(StagingTarget::AutoSelect);
+                            asg.build_stage(StagingTarget::AutoSelect, stabilize);
                         }
                     } else {
                         #[cfg(feature = "staging")]

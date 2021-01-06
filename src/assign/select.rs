@@ -21,7 +21,7 @@ pub trait VarSelectIF {
 
     #[cfg(feature = "staging")]
     /// select staged vars
-    fn take_stage(&mut self, target: StagingTarget);
+    fn build_stage(&mut self, target: StagingTarget, rephasing: bool);
 
     #[cfg(feature = "staging")]
     /// return the number of forgotton vars.
@@ -80,7 +80,24 @@ impl VarSelectIF for AssignStack {
             .count()
     }
     #[cfg(feature = "staging")]
-    fn take_stage(&mut self, mut target: StagingTarget) {
+    fn build_stage(&mut self, mut target: StagingTarget, rephasing: bool) {
+        self.rephasing = rephasing;
+        if !self.use_stage {
+            return;
+        } else if target == StagingTarget::AutoSelect {
+            let _k = self.num_vars - self.num_asserted_vars - self.num_eliminated_vars;
+            let n = self.num_staging_cands();
+            self.stage_mode_select += 1;
+            if self.last_staging_targets < n {
+                target = StagingTarget::Extend(n / 2);
+            } else if self.stage_mode_select % 2 == 0 {
+                target = StagingTarget::Extend(0);
+            } else {
+                target = StagingTarget::Clear;
+            }
+            self.last_staging_targets = n;
+        }
+        /*
         if target == StagingTarget::AutoSelect {
             let n = self.num_staging_cands();
             if 0 < n {
