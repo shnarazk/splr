@@ -123,13 +123,6 @@ impl VarSelectIF for AssignStack {
         self.staged_vars.clear();
         // self.staging_reward_value = self.staging_reward_value.sqrt();
         match target {
-            StagingTarget::Best => {
-                for (vi, b) in self.best_phases.iter() {
-                    self.staged_vars.insert(*vi, *b);
-                    self.var[*vi].extra_reward = self.staging_reward_value;
-                    self.var[*vi].set(Flag::PHASE, *b);
-                }
-            }
             StagingTarget::Clear => (),
             StagingTarget::Extend(mut limit) => {
                 for (vi, b) in self.best_phases.iter() {
