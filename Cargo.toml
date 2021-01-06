@@ -28,7 +28,6 @@ moving_var_reward_rate = []
 no_IO = []
 progress_ACC = []
 progress_MLD = []
-rephase_only_reason_vars = []
 trace_analysis = []
 trace_elimination = []
 

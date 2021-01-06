@@ -181,29 +181,6 @@ impl VarSelectIF for AssignStack {
         }
         Lit::from_assign(vi, self.var[vi].is(Flag::PHASE))
     }
-    fn save_best_phases(&mut self) {
-        for l in self.trail.iter().skip(self.len_upto(0)) {
-            #[cfg(not(feature = "rephase_only_reason_vars"))]
-            {
-                let vi = l.vi();
-                if let Some(b) = self.assign[vi] {
-                    self.best_phases.insert(vi, b);
-                }
-            }
-            #[cfg(feature = "rephase_only_reason_vars")]
-            {
-                if let AssignReason::Implication(_, lit) = self.reason[l.vi()] {
-                    let vi = lit.vi();
-                    if self.root_level < self.level[vi] {
-                        if let Some(b) = self.assign[vi] {
-                            self.rephasing_vars.insert(vi, b);
-                        }
-                    }
-                }
-            }
-        }
-        self.build_best_at = self.num_propagation;
-    }
     fn update_order(&mut self, v: VarId) {
         self.update_heap(v);
     }
