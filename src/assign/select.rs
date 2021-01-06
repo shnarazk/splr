@@ -29,8 +29,6 @@ pub trait VarSelectIF {
 
     /// select a new decision variable.
     fn select_decision_literal(&mut self) -> Lit;
-    /// stage the vars is current assignments
-    fn save_best_phases(&mut self);
     /// update the internal heap on var order.
     fn update_order(&mut self, v: VarId);
     /// rebuild the internal var_order

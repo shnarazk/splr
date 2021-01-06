@@ -315,4 +315,14 @@ impl AssignStack {
     fn level_up(&mut self) {
         self.trail_lim.push(self.trail.len());
     }
+    /// save the current assignments as the best phases
+    fn save_best_phases(&mut self) {
+        for l in self.trail.iter().skip(self.len_upto(0)) {
+            let vi = l.vi();
+            if let Some(b) = self.assign[vi] {
+                self.best_phases.insert(vi, b);
+            }
+        }
+        self.build_best_at = self.num_propagation;
+    }
 }
