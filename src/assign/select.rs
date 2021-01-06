@@ -173,7 +173,7 @@ impl VarSelectIF for AssignStack {
     fn select_decision_literal(&mut self) -> Lit {
         let vi = self.select_var();
         if self.use_rephase && self.rephasing {
-            if let Some(b) = self.staged_vars.get(&vi) {
+            if let Some(b) = self.best_phases.get(&vi) {
                 return Lit::from_assign(vi, *b);
             }
         }
@@ -208,8 +208,8 @@ impl AssignStack {
         if self.level[vi] == self.root_level {
             return false;
         }
-        if let Some(b) = self.staged_vars.get(&vi) {
-            assert!(self.assign[vi].is_some());
+        if let Some(b) = self.best_phases.get(&vi) {
+            debug_assert!(self.assign[vi].is_some());
             if self.assign[vi] != Some(*b) {
                 self.best_phases.clear();
                 self.num_best_assign = 0;
