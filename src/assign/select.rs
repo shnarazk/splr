@@ -1,6 +1,6 @@
 /// Decision var selection
 use {
-    super::{AssignIF, AssignStack, Var, VarHeapIF, VarOrderIF, VarRewardIF},
+    super::{AssignStack, Var, VarHeapIF, VarOrderIF, VarRewardIF},
     crate::{state::StagingTarget, types::*},
 };
 
@@ -99,26 +99,6 @@ impl VarSelectIF for AssignStack {
             }
             self.last_staging_targets = n;
         }
-        /*
-        if target == StagingTarget::AutoSelect {
-            let n = self.num_staging_cands();
-            if 0 < n {
-                target = StagingTarget::Extend((n as f64).sqrt() as usize)
-            } else {
-                // self.stage_mode_select += 1;
-                match self.stage_mode_select % 3 {
-                    // 1 => mode = StageMode::Extend((self.num_unreachable() as f64).sqrt() as usize),
-                    // 2 => mode = StageMode::Best,
-                    _ => {
-                        for vi in self.best_phases.keys() {
-                            let mut v = &mut self.var[*vi];
-                            v.reward = 1.0 - (1.0 - v.reward).sqrt();
-                        }
-                        target = StagingTarget::Best;
-                    }
-                }
-            }
-        }
         for vi in self.staged_vars.keys() {
             self.var[*vi].extra_reward = 0.0;
         }
@@ -129,20 +109,27 @@ impl VarSelectIF for AssignStack {
             StagingTarget::Extend(mut limit) => {
                 for (vi, b) in self.best_phases.iter() {
                     self.staged_vars.insert(*vi, *b);
-                    self.var[*vi].extra_reward = self.staging_reward_value;
-                    self.var[*vi].set(Flag::PHASE, *b);
+                    let v = &mut self.var[*vi];
+                    v.extra_reward = self.staging_reward_value;
+                    // v.reward = 0.0; // 1.0 - (1.0 - v.reward).sqrt();
+                    v.set(Flag::PHASE, *b);
                 }
-                let len = self.var_order.idxs[0];
-                for vi in self.var_order.heap[1..=len].iter() {
-                    if self.root_level < self.level[*vi] && self.best_phases.get(&vi).is_none() {
-                        assert!(!self.var[*vi].is(Flag::ELIMINATED));
-                        if limit == 0 {
-                            break;
+                if 0 < limit {
+                    let len = self.var_order.idxs[0];
+                    for vi in self.var_order.heap[1..=len].iter() {
+                        if self.root_level < self.level[*vi] && self.best_phases.get(&vi).is_none()
+                        {
+                            assert!(!self.var[*vi].is(Flag::ELIMINATED));
+                            if limit == 0 {
+                                break;
+                            }
+                            limit -= 1;
+                            let v = &mut self.var[*vi];
+                            self.staged_vars.insert(*vi, v.is(Flag::PHASE));
+                            v.extra_reward = self.staging_reward_value;
+                            // v.reward = 1.0 - (1.0 - v.reward).sqrt();
+                            v.set(Flag::PHASE, v.is(Flag::PHASE));
                         }
-                        limit -= 1;
-                        let v = &mut self.var[*vi];
-                        self.staged_vars.insert(*vi, v.is(Flag::PHASE));
-                        v.extra_reward = self.staging_reward_value;
                     }
                 }
             }
