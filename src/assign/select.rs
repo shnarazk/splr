@@ -90,8 +90,10 @@ impl VarSelectIF for AssignStack {
             self.stage_mode_select += 1;
             if self.last_staging_targets < n {
                 target = StagingTarget::Extend(n / 2);
-            } else if self.stage_mode_select % 2 == 0 {
+                self.num_stages += 1;
+            } else if n == 0 || self.stage_mode_select % 2 == 0 {
                 target = StagingTarget::Extend(0);
+                self.num_stages += 1;
             } else {
                 target = StagingTarget::Clear;
             }
