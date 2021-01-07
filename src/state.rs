@@ -57,6 +57,8 @@ pub enum StagingTarget {
     AutoSelect,
     /// unstage all vars.
     Clear,
+    /// choose vars in core
+    Core,
     /// use best phases with some unsettled vars
     Extend(usize),
     ///
@@ -77,6 +79,7 @@ impl fmt::Display for StagingTarget {
             match self {
                 StagingTarget::AutoSelect => "StageMode",
                 StagingTarget::Clear => "StageMode_Clear",
+                StagingTarget::Core => "StageMode_Core",
                 StagingTarget::Extend(_) => "StageMode_top",
                 StagingTarget::LastAssigned => "StageMode_LA",
                 StagingTarget::Random => "Stage_Random",

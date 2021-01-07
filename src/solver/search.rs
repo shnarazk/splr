@@ -243,7 +243,7 @@ fn search(
                         );
                         #[cfg(feature = "staging")]
                         {
-                            asg.build_stage(StagingTarget::Clear, stabilize);
+                            asg.build_stage(StagingTarget::AutoSelect, stabilize);
                         }
                     } else {
                         #[cfg(feature = "staging")]

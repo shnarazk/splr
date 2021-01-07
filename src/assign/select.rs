@@ -86,10 +86,13 @@ impl VarSelectIF for AssignStack {
             return;
         } else if target == StagingTarget::AutoSelect {
             self.stage_mode_select += 1;
-            match self.stage_mode_select % 5 {
-                1 => target = StagingTarget::Random,
-                2 => target = StagingTarget::Extend(0),
-                _ => (),
+            let n = self.num_unreachables().next_power_of_two().count_zeros() as usize;
+            match self.stage_mode_select % n {
+                1 => target = StagingTarget::Core,
+                2 => target = StagingTarget::Random,
+                3 => target = StagingTarget::LastAssigned,
+                _ => target = StagingTarget::Extend(0),
+                // _ => (),
             }
         }
         for vi in self.staged_vars.keys() {
@@ -99,6 +102,17 @@ impl VarSelectIF for AssignStack {
         // self.staging_reward_value = self.staging_reward_value.sqrt();
         match target {
             StagingTarget::Clear => (),
+            StagingTarget::Core => {
+                let nc = self.num_unreachables();
+                let len = self.var_order.idxs[0];
+                if nc < len {
+                    for vi in self.var_order.heap[len - nc..=len].iter() {
+                        let v = &mut self.var[*vi];
+                        self.staged_vars.insert(*vi, v.is(Flag::PHASE));
+                        v.extra_reward = self.staging_reward_value;
+                    }
+                }
+            }
             StagingTarget::Extend(mut limit) => {
                 for (vi, b) in self.best_phases.iter() {
                     self.staged_vars.insert(*vi, *b);
@@ -134,7 +148,7 @@ impl VarSelectIF for AssignStack {
                 }
             }
             StagingTarget::Random => {
-                let limit = 10000;
+                let limit = self.num_staging_cands();
                 let _len = self.var_order.idxs[0].min(limit);
                 for vi in self.var_order.heap[1..].iter().rev() {
                     let b = self.var[*vi].timestamp % 2 == 0;
