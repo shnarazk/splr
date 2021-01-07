@@ -151,7 +151,6 @@ pub struct AssignStack {
     staging_reward_value: f64,
     staged_vars: HashMap<VarId, bool>,
     stage_mode_select: usize,
-    last_staging_targets: usize,
     num_stages: usize,
 
     //

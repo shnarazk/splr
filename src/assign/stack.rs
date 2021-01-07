@@ -60,7 +60,6 @@ impl Default for AssignStack {
             staging_reward_decay: 0.9,
             staged_vars: HashMap::new(),
             stage_mode_select: 0,
-            last_staging_targets: 0,
             num_stages: 0,
 
             num_vars: 0,
@@ -116,7 +115,6 @@ impl Instantiate for AssignStack {
             use_stage: config.use_stage(),
             staging_reward_decay: config.stg_rwd_dcy,
             staging_reward_value: config.stg_rwd_val,
-            last_staging_targets: cnf.num_of_variables,
             num_vars: cnf.num_of_variables,
             var: Var::new_vars(nv),
             #[cfg(not(feature = "moving_var_reward_rate"))]
