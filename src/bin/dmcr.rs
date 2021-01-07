@@ -119,6 +119,7 @@ ARGS:
     <problem>    a CNF file
 ";
 
+#[allow(clippy::field_reassign_with_default)]
 fn main() {
     let mut from_file = true;
     let mut found = false;
