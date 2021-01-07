@@ -55,12 +55,12 @@ pub trait StateIF {
 pub enum StagingTarget {
     /// select some targets cyclicly.
     AutoSelect,
+    /// use best phases with some unsettled vars
+    Best(usize),
     /// unstage all vars.
     Clear,
     /// choose vars in core
     Core,
-    /// use best phases with some unsettled vars
-    Extend(usize),
     ///
     LastAssigned,
     /// select random vars.
@@ -78,9 +78,9 @@ impl fmt::Display for StagingTarget {
             "{}",
             match self {
                 StagingTarget::AutoSelect => "StageMode",
+                StagingTarget::Best(_) => "StageMode_top",
                 StagingTarget::Clear => "StageMode_Clear",
                 StagingTarget::Core => "StageMode_Core",
-                StagingTarget::Extend(_) => "StageMode_top",
                 StagingTarget::LastAssigned => "StageMode_LA",
                 StagingTarget::Random => "Stage_Random",
 

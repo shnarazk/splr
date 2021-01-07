@@ -91,7 +91,7 @@ impl VarSelectIF for AssignStack {
                 1 => target = StagingTarget::Core,
                 2 => target = StagingTarget::Random,
                 3 => target = StagingTarget::LastAssigned,
-                _ => target = StagingTarget::Extend(0),
+                _ => target = StagingTarget::Best(0),
                 // _ => (),
             }
         }
@@ -101,19 +101,7 @@ impl VarSelectIF for AssignStack {
         self.staged_vars.clear();
         // self.staging_reward_value = self.staging_reward_value.sqrt();
         match target {
-            StagingTarget::Clear => (),
-            StagingTarget::Core => {
-                let nc = self.num_unreachables();
-                let len = self.var_order.idxs[0];
-                if nc < len {
-                    for vi in self.var_order.heap[len - nc..=len].iter() {
-                        let v = &mut self.var[*vi];
-                        self.staged_vars.insert(*vi, v.is(Flag::PHASE));
-                        v.extra_reward = self.staging_reward_value;
-                    }
-                }
-            }
-            StagingTarget::Extend(mut limit) => {
+            StagingTarget::Best(mut limit) => {
                 for (vi, b) in self.best_phases.iter() {
                     self.staged_vars.insert(*vi, *b);
                     let v = &mut self.var[*vi];
@@ -137,6 +125,18 @@ impl VarSelectIF for AssignStack {
                             // v.reward = 1.0 - (1.0 - v.reward).sqrt();
                             v.set(Flag::PHASE, v.is(Flag::PHASE));
                         }
+                    }
+                }
+            }
+            StagingTarget::Clear => (),
+            StagingTarget::Core => {
+                let nc = self.num_unreachables();
+                let len = self.var_order.idxs[0];
+                if nc < len {
+                    for vi in self.var_order.heap[len - nc..=len].iter() {
+                        let v = &mut self.var[*vi];
+                        self.staged_vars.insert(*vi, v.is(Flag::PHASE));
+                        v.extra_reward = self.staging_reward_value;
                     }
                 }
             }
