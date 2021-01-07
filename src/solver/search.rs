@@ -230,21 +230,23 @@ fn search(
                 if let Some((stabilize, new_cycle)) = rst.stabilize(asg.num_conflict) {
                     if new_cycle {
                         let v = asg.var_stats();
+                        let r = rst.exports();
+                        let s = asg.num_staging_cands();
                         state.log(
                             asg.num_conflict,
                             format!(
                                 "Lcyc:{:>4}, #rem:{:>8}, core:{:>8}, cpr:{:>8.2}, off:{:>7}",
                                 // "Lcycle:{:>6}, remain:{:>9}, core:{:>9}, cpr:{:>9.2}, stage:{}",
-                                rst.exports().3,
+                                r.3,
                                 v.3,
                                 v.4,
                                 asg.num_conflict as f64 / asg.exports().2 as f64,
-                                asg.num_staging_cands()
+                                s
                             ),
                         );
                         #[cfg(feature = "staging")]
                         {
-                            asg.build_stage(StagingTarget::AutoSelect, stabilize);
+                            asg.build_stage(StagingTarget::Clear, stabilize);
                         }
                     } else {
                         #[cfg(feature = "staging")]

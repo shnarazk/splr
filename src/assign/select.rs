@@ -85,7 +85,6 @@ impl VarSelectIF for AssignStack {
         if !self.use_stage {
             return;
         } else if target == StagingTarget::AutoSelect {
-            let _k = self.num_vars - self.num_asserted_vars - self.num_eliminated_vars;
             let n = self.num_staging_cands();
             self.stage_mode_select += 1;
             if self.last_staging_targets < n {

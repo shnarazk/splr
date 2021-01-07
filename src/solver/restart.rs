@@ -527,24 +527,23 @@ impl fmt::Display for GeometricStabilizer {
 
 impl GeometricStabilizer {
     fn update(&mut self, now: usize) -> Option<(bool, bool)> {
+        const RELAXATION: usize = 32;
         if self.enable && self.next_trigger <= now {
             self.num_shift += 1;
             self.active = !self.active;
             let mut new_cycle: bool = false;
-            if self.reset_requested {
-                // reset doesn't start a new cycle; it's a kind of redo.
-                self.luby.reset();
-                self.reset_requested = false;
-            } else if self.longest_span < self.step {
+            if self.longest_span < self.step {
                 new_cycle = true;
                 self.num_cycle += 1;
                 self.longest_span = self.step;
-                if self.reset_requested {
+                if self.reset_requested && RELAXATION <= self.longest_span {
+                    // reset the sequence
+                    self.luby.reset();
+                    self.longest_span = 1;
                     self.reset_requested = false;
                 }
             }
             self.step = self.luby.next().unwrap();
-            // assert!(!new_cycle || self.step == 1);
             self.next_trigger = now + self.step * self.scale;
             Some((self.active, new_cycle))
         } else {
