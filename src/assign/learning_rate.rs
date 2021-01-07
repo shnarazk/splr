@@ -10,7 +10,7 @@ impl VarRewardIF for AssignStack {
     #[cfg(feature = "extra_var_reward")]
     fn activity(&self, vi: VarId) -> f64 {
         let v = &self.var[vi];
-        v.reward + v.extra_reward
+        v.reward.max(v.extra_reward)
     }
     #[cfg(not(feature = "extra_var_reward"))]
     fn activity(&self, vi: VarId) -> f64 {
