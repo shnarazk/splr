@@ -43,9 +43,7 @@ pub trait StateIF {
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
-        R: RestartIF
-            + Export<(usize, usize, usize, usize), (RestartMode, usize)>
-            + ExportBox<'r, RestarterEMAs<'r>>;
+        R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
     /// write a one-line message as log.
@@ -466,9 +464,7 @@ impl StateIF for State {
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
-        R: RestartIF
-            + Export<(usize, usize, usize, usize), (RestartMode, usize)>
-            + ExportBox<'r, RestarterEMAs<'r>>,
+        R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
             return;
@@ -494,7 +490,7 @@ impl StateIF for State {
 
         let rst_mode = rst.mode().0;
 
-        let (rst_num_blk, rst_num_rst, rst_num_span, rst_num_cycle) = rst.exports();
+        let (rst_num_blk, rst_num_rst, rst_num_span, rst_num_cycle, _) = rst.exports();
         // let rst_num_stb = rst.mode().1;
 
         #[cfg(not(feature = "progress_ACC"))]
@@ -724,7 +720,7 @@ impl State {
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
-        R: Export<(usize, usize, usize, usize), (RestartMode, usize)>,
+        R: RestartIF,
     {
         self.progress_cnt += 1;
         let (
@@ -768,9 +764,7 @@ impl State {
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
-        R: RestartIF
-            + Export<(usize, usize, usize, usize), (RestartMode, usize)>
-            + ExportBox<'r, RestarterEMAs<'r>>,
+        R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>,
     {
         self.progress_cnt += 1;
         let msg = match mes {

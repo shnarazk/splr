@@ -49,8 +49,11 @@ pub enum RestartMode {
     Bucket,
 }
 
+type RestarterExports = (usize, usize, usize, usize, usize);
+
 /// API for [`restart`](`crate::solver::RestartIF::restart`) and [`stabilize`](`crate::solver::RestartIF::stabilize`).
-pub trait RestartIF {
+pub trait RestartIF: Export<RestarterExports, (RestartMode, usize)> {
+    type Exports;
     /// check blocking and forcing restart condition.
     fn restart(&mut self) -> Option<RestartDecision>;
     /// check stabilization mode.
@@ -787,6 +790,7 @@ pub enum RestartDecision {
 }
 
 impl RestartIF for Restarter {
+    type Exports = RestarterExports;
     #[inline]
     #[allow(clippy::collapsible_if)]
     fn restart(&mut self) -> Option<RestartDecision> {
@@ -855,14 +859,13 @@ impl RestartIF for Restarter {
     }
 }
 
-impl Restarter {}
-
-impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
+impl Export<RestarterExports, (RestartMode, usize)> for Restarter {
     /// exports:
     ///  1. the number of blocking in non-stabilization
     ///  1. the number of forcing restart non-stabilization
     ///  1. the index of span of stabilization phase
     ///  1. the number of stabilization cycle shifts
+    ///  1. the maximum length of stabilization span so far
     ///
     ///```
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
@@ -871,12 +874,13 @@ impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
     /// let (rst_mode, num_stb) = rst.mode();
     ///```
     #[inline]
-    fn exports(&self) -> (usize, usize, usize, usize) {
+    fn exports(&self) -> RestarterExports {
         (
             self.num_block,
             self.num_restart,
             self.stb.span(),
             self.stb.num_cycle,
+            self.stb.longest_span,
         )
     }
     fn mode(&self) -> (RestartMode, usize) {
