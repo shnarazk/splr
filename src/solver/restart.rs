@@ -480,7 +480,7 @@ struct GeometricStabilizer {
 
 impl Default for GeometricStabilizer {
     fn default() -> Self {
-        const STEP: usize = 64;
+        const STEP: usize = 256;
         GeometricStabilizer {
             enable: true,
             active: false,
