@@ -104,7 +104,7 @@ pub trait VarManipulateIF {
     /// * the number of asserted vars
     /// * the number of eliminated vars
     /// * the number of un-asserted vars
-    /// * the number of unreachable unassigned vars
+    /// * the number of unreachable unassigned vars or core
     fn var_stats(&self) -> (usize, usize, usize, usize, usize);
 }
 
@@ -163,8 +163,8 @@ impl VarManipulateIF for AssignStack {
             self.num_vars,
             self.num_asserted_vars,
             self.num_eliminated_vars,
+            self.num_unasserted(),
             self.num_unreachables(),
-            self.num_vars - self.num_best_assign,
         )
     }
 }
