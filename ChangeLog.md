@@ -1,4 +1,4 @@
-## 0.6.0, 2021-01-03
+## 0.6.0, 2021-01-09
 
 - reorganize with redefined terminology
    - _stabilizing_ to stop restart periodically (extention of static restart blocking)
@@ -13,7 +13,7 @@
 - add an extra reward to vars involved in best phase
 - make the learning rate of var rewarding an constant
 - change the definition of restart blocker and its default threshold
-- add or modify command line options: --vbd, --vbr
+- add or modify command line options: --srd, --srv, --vbd, --vbr
 - change the definitions or the default values: --rat, --rlt
 - delete command line options: --rct, --rms, --rmt, --vri, --vrm, --vro
 

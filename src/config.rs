@@ -490,6 +490,8 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       \x1B[000m\x1B[031m--rmt <rst-mld-thr>  Threshold for Max LBD of Dep.     {:>10.2}\x1B[000m
       --rss <rst-stb-scl>  Stabilizer scaling                {:>10.2}
       --rs  <rst-step>     #conflicts between restarts    {:>10}
+      --srd <stg-rwd-dcy>  Decay rate for staged vare reward {:>10.2}
+      --srv <stg-rwd-val>  Extra reward for staged vars      {:>10.2}
       --vib <viv-beg>      Lower bound of vivify loop        {:>10.2}
       --vie <viv-end>      Upper bound of vivify loop        {:>10.2}
       --vii <viv-int>      Vivification interval          {:>10}
@@ -497,8 +499,6 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       \x1B[000m\x1B[031m--vri <vrw-dcy-beg>  Initial var reward decay          {:>10.2}\x1B[000m
       \x1B[000m\x1B[031m--vrm <vrw-dcy-end>  Maximum var reward decay          {:>10.2}\x1B[000m
       \x1B[000m\x1B[031m--vro <vrw-occ-cmp>  Occ. compression rate in LR       {:>10.2}\x1B[000m
-      --srd <stg-rwd-dcy>  Decay rate for staged vare reward {:>10.2}
-      --srv <stg-rwd-val>  Extra reward for staged vars      {:>10.2}
 ARGS:
   <cnf-file>    DIMACS CNF file
 ",
@@ -559,6 +559,8 @@ ARGS:
         },
         config.rst_stb_scl,
         config.rst_step,
+        config.stg_rwd_dcy,
+        config.stg_rwd_val,
         config.viv_beg,
         config.viv_end,
         config.viv_int,
@@ -593,8 +595,6 @@ ARGS:
                 config.vrw_occ_cmp
             }
         },
-        config.stg_rwd_dcy,
-        config.stg_rwd_val,
     )
 }
 
