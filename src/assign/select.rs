@@ -88,9 +88,9 @@ impl VarSelectIF for AssignStack {
             self.stage_mode_select += 1;
             let n = self.num_unreachables().next_power_of_two().count_zeros() as usize;
             match self.stage_mode_select % n {
-                1 => target = StagingTarget::Core,
-                2 => target = StagingTarget::Random,
-                3 => target = StagingTarget::LastAssigned,
+                1 => target = StagingTarget::Random,
+                2 => target = StagingTarget::LastAssigned,
+                3 => target = StagingTarget::Core,
                 _ => target = StagingTarget::Best(0),
                 // _ => (),
             }

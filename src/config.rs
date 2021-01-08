@@ -213,7 +213,7 @@ impl Default for Config {
 
             rst_lbd_len: 32,
             rst_lbd_slw: 8192,
-            rst_lbd_thr: 1.25,
+            rst_lbd_thr: 1.20,
 
             #[cfg(feature = "progress_MLD")]
             rst_mld_scl: 0.10,
