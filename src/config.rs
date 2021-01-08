@@ -473,9 +473,9 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --cl <c-cls-lim>     Soft limit of #clauses (6MC/GB){:>10}
       --ii <c-ip-int>      #cls to start in-processor     {:>10}
   -t, --timeout <c-tout>   CPU time limit in sec.         {:>10}
-      --ecl <elim-cls-lim> Max #lit for clause subsume    {:>10}
-      --evl <elim-grw-lim> Grow limit of #cls in var elim.{:>10}
-      --evo <elim-var-occ> Max #cls for var elimination   {:>10}
+      --ecl <elm-cls-lim>  Max #lit for clause subsume    {:>10}
+      --evl <elm-grw-lim>  Grow limit of #cls in var elim.{:>10}
+      --evo <elm-var-occ>  Max #cls for var elimination   {:>10}
   -o, --dir <io-odir>      Output directory                {:>10}
   -p, --proof <io-pfile>   DRAT Cert. filename                {:>10}
   -r, --result <io-rfile>  Result filename/stdout             {:>10}
