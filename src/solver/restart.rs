@@ -480,7 +480,7 @@ struct GeometricStabilizer {
 
 impl Default for GeometricStabilizer {
     fn default() -> Self {
-        const STEP: usize = 256;
+        const STEP: usize = 64;
         GeometricStabilizer {
             enable: true,
             active: false,
@@ -530,7 +530,6 @@ impl GeometricStabilizer {
         const RELAXATION: usize = 32;
         if self.enable && self.next_trigger <= now {
             self.num_shift += 1;
-            self.active = !self.active;
             let mut new_cycle: bool = false;
             if self.longest_span < self.step {
                 new_cycle = true;
@@ -544,7 +543,13 @@ impl GeometricStabilizer {
                 }
             }
             self.step = self.luby.next().unwrap();
-            self.next_trigger = now + self.step * self.scale;
+            self.active = self.step != 1;
+            self.next_trigger = now
+                + if self.active {
+                    self.step * self.scale.pow(2)
+                } else {
+                    self.step * self.scale
+                };
             Some((self.active, new_cycle))
         } else {
             None
@@ -558,7 +563,7 @@ impl GeometricStabilizer {
     }
 
     #[cfg(feature = "luby_blocking")]
-    fn new(enable: bool, step: usize) -> Self {
+    fn new(enable: bool, scale: usize) -> Self {
         GeometricStabilizer {
             enable,
             active: false,
@@ -566,10 +571,10 @@ impl GeometricStabilizer {
             luby: LubySeries::default(),
             num_cycle: 0,
             num_shift: 0,
-            next_trigger: step,
+            next_trigger: scale,
             reset_requested: false,
-            step,
-            scale: step,
+            step: 1,
+            scale,
         }
     }
 }
@@ -714,7 +719,7 @@ impl Default for Restarter {
             luby: ProgressLuby::default(),
 
             #[cfg(feature = "luby_blocking")]
-            luby_blocking: GeometricStabilizer::new(true, 0),
+            luby_blocking: GeometricStabilizer::new(true, 1000),
 
             stb: GeometricStabilizer::default(),
             after_restart: 0,
@@ -817,7 +822,9 @@ impl RestartIF for Restarter {
             #[cfg(feature = "luby_blocking")]
             {
                 self.luby_blocking.update(0);
-                self.restart_step = self.initial_restart_step * self.luby_blocking.span();
+                self.restart_step = self.initial_restart_step
+                    * self.luby_blocking.span()
+                    * self.luby_blocking.scale;
             }
             return Some(RestartDecision::Block);
         }
@@ -964,7 +971,9 @@ mod tests {
             ..ProgressLuby::default()
         };
         luby.update(0);
-        for v in vec![1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8] {
+        for v in vec![
+            1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8, 1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1,
+        ] {
             assert_eq!(luby.next_restart, v);
             luby.shift();
         }
