@@ -20,15 +20,6 @@ impl VarRewardIF for AssignStack {
         #[cfg(feature = "moving_var_reward_rate")]
         {
             self.reward_step = (self.activity_decay_max - self.activity_decay).abs() / 10_000.0;
-        }
-        // // start with a small reward to explore many vars (big-bang initialization)
-        // let mut v = 0.2;
-        // for vi in iterator {
-        //     self.var[*vi].reward = v;
-        //     v *= 0.99;
-        // }
-        #[cfg(feature = "moving_var_reward_rate")]
-        {
             self.activity_decay = self.activity_decay_max;
         }
     }
