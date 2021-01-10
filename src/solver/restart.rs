@@ -480,7 +480,7 @@ struct GeometricStabilizer {
 
 impl Default for GeometricStabilizer {
     fn default() -> Self {
-        const STEP: usize = 8196;
+        const STEP: usize = 4096;
         GeometricStabilizer {
             enable: true,
             active: false,
@@ -543,8 +543,8 @@ impl GeometricStabilizer {
                 }
             }
             self.step = self.luby.next().unwrap();
-            self.active = /* !self.active; // */ self.step != 1;
-            self.next_trigger = now + self.step * if self.active { self.scale } else { self.scale };
+            self.active = self.step != 1;
+            self.next_trigger = now + self.step * self.scale;
             Some((self.active, new_cycle))
         } else {
             None
@@ -944,7 +944,7 @@ impl LubySeries {
             seq -= 1;
             index %= size;
         }
-        Some(2.0f64.powi(seq as i32) as usize)
+        Some(2usize.pow(seq as u32))
     }
     fn reset(&mut self) {
         self.index = 0;
