@@ -231,14 +231,16 @@ fn search(
                     if new_cycle {
                         let v = asg.var_stats();
                         let r = rst.exports();
+                        let s = asg.num_staging_cands();
                         state.log(
                             asg.num_conflict,
                             format!(
-                                "Lcycle:{:>6}, remain:{:>9}, core:{:>9}, cpr:{:>9.2}",
+                                "Lcycle:{:>6}, remain:{:>9}, core:{:>9}, cpr:{:>9.2}, {}",
                                 r.3,
                                 v.3,
                                 v.4,
                                 asg.num_conflict as f64 / asg.exports().2 as f64,
+                                s
                             ),
                         );
                         #[cfg(feature = "staging")]

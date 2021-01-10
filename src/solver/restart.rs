@@ -480,7 +480,7 @@ struct GeometricStabilizer {
 
 impl Default for GeometricStabilizer {
     fn default() -> Self {
-        const STEP: usize = 64;
+        const STEP: usize = 8196;
         GeometricStabilizer {
             enable: true,
             active: false,
@@ -527,7 +527,7 @@ impl fmt::Display for GeometricStabilizer {
 
 impl GeometricStabilizer {
     fn update(&mut self, now: usize) -> Option<(bool, bool)> {
-        const RELAXATION: usize = 32;
+        const RELAXATION: usize = 1;
         if self.enable && self.next_trigger <= now {
             self.num_shift += 1;
             let mut new_cycle: bool = false;
@@ -543,13 +543,8 @@ impl GeometricStabilizer {
                 }
             }
             self.step = self.luby.next().unwrap();
-            self.active = self.step != 1;
-            self.next_trigger = now
-                + if self.active {
-                    self.step * self.scale.pow(2)
-                } else {
-                    self.step * self.scale
-                };
+            self.active = /* !self.active; // */ self.step != 1;
+            self.next_trigger = now + self.step * if self.active { self.scale } else { self.scale };
             Some((self.active, new_cycle))
         } else {
             None
@@ -890,13 +885,14 @@ impl Export<RestarterExports, (RestartMode, usize)> for Restarter {
         )
     }
     fn mode(&self) -> (RestartMode, usize) {
-        if self.stb.active {
-            (RestartMode::Stabilize, self.stb.span())
-        } else if self.luby.enable {
-            (RestartMode::Luby, self.stb.span())
-        } else {
-            (RestartMode::Dynamic, self.stb.span())
-        }
+        (
+            match self.stb.active {
+                true => RestartMode::Stabilize,
+                false if self.luby.enable => RestartMode::Luby,
+                false => RestartMode::Dynamic,
+            },
+            self.stb.span(),
+        )
     }
 }
 
