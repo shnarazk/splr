@@ -235,12 +235,11 @@ fn search(
                         state.log(
                             asg.num_conflict,
                             format!(
-                                "Lcycle:{:>6}, remain:{:>9}, core:{:>9}, cpr:{:>9.2}, {}",
+                                "Lcycle:{:>6}, core:{:>9}, heat: {:>9}, /cpr:{:>9.2}",
                                 r.3,
-                                v.3,
                                 v.4,
+                                s,
                                 asg.num_conflict as f64 / asg.exports().2 as f64,
-                                s
                             ),
                         );
                         #[cfg(feature = "staging")]
