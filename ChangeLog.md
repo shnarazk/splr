@@ -1,7 +1,7 @@
-## 0.6.0, 2021-01-09
+## 0.6.0, 2021-01-11
 
 - reorganize with redefined terminology
-   - _stabilizing_ to stop restart periodically (extention of static restart blocking)
+   - _stabilizing_ to stop restart periodically (extension of static restart blocking)
    - _staging_ to restrict search space by adding extra var activity
    - _rephasing_ to reuse a good assignment set (so it means 'rephasing to good phases').
 - delete dependencies on 'libc' and 'structopt'
