@@ -517,7 +517,7 @@ impl StateIF for State {
         }
         println!("\x1B[2K{}", self);
         println!(
-            "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
+            "\x1B[2K #conflict:{}, #decision:{}, #propagate:{}",
             i!("{:>11}", self, LogUsizeId::NumConflict, asg_num_conflict),
             i!(
                 "{:>13}",
@@ -533,7 +533,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K  Assignment|#rem:{}, #ass:{}, #elm:{}, prg%:{} ",
+            "\x1B[2K  Assignment|#rem:{}, #ass:{}, #elm:{}, prg%:{}",
             im!(
                 "{:>9}",
                 self,
@@ -555,7 +555,7 @@ impl StateIF for State {
             fm!("{:>9.4}", self, LogF64Id::Progress, rate * 100.0),
         );
         println!(
-            "\x1B[2K      Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
+            "\x1B[2K      Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{}",
             im!("{:>9}", self, LogUsizeId::RemovableClause, cdb_num_learnt),
             im!("{:>9}", self, LogUsizeId::LBD2Clause, cdb_num_lbd2),
             im!(
@@ -572,7 +572,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K {}|#BLK:{}, #RST:{}, Lspn:{}, Lcyc:{} ",
+            "\x1B[2K {}|#BLK:{}, #RST:{}, Lspn:{}, Lcyc:{}",
             match rst_mode {
                 RestartMode::Dynamic => "    Restart",
                 RestartMode::Luby if self.config.no_color => "LubyRestart",
@@ -586,7 +586,7 @@ impl StateIF for State {
             im!("{:>9}", self, LogUsizeId::LubyCycle, rst_num_cycle),
         );
         println!(
-            "\x1B[2K         EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{} ",
+            "\x1B[2K         EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{}",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
             im!("{:>9}", self, LogUsizeId::UnreachableCore, asg_unreachables),
@@ -598,7 +598,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{} ",
+            "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{}",
             fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get()),
             fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
@@ -610,7 +610,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|elim:{}, cviv:{}, #vbv:{}, /cpr:{} ",
+            "\x1B[2K        misc|elim:{}, cviv:{}, #vbv:{}, /cpr:{}",
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
             im!("{:>9}", self, LogUsizeId::Vivify, self[Stat::Vivification]),
             im!(
