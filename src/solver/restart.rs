@@ -480,7 +480,7 @@ struct GeometricStabilizer {
 
 impl Default for GeometricStabilizer {
     fn default() -> Self {
-        const STEP: usize = 4096;
+        const STEP: usize = 64;
         GeometricStabilizer {
             enable: true,
             active: false,
@@ -527,7 +527,7 @@ impl fmt::Display for GeometricStabilizer {
 
 impl GeometricStabilizer {
     fn update(&mut self, now: usize) -> Option<(bool, bool)> {
-        const RELAXATION: usize = 1;
+        const RELAXATION: usize = 16;
         if self.enable && self.next_trigger <= now {
             self.num_shift += 1;
             let mut new_cycle: bool = false;
@@ -543,7 +543,7 @@ impl GeometricStabilizer {
                 }
             }
             self.step = self.luby.next().unwrap();
-            self.active = self.step != 1;
+            self.active = !new_cycle;
             self.next_trigger = now + self.step * self.scale;
             Some((self.active, new_cycle))
         } else {
@@ -553,6 +553,7 @@ impl GeometricStabilizer {
     fn span(&self) -> usize {
         self.step
     }
+    #[allow(dead_code)]
     fn reset_progress(&mut self) {
         self.reset_requested = true;
     }
@@ -764,7 +765,7 @@ impl Instantiate for Restarter {
                 {
                     self.luby_blocking.reset_progress();
                 }
-                self.stb.reset_progress();
+                // self.stb.reset_progress();
             }
             SolverEvent::Restart => {
                 self.after_restart = 0;
@@ -847,7 +848,11 @@ impl RestartIF for Restarter {
             ProgressUpdate::ACC(val) => self.acc.update(val),
 
             ProgressUpdate::ASG(val) => self.asg.update(val),
-            ProgressUpdate::LBD(val) => self.lbd.update(val),
+            ProgressUpdate::LBD(val) => {
+                if !self.stb.active {
+                    self.lbd.update(val);
+                }
+            }
             ProgressUpdate::Luby => self.luby.update(0),
 
             #[cfg(feature = "progress_MLD")]
@@ -946,6 +951,7 @@ impl LubySeries {
         }
         Some(2usize.pow(seq as u32))
     }
+    #[allow(dead_code)]
     fn reset(&mut self) {
         self.index = 0;
         self.seq = 0;
