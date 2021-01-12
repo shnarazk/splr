@@ -222,37 +222,38 @@ fn search(
                 return Ok(false);
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
-            if let Some(decision) = rst.restart() {
-                rst.update(ProgressUpdate::Remain(asg.var_stats().3));
-                if decision == RestartDecision::Force {
-                    RESTART!(asg, rst);
-                }
-                if let Some((stabilize, new_cycle)) = rst.stabilize(asg.num_conflict) {
-                    if new_cycle {
-                        let v = asg.var_stats();
-                        let r = rst.exports();
-                        let s = asg.num_staging_cands();
-                        state.log(
-                            asg.num_conflict,
-                            format!(
-                                "Lcycle:{:>6}, core:{:>9}, heat: {:>9}, /cpr:{:>9.2}",
-                                r.3,
-                                v.4,
-                                s,
-                                asg.num_conflict as f64 / asg.exports().2 as f64,
-                            ),
-                        );
-                        #[cfg(feature = "staging")]
-                        {
-                            asg.build_stage(StagingTarget::AutoSelect, stabilize);
-                        }
-                    } else {
-                        #[cfg(feature = "staging")]
-                        {
-                            asg.dissolve_stage(stabilize);
-                        }
+            rst.update(ProgressUpdate::Remain(asg.var_stats().3));
+            let restart = rst.restart();
+            if matches!(restart, Some(RestartDecision::Force)) {
+                RESTART!(asg, rst);
+            }
+            if let Some((parity, new_cycle)) = rst.stabilize(asg.num_conflict) {
+                if new_cycle {
+                    let v = asg.var_stats();
+                    let r = rst.exports();
+                    let s = asg.num_staging_cands();
+                    state.log(
+                        asg.num_conflict,
+                        format!(
+                            "Lcycle:{:>6}, core:{:>9}, heat: {:>9}, /cpr:{:>9.2}",
+                            r.3,
+                            v.4,
+                            s,
+                            asg.num_conflict as f64 / asg.exports().2 as f64,
+                        ),
+                    );
+                    #[cfg(feature = "staging")]
+                    {
+                        asg.build_stage(StagingTarget::AutoSelect, parity);
                     }
-                    if decision != RestartDecision::Force {
+                } else {
+                    #[cfg(feature = "staging")]
+                    {
+                        asg.dissolve_stage(parity);
+                    }
+                }
+                if let Some(ref decision) = restart {
+                    if *decision != RestartDecision::Force {
                         RESTART!(asg, rst);
                     }
                 }

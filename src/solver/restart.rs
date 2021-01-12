@@ -56,9 +56,9 @@ pub trait RestartIF: Export<RestarterExports, (RestartMode, usize)> {
     type Exports;
     /// check blocking and forcing restart condition.
     fn restart(&mut self) -> Option<RestartDecision>;
-    /// check stabilization mode.
-    /// * just toggled
-    /// * just into a new longest span
+    /// check stabilization mode and  return:
+    /// - `Some(parity_bit, just_start_a_new_cycle)` if a stabilization phase has just ended.
+    /// - `None` otherwise.
     fn stabilize(&mut self, now: usize) -> Option<(bool, bool)>;
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
@@ -480,7 +480,7 @@ struct GeometricStabilizer {
 
 impl Default for GeometricStabilizer {
     fn default() -> Self {
-        const STEP: usize = 64;
+        const STEP: usize = 128;
         GeometricStabilizer {
             enable: true,
             active: false,
@@ -545,7 +545,7 @@ impl GeometricStabilizer {
             self.step = self.luby.next().unwrap();
             self.active = !new_cycle;
             self.next_trigger = now + self.step * self.scale;
-            Some((self.active, new_cycle))
+            Some((self.num_shift % 2 == 1, new_cycle))
         } else {
             None
         }

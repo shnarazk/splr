@@ -1,4 +1,4 @@
-## 0.6.0, 2021-01-11
+## 0.6.0, 2021-01-12
 
 - reorganize with redefined terminology
    - _stabilizing_ to stop restart periodically (extension of static restart blocking)
