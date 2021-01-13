@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.6.0-RC0"
+version = "0.6.0-RC1"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2018"
@@ -15,15 +15,19 @@ categories = ["mathematics", "science"]
 bitflags = "1.2"
 
 [features]
-default = []
+default = ["staging"]
+staging = ["extra_var_reward"]
 boundary_check = []
 ema_calibration = []
 EVSIDS = []
-explore_timestamp = []
+explore_timestamp = ["staging"]
+extra_var_reward = []
 incremental_solver = []
+luby_blocking = []
 moving_var_reward_rate = []
 no_IO = []
-temp_order = []
+progress_ACC = []
+progress_MLD = []
 trace_analysis = []
 trace_elimination = []
 

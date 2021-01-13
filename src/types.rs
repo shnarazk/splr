@@ -679,7 +679,7 @@ pub trait FlagIF {
 }
 
 bitflags! {
-    /// Misc flags used by `Clause` and `Var`.
+    /// Misc flags used by [`Clause`](`crate::cdb::Clause`) and [`Var`](`crate::assign::Var`).
     pub struct Flag: u16 {
 
         //
@@ -704,7 +704,7 @@ bitflags! {
         /// a given clause derived a learnt which LBD is smaller than 20.
         const DERIVE20     = 0b0010_0000_0000_0000;
         /// a temporal clause during vivification
-        const VIV_ASSUMP   = 0b0100_0000_0000_0000;
+        const VIV_ASSUMED  = 0b0100_0000_0000_0000;
 
         //
         //## For Var
@@ -715,10 +715,6 @@ bitflags! {
         const CA_SEEN      = 0b0000_0010_0000_0000;
         /// the previous assigned value of a Var.
         const PHASE        = 0b0000_0100_0000_0000;
-        /// the previous assigned value of a Var.
-        const BEST_PHASE   = 0b0000_1000_0000_0000;
-        /// the previous assigned value of a Var.
-        const REPHASE      = 0b0001_0000_0000_0000;
     }
 }
 

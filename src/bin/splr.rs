@@ -267,18 +267,18 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     out.write_all(
         format!(
             "c  #conflict:{}, #decision:{}, #propagate:{},\n",
-            format!("{:>11}", state[LogUsizeId::Conflict]),
-            format!("{:>13}", state[LogUsizeId::Decision]),
-            format!("{:>15}", state[LogUsizeId::Propagate]),
+            format!("{:>11}", state[LogUsizeId::NumConflict]),
+            format!("{:>13}", state[LogUsizeId::NumDecision]),
+            format!("{:>15}", state[LogUsizeId::NumPropagate]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
             "c   Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{},\n",
-            format!("{:>9}", state[LogUsizeId::Remain]),
-            format!("{:>9}", state[LogUsizeId::Assert]),
-            format!("{:>9}", state[LogUsizeId::Eliminated]),
+            format!("{:>9}", state[LogUsizeId::RemainingVar]),
+            format!("{:>9}", state[LogUsizeId::AssertedVar]),
+            format!("{:>9}", state[LogUsizeId::EliminatedVar]),
             format!("{:>9.4}", state[LogF64Id::Progress]),
         )
         .as_bytes(),
@@ -286,35 +286,35 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     out.write_all(
         format!(
             "c       Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{},\n",
-            format!("{:>9}", state[LogUsizeId::Removable]),
-            format!("{:>9}", state[LogUsizeId::LBD2]),
+            format!("{:>9}", state[LogUsizeId::RemovableClause]),
+            format!("{:>9}", state[LogUsizeId::LBD2Clause]),
             format!("{:>9}", state[LogUsizeId::Binclause]),
-            format!("{:>9}", state[LogUsizeId::Permanent]),
+            format!("{:>9}", state[LogUsizeId::PermanentClause]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c  {}|#RST:{}, #BLK:{}, #STB:{}, #CNC:{},\n",
+            "c  {}|#BLK:{}, #RST:{}, Lspn:{}, Lcyc:{},\n",
             if s.rst.mode().0 == RestartMode::Luby {
                 "LubyRestart"
             } else {
                 "    Restart"
             },
-            format!("{:>9}", state[LogUsizeId::Restart]),
             format!("{:>9}", state[LogUsizeId::RestartBlock]),
-            format!("{:>9}", state[LogUsizeId::Stabilize]),
-            format!("{:>9}", state[LogUsizeId::RestartCancel]),
+            format!("{:>9}", state[LogUsizeId::Restart]),
+            format!("{:>9}", state[LogUsizeId::LubySpan]),
+            format!("{:>9}", state[LogUsizeId::LubyCycle]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c          EMA|tLBD:{}, tASG:{}, eMLD:{}, eCCC:{},\n",
+            "c          EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{},\n",
             format!("{:>9.4}", state[LogF64Id::TrendLBD]),
             format!("{:>9.4}", state[LogF64Id::TrendASG]),
-            format!("{:>9.4}", state[LogF64Id::EmaMLD]),
-            format!("{:>9.0}", state[LogF64Id::EmaCCC]),
+            format!("{:>9.4}", state[LogUsizeId::UnreachableCore]),
+            format!("{:>9.2}", state[LogF64Id::DecisionPerConflict]),
         )
         .as_bytes(),
     )?;
@@ -325,7 +325,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             format!("{:>9.2}", state[LogF64Id::EmaLBD]),
             format!("{:>9.2}", state[LogF64Id::CLevel]),
             format!("{:>9.2}", state[LogF64Id::BLevel]),
-            format!("{:>9.4}", state[LogF64Id::PropagationPerConflict]),
+            format!("{:>9.2}", state[LogF64Id::PropagationPerConflict]),
         )
         .as_bytes(),
     )?;

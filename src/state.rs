@@ -3,7 +3,7 @@ use {
     crate::{
         assign::AssignIF,
         cdb::ClauseDBIF,
-        solver::{RestartIF, RestartMode, SolverEvent},
+        solver::{RestartIF, RestartMode, RestarterEMAs, SolverEvent},
         types::*,
     },
     std::{
@@ -15,7 +15,9 @@ use {
     },
 };
 
-/// API for state/statistics management, providing `progress`.
+const PROGRESS_REPORT_ROWS: usize = 9;
+
+/// API for state/statistics management, providing [`progress`](`crate::state::StateIF::progress`).
 pub trait StateIF {
     /// return `true` if it is timed out.
     fn is_timeout(&self) -> bool;
@@ -41,9 +43,7 @@ pub trait StateIF {
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
-        R: RestartIF
-            + Export<(usize, usize, usize, usize), (RestartMode, usize)>
-            + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>;
+        R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
     /// write a one-line message as log.
@@ -52,40 +52,40 @@ pub trait StateIF {
 
 /// Phase saving modes.
 #[derive(Debug, Eq, PartialEq)]
-pub enum RephaseMode {
-    /// use the best phase so far.
-    Best,
-    /// a dummy
+pub enum StagingTarget {
+    /// select some targets cyclicly.
+    AutoSelect,
+    /// use best phases with some unsettled vars
+    Best(usize),
+    /// unstage all vars.
     Clear,
-    #[cfg(explore_timestamp)]
-    #[cfg(feature = "temp_order")]
-    /// seek unchecked vars.
-    Explore(usize),
-    /// force an assignment
-    #[cfg(feature = "temp_order")]
-    Force(bool),
-    /// use random values.
-    #[cfg(feature = "temp_order")]
+    /// choose vars in core
+    Core,
+    ///
+    LastAssigned,
+    /// select random vars.
     Random,
+
+    #[cfg(feature = "explore_timestamp")]
+    /// seek unchecked vars.
+    Explore,
 }
 
-impl fmt::Display for RephaseMode {
+impl fmt::Display for StagingTarget {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(
             formatter,
             "{}",
             match self {
-                RephaseMode::Best => "RP_Best",
-                RephaseMode::Clear => "RP_Clear",
-                #[cfg(explore_timestamp)]
-                #[cfg(feature = "temp_order")]
-                RephaseMode::Explore(_) => "RP_Reverse",
-                #[cfg(feature = "temp_order")]
-                RephaseMode::Force(false) => "RP_False",
-                #[cfg(feature = "temp_order")]
-                RephaseMode::Force(true) => "RP_True",
-                #[cfg(feature = "temp_order")]
-                RephaseMode::Random => "RP_Random",
+                StagingTarget::AutoSelect => "StageMode",
+                StagingTarget::Best(_) => "StageMode_top",
+                StagingTarget::Clear => "StageMode_Clear",
+                StagingTarget::Core => "StageMode_Core",
+                StagingTarget::LastAssigned => "StageMode_LA",
+                StagingTarget::Random => "Stage_Random",
+
+                #[cfg(feature = "explore_timestamp")]
+                StagingTarget::Explore => "StageMode_Exp",
             }
         )
     }
@@ -183,7 +183,7 @@ impl IndexMut<Stat> for [usize] {
     }
 }
 
-/// Data storage for `Solver`.
+/// Data storage for [`Solver`](`crate::solver::Solver`).
 #[derive(Debug)]
 pub struct State {
     /// solver configuration
@@ -431,8 +431,9 @@ impl StateIF for State {
         if 0 == self.progress_cnt {
             self.progress_cnt = 1;
             println!("{}", self);
-            let repeat = 8;
-            for _i in 0..repeat {
+
+            //## PROGRESS REPORT ROWS
+            for _i in 0..PROGRESS_REPORT_ROWS - 1 {
                 println!("                                                  ");
             }
         }
@@ -466,9 +467,7 @@ impl StateIF for State {
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
-        R: RestartIF
-            + Export<(usize, usize, usize, usize), (RestartMode, usize)>
-            + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>,
+        R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
             return;
@@ -494,42 +493,71 @@ impl StateIF for State {
 
         let rst_mode = rst.mode().0;
 
-        let (rst_num_blk, rst_num_rst, rst_num_span, rst_num_shift) = rst.exports();
+        let (rst_num_blk, rst_num_rst, rst_num_span, rst_num_cycle, _) = rst.exports();
         // let rst_num_stb = rst.mode().1;
-        let (_rst_acc, rst_asg, rst_lbd, _rst_mld) = *rst.exports_box();
+
+        #[cfg(not(feature = "progress_ACC"))]
+        let (rst_asg, rst_lbd) = *rst.exports_box();
+
+        #[cfg(feature = "progress_ACC")]
+        let (_rst_acc, rst_asg, rst_lbd) = *rst.exports_box();
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
             return;
         }
         self.progress_cnt += 1;
-        print!("\x1B[9A\x1B[1G");
+        // print!("\x1B[9A\x1B[1G");
+        print!("\x1B[");
+        print!("{}", PROGRESS_REPORT_ROWS);
+        print!("A\x1B[1G");
+
         while let Some(m) = self.log_messages.pop() {
-            println!("\x1B[2K{}", m);
+            println!("\x1B[2K\x1B[000m\x1B[036m{}\x1B[000m", m);
         }
         println!("\x1B[2K{}", self);
         println!(
-            "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
-            i!("{:>11}", self, LogUsizeId::Conflict, asg_num_conflict),
-            i!("{:>13}", self, LogUsizeId::Decision, self[Stat::Decision]),
-            i!("{:>15}", self, LogUsizeId::Propagate, asg_num_propagation),
+            "\x1B[2K #conflict:{}, #decision:{}, #propagate:{}",
+            i!("{:>11}", self, LogUsizeId::NumConflict, asg_num_conflict),
+            i!(
+                "{:>13}",
+                self,
+                LogUsizeId::NumDecision,
+                self[Stat::Decision]
+            ),
+            i!(
+                "{:>15}",
+                self,
+                LogUsizeId::NumPropagate,
+                asg_num_propagation
+            ),
         );
         println!(
-            "\x1B[2K  Assignment|#rem:{}, #ass:{}, #elm:{}, prg%:{} ",
-            im!("{:>9}", self, LogUsizeId::Remain, asg_num_unasserted_vars),
-            im!("{:>9}", self, LogUsizeId::Assert, asg_num_asserted_vars),
+            "\x1B[2K  Assignment|#rem:{}, #ass:{}, #elm:{}, prg%:{}",
             im!(
                 "{:>9}",
                 self,
-                LogUsizeId::Eliminated,
+                LogUsizeId::RemainingVar,
+                asg_num_unasserted_vars
+            ),
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::AssertedVar,
+                asg_num_asserted_vars
+            ),
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::EliminatedVar,
                 asg_num_eliminated_vars
             ),
             fm!("{:>9.4}", self, LogF64Id::Progress, rate * 100.0),
         );
         println!(
-            "\x1B[2K      Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
-            im!("{:>9}", self, LogUsizeId::Removable, cdb_num_learnt),
-            im!("{:>9}", self, LogUsizeId::LBD2, cdb_num_lbd2),
+            "\x1B[2K      Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{}",
+            im!("{:>9}", self, LogUsizeId::RemovableClause, cdb_num_learnt),
+            im!("{:>9}", self, LogUsizeId::LBD2Clause, cdb_num_lbd2),
             im!(
                 "{:>9}",
                 self,
@@ -539,12 +567,12 @@ impl StateIF for State {
             im!(
                 "{:>9}",
                 self,
-                LogUsizeId::Permanent,
+                LogUsizeId::PermanentClause,
                 cdb_num_active - cdb_num_learnt
             ),
         );
         println!(
-            "\x1B[2K {}|#BLK:{}, #RST:{}, span:{}, shft:{} ",
+            "\x1B[2K {}|#BLK:{}, #RST:{}, Lspn:{}, Lcyc:{}",
             match rst_mode {
                 RestartMode::Dynamic => "    Restart",
                 RestartMode::Luby if self.config.no_color => "LubyRestart",
@@ -554,41 +582,23 @@ impl StateIF for State {
             },
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-            im!("{:>9}", self, LogUsizeId::End, rst_num_span),
-            im!("{:>9}", self, LogUsizeId::End, rst_num_shift),
+            im!("{:>9}", self, LogUsizeId::LubySpan, rst_num_span),
+            im!("{:>9}", self, LogUsizeId::LubyCycle, rst_num_cycle),
         );
-        /*
         println!(
-            "\x1B[2K {}|#BLK:{}, #CNC:{}, #RST:{}, #STB:{} ",
-            match rst_mode {
-                RestartMode::Dynamic => "    Restart",
-                RestartMode::Luby if self.config.no_color => "LubyRestart",
-                RestartMode::Luby => "\x1B[001m\x1B[035mLubyRestart\x1B[000m",
-                RestartMode::Stabilize if self.config.no_color => "  Stabilize",
-                RestartMode::Stabilize => "  \x1B[001m\x1B[030mStabilize\x1B[000m",
-            },
-            im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
-            im!("{:>9}", self, LogUsizeId::RestartCancel, rst_num_sblk),
-            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-            im!("{:>9}", self, LogUsizeId::RestartStabilize, rst_num_srst),
-        );
-         */
-        println!(
-            "\x1B[2K         EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{} ",
+            "\x1B[2K         EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{}",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
-            // fm!("{:>9.4}", self, LogF64Id::EmaMLD, rst_mld.get()),
-            // fm!("{:>9.4}", self, LogF64Id::EmaCCC, rst_acc.get()),
-            im!("{:>9}", self, LogUsizeId::End, asg_unreachables),
+            im!("{:>9}", self, LogUsizeId::UnreachableCore, asg_unreachables),
             fm!(
                 "{:>9.2}",
                 self,
-                LogF64Id::End,
+                LogF64Id::DecisionPerConflict,
                 self[Stat::Decision] as f64 / asg_num_conflict as f64
             ),
         );
         println!(
-            "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{} ",
+            "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{}",
             fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get()),
             fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
@@ -600,7 +610,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|elim:{}, cviv:{}, #vbv:{}, /cpr:{} ",
+            "\x1B[2K        misc|elim:{}, cviv:{}, #vbv:{}, /cpr:{}",
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
             im!("{:>9}", self, LogUsizeId::Vivify, self[Stat::Vivification]),
             im!(
@@ -713,7 +723,7 @@ impl State {
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
-        R: Export<(usize, usize, usize, usize), (RestartMode, usize)>,
+        R: RestartIF,
     {
         self.progress_cnt += 1;
         let (
@@ -757,9 +767,7 @@ impl State {
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
-        R: RestartIF
-            + Export<(usize, usize, usize, usize), (RestartMode, usize)>
-            + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>,
+        R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>,
     {
         self.progress_cnt += 1;
         let msg = match mes {
@@ -787,7 +795,13 @@ impl State {
             let e = rst.exports();
             e.0 + e.2
         };
-        let (_, rst_asg, rst_lbd, _) = *rst.exports_box();
+
+        #[cfg(not(feature = "progress_ACC"))]
+        let (rst_asg, rst_lbd) = *rst.exports_box();
+
+        #[cfg(feature = "progress_ACC")]
+        let (_, rst_asg, rst_lbd) = *rst.exports_box();
+
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
              {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
@@ -814,30 +828,54 @@ impl State {
     }
 }
 
-/// Index for `Usize` data, used in `ProgressRecord`.
+/// Index for `Usize` data, used in [`ProgressRecord`](`crate::state::ProgressRecord`).
 pub enum LogUsizeId {
-    Propagate = 0,
-    Decision,
-    Conflict,
-    Remain,
-    Assert,
-    Eliminated,
-    Removable,
-    LBD2,
+    //
+    //## primary stats
+    //
+    NumConflict = 0,
+    NumPropagate,
+    NumDecision,
+
+    //
+    //## vars
+    //
+    RemainingVar,
+    AssertedVar,
+    EliminatedVar,
+    UnreachableCore,
+
+    //
+    //## clause
+    //
+    RemovableClause,
+    LBD2Clause,
     Binclause,
-    Permanent,
+    PermanentClause,
+
+    //
+    // stabilization and restart
+    //
+    LubySpan,
+    LubyCycle,
     Restart,
     RestartBlock,
     RestartCancel,
     RestartStabilize,
+
+    //
+    //## pre-in processor
+    //
     Simplify,
     Stabilize,
     Vivify,
     VivifiedVar,
+
+    // the sentinel
     End,
 }
 
-/// Index for `f64` data, used in `ProgressRecord`.
+/// Index for `f64` data, used in [`ProgressRecord`](`crate::state::ProgressRecord`).
 pub enum LogF64Id {
     Progress = 0,
     EmaASG,
@@ -846,10 +884,9 @@ pub enum LogF64Id {
     EmaMLD,
     TrendASG,
     TrendLBD,
-    TrendMLD,
-    TrendMVA,
     BLevel,
     CLevel,
+    DecisionPerConflict,
     ConflictPerRestart,
     PropagationPerConflict,
     End,

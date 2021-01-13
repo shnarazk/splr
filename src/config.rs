@@ -13,8 +13,11 @@ pub struct Config {
     /// Eliminator switch
     a_elim: i32,
 
-    /// Use Luby series forcely
+    /// Use Luby series forcibly
     a_luby: i32,
+
+    /// Clause reduction switch
+    a_reduce: i32,
 
     /// Re-phase switch
     a_rephase: i32,
@@ -25,8 +28,8 @@ pub struct Config {
     /// Stabilization switch
     a_stabilize: i32,
 
-    /// Clause reduction switch
-    a_reduce: i32,
+    /// Staging
+    a_stage: i32,
 
     /// Vivification switch
     a_vivify: i32,
@@ -103,6 +106,7 @@ pub struct Config {
     /// Blocking restart threshold. Originally this was the Glucose's R.
     pub rst_asg_thr: f64,
 
+    #[cfg(feature = "progress_ACC")]
     /// Conflict Correlation threshold
     pub rst_ccc_thr: f64,
 
@@ -115,9 +119,11 @@ pub struct Config {
     /// Forcing restart threshold
     pub rst_lbd_thr: f64,
 
+    #[cfg(feature = "progress_MLD")]
     /// Scaling for Maximum LBD of a Dep. graph
     pub rst_mld_scl: f64,
 
+    #[cfg(feature = "progress_MLD")]
     /// Threshold for Maximum LBD of a Dep. graph
     pub rst_mld_thr: f64,
 
@@ -140,16 +146,24 @@ pub struct Config {
     pub viv_scale: f64,
 
     //
+    //## staging
+    //
+    /// Decay rate for Extra reward for vars on stage
+    pub stg_rwd_dcy: f64,
+    /// Initial value for the extra reward for vars on stage
+    pub stg_rwd_val: f64,
+
+    //
     //## var rewarding
     //
-    #[cfg(not(moving_var_reward_rate))]
+    #[cfg(not(feature = "moving_var_reward_rate"))]
     pub vrw_dcy_rat: f64,
 
-    #[cfg(moving_var_reward_rate)]
+    #[cfg(feature = "moving_var_reward_rate")]
     /// Initial var reward decay
     pub vrw_dcy_beg: f64,
 
-    #[cfg(moving_var_reward_rate)]
+    #[cfg(feature = "moving_var_reward_rate")]
     /// Maximum var reward decay
     pub vrw_dcy_end: f64,
 
@@ -167,6 +181,7 @@ impl Default for Config {
             a_rephase: 1,
             a_rsr: 1,
             a_stabilize: 1,
+            a_stage: 1,
             a_vivify: 1,
 
             c_cbt_thr: 100,
@@ -188,28 +203,38 @@ impl Default for Config {
             elm_grw_lim: 0,
             elm_var_occ: 8192,
 
-            rst_step: 32,
+            rst_step: 24,
             rst_asg_len: 32,
             rst_asg_slw: 10000,
-            rst_asg_thr: 0.40,
-            rst_ccc_thr: 0.70,
-            rst_lbd_len: 16,
+            rst_asg_thr: 0.10,
+
+            #[cfg(feature = "progress_ACC")]
+            rst_ccc_thr: 0.7,
+
+            rst_lbd_len: 32,
             rst_lbd_slw: 8192,
-            rst_lbd_thr: 0.40,
+            rst_lbd_thr: 1.20,
+
+            #[cfg(feature = "progress_MLD")]
             rst_mld_scl: 0.10,
+            #[cfg(feature = "progress_MLD")]
             rst_mld_thr: 0.80,
+
             rst_stb_scl: 2.0,
+
+            stg_rwd_dcy: 0.5,
+            stg_rwd_val: 1.0,
 
             viv_beg: 1.0,
             viv_end: 8.0,
             viv_int: 4,
             viv_scale: 1.2,
 
-            #[cfg(not(moving_var_reward_rate))]
+            #[cfg(not(feature = "moving_var_reward_rate"))]
             vrw_dcy_rat: 0.96,
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             vrw_dcy_beg: 0.90,
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             vrw_dcy_end: 0.96,
             vrw_occ_cmp: 0.50,
         }
@@ -231,21 +256,23 @@ impl Config {
         while let Some(arg) = iter.next() {
             if let Some(stripped) = arg.strip_prefix("--") {
                 let flags = ["no-color", "quiet", "certify", "log", "help", "version"];
-                let options_i32 = ["ADP", "ELI", "LBY", "RDC", "RPH", "RSR", "STB", "VIV"];
+                let options_i32 = [
+                    "ADP", "ELI", "LBY", "RDC", "RPH", "RSR", "STB", "STG", "VIV",
+                ];
                 let options_u32 = ["cbt"];
                 let options_usize = [
                     "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
                     "vii",
                 ];
-                #[cfg(not(moving_var_reward_rate))]
+                #[cfg(not(feature = "moving_var_reward_rate"))]
                 let options_f64 = [
-                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "vib", "vie", "vis",
-                    "vdr", "vro",
+                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "srd", "srv", "vib",
+                    "vie", "vis", "vdr", "vro",
                 ];
-                #[cfg(moving_var_reward_rate)]
+                #[cfg(feature = "moving_var_reward_rate")]
                 let options_f64 = [
-                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "vib", "vie", "vis",
-                    "vri", "vrm", "vro",
+                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "srd", "srv", "vib",
+                    "vie", "vis", "vri", "vrm", "vro",
                 ];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
@@ -273,6 +300,7 @@ impl Config {
                                         "RPH" => self.a_rephase = val,
                                         "RSR" => self.a_rsr = val,
                                         "STB" => self.a_stabilize = val,
+                                        "STG" => self.a_stage = val,
                                         "VIV" => self.a_vivify = val,
                                         _ => panic!("invalid option: {}", name),
                                     }
@@ -324,19 +352,28 @@ impl Config {
                                     match name {
                                         "timeout" => self.c_tout = val,
                                         "rat" => self.rst_asg_thr = val,
+
+                                        #[cfg(feature = "progress_ACC")]
                                         "rct" => self.rst_ccc_thr = val,
+
                                         "rlt" => self.rst_lbd_thr = val,
+
+                                        #[cfg(feature = "progress_MLD")]
                                         "rms" => self.rst_mld_scl = val,
+                                        #[cfg(feature = "progress_MLD")]
                                         "rmt" => self.rst_mld_thr = val,
+
                                         "rss" => self.rst_stb_scl = val,
                                         "vib" => self.viv_beg = val,
                                         "vie" => self.viv_end = val,
                                         "vis" => self.viv_scale = val,
-                                        #[cfg(not(oving_var_reward_rate))]
+                                        "srd" => self.stg_rwd_dcy = val,
+                                        "srv" => self.stg_rwd_val = val,
+                                        #[cfg(not(feature = "moving_var_reward_rate"))]
                                         "vdr" => self.vrw_dcy_rat = val,
-                                        #[cfg(moving_var_reward_rate)]
+                                        #[cfg(feature = "moving_var_reward_rate")]
                                         "vri" => self.vrw_dcy_beg = val,
-                                        #[cfg(moving_var_reward_rate)]
+                                        #[cfg(feature = "moving_var_reward_rate")]
                                         "vrm" => self.vrw_dcy_end = val,
                                         "vro" => self.vrw_occ_cmp = val,
                                         _ => panic!("invalid option: {}", name),
@@ -409,7 +446,6 @@ impl Config {
     }
 }
 
-#[cfg(not(moving_var_reward_rate))]
 fn help_string() -> String {
     let config = Config::default();
     format!(
@@ -423,7 +459,7 @@ FLAGS:
   -c, --certify            Writes a DRAT UNSAT certification file
   -l, --log                Uses Glucose-like progress report
   -V, --version            Prints version information
-OPTIONS:
+OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m):
       --ADP <a-adaptive>   Strategy adaptation switch     {:>10}
       --ELI <a-elim>       Eliminator switch              {:>10}
       --LBY <a-luby>       Use Luby series for restart    {:>10}
@@ -431,34 +467,38 @@ OPTIONS:
       --RPH <a-rephase>    Re-phase switch                {:>10}
       --RSR <a-rsr>        Reason-Side Rewarding switch   {:>10}
       --STB <a-stabilize>  Stabilization switch           {:>10}
+      --STG <a-stage>      Stage switch                   {:>10}
       --VIV <a-vivify>     Vivification switch            {:>10}
       --cbt <c-cbt-thr>    Dec. lvl to use chronoBT       {:>10}
       --cl <c-cls-lim>     Soft limit of #clauses (6MC/GB){:>10}
       --ii <c-ip-int>      #cls to start in-processor     {:>10}
   -t, --timeout <c-tout>   CPU time limit in sec.         {:>10}
-      --ecl <elim-cls-lim> Max #lit for clause subsume    {:>10}
-      --evl <elim-grw-lim> Grow limit of #cls in var elim.{:>10}
-      --evo <elim-var-occ> Max #cls for var elimination   {:>10}
+      --ecl <elm-cls-lim>  Max #lit for clause subsume    {:>10}
+      --evl <elm-grw-lim>  Grow limit of #cls in var elim.{:>10}
+      --evo <elm-var-occ>  Max #cls for var elimination   {:>10}
   -o, --dir <io-odir>      Output directory                {:>10}
   -p, --proof <io-pfile>   DRAT Cert. filename                {:>10}
   -r, --result <io-rfile>  Result filename/stdout             {:>10}
       --ral <rst-asg-len>  Length of assign. fast EMA     {:>10}
       --ras <rst-asg-slw>  Length of assign. slow EMA     {:>10}
       --rat <rst-asg-thr>  Blocking restart threshold        {:>10.2}
-      --rct <rst-ccc-thr>  Conflict Correlation threshold    {:>10.2}
+      \x1B[000m\x1B[031m--rct <rst-ccc-thr>  Conflict Correlation threshold    {:>10.2}\x1B[000m
       --rll <rst-lbd-len>  Length of LBD fast EMA         {:>10}
       --rls <rst-lbd-slw>  Length of LBD slow EMA         {:>10}
       --rlt <rst-lbd-thr>  Forcing restart threshold         {:>10.2}
-      --rms <rst-mld-scl>  Scaling for Max LBD of Dep.       {:>10.2}
-      --rmt <rst-mld-thr>  Threshold for Max LBD of Dep.     {:>10.2}
+      \x1B[000m\x1B[031m--rms <rst-mld-scl>  Scaling for Max LBD of Dep.       {:>10.2}\x1B[000m
+      \x1B[000m\x1B[031m--rmt <rst-mld-thr>  Threshold for Max LBD of Dep.     {:>10.2}\x1B[000m
       --rss <rst-stb-scl>  Stabilizer scaling                {:>10.2}
-      --rs <rst-step>      #conflicts between restarts    {:>10}
+      --rs  <rst-step>     #conflicts between restarts    {:>10}
+      --srd <stg-rwd-dcy>  Decay rate for staged vare reward {:>10.2}
+      --srv <stg-rwd-val>  Extra reward for staged vars      {:>10.2}
       --vib <viv-beg>      Lower bound of vivify loop        {:>10.2}
       --vie <viv-end>      Upper bound of vivify loop        {:>10.2}
       --vii <viv-int>      Vivification interval          {:>10}
       --vis <viv-scale>    #reduction to vivify              {:>10.2}
-      --vdr <vrw-dcy-rat>  Var reward Decay Rate             {:>10.2}
-      --vro <vrw-occ-cmp>  Occ. compression rate in LR       {:>10.2}
+      \x1B[000m\x1B[031m--vri <vrw-dcy-beg>  Initial var reward decay          {:>10.2}\x1B[000m
+      \x1B[000m\x1B[031m--vrm <vrw-dcy-end>  Maximum var reward decay          {:>10.2}\x1B[000m
+      \x1B[000m\x1B[031m--vro <vrw-occ-cmp>  Occ. compression rate in LR       {:>10.2}\x1B[000m
 ARGS:
   <cnf-file>    DIMACS CNF file
 ",
@@ -469,6 +509,7 @@ ARGS:
         config.a_rephase,
         config.a_rsr,
         config.a_stabilize,
+        config.a_stage,
         config.a_vivify,
         config.c_cbt_thr,
         config.c_cls_lim,
@@ -483,112 +524,77 @@ ARGS:
         config.rst_asg_len,
         config.rst_asg_slw,
         config.rst_asg_thr,
-        config.rst_ccc_thr,
+        {
+            #[cfg(not(feature = "progress_ACC"))]
+            {
+                0.0
+            }
+            #[cfg(feature = "progress_ACC")]
+            {
+                config.rst_ccc_thr
+            }
+        },
         config.rst_lbd_len,
         config.rst_lbd_slw,
         config.rst_lbd_thr,
-        config.rst_mld_scl,
-        config.rst_mld_thr,
+        {
+            #[cfg(feature = "progress_MLD")]
+            {
+                config.rst_mld_scl
+            }
+            #[cfg(not(feature = "progress_MLD"))]
+            {
+                0.0
+            }
+        },
+        {
+            #[cfg(feature = "progress_MLD")]
+            {
+                config.rst_mld_thr
+            }
+            #[cfg(not(feature = "progress_MLD"))]
+            {
+                0.0
+            }
+        },
         config.rst_stb_scl,
         config.rst_step,
+        config.stg_rwd_dcy,
+        config.stg_rwd_val,
         config.viv_beg,
         config.viv_end,
         config.viv_int,
         config.viv_scale,
-        config.vrw_dcy_rat,
-        config.vrw_occ_cmp,
-    )
-}
-#[cfg(moving_var_reward_rate)]
-fn help_string() -> String {
-    let config = Config::default();
-    format!(
-        "
-USAGE:
-  splr [FLAGS] [OPTIONS] <cnf-file>
-FLAGS:
-  -h, --help               Prints help information
-  -C, --no-color           Disable coloring
-  -q, --quiet              Disable any progress message
-  -c, --certify            Writes a DRAT UNSAT certification file
-  -l, --log                Uses Glucose-like progress report
-  -V, --version            Prints version information
-OPTIONS:
-      --ADP <a-adaptive>   Strategy adaptation switch     {:>10}
-      --ELI <a-elim>       Eliminator switch              {:>10}
-      --LBY <a-luby>       Use Luby series for restart    {:>10}
-      --RDC <a-reduce>     Clause reduction switch        {:>10}
-      --RPH <a-rephase>    Re-phase switch                {:>10}
-      --RSR <a-rsr>        Reason-Side Rewarding switch   {:>10}
-      --STB <a-stabilize>  Stabilization switch           {:>10}
-      --VIV <a-vivify>     Vivification switch            {:>10}
-      --cbt <c-cbt-thr>    Dec. lvl to use chronoBT       {:>10}
-      --cl <c-cls-lim>     Soft limit of #clauses (6MC/GB){:>10}
-      --ii <c-ip-int>      #cls to start in-processor     {:>10}
-  -t, --timeout <c-tout>   CPU time limit in sec.         {:>10}
-      --ecl <elim-cls-lim> Max #lit for clause subsume    {:>10}
-      --evl <elim-grw-lim> Grow limit of #cls in var elim.{:>10}
-      --evo <elim-var-occ> Max #cls for var elimination   {:>10}
-  -o, --dir <io-odir>      Output directory                {:>10}
-  -p, --proof <io-pfile>   DRAT Cert. filename                {:>10}
-  -r, --result <io-rfile>  Result filename/stdout             {:>10}
-      --ral <rst-asg-len>  Length of assign. fast EMA     {:>10}
-      --ras <rst-asg-slw>  Length of assign. slow EMA     {:>10}
-      --rat <rst-asg-thr>  Blocking restart threshold        {:>10.2}
-      --rct <rst-ccc-thr>  Conflict Correlation threshold    {:>10.2}
-      --rll <rst-lbd-len>  Length of LBD fast EMA         {:>10}
-      --rls <rst-lbd-slw>  Length of LBD slow EMA         {:>10}
-      --rlt <rst-lbd-thr>  Forcing restart threshold         {:>10.2}
-      --rms <rst-mld-scl>  Scaling for Max LBD of Dep.       {:>10.2}
-      --rmt <rst-mld-thr>  Threshold for Max LBD of Dep.     {:>10.2}
-      --rss <rst-stb-scl>  Stabilizer scaling                {:>10.2}
-      --rs <rst-step>      #conflicts between restarts    {:>10}
-      --vib <viv-beg>      Lower bound of vivify loop        {:>10.2}
-      --vie <viv-end>      Upper bound of vivify loop        {:>10.2}
-      --vii <viv-int>      Vivification interval          {:>10}
-      --vis <viv-scale>    #reduction to vivify              {:>10.2}
-      --vri <vrw-dcy-beg>  Initial var reward decay          {:>10.2}
-      --vrm <vrw-dcy-end>  Maximum var reward decay          {:>10.2}
-      --vro <vrw-occ-cmp>  Occ. compression rate in LR       {:>10.2}
-ARGS:
-  <cnf-file>    DIMACS CNF file
-",
-        config.a_adaptive,
-        config.a_elim,
-        config.a_luby,
-        config.a_reduce,
-        config.a_rephase,
-        config.a_rsr,
-        config.a_stabilize,
-        config.a_vivify,
-        config.c_cbt_thr,
-        config.c_cls_lim,
-        config.c_ip_int,
-        config.c_tout,
-        config.elm_cls_lim,
-        config.elm_grw_lim,
-        config.elm_var_occ,
-        config.io_odir.to_string_lossy(),
-        config.io_pfile.to_string_lossy(),
-        config.io_rfile.to_string_lossy(),
-        config.rst_asg_len,
-        config.rst_asg_slw,
-        config.rst_asg_thr,
-        config.rst_ccc_thr,
-        config.rst_lbd_len,
-        config.rst_lbd_slw,
-        config.rst_lbd_thr,
-        config.rst_mld_scl,
-        config.rst_mld_thr,
-        config.rst_stb_scl,
-        config.rst_step,
-        config.viv_beg,
-        config.viv_end,
-        config.viv_int,
-        config.viv_scale,
-        config.vrw_dcy_beg,
-        config.vrw_dcy_end,
-        config.vrw_occ_cmp,
+        {
+            #[cfg(not(feature = "moving_var_reward_rate"))]
+            {
+                0.0
+            }
+            #[cfg(feature = "moving_var_reward_rate")]
+            {
+                config.vrw_dcy_beg
+            }
+        },
+        {
+            #[cfg(not(feature = "moving_var_reward_rate"))]
+            {
+                0.0
+            }
+            #[cfg(feature = "moving_var_reward_rate")]
+            {
+                config.vrw_dcy_end
+            }
+        },
+        {
+            #[cfg(not(feature = "moving_var_reward_rate"))]
+            {
+                0.0
+            }
+            #[cfg(feature = "moving_var_reward_rate")]
+            {
+                config.vrw_occ_cmp
+            }
+        },
     )
 }
 
@@ -643,6 +649,9 @@ impl Config {
     }
     pub fn use_stabilize(&self) -> bool {
         dispatch!(self.a_stabilize)
+    }
+    pub fn use_stage(&self) -> bool {
+        dispatch!(self.a_stage)
     }
     pub fn use_adaptive(&self) -> bool {
         dispatch!(self.a_adaptive)

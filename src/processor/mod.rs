@@ -107,7 +107,7 @@ pub trait EliminatorStatIF {
 
 #[derive(Copy, Clone, Eq, Debug, PartialEq)]
 enum EliminatorMode {
-    Deactive,
+    Dormant,
     Waiting,
     Running,
 }
@@ -225,7 +225,7 @@ impl Default for Eliminator {
         Eliminator {
             enable: true,
             to_simplify: 0.0,
-            mode: EliminatorMode::Deactive,
+            mode: EliminatorMode::Dormant,
             var_queue: VarOccHeap::new(0, 0),
             clause_queue: Vec::new(),
             bwdsub_assigns: 0,
@@ -391,7 +391,7 @@ impl EliminateIF for Eliminator {
                 w.clear();
             }
         }
-        self.mode = EliminatorMode::Deactive;
+        self.mode = EliminatorMode::Dormant;
     }
     fn prepare<A, C>(&mut self, asg: &mut A, cdb: &mut C, force: bool)
     where
@@ -666,12 +666,12 @@ impl Eliminator {
         C: ClauseDBIF,
     {
         debug_assert!(asg.decision_level() == 0);
-        if self.mode == EliminatorMode::Deactive {
+        if self.mode == EliminatorMode::Dormant {
             return Ok(());
         }
         self.num_full_elimination += 1;
         let mut timedout: usize = {
-            let nv = asg.var_stats().3 as f64; // unasserted vars
+            let nv = asg.var_stats().3 as f64; // un-asserted vars
             let nc = cdb.count() as f64;
             (6.0 * nv.log(2.0) * nc) as usize
         };

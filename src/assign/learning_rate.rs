@@ -1,4 +1,4 @@
-/// Var Rewarding based on Learning Rate Rewardin gand Reason Side Rewarding
+/// Var Rewarding based on Learning Rate Rewarding and Reason Side Rewarding
 use {
     super::{AssignStack, VarRewardIF},
     crate::types::*,
@@ -7,33 +7,20 @@ use {
 
 impl VarRewardIF for AssignStack {
     #[inline]
+    #[cfg(feature = "extra_var_reward")]
+    fn activity(&self, vi: VarId) -> f64 {
+        let v = &self.var[vi];
+        v.reward.max(v.extra_reward)
+    }
+    #[cfg(not(feature = "extra_var_reward"))]
     fn activity(&self, vi: VarId) -> f64 {
         self.var[vi].reward
     }
-    fn initialize_reward(&mut self, iterator: Iter<'_, usize>) {
-        #[cfg(moving_var_reward_rate)]
+    fn initialize_reward(&mut self, _iterator: Iter<'_, usize>) {
+        #[cfg(feature = "moving_var_reward_rate")]
         {
             self.reward_step = (self.activity_decay_max - self.activity_decay).abs() / 10_000.0;
-        }
-        // big bang initialization
-        let mut v = 0.5;
-        for vi in iterator {
-            self.var[*vi].reward = v;
-            v *= 0.99;
-        }
-        #[cfg(moving_var_reward_rate)]
-        {
             self.activity_decay = self.activity_decay_max;
-        }
-    }
-    fn expand_reward(&mut self, contract: bool) {
-        const SCALE: f64 = 1.5;
-        let scale: f64 = if contract { 1.0 / SCALE } else { SCALE };
-        for vi in 1..self.var.len() {
-            let v = &mut self.var[vi];
-            if !v.is(Flag::ELIMINATED) {
-                v.reward = v.reward.powf(scale);
-            }
         }
     }
     fn clear_reward(&mut self, vi: VarId) {
@@ -59,15 +46,14 @@ impl VarRewardIF for AssignStack {
     }
     fn reward_update(&mut self) {
         self.ordinal += 1;
-        #[cfg(moving_var_reward_rate)]
+        #[cfg(feature = "moving_var_reward_rate")]
         {
             self.activity_decay = self
                 .activity_decay_max
                 .min(self.activity_decay + self.reward_step);
-            // self.activity_decay = 1.0 - 1.0 / (1.0 + 0.5 * (self.num_restart as f64)).sqrt();
         }
     }
-    #[cfg(moving_var_reward_rate)]
+    #[cfg(feature = "moving_var_reward_rate")]
     fn adjust_reward(&mut self, state: &State) {
         if state.strategy.1 == self.num_conflict {
             match state.strategy.0 {

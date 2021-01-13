@@ -10,12 +10,12 @@ use {
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
-        state::{Stat, State, StateIF},
+        state::{StagingTarget, Stat, State, StateIF},
         types::*,
     },
 };
 
-/// API for SAT solver like `build`, `solve` and so on.
+/// API to [`solve`](`crate::solver::SolveIF::solve`) SAT problems.
 pub trait SolveIF {
     /// search an assignment.
     ///
@@ -101,8 +101,6 @@ impl SolveIF for Solver {
                     elim.enqueue_var(asg, vi, false);
                 }
             }
-            #[cfg(feature = "temp_order")]
-            asg.force_select_iter(Some(elim.sorted_iterator()));
             //
             //## Run eliminator
             //
@@ -202,7 +200,6 @@ fn search(
     state: &mut State,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
-    let mut stabilizing: bool = false;
     let use_vivify = state.config.use_vivify();
     rst.update(ProgressUpdate::Luby);
     rst.update(ProgressUpdate::Remain(asg.num_vars - asg.num_asserted_vars));
@@ -225,37 +222,40 @@ fn search(
                 return Ok(false);
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
-            if let Some(decision) = rst.restart() {
-                rst.update(ProgressUpdate::Remain(asg.var_stats().3));
-                if decision == RestartDecision::Force {
-                    RESTART!(asg, rst);
-                }
-                if let Some((_stabilize, new_cycle)) = rst.stabilize(asg.num_conflict) {
-                    stabilizing = new_cycle;
-                    // let span = rst.exports().2;
-                    if new_cycle {
-                        let v = asg.var_stats();
-                        state.log(
-                            rst.exports().3,
-                            format!(
-                                "remain: {:>6}, unreachable: {:>6}, cpr: {:>8.2}",
-                                v.3,
-                                v.4,
-                                asg.num_conflict as f64 / asg.exports().2 as f64,
-                            ),
-                        );
-                        // asg.expand_reward(stabilize || true);
-                        // if stabilize && span == 1 {
-                        //     asg.force_rephase(RephaseMode::Best)
-                        // }
+            rst.update(ProgressUpdate::Remain(asg.var_stats().3));
+            let restart = rst.restart();
+            if matches!(restart, Some(RestartDecision::Force)) {
+                RESTART!(asg, rst);
+            }
+            if let Some((parity, new_cycle)) = rst.stabilize(asg.num_conflict) {
+                if new_cycle {
+                    let v = asg.var_stats();
+                    let r = rst.exports();
+                    let s = asg.num_staging_cands();
+                    state.log(
+                        asg.num_conflict,
+                        format!(
+                            "Lcycle:{:>6}, core:{:>9}, heat: {:>9}, /cpr:{:>9.2}",
+                            r.3,
+                            v.4,
+                            s,
+                            asg.num_conflict as f64 / asg.exports().2 as f64,
+                        ),
+                    );
+                    #[cfg(feature = "staging")]
+                    {
+                        asg.build_stage(StagingTarget::AutoSelect, parity);
                     }
-                    // if span == 1 {
-                    //     asg.expand_reward(false);
-                    //     if stabilize {
-                    //         asg.cancel_until(asg.root_level);
-                    //         asg.force_rephase(RephaseMode::Best);
-                    //     }
-                    // }
+                } else {
+                    #[cfg(feature = "staging")]
+                    {
+                        asg.dissolve_stage(parity);
+                    }
+                }
+                if let Some(ref decision) = restart {
+                    if *decision != RestartDecision::Force {
+                        RESTART!(asg, rst);
+                    }
                 }
             }
             if a_decision_was_made {
@@ -293,7 +293,10 @@ fn search(
             if state.config.c_ip_int <= elim.to_simplify as usize {
                 elim.to_simplify = 0.0;
                 if elim.enable {
-                    elim.subsume_literal_limit = (rst.exports_box().3.get_slow() * 2.0) as usize;
+                    #[cfg(feature = "progress_MLD")]
+                    {
+                        elim.subsume_literal_limit = (rst.mld.get_slow() * 2.0) as usize;
+                    }
                     elim.activate();
                 }
                 elim.simplify(asg, cdb, state)?;
@@ -304,7 +307,7 @@ fn search(
             }
         }
         if !asg.remains() {
-            let lit = asg.select_decision_literal(stabilizing);
+            let lit = asg.select_decision_literal();
             asg.assign_by_decision(lit);
             state[Stat::Decision] += 1;
             a_decision_was_made = true;

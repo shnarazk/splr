@@ -2,7 +2,7 @@
 use {
     super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF, VarSelectIF},
     crate::{cdb::ClauseDBIF, solver::SolverEvent, types::*},
-    std::{fmt, ops::Range, slice::Iter},
+    std::{collections::HashMap, fmt, ops::Range, slice::Iter},
 };
 
 #[cfg(not(feature = "no_IO"))]
@@ -47,27 +47,42 @@ impl Default for AssignStack {
             root_level: 0,
             conflicts: (0, 0),
             var_order: VarIdHeap::default(),
-            temp_order: Vec::new(),
+
+            use_rephase: true,
+            best_assign: false,
+            best_phases: HashMap::new(),
+            build_best_at: 0,
+            num_best_assign: 0,
+            rephasing: false,
+
+            use_stage: true,
+            staging_reward_value: 1.0,
+            staging_reward_decay: 0.9,
+            staged_vars: HashMap::new(),
+            stage_mode_select: 0,
+            num_stages: 0,
+
             num_vars: 0,
             num_asserted_vars: 0,
             num_eliminated_vars: 0,
-            use_rephase: true,
-            best_assign: false,
-            build_best_at: 0,
-            num_best_assign: 0,
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,
+
             ordinal: 0,
             var: Vec::new(),
+
             activity_decay: 0.0,
-            #[cfg(moving_var_reward_rate)]
+
+            #[cfg(feature = "moving_var_reward_rate")]
             activity_decay_max: 0.9,
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             activity_decay_min: 0.8,
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             reward_step: 0.0,
+
             occurrence_compression_rate: 0.5,
+
             vivify_sandbox: (0, 0, 0),
         }
     }
@@ -96,16 +111,19 @@ impl Instantiate for AssignStack {
             reason: vec![AssignReason::default(); nv + 1],
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
-            num_vars: cnf.num_of_variables,
             use_rephase: config.use_rephase(),
+            use_stage: config.use_stage(),
+            staging_reward_decay: config.stg_rwd_dcy,
+            staging_reward_value: config.stg_rwd_val,
+            num_vars: cnf.num_of_variables,
             var: Var::new_vars(nv),
-            #[cfg(not(moving_var_reward_rate))]
+            #[cfg(not(feature = "moving_var_reward_rate"))]
             activity_decay: config.vrw_dcy_rat,
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             activity_decay: config.vrw_dcy_beg,
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             activity_decay_max: config.vrw_dcy_end,
-            #[cfg(moving_var_reward_rate)]
+            #[cfg(feature = "moving_var_reward_rate")]
             activity_decay_min: config.vrw_dcy_beg,
             occurrence_compression_rate: config.vrw_occ_cmp,
             ..AssignStack::default()
@@ -115,7 +133,7 @@ impl Instantiate for AssignStack {
     fn handle(&mut self, e: SolverEvent) {
         match e {
             SolverEvent::Adapt(_, _) => (),
-            // called only by assertion on choroBT
+            // called only by assertion on chronoBT
             // So execute everything of `assign_by_unitclause` but cancel_until(root_level)
             SolverEvent::Assert(vi) => {
                 self.make_var_asserted(vi);
@@ -322,6 +340,15 @@ impl AssignIF for AssignStack {
 }
 
 impl AssignStack {
+    /// return the number of vars in `the unreachable core'
+    #[inline]
+    pub fn num_unasserted(&self) -> usize {
+        self.num_vars - self.num_eliminated_vars - self.num_asserted_vars
+    }
+    #[inline]
+    pub fn num_unreachables(&self) -> usize {
+        self.num_vars - self.num_best_assign
+    }
     #[cfg(feature = "boundary_check")]
     pub fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
         &mut self,
@@ -408,7 +435,7 @@ impl fmt::Display for AssignStack {
         } else {
             write!(
                 f,
-                "ASG:: trail({}):[(0, {:?})]\n      level: {}, asserted: {}, elimed: {}",
+                "ASG:: trail({}):[(0, {:?})]\n      level: {}, asserted: {}, eliminated: {}",
                 self.trail.len(),
                 &v,
                 levels,

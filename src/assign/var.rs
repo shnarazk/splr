@@ -14,10 +14,14 @@ impl Default for Var {
             index: 0,
             reward: 0.0,
             timestamp: 0,
-            #[cfg(explore_timestamp)]
-            assign_timestamp: 0,
             flags: Flag::empty(),
             participated: 0,
+
+            #[cfg(feature = "explore_timestamp")]
+            assign_timestamp: 0,
+
+            #[cfg(feature = "extra_var_reward")]
+            extra_reward: 0.0,
         }
     }
 }
@@ -99,8 +103,8 @@ pub trait VarManipulateIF {
     /// * the number of vars
     /// * the number of asserted vars
     /// * the number of eliminated vars
-    /// * the number of unasserted vars
-    /// * the number of unreachable unassigned vars
+    /// * the number of un-asserted vars
+    /// * the number of unreachable unassigned vars or core
     fn var_stats(&self) -> (usize, usize, usize, usize, usize);
 }
 
@@ -154,13 +158,13 @@ impl VarManipulateIF for AssignStack {
             self.num_asserted_vars <= self.num_vars,
             format!("nav.{}, nv.{}", self.num_asserted_vars, self.num_vars)
         );
-        assert!(self.num_eliminated_vars <= self.num_vars);
+        debug_assert!(self.num_eliminated_vars <= self.num_vars);
         (
             self.num_vars,
             self.num_asserted_vars,
             self.num_eliminated_vars,
-            self.num_vars - self.num_asserted_vars - self.num_eliminated_vars,
-            self.num_vars - self.num_best_assign,
+            self.num_unasserted(),
+            self.num_unreachables(),
         )
     }
 }
