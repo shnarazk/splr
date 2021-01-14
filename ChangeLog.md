@@ -11,7 +11,7 @@
 - revise command line option parser to handle the last option better
 - stabilization span and restart blocking spans are controlled with Luby sequence
 - add an extra reward to vars involved in best phase
-- make the learning rate of var rewarding an constant
+- make the learning rate of var rewarding constant
 - change the definition of restart blocker and its default threshold
 - add or modify command line options: --srd, --srv, --vbd, --vbr
 - change the definitions or the default values: --rat, --rlt
