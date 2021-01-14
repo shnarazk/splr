@@ -273,6 +273,7 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 | `/cpr`       | conflicts per restart                                                                     |
 | `mode`       | Selected strategy's id                                                                    |
 | `time`       | the elapsed CPU time in seconds                                                           |
+| `heat`       | the number of vars with higher activities than the smallest activity chosen as best phase |
 
 ## Command line options
 
@@ -296,41 +297,40 @@ FLAGS:
   -l, --log                Uses Glucose-like progress report
   -V, --version            Prints version information
 OPTIONS (green options depends on compile-time flags):
-      --ADP <a-adaptive>   Strategy adaptation switch              1
+OPTIONS (red options depend on features in Cargo.toml):
+      --ADP <a-adaptive>   Strategy adaptation switch              0
       --ELI <a-elim>       Eliminator switch                       1
       --LBY <a-luby>       Use Luby series for restart             0
       --RDC <a-reduce>     Clause reduction switch                 1
       --RPH <a-rephase>    Re-phase switch                         1
       --RSR <a-rsr>        Reason-Side Rewarding switch            1
       --STB <a-stabilize>  Stabilization switch                    1
-      --VIV <a-vivify>     Vivification switch                     1
+      --STG <a-stage>      Stage switch                            1
+      --VIV <a-vivify>     Vivification switch                     0
       --cbt <c-cbt-thr>    Dec. lvl to use chronoBT              100
       --cl <c-cls-lim>     Soft limit of #clauses (6MC/GB)         0
       --ii <c-ip-int>      #cls to start in-processor          10000
   -t, --timeout <c-tout>   CPU time limit in sec.               5000
-      --ecl <elim-cls-lim> Max #lit for clause subsume            32
-      --evl <elim-grw-lim> Grow limit of #cls in var elim.         0
-      --evo <elim-var-occ> Max #cls for var elimination         8192
+      --ecl <elm-cls-lim>  Max #lit for clause subsume            32
+      --evl <elm-grw-lim>  Grow limit of #cls in var elim.         0
+      --evo <elm-var-occ>  Max #cls for var elimination         8192
   -o, --dir <io-odir>      Output directory                         .
   -p, --proof <io-pfile>   DRAT Cert. filename                 proof.out
-  -r, --result <io-rfile>  Result filename/stdout
-      --ral <rst-asg-len>  Length of assign. fast EMA             20
+  -r, --result <io-rfile>  Result filename/stdout                       
+      --ral <rst-asg-len>  Length of assign. fast EMA             32
       --ras <rst-asg-slw>  Length of assign. slow EMA          10000
-      --rat <rst-asg-thr>  Blocking restart threshold              0.25
+      --rat <rst-asg-thr>  Blocking restart threshold              0.10
       --rct <rst-ccc-thr>  Conflict Correlation threshold          0.00
-      --rll <rst-lbd-len>  Length of LBD fast EMA                 20
+      --rll <rst-lbd-len>  Length of LBD fast EMA                 32
       --rls <rst-lbd-slw>  Length of LBD slow EMA               8192
-      --rlt <rst-lbd-thr>  Forcing restart threshold               1.40
-      --rms <rst-mld-scl>  Scaling for Max LBD of Dep.             0.10
-      --rmt <rst-mld-thr>  Threshold for Max LBD of Dep.           0.80
+      --rlt <rst-lbd-thr>  Forcing restart threshold               1.20
+      --rms <rst-mld-scl>  Scaling for Max LBD of Dep.             0.00
+      --rmt <rst-mld-thr>  Threshold for Max LBD of Dep.           0.00
       --rss <rst-stb-scl>  Stabilizer scaling                      2.00
-      --rs <rst-step>      #conflicts between restarts            20
-      --vib <viv-beg>      Lower bound of vivify loop              1.00
-      --vie <viv-end>      Upper bound of vivify loop              8.00
-      --vii <viv-int>      Vivification interval                   4
-      --vis <viv-scale>    #reduction to vivify                    1.20
-      --vbd <vrw-bst-dcy>  Decay rate for best phase reward        0.94
-      --vbr <vrw-bst-rwd>  Var reward for vars in best phase       0.10
+      --rs  <rst-step>     #conflicts between restarts            24
+      --srd <stg-rwd-dcy>  Decay rate for staged vare reward       0.50
+      --srv <stg-rwd-val>  Extra reward for staged vars            1.00
+      --vit <viv-thr>      #clause to try to vivify              200
       --vri <vrw-dcy-beg>  Initial var reward decay                0.00
       --vrm <vrw-dcy-end>  Maximum var reward decay                0.00
       --vro <vrw-occ-cmp>  Occ. compression rate in LR             0.00
