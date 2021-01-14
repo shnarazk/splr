@@ -1,6 +1,5 @@
 // SAT solver for Propositional Logic in Rust
 use {
-    libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     splr::{
         cdb::CertifiedRecord,
         solver::*,
@@ -17,7 +16,6 @@ use {
         thread,
         time::Duration,
     },
-    structopt::StructOpt,
 };
 
 const RED: &str = "\x1B[001m\x1B[031m";
@@ -42,7 +40,8 @@ fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
 }
 
 fn main() {
-    let mut config = Config::from_args().override_args();
+    let mut config = Config::default();
+    config.inject_from_args();
     config.splr_interface = true;
     if !config.cnf_file.exists() {
         println!(
@@ -82,20 +81,6 @@ fn main() {
     let mut s = Solver::build(&config).expect("failed to load");
     let res = s.solve();
     save_result(&s, &res, &cnf_file, ans_file);
-    if 0 < s.state.config.io_dump && !s.state.development.is_empty() {
-        let dump = config.cnf_file.file_stem().unwrap().to_str().unwrap();
-        if let Ok(f) = File::create(format!("stat_{}.csv", dump)) {
-            let mut buf = BufWriter::new(f);
-            buf.write_all(b"conflict,asserted,restart,block,ASG,LBD\n")
-                .unwrap();
-            for (n, a, b, c, d, e) in s.state.development.iter() {
-                buf.write_all(
-                    format!("{:.0},{:.5},{:.0},{:.0},{:.5},{:.5}\n", n, a, b, c, d, e,).as_bytes(),
-                )
-                .unwrap();
-            }
-        }
-    }
     std::process::exit(match res {
         Ok(Certificate::SAT(_)) => 10,
         Ok(Certificate::UNSAT) => 20,
@@ -270,20 +255,8 @@ fn save_proof<S: AsRef<str> + std::fmt::Display>(s: &Solver, input: S, output: &
 
 fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     let state = &s.state;
-    let tm = {
-        let mut time = timespec {
-            tv_sec: 0,
-            tv_nsec: 0,
-        };
-        if unsafe { clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &mut time) } == -1 {
-            match state.start.elapsed() {
-                Ok(e) => e.as_secs() as f64 + f64::from(e.subsec_millis()) / 1000.0f64,
-                Err(_) => 0.0f64,
-            }
-        } else {
-            time.tv_sec as f64 + time.tv_nsec as f64 / 1_000_000_000.0f64
-        }
-    };
+    let elapsed: Duration = s.state.start.elapsed();
+    let tm: f64 = elapsed.as_millis() as f64 / 1_000.0;
     out.write_all(
         format!(
             "c {:<43}, #var:{:9}, #cls:{:9}\n",
@@ -294,18 +267,18 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     out.write_all(
         format!(
             "c  #conflict:{}, #decision:{}, #propagate:{},\n",
-            format!("{:>11}", state[LogUsizeId::Conflict]),
-            format!("{:>13}", state[LogUsizeId::Decision]),
-            format!("{:>15}", state[LogUsizeId::Propagate]),
+            format!("{:>11}", state[LogUsizeId::NumConflict]),
+            format!("{:>13}", state[LogUsizeId::NumDecision]),
+            format!("{:>15}", state[LogUsizeId::NumPropagate]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
             "c   Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{},\n",
-            format!("{:>9}", state[LogUsizeId::Remain]),
-            format!("{:>9}", state[LogUsizeId::Assert]),
-            format!("{:>9}", state[LogUsizeId::Eliminated]),
+            format!("{:>9}", state[LogUsizeId::RemainingVar]),
+            format!("{:>9}", state[LogUsizeId::AssertedVar]),
+            format!("{:>9}", state[LogUsizeId::EliminatedVar]),
             format!("{:>9.4}", state[LogF64Id::Progress]),
         )
         .as_bytes(),
@@ -313,35 +286,35 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     out.write_all(
         format!(
             "c       Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{},\n",
-            format!("{:>9}", state[LogUsizeId::Removable]),
-            format!("{:>9}", state[LogUsizeId::LBD2]),
+            format!("{:>9}", state[LogUsizeId::RemovableClause]),
+            format!("{:>9}", state[LogUsizeId::LBD2Clause]),
             format!("{:>9}", state[LogUsizeId::Binclause]),
-            format!("{:>9}", state[LogUsizeId::Permanent]),
+            format!("{:>9}", state[LogUsizeId::PermanentClause]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c  {}|#RST:{}, #BLK:{}, #STB:{}, #CNC:{},\n",
-            if s.rst.active_mode().0 == RestartMode::Luby {
+            "c  {}|#BLK:{}, #RST:{}, Lspn:{}, Lcyc:{},\n",
+            if s.rst.mode().0 == RestartMode::Luby {
                 "LubyRestart"
             } else {
                 "    Restart"
             },
-            format!("{:>9}", state[LogUsizeId::Restart]),
             format!("{:>9}", state[LogUsizeId::RestartBlock]),
-            format!("{:>9}", state[LogUsizeId::Stabilize]),
-            format!("{:>9}", state[LogUsizeId::RestartCancel]),
+            format!("{:>9}", state[LogUsizeId::Restart]),
+            format!("{:>9}", state[LogUsizeId::LubySpan]),
+            format!("{:>9}", state[LogUsizeId::LubyCycle]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c          EMA|tLBD:{}, tASG:{}, eMLD:{}, eCCC:{},\n",
+            "c          EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{},\n",
             format!("{:>9.4}", state[LogF64Id::TrendLBD]),
             format!("{:>9.4}", state[LogF64Id::TrendASG]),
-            format!("{:>9.4}", state[LogF64Id::EmaMLD]),
-            format!("{:>9.0}", state[LogF64Id::EmaCCC]),
+            format!("{:>9.4}", state[LogUsizeId::UnreachableCore]),
+            format!("{:>9.2}", state[LogF64Id::DecisionPerConflict]),
         )
         .as_bytes(),
     )?;
@@ -352,7 +325,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             format!("{:>9.2}", state[LogF64Id::EmaLBD]),
             format!("{:>9.2}", state[LogF64Id::CLevel]),
             format!("{:>9.2}", state[LogF64Id::BLevel]),
-            format!("{:>9.4}", state[LogF64Id::PropagationPerConflict]),
+            format!("{:>9.2}", state[LogF64Id::PropagationPerConflict]),
         )
         .as_bytes(),
     )?;
@@ -366,13 +339,22 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
         )
         .as_bytes(),
     )?;
-    out.write_all(
-        format!(
-            "c     Strategy|mode:{:>15}, time:{:9.2},\n",
-            state.strategy.0, tm,
-        )
-        .as_bytes(),
-    )?;
+
+    #[cfg(not(feature = "strategy_adaptation"))]
+    {
+        out.write_all(format!("c     Strategy|mode:  generic, time:{:9.2},\n", tm).as_bytes())?;
+    }
+    #[cfg(feature = "strategy_adaptation")]
+    {
+        out.write_all(
+            format!(
+                "c     Strategy|mode:{:>15}, time:{:9.2},\n",
+                state.strategy.0, tm,
+            )
+            .as_bytes(),
+        )?;
+    }
+
     out.write_all(b"c \n")?;
     Ok(())
 }

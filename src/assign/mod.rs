@@ -20,31 +20,32 @@ pub use self::{
 
 use {
     self::heap::{VarHeapIF, VarOrderIF},
-    super::{cdb::ClauseDBIF, state::State, types::*},
-    std::{ops::Range, slice::Iter},
+    super::{cdb::ClauseDBIF, types::*},
+    std::{collections::HashMap, ops::Range, slice::Iter},
 };
 
 /// API for var rewarding.
 pub trait VarRewardIF {
     /// return var's activity.
-    fn activity(&mut self, vi: VarId) -> f64;
+    fn activity(&self, vi: VarId) -> f64;
     /// initialize rewards based on an order of vars.
     fn initialize_reward(&mut self, iterator: Iter<'_, usize>);
     /// clear var's activity
     fn clear_reward(&mut self, vi: VarId);
-    /// modify var's activity at conflict analysis in `analyze`.
+    /// modify var's activity at conflict analysis in `conflict_analyze` in [`solver`](`crate::solver`).
     fn reward_at_analysis(&mut self, vi: VarId);
-    /// modify var's activity at value assignment in `uncheck_{assume, enqueue, fix}`.
+    /// modify var's activity at value assignment in unit propagation.
     fn reward_at_assign(&mut self, vi: VarId);
-    /// modify var's activity at value unassigment in `cancel_until`.
+    /// modify var's activity at value un-assignment in [`cancel_until`](`crate::assign::PropagateIF::cancel_until`).
     fn reward_at_unassign(&mut self, vi: VarId);
     /// update internal counter.
     fn reward_update(&mut self);
-    /// update reward setting as a part of module adoptation.
+    #[cfg(feature = "moving_var_reward_rate")]
+    /// update reward setting as a part of module adaptation.
     fn adjust_reward(&mut self, state: &State);
 }
 
-/// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
+/// API about assignment like [`decision_level`](`crate::assign::AssignIF::decision_level`), [`stack`](`crate::assign::AssignIF::stack`), [`best_assigned`](`crate::assign::AssignIF::best_assigned`), and so on.
 pub trait AssignIF: ClauseManipulateIF + PropagateIF + VarManipulateIF + VarRewardIF {
     /// return a literal in the stack.
     fn stack(&self, i: usize) -> Lit;
@@ -66,15 +67,15 @@ pub trait AssignIF: ClauseManipulateIF + PropagateIF + VarManipulateIF + VarRewa
     fn decision_level(&self) -> DecisionLevel;
     ///return the decision var's id at that level.
     fn decision_vi(&self, lv: DecisionLevel) -> VarId;
-    /// return `true` if there are unpropagated assignments.
+    /// return `true` if there are un-propagated assignments.
     fn remains(&self) -> bool;
     /// return `true` if subsequential propagations emit the same conflict.
     fn recurrent_conflicts(&self) -> bool;
-    /// return a reference to `aasign`.
+    /// return a reference to `assign`.
     fn assign_ref(&self) -> &[Option<bool>];
     /// return a reference to `level`.
     fn level_ref(&self) -> &[DecisionLevel];
-    fn best_assigned(&mut self, flag: Flag) -> usize;
+    fn best_assigned(&mut self) -> Option<usize>;
     /// inject assignments for eliminated vars.
     fn extend_model<C>(&mut self, c: &mut C, lits: &[Lit]) -> Vec<Option<bool>>
     where
@@ -99,10 +100,18 @@ pub struct Var {
     participated: u32,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
     reward: f64,
-    /// the number of conflicts at which this var was assigned lastly.
+    /// the number of conflicts at which this var was assigned an rewarded lastly.
     timestamp: usize,
     /// the `Flag`s
     flags: Flag,
+
+    #[cfg(feature = "explore_timestamp")]
+    /// the number of conflicts at which this var was assigned lastly
+    assign_timestamp: usize,
+
+    #[cfg(feature = "extra_var_reward")]
+    /// a special reward given by aux rewarding mechanism
+    extra_reward: f64,
 }
 
 /// A record of assignment. It's called 'trail' in Glucose.
@@ -121,15 +130,28 @@ pub struct AssignStack {
     pub root_level: DecisionLevel,
     conflicts: (VarId, VarId),
     var_order: VarIdHeap, // Variable Order
-    temp_order: Vec<Lit>,
 
     //
     //## Phase handling
     //
     use_rephase: bool,
     best_assign: bool,
+    best_phases: HashMap<VarId, bool>,
     build_best_at: usize,
-    num_best_assign: f64,
+    num_best_assign: usize,
+    rephasing: bool,
+
+    //
+    //## Stage handling
+    //
+    use_stage: bool,
+    /// Decay rate for staging reward
+    staging_reward_decay: f64,
+    /// Bonus reward for vars on stage
+    staging_reward_value: f64,
+    staged_vars: HashMap<VarId, bool>,
+    stage_mode_select: usize,
+    num_stages: usize,
 
     //
     //## Statistics
@@ -157,10 +179,19 @@ pub struct AssignStack {
     //
     /// var activity decay
     activity_decay: f64,
+
+    #[cfg(feature = "moving_var_reward_rate")]
     /// maximum var activity decay
     activity_decay_max: f64,
+    #[cfg(feature = "moving_var_reward_rate")]
+    /// minimum var activity decay
+    activity_decay_min: f64,
+    #[cfg(feature = "moving_var_reward_rate")]
     /// ONLY used in feature EVSIDS
     reward_step: f64,
+
+    /// for LR
+    occurrence_compression_rate: f64,
 
     //
     //## Vivification
@@ -179,6 +210,6 @@ pub struct VarIdHeap {
     /// order : usize -> VarId, -- Which var is the n-th best?
     heap: Vec<VarId>,
     /// VarId : -> order : usize -- How good is the var?
-    /// idxs[0] contais the number of alive elements
+    /// `idxs[0]` holds the number of alive elements
     idxs: Vec<usize>,
 }

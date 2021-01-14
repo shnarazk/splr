@@ -6,7 +6,7 @@ use crate::{
     types::{Lit, MaybeInconsistent, SolverError},
 };
 
-/// API for SAT validator like `inject_assignment`, `validate` and so on.
+/// API for SAT validator like [`inject_assignment`](`crate::solver::ValidateIF::inject_assignment`), [`validate`](`crate::solver::ValidateIF::validate`) and so on.
 pub trait ValidateIF {
     /// load a assignment set into solver.
     ///

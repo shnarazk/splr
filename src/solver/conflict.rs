@@ -1,4 +1,5 @@
 //! Conflict Analysis
+
 use {
     super::{
         restart::{ProgressUpdate, RestartIF, Restarter},
@@ -6,7 +7,7 @@ use {
     },
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF},
-        cdb::{ClauseDB, ClauseDBIF},
+        cdb::{ClauseDB, ClauseDBIF, WatchDBIF},
         processor::{EliminateIF, Eliminator},
         solver::SolverEvent,
         types::*,
@@ -40,22 +41,15 @@ pub fn handle_conflict(
     } else {
         None
     };
-    rst.update(ProgressUpdate::Counter(num_conflict));
-
-    if 0 < state.last_asg {
-        rst.update(ProgressUpdate::ASG(asg.stack_len()));
-        state.last_asg = 0;
-    }
-
+    rst.update(ProgressUpdate::Counter);
     // rst.block_restart(); // to update asg progress_evaluator
     let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.c_cbt_thr);
     if use_chronobt {
         let level = asg.level_ref();
-        let c = &cdb[ci];
+        let c = &mut cdb[ci];
         let lit_count = c.iter().filter(|l| level[l.vi()] == original_dl).count();
         if 1 == lit_count {
             debug_assert!(c.iter().any(|l| level[l.vi()] == original_dl));
-            let decision = *c.iter().find(|l| level[l.vi()] == original_dl).unwrap();
             let snd_l = c
                 .iter()
                 .map(|l| level[l.vi()])
@@ -67,7 +61,10 @@ pub fn handle_conflict(
                 // decision level, we let BCP propagating that literal at the second
                 // highest decision level in conflicting cls.
                 // PREMISE: 0 < snd_l
-                asg.cancel_until(snd_l - 1);
+                let decision: Lit = *c.iter().find(|l| level[l.vi()] == original_dl).unwrap();
+                debug_assert_eq!(asg.assigned(decision), Some(false));
+                debug_assert!(snd_l < asg.level(decision.vi()));
+                asg.cancel_until(snd_l);
                 debug_assert!(
                     asg.stack_iter().all(|l| l.vi() != decision.vi()),
                     format!(
@@ -75,7 +72,55 @@ pub fn handle_conflict(
                         original_dl, snd_l
                     )
                 );
-                asg.assign_by_decision(decision);
+                debug_assert!(asg.assign(decision.vi()).is_none());
+                debug_assert!(
+                    c.iter()
+                        .all(|l| *l != decision || asg.assigned(*l).is_none()),
+                    format!(
+                        "{} maps to {:?} {:?}: decision {}",
+                        c,
+                        c.iter().map(|l| asg.assigned(*l)).collect::<Vec<_>>(),
+                        c.iter().map(|l| asg.assign(l.vi())).collect::<Vec<_>>(),
+                        decision,
+                    )
+                );
+                let l0 = c.lits[0];
+                let l1 = c.lits[1];
+                if c.lits.len() == 2 {
+                    if decision == l0 {
+                        asg.assign_by_implication(
+                            decision,
+                            AssignReason::Implication(ci, l1),
+                            snd_l,
+                        );
+                    } else {
+                        asg.assign_by_implication(
+                            decision,
+                            AssignReason::Implication(ci, l0),
+                            snd_l,
+                        );
+                    }
+                } else {
+                    if l0 == decision {
+                    } else if l1 == decision {
+                        c.lits.swap(0, 1);
+                    } else {
+                        for i in 2..c.lits.len() {
+                            let l = c.lits[i];
+                            if l == decision {
+                                c.lits.swap(0, i);
+                                cdb.watcher_lists_mut()[usize::from(!l0)].detach_with(ci);
+                                cdb.watcher_lists_mut()[usize::from(!decision)].register(l0, ci);
+                                break;
+                            }
+                        }
+                    }
+                    asg.assign_by_implication(
+                        decision,
+                        AssignReason::Implication(ci, NULL_LIT),
+                        snd_l,
+                    );
+                }
                 return Ok(());
             }
         }
@@ -109,7 +154,18 @@ pub fn handle_conflict(
     );
     asg.handle(SolverEvent::Conflict);
     // backtrack level by analyze
-    let bl_a = conflict_analyze(asg, cdb, rst, state, ci).max(asg.root_level);
+
+    let bl_a = {
+        #[cfg(not(feature = "progress_MLD"))]
+        {
+            conflict_analyze(asg, cdb, state, ci).max(asg.root_level)
+        }
+        #[cfg(feature = "progress_MLD")]
+        {
+            conflict_analyze(asg, cdb, rst, state, ci).max(asg.root_level)
+        }
+    };
+
     if state.new_learnt.is_empty() {
         #[cfg(debug)]
         {
@@ -120,6 +176,7 @@ pub fn handle_conflict(
                 asg.dump(asg, &cdb[ci]),
             );
         }
+
         return Err(SolverError::NullLearnt);
     }
     // asg.bump_vars(asg, cdb, ci);
@@ -163,12 +220,11 @@ pub fn handle_conflict(
             asg.cancel_until(bl);
             debug_assert!(asg.stack_iter().all(|l| l.vi() != l0.vi()));
             asg.assign_by_implication(l0, AssignReason::default(), 0);
+            asg.handle(SolverEvent::Assert(l0.vi()));
         } else {
             asg.assign_by_unitclause(l0);
         }
-        asg.handle(SolverEvent::Assert);
-        rst.update(ProgressUpdate::Reset);
-        elim.to_simplify += 2.0; // 1 for the positive lit, 1 for the negative.
+        rst.handle(SolverEvent::Assert(l0.vi()))
     } else {
         {
             // At the present time, some reason clauses can contain first UIP or its negation.
@@ -179,9 +235,6 @@ pub fn handle_conflict(
                 //## Learnt Literal Rewarding
                 //
                 asg.reward_at_analysis(lit.vi());
-                if !state.stabilize {
-                    continue;
-                }
                 if let AssignReason::Implication(r, _) = asg.reason(lit.vi()) {
                     for l in &cdb[r].lits {
                         let vi = l.vi();
@@ -217,7 +270,11 @@ pub fn handle_conflict(
                 act = a;
             }
         }
-        rst.update(ProgressUpdate::ACC(act));
+
+        #[cfg(feature = "progress_ACC")]
+        {
+            rst.update(ProgressUpdate::ACC(act));
+        }
 
         elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
         if lbd <= 20 {
@@ -227,21 +284,8 @@ pub fn handle_conflict(
         }
     }
     cdb.scale_activity();
-    if 0 < state.config.io_dump && num_conflict % state.config.io_dump == 0 {
-        let (rst_num_block, rst_num_restart, _, _) = rst.exports();
-        let (_rst_acc, rst_asg, rst_lbd, _rst_mld) = *rst.exports_box();
-        state.development.push((
-            num_conflict,
-            (asg.num_asserted_vars + asg.num_eliminated_vars) as f64
-                / state.target.num_of_variables as f64,
-            rst_num_restart as f64,
-            rst_num_block as f64,
-            rst_asg.trend().min(10.0),
-            rst_lbd.trend().min(10.0),
-        ));
-    }
     if cdb.check_and_reduce(asg, num_conflict) {
-        state.to_vivify += 1;
+        state.to_vivify += 1.0;
     }
     Ok(())
 }
@@ -253,7 +297,9 @@ pub fn handle_conflict(
 fn conflict_analyze(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
-    rst: &mut Restarter,
+
+    #[cfg(feature = "progress_MLD")] rst: &mut Restarter,
+
     state: &mut State,
     conflicting_clause: ClauseId,
 ) -> DecisionLevel {
@@ -263,10 +309,15 @@ fn conflict_analyze(
     learnt.push(NULL_LIT);
     let dl = asg.decision_level();
     let mut p = cdb[conflicting_clause].lits[0];
+
     #[cfg(feature = "trace_analysis")]
     println!("- analyze conflicting literal {}", p);
+
     let mut path_cnt = 0;
+
+    #[cfg(feature = "progress_MLD")]
     let mut largest_clause: u16 = 2;
+
     let vi = p.vi();
     if !asg.var(vi).is(Flag::CA_SEEN) && 0 < asg.level(vi) {
         let lvl = asg.level(vi);
@@ -281,6 +332,7 @@ fn conflict_analyze(
         } else {
             #[cfg(feature = "trace_analysis")]
             println!("- push {} to learnt, which level is {}", p, lvl);
+
             learnt.push(p);
         }
     }
@@ -311,6 +363,7 @@ fn conflict_analyze(
             AssignReason::Implication(cid, _) => {
                 #[cfg(feature = "trace_analysis")]
                 println!("analyze {}", p);
+
                 debug_assert!(!cid.is_none());
                 cdb.mark_clause_as_used(asg, cid);
                 cdb.bump_activity(cid, ());
@@ -318,7 +371,11 @@ fn conflict_analyze(
                 if !c.is(Flag::LEARNT) {
                     state.derive20.push(cid);
                 }
-                largest_clause = largest_clause.max(c.rank);
+                #[cfg(feature = "progress_MLD")]
+                {
+                    largest_clause = largest_clause.max(c.rank);
+                }
+
                 #[cfg(feature = "boundary_check")]
                 assert!(
                     0 < c.len(),
@@ -331,8 +388,10 @@ fn conflict_analyze(
                         asg.var(p.vi())
                     )
                 );
+
                 #[cfg(feature = "trace_analysis")]
                 println!("- handle {}", cid);
+
                 for q in &c[1..] {
                     let vi = q.vi();
                     if !asg.var(vi).is(Flag::CA_SEEN) {
@@ -354,6 +413,7 @@ fn conflict_analyze(
                         } else {
                             #[cfg(feature = "trace_analysis")]
                             println!("- push {} to learnt, which level is {}", q, lvl);
+
                             learnt.push(*q);
                         }
                     } else {
@@ -388,17 +448,20 @@ fn conflict_analyze(
         // set the index of the next literal to ti
         while {
             let vi = asg.stack(ti).vi();
+
             #[cfg(feature = "boundary_check")]
             assert!(
                 vi < asg.level_ref().len(),
                 format!("ti:{}, lit:{}, len:{}", ti, asg.stack(ti), asg.stack_len())
             );
+
             let lvl = asg.level(vi);
             let v = asg.var(vi);
             !v.is(Flag::CA_SEEN) || lvl != dl
         } {
             #[cfg(feature = "trace_analysis")]
             println!("- skip {} because it isn't flagged", asg.stack(ti));
+
             #[cfg(feature = "boundary_check")]
             assert!(
                 0 < ti,
@@ -411,11 +474,14 @@ fn conflict_analyze(
                     asg.dump(&cdb[conflicting_clause].lits),
                 ),
             );
+
             ti -= 1;
         }
         p = asg.stack(ti);
+
         #[cfg(feature = "trace_analysis")]
         println!("- move to flagged {}; num path: {}", p.vi(), path_cnt - 1,);
+
         asg.var_mut(p.vi()).turn_off(Flag::CA_SEEN);
         // since the trail can contain a literal which level is under `dl` after
         // the `dl`-th decision var, we must skip it.
@@ -430,9 +496,15 @@ fn conflict_analyze(
     debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);
     learnt[0] = !p;
-    rst.update(ProgressUpdate::MLD(largest_clause));
+
+    #[cfg(feature = "progress_MLD")]
+    {
+        rst.update(ProgressUpdate::MLD(largest_clause));
+    }
+
     #[cfg(feature = "trace_analysis")]
     println!("- appending {}, the result is {:?}", learnt[0], learnt);
+
     state.minimize_learnt(asg, cdb)
 }
 
@@ -449,8 +521,10 @@ impl State {
             levels[level[l.vi()] as usize] = true;
         }
         let l0 = new_learnt[0];
+
         #[cfg(feature = "boundary_check")]
         assert!(!new_learnt.is_empty());
+
         new_learnt.retain(|l| *l == l0 || !l.is_redundant(asg, cdb, &mut to_clear, &levels));
         let len = new_learnt.len();
         if 2 < len && len < 30 {
@@ -517,8 +591,10 @@ impl Lit {
                 }
                 AssignReason::Implication(cid, _) => {
                     let c = &cdb[cid];
+
                     #[cfg(feature = "boundary_check")]
                     assert!(0 < c.len());
+
                     for q in &(*c)[1..] {
                         let vi = q.vi();
                         let lv = asg.level(vi);

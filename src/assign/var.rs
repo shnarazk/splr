@@ -1,6 +1,6 @@
 /// Var struct and Database management API
 use {
-    super::{AssignStack, ClauseManipulateIF, Var, VarRewardIF},
+    super::{AssignStack, ClauseManipulateIF, Var, VarHeapIF, VarRewardIF},
     crate::types::*,
     std::{
         fmt,
@@ -16,6 +16,12 @@ impl Default for Var {
             timestamp: 0,
             flags: Flag::empty(),
             participated: 0,
+
+            #[cfg(feature = "explore_timestamp")]
+            assign_timestamp: 0,
+
+            #[cfg(feature = "extra_var_reward")]
+            extra_reward: 0.0,
         }
     }
 }
@@ -97,8 +103,9 @@ pub trait VarManipulateIF {
     /// * the number of vars
     /// * the number of asserted vars
     /// * the number of eliminated vars
-    /// * the number of unasserted vars
-    fn var_stats(&self) -> (usize, usize, usize, usize);
+    /// * the number of un-asserted vars
+    /// * the number of unreachable unassigned vars or core
+    fn var_stats(&self) -> (usize, usize, usize, usize, usize);
 }
 
 impl VarManipulateIF for AssignStack {
@@ -138,6 +145,7 @@ impl VarManipulateIF for AssignStack {
         if !self.var[vi].is(Flag::ELIMINATED) {
             self.var[vi].turn_on(Flag::ELIMINATED);
             self.clear_reward(vi);
+            self.remove_from_heap(vi);
             self.num_eliminated_vars += 1;
         } else {
             #[cfg(feature = "boundary_check")]
@@ -145,12 +153,18 @@ impl VarManipulateIF for AssignStack {
         }
     }
     #[inline]
-    fn var_stats(&self) -> (usize, usize, usize, usize) {
+    fn var_stats(&self) -> (usize, usize, usize, usize, usize) {
+        debug_assert!(
+            self.num_asserted_vars <= self.num_vars,
+            format!("nav.{}, nv.{}", self.num_asserted_vars, self.num_vars)
+        );
+        debug_assert!(self.num_eliminated_vars <= self.num_vars);
         (
             self.num_vars,
             self.num_asserted_vars,
             self.num_eliminated_vars,
-            self.num_vars - self.num_asserted_vars - self.num_eliminated_vars,
+            self.num_unasserted(),
+            self.num_unreachables(),
         )
     }
 }

@@ -31,7 +31,7 @@ pub trait VarHeapIF {
     fn get_heap_root(&mut self) -> VarId;
     fn percolate_up(&mut self, start: usize);
     fn percolate_down(&mut self, start: usize);
-    fn remove(&mut self, vs: VarId);
+    fn remove_from_heap(&mut self, vs: VarId);
 }
 
 impl VarHeapIF for AssignStack {
@@ -137,24 +137,25 @@ impl VarHeapIF for AssignStack {
         }
     }
     #[allow(dead_code)]
-    fn remove(&mut self, vs: VarId) {
-        let s = self.var_order.idxs[vs];
+    fn remove_from_heap(&mut self, vi: VarId) {
+        let i = self.var_order.idxs[vi];
         let n = self.var_order.idxs[0];
-        if n < s {
+        debug_assert_ne!(i, 0);
+        if n < i {
             return;
         }
         let vn = self.var_order.heap[n];
-        self.var_order.heap.swap(n, s);
-        self.var_order.idxs.swap(vn, vs);
+        self.var_order.heap.swap(n, i);
+        self.var_order.idxs.swap(vn, vi);
         self.var_order.idxs[0] -= 1;
         if 1 < self.var_order.idxs[0] {
-            self.percolate_down(1);
+            self.percolate_down(i);
         }
     }
 }
 
 pub trait VarOrderIF {
-    fn new(n: usize, init: usize) -> VarIdHeap;
+    fn new(n: usize, init: usize) -> Self;
     fn clear(&mut self);
     fn contains(&self, v: VarId) -> bool;
     fn len(&self) -> usize;
@@ -162,7 +163,7 @@ pub trait VarOrderIF {
 }
 
 impl VarOrderIF for VarIdHeap {
-    fn new(n: usize, init: usize) -> VarIdHeap {
+    fn new(n: usize, init: usize) -> Self {
         let mut heap = Vec::with_capacity(n + 1);
         let mut idxs = Vec::with_capacity(n + 1);
         heap.push(0);
@@ -200,8 +201,8 @@ impl VarIdHeap {
     fn check(&self, s: &str) {
         let h = &mut self.heap.clone()[1..];
         let d = &mut self.idxs.clone()[1..];
-        h.sort();
-        d.sort();
+        h.sort_unstable();
+        d.sort_unstable();
         for i in 0..h.len() {
             if h[i] != i + 1 {
                 panic!("heap {} {} {:?}", i, h[i], h);

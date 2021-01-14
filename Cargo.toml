@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2018"
@@ -13,26 +13,22 @@ categories = ["mathematics", "science"]
 
 [dependencies]
 bitflags = "1.2"
-libc = { version = "0.2", optional = true }
-structopt = { version = "0.3", optional = true }
-
-[[bin]]
-name = "dmcr"
-required-features = ["libc", "structopt"]
-
-[[bin]]
-name = "splr"
-required-features = ["libc", "structopt"]
 
 [features]
-default = ["cli"]
-cli = ["libc", "structopt"]
+default = ["staging"]
+staging = ["extra_var_reward"]
 boundary_check = []
 ema_calibration = []
 EVSIDS = []
+explore_timestamp = ["staging"]
+extra_var_reward = []
 incremental_solver = []
+luby_blocking = []
+moving_var_reward_rate = []
 no_IO = []
-temp_order = []
+progress_ACC = []
+progress_MLD = []
+strategy_adaptation = []
 trace_analysis = []
 trace_elimination = []
 

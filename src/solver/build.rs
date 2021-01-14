@@ -103,7 +103,7 @@ pub trait SatSolverIF {
     /// * `SolverError::OutOfRange` if any literal used in the CNF is out of range for var index.
     #[cfg(not(feature = "no_IO"))]
     fn build(config: &Config) -> Result<Solver, SolverError>;
-    /// reinitialize a solver for incremental solving. **Requires 'incremenal_solver' feature**
+    /// reinitialize a solver for incremental solving. **Requires 'incremental_solver' feature**
     fn reset(&mut self);
 }
 
@@ -246,7 +246,7 @@ impl SatSolverIF for Solver {
 }
 
 impl Solver {
-    /// FIXME: this should return Result<ClauseId, SolverErrror>
+    /// FIXME: this should return Result<ClauseId, SolverError>
     /// fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId>
     // renamed from clause_new
     fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId> {
@@ -293,14 +293,9 @@ impl Solver {
     #[cfg(not(feature = "no_IO"))]
     fn inject(mut self, mut reader: BufReader<File>) -> Result<Solver, SolverError> {
         self.state.progress_header();
-        self.state.progress(
-            &self.asg,
-            &self.cdb,
-            &self.elim,
-            &self.rst,
-            Some("initialization phase"),
-        );
-        self.state.flush("loading...");
+        self.state
+            .progress(&self.asg, &self.cdb, &self.elim, &self.rst);
+        self.state.flush("Initialization phase: loading...");
         let mut buf = String::new();
         loop {
             buf.clear();
@@ -326,8 +321,13 @@ impl Solver {
         }
         debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
-        self.asg.handle(SolverEvent::Adapt(self.state.strategy, 0));
-        self.rst.handle(SolverEvent::Adapt(self.state.strategy, 0));
+
+        #[cfg(feature = "strategy_adaptation")]
+        {
+            self.asg.handle(SolverEvent::Adapt(self.state.strategy, 0));
+            self.rst.handle(SolverEvent::Adapt(self.state.strategy, 0));
+        }
+
         Ok(self)
     }
     fn inject_from_vec<V>(mut self, v: &[V]) -> Result<Solver, SolverError>
@@ -335,13 +335,8 @@ impl Solver {
         V: AsRef<[i32]>,
     {
         self.state.progress_header();
-        self.state.progress(
-            &self.asg,
-            &self.cdb,
-            &self.elim,
-            &self.rst,
-            Some("initialization phase"),
-        );
+        self.state
+            .progress(&self.asg, &self.cdb, &self.elim, &self.rst);
         self.state.flush("injecting...");
         for ints in v.iter() {
             for i in ints.as_ref().iter() {
@@ -360,8 +355,13 @@ impl Solver {
         }
         debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
-        self.asg.handle(SolverEvent::Adapt(self.state.strategy, 0));
-        self.rst.handle(SolverEvent::Adapt(self.state.strategy, 0));
+
+        #[cfg(feature = "strategy_adaptation")]
+        {
+            self.asg.handle(SolverEvent::Adapt(self.state.strategy, 0));
+            self.rst.handle(SolverEvent::Adapt(self.state.strategy, 0));
+        }
+
         Ok(self)
     }
 }

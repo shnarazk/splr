@@ -6,8 +6,8 @@ use {
 };
 
 pub trait VarOrderIF {
-    fn new(n: usize, init: usize) -> VarOccHeap;
-    fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upword: bool);
+    fn new(n: usize, init: usize) -> Self;
+    fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upward: bool);
     fn clear<A>(&mut self, asg: &mut A)
     where
         A: AssignIF;
@@ -22,7 +22,7 @@ pub trait VarOrderIF {
 }
 
 impl VarOrderIF for VarOccHeap {
-    fn new(n: usize, init: usize) -> VarOccHeap {
+    fn new(n: usize, init: usize) -> Self {
         let mut heap = Vec::with_capacity(n + 1);
         let mut idxs = Vec::with_capacity(n + 1);
         heap.push(0);
@@ -190,7 +190,7 @@ impl VarOccHeap {
             }
         }
     }
-    #[allow(dead_code)]
+    /* #[allow(dead_code)]
     fn peek(&self) -> VarId {
         self.heap[1]
     }
@@ -213,8 +213,8 @@ impl VarOccHeap {
     fn check(&self, s: &str) {
         let h = &mut self.heap.clone()[1..];
         let d = &mut self.idxs.clone()[1..];
-        h.sort();
-        d.sort();
+        h.sort_unstable();
+        d.sort_unstable();
         for i in 0..h.len() {
             if h[i] != i + 1 {
                 panic!("heap {} {} {:?}", i, h[i], h);
@@ -224,7 +224,7 @@ impl VarOccHeap {
             }
         }
         println!(" - pass var_order test at {}", s);
-    }
+    } */
 }
 
 impl fmt::Display for VarOccHeap {

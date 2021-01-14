@@ -1,9 +1,8 @@
+#[cfg(feature = "strategy_adaptation")]
+use crate::state::SearchStrategy;
 use {
     super::{CertifiedRecord, Clause, ClauseDB, ClauseId, WatchDBIF, LBDIF},
-    crate::{
-        assign::AssignIF, processor::EliminateIF, solver::SolverEvent, state::SearchStrategy,
-        types::*,
-    },
+    crate::{assign::AssignIF, solver::SolverEvent, types::*},
     std::{
         cmp::Ordering,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -13,7 +12,7 @@ use {
 
 const ACTIVITY_MAX: f64 = 1e308;
 
-/// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
+/// API for clause management like [`check_and_reduce`](`crate::cdb::ClauseDBIF::check_and_reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`watcher_list`](`crate::cdb::ClauseDBIF::watcher_list`), and so on.
 pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// return the length of `clause`.
     fn len(&self) -> usize;
@@ -29,7 +28,7 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     fn watcher_list(&self, l: Lit) -> &[Watch];
     /// return the list of watch lists
     fn watcher_lists_mut(&mut self) -> &mut [Vec<Watch>];
-    /// unregister a clause `cid` from clause database and make the clause dead.
+    /// un-register a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
     /// check a condition to reduce.
     /// * return `true` if reduction is done.
@@ -72,11 +71,6 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     fn certificate_add(&mut self, vec: &[Lit]);
     /// record a deleted clause to unsat certification.
     fn certificate_delete(&mut self, vec: &[Lit]);
-    /// delete satisfied clauses at decision level zero.
-    fn eliminate_satisfied_clauses<A, E>(&mut self, asg: &mut A, elim: &mut E, occur: bool)
-    where
-        A: AssignIF,
-        E: EliminateIF;
     /// flag positive and negative literals of a var as dirty
     fn touch_var(&mut self, vi: VarId);
     /// check the number of clauses
@@ -96,8 +90,10 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     fn minimize_with_biclauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
     where
         A: AssignIF;
-    /// save an eliminated permanent clause to an extra space for incremental solving.
+
+    #[cfg(feature = "strategy_adaptation")]
     #[cfg(feature = "incremental_solver")]
+    /// save an eliminated permanent clause to an extra space for incremental solving.
     fn make_permanent_immortal(&mut self, cid: ClauseId);
 }
 
@@ -121,7 +117,7 @@ impl Default for ClauseDB {
             extra_inc: 1000,
             first_reduction: 1000,
             next_reduction: 1000,
-            reducable: true,
+            reducible: true,
             reduction_coeff: 1,
             num_active: 0,
             num_bi_clause: 0,
@@ -248,13 +244,14 @@ impl Instantiate for ClauseDB {
             bin_watcher,
             watcher,
             certified,
-            reducable: config.use_reduce(),
+            reducible: config.use_reduce(),
             soft_limit: config.c_cls_lim,
             ..ClauseDB::default()
         }
     }
     fn handle(&mut self, e: SolverEvent) {
         match e {
+            #[cfg(feature = "strategy_adaptation")]
             SolverEvent::Adapt(strategy, num_conflict) => {
                 // # PRECONDITION
                 // decision level must be 0 if `state.strategy.1` == `state[Stat::Conflict]`
@@ -305,7 +302,7 @@ impl Instantiate for ClauseDB {
     }
 }
 
-impl Export<(usize, usize, usize, usize, usize, usize), ()> for ClauseDB {
+impl Export<(usize, usize, usize, usize, usize, usize), bool> for ClauseDB {
     /// exports:
     ///  1. the number of active clauses
     ///  1. the number of binary clauses
@@ -332,7 +329,9 @@ impl Export<(usize, usize, usize, usize, usize, usize), ()> for ClauseDB {
         )
     }
     /// return the value of `use_chan_seok`
-    fn active_mode(&self) {}
+    fn mode(&self) -> bool {
+        self.use_chan_seok
+    }
 }
 
 impl ClauseDBIF for ClauseDB {
@@ -397,7 +396,7 @@ impl ClauseDBIF for ClauseDB {
                     if c.is(Flag::LEARNT) {
                         self.num_learnt -= 1;
                     }
-                    if !certified.is_empty() && !c.is(Flag::VIV_ASSUMP) {
+                    if !certified.is_empty() && !c.is(Flag::VIV_ASSUMED) {
                         let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
                         debug_assert!(!temp.is_empty());
                         certified.push((CertifiedRecord::DELETE, temp));
@@ -434,7 +433,7 @@ impl ClauseDBIF for ClauseDB {
                     if c.is(Flag::LEARNT) {
                         self.num_learnt -= 1;
                     }
-                    if !certified.is_empty() && !c.is(Flag::VIV_ASSUMP) {
+                    if !certified.is_empty() && !c.is(Flag::VIV_ASSUMED) {
                         let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
                         debug_assert!(!temp.is_empty());
                         certified.push((CertifiedRecord::DELETE, temp));
@@ -540,7 +539,7 @@ impl ClauseDBIF for ClauseDB {
             self.clause.push(c);
         };
         if self.during_vivification {
-            self[cid].turn_on(Flag::VIV_ASSUMP);
+            self[cid].turn_on(Flag::VIV_ASSUMED);
         }
         let c = &mut self[cid];
         // assert!(0 < c.rank);
@@ -633,7 +632,7 @@ impl ClauseDBIF for ClauseDB {
     where
         A: AssignIF,
     {
-        if !self.reducable || 0 == self.num_learnt {
+        if !self.reducible || 0 == self.num_learnt {
             return false;
         }
         let go = if self.use_chan_seok {
@@ -669,26 +668,6 @@ impl ClauseDBIF for ClauseDB {
             let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
             self.certified.push((CertifiedRecord::DELETE, temp));
         }
-    }
-    fn eliminate_satisfied_clauses<A, E>(&mut self, asg: &mut A, elim: &mut E, update_occur: bool)
-    where
-        A: AssignIF,
-        E: EliminateIF,
-    {
-        for (cid, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
-            if !c.is(Flag::DEAD) && asg.satisfies(&c.lits) {
-                c.kill(&mut self.touched);
-                if elim.is_running() {
-                    if update_occur {
-                        elim.remove_cid_occur(asg, ClauseId::from(cid), c);
-                    }
-                    for l in &c.lits {
-                        elim.enqueue_var(asg, l.vi(), true);
-                    }
-                }
-            }
-        }
-        self.garbage_collect();
     }
     fn touch_var(&mut self, vi: VarId) {
         self.touched[Lit::from_assign(vi, true)] = true;
@@ -850,6 +829,8 @@ impl ClauseDB {
         debug_assert!(perm[0..keep].iter().all(|cid| !clause[*cid].is(Flag::DEAD)));
         self.garbage_collect();
     }
+
+    #[cfg(feature = "strategy_adaptation")]
     /// change good learnt clauses to permanent one.
     fn make_permanent(&mut self, reinit: bool) {
         // Adjusting for low decision levels.

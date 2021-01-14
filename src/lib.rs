@@ -47,12 +47,12 @@ match Certificate::try_from(v).expect("panic!") {
 ## Incremental solver
 
 Splr provides 'incremental solver mode' if you built it with feature 'incremental_solver'.
-This document covers extra functions only if you built it with `cargo doc --features incremental_sorver`.
+This document covers extra functions only if you built it with `cargo doc --features incremental_solver`.
 
 */
 /// Crate `assign` implements Boolean Constraint Propagation and decision var selection.
 pub mod assign;
-/// Crate `cdb` provides `Clause` object and its manager `ClauseDB`
+/// Crate `cdb` provides [`Clause`](`crate::cdb::Clause`) object and its manager [`ClauseDB`](`crate::cdb::ClauseDB`).
 pub mod cdb;
 /// Crate `config` provides solver's configuration and CLI.
 pub mod config;

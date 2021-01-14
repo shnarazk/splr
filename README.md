@@ -1,18 +1,17 @@
-A modern SAT Solver for Propositional Logic in Rust
-----
+## A modern SAT Solver for Propositional Logic in Rust
 
 Splr is a pure [Rust](https://www.rust-lang.org)ic modern SAT solver, based on [Glucose 4.1](https://www.labri.fr/perso/lsimon/glucose/).
 It adopts various research results on SAT solvers:
 
-- *CDCL*, *watch literals*, *LBD* and so on from Glucose, [Minisat](http://minisat.se) and the ancestors
-- Glucose-like *dynamic blocking/forcing restarts* based on [EMAs](https://arxiv.org/abs/1506.08905)
+- _CDCL_, _watch literals_, _LBD_ and so on from Glucose, [Minisat](http://minisat.se) and the ancestors
+- Glucose-like _dynamic blocking/forcing restarts_ based on [EMAs](https://arxiv.org/abs/1506.08905)
 - pre/in-process simplification based on clause subsumption and variable elimination
-- compile-time selection of a variant of *Learning Rate Based Branching* with *Reason Side Rewarding* and EVSIDS
-- *chronological backtrack* aka *chronoBT*
+- compile-time selection of a variant of _Learning Rate Based Branching_ with _Reason Side Rewarding_ and EVSIDS
+- _chronological backtrack_ aka _chronoBT_
 - Glucose-like heuristics adaptation
 - [CaDiCaL](https://github.com/arminbiere/cadical)-like extended phase saving
 - a variant of CaDiCaL-like search stabilization
-- *clause vivification* by {pre,in}-processor
+- _clause vivification_ by {pre,in}-processor
 
 *Many thanks to SAT researchers.*
 
@@ -22,14 +21,16 @@ Please check [ChangeLog](ChangeLog.md) about recent updates.
 
 Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results.
 
-#### Version 0.5.0
+#### Version 0.6.0
 
-* all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
-* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.5.0(3e68efc) solved with a 500 sec (soft) timeout:
-  * 67 satisfiable problems: all the solutions were correct.
-  * 7 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+_Warning: Version 0.6.0 might not be the best version. It changed var reward mechanism, restart policy and in-processor timing._
 
-![](https://user-images.githubusercontent.com/997855/91648473-42d44d80-eaa3-11ea-83d8-5a52e02621d0.png)
+- all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+- [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.6.0 RC() solved with a 300 sec (soft) timeout:
+  - 45 (20201226) and 42 (eab832c) satisfiable problems: all the solutions were correct.
+  - 6 (20201226) and 4 (eab832c) unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+
+![Benchmark result(2020-12-27)](https://user-images.githubusercontent.com/997855/103163156-9f6f2b80-483d-11eb-90d3-29d076792c13.png)
 
 ## Install
 
@@ -45,41 +46,43 @@ Splr is a standalone program, taking a CNF file. The result will be saved to a f
 defined by [SAT competition 2011 rules](http://www.satcompetition.org/2011/rules.pdf).
 
 ```plain
-$ splr tests/sample.cnf
-sample.cnf                                         250,1065 |time:     0.14
- #conflict:       8481, #decision:         9686, #propagate:          18146 
-  Assignment|#rem:      243, #ass:        1, #elm:        6, prg%:   2.8000 
-      Clause|Remv:     6952, LBD2:       42, Binc:        0, Perm:     1056 
-   Stabilize|#RST:       24, #BLK:      138, #STB:        2, #CNC:       86 
-         EMA|tLBD:   1.6450, tASG:   2.9712, eMLD:   6.6816, eCCC:   0.7302 
-    Conflict|eLBD:     8.70, cnfl:    10.67, bjmp:     9.84, /ppc:     2.14 
-        misc|elim:        1, cviv:        0, #vbv:        0, /cpr:   353.38 
+$ splr tests/uf250-02.cnf
+[     16384] Lcycle:     1, core:      120, heat:         5, /cpr:  8192.00
+[     49175] Lcycle:     2, core:       97, heat:         4, /cpr:  4097.92
+uf250-02.cnf                                       250,1065 |time:     2.82
+ #conflict:      75182, #decision:        81701, #propagate:        3139389
+  Assignment|#rem:      244, #ass:        0, #elm:        6, prg%:   2.4000
+      Clause|Remv:    35393, LBD2:      201, Binc:       22, Perm:     1083
+   Stabilize|#BLK:      515, #RST:       96, Lspn:        2, Lcyc:        2
+         EMA|tLBD:   1.2936, tASG:   1.2015, core:        0, /dpc:     1.09
+    Conflict|eLBD:    11.69, cnfl:    11.85, bjmp:    10.85, /ppc:    41.76
+        misc|elim:        1, cviv:        2, #vbv:        0, /cpr:   783.15
     Strategy|mode: Initial search phase before a main strategy
-      Result|file: ./.ans_sample.cnf
-s SATISFIABLE: tests/sample.cnf
+      Result|file: ./.ans_uf250-02.cnf
+s SATISFIABLE: tests/uf250-02.cnf
 ```
 
 ```plain
-$ cat .ans_sample.cnf
-c This file was generated by splr-0.5.0 for tests/sample.cnf
+$ cat .ans_uf250-02.cnf
+c This file was generated by splr-0.6.0-RC0 for tests/uf250-02.cnf
 c 
-c CNF file(sample.cnf), #var:      250, #cls:     1065
-c  #conflict:       8481, #decision:         9686, #propagate:          18146,
-c   Assignment|#rem:      243, #fix:        1, #elm:        6, prg%:   2.8000,
-c       Clause|Remv:     6952, LBD2:       42, Binc:        0, Perm:     1056,
-c      Restart|#RST:       24, #BLK:      138, #STB:        2, #CNC:       86,
-c          EMA|tLBD:   1.6450, tASG:   2.9712, eMLD:   6.6816, eCCC:        1,
-c     Conflict|eLBD:     8.70, cnfl:    10.67, bjmp:     9.84, /ppc:   2.1396,
-c         misc|elim:        1, cviv:        0, #vbv:        0, /cpr:   353.38,
-c     Strategy|mode:        Initial, time:     0.14,
+c CNF file(uf250-02.cnf), #var:      250, #cls:     1065
+c  #conflict:      75182, #decision:        81701, #propagate:        3139389,
+c   Assignment|#rem:      244, #fix:        0, #elm:        6, prg%:   2.4000,
+c       Clause|Remv:    35393, LBD2:      201, Binc:       22, Perm:     1083,
+c      Restart|#BLK:      515, #RST:       96, Lspn:        2, Lcyc:        2,
+c          EMA|tLBD:   1.2936, tASG:   1.2015, core:        0, /dpc:     1.09,
+c     Conflict|eLBD:    11.69, cnfl:    11.85, bjmp:    10.85, /ppc:    41.76,
+c         misc|elim:        1, cviv:        2, #vbv:        0, /cpr:   783.15,
+c     Strategy|mode:        Initial, time:     2.82,
 c 
 s SATISFIABLE
-v 1 2 3 4 -5 6 7 -8 -9 10 11 -12 -13 -14 15 16 -17 18 ... 0
+v -1 -2 -3 4 5 6 7 -8 9 10 11 12 -13 14 -15 16 -17 -18 19 -20 ... -250 0
 ```
 
 ```plain
-$ dmcr tests/sample.cnf
-A valid assignment set for tests/sample.cnf is found in .ans_sample.cnf.
+$ dmcr tests/uf250-02.cnf
+A valid assignment set for tests/uf250-02.cnf is found in .ans_uf250-02.cnf
 ```
 
 If you want to certificate unsatisfiability, use `splr --certificate` and recommend to use [Grid](https://www21.in.tum.de/~lammich/grat/).
@@ -89,13 +92,13 @@ If you want to certificate unsatisfiability, use `splr --certificate` and recomm
 ```plain
 $ splr -c tests/unsat.cnf
 unsat.cnf                                            83,570 |time:     0.00
- #conflict:          0, #decision:            0, #propagate:              0 
-  Assignment|#rem:       19, #ass:       64, #elm:        0, prg%:  77.1084 
-      Clause|Remv:        0, LBD2:        0, Binc:      126, Perm:      135 
-     Restart|#RST:        0, #BLK:        0, #STB:        0, #CNC:        0 
-         EMA|tLBD:      NaN, tASG:      NaN, eMLD:   0.0000, eCCC:   0.0000 
-    Conflict|eLBD:     0.00, cnfl:     0.00, bjmp:     0.00, /ppc:      NaN 
-        misc|elim:        0, cviv:        0, #vbv:        0, /cpr:      NaN 
+ #conflict:          0, #decision:            0, #propagate:              0
+  Assignment|#rem:       19, #ass:       64, #elm:        0, prg%:  77.1084
+      Clause|Remv:        0, LBD2:        0, Binc:      126, Perm:      135
+     Restart|#BLK:        0, #RST:        0, Lspn:        1, Lcyc:        0
+         EMA|tLBD:      NaN, tASG:      NaN, core:       83, /dpc:      NaN
+    Conflict|eLBD:     0.00, cnfl:     0.00, bjmp:     0.00, /ppc:      NaN
+        misc|elim:        1, cviv:        0, #vbv:        0, /cpr:      NaN
     Strategy|mode: Initial search phase before a main strategy
       Result|file: ./.ans_unsat.cnf
  Certificate|file: proof.out
@@ -116,7 +119,7 @@ c sizeof(cdb_t) = 4
 c sizeof(cdb_t*) = 8
 c Using RAT run heuristics
 c Parsing formula ... 0ms
-c Parsing proof (ASCII format) ... 0ms
+c Parsing proof (ASCII format) ... 1ms
 c Forward pass ... 0ms
 c Starting Backward pass
 c Single threaded mode
@@ -140,23 +143,21 @@ c   RAT run heuristics:   0
 c Total lemmas:  0
 
 c Size statistics (bytes)
-c Number of clauses: 981
-c Clause DB size:  25372
-c Item list:       15696
-c Pivots store:    4096
+c Number of clauses: 1110
+c Clause DB size:  27612
+c Item list:       23840
+c Pivots store:    8192
 ```
 
 4. Verify it with `gratchk`
 
 ```plain
 $ gratchk unsat tests/unsat.cnf proof.grat
-gratchk unsat tests/unsat.cnf proof.grat gratchktests/unsat.cnf proof.grat
 c Reading cnf
 c Reading proof
 c Done
 c Verifying unsat
 s VERIFIED UNSAT
-$
 ```
 
 ### Calling Splr from Rust programs
@@ -239,104 +240,102 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 
 ### Mnemonics used in the progress message
 
-| mnemonic  | meaning |
-| --------- |------- |
-| `#var`  | the number of variables used in the given CNF file |
-| `#cls`  | the number of clauses used in the given CNF file |
-| `time`  | elapsed CPU time in seconds (or wall-clock time if CPU time is not available) |
-| `#conflict` | the number of conflicts |
-| `#decision` | the number of decisions |
-| `#propagate` | the number of propagates (its unit is literal) |
-| `#rem` | the number of remaining variables |
-| `#fix` | the number of asserted variables (which has been assigned a value at decision level zero) |
-| `#elm` | the number of eliminated variables |
-| `prg%` | the percentage of `remaining variables / total variables` |
-| `Remv` | the number of learnt clauses which are not biclauses |
-| `LBD2` | the number of learnt clauses which LBDs are 2 |
-| `Binc` | the number of binary learnt clauses |
-| `Perm` | the number of given clauses and binary learnt clauses |
-| `#RST` | the number of restart |
-| `#BLK` | the number of blocking restart |
-| `#STB` | the number of restart in stabilization mode |
-| `#CNC` | the number of blocking restart in stabilization mode |
-| `tLBD` | the trend rate of learn clause's LBD |
-| `tASG` | the trend rate of the number of assigned variables |
-| `eMLD` | the EMA, Exponential Moving Average, of Maximum LBD of Dependency graphs |
-| `eCCC` | the EMA, Exponential Moving Average, of activity-based Conflict Correlation Coefficients |
-| `eLBD` | the EMA, Exponential Moving Average, of learn clauses' LBDs |
-| `eMLD` | the EMA, Exponential Moving Average, of learn clauses' LBDs |
-| `cnfl` | the EMA of decision levels at which conflicts occur |
-| `bjmp` | the EMA of decision levels to which backjumps go |
-| `/ppc` | the number of propagations per conflict |
-| `elim` | the number of invocations of clause/var elimination |
-| `cviv` | the number of invocations of clause vivification |
-| `#vbv` | the number of vars which were asserted by clause vivification |
-| `/cpr` | the number of conflicts per restart |
-| `mode` | Selected strategy's id |
-| `time` | the elapsed CPU time in seconds |
+| mnemonic     | meaning                                                                                   |
+| ------------ | ----------------------------------------------------------------------------------------- |
+| `#var`       | the number of variables used in the given CNF file                                        |
+| `#cls`       | the number of clauses used in the given CNF file                                          |
+| `time`       | elapsed CPU time in seconds (or wall-clock time if CPU time is not available)             |
+| `#conflict`  | the number of conflicts                                                                   |
+| `#decision`  | the number of decisions                                                                   |
+| `#propagate` | the number of propagates (its unit is literal)                                            |
+| `#rem`       | the number of remaining variables                                                         |
+| `#ass`       | the number of asserted variables (which has been assigned a value at decision level zero) |
+| `#elm`       | the number of eliminated variables                                                        |
+| `prg%`       | the percentage of `remaining variables / total variables`                                 |
+| `Remv`       | the number of learnt clauses which are not biclauses                                      |
+| `LBD2`       | the number of learnt clauses which LBDs are 2                                             |
+| `Binc`       | the number of binary learnt clauses                                                       |
+| `Perm`       | the number of given clauses and binary learnt clauses                                     |
+| `#BLK`       | the number of blocking restart                                                            |
+| `#RST`       | the number of restart                                                                     |
+| `Lspn`       | the current length of rephrase mode                                                       |
+| `Lcyc`       | the number of Lucy-based rephrasing cycle                                                 |
+| `tLBD`       | the trend rate of learn clause's LBD                                                      |
+| `core`       | the least number of unassigned vars                                                       |
+| `/dpc`       | decisions per conflict                                                                    |
+| `eLBD`       | the EMA, Exponential Moving Average, of learn clauses' LBDs                               |
+| `cnfl`       | the EMA of decision levels at which conflicts occur                                       |
+| `bjmp`       | the EMA of decision levels to which backjumps go                                          |
+| `/ppc`       | propagations per conflict                                                                 |
+| `elim`       | the number of invocations of clause/var elimination                                       |
+| `cviv`       | the number of invocations of clause vivification                                          |
+| `#vbv`       | the number of vars which were asserted by clause vivification                             |
+| `/cpr`       | conflicts per restart                                                                     |
+| `mode`       | Selected strategy's id                                                                    |
+| `time`       | the elapsed CPU time in seconds                                                           |
+| `heat`       | the number of vars with higher activities than the smallest activity chosen as best phase |
 
 ## Command line options
 
 Please check the help message.
 
-* The 'switch' in help message below is either '1' or '0' to or not to use a module.
-* Splr can't handle compressed CNF files so far.
+- The 'switch' in help message below is either '1' or '0' to or not to use a module.
+- Splr can't handle compressed CNF files so far.
 
 ```plain
 $ splr --help
-splr 0.5.0
-Narazaki Shuji <shujinarazaki@protonmail.com>
+splr 0.6.0
 A modern CDCL SAT solver in Rust
 
 USAGE:
-    splr [FLAGS] [OPTIONS] <cnf-file>
-
+  splr [FLAGS] [OPTIONS] <cnf-file>
 FLAGS:
-    -h, --help        Prints help information
-    -C, --no-color    Disable coloring
-    -q, --quiet       Disable any progress message
-    -c, --certify     Writes a DRAT UNSAT certification file
-    -l, --log         Uses Glucose-like progress report
-    -V, --version     Prints version information
-
-OPTIONS:
-        --ADP <a-adaptive>      Strategy adaptation switch       [default: 1]
-        --ELI <a-elim>          Eliminator switch                [default: 1]
-        --RDC <a-reduce>        Clause reduction switch          [default: 1]
-        --RPH <a-rephase>       Rephase switch                   [default: 1]
-        --RSR <a-rsr>           Reason-Side Rewarding switch     [default: 1]
-        --STB <a-stabilize>     Stabilization switch             [default: 1]
-        --VIV <a-vivify>        Vivification switch              [default: 1]
-        --cbt <c-cbt-thr>       Dec. lvl to use chronoBT       [default: 100]
-        --cl <c-cls-lim>        Soft limit of #clauses (6MC/GB)  [default: 0]
-        --ii <c-ip-int>         #cls to start in-processor   [default: 25000]
-    -t, --timeout <c-tout>      CPU time limit in sec.      [default: 5000.0]
-        --ecl <elim-cls-lim>    Max #lit for clause subsume     [default: 32]
-        --evl <elim-grw-lim>    Grow limit of #cls in var elim.  [default: 0]
-        --evo <elim-var-occ>    Max #cls for var elimination  [default: 8192]
-        --stat <io-dump>        Interval for dumping stat data   [default: 0]
-    -o, --dir <io-odir>         Output directory                 [default: .]
-    -p, --proof <io-pfile>      DRAT Cert. filename      [default: proof.out]
-    -r, --result <io-rfile>     Result filename/stdout            [default: ]
-        --ral <rst-asg-len>     Length of assign. fast EMA      [default: 30]
-        --ras <rst-asg-slw>     Length of assign. slow EMA   [default: 10000]
-        --rat <rst-asg-thr>     Blocking restart threshold     [default: 1.4]
-        --rct <rst-ccc-thr>     Conflict Correlation threshold [default: 0.7]
-        --rll <rst-lbd-len>     Length of LBD fast EMA          [default: 30]
-        --rls <rst-lbd-slw>     Length of LBD slow EMA       [default: 10000]
-        --rlt <rst-lbd-thr>     Forcing restart threshold      [default: 1.2]
-        --rut <rst-mld-thr>     Usability to restart           [default: 4.0]
-        --rss <rst-stb-scl>     Stabilizer scaling             [default: 2.0]
-        --rs <rst-step>         #conflicts between restarts     [default: 40]
-        --vib <viv-beg>         Lower bound of vivif. loop     [default: 0.5]
-        --vie <viv-end>         Upper bound of vivif. loop     [default: 1.5]
-        --vii <viv-int>         Vivification interval            [default: 2]
-        --vis <viv-scale>       #reduction for next vivif.     [default: 1.2]
-        --vri <vrw-dcy-beg>     Initial var reward decay      [default: 0.75]
-        --vrm <vrw-dcy-end>     Maximum var reward decay      [default: 0.98]
-
+  -h, --help               Prints help information
+  -C, --no-color           Disable coloring
+  -q, --quiet              Disable any progress message
+  -c, --certify            Writes a DRAT UNSAT certification file
+  -l, --log                Uses Glucose-like progress report
+  -V, --version            Prints version information
+OPTIONS (green options depends on compile-time flags):
+OPTIONS (red options depend on features in Cargo.toml):
+      --ADP <a-adaptive>   Strategy adaptation switch              0
+      --ELI <a-elim>       Eliminator switch                       1
+      --LBY <a-luby>       Use Luby series for restart             0
+      --RDC <a-reduce>     Clause reduction switch                 1
+      --RPH <a-rephase>    Re-phase switch                         1
+      --RSR <a-rsr>        Reason-Side Rewarding switch            1
+      --STB <a-stabilize>  Stabilization switch                    1
+      --STG <a-stage>      Stage switch                            1
+      --VIV <a-vivify>     Vivification switch                     0
+      --cbt <c-cbt-thr>    Dec. lvl to use chronoBT              100
+      --cl <c-cls-lim>     Soft limit of #clauses (6MC/GB)         0
+      --ii <c-ip-int>      #cls to start in-processor          10000
+  -t, --timeout <c-tout>   CPU time limit in sec.               5000
+      --ecl <elm-cls-lim>  Max #lit for clause subsume            32
+      --evl <elm-grw-lim>  Grow limit of #cls in var elim.         0
+      --evo <elm-var-occ>  Max #cls for var elimination         8192
+  -o, --dir <io-odir>      Output directory                         .
+  -p, --proof <io-pfile>   DRAT Cert. filename                 proof.out
+  -r, --result <io-rfile>  Result filename/stdout                       
+      --ral <rst-asg-len>  Length of assign. fast EMA             32
+      --ras <rst-asg-slw>  Length of assign. slow EMA          10000
+      --rat <rst-asg-thr>  Blocking restart threshold              0.10
+      --rct <rst-ccc-thr>  Conflict Correlation threshold          0.00
+      --rll <rst-lbd-len>  Length of LBD fast EMA                 32
+      --rls <rst-lbd-slw>  Length of LBD slow EMA               8192
+      --rlt <rst-lbd-thr>  Forcing restart threshold               1.20
+      --rms <rst-mld-scl>  Scaling for Max LBD of Dep.             0.00
+      --rmt <rst-mld-thr>  Threshold for Max LBD of Dep.           0.00
+      --rss <rst-stb-scl>  Stabilizer scaling                      2.00
+      --rs  <rst-step>     #conflicts between restarts            24
+      --srd <stg-rwd-dcy>  Decay rate for staged vare reward       0.50
+      --srv <stg-rwd-val>  Extra reward for staged vars            1.00
+      --vit <viv-thr>      #clause to try to vivify              200
+      --vri <vrw-dcy-beg>  Initial var reward decay                0.00
+      --vrm <vrw-dcy-end>  Maximum var reward decay                0.00
+      --vro <vrw-occ-cmp>  Occ. compression rate in LR             0.00
 ARGS:
-    <cnf-file>    DIMACS CNF file                 
+  <cnf-file>    DIMACS CNF file
 ```
 
 ## License
@@ -345,5 +344,6 @@ This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-----
+---
+
 2020, Narazaki Shuji

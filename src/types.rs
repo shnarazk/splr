@@ -24,7 +24,7 @@ use {
 /// `T` is the list of exporting values.
 pub trait Export<T, Mode> {
     fn exports(&self) -> T;
-    fn active_mode(&self) -> Mode;
+    fn mode(&self) -> Mode;
 }
 
 pub trait ExportBox<'a, T> {
@@ -33,6 +33,8 @@ pub trait ExportBox<'a, T> {
 
 /// API for Literal like `from_int`, `from_assign`, `to_cid` and so on.
 pub trait LitIF {
+    /// convert to bool
+    fn as_bool(self) -> bool;
     /// convert [VarId](../type.VarId.html) to [Lit](../type.Lit.html).
     /// It returns a positive literal if `p` is `TRUE` or `BOTTOM`.
     fn from_assign(vi: VarId, p: bool) -> Self;
@@ -50,7 +52,7 @@ pub trait ActivityIF {
     type Inc;
     /// return the current activity of an element.
     fn activity(&mut self, ix: Self::Ix) -> f64;
-    /// set activity forcely.
+    /// set activity forcibly.
     fn set_activity(&mut self, ix: Self::Ix, val: f64);
     /// update an element's activity.
     fn bump_activity(&mut self, ix: Self::Ix, dl: Self::Inc);
@@ -323,6 +325,10 @@ impl IndexMut<Lit> for Vec<Vec<Watch>> {
 /// assert_eq!(Lit::from(-2i32), !Lit::from( 2i32));
 /// ```
 impl LitIF for Lit {
+    #[inline]
+    fn as_bool(self) -> bool {
+        self.ordinal & 1 == 1
+    }
     #[inline]
     fn from_assign(vi: VarId, p: bool) -> Lit {
         Lit {
@@ -673,7 +679,7 @@ pub trait FlagIF {
 }
 
 bitflags! {
-    /// Misc flags used by `Clause` and `Var`.
+    /// Misc flags used by [`Clause`](`crate::cdb::Clause`) and [`Var`](`crate::assign::Var`).
     pub struct Flag: u16 {
 
         //
@@ -698,7 +704,7 @@ bitflags! {
         /// a given clause derived a learnt which LBD is smaller than 20.
         const DERIVE20     = 0b0010_0000_0000_0000;
         /// a temporal clause during vivification
-        const VIV_ASSUMP   = 0b0100_0000_0000_0000;
+        const VIV_ASSUMED  = 0b0100_0000_0000_0000;
 
         //
         //## For Var
@@ -709,10 +715,6 @@ bitflags! {
         const CA_SEEN      = 0b0000_0010_0000_0000;
         /// the previous assigned value of a Var.
         const PHASE        = 0b0000_0100_0000_0000;
-        /// the previous assigned value of a Var.
-        const BEST_PHASE   = 0b0000_1000_0000_0000;
-        /// the previous assigned value of a Var.
-        const REPHASE      = 0b0001_0000_0000_0000;
     }
 }
 
