@@ -293,14 +293,9 @@ impl Solver {
     #[cfg(not(feature = "no_IO"))]
     fn inject(mut self, mut reader: BufReader<File>) -> Result<Solver, SolverError> {
         self.state.progress_header();
-        self.state.progress(
-            &self.asg,
-            &self.cdb,
-            &self.elim,
-            &self.rst,
-            Some("initialization phase"),
-        );
-        self.state.flush("loading...");
+        self.state
+            .progress(&self.asg, &self.cdb, &self.elim, &self.rst);
+        self.state.flush("Initialization phase: loading...");
         let mut buf = String::new();
         loop {
             buf.clear();
@@ -335,13 +330,8 @@ impl Solver {
         V: AsRef<[i32]>,
     {
         self.state.progress_header();
-        self.state.progress(
-            &self.asg,
-            &self.cdb,
-            &self.elim,
-            &self.rst,
-            Some("initialization phase"),
-        );
+        self.state
+            .progress(&self.asg, &self.cdb, &self.elim, &self.rst);
         self.state.flush("injecting...");
         for ints in v.iter() {
             for i in ints.as_ref().iter() {

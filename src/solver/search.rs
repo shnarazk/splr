@@ -58,7 +58,9 @@ impl SolveIF for Solver {
         }
         asg.num_asserted_vars = asg.stack_len();
         state.progress_header();
-        state.progress(asg, cdb, elim, rst, Some("preprocessing stage"));
+        state.progress(asg, cdb, elim, rst);
+        state.flush("");
+        state.flush("Preprocessing stage: ");
         if 0 < asg.stack_len() {
             elim.eliminate_satisfied_clauses(asg, cdb, false);
         }
@@ -109,7 +111,7 @@ impl SolveIF for Solver {
                 if elim.simplify(asg, cdb, state).is_err() {
                     // Why inconsistent? Because the CNF contains a conflict, not an error!
                     // Or out of memory.
-                    state.progress(asg, cdb, elim, rst, None);
+                    state.progress(asg, cdb, elim, rst);
                     if cdb.check_size().is_err() {
                         return Err(SolverError::OutOfMemory);
                     }
@@ -136,9 +138,9 @@ impl SolveIF for Solver {
         //
         //## Search
         //
-        state.progress(asg, cdb, elim, rst, None);
+        state.progress(asg, cdb, elim, rst);
         let answer = search(asg, cdb, elim, rst, state);
-        state.progress(asg, cdb, elim, rst, None);
+        state.progress(asg, cdb, elim, rst);
         match answer {
             Ok(true) => {
                 // As a preparation for incremental solving, we need to backtrack to the
@@ -322,7 +324,7 @@ fn adapt_modules(
     rst: &mut Restarter,
     state: &mut State,
 ) -> MaybeInconsistent {
-    state.progress(asg, cdb, elim, rst, None);
+    state.progress(asg, cdb, elim, rst);
     let asg_num_conflict = asg.num_conflict;
     if 10 * state.reflection_interval == asg_num_conflict {
         // Need to call it before `cdb.adapt_to`

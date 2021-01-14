@@ -32,14 +32,8 @@ pub trait StateIF {
     /// write a header of stat data to stdio.
     fn progress_header(&mut self);
     /// write stat data to stdio.
-    fn progress<'r, A, C, E, R>(
-        &mut self,
-        asg: &A,
-        cdb: &C,
-        elim: &E,
-        rst: &'r R,
-        mes: Option<&str>,
-    ) where
+    fn progress<'r, A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &'r R)
+    where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
@@ -456,14 +450,8 @@ impl StateIF for State {
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
-    fn progress<'r, A, C, E, R>(
-        &mut self,
-        asg: &A,
-        cdb: &C,
-        elim: &E,
-        rst: &'r R,
-        mes: Option<&str>,
-    ) where
+    fn progress<'r, A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &'r R)
+    where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
@@ -626,11 +614,7 @@ impl StateIF for State {
                 asg_num_conflict as f64 / asg_num_restart as f64
             )
         );
-        if let Some(m) = mes {
-            println!("\x1B[2K    Strategy|mode: {}", m);
-        } else {
-            println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
-        }
+        println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
         self.flush("");
     }
 }
