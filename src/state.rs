@@ -199,7 +199,7 @@ pub struct State {
     /// time to execute vivification
     pub to_vivify: f64,
     /// loop limit of vivification loop
-    pub vivify_thr: f64,
+    pub vivify_thr: usize,
     //
     //## MISC
     //
@@ -236,7 +236,7 @@ impl Default for State {
             target: CNFDescription::default(),
             reflection_interval: 10_000,
             to_vivify: 0.0,
-            vivify_thr: 0.0,
+            vivify_thr: 0,
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
             conflicts: Vec::new(),
@@ -276,7 +276,7 @@ impl Instantiate for State {
             } else {
                 (SearchStrategy::Generic, 0)
             },
-            vivify_thr: config.viv_end, // starting with a big value
+            vivify_thr: config.viv_thr,
             target: cnf.clone(),
             time_limit: config.c_tout,
             ..State::default()

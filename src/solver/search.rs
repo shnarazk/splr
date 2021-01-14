@@ -280,7 +280,7 @@ fn search(
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == asg.root_level {
-            if use_vivify && state.config.viv_int <= state.to_vivify as usize {
+            if use_vivify && 1.0 <= state.to_vivify {
                 state.to_vivify = 0.0;
                 if vivify(asg, cdb, elim, state).is_err() {
                     // return Err(SolverError::UndescribedError);

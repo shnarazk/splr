@@ -544,7 +544,11 @@ impl GeometricStabilizer {
             }
             self.step = self.luby.next().unwrap();
             self.active = !new_cycle;
-            self.next_trigger = now + self.step * self.scale;
+            if self.active {
+                self.next_trigger = now + self.step.pow(2) * self.scale;
+            } else {
+                self.next_trigger = now + self.step * self.scale;
+            }
             Some((self.num_shift % 2 == 1, new_cycle))
         } else {
             None

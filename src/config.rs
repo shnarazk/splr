@@ -133,17 +133,8 @@ pub struct Config {
     //
     //## vivifier
     //
-    /// Lower bound of vivification loop
-    pub viv_beg: f64,
-
-    /// Upper bound of vivification loop
-    pub viv_end: f64,
-
-    /// Vivification interval
-    pub viv_int: usize,
-
     /// #reduction for next vivification
-    pub viv_scale: f64,
+    pub viv_thr: usize,
 
     //
     //## staging
@@ -225,10 +216,7 @@ impl Default for Config {
             stg_rwd_dcy: 0.5,
             stg_rwd_val: 1.0,
 
-            viv_beg: 1.0,
-            viv_end: 8.0,
-            viv_int: 4,
-            viv_scale: 1.2,
+            viv_thr: 200,
 
             #[cfg(not(feature = "moving_var_reward_rate"))]
             vrw_dcy_rat: 0.96,
@@ -262,17 +250,16 @@ impl Config {
                 let options_u32 = ["cbt"];
                 let options_usize = [
                     "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
-                    "vii",
+                    "vit",
                 ];
                 #[cfg(not(feature = "moving_var_reward_rate"))]
                 let options_f64 = [
-                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "srd", "srv", "vib",
-                    "vie", "vis", "vdr", "vro",
+                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "srd", "srv", "vdr", "vro",
                 ];
                 #[cfg(feature = "moving_var_reward_rate")]
                 let options_f64 = [
-                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "srd", "srv", "vib",
-                    "vie", "vis", "vri", "vrm", "vro",
+                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "srd", "srv", "vri",
+                    "vrm", "vro",
                 ];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
@@ -337,7 +324,7 @@ impl Config {
                                         "ras" => self.rst_asg_slw = val,
                                         "rll" => self.rst_lbd_len = val,
                                         "rls" => self.rst_lbd_slw = val,
-                                        "vii" => self.viv_int = val,
+                                        "vit" => self.viv_thr = val,
                                         _ => panic!("invalid option: {}", name),
                                     }
                                 } else {
@@ -364,9 +351,6 @@ impl Config {
                                         "rmt" => self.rst_mld_thr = val,
 
                                         "rss" => self.rst_stb_scl = val,
-                                        "vib" => self.viv_beg = val,
-                                        "vie" => self.viv_end = val,
-                                        "vis" => self.viv_scale = val,
                                         "srd" => self.stg_rwd_dcy = val,
                                         "srv" => self.stg_rwd_val = val,
                                         #[cfg(not(feature = "moving_var_reward_rate"))]
@@ -492,10 +476,7 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --rs  <rst-step>     #conflicts between restarts    {:>10}
       --srd <stg-rwd-dcy>  Decay rate for staged vare reward {:>10.2}
       --srv <stg-rwd-val>  Extra reward for staged vars      {:>10.2}
-      --vib <viv-beg>      Lower bound of vivify loop        {:>10.2}
-      --vie <viv-end>      Upper bound of vivify loop        {:>10.2}
-      --vii <viv-int>      Vivification interval          {:>10}
-      --vis <viv-scale>    #reduction to vivify              {:>10.2}
+      --vit <viv-thr>      #clause to try to vivify       {:>10}
       \x1B[000m\x1B[031m--vri <vrw-dcy-beg>  Initial var reward decay          {:>10.2}\x1B[000m
       \x1B[000m\x1B[031m--vrm <vrw-dcy-end>  Maximum var reward decay          {:>10.2}\x1B[000m
       \x1B[000m\x1B[031m--vro <vrw-occ-cmp>  Occ. compression rate in LR       {:>10.2}\x1B[000m
@@ -561,10 +542,7 @@ ARGS:
         config.rst_step,
         config.stg_rwd_dcy,
         config.stg_rwd_val,
-        config.viv_beg,
-        config.viv_end,
-        config.viv_int,
-        config.viv_scale,
+        config.viv_thr,
         {
             #[cfg(not(feature = "moving_var_reward_rate"))]
             {

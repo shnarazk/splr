@@ -25,11 +25,8 @@ pub fn vivify(
     debug_assert_eq!(dl, 0);
     // This is a reusable vector to reduce memory consumption, the key is the number of invocation
     let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
-    let check_thr = {
-        let nv = asg.var_stats().3 as f64;
-        let nc = cdb.count() as f64;
-        (state.vivify_thr * (nv.powf(0.5) + nc.powf(0.3))) as usize
-    };
+    let mut check_thr = state.vivify_thr;
+    let check_max = 4 * state.vivify_thr;
     let display_step: usize = 250.max(check_thr / 5);
     let mut num_check = 0;
     let mut num_purge = 0;
@@ -70,7 +67,7 @@ pub fn vivify(
         let mut copied: Vec<Lit> = Vec::new();
         let mut flipped = true;
         // elim.eliminate_satisfied_clauses(asg, cdb, false);
-        num_check += clits.len();
+        num_check += 1;
         'this_clause: for l in clits.iter() {
             debug_assert_eq!(0, asg.decision_level());
             seen[0] = num_check;
@@ -172,6 +169,7 @@ pub fn vivify(
                 debug_assert_eq!(asg.decision_level(), asg.root_level);
                 if asg.assigned(l0) == None {
                     num_assert += 1;
+                    check_thr = ((check_thr as f64 * 1.2) as usize).min(check_max);
                     cdb.certificate_add(&copied);
                     asg.assign_at_rootlevel(l0)?;
                     if !asg.propagate(cdb).is_none() {
@@ -188,9 +186,11 @@ pub fn vivify(
             n => {
                 if n == 2 && cdb.registered_bin_clause(copied[0], copied[1]) {
                     num_purge += 1;
+                    check_thr = (check_thr + 1).min(check_max);
                     elim.to_simplify += 1.0;
                 } else {
                     num_shrink += 1;
+                    check_thr = (check_thr + state.vivify_thr / 10).min(check_max);
                     cdb.certificate_add(&copied);
                     cdb.handle(SolverEvent::Vivify(true));
                     let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
@@ -207,11 +207,6 @@ pub fn vivify(
             break;
         }
         clauses.retain(|ci| !cdb[ci].is(Flag::DEAD));
-    }
-    if state.config.viv_end <= state.vivify_thr {
-        state.vivify_thr = state.config.viv_beg;
-    } else {
-        state.vivify_thr *= state.config.viv_scale;
     }
     // if 0 < num_assert || 0 < num_purge || 0 < num_shrink {
     //     state.flush("");
