@@ -339,13 +339,22 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
         )
         .as_bytes(),
     )?;
-    out.write_all(
-        format!(
-            "c     Strategy|mode:{:>15}, time:{:9.2},\n",
-            state.strategy.0, tm,
-        )
-        .as_bytes(),
-    )?;
+
+    #[cfg(not(feature = "strategy_adaptation"))]
+    {
+        out.write_all(format!("c     Strategy|mode:  generic, time:{:9.2},\n", tm).as_bytes())?;
+    }
+    #[cfg(feature = "strategy_adaptation")]
+    {
+        out.write_all(
+            format!(
+                "c     Strategy|mode:{:>15}, time:{:9.2},\n",
+                state.strategy.0, tm,
+            )
+            .as_bytes(),
+        )?;
+    }
+
     out.write_all(b"c \n")?;
     Ok(())
 }

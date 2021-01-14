@@ -1,9 +1,6 @@
 //! Crate `restart` provides restart heuristics.
 use {
-    crate::{
-        solver::{SearchStrategy, SolverEvent},
-        types::*,
-    },
+    crate::{solver::SolverEvent, types::*},
     std::fmt,
 };
 
@@ -758,12 +755,6 @@ impl Instantiate for Restarter {
     }
     fn handle(&mut self, e: SolverEvent) {
         match e {
-            SolverEvent::Adapt((SearchStrategy::Initial, 0), _) => {
-                // self.int.enable = true;
-            }
-            SolverEvent::Adapt((SearchStrategy::LowSuccessive, n), m) if n == m => {
-                // self.luby.enable = true;
-            }
             SolverEvent::Assert(_) => {
                 #[cfg(feature = "luby_blocking")]
                 {

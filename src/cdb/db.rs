@@ -1,6 +1,8 @@
+#[cfg(feature = "strategy_adaptation")]
+use crate::state::SearchStrategy;
 use {
     super::{CertifiedRecord, Clause, ClauseDB, ClauseId, WatchDBIF, LBDIF},
-    crate::{assign::AssignIF, solver::SolverEvent, state::SearchStrategy, types::*},
+    crate::{assign::AssignIF, solver::SolverEvent, types::*},
     std::{
         cmp::Ordering,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -88,8 +90,10 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     fn minimize_with_biclauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
     where
         A: AssignIF;
-    /// save an eliminated permanent clause to an extra space for incremental solving.
+
+    #[cfg(feature = "strategy_adaptation")]
     #[cfg(feature = "incremental_solver")]
+    /// save an eliminated permanent clause to an extra space for incremental solving.
     fn make_permanent_immortal(&mut self, cid: ClauseId);
 }
 
@@ -247,6 +251,7 @@ impl Instantiate for ClauseDB {
     }
     fn handle(&mut self, e: SolverEvent) {
         match e {
+            #[cfg(feature = "strategy_adaptation")]
             SolverEvent::Adapt(strategy, num_conflict) => {
                 // # PRECONDITION
                 // decision level must be 0 if `state.strategy.1` == `state[Stat::Conflict]`
@@ -824,6 +829,8 @@ impl ClauseDB {
         debug_assert!(perm[0..keep].iter().all(|cid| !clause[*cid].is(Flag::DEAD)));
         self.garbage_collect();
     }
+
+    #[cfg(feature = "strategy_adaptation")]
     /// change good learnt clauses to permanent one.
     fn make_permanent(&mut self, reinit: bool) {
         // Adjusting for low decision levels.

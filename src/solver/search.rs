@@ -330,13 +330,22 @@ fn adapt_modules(
         // Need to call it before `cdb.adapt_to`
         // 'decision_level == 0' is required by `cdb.adapt_to`.
         RESTART!(asg, rst);
-        state.select_strategy(asg, cdb);
+
+        #[cfg(feature = "strategy_adaptation")]
+        {
+            state.select_strategy(asg, cdb);
+        }
     }
-    #[cfg(feature = "boundary_check")]
-    debug_assert!(state.strategy.1 != asg_num_conflict || 0 == asg.decision_level());
-    asg.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
-    cdb.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
-    rst.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
+    #[cfg(feature = "strategy_adaptation")]
+    {
+        #[cfg(feature = "boundary_check")]
+        debug_assert!(state.strategy.1 != asg_num_conflict || 0 == asg.decision_level());
+
+        asg.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
+        cdb.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
+        rst.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
+    }
+
     Ok(())
 }
 

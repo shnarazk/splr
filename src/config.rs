@@ -7,6 +7,7 @@ pub struct Config {
     //
     // Switches
     //
+    #[cfg(feature = "strategy_adaptation")]
     /// Strategy adaptation switch
     a_adaptive: i32,
 
@@ -165,7 +166,9 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
+            #[cfg(feature = "strategy_adaptation")]
             a_adaptive: 0,
+
             a_elim: 1,
             a_luby: 0,
             a_reduce: 1,
@@ -280,7 +283,9 @@ impl Config {
                             if let Some(str) = iter.next() {
                                 if let Ok(val) = str.parse::<i32>() {
                                     match name {
+                                        #[cfg(feature = "strategy_adaptation")]
                                         "ADP" => self.a_adaptive = val,
+
                                         "ELI" => self.a_elim = val,
                                         "LBY" => self.a_luby = val,
                                         "RDC" => self.a_reduce = val,
@@ -444,7 +449,7 @@ FLAGS:
   -l, --log                Uses Glucose-like progress report
   -V, --version            Prints version information
 OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m):
-      --ADP <a-adaptive>   Strategy adaptation switch     {:>10}
+      \x1B[000m\x1B[031m--ADP <a-adaptive>   Strategy adaptation switch     {:>10}\x1B[000m
       --ELI <a-elim>       Eliminator switch              {:>10}
       --LBY <a-luby>       Use Luby series for restart    {:>10}
       --RDC <a-reduce>     Clause reduction switch        {:>10}
@@ -483,7 +488,16 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
 ARGS:
   <cnf-file>    DIMACS CNF file
 ",
-        config.a_adaptive,
+        {
+            #[cfg(not(feature = "strategy_adaptation"))]
+            {
+                0.0
+            }
+            #[cfg(feature = "strategy_adaptation")]
+            {
+                config.a_adaptive
+            }
+        },
         config.a_elim,
         config.a_luby,
         config.a_reduce,
@@ -631,6 +645,7 @@ impl Config {
     pub fn use_stage(&self) -> bool {
         dispatch!(self.a_stage)
     }
+    #[cfg(feature = "strategy_adaptation")]
     pub fn use_adaptive(&self) -> bool {
         dispatch!(self.a_adaptive)
     }

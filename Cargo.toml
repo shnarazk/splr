@@ -28,6 +28,7 @@ moving_var_reward_rate = []
 no_IO = []
 progress_ACC = []
 progress_MLD = []
+strategy_adaptation = []
 trace_analysis = []
 trace_elimination = []
 

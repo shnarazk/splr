@@ -1,20 +1,22 @@
+#[cfg(feature = "strategy_adaptation")]
+use {crate::cdb::ClauseDBIF, std::cmp::Ordering};
 /// Crate `state` is a collection of internal data.
 use {
     crate::{
         assign::AssignIF,
-        cdb::ClauseDBIF,
         solver::{RestartIF, RestartMode, RestarterEMAs, SolverEvent},
         types::*,
     },
     std::{
-        cmp::Ordering,
         fmt,
         io::{stdout, Write},
         ops::{Index, IndexMut},
         time::{Duration, Instant},
     },
 };
-
+#[cfg(not(feature = "strategy_adaptation"))]
+const PROGRESS_REPORT_ROWS: usize = 8;
+#[cfg(feature = "strategy_adaptation")]
 const PROGRESS_REPORT_ROWS: usize = 9;
 
 /// API for state/statistics management, providing [`progress`](`crate::state::StateIF::progress`).
@@ -24,11 +26,14 @@ pub trait StateIF {
     /// return elapsed time as a fraction.
     /// return None if something is wrong.
     fn elapsed(&self) -> Option<f64>;
+
+    #[cfg(feature = "strategy_adaptation")]
     /// change heuristics based on stat data.
     fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: Export<(usize, usize, usize, f64), ()>,
         C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), bool>;
+
     /// write a header of stat data to stdio.
     fn progress_header(&mut self);
     /// write stat data to stdio.
@@ -85,6 +90,7 @@ impl fmt::Display for StagingTarget {
     }
 }
 
+#[cfg(feature = "strategy_adaptation")]
 /// A collection of named search heuristics.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SearchStrategy {
@@ -102,6 +108,7 @@ pub enum SearchStrategy {
     ManyGlues,
 }
 
+#[cfg(feature = "strategy_adaptation")]
 impl fmt::Display for SearchStrategy {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         if formatter.alternate() {
@@ -128,6 +135,7 @@ impl fmt::Display for SearchStrategy {
     }
 }
 
+#[cfg(feature = "strategy_adaptation")]
 impl SearchStrategy {
     pub fn to_str(self) -> &'static str {
         match self {
@@ -184,8 +192,11 @@ pub struct State {
     pub config: Config,
     /// collection of statistics data
     pub stats: [usize; Stat::EndOfStatIndex as usize],
+
+    #[cfg(feature = "strategy_adaptation")]
     /// tuple of current strategy and the number of conflicts at which the strategy is selected.
     pub strategy: (SearchStrategy, usize),
+
     /// problem description
     pub target: CNFDescription,
     /// strategy adjustment interval in conflict
@@ -226,7 +237,10 @@ impl Default for State {
         State {
             config: Config::default(),
             stats: [0; Stat::EndOfStatIndex as usize],
+
+            #[cfg(feature = "strategy_adaptation")]
             strategy: (SearchStrategy::Initial, 0),
+
             target: CNFDescription::default(),
             reflection_interval: 10_000,
             to_vivify: 0.0,
@@ -265,11 +279,14 @@ impl Instantiate for State {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> State {
         State {
             config: config.clone(),
+
+            #[cfg(feature = "strategy_adaptation")]
             strategy: if config.use_adaptive() {
                 (SearchStrategy::Initial, 0)
             } else {
                 (SearchStrategy::Generic, 0)
             },
+
             vivify_thr: config.viv_thr,
             target: cnf.clone(),
             time_limit: config.c_tout,
@@ -282,7 +299,6 @@ impl Instantiate for State {
                 self.target.num_of_variables += 1;
             }
             SolverEvent::Assert(_) => (),
-            SolverEvent::Adapt(_, _) => (),
             SolverEvent::Conflict => (),
             SolverEvent::Eliminate(_) => (),
             SolverEvent::Instantiate => (),
@@ -290,6 +306,9 @@ impl Instantiate for State {
             SolverEvent::Restart => (),
             SolverEvent::Stabilize((_, _)) => (),
             SolverEvent::Vivify(_) => (),
+
+            #[cfg(feature = "strategy_adaptation")]
+            SolverEvent::Adapt(_, _) => (),
         }
     }
 }
@@ -391,6 +410,7 @@ impl StateIF for State {
                 / Duration::from_secs(self.config.c_tout as u64).as_secs_f64(),
         )
     }
+    #[cfg(feature = "strategy_adaptation")]
     fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: Export<(usize, usize, usize, f64), ()>,
@@ -614,7 +634,10 @@ impl StateIF for State {
                 asg_num_conflict as f64 / asg_num_restart as f64
             )
         );
-        println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
+        #[cfg(feature = "strategy_adaptation")]
+        {
+            println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
+        }
         self.flush("");
     }
 }
@@ -747,17 +770,13 @@ impl State {
         );
     }
     #[allow(dead_code)]
-    fn dump_details<'r, A, C, E, R, V>(&mut self, asg: &A, cdb: &C, rst: &'r R, mes: Option<&str>)
+    fn dump_details<'r, A, C, E, R, V>(&mut self, asg: &A, cdb: &C, rst: &'r R)
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>,
     {
         self.progress_cnt += 1;
-        let msg = match mes {
-            None => self.strategy.0.to_str(),
-            Some(x) => x,
-        };
         let (
             asg_num_vars,
             asg_num_asserted_vars,
@@ -787,11 +806,10 @@ impl State {
         let (_, rst_asg, rst_lbd) = *rst.exports_box();
 
         println!(
-            "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
+            "{:>3},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
              {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
              {:>6},{:>6}",
             self.progress_cnt,
-            msg,
             asg_num_unasserted_vars,
             asg_num_asserted_vars,
             asg_num_eliminated_vars,
