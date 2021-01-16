@@ -1,4 +1,6 @@
 //! Conflict-Driven Clause Learning Search engine
+#[cfg(feature = "staging")]
+use crate::state::StagingTarget;
 use {
     super::{
         conflict::handle_conflict,
@@ -10,7 +12,7 @@ use {
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
-        state::{StagingTarget, Stat, State, StateIF},
+        state::{Stat, State, StateIF},
         types::*,
     },
 };
@@ -82,19 +84,19 @@ impl SolveIF for Solver {
                     continue;
                 }
                 if let Some((p, m)) = elim.stats(vi) {
-                    // We can't call `asg.assign_at_rootlevel(l)` even if p or m == 0.
+                    // We can't call `asg.assign_at_root_level(l)` even if p or m == 0.
                     // This means we can't pick `!l`.
                     // This becomes a problem in the case of incremental solving.
                     #[cfg(not(feature = "incremental_solver"))]
                     {
                         if m == 0 {
                             let l = Lit::from_assign(vi, true);
-                            if asg.assign_at_rootlevel(l).is_err() {
+                            if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
                         } else if p == 0 {
                             let l = Lit::from_assign(vi, false);
-                            if asg.assign_at_rootlevel(l).is_err() {
+                            if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
                         }
@@ -229,15 +231,25 @@ fn search(
             if matches!(restart, Some(RestartDecision::Force)) {
                 RESTART!(asg, rst);
             }
+            #[allow(unused_variables)]
             if let Some((parity, new_cycle)) = rst.stabilize(asg.num_conflict) {
                 if new_cycle {
                     let v = asg.var_stats();
                     let r = rst.exports();
-                    let s = asg.num_staging_cands();
+                    let s = {
+                        #[cfg(not(feature = "staging"))]
+                        {
+                            0
+                        }
+                        #[cfg(feature = "staging")]
+                        {
+                            asg.num_staging_cands()
+                        }
+                    };
                     state.log(
                         asg.num_conflict,
                         format!(
-                            "Lcycle:{:>6}, core:{:>9}, heat: {:>9}, /cpr:{:>9.2}",
+                            "Lcycle:{:>6}, core:{:>9}, #ion: {:>9}, /cpr:{:>9.2}",
                             r.3,
                             v.4,
                             s,
@@ -246,6 +258,8 @@ fn search(
                     );
                     #[cfg(feature = "staging")]
                     {
+                        let d = 1.0 / ((s + 2) as f64).log(2.0);
+                        rst.update(ProgressUpdate::Temperature(d));
                         asg.build_stage(StagingTarget::AutoSelect, parity);
                     }
                 } else {

@@ -1,7 +1,9 @@
+#[cfg(feature = "staging")]
+use crate::state::StagingTarget;
 /// Decision var selection
 use {
     super::{AssignStack, Var, VarHeapIF, VarOrderIF, VarRewardIF},
-    crate::{state::StagingTarget, types::*},
+    crate::types::*,
 };
 
 /// ```

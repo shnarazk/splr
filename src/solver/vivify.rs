@@ -171,7 +171,7 @@ pub fn vivify(
                     num_assert += 1;
                     check_thr = ((check_thr as f64 * 1.2) as usize).min(check_max);
                     cdb.certificate_add(&copied);
-                    asg.assign_at_rootlevel(l0)?;
+                    asg.assign_at_root_level(l0)?;
                     if !asg.propagate(cdb).is_none() {
                         // panic!("Vivification found an inconsistency.");
                         return Err(SolverError::Inconsistent);

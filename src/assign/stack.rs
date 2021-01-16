@@ -462,19 +462,19 @@ mod tests {
         };
         let mut asg = AssignStack::instantiate(&config, &cnf);
         // [] + 1 => [1]
-        assert!(asg.assign_at_rootlevel(lit(1)).is_ok());
+        assert!(asg.assign_at_root_level(lit(1)).is_ok());
         assert_eq!(asg.trail, vec![lit(1)]);
 
         // [1] + 1 => [1]
-        assert!(asg.assign_at_rootlevel(lit(1)).is_ok());
+        assert!(asg.assign_at_root_level(lit(1)).is_ok());
         assert_eq!(asg.trail, vec![lit(1)]);
 
         // [1] + 2 => [1, 2]
-        assert!(asg.assign_at_rootlevel(lit(2)).is_ok());
+        assert!(asg.assign_at_root_level(lit(2)).is_ok());
         assert_eq!(asg.trail, vec![lit(1), lit(2)]);
 
         // [1, 2] + -1 => ABORT & [1, 2]
-        assert!(asg.assign_at_rootlevel(lit(-1)).is_err());
+        assert!(asg.assign_at_root_level(lit(-1)).is_err());
         assert_eq!(asg.decision_level(), 0);
         assert_eq!(asg.stack_len(), 2);
 

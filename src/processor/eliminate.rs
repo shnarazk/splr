@@ -60,7 +60,7 @@ where
                             vi, lit, p, cdb[*p], n, cdb[*n],
                         );
                         cdb.certificate_add(&*vec);
-                        asg.assign_at_rootlevel(lit)?;
+                        asg.assign_at_root_level(lit)?;
                     }
                     2 => {
                         if !cdb.registered_bin_clause((*vec)[0], (*vec)[1]) {

@@ -15,7 +15,7 @@ pub trait PropagateIF {
     /// # Errors
     ///
     /// emit `SolverError::Inconsistent` exception if solver becomes inconsistent.
-    fn assign_at_rootlevel(&mut self, l: Lit) -> MaybeInconsistent;
+    fn assign_at_root_level(&mut self, l: Lit) -> MaybeInconsistent;
     /// unsafe enqueue (assign by implication); doesn't emit an exception.
     ///
     /// ## Warning
@@ -83,7 +83,7 @@ macro_rules! unset_assign {
 }
 
 impl PropagateIF for AssignStack {
-    fn assign_at_rootlevel(&mut self, l: Lit) -> MaybeInconsistent {
+    fn assign_at_root_level(&mut self, l: Lit) -> MaybeInconsistent {
         let vi = l.vi();
         debug_assert!(vi < self.var.len());
         self.level[vi] = 0;
@@ -279,10 +279,9 @@ impl PropagateIF for AssignStack {
                             n -= 1;
                             source.detach(n);
                             lits.swap(1, k);
+                            // If `search_from` gets out of range, the next loop will ignore it safely;
+                            // the first iteration loop becomes null.
                             *search_from = k + 1;
-                            if *search_from == len {
-                                *search_from = 2;
-                            }
                             continue 'next_clause;
                         }
                     }

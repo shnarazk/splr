@@ -3,7 +3,7 @@ use {crate::cdb::ClauseDBIF, std::cmp::Ordering};
 /// Crate `state` is a collection of internal data.
 use {
     crate::{
-        assign::AssignIF,
+        assign::{AssignIF, VarSelectIF},
         solver::{RestartIF, RestartMode, RestarterEMAs, SolverEvent},
         types::*,
     },
@@ -39,7 +39,7 @@ pub trait StateIF {
     /// write stat data to stdio.
     fn progress<'r, A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &'r R)
     where
-        A: AssignIF + Export<(usize, usize, usize, f64), ()>,
+        A: AssignIF + VarSelectIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>;
@@ -472,7 +472,7 @@ impl StateIF for State {
     #[allow(clippy::cognitive_complexity)]
     fn progress<'r, A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &'r R)
     where
-        A: AssignIF + Export<(usize, usize, usize, f64), ()>,
+        A: AssignIF + VarSelectIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>,
@@ -501,7 +501,7 @@ impl StateIF for State {
 
         let rst_mode = rst.mode().0;
 
-        let (rst_num_blk, rst_num_rst, rst_num_span, rst_num_cycle, _) = rst.exports();
+        let (rst_num_blk, rst_num_rst, rst_num_span, rst_num_cycle, _stb_lspan) = rst.exports();
         // let rst_num_stb = rst.mode().1;
 
         #[cfg(not(feature = "progress_ACC"))]
@@ -580,7 +580,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K {}|#BLK:{}, #RST:{}, Lspn:{}, Lcyc:{}",
+            "\x1B[2K {}|#BLK:{}, #RST:{}, #ion:{}, Lspn:{}",
             match rst_mode {
                 RestartMode::Dynamic => "    Restart",
                 RestartMode::Luby if self.config.no_color => "LubyRestart",
@@ -590,9 +590,19 @@ impl StateIF for State {
             },
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
+            im!("{:>9}", self, LogUsizeId::NumIon, {
+                #[cfg(not(feature = "staging"))]
+                {
+                    0
+                }
+                #[cfg(feature = "staging")]
+                {
+                    asg.num_staging_cands()
+                }
+            }),
             im!("{:>9}", self, LogUsizeId::LubySpan, rst_num_span),
-            im!("{:>9}", self, LogUsizeId::LubyCycle, rst_num_cycle),
         );
+        self[LogUsizeId::LubyCycle] = rst_num_cycle;
         println!(
             "\x1B[2K         EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{}",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
@@ -856,10 +866,11 @@ pub enum LogUsizeId {
     PermanentClause,
 
     //
-    // stabilization and restart
+    //## stabilization, staging and restart
     //
-    LubySpan,
     LubyCycle,
+    LubySpan,
+    NumIon,
     Restart,
     RestartBlock,
     RestartCancel,

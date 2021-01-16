@@ -174,7 +174,7 @@ impl SatSolverIF for Solver {
         if val == 0 || self.asg.num_vars < val.abs() as usize {
             return Err(SolverError::OutOfRange);
         }
-        self.asg.assign_at_rootlevel(Lit::from(val)).map(|_| self)
+        self.asg.assign_at_root_level(Lit::from(val)).map(|_| self)
     }
     fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver, SolverError>
     where
@@ -281,7 +281,7 @@ impl Solver {
         match lits.len() {
             0 => None, // Empty clause is UNSAT.
             1 => asg
-                .assign_at_rootlevel(lits[0])
+                .assign_at_root_level(lits[0])
                 .map_or(None, |_| Some(ClauseId::default())),
             _ => {
                 let cid = cdb.new_clause(asg, lits, false, false);

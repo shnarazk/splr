@@ -295,7 +295,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c  {}|#BLK:{}, #RST:{}, Lspn:{}, Lcyc:{},\n",
+            "c  {}|#BLK:{}, #RST:{}, #ion:{}, Lcyc:{},\n",
             if s.rst.mode().0 == RestartMode::Luby {
                 "LubyRestart"
             } else {
@@ -303,7 +303,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             },
             format!("{:>9}", state[LogUsizeId::RestartBlock]),
             format!("{:>9}", state[LogUsizeId::Restart]),
-            format!("{:>9}", state[LogUsizeId::LubySpan]),
+            format!("{:>9}", state[LogUsizeId::NumIon]),
             format!("{:>9}", state[LogUsizeId::LubyCycle]),
         )
         .as_bytes(),

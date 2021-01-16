@@ -1,11 +1,11 @@
-## 0.6.0, 2021-01-14
+## 0.6.0, 2021-01-16
 
 - reorganize with redefined terminology
    - _stabilizing_ to stop restart periodically (extension of static restart blocking)
    - _staging_ to restrict search space by adding extra var activity
    - _rephasing_ to reuse a good assignment set (so it means 'rephasing to good phases').
 - delete dependencies on 'libc' and 'structopt'
-- make Splr *monotonous*, by removing timer based decision makers. Monotonous means that if a solver solves a problem within T timeout, it solves the problem within any timeout longer than T.
+- make Splr deterministic or *monotonous*, by removing timer based decision makers. Monotonous means that if a solver solves a problem within T timeout, it solves the problem within any timeout longer than T.
 - Solver::restart provides both of `restart` and `stabilize`
 - fix a bug in chronoBT, that occurred if a conflicting clause has just a single literal at the conflicting level.
 - revise command line option parser to handle the last option better
@@ -20,9 +20,11 @@
 #### Verification
 
 - all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
-- [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.6.0 RC(20201226) solved with a 300 sec (soft) timeout:
-  - 45 satisfiable problems: all the solutions were correct.
-  - 6 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+- [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.6.0 RC() solved with a 300 sec (soft) timeout:
+  - 45 (20201226), 42 (eab832c), and 38 (0.6.0) satisfiable problems: all the solutions were correct.
+  - 6 (20201226), 4 (eab832c), and 4 (0.6.0) unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+
+![Benchmark result(2021-01-16)](https://user-images.githubusercontent.com/997855/104808677-24d97080-582b-11eb-85af-d01fd161bafd.png)
 
 ![Benchmark result(2020-12-27)](https://user-images.githubusercontent.com/997855/103163156-9f6f2b80-483d-11eb-90d3-29d076792c13.png)
 
