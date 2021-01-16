@@ -23,7 +23,7 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 
 #### Version 0.6.0
 
-_Warning: Version 0.6.0 isn't the best version. It changed most modules like var reward mechanism, restart policy and in-processor timing.
+_Warning: Version 0.6.0 isn't the best version._ It changed most modules like var reward mechanism, restart policy and in-processor timing.
 
 - all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
 - [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.6.0 RC() solved with a 300 sec (soft) timeout:

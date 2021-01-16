@@ -91,7 +91,6 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     where
         A: AssignIF;
 
-    #[cfg(feature = "strategy_adaptation")]
     #[cfg(feature = "incremental_solver")]
     /// save an eliminated permanent clause to an extra space for incremental solving.
     fn make_permanent_immortal(&mut self, cid: ClauseId);
