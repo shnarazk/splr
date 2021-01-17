@@ -9,6 +9,10 @@ pub trait LBDIF {
     fn compute_lbd<A>(&mut self, asg: &A, vec: &[Lit]) -> usize
     where
         A: AssignIF;
+    /// update the rank of the given clause, but ignoring literals at decision level *l*.
+    fn update_lbd<A>(&mut self, asg: &A, cid: ClauseId, ignore: DecisionLevel)
+    where
+        A: AssignIF;
     /// return the LBD value of clause `cid`.
     fn compute_lbd_of<A>(&mut self, asg: &A, cid: ClauseId) -> usize
     where
@@ -38,6 +42,34 @@ impl LBDIF for ClauseDB {
                 }
             }
             cnt
+        }
+    }
+    fn update_lbd<A>(&mut self, asg: &A, cid: ClauseId, ignore: DecisionLevel)
+    where
+        A: AssignIF,
+    {
+        let level = asg.level_ref();
+        let ClauseDB {
+            ref mut lbd_temp,
+            ref mut clause,
+            ..
+        } = self;
+        unsafe {
+            let key: usize = lbd_temp.get_unchecked(0) + 1;
+            *self.lbd_temp.get_unchecked_mut(0) = key;
+            let mut cnt = 0;
+            for l in &clause[cid.ordinal as usize].lits {
+                let lv = level[l.vi()];
+                if lv == ignore {
+                    continue;
+                }
+                let p = self.lbd_temp.get_unchecked_mut(lv as usize);
+                if *p != key {
+                    *p = key;
+                    cnt += 1;
+                }
+            }
+            clause[cid.ordinal as usize].rank = cnt;
         }
     }
     fn compute_lbd_of<A>(&mut self, asg: &A, cid: ClauseId) -> usize

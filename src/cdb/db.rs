@@ -13,7 +13,7 @@ use {
 const ACTIVITY_MAX: f64 = 1e308;
 
 /// API for clause management like [`check_and_reduce`](`crate::cdb::ClauseDBIF::check_and_reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`watcher_list`](`crate::cdb::ClauseDBIF::watcher_list`), and so on.
-pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
+pub trait ClauseDBIF: LBDIF + IndexMut<ClauseId, Output = Clause> {
     /// return the length of `clause`.
     fn len(&self) -> usize;
     /// return true if it's empty.
