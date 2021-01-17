@@ -214,7 +214,7 @@ impl PropagateIF for AssignStack {
                 // we have to drop `p` here to use self as a mutable reference again later.
                 let bin_source = (*bin_watcher).get_unchecked(usize::from(*p));
                 let source = (*watcher).get_unchecked_mut(usize::from(*p));
-                if self.conflicts.0 == false_lit.vi() {
+                if self.last_conflict == false_lit.vi() {
                     for w in source.iter() {
                         cdb.update_lbd(self, w.c, 0);
                     }
@@ -229,8 +229,7 @@ impl PropagateIF for AssignStack {
                     match lit_assign!(self, w.blocker) {
                         Some(true) => (),
                         Some(false) => {
-                            self.conflicts.1 = self.conflicts.0;
-                            self.conflicts.0 = false_lit.vi();
+                            self.last_conflict = false_lit.vi();
                             self.num_conflict += 1;
                             return w.c;
                         }
@@ -292,8 +291,7 @@ impl PropagateIF for AssignStack {
                     }
 
                     if first_value == Some(false) {
-                        self.conflicts.1 = self.conflicts.0;
-                        self.conflicts.0 = false_lit.vi();
+                        self.last_conflict = false_lit.vi();
                         self.num_conflict += 1;
                         return w.c;
                     }
