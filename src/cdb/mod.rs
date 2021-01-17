@@ -4,8 +4,6 @@ mod cid;
 mod clause;
 /// methods on `ClauseDB`
 mod db;
-/// methods about Literal Block Distance, or LBD
-mod lbd;
 /// methods on `Watch` and `WatchDB`
 mod watch;
 
@@ -13,7 +11,6 @@ pub use self::{
     cid::ClauseIdIF,
     clause::ClauseIF,
     db::ClauseDBIF,
-    lbd::LBDIF,
     watch::{Watch, WatchDBIF},
 };
 
