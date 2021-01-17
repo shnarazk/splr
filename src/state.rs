@@ -330,10 +330,10 @@ macro_rules! im {
                     format!("\x1B[031m{}\x1B[000m", format!($format, *ptr))
                 } else if (*ptr as f64) * 1.6 < v as f64 {
                     *ptr = v;
-                    format!("\x1B[001m\x1B[034m{}\x1B[000m", format!($format, *ptr))
+                    format!("\x1B[001m\x1B[036m{}\x1B[000m", format!($format, *ptr))
                 } else if *ptr < v {
                     *ptr = v;
-                    format!("\x1B[034m{}\x1B[000m", format!($format, *ptr))
+                    format!("\x1B[036m{}\x1B[000m", format!($format, *ptr))
                 } else {
                     *ptr = v;
                     format!($format, *ptr)
@@ -373,10 +373,10 @@ macro_rules! fm {
                     format!("\x1B[031m{}\x1B[000m", format!($format, *ptr))
                 } else if *ptr * 1.6 < v {
                     *ptr = v;
-                    format!("\x1B[001m\x1B[034m{}\x1B[000m", format!($format, *ptr))
+                    format!("\x1B[001m\x1B[036m{}\x1B[000m", format!($format, *ptr))
                 } else if *ptr < v {
                     *ptr = v;
-                    format!("\x1B[034m{}\x1B[000m", format!($format, *ptr))
+                    format!("\x1B[036m{}\x1B[000m", format!($format, *ptr))
                 } else {
                     *ptr = v;
                     format!($format, *ptr)
@@ -521,7 +521,7 @@ impl StateIF for State {
         print!("A\x1B[1G");
 
         while let Some(m) = self.log_messages.pop() {
-            println!("\x1B[2K\x1B[000m\x1B[036m{}\x1B[000m", m);
+            println!("\x1B[2K\x1B[000m\x1B[034m{}\x1B[000m", m);
         }
         println!("\x1B[2K{}", self);
         println!(
