@@ -691,6 +691,7 @@ pub struct Restarter {
     after_restart: usize,
     restart_step: usize,
     initial_restart_step: usize,
+    stb_expansion_factor: f64,
 
     //
     //## statistics
@@ -726,6 +727,8 @@ impl Default for Restarter {
             after_restart: 0,
             restart_step: 0,
             initial_restart_step: 0,
+            stb_expansion_factor: 1.0,
+
             num_block: 0,
             num_restart: 0,
         }
@@ -754,6 +757,8 @@ impl Instantiate for Restarter {
             stb: GeometricStabilizer::instantiate(config, cnf),
             restart_step: config.rst_step,
             initial_restart_step: config.rst_step,
+            stb_expansion_factor: config.rst_stb_exp,
+
             ..Restarter::default()
         }
     }
@@ -843,7 +848,7 @@ impl RestartIF for Restarter {
                 self.luby.update(self.after_restart);
             }
             ProgressUpdate::Temperature(c) => {
-                self.stb.depth = 1.0 + c;
+                self.stb.depth = 1.0 + self.stb_expansion_factor * c;
             }
 
             #[cfg(feature = "progress_ACC")]
