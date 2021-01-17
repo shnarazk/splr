@@ -617,6 +617,7 @@ impl TryFrom<&PathBuf> for CNFReader {
         let mut buf = String::new();
         let mut nv: usize = 0;
         let mut nc: usize = 0;
+        let mut found_valid_header = false;
         loop {
             buf.clear();
             match reader.read_line(&mut buf) {
@@ -628,6 +629,7 @@ impl TryFrom<&PathBuf> for CNFReader {
                             if let Some(c) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
                                 nv = v;
                                 nc = c;
+                                found_valid_header = true;
                                 break;
                             }
                         }
@@ -639,6 +641,9 @@ impl TryFrom<&PathBuf> for CNFReader {
                     return Err(SolverError::IOError);
                 }
             }
+        }
+        if !found_valid_header {
+            return Err(SolverError::IOError);
         }
         let cnf = CNFDescription {
             num_of_variables: nv,
