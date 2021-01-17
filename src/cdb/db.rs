@@ -576,12 +576,18 @@ impl ClauseDBIF for ClauseDB {
         } else {
             0
         };
-        let nlevels = self.compute_lbd_of(asg, cid);
-        let c = &mut self[cid];
+        let ClauseDB {
+            ref mut clause,
+            ref mut lbd_temp,
+            ..
+        } = self;
+        let c = &mut clause[cid.ordinal as usize];
+        let old_rank = c.rank as usize;
+        let nlevels = c.update_lbd(asg, lbd_temp);
         debug_assert!(!c.is(Flag::DEAD), format!("found {} is dead: {}", cid, c));
-        if nlevels < c.rank as usize {
+        if nlevels < old_rank {
             match (c.is(Flag::VIVIFIED2), c.is(Flag::VIVIFIED)) {
-                _ if nlevels == 1 || nlevels + 1 < c.rank as usize => {
+                _ if nlevels == 1 || nlevels + 1 < old_rank => {
                     c.turn_on(Flag::VIVIFIED2);
                     c.turn_off(Flag::VIVIFIED);
                 }
@@ -598,13 +604,11 @@ impl ClauseDBIF for ClauseDB {
                 // chan_seok_condition is zero if !use_chan_seok
                 if nlevels < chan_seok_condition {
                     c.turn_off(Flag::LEARNT);
-                    c.rank = nlevels as u16;
                     self.num_learnt -= 1;
                     return true;
                 }
             }
         }
-        c.rank = nlevels as u16;
         false
     }
     fn count(&self) -> usize {
@@ -789,6 +793,7 @@ impl ClauseDB {
     {
         let ClauseDB {
             ref mut clause,
+            ref mut lbd_temp,
             ref mut touched,
             ..
         } = self;
@@ -798,6 +803,7 @@ impl ClauseDB {
             let used = c.is(Flag::JUST_USED);
             if c.is(Flag::LEARNT) && !c.is(Flag::DEAD) && !asg.locked(c, ClauseId::from(i)) && !used
             {
+                c.update_lbd(asg, lbd_temp);
                 perm.push(i);
             }
             if used {
