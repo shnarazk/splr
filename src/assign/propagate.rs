@@ -214,6 +214,11 @@ impl PropagateIF for AssignStack {
                 // we have to drop `p` here to use self as a mutable reference again later.
                 let bin_source = (*bin_watcher).get_unchecked(usize::from(*p));
                 let source = (*watcher).get_unchecked_mut(usize::from(*p));
+                if self.conflicts.0 == false_lit.vi() {
+                    for w in source.iter() {
+                        cdb.update_lbd(self, w.c, 0);
+                    }
+                }
                 // binary loop
                 for w in bin_source.iter() {
                     debug_assert!(!cdb[w.c].is(Flag::DEAD));
