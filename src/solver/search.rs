@@ -234,9 +234,6 @@ fn search(
             #[allow(unused_variables)]
             if let Some((parity, new_cycle)) = rst.stabilize(asg.num_conflict) {
                 if new_cycle {
-                    for (i, c) in cdb.iter_mut().enumerate().skip(1) {
-                        c.turn_off(Flag::JUST_USED);
-                    }
                     let v = asg.var_stats();
                     let r = rst.exports();
                     let s = {
@@ -264,6 +261,11 @@ fn search(
                         let d = 1.0 / ((s + 2) as f64).log(2.0);
                         rst.update(ProgressUpdate::Temperature(d));
                         asg.build_stage(StagingTarget::AutoSelect, parity);
+                    }
+                    if 0 < s {
+                        for (i, c) in cdb.iter_mut().enumerate().skip(1) {
+                            c.turn_off(Flag::JUST_USED);
+                        }
                     }
                 } else {
                     #[cfg(feature = "staging")]
