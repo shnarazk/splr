@@ -234,9 +234,6 @@ fn search(
             #[allow(unused_variables)]
             if let Some((parity, new_cycle)) = rst.stabilize(asg.num_conflict) {
                 if new_cycle {
-                    for (i, c) in cdb.iter_mut().enumerate().skip(1) {
-                        c.turn_off(Flag::JUST_USED);
-                    }
                     let v = asg.var_stats();
                     let r = rst.exports();
                     let s = {
