@@ -217,7 +217,7 @@ impl Default for Config {
             #[cfg(feature = "progress_MLD")]
             rst_mld_thr: 0.80,
 
-            rst_stb_exp: 0.9,
+            rst_stb_exp: 1.0,
             rst_stb_scl: 2.0,
 
             stg_rwd_dcy: 0.5,

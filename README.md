@@ -283,7 +283,6 @@ Please check the help message.
 
 ```plain
 $ splr --help
-splr 0.6.0
 A modern CDCL SAT solver in Rust
 
 USAGE:
@@ -295,7 +294,6 @@ FLAGS:
   -c, --certify            Writes a DRAT UNSAT certification file
   -l, --log                Uses Glucose-like progress report
   -V, --version            Prints version information
-OPTIONS (green options depends on compile-time flags):
 OPTIONS (red options depend on features in Cargo.toml):
       --ADP <a-adaptive>   Strategy adaptation switch              0
       --ELI <a-elim>       Eliminator switch                       1
@@ -325,6 +323,7 @@ OPTIONS (red options depend on features in Cargo.toml):
       --rlt <rst-lbd-thr>  Forcing restart threshold               1.20
       --rms <rst-mld-scl>  Scaling for Max LBD of Dep.             0.00
       --rmt <rst-mld-thr>  Threshold for Max LBD of Dep.           0.00
+      --rse <rst-stb-exp>  Stabilizer expansion scale              1.00
       --rss <rst-stb-scl>  Stabilizer scaling                      2.00
       --rs  <rst-step>     #conflicts between restarts            24
       --srd <stg-rwd-dcy>  Decay rate for staged vare reward       0.50

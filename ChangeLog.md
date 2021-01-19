@@ -1,3 +1,14 @@
+## 0.6.2, 2021-01-20
+
+- update LBD correctly
+- check CNF header correctly
+- add command line option: --rst
+
+## 0.6.1, 2021-01-16
+
+- fix compilation errors on configurations with feature 'incremental_solver'
+- fix a typo in README.md
+
 ## 0.6.0, 2021-01-16
 
 - reorganize with redefined terminology
