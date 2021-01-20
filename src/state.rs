@@ -521,7 +521,11 @@ impl StateIF for State {
         print!("A\x1B[1G");
 
         while let Some(m) = self.log_messages.pop() {
-            println!("\x1B[2K\x1B[000m\x1B[034m{}\x1B[000m", m);
+            if self.config.no_color {
+                println!("{}", m);
+            } else {
+                println!("\x1B[2K\x1B[000m\x1B[034m{}\x1B[000m", m);
+            }
         }
         println!("\x1B[2K{}", self);
         println!(
