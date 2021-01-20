@@ -4,8 +4,6 @@ mod cid;
 mod clause;
 /// methods on `ClauseDB`
 mod db;
-/// methods about Literal Block Distance, or LBD
-mod lbd;
 /// methods on `Watch` and `WatchDB`
 mod watch;
 
@@ -13,7 +11,6 @@ pub use self::{
     cid::ClauseIdIF,
     clause::ClauseIF,
     db::ClauseDBIF,
-    lbd::LBDIF,
     watch::{Watch, WatchDBIF},
 };
 
@@ -184,7 +181,7 @@ mod tests {
 
         let c1 = cdb.new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false, false);
         let c = &cdb[c1];
-        assert_eq!(c.rank, 3);
+        assert_eq!(c.rank, 2);
         assert!(!c.is(Flag::DEAD));
         assert!(!c.is(Flag::LEARNT));
         assert!(!c.is(Flag::JUST_USED));

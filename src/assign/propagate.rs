@@ -224,8 +224,7 @@ impl PropagateIF for AssignStack {
                     match lit_assign!(self, w.blocker) {
                         Some(true) => (),
                         Some(false) => {
-                            self.conflicts.1 = self.conflicts.0;
-                            self.conflicts.0 = false_lit.vi();
+                            self.last_conflict = false_lit.vi();
                             self.num_conflict += 1;
                             return w.c;
                         }
@@ -287,8 +286,7 @@ impl PropagateIF for AssignStack {
                     }
 
                     if first_value == Some(false) {
-                        self.conflicts.1 = self.conflicts.0;
-                        self.conflicts.0 = false_lit.vi();
+                        self.last_conflict = false_lit.vi();
                         self.num_conflict += 1;
                         return w.c;
                     }

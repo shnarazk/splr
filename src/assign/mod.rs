@@ -69,8 +69,6 @@ pub trait AssignIF: ClauseManipulateIF + PropagateIF + VarManipulateIF + VarRewa
     fn decision_vi(&self, lv: DecisionLevel) -> VarId;
     /// return `true` if there are un-propagated assignments.
     fn remains(&self) -> bool;
-    /// return `true` if subsequential propagations emit the same conflict.
-    fn recurrent_conflicts(&self) -> bool;
     /// return a reference to `assign`.
     fn assign_ref(&self) -> &[Option<bool>];
     /// return a reference to `level`.
@@ -128,7 +126,7 @@ pub struct AssignStack {
     trail_lim: Vec<usize>,
     q_head: usize,
     pub root_level: DecisionLevel,
-    conflicts: (VarId, VarId),
+    last_conflict: VarId,
     var_order: VarIdHeap, // Variable Order
 
     //

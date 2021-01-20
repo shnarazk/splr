@@ -131,6 +131,9 @@ pub struct Config {
     /// Stabilizer scaling
     pub rst_stb_scl: f64,
 
+    /// Stabilizer expansion scale
+    pub rst_stb_exp: f64,
+
     //
     //## vivifier
     //
@@ -214,6 +217,7 @@ impl Default for Config {
             #[cfg(feature = "progress_MLD")]
             rst_mld_thr: 0.80,
 
+            rst_stb_exp: 1.0,
             rst_stb_scl: 2.0,
 
             stg_rwd_dcy: 0.5,
@@ -257,12 +261,13 @@ impl Config {
                 ];
                 #[cfg(not(feature = "moving_var_reward_rate"))]
                 let options_f64 = [
-                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "srd", "srv", "vdr", "vro",
+                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rse", "rss", "srd", "srv",
+                    "vdr", "vro",
                 ];
                 #[cfg(feature = "moving_var_reward_rate")]
                 let options_f64 = [
-                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "srd", "srv", "vri",
-                    "vrm", "vro",
+                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rse", "rss", "srd", "srv",
+                    "vri", "vrm", "vro",
                 ];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
@@ -355,6 +360,7 @@ impl Config {
                                         #[cfg(feature = "progress_MLD")]
                                         "rmt" => self.rst_mld_thr = val,
 
+                                        "rse" => self.rst_stb_exp = val,
                                         "rss" => self.rst_stb_scl = val,
                                         "srd" => self.stg_rwd_dcy = val,
                                         "srv" => self.stg_rwd_val = val,
@@ -477,6 +483,7 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --rlt <rst-lbd-thr>  Forcing restart threshold         {:>10.2}
       \x1B[000m\x1B[031m--rms <rst-mld-scl>  Scaling for Max LBD of Dep.       {:>10.2}\x1B[000m
       \x1B[000m\x1B[031m--rmt <rst-mld-thr>  Threshold for Max LBD of Dep.     {:>10.2}\x1B[000m
+      --rse <rst-stb-exp>  Stabilizer expansion scale        {:>10.2}
       --rss <rst-stb-scl>  Stabilizer scaling                {:>10.2}
       --rs  <rst-step>     #conflicts between restarts    {:>10}
       --srd <stg-rwd-dcy>  Decay rate for staged vare reward {:>10.2}
@@ -552,6 +559,7 @@ ARGS:
                 0.0
             }
         },
+        config.rst_stb_exp,
         config.rst_stb_scl,
         config.rst_step,
         config.stg_rwd_dcy,

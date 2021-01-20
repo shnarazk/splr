@@ -45,7 +45,7 @@ impl Default for AssignStack {
             trail_lim: Vec::new(),
             q_head: 0,
             root_level: 0,
-            conflicts: (0, 0),
+            last_conflict: VarId::default(),
             var_order: VarIdHeap::default(),
 
             use_rephase: true,
@@ -228,9 +228,6 @@ impl AssignIF for AssignStack {
     }
     fn remains(&self) -> bool {
         self.q_head < self.trail.len()
-    }
-    fn recurrent_conflicts(&self) -> bool {
-        self.conflicts.0 == self.conflicts.1
     }
     fn assign_ref(&self) -> &[Option<bool>] {
         &self.assign

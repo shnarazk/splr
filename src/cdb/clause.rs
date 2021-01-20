@@ -1,5 +1,5 @@
 use {
-    crate::types::*,
+    crate::{assign::AssignIF, types::*},
     std::{
         cmp::Ordering,
         fmt,
@@ -16,6 +16,10 @@ pub trait ClauseIF {
     fn iter(&self) -> Iter<'_, Lit>;
     /// return the number of literals.
     fn len(&self) -> usize;
+    /// update rank field with the present LBD.
+    fn update_lbd<A>(&mut self, asg: &A, lbd_temp: &mut [usize]) -> usize
+    where
+        A: AssignIF;
 }
 
 impl Default for Clause {
@@ -106,6 +110,30 @@ impl ClauseIF for Clause {
     }
     fn len(&self) -> usize {
         self.lits.len()
+    }
+    fn update_lbd<A>(&mut self, asg: &A, lbd_temp: &mut [usize]) -> usize
+    where
+        A: AssignIF,
+    {
+        let level = asg.level_ref();
+        unsafe {
+            let key: usize = lbd_temp.get_unchecked(0) + 1;
+            *lbd_temp.get_unchecked_mut(0) = key;
+            let mut cnt = 0;
+            for l in &self.lits {
+                let lv = level[l.vi()];
+                if lv == 0 {
+                    continue;
+                }
+                let p = lbd_temp.get_unchecked_mut(lv as usize);
+                if *p != key {
+                    *p = key;
+                    cnt += 1;
+                }
+            }
+            self.rank = cnt;
+            cnt as usize
+        }
     }
 }
 
