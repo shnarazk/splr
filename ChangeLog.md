@@ -2,7 +2,7 @@
 
 - update LBD correctly
 - check CNF header correctly
-- add command line option: --rst
+- add command line option: --rse
 
 ## 0.6.1, 2021-01-16
 
