@@ -1,4 +1,6 @@
 //! Crate `restart` provides restart heuristics.
+#[cfg(feature = "LBD_investigation")]
+use std::{fs::File, io::Write};
 use {
     crate::{solver::SolverEvent, types::*},
     std::fmt,
@@ -128,6 +130,10 @@ struct ProgressLBD {
     /// For force restart based on average LBD of newly generated clauses: 0.80.
     /// This is called `K` in Glucose
     threshold: f64,
+
+    #[cfg(feature = "LBD_investigation")]
+    /// LBD dump destination
+    pub dump: File,
 }
 
 impl Default for ProgressLBD {
@@ -138,15 +144,26 @@ impl Default for ProgressLBD {
             num: 0,
             sum: 0,
             threshold: 1.4,
+
+            #[cfg(feature = "LBD_investigation")]
+            dump: File::create("LBD_distance.txt").expect("fail to investigate"),
         }
     }
 }
 
 impl Instantiate for ProgressLBD {
-    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
+    fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
         ProgressLBD {
             ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_slw),
             threshold: config.rst_lbd_thr,
+
+            #[cfg(feature = "LBD_investigation")]
+            dump: File::create(match cnf.pathname {
+                CNFIndicator::File(ref f) => format!("LBD_{}.csv", f),
+                _ => "sample".to_string(),
+            })
+            .expect("fail to investigate"),
+
             ..ProgressLBD::default()
         }
     }
@@ -157,6 +174,12 @@ impl EmaIF for ProgressLBD {
     fn update(&mut self, d: Self::Input) {
         self.num += 1;
         self.sum += d as usize;
+
+        #[cfg(feature = "LBD_investigation")]
+        self.dump
+            .write_all(&format!("{:.2},{}\n", self.ema.get(), d).into_bytes())
+            .expect("fail to dump");
+
         self.ema.update(d as f64);
     }
     fn get(&self) -> f64 {

@@ -13,9 +13,10 @@ categories = ["mathematics", "science"]
 
 [dependencies]
 bitflags = "1.2"
+csv = "1.1"
 
 [features]
-default = ["staging"]
+default = ["ema_calibration", "LBD_investigation", "staging"]
 staging = ["extra_var_reward"]
 boundary_check = []
 ema_calibration = []
@@ -23,6 +24,7 @@ EVSIDS = []
 explore_timestamp = ["staging"]
 extra_var_reward = []
 incremental_solver = []
+LBD_investigation = []
 luby_blocking = []
 moving_var_reward_rate = []
 no_IO = []
