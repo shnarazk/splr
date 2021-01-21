@@ -284,9 +284,6 @@ pub fn handle_conflict(
         }
     }
     cdb.scale_activity();
-    if cdb.check_and_reduce(asg, num_conflict) {
-        state.to_vivify += 1.0;
-    }
     Ok(())
 }
 

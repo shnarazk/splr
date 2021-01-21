@@ -205,6 +205,7 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
     let use_vivify = state.config.use_vivify();
+    let mut parity = false;
     rst.update(ProgressUpdate::Luby);
     rst.update(ProgressUpdate::Remain(asg.num_vars - asg.num_asserted_vars));
 
@@ -232,7 +233,7 @@ fn search(
                 RESTART!(asg, rst);
             }
             #[allow(unused_variables)]
-            if let Some((parity, new_cycle)) = rst.stabilize(asg.num_conflict) {
+            if let Some((stabilizing, new_cycle)) = rst.stabilize(asg.num_conflict) {
                 if new_cycle {
                     let v = asg.var_stats();
                     let r = rst.exports();
@@ -246,6 +247,23 @@ fn search(
                             asg.num_staging_cands()
                         }
                     };
+                    parity = !parity;
+                    #[cfg(feature = "staging")]
+                    {
+                        let d = 1.0 / ((s + 2) as f64).log(2.0);
+                        rst.update(ProgressUpdate::Temperature(d));
+                        asg.build_stage(StagingTarget::AutoSelect, parity);
+                    }
+                    if stabilizing {
+                        for c in cdb.iter_mut().skip(1) {
+                            if c.is(Flag::LEARNT) {
+                                c.turn_off(Flag::JUST_USED);
+                            }
+                        }
+                    }
+                    if cdb.check_and_reduce(asg, asg.num_conflict) {
+                        state.to_vivify += 1.0;
+                    }
                     state.log(
                         asg.num_conflict,
                         format!(
@@ -256,21 +274,23 @@ fn search(
                             asg.num_conflict as f64 / asg.exports().2 as f64,
                         ),
                     );
-                    #[cfg(feature = "staging")]
-                    {
-                        let d = 1.0 / ((s + 2) as f64).log(2.0);
-                        rst.update(ProgressUpdate::Temperature(d));
-                        asg.build_stage(StagingTarget::AutoSelect, parity);
-                    }
                 } else {
                     #[cfg(feature = "staging")]
                     {
-                        asg.dissolve_stage(parity);
+                        asg.dissolve_stage(parity && !stabilizing);
                     }
                 }
                 if let Some(ref decision) = restart {
                     if *decision != RestartDecision::Force {
                         RESTART!(asg, rst);
+                    }
+                }
+                if use_vivify && 1.0 <= state.to_vivify {
+                    state.to_vivify = 0.0;
+                    if vivify(asg, cdb, elim, state).is_err() {
+                        // return Err(SolverError::UndescribedError);
+                        analyze_final(asg, state, &cdb[ci]);
+                        return Ok(false);
                     }
                 }
             }
@@ -296,14 +316,6 @@ fn search(
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == asg.root_level {
-            if use_vivify && 1.0 <= state.to_vivify {
-                state.to_vivify = 0.0;
-                if vivify(asg, cdb, elim, state).is_err() {
-                    // return Err(SolverError::UndescribedError);
-                    analyze_final(asg, state, &cdb[ci]);
-                    return Ok(false);
-                }
-            }
             // `elim.to_simplify` is increased much in particular when vars are asserted or
             // learnts are small. We don't need to count the number of asserted vars.
             if state.config.c_ip_int <= elim.to_simplify as usize {

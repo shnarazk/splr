@@ -19,6 +19,7 @@ trait ProgressEvaluator {
 pub enum ProgressUpdate {
     Counter,
     Temperature(f64),
+    ResetStabilizer,
 
     #[cfg(feature = "progress_ACC")]
     ACC(f64),
@@ -535,25 +536,26 @@ impl GeometricStabilizer {
                 new_cycle = true;
                 self.num_cycle += 1;
                 self.longest_span = self.step;
-                if self.reset_requested && RELAXATION <= self.longest_span {
-                    // reset the sequence
-                    self.luby.reset();
-                    self.longest_span = 1;
-                    self.reset_requested = false;
-                }
             }
             self.step = self.luby.next().unwrap();
-            self.active = !new_cycle;
+            self.active = self.longest_span < self.step;
             if self.active {
                 self.next_trigger =
                     now + ((self.step as f64).powf(self.depth) as usize) * self.scale;
             } else {
                 self.next_trigger = now + self.step * self.scale;
             }
-            Some((self.num_shift % 2 == 1, new_cycle))
-        } else {
-            None
+            return Some((self.active, new_cycle));
         }
+        if self.reset_requested && RELAXATION <= self.longest_span {
+            self.luby.reset();
+            self.longest_span = 1;
+            self.step = self.luby.next().unwrap();
+            self.active = false;
+            self.reset_requested = false;
+            self.next_trigger = now;
+        }
+        None
     }
     fn span(&self) -> usize {
         self.step
@@ -850,7 +852,9 @@ impl RestartIF for Restarter {
             ProgressUpdate::Temperature(c) => {
                 self.stb.depth = 1.0 + self.stb_expansion_factor * c;
             }
-
+            ProgressUpdate::ResetStabilizer => {
+                self.stb.reset_progress();
+            }
             #[cfg(feature = "progress_ACC")]
             ProgressUpdate::ACC(val) => self.acc.update(val),
 
