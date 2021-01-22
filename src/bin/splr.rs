@@ -66,17 +66,14 @@ fn main() {
     if let Ok(val) = env::var("SPLR_TIMEOUT") {
         if let Ok(timeout) = val.parse::<u64>() {
             let input = cnf_file.as_ref().to_string();
-            let quiet_mode = config.quiet_mode;
             let no_color = config.no_color;
             thread::spawn(move || {
                 thread::sleep(Duration::from_millis(timeout * 1000));
-                if !quiet_mode {
-                    println!(
-                        "{} (TimeOut): {}",
-                        colored(Err(&SolverError::TimeOut), no_color),
-                        input
-                    );
-                }
+                println!(
+                    "{} (TimeOut): {}",
+                    colored(Err(&SolverError::TimeOut), no_color),
+                    input
+                );
                 std::process::exit(0);
             });
         }
@@ -128,9 +125,7 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                 }
                 _ => (),
             }
-            if !s.state.config.quiet_mode {
-                println!("{}: {}", colored(Ok(true), s.state.config.no_color), input);
-            }
+            println!("{}: {}", colored(Ok(true), s.state.config.no_color), input);
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
