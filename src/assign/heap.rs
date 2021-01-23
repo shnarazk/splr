@@ -1,6 +1,6 @@
 /// Heap struct for selecting decision vars
 use {
-    super::{AssignStack, VarIdHeap, VarRewardIF},
+    super::{AssignStack, VarIdHeap},
     crate::types::*,
     std::fmt,
 };

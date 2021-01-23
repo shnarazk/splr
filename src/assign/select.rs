@@ -2,7 +2,7 @@
 use crate::state::StagingTarget;
 /// Decision var selection
 use {
-    super::{AssignStack, Var, VarHeapIF, VarOrderIF, VarRewardIF},
+    super::{AssignStack, Var, VarHeapIF, VarOrderIF},
     crate::types::*,
 };
 
