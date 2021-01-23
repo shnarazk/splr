@@ -1,7 +1,6 @@
 use {
     crate::{assign::AssignIF, types::*},
     std::{
-        cmp::Ordering,
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::Iter,
@@ -149,46 +148,6 @@ impl FlagIF for Clause {
     }
     fn turn_on(&mut self, flag: Flag) {
         self.flags.insert(flag);
-    }
-}
-
-impl PartialEq for Clause {
-    fn eq(&self, other: &Clause) -> bool {
-        self == other
-    }
-}
-
-impl Eq for Clause {}
-
-impl PartialOrd for Clause {
-    fn partial_cmp(&self, other: &Clause) -> Option<Ordering> {
-        if self.rank < other.rank {
-            Some(Ordering::Less)
-        } else if other.rank < self.rank {
-            Some(Ordering::Greater)
-        } else if self.reward > other.reward {
-            Some(Ordering::Less)
-        } else if other.reward > self.reward {
-            Some(Ordering::Greater)
-        } else {
-            Some(Ordering::Equal)
-        }
-    }
-}
-
-impl Ord for Clause {
-    fn cmp(&self, other: &Clause) -> Ordering {
-        if self.rank < other.rank {
-            Ordering::Less
-        } else if other.rank > self.rank {
-            Ordering::Greater
-        } else if self.reward > other.reward {
-            Ordering::Less
-        } else if other.reward > self.reward {
-            Ordering::Greater
-        } else {
-            Ordering::Equal
-        }
     }
 }
 
