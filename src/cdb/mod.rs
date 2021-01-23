@@ -45,7 +45,7 @@ impl ClauseId {
 }
 
 /// A representation of 'clause'
-#[derive(Debug)]
+#[derive(Debug, PartialEq, PartialOrd)]
 pub struct Clause {
     /// The literals in a clause.
     pub lits: Vec<Lit>,

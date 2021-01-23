@@ -4,7 +4,6 @@ use {
     super::{CertifiedRecord, Clause, ClauseDB, ClauseId, WatchDBIF},
     crate::{assign::AssignIF, solver::SolverEvent, types::*},
     std::{
-        cmp::Ordering,
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::{Iter, IterMut},
     },
@@ -789,6 +788,14 @@ impl ClauseDB {
     where
         A: AssignIF,
     {
+        const SCALE_UP: f64 = 100_000_000.0;
+
+        #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+        struct ClauseSorter {
+            weight: usize,
+            index: usize,
+        }
+
         let ClauseDB {
             ref mut clause,
             ref mut lbd_temp,
@@ -796,40 +803,45 @@ impl ClauseDB {
             ..
         } = self;
         self.next_reduction += self.inc_step;
-        let mut perm = Vec::with_capacity(clause.len());
+        let mut perm: Vec<ClauseSorter> = Vec::with_capacity(clause.len());
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
-            let used = c.is(Flag::JUST_USED);
-            if c.is(Flag::LEARNT) && !c.is(Flag::DEAD) && !asg.locked(c, ClauseId::from(i)) && !used
-            {
-                c.update_lbd(asg, lbd_temp);
-                perm.push(i);
+            let mut w: f64 = 0.0;
+            for l in c.lits.iter() {
+                // w = w.max(asg.activity(l.vi()));
+                w += asg.activity(l.vi());
             }
-            if used {
-                c.turn_off(Flag::JUST_USED)
+            if c.is(Flag::LEARNT) && !c.is(Flag::DEAD) && !asg.locked(c, ClauseId::from(i)) {
+                c.update_lbd(asg, lbd_temp);
+                let weight: usize = if self.use_chan_seok {
+                    (SCALE_UP / (0.001 + c.reward)) as usize
+                } else {
+                    (c.rank as f64 * SCALE_UP / (1.0 + w)) as usize
+                };
+                perm.push(ClauseSorter { weight, index: i });
             }
         }
         if perm.is_empty() {
             return;
         }
         let keep = perm.len() / 2;
-        if self.use_chan_seok {
-            perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
-        } else {
-            perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
-            if clause[perm[keep]].rank <= 3 {
+        if !self.use_chan_seok {
+            if clause[perm[keep].index].rank <= 3 {
                 self.next_reduction += self.extra_inc;
             }
-            if clause[perm[0]].rank <= 5 {
+            if clause[perm[0].index].rank <= 5 {
                 self.next_reduction += self.extra_inc;
             };
         }
+        perm.sort_unstable_by_key(|c| c.weight);
         for i in &perm[keep..] {
-            let c = &mut clause[*i];
+            let c = &mut clause[i.index];
             if 2 < c.rank {
                 c.kill(touched);
             }
         }
-        debug_assert!(perm[0..keep].iter().all(|cid| !clause[*cid].is(Flag::DEAD)));
+        debug_assert!(perm[0..keep]
+            .iter()
+            .all(|c| !clause[c.index].is(Flag::DEAD)));
         self.garbage_collect();
     }
 
@@ -854,16 +866,6 @@ impl ClauseDB {
 }
 
 impl Clause {
-    #[allow(clippy::comparison_chain)]
-    fn cmp_activity(&self, other: &Clause) -> Ordering {
-        if self.reward > other.reward {
-            Ordering::Less
-        } else if other.reward > self.reward {
-            Ordering::Greater
-        } else {
-            Ordering::Equal
-        }
-    }
     /// make a clause *dead*; the clause still exists in clause database as a garbage.
     fn kill(&mut self, touched: &mut [bool]) {
         self.turn_on(Flag::DEAD);
