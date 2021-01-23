@@ -9,7 +9,7 @@ use {
         Certificate, Solver, SolverEvent, SolverResult,
     },
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
+        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
@@ -131,7 +131,9 @@ impl SolveIF for Solver {
                         _ => (),
                     }
                 }
-                asg.initialize_reward(elim.sorted_iterator());
+                for vi in elim.sorted_iterator() {
+                    asg.initialize_reward(*vi);
+                }
                 asg.rebuild_order();
             }
             elim.stop(asg, cdb);
@@ -210,7 +212,8 @@ fn search(
     rst.update(ProgressUpdate::Remain(asg.num_vars - asg.num_asserted_vars));
 
     loop {
-        asg.reward_update();
+        asg.update_rewards();
+        cdb.update_rewards();
         let ci = asg.propagate(cdb);
         if ci.is_none() {
             state.last_asg = state.last_asg.max(asg.stack_len());
@@ -253,13 +256,6 @@ fn search(
                         let d = 1.0 / ((s + 2) as f64).log(2.0);
                         rst.update(ProgressUpdate::Temperature(d));
                         asg.build_stage(StagingTarget::AutoSelect, parity);
-                    }
-                    if stabilizing {
-                        for c in cdb.iter_mut().skip(1) {
-                            if c.is(Flag::LEARNT) {
-                                c.turn_off(Flag::JUST_USED);
-                            }
-                        }
                     }
                     if cdb.check_and_reduce(asg, asg.num_conflict) {
                         state.to_vivify += 1.0;

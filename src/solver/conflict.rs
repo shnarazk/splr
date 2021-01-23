@@ -6,7 +6,7 @@ use {
         State,
     },
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF},
+        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF, WatchDBIF},
         processor::{EliminateIF, Eliminator},
         solver::SolverEvent,
@@ -283,7 +283,6 @@ pub fn handle_conflict(
             }
         }
     }
-    cdb.scale_activity();
     Ok(())
 }
 
@@ -363,11 +362,13 @@ fn conflict_analyze(
 
                 debug_assert!(!cid.is_none());
                 cdb.mark_clause_as_used(asg, cid);
-                cdb.bump_activity(cid, ());
-                let c = &cdb[cid];
-                if !c.is(Flag::LEARNT) {
+                // FIXME: cdb.bump_activity(cid, ());
+                if cdb[cid].is(Flag::LEARNT) {
+                    cdb.reward_at_analysis(cid);
+                } else {
                     state.derive20.push(cid);
                 }
+                let c = &cdb[cid];
                 #[cfg(feature = "progress_MLD")]
                 {
                     largest_clause = largest_clause.max(c.rank);

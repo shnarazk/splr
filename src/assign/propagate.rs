@@ -1,7 +1,7 @@
 /// implement boolean constraint propagation, backjump
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{AssignIF, AssignStack, VarHeapIF, VarRewardIF, VarSelectIF},
+    super::{AssignIF, AssignStack, VarHeapIF, VarSelectIF},
     crate::{
         cdb::{ClauseDBIF, WatchDBIF},
         types::*,
@@ -272,6 +272,7 @@ impl PropagateIF for AssignStack {
                     for k in (*search_from..len).chain(2..*search_from) {
                         let lk = &lits[k];
                         if lit_assign!(self, *lk) != Some(false) {
+                            let cid = w.c;
                             (*watcher)
                                 .get_unchecked_mut(usize::from(!*lk))
                                 .register(first, w.c);
@@ -281,6 +282,7 @@ impl PropagateIF for AssignStack {
                             // If `search_from` gets out of range, the next loop will ignore it safely;
                             // the first iteration loop becomes null.
                             *search_from = k + 1;
+                            cdb.reward_at_assign(cid);
                             continue 'next_clause;
                         }
                     }
