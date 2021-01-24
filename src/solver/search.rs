@@ -227,7 +227,6 @@ fn search(
     rst.update(ProgressUpdate::Remain(asg.num_vars - asg.num_asserted_vars));
 
     loop {
-        asg.update_rewards();
         let ci = asg.propagate(cdb);
         if ci.is_none() {
             //
@@ -250,7 +249,7 @@ fn search(
                 return Ok(false);
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
-            // asg.update_rewards();
+            asg.update_rewards();
             cdb.update_rewards();
             rst.update(ProgressUpdate::Remain(asg.var_stats().3));
             let restart = rst.restart();
