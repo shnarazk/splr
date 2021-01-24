@@ -287,7 +287,6 @@ impl PropagateIF for AssignStack {
                             // If `search_from` gets out of range, the next loop will ignore it safely;
                             // the first iteration loop becomes null.
                             *search_from = k + 1;
-                            cdb.reward_at_assign(cid);
                             continue 'next_clause;
                         }
                     }
