@@ -643,7 +643,6 @@ impl ClauseDBIF for ClauseDB {
         if go {
             self.reduction_coeff = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
             self.reduce(asg);
-            self.num_reduction += 1;
         }
         go
     }
@@ -808,6 +807,7 @@ impl ClauseDB {
             ref activity_decay,
             ..
         } = self;
+        self.num_reduction += 1;
         self.next_reduction += self.inc_step;
         let mut perm: Vec<ClauseSorter> = Vec::with_capacity(clause.len());
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
@@ -825,7 +825,7 @@ impl ClauseDB {
         if perm.is_empty() {
             return;
         }
-        let keep = perm.len() / 2;
+        let keep = perm.len() / (1 + self.num_reduction);
         if !self.use_chan_seok {
             if clause[perm[keep].index].rank <= 3 {
                 self.next_reduction += self.extra_inc;
