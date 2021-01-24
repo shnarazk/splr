@@ -197,15 +197,15 @@ impl ActivityIF<ClauseId> for ClauseDB {
     fn clear_reward(&mut self, cid: ClauseId) {
         self[cid].reward = 0.0;
     }
-    fn reward_at_assign(&mut self, cid: ClauseId) {
+    fn reward_at_unassign(&mut self, cid: ClauseId) {
         let d = self.activity_decay;
         let t = self.ordinal;
-        self.clause[cid.ordinal as usize].activity1(t, d);
+        self.clause[cid.ordinal as usize].activity(t, d);
     }
     fn reward_at_analysis(&mut self, cid: ClauseId) {
         let d = self.activity_decay;
         let t = self.ordinal;
-        self.clause[cid.ordinal as usize].activity1(t, d);
+        self.clause[cid.ordinal as usize].activity(t, d);
     }
     fn update_rewards(&mut self) {
         self.ordinal += 1;
@@ -875,13 +875,6 @@ impl Clause {
             self.reward += 1.0 - decay;
             self.timestamp = t;
         }
-        self.reward
-    }
-    fn activity1(&mut self, t: usize, decay: f64) -> f64 {
-        let duration = (t + 1 - self.timestamp) as f64;
-        self.reward *= decay.powf(duration);
-        self.reward += 1.0 - decay;
-        self.timestamp = t;
         self.reward
     }
     /// make a clause *dead*; the clause still exists in clause database as a garbage.
