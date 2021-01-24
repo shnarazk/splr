@@ -362,7 +362,6 @@ fn conflict_analyze(
 
                 debug_assert!(!cid.is_none());
                 cdb.mark_clause_as_used(asg, cid);
-                // FIXME: cdb.bump_activity(cid, ());
                 if cdb[cid].is(Flag::LEARNT) {
                     cdb.reward_at_analysis(cid);
                 } else {

@@ -27,6 +27,21 @@ pub trait SolveIF {
     fn solve(&mut self) -> SolverResult;
 }
 
+#[allow(dead_code)]
+fn update_clause_rewards(asg: &mut AssignStack, cdb: &mut ClauseDB, conflicting: ClauseId) {
+    cdb.reward_at_unassign(conflicting);
+    for l in asg.stack_iter() {
+        match asg.reason(l.vi()) {
+            AssignReason::Implication(cid, NULL_LIT) => {
+                if cdb[cid].is(Flag::LEARNT) {
+                    cdb.reward_at_unassign(cid);
+                }
+            }
+            _ => (),
+        }
+    }
+}
+
 macro_rules! RESTART {
     ($asg: expr, $rst: expr) => {
         $asg.cancel_until($asg.root_level);
@@ -213,14 +228,19 @@ fn search(
 
     loop {
         asg.update_rewards();
-        cdb.update_rewards();
         let ci = asg.propagate(cdb);
         if ci.is_none() {
+            //
+            //## NO CONFLICT PATH
+            //
             state.last_asg = state.last_asg.max(asg.stack_len());
             if asg.num_vars <= state.last_asg + asg.num_eliminated_vars {
                 return Ok(true);
             }
         } else {
+            //
+            //## CONFLICT
+            //
             if 0 < state.last_asg {
                 rst.update(ProgressUpdate::ASG(state.last_asg));
                 state.last_asg = 0;
@@ -230,9 +250,19 @@ fn search(
                 return Ok(false);
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
+            // asg.update_rewards();
+            cdb.update_rewards();
             rst.update(ProgressUpdate::Remain(asg.var_stats().3));
             let restart = rst.restart();
             if matches!(restart, Some(RestartDecision::Force)) {
+                for l in asg.stack_iter() {
+                    match asg.reason(l.vi()) {
+                        AssignReason::Implication(cid, NULL_LIT) => {
+                            cdb.reward_at_unassign(cid);
+                        }
+                        _ => (),
+                    }
+                }
                 RESTART!(asg, rst);
             }
             #[allow(unused_variables)]
