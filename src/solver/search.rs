@@ -327,7 +327,7 @@ fn search(
             }
             if let Some(na) = asg.best_assigned() {
                 state.flush("");
-                state.flush(format!("unreachable: {}", na));
+                state.flush(format!("unreachable core: {}", na));
             }
             if asg.num_conflict % state.reflection_interval == 0 {
                 adapt_modules(asg, cdb, elim, rst, state)?;
