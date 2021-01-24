@@ -8,6 +8,7 @@ impl ActivityIF<VarId> for AssignStack {
         let v = &self.var[vi];
         v.reward.max(v.extra_reward)
     }
+    fn initialize_reward(&mut self, _ix: VarId) {}
     #[cfg(not(feature = "extra_var_reward"))]
     fn activity(&mut self, vi: VarId) -> f64 {
         self.var[vi].reward
