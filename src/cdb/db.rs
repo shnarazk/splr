@@ -106,7 +106,7 @@ impl Default for ClauseDB {
             // lbd_frozen_clause: 30,
             ordinal: 0,
             activity_inc: 1.0,
-            activity_decay: 0.98,
+            activity_decay: 0.99,
             touched: Vec::new(),
             lbd_temp: Vec::new(),
             num_lbd_update: 0,
