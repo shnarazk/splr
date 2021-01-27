@@ -227,6 +227,7 @@ fn search(
     rst.update(ProgressUpdate::Remain(asg.num_vars - asg.num_asserted_vars));
 
     loop {
+        let dl0 = asg.decision_level();
         let ci = asg.propagate(cdb);
         if ci.is_none() {
             //
@@ -252,6 +253,8 @@ fn search(
             asg.update_rewards();
             cdb.update_rewards();
             rst.update(ProgressUpdate::Remain(asg.var_stats().3));
+            let dl = asg.decision_level();
+            rst.adl_index = if dl0 < dl { (dl - dl0) as f64 } else { 0.0 };
             let restart = rst.restart();
             if matches!(restart, Some(RestartDecision::Force)) {
                 for l in asg.stack_iter() {
@@ -325,6 +328,7 @@ fn search(
                 state[Stat::NoDecisionConflict] += 1;
             }
             if let Some(na) = asg.best_assigned() {
+                rst.adl_threshold = 10.0 * asg.decision_level() as f64;
                 state.flush("");
                 state.flush(format!("unreachable core: {}", na));
             }

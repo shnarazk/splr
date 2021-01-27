@@ -700,6 +700,11 @@ pub struct Restarter {
     //
     num_block: usize,
     num_restart: usize,
+
+    //
+    pub adl_threshold: f64,
+    adl_remain: f64,
+    pub adl_index: f64,
 }
 
 impl Default for Restarter {
@@ -733,7 +738,22 @@ impl Default for Restarter {
 
             num_block: 0,
             num_restart: 0,
+
+            adl_threshold: 100.0,
+            adl_remain: 100.0,
+            adl_index: 0.0,
         }
+    }
+}
+
+fn adl_is_active(rst: &mut Restarter) -> bool {
+    let val = rst.adl_index;
+    if rst.adl_remain < val {
+        rst.adl_remain = rst.adl_threshold;
+        true
+    } else {
+        rst.adl_remain -= val;
+        false
     }
 }
 
@@ -817,10 +837,12 @@ impl RestartIF for Restarter {
             return Some(RestartDecision::Stabilize);
         }
 
+        // if adl_is_active(self) {
+        //     return Some(RestartDecision::Force);
+        // }
         if self.asg.is_active() {
             self.num_block += 1;
             self.after_restart = 0;
-
             #[cfg(feature = "luby_blocking")]
             {
                 self.luby_blocking.update(0);
@@ -830,7 +852,6 @@ impl RestartIF for Restarter {
             }
             return Some(RestartDecision::Block);
         }
-
         if self.lbd.is_active() {
             #[cfg(feature = "luby_blocking")]
             {

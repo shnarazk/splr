@@ -106,7 +106,7 @@ impl Default for ClauseDB {
             // lbd_frozen_clause: 30,
             ordinal: 0,
             activity_inc: 1.0,
-            activity_decay: 0.99,
+            activity_decay: 0.92,
             touched: Vec::new(),
             lbd_temp: Vec::new(),
             num_lbd_update: 0,
@@ -793,15 +793,17 @@ impl ClauseDB {
         self.num_reduction += 1;
         self.next_reduction += self.inc_step;
         let mut perm: Vec<ClauseSorter> = Vec::with_capacity(clause.len());
+        let act_ratio = 0.5;
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
-            let mut act_v: f64 = 0.0;
+            let mut act_v: f64 = 1.0;
             for l in c.lits.iter() {
                 act_v = act_v.max(asg.activity(l.vi()));
             }
             if c.is(Flag::LEARNT) && !c.is(Flag::DEAD) && !asg.locked(c, ClauseId::from(i)) {
                 let rank = c.update_lbd(asg, lbd_temp) as f64;
                 let act_c = c.activity(*ordinal, *activity_decay);
-                let weight = (SCALE_UP * rank / (act_v + act_c)) as usize;
+                let weight =
+                    (SCALE_UP * rank / (act_ratio * act_v + (1.0 - act_ratio) * act_c)) as usize;
                 perm.push(ClauseSorter { weight, index: i });
             }
         }
