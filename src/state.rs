@@ -1,3 +1,5 @@
+#[cfg(feature = "LBD_investigation")]
+use std::fs::File;
 #[cfg(feature = "strategy_adaptation")]
 use {crate::cdb::ClauseDBIF, std::cmp::Ordering};
 /// Crate `state` is a collection of internal data.
@@ -230,6 +232,10 @@ pub struct State {
     pub time_limit: f64,
     /// logging facility.
     log_messages: Vec<String>,
+
+    #[cfg(feature = "LBD_investigation")]
+    /// LBD dump destination
+    pub dump: File,
 }
 
 impl Default for State {
@@ -256,6 +262,9 @@ impl Default for State {
             start: Instant::now(),
             time_limit: 0.0,
             log_messages: Vec::new(),
+
+            #[cfg(feature = "LBD_investigation")]
+            dump: File::create("LBD_distance.txt").expect("fail to investigate"),
         }
     }
 }
@@ -290,6 +299,14 @@ impl Instantiate for State {
             vivify_thr: config.viv_thr,
             target: cnf.clone(),
             time_limit: config.c_tout,
+
+            #[cfg(feature = "LBD_investigation")]
+            dump: File::create(match cnf.pathname {
+                CNFIndicator::File(ref f) => format!("cDL_{}.csv", f),
+                _ => "sample".to_string(),
+            })
+            .expect("fail to investigate"),
+
             ..State::default()
         }
     }

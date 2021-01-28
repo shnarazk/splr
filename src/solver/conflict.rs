@@ -1,5 +1,6 @@
 //! Conflict Analysis
-
+#[cfg(feature = "LBD_investigation")]
+use std::io::Write;
 use {
     super::{
         restart::{ProgressUpdate, RestartIF, Restarter},
@@ -262,6 +263,12 @@ pub fn handle_conflict(
         asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), al);
         let lbd = cdb[cid].rank;
         rst.update(ProgressUpdate::LBD(lbd));
+
+        #[cfg(feature = "LBD_investigation")]
+        state
+            .dump
+            .write_all(&format!("{},{}\n", original_dl, lbd).into_bytes())
+            .expect("fail to dump");
 
         let mut act: f64 = 0.0;
         for li in cdb[cid].iter() {
