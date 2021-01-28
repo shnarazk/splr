@@ -188,12 +188,14 @@ mod tests {
         assert_eq!(c.rank, 2);
         assert!(!c.is(Flag::DEAD));
         assert!(!c.is(Flag::LEARNT));
+        assert!(!c.is(Flag::JUST_USED));
 
         let c2 = cdb.new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true, true);
         let c = &cdb[c2];
         assert_eq!(c.rank, 2);
         assert!(!c.is(Flag::DEAD));
         assert!(c.is(Flag::LEARNT));
+        assert!(!c.is(Flag::JUST_USED));
     }
     #[test]
     fn test_clause_equality() -> () {

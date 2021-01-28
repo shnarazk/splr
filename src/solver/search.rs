@@ -28,8 +28,10 @@ pub trait SolveIF {
 }
 
 #[allow(dead_code)]
-fn update_clause_rewards(asg: &mut AssignStack, cdb: &mut ClauseDB, conflicting: ClauseId) {
-    cdb.reward_at_unassign(conflicting);
+fn update_clause_rewards(asg: &mut AssignStack, cdb: &mut ClauseDB, conflicting: Option<ClauseId>) {
+    if let Some(cid) = conflicting {
+        cdb.reward_at_unassign(cid);
+    }
     for l in asg.stack_iter() {
         match asg.reason(l.vi()) {
             AssignReason::Implication(cid, NULL_LIT) => {
@@ -254,21 +256,14 @@ fn search(
             rst.update(ProgressUpdate::Remain(asg.var_stats().3));
             let restart = rst.restart();
             if matches!(restart, Some(RestartDecision::Force)) {
-                for l in asg.stack_iter() {
-                    match asg.reason(l.vi()) {
-                        AssignReason::Implication(cid, NULL_LIT) => {
-                            cdb.reward_at_unassign(cid);
-                        }
-                        _ => (),
-                    }
-                }
+                // update_clause_rewards(asg, cdb, None);
                 RESTART!(asg, rst);
             }
             #[allow(unused_variables)]
             if let Some((stabilizing, new_cycle)) = rst.stabilize(asg.num_conflict) {
+                let r = rst.exports();
                 if new_cycle {
                     let v = asg.var_stats();
-                    let r = rst.exports();
                     let s = {
                         #[cfg(not(feature = "staging"))]
                         {
@@ -285,9 +280,6 @@ fn search(
                         let d = 1.0 / ((s + 2) as f64).log(2.0);
                         rst.update(ProgressUpdate::Temperature(d));
                         asg.build_stage(StagingTarget::AutoSelect, parity);
-                    }
-                    if cdb.check_and_reduce(asg, asg.num_conflict) {
-                        state.to_vivify += 1.0;
                     }
                     state.log(
                         asg.num_conflict,
@@ -307,8 +299,12 @@ fn search(
                 }
                 if let Some(ref decision) = restart {
                     if *decision != RestartDecision::Force {
+                        // update_clause_rewards(asg, cdb, None);
                         RESTART!(asg, rst);
                     }
+                }
+                if cdb.check_and_reduce(asg, asg.num_conflict, r.3) {
+                    state.to_vivify += 1.0;
                 }
                 if use_vivify && 1.0 <= state.to_vivify {
                     state.to_vivify = 0.0;

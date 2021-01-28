@@ -33,7 +33,7 @@ pub trait ClauseDBIF: ActivityIF<ClauseId> + IndexMut<ClauseId, Output = Clause>
     ///
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn check_and_reduce<A>(&mut self, asg: &mut A, nc: usize) -> bool
+    fn check_and_reduce<A>(&mut self, asg: &mut A, nc: usize, index: usize) -> bool
     where
         A: AssignIF;
     fn reset(&mut self);
@@ -192,7 +192,7 @@ impl ActivityIF<ClauseId> for ClauseDB {
     fn activity(&mut self, cid: ClauseId) -> f64 {
         let d = self.activity_decay;
         let t = self.ordinal;
-        self.clause[cid.ordinal as usize].activity(t, d)
+        self.clause[cid.ordinal as usize].update_activity(t, d)
     }
     fn clear_reward(&mut self, cid: ClauseId) {
         self[cid].reward = 0.0;
@@ -200,12 +200,12 @@ impl ActivityIF<ClauseId> for ClauseDB {
     fn reward_at_unassign(&mut self, cid: ClauseId) {
         let d = self.activity_decay;
         let t = self.ordinal;
-        self.clause[cid.ordinal as usize].activity(t, d);
+        self.clause[cid.ordinal as usize].update_activity(t, d);
     }
     fn reward_at_analysis(&mut self, cid: ClauseId) {
         let d = self.activity_decay;
         let t = self.ordinal;
-        self.clause[cid.ordinal as usize].activity(t, d);
+        self.clause[cid.ordinal as usize].update_activity(t, d);
     }
     fn update_rewards(&mut self) {
         self.ordinal += 1;
@@ -600,10 +600,14 @@ impl ClauseDBIF for ClauseDB {
                 (true, true) => (),
             }
             // chan_seok_condition is zero if !use_chan_seok
-            if c.is(Flag::LEARNT) && nlevels < chan_seok_condition {
-                c.turn_off(Flag::LEARNT);
-                self.num_learnt -= 1;
-                return true;
+            if c.is(Flag::LEARNT) {
+                if nlevels < chan_seok_condition {
+                    c.turn_off(Flag::LEARNT);
+                    self.num_learnt -= 1;
+                    return true;
+                } else {
+                    c.turn_on(Flag::JUST_USED);
+                }
             }
         }
         false
@@ -628,7 +632,7 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
     }
-    fn check_and_reduce<A>(&mut self, asg: &mut A, nc: usize) -> bool
+    fn check_and_reduce<A>(&mut self, asg: &mut A, nc: usize, index: usize) -> bool
     where
         A: AssignIF,
     {
@@ -642,7 +646,7 @@ impl ClauseDBIF for ClauseDB {
         };
         if go {
             self.reduction_coeff = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
-            self.reduce(asg);
+            self.reduce(asg, index);
         }
         go
     }
@@ -787,7 +791,7 @@ impl ClauseDBIF for ClauseDB {
 
 impl ClauseDB {
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce<A>(&mut self, asg: &mut A)
+    fn reduce<A>(&mut self, asg: &mut A, index: usize)
     where
         A: AssignIF,
     {
@@ -811,21 +815,27 @@ impl ClauseDB {
         self.next_reduction += self.inc_step;
         let mut perm: Vec<ClauseSorter> = Vec::with_capacity(clause.len());
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
+            if !c.is(Flag::LEARNT) || c.is(Flag::DEAD) || asg.locked(c, ClauseId::from(i)) {
+                continue;
+            }
+            let used = c.is(Flag::JUST_USED);
+            if used {
+                c.turn_off(Flag::JUST_USED);
+                continue;
+            }
             let mut act_v: f64 = 0.0;
             for l in c.lits.iter() {
                 act_v = act_v.max(asg.activity(l.vi()));
             }
-            if c.is(Flag::LEARNT) && !c.is(Flag::DEAD) && !asg.locked(c, ClauseId::from(i)) {
-                let rank = c.update_lbd(asg, lbd_temp) as f64;
-                let act_c = c.activity(*ordinal, *activity_decay);
-                let weight = (SCALE_UP * rank / (act_v + act_c)) as usize;
-                perm.push(ClauseSorter { weight, index: i });
-            }
+            let rank = c.update_lbd(asg, lbd_temp) as f64;
+            let act_c = c.update_activity(*ordinal, *activity_decay);
+            let weight = (SCALE_UP * rank / (act_v + act_c)) as usize;
+            perm.push(ClauseSorter { weight, index: i });
         }
-        if perm.is_empty() {
+        if perm.len() < 10_000 {
             return;
         }
-        let keep = perm.len() / (1 + self.num_reduction);
+        let keep = (perm.len() - 1_000).min(1_000 * index);
         if !self.use_chan_seok {
             if clause[perm[keep].index].rank <= 3 {
                 self.next_reduction += self.extra_inc;
@@ -868,7 +878,7 @@ impl ClauseDB {
 }
 
 impl Clause {
-    fn activity(&mut self, t: usize, decay: f64) -> f64 {
+    fn update_activity(&mut self, t: usize, decay: f64) -> f64 {
         if self.timestamp < t {
             let duration = (t - self.timestamp) as f64;
             self.reward *= decay.powf(duration);
