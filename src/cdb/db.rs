@@ -9,7 +9,7 @@ use {
     },
 };
 
-/// API for clause management like [`check_and_reduce`](`crate::cdb::ClauseDBIF::check_and_reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`watcher_list`](`crate::cdb::ClauseDBIF::watcher_list`), and so on.
+/// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`watcher_list`](`crate::cdb::ClauseDBIF::watcher_list`), and so on.
 pub trait ClauseDBIF: ActivityIF<ClauseId> + IndexMut<ClauseId, Output = Clause> {
     /// return the length of `clause`.
     fn len(&self) -> usize;
@@ -33,7 +33,7 @@ pub trait ClauseDBIF: ActivityIF<ClauseId> + IndexMut<ClauseId, Output = Clause>
     ///
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn check_and_reduce<A>(&mut self, asg: &mut A, nc: usize, index: usize) -> bool
+    fn reduce<A>(&mut self, asg: &mut A, nc: usize) -> bool
     where
         A: AssignIF;
     fn reset(&mut self);
@@ -190,22 +190,19 @@ impl IndexMut<RangeFrom<usize>> for ClauseDB {
 
 impl ActivityIF<ClauseId> for ClauseDB {
     fn activity(&mut self, cid: ClauseId) -> f64 {
-        let d = self.activity_decay;
         let t = self.ordinal;
-        self.clause[cid.ordinal as usize].update_activity(t, d)
+        self.clause[cid.ordinal as usize].update_activity(t, self.activity_decay)
     }
     fn clear_reward(&mut self, cid: ClauseId) {
         self[cid].reward = 0.0;
     }
     fn reward_at_unassign(&mut self, cid: ClauseId) {
-        let d = self.activity_decay;
         let t = self.ordinal;
-        self.clause[cid.ordinal as usize].update_activity(t, d);
+        self.clause[cid.ordinal as usize].update_activity(t, self.activity_decay);
     }
     fn reward_at_analysis(&mut self, cid: ClauseId) {
-        let d = self.activity_decay;
         let t = self.ordinal;
-        self.clause[cid.ordinal as usize].update_activity(t, d);
+        self.clause[cid.ordinal as usize].update_activity(t, self.activity_decay);
     }
     fn update_rewards(&mut self) {
         self.ordinal += 1;
@@ -632,7 +629,7 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
     }
-    fn check_and_reduce<A>(&mut self, asg: &mut A, nc: usize, index: usize) -> bool
+    fn reduce<A>(&mut self, asg: &mut A, nc: usize) -> bool
     where
         A: AssignIF,
     {
@@ -646,7 +643,7 @@ impl ClauseDBIF for ClauseDB {
         };
         if go {
             self.reduction_coeff = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
-            self.reduce(asg, index);
+            self.reduce_db(asg, nc);
         }
         go
     }
@@ -791,7 +788,7 @@ impl ClauseDBIF for ClauseDB {
 
 impl ClauseDB {
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce<A>(&mut self, asg: &mut A, index: usize)
+    fn reduce_db<A>(&mut self, asg: &mut A, nc: usize)
     where
         A: AssignIF,
     {
@@ -818,11 +815,11 @@ impl ClauseDB {
             if !c.is(Flag::LEARNT) || c.is(Flag::DEAD) || asg.locked(c, ClauseId::from(i)) {
                 continue;
             }
-            let used = c.is(Flag::JUST_USED);
-            if used {
-                c.turn_off(Flag::JUST_USED);
-                continue;
-            }
+            // let used = c.is(Flag::JUST_USED);
+            // if used {
+            //     c.turn_off(Flag::JUST_USED);
+            //     continue;
+            // }
             let mut act_v: f64 = 0.0;
             for l in c.lits.iter() {
                 act_v = act_v.max(asg.activity(l.vi()));
@@ -832,10 +829,7 @@ impl ClauseDB {
             let weight = (SCALE_UP * rank / (act_v + act_c)) as usize;
             perm.push(ClauseSorter { weight, index: i });
         }
-        if perm.len() < 10_000 {
-            return;
-        }
-        let keep = (perm.len() - 1_000).min(1_000 * index);
+        let keep = (perm.len() / 2).min(nc / 2);
         if !self.use_chan_seok {
             if clause[perm[keep].index].rank <= 3 {
                 self.next_reduction += self.extra_inc;

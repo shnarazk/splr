@@ -291,6 +291,9 @@ fn search(
                             asg.num_conflict as f64 / asg.exports().2 as f64,
                         ),
                     );
+                    if cdb.reduce(asg, asg.num_conflict) {
+                        state.to_vivify += 1.0;
+                    }
                 } else {
                     #[cfg(feature = "staging")]
                     {
@@ -299,12 +302,8 @@ fn search(
                 }
                 if let Some(ref decision) = restart {
                     if *decision != RestartDecision::Force {
-                        // update_clause_rewards(asg, cdb, None);
                         RESTART!(asg, rst);
                     }
-                }
-                if cdb.check_and_reduce(asg, asg.num_conflict, r.3) {
-                    state.to_vivify += 1.0;
                 }
                 if use_vivify && 1.0 <= state.to_vivify {
                     state.to_vivify = 0.0;
