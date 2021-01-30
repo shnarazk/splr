@@ -30,7 +30,7 @@ fn main() {
                 let entry = hash.entry(ema).or_insert((0, 0.0));
                 *entry = (entry.0 + count, entry.1 + (lbd * count) as f64);
             }
-            let mut keys = hash.keys().map(|k| *k).collect::<Vec<usize>>();
+            let mut keys = hash.keys().copied().collect::<Vec<usize>>();
             keys.sort_unstable();
             for i in keys.iter() {
                 if let Some(v) = hash.get(i) {
