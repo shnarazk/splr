@@ -326,7 +326,7 @@ fn conflict_analyze(
     let mut largest_clause: u16 = 2;
 
     #[cfg(feature = "LBD_investigation")]
-    let mut used_level: HashSet<DecisionLevel> = HashSet::new();
+    let mut used_level: HashSet<VarId> = HashSet::new();
 
     let vi = p.vi();
     if !asg.var(vi).is(Flag::CA_SEEN) && 0 < asg.level(vi) {
@@ -344,11 +344,6 @@ fn conflict_analyze(
             println!("- push {} to learnt, which level is {}", p, lvl);
 
             learnt.push(p);
-
-            #[cfg(feature = "LBD_investigation")]
-            {
-                used_level.insert(lvl);
-            }
         }
     }
     let mut reason = AssignReason::Implication(conflicting_clause, NULL_LIT);
@@ -425,16 +420,16 @@ fn conflict_analyze(
                             //## Conflict-Side Rewarding
                             //
                             asg.reward_at_analysis(vi);
+
+                            #[cfg(feature = "LBD_investigation")]
+                            {
+                                used_level.insert(vi);
+                            }
                         } else {
                             #[cfg(feature = "trace_analysis")]
                             println!("- push {} to learnt, which level is {}", q, lvl);
 
                             learnt.push(*q);
-
-                            #[cfg(feature = "LBD_investigation")]
-                            {
-                                used_level.insert(lvl);
-                            }
                         }
                     } else {
                         #[cfg(feature = "trace_analysis")]
@@ -525,9 +520,11 @@ fn conflict_analyze(
     #[cfg(feature = "trace_analysis")]
     println!("- appending {}, the result is {:?}", learnt[0], learnt);
 
+    let result = state.minimize_learnt(asg, cdb);
+
     #[cfg(feature = "LBD_investigation")]
     {
-        if learnt.len() == 1 {
+        if state.new_learnt.len() == 1 {
             state
                 .dump_hop
                 .write_all(
@@ -537,7 +534,7 @@ fn conflict_analyze(
         }
     }
 
-    state.minimize_learnt(asg, cdb)
+    result
 }
 
 impl State {
