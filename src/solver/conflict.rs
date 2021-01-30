@@ -525,12 +525,20 @@ fn conflict_analyze(
     #[cfg(feature = "LBD_investigation")]
     {
         if state.new_learnt.len() == 1 {
+            let last_found = state.dump_hop.1;
             state
                 .dump_hop
+                .0
                 .write_all(
-                    &format!("{},{}\n", asg.num_conflict, used_level.iter().count()).into_bytes(),
+                    &format!(
+                        "{},{}\n",
+                        asg.num_conflict - last_found,
+                        used_level.iter().count()
+                    )
+                    .into_bytes(),
                 )
                 .expect("fail to dump");
+            state.dump_hop.1 = asg.num_conflict;
         }
     }
 

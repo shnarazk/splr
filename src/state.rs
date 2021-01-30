@@ -238,7 +238,7 @@ pub struct State {
     pub dump_dl: File,
     #[cfg(feature = "LBD_investigation")]
     /// hops between reason literal to conflicting literal
-    pub dump_hop: File,
+    pub dump_hop: (File, usize),
 }
 
 impl Default for State {
@@ -269,7 +269,10 @@ impl Default for State {
             #[cfg(feature = "LBD_investigation")]
             dump_dl: File::create("LBD_distance.csv").expect("fail to investigate"),
             #[cfg(feature = "LBD_investigation")]
-            dump_hop: File::create("HOP_distance.csv").expect("fail to investigate"),
+            dump_hop: (
+                File::create("HOP_distance.csv").expect("fail to investigate"),
+                0,
+            ),
         }
     }
 }
@@ -313,11 +316,14 @@ impl Instantiate for State {
             .expect("fail to investigate"),
 
             #[cfg(feature = "LBD_investigation")]
-            dump_hop: File::create(match cnf.pathname {
-                CNFIndicator::File(ref f) => format!("hop_{}.csv", f),
-                _ => "hop.csv".to_string(),
-            })
-            .expect("fail to investigate"),
+            dump_hop: (
+                File::create(match cnf.pathname {
+                    CNFIndicator::File(ref f) => format!("hop_{}.csv", f),
+                    _ => "hop.csv".to_string(),
+                })
+                .expect("fail to investigate"),
+                0,
+            ),
 
             ..State::default()
         }
