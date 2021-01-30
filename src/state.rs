@@ -234,8 +234,11 @@ pub struct State {
     log_messages: Vec<String>,
 
     #[cfg(feature = "LBD_investigation")]
-    /// LBD dump destination
-    pub dump: File,
+    /// LBD againt conflicting DL
+    pub dump_dl: File,
+    #[cfg(feature = "LBD_investigation")]
+    /// hops between reason literal to conflicting literal
+    pub dump_hop: File,
 }
 
 impl Default for State {
@@ -264,7 +267,9 @@ impl Default for State {
             log_messages: Vec::new(),
 
             #[cfg(feature = "LBD_investigation")]
-            dump: File::create("LBD_distance.txt").expect("fail to investigate"),
+            dump_dl: File::create("LBD_distance.csv").expect("fail to investigate"),
+            #[cfg(feature = "LBD_investigation")]
+            dump_hop: File::create("HOP_distance.csv").expect("fail to investigate"),
         }
     }
 }
@@ -301,9 +306,16 @@ impl Instantiate for State {
             time_limit: config.c_tout,
 
             #[cfg(feature = "LBD_investigation")]
-            dump: File::create(match cnf.pathname {
+            dump_dl: File::create(match cnf.pathname {
                 CNFIndicator::File(ref f) => format!("cDL_{}.csv", f),
-                _ => "sample".to_string(),
+                _ => "cDL.csv".to_string(),
+            })
+            .expect("fail to investigate"),
+
+            #[cfg(feature = "LBD_investigation")]
+            dump_hop: File::create(match cnf.pathname {
+                CNFIndicator::File(ref f) => format!("hop_{}.csv", f),
+                _ => "hop.csv".to_string(),
             })
             .expect("fail to investigate"),
 

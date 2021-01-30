@@ -1,6 +1,6 @@
 //! Conflict Analysis
 #[cfg(feature = "LBD_investigation")]
-use std::io::Write;
+use std::{collections::HashSet, io::Write};
 use {
     super::{
         restart::{ProgressUpdate, RestartIF, Restarter},
@@ -266,7 +266,7 @@ pub fn handle_conflict(
 
         #[cfg(feature = "LBD_investigation")]
         state
-            .dump
+            .dump_dl
             .write_all(&format!("{},{}\n", original_dl, lbd).into_bytes())
             .expect("fail to dump");
 
@@ -325,6 +325,9 @@ fn conflict_analyze(
     #[cfg(feature = "progress_MLD")]
     let mut largest_clause: u16 = 2;
 
+    #[cfg(feature = "LBD_investigation")]
+    let mut used_level: HashSet<DecisionLevel> = HashSet::new();
+
     let vi = p.vi();
     if !asg.var(vi).is(Flag::CA_SEEN) && 0 < asg.level(vi) {
         let lvl = asg.level(vi);
@@ -341,6 +344,11 @@ fn conflict_analyze(
             println!("- push {} to learnt, which level is {}", p, lvl);
 
             learnt.push(p);
+
+            #[cfg(feature = "LBD_investigation")]
+            {
+                used_level.insert(lvl);
+            }
         }
     }
     let mut reason = AssignReason::Implication(conflicting_clause, NULL_LIT);
@@ -422,6 +430,11 @@ fn conflict_analyze(
                             println!("- push {} to learnt, which level is {}", q, lvl);
 
                             learnt.push(*q);
+
+                            #[cfg(feature = "LBD_investigation")]
+                            {
+                                used_level.insert(lvl);
+                            }
                         }
                     } else {
                         #[cfg(feature = "trace_analysis")]
@@ -511,6 +524,18 @@ fn conflict_analyze(
 
     #[cfg(feature = "trace_analysis")]
     println!("- appending {}, the result is {:?}", learnt[0], learnt);
+
+    #[cfg(feature = "LBD_investigation")]
+    {
+        if learnt.len() == 1 {
+            state
+                .dump_hop
+                .write_all(
+                    &format!("{},{}\n", asg.num_conflict, used_level.iter().count()).into_bytes(),
+                )
+                .expect("fail to dump");
+        }
+    }
 
     state.minimize_learnt(asg, cdb)
 }

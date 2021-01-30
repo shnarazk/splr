@@ -160,7 +160,7 @@ impl Instantiate for ProgressLBD {
             #[cfg(feature = "LBD_investigation")]
             dump: File::create(match cnf.pathname {
                 CNFIndicator::File(ref f) => format!("LBD_{}.csv", f),
-                _ => "sample".to_string(),
+                _ => "LBD.csv".to_string(),
             })
             .expect("fail to investigate"),
 
