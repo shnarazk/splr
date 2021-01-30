@@ -109,8 +109,10 @@ pub fn handle_conflict(
                             let l = c.lits[i];
                             if l == decision {
                                 c.lits.swap(0, i);
-                                cdb.watcher_lists_mut()[usize::from(!l0)].detach_with(ci);
-                                cdb.watcher_lists_mut()[usize::from(!decision)].register(l0, ci);
+                                let mut w =
+                                    cdb.watcher_lists_mut()[usize::from(!l0)].detach_with(ci);
+                                w.blocker = l0;
+                                cdb.watcher_lists_mut()[usize::from(!decision)].register(w);
                                 break;
                             }
                         }

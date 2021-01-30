@@ -555,11 +555,23 @@ impl ClauseDBIF for ClauseDB {
             }
             if len2 {
                 *num_bi_clause += 1;
-                bin_watcher[!l0].register(l1, cid);
-                bin_watcher[!l1].register(l0, cid);
+                bin_watcher[!l0].register(Watch {
+                    blocker: l1,
+                    c: cid,
+                });
+                bin_watcher[!l1].register(Watch {
+                    blocker: l0,
+                    c: cid,
+                });
             } else {
-                watcher[!l0].register(l1, cid);
-                watcher[!l1].register(l0, cid);
+                watcher[!l0].register(Watch {
+                    blocker: l1,
+                    c: cid,
+                });
+                watcher[!l1].register(Watch {
+                    blocker: l0,
+                    c: cid,
+                });
             }
             *num_active += 1;
         }
@@ -725,13 +737,16 @@ impl ClauseDBIF for ClauseDB {
             };
             debug_assert!(1 < usize::from(!p));
             if 2 == lits.len() {
-                self.watcher[!p].detach_with(cid);
-                self.watcher[!r].detach_with(cid);
-                self.bin_watcher[!q].register(r, cid);
-                self.bin_watcher[!r].register(q, cid);
+                let mut w1 = self.watcher[!p].detach_with(cid);
+                w1.blocker = r;
+                let mut w2 = self.watcher[!r].detach_with(cid);
+                w2.blocker = q;
+                self.bin_watcher[!q].register(w1);
+                self.bin_watcher[!r].register(w2);
             } else {
-                self.watcher[!p].detach_with(cid);
-                self.watcher[!q].register(r, cid);
+                let mut w0 = self.watcher[!p].detach_with(cid);
+                w0.blocker = r;
+                self.watcher[!q].register(w0);
                 self.watcher[!r].update_blocker(cid, q);
             }
         } else {
@@ -739,10 +754,12 @@ impl ClauseDBIF for ClauseDB {
             if 2 == lits.len() {
                 let q = lits[0];
                 let r = lits[1];
-                self.watcher[!q].detach_with(cid);
-                self.watcher[!r].detach_with(cid);
-                self.bin_watcher[!q].register(r, cid);
-                self.bin_watcher[!r].register(q, cid);
+                let mut w1 = self.watcher[!q].detach_with(cid);
+                w1.blocker = r;
+                let mut w2 = self.watcher[!r].detach_with(cid);
+                w2.blocker = q;
+                self.bin_watcher[!q].register(w1);
+                self.bin_watcher[!r].register(w2);
             }
         }
         false

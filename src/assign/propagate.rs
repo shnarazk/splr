@@ -212,9 +212,11 @@ impl PropagateIF for AssignStack {
                 self.q_head += 1;
                 let false_lit = !*p;
                 // we have to drop `p` here to use self as a mutable reference again later.
-                let bin_source = (*bin_watcher).get_unchecked(usize::from(*p));
-                let source = (*watcher).get_unchecked_mut(usize::from(*p));
-                // binary loop
+
+                //
+                //## binary loop
+                //
+                let bin_source = (*bin_watcher).get_unchecked(usize::from(!false_lit));
                 for w in bin_source.iter() {
                     debug_assert!(!cdb[w.c].is(Flag::DEAD));
                     debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
@@ -237,13 +239,20 @@ impl PropagateIF for AssignStack {
                         }
                     }
                 }
-                // normal clause loop
+                //
+                //## normal clause loop
+                //
+                let source = (*watcher).get_unchecked_mut(usize::from(!false_lit));
+                // let mut source: Vec<Watch> = Vec::new();
+                // std::mem::swap(&mut source, (*watcher).get_unchecked_mut(usize::from(p)));
                 let mut n = 0;
-                'next_clause: while n < source.len() {
-                    let w = source.get_unchecked_mut(n);
+                'next_clause: // while let Some(mut w) = source.pop() {
+                while n < source.len() {
+                    let mut w = source.get_unchecked_mut(n);
                     n += 1;
                     let blocker_value = lit_assign!(self, w.blocker);
                     if blocker_value == Some(true) {
+                        // SWAP: (*watcher)[usize::from(p)].register(w);
                         continue 'next_clause;
                     }
                     // debug_assert!(!cdb[w.c].is(Flag::DEAD));
@@ -253,14 +262,15 @@ impl PropagateIF for AssignStack {
                         ..
                     } = cdb[w.c];
                     debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
-                    let mut first = *lits.get_unchecked(0);
+                    let mut first = lits[0];
                     if first == false_lit {
-                        first = *lits.get_unchecked(1);
+                        first = lits[1];
                         lits.swap(0, 1);
                     }
                     let first_value = lit_assign!(self, first);
                     if first != w.blocker && first_value == Some(true) {
                         w.blocker = first;
+                        // SWAP: (*watcher)[usize::from(p)].register(w);
                         continue 'next_clause;
                     }
                     //
@@ -272,11 +282,10 @@ impl PropagateIF for AssignStack {
                     for k in (*search_from..len).chain(2..*search_from) {
                         let lk = &lits[k];
                         if lit_assign!(self, *lk) != Some(false) {
-                            (*watcher)
-                                .get_unchecked_mut(usize::from(!*lk))
-                                .register(first, w.c);
                             n -= 1;
-                            source.detach(n);
+                            let mut w = source.detach(n);
+                            w.blocker = first;
+                            (*watcher)[usize::from(!*lk)].register(w);
                             lits.swap(1, k);
                             // If `search_from` gets out of range, the next loop will ignore it safely;
                             // the first iteration loop becomes null.
@@ -286,9 +295,14 @@ impl PropagateIF for AssignStack {
                     }
 
                     if first_value == Some(false) {
+                        let cid = w.c;
                         self.last_conflict = false_lit.vi();
                         self.num_conflict += 1;
-                        return w.c;
+                        // SWAP: std::mem::swap(&mut source, &mut (*watcher)[usize::from(p)]);
+                        // SWAP: (*watcher)[usize::from(p)].append(&mut source);
+                        // SWAP: (*watcher)[usize::from(p)].register(*w);
+                        // SWAP: assert!(source.is_empty());
+                        return cid;
                     }
                     let lv = lits[1..]
                         .iter()
@@ -297,6 +311,7 @@ impl PropagateIF for AssignStack {
                         .unwrap_or(0);
                     self.assign_by_implication(first, AssignReason::Implication(w.c, NULL_LIT), lv);
                 }
+                // SWAP: assert!(source.is_empty());
             }
         }
         let na = self.q_head + self.num_eliminated_vars;
