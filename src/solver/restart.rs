@@ -466,7 +466,6 @@ impl ProgressLuby {
 #[derive(Debug)]
 struct GeometricStabilizer {
     enable: bool,
-    active: bool,
     longest_span: usize,
     luby: LubySeries,
     num_cycle: usize,
@@ -474,24 +473,20 @@ struct GeometricStabilizer {
     next_trigger: usize,
     reset_requested: bool,
     step: usize,
-    scale: usize,
     depth: f64,
 }
 
 impl Default for GeometricStabilizer {
     fn default() -> Self {
-        const STEP: usize = 64;
         GeometricStabilizer {
             enable: true,
-            active: false,
             longest_span: 1,
             luby: LubySeries::default(),
             num_cycle: 0,
             num_shift: 0,
-            next_trigger: STEP,
+            next_trigger: 1,
             reset_requested: false,
             step: 1,
-            scale: STEP,
             depth: 1.0,
         }
     }
@@ -510,7 +505,7 @@ impl fmt::Display for GeometricStabilizer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if !self.enable {
             write!(f, "Stabilizer(dead)")
-        } else if self.active && self.enable {
+        } else if self.enable {
             write!(
                 f,
                 "Stabilizer[step: {}, next:{}, on]",
@@ -537,7 +532,6 @@ impl GeometricStabilizer {
                 self.longest_span = self.step;
             }
             self.step = self.luby.next().unwrap();
-            self.active = self.longest_span < self.step;
             self.next_trigger = now + self.longest_span / self.step;
             return Some(new_cycle);
         }
@@ -545,7 +539,6 @@ impl GeometricStabilizer {
             self.luby.reset();
             self.longest_span = 1;
             self.step = self.luby.next().unwrap();
-            self.active = false;
             self.reset_requested = false;
             self.next_trigger = now;
         }
@@ -571,7 +564,6 @@ impl GeometricStabilizer {
             next_trigger: scale,
             reset_requested: false,
             step: 1,
-            scale,
         }
     }
 }
@@ -861,9 +853,7 @@ impl RestartIF for Restarter {
 
             ProgressUpdate::ASG(val) => self.asg.update(val),
             ProgressUpdate::LBD(val) => {
-                if !self.stb.active {
-                    self.lbd.update(val);
-                }
+                self.lbd.update(val);
             }
             ProgressUpdate::Luby => self.luby.update(0),
 
@@ -903,10 +893,10 @@ impl Export<RestarterExports, (RestartMode, usize)> for Restarter {
     }
     fn mode(&self) -> (RestartMode, usize) {
         (
-            match self.stb.active {
-                true => RestartMode::Stabilize,
-                false if self.luby.enable => RestartMode::Luby,
-                false => RestartMode::Dynamic,
+            if self.luby.enable {
+                RestartMode::Luby
+            } else {
+                RestartMode::Dynamic
             },
             self.stb.span(),
         )
