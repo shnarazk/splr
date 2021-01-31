@@ -278,7 +278,6 @@ impl PropagateIF for AssignStack {
                     for k in (*search_from..len).chain(2..*search_from) {
                         let lk = &lits[k];
                         if lit_assign!(self, *lk) != Some(false) {
-                            let cid = w.c;
                             n -= 1;
                             let mut w = source.detach(n);
                             w.blocker = first;
