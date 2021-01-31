@@ -875,7 +875,7 @@ impl Clause {
     fn update_activity(&mut self, t: usize, decay: f64) -> f64 {
         if self.timestamp < t {
             let duration = (t - self.timestamp) as f64;
-            self.reward *= decay.powf(duration);
+            self.reward *= decay.powf((1.0 + duration).log(2.0));
             self.reward += 1.0 - decay;
             self.timestamp = t;
         }

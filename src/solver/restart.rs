@@ -480,7 +480,7 @@ struct GeometricStabilizer {
 
 impl Default for GeometricStabilizer {
     fn default() -> Self {
-        const STEP: usize = 128;
+        const STEP: usize = 64;
         GeometricStabilizer {
             enable: true,
             active: false,
@@ -539,15 +539,17 @@ impl GeometricStabilizer {
             }
             self.step = self.luby.next().unwrap();
             self.active = self.longest_span < self.step;
-            if self.active {
-                self.next_trigger =
-                    now + ((self.step as f64).powf(self.depth) as usize) * self.scale;
-            } else {
-                self.next_trigger = now + self.step * self.scale;
-            }
+            // if self.active {
+            //     self.next_trigger =
+            //         now + ((self.step as f64).powf(self.depth) as usize) * self.scale;
+            // } else {
+            //     self.next_trigger = now + self.step * self.scale;
+            // }
+            // self.next_trigger = now + self.step * self.scale;
+            self.next_trigger = now + self.longest_span / self.step;
             return Some((self.active, new_cycle));
         }
-        if self.reset_requested && RELAXATION <= self.longest_span {
+        if false && self.reset_requested && RELAXATION <= self.longest_span {
             self.luby.reset();
             self.longest_span = 1;
             self.step = self.luby.next().unwrap();
@@ -692,6 +694,7 @@ pub struct Restarter {
     stb: GeometricStabilizer,
     after_restart: usize,
     restart_step: usize,
+    restart_waiting: usize,
     initial_restart_step: usize,
     stb_expansion_factor: f64,
 
@@ -728,6 +731,7 @@ impl Default for Restarter {
             stb: GeometricStabilizer::default(),
             after_restart: 0,
             restart_step: 0,
+            restart_waiting: 0,
             initial_restart_step: 0,
             stb_expansion_factor: 1.0,
 
@@ -771,7 +775,7 @@ impl Instantiate for Restarter {
                 {
                     self.luby_blocking.reset_progress();
                 }
-                // self.stb.reset_progress();
+                self.stb.reset_progress();
             }
             SolverEvent::Restart => {
                 self.after_restart = 0;
@@ -813,11 +817,11 @@ impl RestartIF for Restarter {
             self.acc.shift();
         }
 
-        if self.stb.active {
-            return Some(RestartDecision::Stabilize);
-        }
+        // if self.stb.active {
+        //     return Some(RestartDecision::Stabilize);
+        // }
 
-        if self.asg.is_active() {
+        if false && self.asg.is_active() {
             self.num_block += 1;
             self.after_restart = 0;
 
@@ -836,12 +840,17 @@ impl RestartIF for Restarter {
             {
                 self.restart_step = self.initial_restart_step;
             }
-            return Some(RestartDecision::Force);
+            self.restart_waiting += 1;
+            if self.stb.step <= self.restart_waiting {
+                self.restart_waiting = 0;
+                return Some(RestartDecision::Force);
+            }
         }
-        Some(RestartDecision::Postpone)
+        // Some(RestartDecision::Postpone)
+        None
     }
-    fn stabilize(&mut self, now: usize) -> Option<(bool, bool)> {
-        self.stb.update(now)
+    fn stabilize(&mut self, _now: usize) -> Option<(bool, bool)> {
+        self.stb.update(self.num_restart)
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
