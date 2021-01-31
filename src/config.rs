@@ -208,7 +208,7 @@ impl Default for Config {
             #[cfg(feature = "progress_ACC")]
             rst_ccc_thr: 0.7,
 
-            rst_lbd_len: 24,
+            rst_lbd_len: 20,
             rst_lbd_slw: 8192,
             rst_lbd_thr: 1.20,
 

@@ -58,7 +58,7 @@ pub trait RestartIF: Export<RestarterExports, (RestartMode, usize)> {
     /// check stabilization mode and  return:
     /// - `Some(parity_bit, just_start_a_new_cycle)` if a stabilization phase has just ended.
     /// - `None` otherwise.
-    fn stabilize(&mut self, now: usize) -> Option<(bool, bool)>;
+    fn stabilize(&mut self, now: usize) -> Option<bool>;
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
 }
@@ -527,8 +527,7 @@ impl fmt::Display for GeometricStabilizer {
 }
 
 impl GeometricStabilizer {
-    fn update(&mut self, now: usize) -> Option<(bool, bool)> {
-        const RELAXATION: usize = 16;
+    fn update(&mut self, now: usize) -> Option<bool> {
         if self.enable && self.next_trigger <= now {
             self.num_shift += 1;
             let mut new_cycle: bool = false;
@@ -539,17 +538,10 @@ impl GeometricStabilizer {
             }
             self.step = self.luby.next().unwrap();
             self.active = self.longest_span < self.step;
-            // if self.active {
-            //     self.next_trigger =
-            //         now + ((self.step as f64).powf(self.depth) as usize) * self.scale;
-            // } else {
-            //     self.next_trigger = now + self.step * self.scale;
-            // }
-            // self.next_trigger = now + self.step * self.scale;
             self.next_trigger = now + self.longest_span / self.step;
-            return Some((self.active, new_cycle));
+            return Some(new_cycle);
         }
-        if false && self.reset_requested && RELAXATION <= self.longest_span {
+        if self.reset_requested {
             self.luby.reset();
             self.longest_span = 1;
             self.step = self.luby.next().unwrap();
@@ -564,7 +556,7 @@ impl GeometricStabilizer {
     }
     #[allow(dead_code)]
     fn reset_progress(&mut self) {
-        self.reset_requested = true;
+        // self.reset_requested = true;
     }
 
     #[cfg(feature = "luby_blocking")]
@@ -849,7 +841,7 @@ impl RestartIF for Restarter {
         // Some(RestartDecision::Postpone)
         None
     }
-    fn stabilize(&mut self, _now: usize) -> Option<(bool, bool)> {
+    fn stabilize(&mut self, _now: usize) -> Option<bool> {
         self.stb.update(self.num_restart)
     }
     fn update(&mut self, kind: ProgressUpdate) {

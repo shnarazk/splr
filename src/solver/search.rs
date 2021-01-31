@@ -260,7 +260,7 @@ fn search(
                 RESTART!(asg, rst);
             }
             #[allow(unused_variables)]
-            if let Some((stabilizing, new_cycle)) = rst.stabilize(asg.num_conflict) {
+            if let Some(new_cycle) = rst.stabilize(asg.num_conflict) {
                 let r = rst.exports();
                 if new_cycle {
                     let v = asg.var_stats();
@@ -297,7 +297,7 @@ fn search(
                 } else {
                     #[cfg(feature = "staging")]
                     {
-                        asg.dissolve_stage(parity && !stabilizing);
+                        asg.dissolve_stage(parity);
                     }
                 }
                 if let Some(ref decision) = restart {
