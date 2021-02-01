@@ -291,14 +291,14 @@ fn search(
                             asg.num_conflict as f64 / asg.exports().2 as f64,
                         ),
                     );
-                    if cdb.reduce(asg, asg.num_conflict) {
-                        state.to_vivify += 1.0;
-                    }
                 } else {
                     #[cfg(feature = "staging")]
                     {
                         asg.dissolve_stage(parity);
                     }
+                }
+                if cdb.reduce(asg, asg.num_conflict) {
+                    state.to_vivify += 1.0;
                 }
                 if let Some(ref decision) = restart {
                     if *decision != RestartDecision::Force {
