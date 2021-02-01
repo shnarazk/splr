@@ -549,7 +549,7 @@ impl GeometricStabilizer {
     }
     #[allow(dead_code)]
     fn reset_progress(&mut self) {
-        // self.reset_requested = true;
+        self.reset_requested = true;
     }
 
     #[cfg(feature = "luby_blocking")]
@@ -760,6 +760,7 @@ impl Instantiate for Restarter {
                     self.luby_blocking.reset_progress();
                 }
                 self.stb.reset_progress();
+                self.restart_waiting = self.stb.step;
             }
             SolverEvent::Restart => {
                 self.after_restart = 0;

@@ -175,7 +175,7 @@ impl Default for Config {
             a_elim: 1,
             a_luby: 0,
             a_reduce: 1,
-            a_rephase: 1,
+            a_rephase: 0,
             a_rsr: 1,
             a_stabilize: 1,
             a_stage: 1,
