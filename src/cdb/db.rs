@@ -603,6 +603,7 @@ impl ClauseDBIF for ClauseDB {
                     self.num_learnt -= 1;
                     return true;
                 } else {
+                    #[cfg(feature = "just_used")]
                     c.turn_on(Flag::JUST_USED);
                 }
             }
@@ -815,11 +816,16 @@ impl ClauseDB {
             if !c.is(Flag::LEARNT) || c.is(Flag::DEAD) || asg.locked(c, ClauseId::from(i)) {
                 continue;
             }
-            // let used = c.is(Flag::JUST_USED);
-            // if used {
-            //     c.turn_off(Flag::JUST_USED);
-            //     continue;
-            // }
+
+            #[cfg(feature = "just_used")]
+            {
+                let used = c.is(Flag::JUST_USED);
+                if used {
+                    c.turn_off(Flag::JUST_USED);
+                    continue;
+                }
+            }
+
             let mut act_v: f64 = 0.0;
             for l in c.lits.iter() {
                 act_v = act_v.max(asg.activity(l.vi()));
