@@ -829,6 +829,7 @@ impl RestartIF for Restarter {
                 self.restart_waiting = 0;
                 return Some(RestartDecision::Force);
             }
+            self.after_restart = 0;
         }
         // Some(RestartDecision::Postpone)
         None
