@@ -1,6 +1,6 @@
 //! Conflict Analysis
 #[cfg(feature = "LBD_investigation")]
-use std::{collections::HashSet, io::Write};
+use std::collections::HashSet;
 use {
     super::{
         restart::{ProgressUpdate, RestartIF, Restarter},
@@ -265,10 +265,7 @@ pub fn handle_conflict(
         rst.update(ProgressUpdate::LBD(lbd));
 
         #[cfg(feature = "LBD_investigation")]
-        state
-            .dump_dl
-            .write_all(&format!("{},{}\n", original_dl, lbd).into_bytes())
-            .expect("fail to dump");
+        state.dump_dl.dump(format!("{},{}\n", original_dl, lbd));
 
         let mut act: f64 = 0.0;
         for li in cdb[cid].iter() {
@@ -526,18 +523,11 @@ fn conflict_analyze(
     {
         if state.new_learnt.len() == 1 {
             let last_found = state.dump_hop.1;
-            state
-                .dump_hop
-                .0
-                .write_all(
-                    &format!(
-                        "{},{}\n",
-                        asg.num_conflict - last_found,
-                        used_level.iter().count()
-                    )
-                    .into_bytes(),
-                )
-                .expect("fail to dump");
+            state.dump_hop.0.dump(format!(
+                "{},{}\n",
+                asg.num_conflict - last_found,
+                used_level.iter().count()
+            ));
             state.dump_hop.1 = asg.num_conflict;
         }
     }

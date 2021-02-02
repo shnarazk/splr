@@ -1,6 +1,4 @@
 //! Crate `restart` provides restart heuristics.
-#[cfg(feature = "LBD_investigation")]
-use std::{fs::File, io::Write};
 use {
     crate::{solver::SolverEvent, types::*},
     std::fmt,
@@ -133,7 +131,7 @@ struct ProgressLBD {
 
     #[cfg(feature = "LBD_investigation")]
     /// LBD dump destination
-    pub dump: File,
+    pub dump: Logger,
 }
 
 impl Default for ProgressLBD {
@@ -146,7 +144,7 @@ impl Default for ProgressLBD {
             threshold: 1.4,
 
             #[cfg(feature = "LBD_investigation")]
-            dump: File::create("LBD_distance.txt").expect("fail to investigate"),
+            dump: Logger::default(),
         }
     }
 }
@@ -158,11 +156,10 @@ impl Instantiate for ProgressLBD {
             threshold: config.rst_lbd_thr,
 
             #[cfg(feature = "LBD_investigation")]
-            dump: File::create(match cnf.pathname {
+            dump: Logger::new(match cnf.pathname {
                 CNFIndicator::File(ref f) => format!("LBD_{}.csv", f),
                 _ => "LBD.csv".to_string(),
-            })
-            .expect("fail to investigate"),
+            }),
 
             ..ProgressLBD::default()
         }
@@ -176,9 +173,7 @@ impl EmaIF for ProgressLBD {
         self.sum += d as usize;
 
         #[cfg(feature = "LBD_investigation")]
-        self.dump
-            .write_all(&format!("{:.2},{}\n", self.ema.get(), d).into_bytes())
-            .expect("fail to dump");
+        self.dump.dump(format!("{:.2},{}\n", self.ema.get(), d));
 
         self.ema.update(d as f64);
     }

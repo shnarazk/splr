@@ -1,5 +1,3 @@
-#[cfg(feature = "LBD_investigation")]
-use std::fs::File;
 #[cfg(feature = "strategy_adaptation")]
 use {crate::cdb::ClauseDBIF, std::cmp::Ordering};
 /// Crate `state` is a collection of internal data.
@@ -235,10 +233,10 @@ pub struct State {
 
     #[cfg(feature = "LBD_investigation")]
     /// LBD againt conflicting DL
-    pub dump_dl: File,
+    pub dump_dl: Logger,
     #[cfg(feature = "LBD_investigation")]
     /// hops between reason literal to conflicting literal
-    pub dump_hop: (File, usize),
+    pub dump_hop: (Logger, usize),
 }
 
 impl Default for State {
@@ -267,12 +265,9 @@ impl Default for State {
             log_messages: Vec::new(),
 
             #[cfg(feature = "LBD_investigation")]
-            dump_dl: File::create("LBD_distance.csv").expect("fail to investigate"),
+            dump_dl: Logger::default(),
             #[cfg(feature = "LBD_investigation")]
-            dump_hop: (
-                File::create("HOP_distance.csv").expect("fail to investigate"),
-                0,
-            ),
+            dump_hop: (Logger::default(), 0),
         }
     }
 }
@@ -309,19 +304,17 @@ impl Instantiate for State {
             time_limit: config.c_tout,
 
             #[cfg(feature = "LBD_investigation")]
-            dump_dl: File::create(match cnf.pathname {
+            dump_dl: Logger::new(match cnf.pathname {
                 CNFIndicator::File(ref f) => format!("cDL_{}.csv", f),
                 _ => "cDL.csv".to_string(),
-            })
-            .expect("fail to investigate"),
+            }),
 
             #[cfg(feature = "LBD_investigation")]
             dump_hop: (
-                File::create(match cnf.pathname {
+                Logger::new(match cnf.pathname {
                     CNFIndicator::File(ref f) => format!("hop_{}.csv", f),
                     _ => "hop.csv".to_string(),
-                })
-                .expect("fail to investigate"),
+                }),
                 0,
             ),
 
