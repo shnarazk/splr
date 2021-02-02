@@ -1,3 +1,12 @@
+## 0.6.3, 2021-02-XX
+
+- disable Glucose-like restart blocking
+- switch to one-restarting-after-blocking-N-restarts stabilizer
+- switch to stabilization-mode-driven clause reduction
+- enable re-phasing
+- recycle `Watch` data
+- handle `--no-color` and `--quiet` correctly
+
 ## 0.6.2, 2021-01-20
 
 - update LBD correctly
