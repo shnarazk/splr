@@ -740,6 +740,40 @@ bitflags! {
     }
 }
 
+#[derive(Debug)]
+pub struct Logger {
+    dest: Option<File>,
+}
+
+impl Default for Logger {
+    fn default() -> Self {
+        Logger { dest: None }
+    }
+}
+
+impl fmt::Display for Logger {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Dump({:?})", self.dest)
+    }
+}
+
+impl Logger {
+    pub fn new<T: AsRef<str>>(fname: T) -> Self {
+        Logger {
+            dest: File::create(fname.as_ref()).ok(),
+        }
+    }
+    pub fn dump(&mut self, mes: String) {
+        use std::io::Write;
+        if let Some(f) = &mut self.dest {
+            f.write_all(&mes.into_bytes())
+                .unwrap_or_else(|_| panic!("fail to dump {:?}", f));
+        } else {
+            println!("{}", mes);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
