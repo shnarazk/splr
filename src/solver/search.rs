@@ -33,13 +33,10 @@ fn update_clause_rewards(asg: &mut AssignStack, cdb: &mut ClauseDB, conflicting:
         cdb.reward_at_unassign(cid);
     }
     for l in asg.stack_iter() {
-        match asg.reason(l.vi()) {
-            AssignReason::Implication(cid, NULL_LIT) => {
-                if cdb[cid].is(Flag::LEARNT) {
-                    cdb.reward_at_unassign(cid);
-                }
+        if let AssignReason::Implication(cid, NULL_LIT) = asg.reason(l.vi()) {
+            if cdb[cid].is(Flag::LEARNT) {
+                cdb.reward_at_unassign(cid);
             }
-            _ => (),
         }
     }
 }
