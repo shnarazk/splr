@@ -806,7 +806,7 @@ impl RestartIF for Restarter {
         //     return Some(RestartDecision::Stabilize);
         // }
 
-        if false && self.asg.is_active() {
+        if self.asg.is_active() {
             self.num_block += 1;
             self.after_restart = 0;
 
