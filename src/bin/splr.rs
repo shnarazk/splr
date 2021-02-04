@@ -116,7 +116,7 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
     match res {
         Ok(Certificate::SAT(v)) => {
             match output {
-                Some(ref f) if redirect => println!(
+                Some(ref f) if redirect && !s.state.config.quiet_mode => println!(
                     "      Result|dump: to STDOUT instead of {} due to an IO error.",
                     f.to_string_lossy(),
                 ),
@@ -146,11 +146,13 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
         }
         Ok(Certificate::UNSAT) => {
             match output {
-                Some(ref f) if redirect => println!(
+                Some(ref f) if redirect && !s.state.config.quiet_mode => println!(
                     "      Result|dump: to STDOUT instead of {} due to an IO error.",
                     f.to_string_lossy(),
                 ),
-                Some(ref f) => println!("      Result|file: {}", f.to_str().unwrap(),),
+                Some(ref f) if !s.state.config.quiet_mode => {
+                    println!("      Result|file: {}", f.to_str().unwrap(),)
+                }
                 _ => (),
             }
             if s.state.config.use_certification {
@@ -179,11 +181,13 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
         }
         Err(e) => {
             match output {
-                Some(ref f) if redirect => println!(
+                Some(ref f) if redirect && !s.state.config.quiet_mode => println!(
                     "      Result|dump: to STDOUT instead of {} due to an IO error.",
                     f.to_string_lossy(),
                 ),
-                Some(ref f) => println!("      Result|file: {}", f.to_str().unwrap(),),
+                Some(ref f) if !s.state.config.quiet_mode => {
+                    println!("      Result|file: {}", f.to_str().unwrap(),)
+                }
                 _ => (),
             }
             println!(
