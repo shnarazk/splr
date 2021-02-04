@@ -778,8 +778,9 @@ pub enum RestartDecision {
     Block,
     /// We should restart now.
     Force,
-    /// TODO
-    Postpone,
+    // TODO
+    // Postpone,
+    #[cfg(feature = "pure_stabilization")]
     /// We are in stabilization mode.
     Stabilize,
 }
@@ -802,9 +803,12 @@ impl RestartIF for Restarter {
             self.acc.shift();
         }
 
-        // if self.stb.active {
-        //     return Some(RestartDecision::Stabilize);
-        // }
+        #[cfg(feature = "pure_stabilization")]
+        {
+            if self.stb.active {
+                return Some(RestartDecision::Stabilize);
+            }
+        }
 
         if self.asg.is_active() {
             self.num_block += 1;
