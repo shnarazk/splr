@@ -182,7 +182,7 @@
 
 - adopt a modified CHB instead of EVSIDS
 - introduce [big bang initialization](https://medium.com/backjump-technologies/big-bang-initialization-of-variable-activity-in-a-sat-solver-ada154f56fb0) for variable activity
-- The literal endconding uses even integers for positive literals
+- The literal encoding uses even integers for positive literals
 - `Lbool` was changed to `Option<bool>`
 
 ## 0.1.4, 2019-09-12
