@@ -394,7 +394,6 @@ fn conflict_analyze(
                 for q in &c[1..] {
                     let vi = q.vi();
                     if !asg.var(vi).is(Flag::CA_SEEN) {
-                        // asg.reward_at_analysis(vi);
                         let lvl = asg.level(vi);
                         if 0 == lvl {
                             continue;
