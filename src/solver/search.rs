@@ -222,6 +222,7 @@ fn search(
     let mut a_decision_was_made = false;
     let use_vivify = state.config.use_vivify();
     let mut parity = false;
+    let mut last_core = 0;
     rst.update(ProgressUpdate::Luby);
     rst.update(ProgressUpdate::Remain(asg.num_vars - asg.num_asserted_vars));
 
@@ -278,16 +279,20 @@ fn search(
                         rst.update(ProgressUpdate::Temperature(d));
                         asg.build_stage(StagingTarget::AutoSelect, parity);
                     }
-                    state.log(
-                        asg.num_conflict,
-                        format!(
-                            "Lcycle:{:>6}, core:{:>9}, #ion: {:>9}, /cpr:{:>9.2}",
-                            r.3,
-                            v.4,
-                            s,
-                            asg.num_conflict as f64 / asg.exports().2 as f64,
-                        ),
-                    );
+
+                    if last_core != v.4 || 0 == v.4 {
+                        state.log(
+                            asg.num_conflict,
+                            format!(
+                                "Lcycle:{:>6}, core:{:>9}, #ion: {:>9}, /cpr:{:>9.2}",
+                                r.3,
+                                v.4,
+                                s,
+                                asg.num_conflict as f64 / asg.exports().2 as f64,
+                            ),
+                        );
+                        last_core = v.4;
+                    }
                 } else {
                     #[cfg(feature = "staging")]
                     {
