@@ -652,6 +652,7 @@ impl Eliminator {
                 break;
             }
         }
+        self.num_full_elimination += 1;
         Ok(())
     }
     /// do the elimination task
@@ -669,7 +670,6 @@ impl Eliminator {
         if self.mode == EliminatorMode::Dormant {
             return Ok(());
         }
-        self.num_full_elimination += 1;
         let mut timedout: usize = {
             let nv = asg.var_stats().3 as f64; // un-asserted vars
             let nc = cdb.count() as f64;
