@@ -196,19 +196,12 @@ pub fn vivify(
         }
         clauses.retain(|ci| !cdb[ci].is(Flag::DEAD));
     }
-    // if 0 < num_assert || 0 < num_purge || 0 < num_shrink {
-    //     state.flush("");
-    //     state.flush(format!(
-    //         "vivified(assert:{}, purge:{}, shorten:{})...",
-    //         num_assert, num_purge, num_shrink,
-    //     ));
-    // }
     asg.handle(SolverEvent::Vivify(false));
     if 0 < num_assert || 0 < num_purge || 0 < num_shrink {
         state.log(
             state[Stat::Vivification],
             format!(
-                "vivification target:{:>5}, assert:{:>4}, purge:{:>4}, shorten:{:>4}",
+                "vivification target:{:>4}, assert:{:>4}, purge:{:>4}, shrink:{:>4}",
                 num_check, num_assert, num_purge, num_shrink
             ),
         );
