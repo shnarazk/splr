@@ -590,7 +590,7 @@ impl StateIF for State {
                 RestartMode::Luby if self.config.no_color => "LubyRestart",
                 RestartMode::Luby => "\x1B[001m\x1B[035mLubyRestart\x1B[000m",
                 RestartMode::Stabilize if self.config.no_color => "  Stabilize",
-                RestartMode::Stabilize => "  \x1B[001m\x1B[030mStabilize\x1B[000m",
+                RestartMode::Stabilize => "  \x1B[001m\x1B[036mStabilize\x1B[000m",
             },
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),

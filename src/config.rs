@@ -175,7 +175,7 @@ impl Default for Config {
             a_elim: 1,
             a_luby: 0,
             a_reduce: 1,
-            a_rephase: 1,
+            a_rephase: 0,
             a_rsr: 1,
             a_stabilize: 1,
             a_stage: 1,
@@ -203,12 +203,12 @@ impl Default for Config {
             rst_step: 24,
             rst_asg_len: 32,
             rst_asg_slw: 10000,
-            rst_asg_thr: 0.10,
+            rst_asg_thr: 0.20,
 
             #[cfg(feature = "progress_ACC")]
             rst_ccc_thr: 0.7,
 
-            rst_lbd_len: 32,
+            rst_lbd_len: 20,
             rst_lbd_slw: 8192,
             rst_lbd_thr: 1.20,
 
@@ -223,7 +223,7 @@ impl Default for Config {
             stg_rwd_dcy: 0.5,
             stg_rwd_val: 1.0,
 
-            viv_thr: 200,
+            viv_thr: 1,
 
             #[cfg(not(feature = "moving_var_reward_rate"))]
             vrw_dcy_rat: 0.96,

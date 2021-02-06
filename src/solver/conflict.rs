@@ -6,7 +6,7 @@ use {
         State,
     },
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF},
+        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF, WatchDBIF},
         processor::{EliminateIF, Eliminator},
         solver::SolverEvent,
@@ -226,6 +226,7 @@ pub fn handle_conflict(
         } else {
             asg.assign_by_unitclause(l0);
         }
+        // state.to_vivify = 0.0;
         rst.handle(SolverEvent::Assert(l0.vi()))
     } else {
         {
@@ -284,10 +285,6 @@ pub fn handle_conflict(
                 cdb[cid].turn_on(Flag::DERIVE20);
             }
         }
-    }
-    cdb.scale_activity();
-    if cdb.check_and_reduce(asg, num_conflict) {
-        state.to_vivify += 1.0;
     }
     Ok(())
 }
@@ -368,11 +365,12 @@ fn conflict_analyze(
 
                 debug_assert!(!cid.is_none());
                 cdb.mark_clause_as_used(asg, cid);
-                cdb.bump_activity(cid, ());
-                let c = &cdb[cid];
-                if !c.is(Flag::LEARNT) {
+                if cdb[cid].is(Flag::LEARNT) {
+                    cdb.reward_at_analysis(cid);
+                } else {
                     state.derive20.push(cid);
                 }
+                let c = &cdb[cid];
                 #[cfg(feature = "progress_MLD")]
                 {
                     largest_clause = largest_clause.max(c.rank);
@@ -397,7 +395,6 @@ fn conflict_analyze(
                 for q in &c[1..] {
                     let vi = q.vi();
                     if !asg.var(vi).is(Flag::CA_SEEN) {
-                        // asg.reward_at_analysis(vi);
                         let lvl = asg.level(vi);
                         if 0 == lvl {
                             continue;

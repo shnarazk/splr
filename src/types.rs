@@ -44,20 +44,35 @@ pub trait LitIF {
     fn is_none(self) -> bool;
 }
 
-/// API for clause and var rewarding.
-pub trait ActivityIF {
-    /// type for index
-    type Ix;
-    /// an extra parameter for bumping
-    type Inc;
-    /// return the current activity of an element.
-    fn activity(&mut self, ix: Self::Ix) -> f64;
-    /// set activity forcibly.
-    fn set_activity(&mut self, ix: Self::Ix, val: f64);
-    /// update an element's activity.
-    fn bump_activity(&mut self, ix: Self::Ix, dl: Self::Inc);
-    /// increment activity step.
-    fn scale_activity(&mut self);
+/// API for reward based activity management.
+pub trait ActivityIF<Ix> {
+    /// return one's activity.
+    fn activity(&mut self, ix: Ix) -> f64;
+    /// initialize one's reward.
+    fn initialize_reward(&mut self, _ix: Ix) {
+        todo!()
+    }
+    /// clear one's activity
+    fn clear_reward(&mut self, ix: Ix);
+    /// modify one's activity at conflict analysis in `conflict_analyze` in [`solver`](`crate::solver`).
+    fn reward_at_analysis(&mut self, _ix: Ix) {
+        todo!()
+    }
+    /// modify one's activity at value assignment in unit propagation.
+    fn reward_at_assign(&mut self, _ix: Ix) {
+        todo!()
+    }
+    /// modify one's activity at value un-assignment in [`cancel_until`](`crate::assign::PropagateIF::cancel_until`).
+    fn reward_at_unassign(&mut self, _ix: Ix) {
+        todo!()
+    }
+    /// update internal counter.
+    fn update_rewards(&mut self);
+    #[cfg(feature = "moving_var_reward_rate")]
+    /// update reward setting as a part of module adaptation.
+    fn adjust_rewards(&mut self, state: &State) {
+        todo!()
+    }
 }
 
 /// API for object instantiation based on `Configuration` and `CNFDescription`.
@@ -694,32 +709,68 @@ bitflags! {
         const DEAD         = 0b0000_0000_0000_0001;
         /// a clause is a generated clause by conflict analysis and is removable.
         const LEARNT       = 0b0000_0000_0000_0010;
-        /// a clause is used recently in conflict analysis.
-        const JUST_USED    = 0b0000_0000_0000_0100;
         /// a clause is registered in vars' occurrence list.
-        const OCCUR_LINKED = 0b0000_0000_0000_1000;
+        const OCCUR_LINKED = 0b0000_0000_0000_0100;
         /// a clause or var is enqueued for eliminator.
-        const ENQUEUED     = 0b0000_0000_0001_0000;
+        const ENQUEUED     = 0b0000_0000_0000_1000;
         /// mark to run garbage collector on the corresponding watcher lists
-        const TOUCHED      = 0b0000_0000_0010_0000;
+        const TOUCHED      = 0b0000_0000_0001_0000;
         /// for vivified clauses
-        const VIVIFIED     = 0b0000_0000_0100_0000;
+        const VIVIFIED     = 0b0000_0000_0010_0000;
         /// for a clause which decreases LBD twice after vivification
-        const VIVIFIED2    = 0b0000_0000_1000_0000;
+        const VIVIFIED2    = 0b0000_0000_0100_0000;
         /// a given clause derived a learnt which LBD is smaller than 20.
-        const DERIVE20     = 0b0010_0000_0000_0000;
+        const DERIVE20     = 0b0000_0000_1000_0000;
         /// a temporal clause during vivification
-        const VIV_ASSUMED  = 0b0100_0000_0000_0000;
+        const VIV_ASSUMED  = 0b0000_0001_0000_0000;
 
         //
         //## For Var
         //
         /// a var is eliminated and managed by eliminator.
-        const ELIMINATED   = 0b0000_0001_0000_0000;
+        const ELIMINATED   = 0b0000_0010_0000_0000;
         /// a var is checked during in the current conflict analysis.
-        const CA_SEEN      = 0b0000_0010_0000_0000;
+        const CA_SEEN      = 0b0000_0100_0000_0000;
         /// the previous assigned value of a Var.
-        const PHASE        = 0b0000_0100_0000_0000;
+        const PHASE        = 0b0000_1000_0000_0000;
+
+        #[cfg(feature = "just_used")]
+        /// a clause is used recently in conflict analysis.
+        const JUST_USED    = 0b0000_0000_0000_0000;
+    }
+}
+
+#[derive(Debug)]
+pub struct Logger {
+    dest: Option<File>,
+}
+
+impl Default for Logger {
+    fn default() -> Self {
+        Logger { dest: None }
+    }
+}
+
+impl fmt::Display for Logger {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Dump({:?})", self.dest)
+    }
+}
+
+impl Logger {
+    pub fn new<T: AsRef<str>>(fname: T) -> Self {
+        Logger {
+            dest: File::create(fname.as_ref()).ok(),
+        }
+    }
+    pub fn dump(&mut self, mes: String) {
+        use std::io::Write;
+        if let Some(f) = &mut self.dest {
+            f.write_all(&mes.into_bytes())
+                .unwrap_or_else(|_| panic!("fail to dump {:?}", f));
+        } else {
+            println!("{}", mes);
+        }
     }
 }
 

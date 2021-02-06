@@ -34,7 +34,7 @@ _Warning: Version 0.6.0 isn't the best version._ It changed most modules like va
 
 ## Install
 
-Just run `cargo install splr --features cli` after installing the latest [cargo](https://www.rust-lang.org/tools/install).
+Just run `cargo install splr` after installing the latest [cargo](https://www.rust-lang.org/tools/install).
 Two executables will be installed:
 
 - `splr` -- the solver

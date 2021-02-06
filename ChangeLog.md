@@ -1,3 +1,12 @@
+## 0.6.3, 2021-02-XX
+
+- Learning-rate-based var rewarding uses the number of conflicts instead of the number of propagation, which was not intended.
+- switch to one-restarting-after-blocking-N-restarts stabilizer
+- switch to stabilization-mode-driven clause reduction
+- enable re-phasing
+- recycle `Watch` data
+- handle `--no-color` and `--quiet` correctly
+
 ## 0.6.2, 2021-01-20
 
 - update LBD correctly
@@ -174,7 +183,7 @@
 
 - adopt a modified CHB instead of EVSIDS
 - introduce [big bang initialization](https://medium.com/backjump-technologies/big-bang-initialization-of-variable-activity-in-a-sat-solver-ada154f56fb0) for variable activity
-- The literal endconding uses even integers for positive literals
+- The literal encoding uses even integers for positive literals
 - `Lbool` was changed to `Option<bool>`
 
 ## 0.1.4, 2019-09-12
