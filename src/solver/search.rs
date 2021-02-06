@@ -297,9 +297,10 @@ fn search(
                             asg.dissolve_stage(parity);
                         }
                     }
+
                     if cdb.reduce(asg, asg.num_conflict) {
                         state.to_vivify += 0.5;
-                        elim.to_simplify *= 2.0;
+                        elim.to_simplify *= 1.2;
                     }
                     if use_vivify && 1.0 <= state.to_vivify {
                         state.to_vivify = 0.0;
@@ -308,6 +309,7 @@ fn search(
                             analyze_final(asg, state, &cdb[ci]);
                             return Ok(false);
                         }
+                        elim.to_simplify *= 1.2;
                     }
                     // Simplification has been postponed because chronoBT was used.
                     // `elim.to_simplify` is increased much in particular
@@ -325,16 +327,10 @@ fn search(
                         elim.simplify(asg, cdb, state)?;
                     }
                 }
-                if asg.num_conflict % state.reflection_interval == 0 {
-                    adapt_modules(asg, cdb, elim, rst, state)?;
-                    if let Some(p) = state.elapsed() {
-                        if 1.0 <= p {
-                            return Err(SolverError::TimeOut);
-                        }
-                    } else {
-                        return Err(SolverError::UndescribedError);
-                    }
-                }
+            }
+            // By simplification, we may get further solutions.
+            if asg.decision_level() == asg.root_level && asg.num_asserted_vars < asg.stack_len() {
+                asg.num_asserted_vars = asg.stack_len();
             }
             if a_decision_was_made {
                 a_decision_was_made = false;
@@ -345,10 +341,16 @@ fn search(
                 state.flush("");
                 state.flush(format!("unreachable core: {}", na));
             }
-        }
-        // By simplification, we may get further solutions.
-        if asg.decision_level() == asg.root_level && asg.num_asserted_vars < asg.stack_len() {
-            asg.num_asserted_vars = asg.stack_len();
+            if asg.num_conflict % state.reflection_interval == 0 {
+                adapt_modules(asg, cdb, elim, rst, state)?;
+                if let Some(p) = state.elapsed() {
+                    if 1.0 <= p {
+                        return Err(SolverError::TimeOut);
+                    }
+                } else {
+                    return Err(SolverError::UndescribedError);
+                }
+            }
         }
         if !asg.remains() {
             let lit = asg.select_decision_literal();
