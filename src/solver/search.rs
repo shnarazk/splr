@@ -304,9 +304,10 @@ fn search(
                         RESTART!(asg, rst);
                     }
                     if cdb.reduce(asg, asg.num_conflict) {
-                        state.to_vivify += 0.6;
+                        state.to_vivify += 0.5;
+                        elim.to_simplify *= 2.0;
                     }
-                    if new_cycle && use_vivify && 1.0 <= state.to_vivify {
+                    if use_vivify && 1.0 <= state.to_vivify {
                         state.to_vivify = 0.0;
                         if vivify(asg, cdb, elim, state).is_err() {
                             // return Err(SolverError::UndescribedError);
