@@ -258,61 +258,76 @@ fn search(
                 RESTART!(asg, rst);
             }
             #[allow(unused_variables)]
-            if let Some(new_cycle) = rst.stabilize(asg.num_conflict) {
-                let r = rst.exports();
-                if new_cycle {
-                    let v = asg.var_stats();
-                    let s = {
-                        #[cfg(not(feature = "staging"))]
-                        {
-                            0
-                        }
+            if !matches!(restart, Some(RestartDecision::Block)) {
+                if let Some(new_cycle) = rst.stabilize(asg.num_conflict) {
+                    let r = rst.exports();
+                    if new_cycle {
+                        let v = asg.var_stats();
+                        let s = {
+                            #[cfg(not(feature = "staging"))]
+                            {
+                                0
+                            }
+                            #[cfg(feature = "staging")]
+                            {
+                                asg.num_staging_cands()
+                            }
+                        };
+                        parity = !parity;
                         #[cfg(feature = "staging")]
                         {
-                            asg.num_staging_cands()
+                            let d = 1.0 / ((s + 2) as f64).log(2.0);
+                            rst.update(ProgressUpdate::Temperature(d));
+                            asg.build_stage(StagingTarget::AutoSelect, parity);
                         }
-                    };
-                    parity = !parity;
-                    #[cfg(feature = "staging")]
-                    {
-                        let d = 1.0 / ((s + 2) as f64).log(2.0);
-                        rst.update(ProgressUpdate::Temperature(d));
-                        asg.build_stage(StagingTarget::AutoSelect, parity);
-                    }
 
-                    if last_core != v.4 || 0 == v.4 {
-                        state.log(
-                            asg.num_conflict,
-                            format!(
-                                "Lcycle:{:>6}, core:{:>9}, #ion: {:>9}, /cpr:{:>9.2}",
-                                r.3,
-                                v.4,
-                                s,
-                                asg.num_conflict as f64 / asg.exports().2 as f64,
-                            ),
-                        );
-                        last_core = v.4;
+                        if last_core != v.4 || 0 == v.4 {
+                            state.log(
+                                asg.num_conflict,
+                                format!(
+                                    "Lcycle:{:>6}, core:{:>9}, #ion: {:>9}, /cpr:{:>9.2}",
+                                    r.3,
+                                    v.4,
+                                    s,
+                                    asg.num_conflict as f64 / asg.exports().2 as f64,
+                                ),
+                            );
+                            last_core = v.4;
+                        }
+                    } else {
+                        #[cfg(feature = "staging")]
+                        {
+                            asg.dissolve_stage(parity);
+                        }
                     }
-                } else {
-                    #[cfg(feature = "staging")]
-                    {
-                        asg.dissolve_stage(parity);
-                    }
-                }
-                if cdb.reduce(asg, asg.num_conflict) {
-                    state.to_vivify += 1.0;
-                }
-                if let Some(ref decision) = restart {
-                    if *decision != RestartDecision::Force {
+                    if asg.root_level != asg.decision_level() {
                         RESTART!(asg, rst);
                     }
-                }
-                if use_vivify && 1.0 <= state.to_vivify {
-                    state.to_vivify = 0.0;
-                    if vivify(asg, cdb, elim, state).is_err() {
-                        // return Err(SolverError::UndescribedError);
-                        analyze_final(asg, state, &cdb[ci]);
-                        return Ok(false);
+                    if cdb.reduce(asg, asg.num_conflict) {
+                        state.to_vivify += 0.6;
+                    }
+                    if new_cycle && use_vivify && 1.0 <= state.to_vivify {
+                        state.to_vivify = 0.0;
+                        if vivify(asg, cdb, elim, state).is_err() {
+                            // return Err(SolverError::UndescribedError);
+                            analyze_final(asg, state, &cdb[ci]);
+                            return Ok(false);
+                        }
+                    }
+                    // Simplification has been postponed because chronoBT was used.
+                    // `elim.to_simplify` is increased much in particular
+                    // when vars are asserted or learnts are small.
+                    // We don't need to count the number of asserted vars.
+                    if elim.enable && state.config.c_ip_int <= elim.to_simplify as usize {
+                        elim.to_simplify = 0.0;
+
+                        #[cfg(feature = "progress_MLD")]
+                        {
+                            elim.subsume_literal_limit = (rst.mld.get_slow() * 2.0) as usize;
+                        }
+
+                        elim.activate();
+                        elim.simplify(asg, cdb, state)?;
                     }
                 }
             }
@@ -336,25 +351,9 @@ fn search(
                 }
             }
         }
-        // Simplification has been postponed because chronoBT was used.
-        if asg.decision_level() == asg.root_level {
-            // `elim.to_simplify` is increased much in particular when vars are asserted or
-            // learnts are small. We don't need to count the number of asserted vars.
-            if state.config.c_ip_int <= elim.to_simplify as usize {
-                elim.to_simplify = 0.0;
-                if elim.enable {
-                    #[cfg(feature = "progress_MLD")]
-                    {
-                        elim.subsume_literal_limit = (rst.mld.get_slow() * 2.0) as usize;
-                    }
-                    elim.activate();
-                }
-                elim.simplify(asg, cdb, state)?;
-            }
-            // By simplification, we may get further solutions.
-            if asg.num_asserted_vars < asg.stack_len() {
-                asg.num_asserted_vars = asg.stack_len();
-            }
+        // By simplification, we may get further solutions.
+        if asg.decision_level() == asg.root_level && asg.num_asserted_vars < asg.stack_len() {
+            asg.num_asserted_vars = asg.stack_len();
         }
         if !asg.remains() {
             let lit = asg.select_decision_literal();
