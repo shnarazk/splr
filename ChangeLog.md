@@ -1,5 +1,6 @@
 ## 0.6.3, 2021-02-XX
 
+- VarRewardIF was merged into ActivityIF. ClauseDB implements it.
 - Learning-rate-based var rewarding uses the number of conflicts instead of the number of propagation, which was not intended.
 - switch to one-restarting-after-blocking-N-restarts stabilizer
 - switch to stabilization-mode-driven clause reduction
