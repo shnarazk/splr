@@ -19,7 +19,6 @@ trait ProgressEvaluator {
 pub enum ProgressUpdate {
     Counter,
     Temperature(f64),
-    ResetStabilizer,
 
     #[cfg(feature = "progress_ACC")]
     ACC(f64),
@@ -547,11 +546,6 @@ impl GeometricStabilizer {
     fn span(&self) -> usize {
         self.step
     }
-    #[allow(dead_code)]
-    fn reset_progress(&mut self) {
-        self.reset_requested = true;
-    }
-
     #[cfg(feature = "luby_blocking")]
     fn new(enable: bool, scale: usize) -> Self {
         GeometricStabilizer {
@@ -759,7 +753,6 @@ impl Instantiate for Restarter {
                 {
                     self.luby_blocking.reset_progress();
                 }
-                self.stb.reset_progress();
                 self.restart_waiting = self.stb.step;
             }
             SolverEvent::Restart => {
@@ -850,9 +843,6 @@ impl RestartIF for Restarter {
             }
             ProgressUpdate::Temperature(c) => {
                 self.stb.depth = 1.0 + self.stb_expansion_factor * c;
-            }
-            ProgressUpdate::ResetStabilizer => {
-                self.stb.reset_progress();
             }
             #[cfg(feature = "progress_ACC")]
             ProgressUpdate::ACC(val) => self.acc.update(val),
