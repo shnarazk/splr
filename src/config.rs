@@ -179,7 +179,7 @@ impl Default for Config {
             a_rsr: 1,
             a_stabilize: 1,
             a_stage: 1,
-            a_vivify: 1,
+            a_vivify: 0,
 
             c_cbt_thr: 100,
             c_cls_lim: 0,

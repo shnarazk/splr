@@ -252,13 +252,9 @@ fn search(
             asg.update_rewards();
             cdb.update_rewards();
             rst.update(ProgressUpdate::Remain(asg.var_stats().3));
-            let restart = rst.restart();
-            if matches!(restart, Some(RestartDecision::Force)) {
+            if let Some(RestartDecision::Force) = rst.restart() {
                 // update_clause_rewards(asg, cdb, None);
                 RESTART!(asg, rst);
-            }
-            #[allow(unused_variables)]
-            if !matches!(restart, Some(RestartDecision::Block)) {
                 if let Some(new_cycle) = rst.stabilize(asg.num_conflict) {
                     let r = rst.exports();
                     if new_cycle {
@@ -274,6 +270,7 @@ fn search(
                             }
                         };
                         parity = !parity;
+
                         #[cfg(feature = "staging")]
                         {
                             let d = 1.0 / ((s + 2) as f64).log(2.0);
@@ -299,9 +296,6 @@ fn search(
                         {
                             asg.dissolve_stage(parity);
                         }
-                    }
-                    if asg.root_level != asg.decision_level() {
-                        RESTART!(asg, rst);
                     }
                     if cdb.reduce(asg, asg.num_conflict) {
                         state.to_vivify += 0.5;
@@ -331,6 +325,16 @@ fn search(
                         elim.simplify(asg, cdb, state)?;
                     }
                 }
+                if asg.num_conflict % state.reflection_interval == 0 {
+                    adapt_modules(asg, cdb, elim, rst, state)?;
+                    if let Some(p) = state.elapsed() {
+                        if 1.0 <= p {
+                            return Err(SolverError::TimeOut);
+                        }
+                    } else {
+                        return Err(SolverError::UndescribedError);
+                    }
+                }
             }
             if a_decision_was_made {
                 a_decision_was_made = false;
@@ -340,16 +344,6 @@ fn search(
             if let Some(na) = asg.best_assigned() {
                 state.flush("");
                 state.flush(format!("unreachable core: {}", na));
-            }
-            if asg.num_conflict % state.reflection_interval == 0 {
-                adapt_modules(asg, cdb, elim, rst, state)?;
-                if let Some(p) = state.elapsed() {
-                    if 1.0 <= p {
-                        return Err(SolverError::TimeOut);
-                    }
-                } else {
-                    return Err(SolverError::UndescribedError);
-                }
             }
         }
         // By simplification, we may get further solutions.
