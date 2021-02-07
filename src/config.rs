@@ -201,7 +201,7 @@ impl Default for Config {
             use_certification: false,
             use_log: false,
 
-            crw_dcy_rat: 0.99,
+            crw_dcy_rat: 0.98,
 
             elm_cls_lim: 32,
             elm_grw_lim: 0,
