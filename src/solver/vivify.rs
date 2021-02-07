@@ -26,6 +26,16 @@ pub fn vivify(
         }
     }
     // clauses.sort_by_cached_key(|cid| cdb[*cid].rank);
+    clauses.sort_by_cached_key(|cid| (100_000.0 / cdb.activity(*cid)) as usize);
+    {
+        let mut act: f64 = 0.0;
+        for ci in &clauses {
+            act = act.max(cdb.activity(*ci));
+        }
+        act *= 0.5;
+        clauses.retain(|ci| act <= cdb.activity(*ci));
+    }
+
     // clauses.resize(clauses.len() / num_to_vivify, ClauseId::default());
     let num_target = clauses.len();
     if num_target == 0 {
