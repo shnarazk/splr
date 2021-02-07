@@ -289,7 +289,7 @@ impl Instantiate for State {
 
             vivify_thr: config.viv_thr,
             target: cnf.clone(),
-            time_limit: config.c_tout,
+            time_limit: config.c_timeout,
             ..State::default()
         }
     }
@@ -402,12 +402,12 @@ macro_rules! f {
 
 impl StateIF for State {
     fn is_timeout(&self) -> bool {
-        Duration::from_secs(self.config.c_tout as u64) < self.start.elapsed()
+        Duration::from_secs(self.config.c_timeout as u64) < self.start.elapsed()
     }
     fn elapsed(&self) -> Option<f64> {
         Some(
             self.start.elapsed().as_secs_f64()
-                / Duration::from_secs(self.config.c_tout as u64).as_secs_f64(),
+                / Duration::from_secs(self.config.c_timeout as u64).as_secs_f64(),
         )
     }
     #[cfg(feature = "strategy_adaptation")]
