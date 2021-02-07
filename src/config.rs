@@ -81,6 +81,11 @@ pub struct Config {
     pub use_log: bool,
 
     //
+    //## clause rewarding
+    //
+    pub crw_dcy_rat: f64,
+
+    //
     //## eliminator
     //
     /// Max #lit for clause subsume
@@ -196,6 +201,8 @@ impl Default for Config {
             use_certification: false,
             use_log: false,
 
+            crw_dcy_rat: 0.99,
+
             elm_cls_lim: 32,
             elm_grw_lim: 0,
             elm_var_occ: 8192,
@@ -261,13 +268,13 @@ impl Config {
                 ];
                 #[cfg(not(feature = "moving_var_reward_rate"))]
                 let options_f64 = [
-                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rse", "rss", "srd", "srv",
-                    "vdr", "vro",
+                    "timeout", "cdr", "rat", "rct", "rlt", "rms", "rmt", "rse", "rss", "srd",
+                    "srv", "vdr", "vro",
                 ];
                 #[cfg(feature = "moving_var_reward_rate")]
                 let options_f64 = [
-                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rse", "rss", "srd", "srv",
-                    "vri", "vrm", "vro",
+                    "timeout", "cdr", "rat", "rct", "rlt", "rms", "rmt", "rse", "rss", "srd",
+                    "srv", "vri", "vrm", "vro",
                 ];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
@@ -348,6 +355,7 @@ impl Config {
                                 if let Ok(val) = str.parse::<f64>() {
                                     match name {
                                         "timeout" => self.c_tout = val,
+                                        "cdr" => self.crw_dcy_rat = val,
                                         "rat" => self.rst_asg_thr = val,
 
                                         #[cfg(feature = "progress_ACC")]
@@ -357,6 +365,7 @@ impl Config {
 
                                         #[cfg(feature = "progress_MLD")]
                                         "rms" => self.rst_mld_scl = val,
+
                                         #[cfg(feature = "progress_MLD")]
                                         "rmt" => self.rst_mld_thr = val,
 
@@ -364,12 +373,16 @@ impl Config {
                                         "rss" => self.rst_stb_scl = val,
                                         "srd" => self.stg_rwd_dcy = val,
                                         "srv" => self.stg_rwd_val = val,
+
                                         #[cfg(not(feature = "moving_var_reward_rate"))]
                                         "vdr" => self.vrw_dcy_rat = val,
+
                                         #[cfg(feature = "moving_var_reward_rate")]
                                         "vri" => self.vrw_dcy_beg = val,
+
                                         #[cfg(feature = "moving_var_reward_rate")]
                                         "vrm" => self.vrw_dcy_end = val,
+
                                         "vro" => self.vrw_occ_cmp = val,
                                         _ => panic!("invalid option: {}", name),
                                     }
@@ -465,6 +478,7 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --STG <a-stage>      Stage switch                   {:>10}
       --VIV <a-vivify>     Vivification switch            {:>10}
       --cbt <c-cbt-thr>    Dec. lvl to use chronoBT       {:>10}
+      --cdr <crw-dcy-rat>  Clause reward decay               {:>10.2}
       --cl <c-cls-lim>     Soft limit of #clauses (6MC/GB){:>10}
       --ii <c-ip-int>      #cls to start in-processor     {:>10}
   -t, --timeout <c-tout>   CPU time limit in sec.         {:>10}
@@ -489,6 +503,7 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --srd <stg-rwd-dcy>  Decay rate for staged vare reward {:>10.2}
       --srv <stg-rwd-val>  Extra reward for staged vars      {:>10.2}
       --vit <viv-thr>      #clause to try to vivify       {:>10}
+      \x1B[000m\x1B[031m--vdr <vrw-dcy-rat>  var reward decay                  {:>10.2}\x1B[000m
       \x1B[000m\x1B[031m--vri <vrw-dcy-beg>  Initial var reward decay          {:>10.2}\x1B[000m
       \x1B[000m\x1B[031m--vrm <vrw-dcy-end>  Maximum var reward decay          {:>10.2}\x1B[000m
       \x1B[000m\x1B[031m--vro <vrw-occ-cmp>  Occ. compression rate in LR       {:>10.2}\x1B[000m
@@ -514,6 +529,7 @@ ARGS:
         config.a_stage,
         config.a_vivify,
         config.c_cbt_thr,
+        config.crw_dcy_rat,
         config.c_cls_lim,
         config.c_ip_int,
         config.c_tout,
@@ -565,6 +581,16 @@ ARGS:
         config.stg_rwd_dcy,
         config.stg_rwd_val,
         config.viv_thr,
+        {
+            #[cfg(not(feature = "moving_var_reward_rate"))]
+            {
+                config.vrw_dcy_rat
+            }
+            #[cfg(feature = "moving_var_reward_rate")]
+            {
+                0.0
+            }
+        },
         {
             #[cfg(not(feature = "moving_var_reward_rate"))]
             {

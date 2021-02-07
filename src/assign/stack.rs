@@ -73,6 +73,7 @@ impl Default for AssignStack {
             var: Vec::new(),
 
             activity_decay: 0.0,
+            activity_anti_decay: 1.0,
 
             #[cfg(feature = "moving_var_reward_rate")]
             activity_decay_max: 0.9,
@@ -119,6 +120,7 @@ impl Instantiate for AssignStack {
             var: Var::new_vars(nv),
             #[cfg(not(feature = "moving_var_reward_rate"))]
             activity_decay: config.vrw_dcy_rat,
+            activity_anti_decay: 1.0 - config.vrw_dcy_rat,
             #[cfg(feature = "moving_var_reward_rate")]
             activity_decay: config.vrw_dcy_beg,
             #[cfg(feature = "moving_var_reward_rate")]

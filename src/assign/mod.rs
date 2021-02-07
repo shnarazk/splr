@@ -156,6 +156,8 @@ pub struct AssignStack {
     //
     /// var activity decay
     activity_decay: f64,
+    /// its diff
+    activity_anti_decay: f64,
 
     #[cfg(feature = "moving_var_reward_rate")]
     /// maximum var activity decay

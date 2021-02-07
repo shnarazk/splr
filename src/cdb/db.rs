@@ -107,6 +107,7 @@ impl Default for ClauseDB {
             ordinal: 0,
             activity_inc: 1.0,
             activity_decay: 0.99,
+            activity_anti_decay: 0.01,
             touched: Vec::new(),
             lbd_temp: Vec::new(),
             num_lbd_update: 0,
@@ -191,18 +192,30 @@ impl IndexMut<RangeFrom<usize>> for ClauseDB {
 impl ActivityIF<ClauseId> for ClauseDB {
     fn activity(&mut self, cid: ClauseId) -> f64 {
         let t = self.ordinal;
-        self.clause[cid.ordinal as usize].update_activity(t, self.activity_decay)
+        self.clause[cid.ordinal as usize].update_activity(
+            t,
+            self.activity_decay,
+            self.activity_anti_decay,
+        )
     }
     fn clear_reward(&mut self, cid: ClauseId) {
         self[cid].reward = 0.0;
     }
     fn reward_at_unassign(&mut self, cid: ClauseId) {
         let t = self.ordinal;
-        self.clause[cid.ordinal as usize].update_activity(t, self.activity_decay);
+        self.clause[cid.ordinal as usize].update_activity(
+            t,
+            self.activity_decay,
+            self.activity_anti_decay,
+        );
     }
     fn reward_at_analysis(&mut self, cid: ClauseId) {
         let t = self.ordinal;
-        self.clause[cid.ordinal as usize].update_activity(t, self.activity_decay);
+        self.clause[cid.ordinal as usize].update_activity(
+            t,
+            self.activity_decay,
+            self.activity_anti_decay,
+        );
     }
     fn update_rewards(&mut self) {
         self.ordinal += 1;
@@ -229,13 +242,16 @@ impl Instantiate for ClauseDB {
         }
         ClauseDB {
             clause,
-            touched,
-            lbd_temp: vec![0; nv + 1],
             bin_watcher,
             watcher,
             certified,
-            reducible: config.use_reduce(),
             soft_limit: config.c_cls_lim,
+            activity_decay: config.crw_dcy_rat,
+            activity_anti_decay: 1.0 - config.crw_dcy_rat,
+            touched,
+            lbd_temp: vec![0; nv + 1],
+            reducible: config.use_reduce(),
+
             ..ClauseDB::default()
         }
     }
@@ -807,6 +823,7 @@ impl ClauseDB {
             ref mut touched,
             ref ordinal,
             ref activity_decay,
+            ref activity_anti_decay,
             ..
         } = self;
         self.num_reduction += 1;
@@ -831,7 +848,7 @@ impl ClauseDB {
                 act_v = act_v.max(asg.activity(l.vi()));
             }
             let rank = c.update_lbd(asg, lbd_temp) as f64;
-            let act_c = c.update_activity(*ordinal, *activity_decay);
+            let act_c = c.update_activity(*ordinal, *activity_decay, *activity_anti_decay);
             let weight = (SCALE_UP * rank / (act_v + act_c)) as usize;
             perm.push(ClauseSorter { weight, index: i });
         }
@@ -878,11 +895,11 @@ impl ClauseDB {
 }
 
 impl Clause {
-    fn update_activity(&mut self, t: usize, decay: f64) -> f64 {
+    fn update_activity(&mut self, t: usize, decay: f64, anti_decay: f64) -> f64 {
         if self.timestamp < t {
-            let duration = (t - self.timestamp) as f64;
-            self.reward *= decay.powf((1.0 + duration).log(2.0));
-            self.reward += 1.0 - decay;
+            let duration = (t - self.timestamp + 1) as f64;
+            self.reward *= decay.powf(duration.log(2.0));
+            self.reward += anti_decay;
             self.timestamp = t;
         }
         self.reward

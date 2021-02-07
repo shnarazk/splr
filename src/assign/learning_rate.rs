@@ -28,10 +28,9 @@ impl ActivityIF<VarId> for AssignStack {
     fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
         let duration = (self.ordinal + 1 - v.timestamp) as f64;
-        let decay = self.activity_decay;
         let rate = v.participated as f64 / duration;
-        v.reward *= decay;
-        v.reward += (1.0 - decay) * rate.powf(self.occurrence_compression_rate);
+        v.reward *= self.activity_decay;
+        v.reward += self.activity_anti_decay * rate.powf(self.occurrence_compression_rate);
         v.participated = 0;
     }
     fn update_rewards(&mut self) {
