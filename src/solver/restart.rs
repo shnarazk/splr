@@ -833,7 +833,7 @@ impl RestartIF for Restarter {
         None
     }
     fn stabilize(&mut self, _now: usize) -> Option<bool> {
-        self.stb.update(self.num_restart)
+        self.stb.update(self.num_restart + self.num_block)
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {

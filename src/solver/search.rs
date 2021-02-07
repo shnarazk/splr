@@ -248,14 +248,14 @@ fn search(
                 analyze_final(asg, state, &cdb[ci]);
                 return Ok(false);
             }
+            cdb.update_rewards();
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
             asg.update_rewards();
-            cdb.update_rewards();
             rst.update(ProgressUpdate::Remain(asg.var_stats().3));
-            if let Some(RestartDecision::Force) = rst.restart() {
-                // update_clause_rewards(asg, cdb, None);
-                RESTART!(asg, rst);
+            if let Some(decision) = rst.restart() {
                 if let Some(new_cycle) = rst.stabilize(asg.num_conflict) {
+                    // update_clause_rewards(asg, cdb, None);
+                    RESTART!(asg, rst);
                     let r = rst.exports();
                     if new_cycle {
                         let v = asg.var_stats();
@@ -326,6 +326,8 @@ fn search(
                         elim.activate();
                         elim.simplify(asg, cdb, state)?;
                     }
+                } else if RestartDecision::Force == decision {
+                    RESTART!(asg, rst);
                 }
             }
             // By simplification, we may get further solutions.
