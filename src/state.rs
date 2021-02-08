@@ -186,7 +186,7 @@ impl IndexMut<Stat> for [usize] {
 }
 
 /// Data storage for [`Solver`](`crate::solver::Solver`).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct State {
     /// solver configuration
     pub config: Config,
@@ -906,7 +906,7 @@ pub enum LogF64Id {
 }
 
 /// Record of old stats.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct ProgressRecord {
     pub vali: [usize; LogUsizeId::End as usize],
     pub valf: [f64; LogF64Id::End as usize],

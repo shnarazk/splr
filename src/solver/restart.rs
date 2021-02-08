@@ -63,7 +63,7 @@ pub trait RestartIF: Export<RestarterExports, (RestartMode, usize)> {
 }
 
 /// An assignment history used for blocking restart.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct ProgressASG {
     enable: bool,
     ema: Ema2,
@@ -119,7 +119,7 @@ impl ProgressEvaluator for ProgressASG {
 }
 
 /// An EMA of learnt clauses' LBD, used for forcing restart.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct ProgressLBD {
     enable: bool,
     ema: Ema2,
@@ -176,7 +176,7 @@ impl ProgressEvaluator for ProgressLBD {
 
 #[cfg(feature = "progress_MLD")]
 /// An EMA of Maximum LBD of a Dependent graph, used in conflict analyze
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct ProgressMLD {
     enable: bool,
     ema: Ema2,
@@ -245,7 +245,7 @@ impl ProgressMLD {
 
 #[cfg(feature = "progress_ACC")]
 /// An EMA of Activity-based Conflict Correlation, used for forcing restart.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct ProgressACC {
     enable: bool,
     ema: Ema2,
@@ -357,7 +357,7 @@ impl ProgressEvaluator for ProgressLVL {
 }
 
 /// An implementation of Luby series.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct ProgressLuby {
     enable: bool,
     active: bool,
@@ -462,7 +462,7 @@ impl ProgressLuby {
 /// When an evaluator becomes active, we accept and shift it. But this blocker
 /// absorbs not only the forcing signal but also blocking signal.
 /// This exists in macro `reset`.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct GeometricStabilizer {
     enable: bool,
     active: bool,
@@ -582,7 +582,7 @@ impl GeometricStabilizer {
 
 #[cfg(feature = "progress_Bucket")]
 /// Restart when the sum of LBDs is over a limit.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct ProgressBucket {
     enable: bool,
     num_shift: usize,
@@ -665,7 +665,7 @@ impl ProgressEvaluator for ProgressBucket {
 }
 
 /// `Restarter` provides restart API and holds data about restart conditions.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Restarter {
     #[cfg(feature = "progress_ACC")]
     acc: ProgressACC,
@@ -916,7 +916,7 @@ impl<'a> ExportBox<'a, RestarterEMAs<'a>> for Restarter {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct LubySeries {
     index: usize,
     seq: isize,

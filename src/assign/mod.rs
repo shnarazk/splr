@@ -90,7 +90,7 @@ pub enum AssignReason {
 }
 
 /// Object representing a variable.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Var {
     /// reverse conversion to index. Note `VarId` must be `usize`.
     pub index: VarId,
@@ -113,7 +113,7 @@ pub struct Var {
 }
 
 /// A record of assignment. It's called 'trail' in Glucose.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AssignStack {
     /// assigns of vars
     assign: Vec<Option<bool>>,
@@ -203,7 +203,7 @@ pub struct AssignStack {
 // - both fields has a fixed length. Don't use push and pop.
 // - `idxs[0]` contains the number of alive elements
 //   `indx` is positions. So the unused field 0 can hold the last position as a special case.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VarIdHeap {
     /// order : usize -> VarId, -- Which var is the n-th best?
     heap: Vec<VarId>,
