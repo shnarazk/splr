@@ -3,6 +3,7 @@
 use {
     super::{SolverEvent, Stat, State},
     crate::{
+        assign::sandboxed_propagate,
         assign::{AssignIF, AssignStack, ClauseManipulateIF, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::Eliminator,
@@ -122,7 +123,7 @@ pub fn vivify(
                     };
                     debug_assert_eq!(asg.assigned(!*l), None);
                     asg.assign_by_decision(!*l);
-                    let cc: ClauseId = asg.propagate(cdb);
+                    let cc: ClauseId = sandboxed_propagate(asg, cdb);
                     // Rule 3
                     if !cc.is_none() {
                         copied.push(!*l);

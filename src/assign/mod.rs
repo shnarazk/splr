@@ -7,6 +7,8 @@ mod propagate;
 #[cfg_attr(feature = "EVSIDS", path = "evsids.rs")]
 #[cfg_attr(not(feature = "EVSIDS"), path = "learning_rate.rs")]
 mod reward;
+/// A propagation environment without rewarding
+mod sandbox;
 /// Decision var selection
 mod select;
 /// assignment management
@@ -15,7 +17,8 @@ mod stack;
 mod var;
 
 pub use self::{
-    propagate::PropagateIF, select::VarSelectIF, stack::ClauseManipulateIF, var::VarManipulateIF,
+    propagate::PropagateIF, sandbox::sandboxed_propagate, select::VarSelectIF,
+    stack::ClauseManipulateIF, var::VarManipulateIF,
 };
 
 use {
