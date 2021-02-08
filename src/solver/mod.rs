@@ -25,7 +25,7 @@ use {
 };
 
 /// Normal results returned by Solver.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Certificate {
     /// It is satisfiable; `vec` is such an assignment sorted by var order.
     SAT(Vec<i32>),
