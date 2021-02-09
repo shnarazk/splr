@@ -805,6 +805,7 @@ impl RestartIF for Restarter {
 
         if self.asg.is_active() {
             self.num_block += 1;
+            self.restart_waiting = 0;
             self.after_restart = 0;
 
             #[cfg(feature = "luby_blocking")]
