@@ -63,7 +63,7 @@ pub trait RestartIF: Export<RestarterExports, (RestartMode, usize)> {
 }
 
 /// An assignment history used for blocking restart.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct ProgressASG {
     enable: bool,
     ema: Ema2,
@@ -119,7 +119,7 @@ impl ProgressEvaluator for ProgressASG {
 }
 
 /// An EMA of learnt clauses' LBD, used for forcing restart.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct ProgressLBD {
     enable: bool,
     ema: Ema2,
@@ -176,7 +176,7 @@ impl ProgressEvaluator for ProgressLBD {
 
 #[cfg(feature = "progress_MLD")]
 /// An EMA of Maximum LBD of a Dependent graph, used in conflict analyze
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ProgressMLD {
     enable: bool,
     ema: Ema2,
@@ -245,7 +245,7 @@ impl ProgressMLD {
 
 #[cfg(feature = "progress_ACC")]
 /// An EMA of Activity-based Conflict Correlation, used for forcing restart.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct ProgressACC {
     enable: bool,
     ema: Ema2,
@@ -323,7 +323,7 @@ impl ProgressEvaluator for ProgressACC {
 }
 
 /// An EMA of decision level.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct ProgressLVL {
     ema: Ema2,
 }
@@ -357,7 +357,7 @@ impl ProgressEvaluator for ProgressLVL {
 }
 
 /// An implementation of Luby series.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct ProgressLuby {
     enable: bool,
     active: bool,
@@ -462,7 +462,7 @@ impl ProgressLuby {
 /// When an evaluator becomes active, we accept and shift it. But this blocker
 /// absorbs not only the forcing signal but also blocking signal.
 /// This exists in macro `reset`.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct GeometricStabilizer {
     enable: bool,
     longest_span: usize,
@@ -647,7 +647,7 @@ impl ProgressEvaluator for ProgressBucket {
 }
 
 /// `Restarter` provides restart API and holds data about restart conditions.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Restarter {
     #[cfg(feature = "progress_ACC")]
     acc: ProgressACC,
@@ -907,7 +907,7 @@ impl<'a> ExportBox<'a, RestarterEMAs<'a>> for Restarter {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct LubySeries {
     index: usize,
     seq: isize,

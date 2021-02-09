@@ -377,7 +377,7 @@ pub trait EmaIF {
 }
 
 /// Exponential Moving Average, with a calibrator if feature `ema_calibration` is on.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Ema {
     val: f64,
     #[cfg(feature = "ema_calibration")]
@@ -418,7 +418,7 @@ impl Ema {
 }
 
 /// Exponential Moving Average pair, with a calibrator if feature `ema_calibration` is on.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Ema2 {
     fast: f64,
     slow: f64,

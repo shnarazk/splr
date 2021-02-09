@@ -4,7 +4,7 @@ use {
     super::{SolverEvent, Stat, State},
     crate::{
         assign::{AssignIF, AssignStack, ClauseManipulateIF, PropagateIF, VarManipulateIF},
-        cdb::{ClauseDB, ClauseDBIF},
+        cdb::{ClauseDB, ClauseDBIF, ClauseIF},
         processor::Eliminator,
         state::StateIF,
         types::*,

@@ -17,7 +17,7 @@ pub use self::{
 use crate::types::*;
 
 /// Record of clause operations to build DRAT certifications.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CertifiedRecord {
     /// placed at the end.
     SENTINEL,
@@ -45,7 +45,7 @@ impl ClauseId {
 }
 
 /// A representation of 'clause'
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Clause {
     /// The literals in a clause.
     pub lits: Vec<Lit>,
@@ -68,7 +68,7 @@ pub struct Clause {
 /// use crate::splr::cdb::ClauseDB;
 /// let cdb = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
 ///```
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ClauseDB {
     /// container of clauses
     clause: Vec<Clause>,
