@@ -208,14 +208,14 @@ impl Default for Config {
             elm_var_occ: 8192,
 
             rst_step: 24,
-            rst_asg_len: 32,
-            rst_asg_slw: 10000,
+            rst_asg_len: 24,
+            rst_asg_slw: 8192,
             rst_asg_thr: 0.20,
 
             #[cfg(feature = "progress_ACC")]
             rst_ccc_thr: 0.7,
 
-            rst_lbd_len: 20,
+            rst_lbd_len: 24,
             rst_lbd_slw: 8192,
             rst_lbd_thr: 1.20,
 
