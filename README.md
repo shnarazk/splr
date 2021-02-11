@@ -261,15 +261,15 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 | `Lcyc`       | the number of Lucy-based rephrasing cycle                                                 |
 | `tLBD`       | the trend rate of learn clause's LBD                                                      |
 | `core`       | the least number of unassigned vars                                                       |
-| `/dpc`       | decisions per conflict                                                                    |
+| `/dpc`       | the EMA of decisions per conflict                                                                    |
 | `eLBD`       | the EMA, Exponential Moving Average, of learn clauses' LBDs                               |
 | `cnfl`       | the EMA of decision levels at which conflicts occur                                       |
 | `bjmp`       | the EMA of decision levels to which backjumps go                                          |
-| `/ppc`       | propagations per conflict                                                                 |
+| `/ppc`       | the EMA of propagations per conflict                                                                 |
 | `elim`       | the number of invocations of clause/var elimination                                       |
 | `cviv`       | the number of invocations of clause vivification                                          |
 | `#vbv`       | the number of vars which were asserted by clause vivification                             |
-| `/cpr`       | conflicts per restart                                                                     |
+| `/cpr`       | the EMA of conflicts per restart                                                                     |
 | `mode`       | Selected strategy's id                                                                    |
 | `time`       | the elapsed CPU time in seconds                                                           |
 | `#ion`       | the number of vars with high activities but aren't involved in best phase                 |
