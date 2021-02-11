@@ -213,15 +213,14 @@ pub fn vivify(
             n => {
                 num_shrink += 1;
                 if n == 2 && cdb.registered_bin_clause(copied[0], copied[1]) {
-                    // num_purge += 1;
-                    elim.to_simplify += 1.0;
+                    elim.to_simplify += 1.0 / 2.0;
                 } else {
                     cdb.certificate_add(&copied);
                     cdb.handle(SolverEvent::Vivify(true));
                     let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
                     cdb.handle(SolverEvent::Vivify(false));
                     cdb[cj].turn_on(Flag::VIVIFIED);
-                    elim.to_simplify += 1.0 / ((n - 1) as f64).powf(1.6);
+                    elim.to_simplify += 1.0 / (n as f64).powf(1.5);
                     debug_assert!(!cdb[cs.cid].is(Flag::DEAD));
                     cdb.detach(cs.cid);
                     cdb.garbage_collect();

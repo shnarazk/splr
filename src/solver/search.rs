@@ -284,8 +284,7 @@ fn search(
                     }
 
                     if cdb.reduce(asg, asg.num_conflict) {
-                        state.to_vivify += 0.5;
-                        elim.to_simplify *= 1.2;
+                        state.to_vivify += 1.0;
                     } else {
                         state.to_vivify += 0.1;
                     }
@@ -295,7 +294,6 @@ fn search(
                             analyze_final(asg, state, &cdb[ci]);
                             return Ok(false);
                         }
-                        elim.to_simplify *= 1.2;
                         state.to_vivify = 0.0;
                     }
                     // Simplification has been postponed because chronoBT was used.
