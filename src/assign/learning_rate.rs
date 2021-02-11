@@ -26,10 +26,6 @@ impl ActivityIF<VarId> for AssignStack {
         v.timestamp = t;
     }
     fn reward_at_unassign(&mut self, vi: VarId) {
-        if self.vivifying {
-            self.var[vi].participated = 0;
-            return;
-        }
         let v = &mut self.var[vi];
         let duration = (self.ordinal + 1 - v.timestamp) as f64;
         let rate = v.participated as f64 / duration;

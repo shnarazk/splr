@@ -32,6 +32,8 @@ pub trait PropagateIF {
     fn assign_by_unitclause(&mut self, l: Lit);
     /// execute *backjump*.
     fn cancel_until(&mut self, lv: DecisionLevel);
+    /// execute backjump in vivifiacion sandbox
+    fn backtrack_sandbox(&mut self);
     /// execute *boolean constraint propagation* or *unit propagation*.
     fn propagate<C>(&mut self, cdb: &mut C) -> ClauseId
     where
@@ -194,6 +196,21 @@ impl PropagateIF for AssignStack {
             self.num_restart += 1;
             self.cpr_ema.update(self.num_conflict);
         }
+    }
+    fn backtrack_sandbox(&mut self) {
+        let lim = self.trail_lim[self.root_level as usize];
+        for i in lim..self.trail.len() {
+            let l = self.trail[i];
+            let vi = l.vi();
+            let v = &mut self.var[vi];
+            v.participated = 0;
+            v.set(Flag::PHASE, var_assign!(self, vi).unwrap());
+            unset_assign!(self, vi);
+            self.reason[vi] = AssignReason::default();
+            self.insert_heap(vi);
+        }
+        self.trail_lim.truncate(self.root_level as usize);
+        self.q_head = self.q_head.min(lim);
     }
     /// UNIT PROPAGATION.
     /// Note:

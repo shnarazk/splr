@@ -179,7 +179,7 @@ pub struct AssignStack {
     //
     //## Vivification
     //
-    vivifying: bool,
+    during_vivification: bool,
     /// save old num_conflict, num_propagation, num_restart
     vivify_sandbox: (usize, usize, usize),
 }

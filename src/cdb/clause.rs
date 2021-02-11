@@ -20,7 +20,7 @@ pub trait ClauseIF {
     where
         A: AssignIF;
     /// return `true` if the clause should try vivification
-    fn to_vivify(&self) -> bool;
+    fn to_vivify(&self, threshold: usize) -> Option<f64>;
     /// clear flags about vivification
     fn vivified(&mut self);
 }
@@ -139,11 +139,15 @@ impl ClauseIF for Clause {
             cnt as usize
         }
     }
-    fn to_vivify(&self) -> bool {
-        !self.is(Flag::DEAD)
+    fn to_vivify(&self, threshold: usize) -> Option<f64> {
+        if !self.is(Flag::DEAD)
             && self.is(Flag::VIVIFIED) == self.is(Flag::VIVIFIED2)
             && (self.is(Flag::LEARNT) || self.is(Flag::DERIVE20))
-            && 3 * (self.rank as usize) + self.len() <= 40
+            && 3 * (self.rank as usize) + self.len() <= threshold
+        {
+            return Some(self.reward);
+        }
+        None
     }
     fn vivified(&mut self) {
         self.turn_on(Flag::VIVIFIED);

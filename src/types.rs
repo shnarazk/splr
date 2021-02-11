@@ -50,20 +50,24 @@ pub trait ActivityIF<Ix> {
     fn activity(&mut self, ix: Ix) -> f64;
     /// initialize one's reward.
     fn initialize_reward(&mut self, _ix: Ix) {
+        #[cfg(debug)]
         todo!()
     }
     /// clear one's activity
     fn clear_reward(&mut self, ix: Ix);
     /// modify one's activity at conflict analysis in `conflict_analyze` in [`solver`](`crate::solver`).
     fn reward_at_analysis(&mut self, _ix: Ix) {
+        #[cfg(debug)]
         todo!()
     }
     /// modify one's activity at value assignment in unit propagation.
     fn reward_at_assign(&mut self, _ix: Ix) {
+        #[cfg(debug)]
         todo!()
     }
     /// modify one's activity at value un-assignment in [`cancel_until`](`crate::assign::PropagateIF::cancel_until`).
     fn reward_at_unassign(&mut self, _ix: Ix) {
+        #[cfg(debug)]
         todo!()
     }
     /// update internal counter.
@@ -71,6 +75,7 @@ pub trait ActivityIF<Ix> {
     #[cfg(feature = "moving_var_reward_rate")]
     /// update reward setting as a part of module adaptation.
     fn adjust_rewards(&mut self, state: &State) {
+        #[cfg(debug)]
         todo!()
     }
 }

@@ -30,40 +30,45 @@ pub fn vivify(
     elim: &mut Eliminator,
     state: &mut State,
 ) -> MaybeInconsistent {
-    let mut clauses: Vec<ClauseId> = Vec::new();
+    #[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
+    struct ClauseSorter {
+        val: usize,
+        cid: ClauseId,
+    }
+    let mut clauses: Vec<ClauseSorter> = Vec::new();
     let mut num_clause = 0;
     for (i, c) in cdb.iter().enumerate().skip(1) {
         if !c.is(Flag::DEAD) {
             num_clause += 1;
         }
-        if c.to_vivify() {
-            clauses.push(ClauseId::from(i));
+        if let Some(act_c) = c.to_vivify(60) {
+            let mut act_v: f64 = 0.0;
+            for l in c.iter() {
+                act_v = act_v.max(asg.activity(l.vi()));
+            }
+            if act_v * 1.4 < act_c {
+                clauses.push(ClauseSorter {
+                    val: (1_000_000.0 * (1.0 - act_c + act_v)) as usize,
+                    cid: ClauseId::from(i),
+                });
+            }
         }
     }
-    clauses.sort_by_cached_key(|cid| distortion(asg, &cdb[*cid]));
-    // clauses.sort_by_cached_key(|cid| cdb[*cid].rank);
-    // clauses.sort_by_cached_key(|cid| cdb[*cid].rank);
-    /* clauses.sort_by_cached_key(|cid| (100_000.0 / cdb.activity(*cid)) as usize);
-    {
-        let mut act: f64 = 0.0;
-        for ci in &clauses {
-            act = act.max(cdb.activity(*ci));
-        }
-        act *= 0.5;
-        clauses.retain(|ci| act <= cdb.activity(*ci));
-    } */
-
-    // 1000 => \inf
-    // 2.5K => 20K
-    // 50K => 2K
-    // 1M => 200
+    clauses.sort_unstable();
     if clauses.len() == 0 {
         return Ok(());
     }
     let num_target = clauses
         .len()
-        .min(5_000_000_000 / ((num_clause as f64).powf(1.2) as usize));
-    clauses.resize(num_target, ClauseId::default());
+        .min(5_000_000_000 / ((num_clause as f64).powf(1.15) as usize));
+    // clauses.resize(num_target, ClauseId::default());
+    clauses.resize(
+        num_target,
+        ClauseSorter {
+            val: 0,
+            cid: ClauseId::default(),
+        },
+    );
     asg.handle(SolverEvent::Vivify(true));
     state[Stat::Vivification] += 1;
 
@@ -78,8 +83,8 @@ pub fn vivify(
     let mut num_assert = 0;
     let mut to_display = 0;
 
-    while let Some(ci) = clauses.pop() {
-        let c: &mut Clause = &mut cdb[ci];
+    while let Some(cs) = clauses.pop() {
+        let c: &mut Clause = &mut cdb[cs.cid];
         // Since GC can make `clauses` out of date, we need to check its aliveness here.
         if c.is(Flag::DEAD) {
             continue;
@@ -154,7 +159,7 @@ pub fn vivify(
                         }
                         flipped = false;
                     }
-                    asg.cancel_until(asg.root_level);
+                    asg.backtrack_sandbox();
                     if let Some(cj) = cid {
                         debug_assert!(cdb[cj].is(Flag::VIV_ASSUMED));
                         cdb.detach(cj);
@@ -180,8 +185,8 @@ pub fn vivify(
                 return Err(SolverError::Inconsistent);
             }
             0 => {
-                if !cdb[ci].is(Flag::DEAD) {
-                    cdb.detach(ci);
+                if !cdb[cs.cid].is(Flag::DEAD) {
+                    cdb.detach(cs.cid);
                     cdb.garbage_collect();
                     num_purge += 1;
                 }
@@ -200,8 +205,8 @@ pub fn vivify(
                     }
                     state[Stat::VivifiedVar] += 1;
                 }
-                debug_assert!(!cdb[ci].is(Flag::DEAD));
-                cdb.detach(ci);
+                debug_assert!(!cdb[cs.cid].is(Flag::DEAD));
+                cdb.detach(cs.cid);
                 cdb.garbage_collect();
             }
             n if n == clits.len() => (),
@@ -217,13 +222,13 @@ pub fn vivify(
                     cdb.handle(SolverEvent::Vivify(false));
                     cdb[cj].turn_on(Flag::VIVIFIED);
                     elim.to_simplify += 1.0 / ((n - 1) as f64).powf(1.6);
-                    debug_assert!(!cdb[ci].is(Flag::DEAD));
-                    cdb.detach(ci);
+                    debug_assert!(!cdb[cs.cid].is(Flag::DEAD));
+                    cdb.detach(cs.cid);
                     cdb.garbage_collect();
                 }
             }
         }
-        clauses.retain(|ci| !cdb[ci].is(Flag::DEAD));
+        clauses.retain(|ci| !cdb[ci.cid].is(Flag::DEAD));
     }
     asg.handle(SolverEvent::Vivify(false));
     if 0 < num_assert || 0 < num_purge || 0 < num_shrink {

@@ -201,15 +201,8 @@ impl ActivityIF<ClauseId> for ClauseDB {
     fn clear_reward(&mut self, cid: ClauseId) {
         self[cid].reward = 0.0;
     }
-    fn reward_at_unassign(&mut self, cid: ClauseId) {
-        let t = self.ordinal;
-        self.clause[cid.ordinal as usize].update_activity(
-            t,
-            self.activity_decay,
-            self.activity_anti_decay,
-        );
-    }
     fn reward_at_analysis(&mut self, cid: ClauseId) {
+        // Note: vivifier has its own conflict analyzer, which never call reward functions.
         let t = self.ordinal;
         self.clause[cid.ordinal as usize].update_activity(
             t,
