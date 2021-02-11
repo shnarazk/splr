@@ -209,6 +209,7 @@ impl PropagateIF for AssignStack {
             self.reason[vi] = AssignReason::default();
             self.insert_heap(vi);
         }
+        self.trail.truncate(lim);
         self.trail_lim.truncate(self.root_level as usize);
         self.q_head = self.q_head.min(lim);
     }
