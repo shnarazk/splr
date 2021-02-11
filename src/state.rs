@@ -527,12 +527,16 @@ impl StateIF for State {
         print!("{}", PROGRESS_REPORT_ROWS);
         print!("A\x1B[1G");
 
-        while let Some(m) = self.log_messages.pop() {
-            if self.config.no_color {
-                println!("{}", m);
-            } else {
-                println!("\x1B[2K\x1B[000m\x1B[034m{}\x1B[000m", m);
+        if self.config.show_journal {
+            while let Some(m) = self.log_messages.pop() {
+                if self.config.no_color {
+                    println!("{}", m);
+                } else {
+                    println!("\x1B[2K\x1B[000m\x1B[034m{}\x1B[000m", m);
+                }
             }
+        } else {
+            self.log_messages.clear();
         }
         println!("\x1B[2K{}", self);
         println!(

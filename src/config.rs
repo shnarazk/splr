@@ -74,6 +74,9 @@ pub struct Config {
     /// Disable any progress message
     pub quiet_mode: bool,
 
+    /// Show submodule logging report
+    pub show_journal: bool,
+
     /// Writes a DRAT UNSAT certification file
     pub use_certification: bool,
 
@@ -198,6 +201,7 @@ impl Default for Config {
             io_rfile: PathBuf::new(),
             no_color: false,
             quiet_mode: false,
+            show_journal: false,
             use_certification: false,
             use_log: false,
 
@@ -257,7 +261,9 @@ impl Config {
         let mut iter = args.skip(1);
         while let Some(arg) = iter.next() {
             if let Some(stripped) = arg.strip_prefix("--") {
-                let flags = ["no-color", "quiet", "certify", "log", "help", "version"];
+                let flags = [
+                    "no-color", "quiet", "certify", "journal", "log", "help", "version",
+                ];
                 let options_i32 = [
                     "ADP", "ELI", "LBY", "RDC", "RPH", "RSR", "STB", "STG", "VIV",
                 ];
@@ -286,6 +292,7 @@ impl Config {
                                 "no-color" => self.no_color = true,
                                 "quiet" => self.quiet_mode = true,
                                 "certify" => self.use_certification = true,
+                                "journal" => self.show_journal = true,
                                 "log" => self.use_log = true,
                                 "help" => help = true,
                                 "version" => version = true,
@@ -412,13 +419,14 @@ impl Config {
                     }
                 }
             } else if let Some(name) = arg.strip_prefix('-') {
-                let flags = ["C", "q", "c", "l", "h", "V"];
+                let flags = ["C", "q", "c", "j", "l", "h", "V"];
                 let options_path = ["o", "p", "r", "t"];
                 if flags.contains(&name) {
                     match name {
                         "C" => self.no_color = true,
                         "q" => self.quiet_mode = true,
                         "c" => self.use_certification = true,
+                        "j" => self.show_journal = true,
                         "l" => self.use_log = true,
                         "h" => help = true,
                         "V" => version = true,
@@ -467,6 +475,7 @@ FLAGS:
   -C, --no-color            Disable coloring
   -q, --quiet               Disable any progress message
   -c, --certify             Writes a DRAT UNSAT certification file
+  -j, --journal             Show sub-module logs
   -l, --log                 Uses Glucose-like progress report
   -V, --version             Prints version information
 OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m):
