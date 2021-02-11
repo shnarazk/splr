@@ -84,6 +84,7 @@ impl Default for AssignStack {
 
             occurrence_compression_rate: 0.5,
 
+            vivifying: false,
             vivify_sandbox: (0, 0, 0),
         }
     }
@@ -164,9 +165,11 @@ impl Instantiate for AssignStack {
             }
             SolverEvent::Vivify(start) => {
                 if start {
+                    self.vivifying = true;
                     self.vivify_sandbox =
                         (self.num_conflict, self.num_propagation, self.num_restart);
                 } else {
+                    self.vivifying = false;
                     self.num_conflict = self.vivify_sandbox.0;
                     self.num_propagation = self.vivify_sandbox.1;
                     self.num_restart = self.vivify_sandbox.2;

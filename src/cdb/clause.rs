@@ -19,6 +19,10 @@ pub trait ClauseIF {
     fn update_lbd<A>(&mut self, asg: &A, lbd_temp: &mut [usize]) -> usize
     where
         A: AssignIF;
+    /// return `true` if the clause should try vivification
+    fn to_vivify(&self) -> bool;
+    /// clear flags about vivification
+    fn vivified(&mut self);
 }
 
 impl Default for Clause {
@@ -133,6 +137,19 @@ impl ClauseIF for Clause {
             }
             self.rank = cnt;
             cnt as usize
+        }
+    }
+    fn to_vivify(&self) -> bool {
+        !self.is(Flag::DEAD)
+            && self.is(Flag::VIVIFIED) == self.is(Flag::VIVIFIED2)
+            && (self.is(Flag::LEARNT) || self.is(Flag::DERIVE20))
+            && 3 * (self.rank as usize) + self.len() <= 40
+    }
+    fn vivified(&mut self) {
+        self.turn_on(Flag::VIVIFIED);
+        self.turn_off(Flag::VIVIFIED2);
+        if !self.is(Flag::LEARNT) {
+            self.turn_off(Flag::DERIVE20);
         }
     }
 }

@@ -12,6 +12,17 @@ use {
     std::borrow::Cow,
 };
 
+fn distortion(asg: &mut AssignStack, c: &Clause) -> usize {
+    let mut low: f64 = 1.0;
+    let mut high: f64 = 0.0;
+    for lit in c.iter() {
+        let a = asg.activity(lit.vi());
+        low = low.min(a);
+        high = high.max(a);
+    }
+    (1_000_000.0 * (1.0 - high + low)) as usize
+}
+
 /// vivify clauses in `cdb` under `asg`
 pub fn vivify(
     asg: &mut AssignStack,
@@ -20,13 +31,19 @@ pub fn vivify(
     state: &mut State,
 ) -> MaybeInconsistent {
     let mut clauses: Vec<ClauseId> = Vec::new();
-    for (i, c) in cdb.iter_mut().enumerate().skip(1) {
-        if c.len() == c.rank as usize && c.to_vivify() {
+    let mut num_clause = 0;
+    for (i, c) in cdb.iter().enumerate().skip(1) {
+        if !c.is(Flag::DEAD) {
+            num_clause += 1;
+        }
+        if c.to_vivify() {
             clauses.push(ClauseId::from(i));
         }
     }
+    clauses.sort_by_cached_key(|cid| distortion(asg, &cdb[*cid]));
     // clauses.sort_by_cached_key(|cid| cdb[*cid].rank);
-    clauses.sort_by_cached_key(|cid| (100_000.0 / cdb.activity(*cid)) as usize);
+    // clauses.sort_by_cached_key(|cid| cdb[*cid].rank);
+    /* clauses.sort_by_cached_key(|cid| (100_000.0 / cdb.activity(*cid)) as usize);
     {
         let mut act: f64 = 0.0;
         for ci in &clauses {
@@ -34,13 +51,19 @@ pub fn vivify(
         }
         act *= 0.5;
         clauses.retain(|ci| act <= cdb.activity(*ci));
-    }
+    } */
 
-    // clauses.resize(clauses.len() / num_to_vivify, ClauseId::default());
-    let num_target = clauses.len();
-    if num_target == 0 {
+    // 1000 => \inf
+    // 2.5K => 20K
+    // 50K => 2K
+    // 1M => 200
+    if clauses.len() == 0 {
         return Ok(());
     }
+    let num_target = clauses
+        .len()
+        .min(5_000_000_000 / ((num_clause as f64).powf(1.2) as usize));
+    clauses.resize(num_target, ClauseId::default());
     asg.handle(SolverEvent::Vivify(true));
     state[Stat::Vivification] += 1;
 
@@ -53,7 +76,7 @@ pub fn vivify(
     let mut num_purge = 0;
     let mut num_shrink = 0;
     let mut num_assert = 0;
-    let mut to_display = display_step;
+    let mut to_display = 0;
 
     while let Some(ci) = clauses.pop() {
         let c: &mut Clause = &mut cdb[ci];
@@ -61,12 +84,8 @@ pub fn vivify(
         if c.is(Flag::DEAD) {
             continue;
         }
-        c.turn_on(Flag::VIVIFIED);
-        c.turn_off(Flag::VIVIFIED2);
         let is_learnt = c.is(Flag::LEARNT);
-        if !is_learnt {
-            c.turn_off(Flag::DERIVE20);
-        }
+        c.vivified();
         let clits = c.lits.clone();
         let mut copied: Vec<Lit> = Vec::new();
         let mut flipped = true;
@@ -211,8 +230,14 @@ pub fn vivify(
         state.log(
             state[Stat::Vivification],
             format!(
-                "vivification target:{:>4}, assert:{:>4}, purge:{:>4}, shrink:{:>4}",
-                num_check, num_assert, num_purge, num_shrink
+                // "vivify #cls:{:>6}, assert:{:>6}, purge:{:>6}, shrink:{:>6}",
+                // "vivify target:{:>5}, assert:{:>5}, purged:{:>5}, shrink:{:>5}",
+                "vivification #:{:>6}, assert:{:>5}, purge:{:>5}, shrink:{:>5}",
+                // "vivification target:{:>4}, assert:{:>4}, purge:{:>4}, shrink:{:>4}",
+                num_check,
+                num_assert,
+                num_purge,
+                num_shrink
             ),
         );
     }
@@ -224,16 +249,6 @@ fn flip(vec: &mut [Lit]) -> &mut [Lit] {
         *l = !*l;
     }
     vec
-}
-
-impl Clause {
-    fn to_vivify(&self) -> bool {
-        if self.is(Flag::DEAD) {
-            return false;
-        }
-        self.is(Flag::VIVIFIED) == self.is(Flag::VIVIFIED2)
-            && (self.is(Flag::LEARNT) || self.is(Flag::DERIVE20))
-    }
 }
 
 impl AssignStack {

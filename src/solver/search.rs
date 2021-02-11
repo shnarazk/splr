@@ -223,6 +223,7 @@ fn search(
     let use_vivify = state.config.use_vivify();
     let mut parity = false;
     let mut last_core = 0;
+    let mut num_asserted = 0;
     rst.update(ProgressUpdate::Luby);
     rst.update(ProgressUpdate::Remain(asg.num_vars - asg.num_asserted_vars));
 
@@ -301,15 +302,22 @@ fn search(
                     if cdb.reduce(asg, asg.num_conflict) {
                         state.to_vivify += 0.5;
                         elim.to_simplify *= 1.2;
+                    } else {
+                        state.to_vivify += 0.1;
                     }
-                    if use_vivify && 1.0 <= state.to_vivify {
-                        state.to_vivify = 0.0;
-                        if vivify(asg, cdb, elim, state).is_err() {
-                            // return Err(SolverError::UndescribedError);
-                            analyze_final(asg, state, &cdb[ci]);
-                            return Ok(false);
+                    if use_vivify {
+                        if 1.0 <= state.to_vivify
+                            && (num_asserted == asg.exports().1 || 10.0 <= state.to_vivify)
+                        {
+                            if vivify(asg, cdb, elim, state).is_err() {
+                                // return Err(SolverError::UndescribedError);
+                                analyze_final(asg, state, &cdb[ci]);
+                                return Ok(false);
+                            }
+                            elim.to_simplify *= 1.2;
+                            state.to_vivify = 0.0;
                         }
-                        elim.to_simplify *= 1.2;
+                        num_asserted = asg.exports().1;
                     }
                     // Simplification has been postponed because chronoBT was used.
                     // `elim.to_simplify` is increased much in particular
