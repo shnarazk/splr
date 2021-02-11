@@ -287,7 +287,7 @@ fn search(
                                     r.3,
                                     v.4,
                                     s,
-                                    asg.num_conflict as f64 / asg.exports().2 as f64,
+                                    asg.exports_box().2.get(),
                                 ),
                             );
                             last_core = v.4;
@@ -365,7 +365,6 @@ fn search(
         if !asg.remains() {
             let lit = asg.select_decision_literal();
             asg.assign_by_decision(lit);
-            state[Stat::Decision] += 1;
             a_decision_was_made = true;
         }
     }

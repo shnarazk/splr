@@ -65,9 +65,13 @@ impl Default for AssignStack {
             num_vars: 0,
             num_asserted_vars: 0,
             num_eliminated_vars: 0,
-            num_conflict: 0,
+            num_decision: 0,
             num_propagation: 0,
+            num_conflict: 0,
             num_restart: 0,
+            dpc_ema: EmaSU::new(100),
+            ppc_ema: EmaSU::new(100),
+            cpr_ema: EmaSU::new(100),
 
             ordinal: 0,
             var: Vec::new(),
@@ -180,26 +184,26 @@ impl Instantiate for AssignStack {
     }
 }
 
-impl Export<(usize, usize, usize, f64), ()> for AssignStack {
+impl Export<(usize, usize, usize, usize), ()> for AssignStack {
     /// exports:
-    ///  1. the number of conflicts
+    ///  1. the number of decision
     ///  1. the number of propagations
+    ///  1. the number of conflicts
     ///  1. the number of restarts
-    ///  1. `activity_decay`
     ///
     ///```
     /// use crate::{splr::config::Config, splr::types::*};
     /// use crate::splr::assign::AssignStack;
     /// let asg = AssignStack::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (asg_num_conflict, asg_num_propagation, asg_num_restart, asg_activity_decay) = asg.exports();
+    /// let (num_decsion, num_propagation, num_conflict, num_restart) = asg.exports();
     ///```
     #[inline]
-    fn exports(&self) -> (usize, usize, usize, f64) {
+    fn exports(&self) -> (usize, usize, usize, usize) {
         (
-            self.num_conflict,
+            self.num_decision,
             self.num_propagation,
+            self.num_conflict,
             self.num_restart,
-            self.activity_decay,
         )
     }
     fn mode(&self) {}

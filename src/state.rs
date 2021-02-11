@@ -37,9 +37,12 @@ pub trait StateIF {
     /// write a header of stat data to stdio.
     fn progress_header(&mut self);
     /// write stat data to stdio.
-    fn progress<'r, A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &'r R)
+    fn progress<'a, 'r, A, C, E, R>(&mut self, asg: &'a A, cdb: &C, elim: &E, rst: &'r R)
     where
-        A: AssignIF + VarSelectIF + Export<(usize, usize, usize, f64), ()>,
+        A: AssignIF
+            + VarSelectIF
+            + Export<(usize, usize, usize, usize), ()>
+            + ExportBox<'a, (&'a Ema, &'a Ema, &'a Ema)>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>;
@@ -158,8 +161,6 @@ impl SearchStrategy {
 /// stat index.
 #[derive(Clone, Eq, PartialEq)]
 pub enum Stat {
-    /// the number of decision
-    Decision,
     /// the number of 'no decision conflict'
     NoDecisionConflict,
     /// the number of vivification
@@ -419,7 +420,8 @@ impl StateIF for State {
         if !self.config.use_adaptive() {
             return;
         }
-        let (asg_num_conflict, _num_propagation, _num_restart, _) = asg.exports();
+        let (asg_num_decision, asg_num_propagation, asg_num_conflict, asg_num_restart) =
+            asg.exports();
         let (_active, _bi_clause, cdb_num_bi_learnt, cdb_num_lbd2, _learnt, _reduction) =
             cdb.exports();
         debug_assert_eq!(self.strategy.0, SearchStrategy::Initial);
@@ -470,9 +472,12 @@ impl StateIF for State {
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
-    fn progress<'r, A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &'r R)
+    fn progress<'a, 'r, A, C, E, R>(&mut self, asg: &'a A, cdb: &C, elim: &E, rst: &'r R)
     where
-        A: AssignIF + VarSelectIF + Export<(usize, usize, usize, f64), ()>,
+        A: AssignIF
+            + VarSelectIF
+            + Export<(usize, usize, usize, usize), ()>
+            + ExportBox<'a, (&'a Ema, &'a Ema, &'a Ema)>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>,
@@ -492,7 +497,9 @@ impl StateIF for State {
             asg_unreachables,
         ) = asg.var_stats();
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let (asg_num_conflict, asg_num_propagation, asg_num_restart, _asg_act_dcy) = asg.exports();
+        let (asg_num_decision, asg_num_propagation, asg_num_conflict, _asg_num_restart) =
+            asg.exports();
+        let (asg_dpc_ema, asg_ppc_ema, asg_cpr_ema) = *asg.exports_box();
 
         let (cdb_num_active, cdb_num_biclause, _num_bl, cdb_num_lbd2, cdb_num_learnt, _cdb_nr) =
             cdb.exports();
@@ -531,12 +538,7 @@ impl StateIF for State {
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{}",
             i!("{:>11}", self, LogUsizeId::NumConflict, asg_num_conflict),
-            i!(
-                "{:>13}",
-                self,
-                LogUsizeId::NumDecision,
-                self[Stat::Decision]
-            ),
+            i!("{:>13}", self, LogUsizeId::NumDecision, asg_num_decision),
             i!(
                 "{:>15}",
                 self,
@@ -616,7 +618,7 @@ impl StateIF for State {
                 "{:>9.2}",
                 self,
                 LogF64Id::DecisionPerConflict,
-                self[Stat::Decision] as f64 / asg_num_conflict as f64
+                asg_dpc_ema.get()
             ),
         );
         println!(
@@ -628,7 +630,7 @@ impl StateIF for State {
                 "{:>9.2}",
                 self,
                 LogF64Id::PropagationPerConflict,
-                asg_num_propagation as f64 / asg_num_conflict as f64
+                asg_ppc_ema.get()
             ),
         );
         println!(
@@ -645,7 +647,7 @@ impl StateIF for State {
                 "{:>9.2}",
                 self,
                 LogF64Id::ConflictPerRestart,
-                asg_num_conflict as f64 / asg_num_restart as f64
+                asg_cpr_ema.get()
             )
         );
         #[cfg(feature = "strategy_adaptation")]
@@ -742,7 +744,7 @@ impl State {
     }
     fn dump<A, C, R>(&mut self, asg: &A, cdb: &C, rst: &R)
     where
-        A: AssignIF + Export<(usize, usize, usize, f64), ()>,
+        A: AssignIF + Export<(usize, usize, usize, usize), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         R: RestartIF,
     {
@@ -755,7 +757,7 @@ impl State {
             _,
         ) = asg.var_stats();
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let (asg_num_conflict, _num_propagation, asg_num_restart, _) = asg.exports();
+        let (_num_decision, _num_propagation, asg_num_conflict, asg_num_restart) = asg.exports();
         let (
             cdb_num_active,
             _num_bi_clause,
@@ -799,7 +801,7 @@ impl State {
             _,
         ) = asg.var_stats();
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let (_num_conflict, _num_propagation, asg_num_restart, _) = asg.exports();
+        let (_num_decsion, _num_propagation, _num_conflict, asg_num_restart) = asg.exports();
         let (
             cdb_num_active,
             _num_bi_clause,

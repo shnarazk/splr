@@ -139,9 +139,13 @@ pub struct AssignStack {
     pub num_asserted_vars: usize,
     /// the number of eliminated vars.
     pub num_eliminated_vars: usize,
-    pub num_conflict: usize,
+    num_decision: usize,
     num_propagation: usize,
+    pub num_conflict: usize,
     num_restart: usize,
+    dpc_ema: EmaSU,
+    ppc_ema: EmaSU,
+    cpr_ema: EmaSU,
 
     //
     //## Var DB
@@ -192,4 +196,14 @@ pub struct VarIdHeap {
     /// VarId : -> order : usize -- How good is the var?
     /// `idxs[0]` holds the number of alive elements
     idxs: Vec<usize>,
+}
+
+impl<'a> ExportBox<'a, (&'a Ema, &'a Ema, &'a Ema)> for AssignStack {
+    fn exports_box(&'a self) -> Box<(&'a Ema, &'a Ema, &'a Ema)> {
+        Box::from((
+            self.dpc_ema.get_ema(),
+            self.ppc_ema.get_ema(),
+            self.cpr_ema.get_ema(),
+        ))
+    }
 }

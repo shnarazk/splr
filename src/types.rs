@@ -489,6 +489,37 @@ impl Ema2 {
     }
 }
 
+/// Ema of Sequence of usize
+#[derive(Clone, Debug)]
+pub struct EmaSU {
+    last: f64,
+    ema: Ema,
+}
+
+impl EmaIF for EmaSU {
+    type Input = usize;
+    fn update(&mut self, x: Self::Input) {
+        let diff: f64 = x as f64 - self.last;
+        self.ema.update(diff);
+        self.last = x as f64;
+    }
+    fn get(&self) -> f64 {
+        self.ema.get()
+    }
+}
+
+impl EmaSU {
+    pub fn new(s: usize) -> Self {
+        EmaSU {
+            last: 0.0,
+            ema: Ema::new(s),
+        }
+    }
+    pub fn get_ema(&self) -> &Ema {
+        &self.ema
+    }
+}
+
 /// Internal errors.
 /// Note: returning `Result<(), a-singleton>` is identical to returning `bool`.
 #[derive(Debug, Eq, PartialEq)]

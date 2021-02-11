@@ -142,6 +142,7 @@ impl PropagateIF for AssignStack {
         self.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
+        self.num_decision += 1;
     }
     fn assign_by_unitclause(&mut self, l: Lit) {
         self.cancel_until(self.root_level);
@@ -191,6 +192,7 @@ impl PropagateIF for AssignStack {
         self.q_head = self.q_head.min(lim);
         if lv == self.root_level {
             self.num_restart += 1;
+            self.cpr_ema.update(self.num_conflict);
         }
     }
     /// UNIT PROPAGATION.
@@ -294,6 +296,8 @@ impl PropagateIF for AssignStack {
                         let cid = w.c;
                         self.last_conflict = false_lit.vi();
                         self.num_conflict += 1;
+                        self.dpc_ema.update(self.num_decision);
+                        self.ppc_ema.update(self.num_propagation);
                         return cid;
                     }
                     let lv = lits[1..]
