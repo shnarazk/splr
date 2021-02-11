@@ -8,6 +8,7 @@
 - disable re-phasing and vivification by default
 - recycle `Watch` data
 - handle `--no-color` and `--quiet` correctly
+- add command line option: --journal
 
 ## 0.6.2, 2021-01-20
 
