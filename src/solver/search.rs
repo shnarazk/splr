@@ -307,7 +307,7 @@ fn search(
                     }
                     if use_vivify {
                         if 1.0 <= state.to_vivify
-                            && (num_asserted == asg.exports().1 || 10.0 <= state.to_vivify)
+                        // && (num_asserted == asg.var_stats().1 || 10.0 <= state.to_vivify)
                         {
                             if vivify(asg, cdb, elim, state).is_err() {
                                 // return Err(SolverError::UndescribedError);
@@ -317,7 +317,7 @@ fn search(
                             elim.to_simplify *= 1.2;
                             state.to_vivify = 0.0;
                         }
-                        num_asserted = asg.exports().1;
+                        num_asserted = asg.var_stats().1;
                     }
                     // Simplification has been postponed because chronoBT was used.
                     // `elim.to_simplify` is increased much in particular
