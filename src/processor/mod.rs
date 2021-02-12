@@ -135,7 +135,7 @@ impl Export<(usize, usize, f64), ()> for Eliminator {
 }
 
 /// Mapping from Literal to Clauses.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct LitOccurs {
     aborted: bool,
     pos_occurs: Vec<ClauseId>,
@@ -185,14 +185,14 @@ impl LitOccurs {
 /// - both fields has a fixed length. Don't use push and pop.
 /// - `idxs[0]` contains the number of alive elements
 ///   `indx` is positions. So the unused field 0 can hold the last position as a special case.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct VarOccHeap {
     heap: Vec<VarId>, // order : usize -> VarId
     idxs: Vec<usize>, // VarId : -> order : usize
 }
 
 /// Literal eliminator
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Eliminator {
     pub enable: bool,
     pub to_simplify: f64,
@@ -652,6 +652,7 @@ impl Eliminator {
                 break;
             }
         }
+        self.num_full_elimination += 1;
         Ok(())
     }
     /// do the elimination task
@@ -669,7 +670,6 @@ impl Eliminator {
         if self.mode == EliminatorMode::Dormant {
             return Ok(());
         }
-        self.num_full_elimination += 1;
         let mut timedout: usize = {
             let nv = asg.var_stats().3 as f64; // un-asserted vars
             let nc = cdb.count() as f64;

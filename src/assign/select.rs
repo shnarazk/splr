@@ -2,7 +2,7 @@
 use crate::state::StagingTarget;
 /// Decision var selection
 use {
-    super::{AssignStack, Var, VarHeapIF, VarOrderIF, VarRewardIF},
+    super::{AssignStack, Var, VarHeapIF, VarOrderIF},
     crate::types::*,
 };
 
@@ -88,10 +88,10 @@ impl VarSelectIF for AssignStack {
             return;
         } else if target == StagingTarget::AutoSelect {
             self.stage_mode_select += 1;
-            let n = self.num_unreachables().next_power_of_two().count_zeros() as usize;
+            let n = self.num_unreachables().next_power_of_two().trailing_zeros() as usize;
             match self.stage_mode_select % n {
-                1 => target = StagingTarget::Best(0),
-                2 => target = StagingTarget::Random,
+                2 => target = StagingTarget::Best(0),
+                8 => target = StagingTarget::Random,
                 // 3 => target = StagingTarget::Core,
                 // 4 => target = StagingTarget::LastAssigned,
                 _ => target = StagingTarget::Clear,

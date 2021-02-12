@@ -23,8 +23,8 @@ const GREEN: &str = "\x1B[001m\x1B[032m";
 const BLUE: &str = "\x1B[001m\x1B[034m";
 const RESET: &str = "\x1B[000m";
 
-fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
-    if quiet {
+fn colored(v: Result<bool, &SolverError>, no_color: bool) -> Cow<'static, str> {
+    if no_color {
         match v {
             Ok(false) => Cow::Borrowed("s UNSATISFIABLE"),
             Ok(true) => Cow::Borrowed("s SATISFIABLE"),
@@ -32,8 +32,8 @@ fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
         }
     } else {
         match v {
-            Ok(false) => Cow::from(format!("{}s UNSATISFIABLE{}", GREEN, RESET)),
-            Ok(true) => Cow::from(format!("{}s SATISFIABLE{}", BLUE, RESET)),
+            Ok(false) => Cow::from(format!("{}s UNSATISFIABLE{}", BLUE, RESET)),
+            Ok(true) => Cow::from(format!("{}s SATISFIABLE{}", GREEN, RESET)),
             Err(_) => Cow::from(format!("{}s UNKNOWN{}", RED, RESET)),
         }
     }
@@ -66,12 +66,12 @@ fn main() {
     if let Ok(val) = env::var("SPLR_TIMEOUT") {
         if let Ok(timeout) = val.parse::<u64>() {
             let input = cnf_file.as_ref().to_string();
-            let quiet_mode = config.quiet_mode;
+            let no_color = config.no_color;
             thread::spawn(move || {
                 thread::sleep(Duration::from_millis(timeout * 1000));
                 println!(
                     "{} (TimeOut): {}",
-                    colored(Err(&SolverError::TimeOut), quiet_mode),
+                    colored(Err(&SolverError::TimeOut), no_color),
                     input
                 );
                 std::process::exit(0);
@@ -116,18 +116,16 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
     match res {
         Ok(Certificate::SAT(v)) => {
             match output {
-                Some(ref f) if redirect => println!(
+                Some(ref f) if redirect && !s.state.config.quiet_mode => println!(
                     "      Result|dump: to STDOUT instead of {} due to an IO error.",
                     f.to_string_lossy(),
                 ),
-                Some(ref f) => println!("      Result|file: {}", f.to_str().unwrap(),),
+                Some(ref f) if !s.state.config.quiet_mode => {
+                    println!("      Result|file: {}", f.to_str().unwrap(),)
+                }
                 _ => (),
             }
-            println!(
-                "{}: {}",
-                colored(Ok(true), s.state.config.quiet_mode),
-                input
-            );
+            println!("{}: {}", colored(Ok(true), s.state.config.no_color), input);
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
@@ -148,11 +146,13 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
         }
         Ok(Certificate::UNSAT) => {
             match output {
-                Some(ref f) if redirect => println!(
+                Some(ref f) if redirect && !s.state.config.quiet_mode => println!(
                     "      Result|dump: to STDOUT instead of {} due to an IO error.",
                     f.to_string_lossy(),
                 ),
-                Some(ref f) => println!("      Result|file: {}", f.to_str().unwrap(),),
+                Some(ref f) if !s.state.config.quiet_mode => {
+                    println!("      Result|file: {}", f.to_str().unwrap(),)
+                }
                 _ => (),
             }
             if s.state.config.use_certification {
@@ -163,11 +163,7 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                     s.state.config.io_pfile.to_string_lossy()
                 );
             }
-            println!(
-                "{}: {}",
-                colored(Ok(false), s.state.config.quiet_mode),
-                input
-            );
+            println!("{}: {}", colored(Ok(false), s.state.config.no_color), input);
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
@@ -185,16 +181,18 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
         }
         Err(e) => {
             match output {
-                Some(ref f) if redirect => println!(
+                Some(ref f) if redirect && !s.state.config.quiet_mode => println!(
                     "      Result|dump: to STDOUT instead of {} due to an IO error.",
                     f.to_string_lossy(),
                 ),
-                Some(ref f) => println!("      Result|file: {}", f.to_str().unwrap(),),
+                Some(ref f) if !s.state.config.quiet_mode => {
+                    println!("      Result|file: {}", f.to_str().unwrap(),)
+                }
                 _ => (),
             }
             println!(
                 "{} ({}): {}",
-                colored(Err(e), s.state.config.quiet_mode),
+                colored(Err(e), s.state.config.no_color),
                 e,
                 input
             );

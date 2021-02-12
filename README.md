@@ -34,7 +34,7 @@ _Warning: Version 0.6.0 isn't the best version._ It changed most modules like va
 
 ## Install
 
-Just run `cargo install splr --features cli` after installing the latest [cargo](https://www.rust-lang.org/tools/install).
+Just run `cargo install splr` after installing the latest [cargo](https://www.rust-lang.org/tools/install).
 Two executables will be installed:
 
 - `splr` -- the solver
@@ -47,9 +47,6 @@ defined by [SAT competition 2011 rules](http://www.satcompetition.org/2011/rules
 
 ```plain
 $ splr tests/uf250-02.cnf 
-[       512] Lcycle:     1, core:      135, #ion:         6, /cpr:   256.00
-[      1792] Lcycle:     2, core:      132, #ion:         3, /cpr:   358.40
-[      6144] Lcycle:     3, core:      114, #ion:         1, /cpr:   512.00
 uf250-02.cnf                                       250,1065 |time:     0.12
  #conflict:       6286, #decision:         7133, #propagate:         267271
   Assignment|#rem:      244, #ass:        0, #elm:        6, prg%:   2.4000
@@ -261,15 +258,15 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 | `Lcyc`       | the number of Lucy-based rephrasing cycle                                                 |
 | `tLBD`       | the trend rate of learn clause's LBD                                                      |
 | `core`       | the least number of unassigned vars                                                       |
-| `/dpc`       | decisions per conflict                                                                    |
+| `/dpc`       | the EMA of decisions per conflict                                                                    |
 | `eLBD`       | the EMA, Exponential Moving Average, of learn clauses' LBDs                               |
 | `cnfl`       | the EMA of decision levels at which conflicts occur                                       |
 | `bjmp`       | the EMA of decision levels to which backjumps go                                          |
-| `/ppc`       | propagations per conflict                                                                 |
+| `/ppc`       | the EMA of propagations per conflict                                                                 |
 | `elim`       | the number of invocations of clause/var elimination                                       |
 | `cviv`       | the number of invocations of clause vivification                                          |
 | `#vbv`       | the number of vars which were asserted by clause vivification                             |
-| `/cpr`       | conflicts per restart                                                                     |
+| `/cpr`       | the EMA of conflicts per restart                                                                     |
 | `mode`       | Selected strategy's id                                                                    |
 | `time`       | the elapsed CPU time in seconds                                                           |
 | `#ion`       | the number of vars with high activities but aren't involved in best phase                 |
@@ -288,50 +285,53 @@ A modern CDCL SAT solver in Rust
 USAGE:
   splr [FLAGS] [OPTIONS] <cnf-file>
 FLAGS:
-  -h, --help               Prints help information
-  -C, --no-color           Disable coloring
-  -q, --quiet              Disable any progress message
-  -c, --certify            Writes a DRAT UNSAT certification file
-  -l, --log                Uses Glucose-like progress report
-  -V, --version            Prints version information
+  -h, --help                Prints help information
+  -C, --no-color            Disable coloring
+  -q, --quiet               Disable any progress message
+  -c, --certify             Writes a DRAT UNSAT certification file
+  -j, --journal             Show sub-module logs
+  -l, --log                 Uses Glucose-like progress report
+  -V, --version             Prints version information
 OPTIONS (red options depend on features in Cargo.toml):
-      --ADP <a-adaptive>   Strategy adaptation switch              0
-      --ELI <a-elim>       Eliminator switch                       1
-      --LBY <a-luby>       Use Luby series for restart             0
-      --RDC <a-reduce>     Clause reduction switch                 1
-      --RPH <a-rephase>    Re-phase switch                         1
-      --RSR <a-rsr>        Reason-Side Rewarding switch            1
-      --STB <a-stabilize>  Stabilization switch                    1
-      --STG <a-stage>      Stage switch                            1
-      --VIV <a-vivify>     Vivification switch                     0
-      --cbt <c-cbt-thr>    Dec. lvl to use chronoBT              100
-      --cl <c-cls-lim>     Soft limit of #clauses (6MC/GB)         0
-      --ii <c-ip-int>      #cls to start in-processor          10000
-  -t, --timeout <c-tout>   CPU time limit in sec.               5000
-      --ecl <elm-cls-lim>  Max #lit for clause subsume            32
-      --evl <elm-grw-lim>  Grow limit of #cls in var elim.         0
-      --evo <elm-var-occ>  Max #cls for var elimination         8192
-  -o, --dir <io-odir>      Output directory                         .
-  -p, --proof <io-pfile>   DRAT Cert. filename                 proof.out
-  -r, --result <io-rfile>  Result filename/stdout                       
-      --ral <rst-asg-len>  Length of assign. fast EMA             32
-      --ras <rst-asg-slw>  Length of assign. slow EMA          10000
-      --rat <rst-asg-thr>  Blocking restart threshold              0.10
-      --rct <rst-ccc-thr>  Conflict Correlation threshold          0.00
-      --rll <rst-lbd-len>  Length of LBD fast EMA                 32
-      --rls <rst-lbd-slw>  Length of LBD slow EMA               8192
-      --rlt <rst-lbd-thr>  Forcing restart threshold               1.20
-      --rms <rst-mld-scl>  Scaling for Max LBD of Dep.             0.00
-      --rmt <rst-mld-thr>  Threshold for Max LBD of Dep.           0.00
-      --rse <rst-stb-exp>  Stabilizer expansion scale              1.00
-      --rss <rst-stb-scl>  Stabilizer scaling                      2.00
-      --rs  <rst-step>     #conflicts between restarts            24
-      --srd <stg-rwd-dcy>  Decay rate for staged vare reward       0.50
-      --srv <stg-rwd-val>  Extra reward for staged vars            1.00
-      --vit <viv-thr>      #clause to try to vivify              200
-      --vri <vrw-dcy-beg>  Initial var reward decay                0.00
-      --vrm <vrw-dcy-end>  Maximum var reward decay                0.00
-      --vro <vrw-occ-cmp>  Occ. compression rate in LR             0.00
+      --ADP <a-adaptive>    Strategy adaptation switch              0
+      --ELI <a-elim>        Eliminator switch                       1
+      --LBY <a-luby>        Use Luby series for restart             0
+      --RDC <a-reduce>      Clause reduction switch                 1
+      --RPH <a-rephase>     Re-phase switch                         0
+      --RSR <a-rsr>         Reason-Side Rewarding switch            1
+      --STB <a-stabilize>   Stabilization switch                    1
+      --STG <a-stage>       Stage switch                            1
+      --VIV <a-vivify>      Vivification switch                     0
+      --cbt <c-cbt-thr>     Dec. lvl to use chronoBT              100
+      --cdr <crw-dcy-rat>   Clause reward decay                     0.98
+      --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB)         0
+      --ii <c-ip-int>       #cls to start in-processor          10000
+  -t, --timeout <c-timeout> CPU time limit in sec.               5000
+      --ecl <elm-cls-lim>   Max #lit for clause subsume            32
+      --evl <elm-grw-lim>   Grow limit of #cls in var elim.         0
+      --evo <elm-var-occ>   Max #cls for var elimination         8192
+  -o, --dir <io-odir>       Output directory                         .
+  -p, --proof <io-pfile>    DRAT Cert. filename                 proof.out
+  -r, --result <io-rfile>   Result filename/stdout
+      --ral <rst-asg-len>   Length of assign. fast EMA             24
+      --ras <rst-asg-slw>   Length of assign. slow EMA           8192
+      --rat <rst-asg-thr>   Blocking restart threshold              0.20
+      --rct <rst-ccc-thr>   Conflict Correlation threshold          0.00
+      --rll <rst-lbd-len>   Length of LBD fast EMA                 24
+      --rls <rst-lbd-slw>   Length of LBD slow EMA               8192
+      --rlt <rst-lbd-thr>   Forcing restart threshold               1.20
+      --rms <rst-mld-scl>   Scaling for Max LBD of Dep.             0.00
+      --rmt <rst-mld-thr>   Threshold for Max LBD of Dep.           0.00
+      --rse <rst-stb-exp>   Stabilizer expansion scale              1.00
+      --rss <rst-stb-scl>   Stabilizer scaling                      2.00
+      --rs  <rst-step>      #conflicts between restarts            24
+      --srd <stg-rwd-dcy>   Decay rate for staged var reward       0.50
+      --srv <stg-rwd-val>   Extra reward for staged vars            1.00
+      --vit <viv-thr>       #clause to try to vivify                1
+      --vdr <vrw-dcy-rat>   var reward decay                        0.96
+      --vri <vrw-dcy-beg>   Initial var reward decay                0.00
+      --vrm <vrw-dcy-end>   Maximum var reward decay                0.00
+      --vro <vrw-occ-cmp>   Occ. compression rate in LR             0.00
 ARGS:
   <cnf-file>    DIMACS CNF file
 ```

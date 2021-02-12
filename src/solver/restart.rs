@@ -57,13 +57,13 @@ pub trait RestartIF: Export<RestarterExports, (RestartMode, usize)> {
     /// check stabilization mode and  return:
     /// - `Some(parity_bit, just_start_a_new_cycle)` if a stabilization phase has just ended.
     /// - `None` otherwise.
-    fn stabilize(&mut self, now: usize) -> Option<(bool, bool)>;
+    fn stabilize(&mut self) -> Option<bool>;
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
 }
 
 /// An assignment history used for blocking restart.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct ProgressASG {
     enable: bool,
     ema: Ema2,
@@ -119,7 +119,7 @@ impl ProgressEvaluator for ProgressASG {
 }
 
 /// An EMA of learnt clauses' LBD, used for forcing restart.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct ProgressLBD {
     enable: bool,
     ema: Ema2,
@@ -176,7 +176,7 @@ impl ProgressEvaluator for ProgressLBD {
 
 #[cfg(feature = "progress_MLD")]
 /// An EMA of Maximum LBD of a Dependent graph, used in conflict analyze
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ProgressMLD {
     enable: bool,
     ema: Ema2,
@@ -245,7 +245,7 @@ impl ProgressMLD {
 
 #[cfg(feature = "progress_ACC")]
 /// An EMA of Activity-based Conflict Correlation, used for forcing restart.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct ProgressACC {
     enable: bool,
     ema: Ema2,
@@ -323,7 +323,7 @@ impl ProgressEvaluator for ProgressACC {
 }
 
 /// An EMA of decision level.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct ProgressLVL {
     ema: Ema2,
 }
@@ -357,7 +357,7 @@ impl ProgressEvaluator for ProgressLVL {
 }
 
 /// An implementation of Luby series.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct ProgressLuby {
     enable: bool,
     active: bool,
@@ -427,7 +427,7 @@ impl ProgressEvaluator for ProgressLuby {
     }
     fn shift(&mut self) {
         self.active = false;
-        self.next_restart = self.step * self.luby.next().unwrap();
+        self.next_restart = self.step * self.luby.next();
     }
 }
 
@@ -462,10 +462,9 @@ impl ProgressLuby {
 /// When an evaluator becomes active, we accept and shift it. But this blocker
 /// absorbs not only the forcing signal but also blocking signal.
 /// This exists in macro `reset`.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct GeometricStabilizer {
     enable: bool,
-    active: bool,
     longest_span: usize,
     luby: LubySeries,
     num_cycle: usize,
@@ -473,24 +472,20 @@ struct GeometricStabilizer {
     next_trigger: usize,
     reset_requested: bool,
     step: usize,
-    scale: usize,
     depth: f64,
 }
 
 impl Default for GeometricStabilizer {
     fn default() -> Self {
-        const STEP: usize = 128;
         GeometricStabilizer {
             enable: true,
-            active: false,
             longest_span: 1,
             luby: LubySeries::default(),
             num_cycle: 0,
             num_shift: 0,
-            next_trigger: STEP,
+            next_trigger: 1,
             reset_requested: false,
             step: 1,
-            scale: STEP,
             depth: 1.0,
         }
     }
@@ -509,7 +504,7 @@ impl fmt::Display for GeometricStabilizer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if !self.enable {
             write!(f, "Stabilizer(dead)")
-        } else if self.active && self.enable {
+        } else if self.enable {
             write!(
                 f,
                 "Stabilizer[step: {}, next:{}, on]",
@@ -526,8 +521,7 @@ impl fmt::Display for GeometricStabilizer {
 }
 
 impl GeometricStabilizer {
-    fn update(&mut self, now: usize) -> Option<(bool, bool)> {
-        const RELAXATION: usize = 16;
+    fn update(&mut self, now: usize) -> Option<bool> {
         if self.enable && self.next_trigger <= now {
             self.num_shift += 1;
             let mut new_cycle: bool = false;
@@ -535,34 +529,23 @@ impl GeometricStabilizer {
                 new_cycle = true;
                 self.num_cycle += 1;
                 self.longest_span = self.step;
-                if self.reset_requested && RELAXATION <= self.longest_span {
-                    // reset the sequence
-                    self.luby.reset();
-                    self.longest_span = 1;
-                    self.reset_requested = false;
-                }
             }
-            self.step = self.luby.next().unwrap();
-            self.active = !new_cycle;
-            if self.active {
-                self.next_trigger =
-                    now + ((self.step as f64).powf(self.depth) as usize) * self.scale;
-            } else {
-                self.next_trigger = now + self.step * self.scale;
-            }
-            Some((self.num_shift % 2 == 1, new_cycle))
-        } else {
-            None
+            self.step = self.luby.next();
+            self.next_trigger = now + self.longest_span / self.step;
+            return Some(new_cycle);
         }
+        if self.reset_requested {
+            self.luby.reset();
+            self.longest_span = 1;
+            self.step = self.luby.next();
+            self.reset_requested = false;
+            self.next_trigger = now;
+        }
+        None
     }
     fn span(&self) -> usize {
         self.step
     }
-    #[allow(dead_code)]
-    fn reset_progress(&mut self) {
-        self.reset_requested = true;
-    }
-
     #[cfg(feature = "luby_blocking")]
     fn new(enable: bool, scale: usize) -> Self {
         GeometricStabilizer {
@@ -575,7 +558,6 @@ impl GeometricStabilizer {
             next_trigger: scale,
             reset_requested: false,
             step: 1,
-            scale,
         }
     }
 }
@@ -665,7 +647,7 @@ impl ProgressEvaluator for ProgressBucket {
 }
 
 /// `Restarter` provides restart API and holds data about restart conditions.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Restarter {
     #[cfg(feature = "progress_ACC")]
     acc: ProgressACC,
@@ -690,6 +672,7 @@ pub struct Restarter {
     stb: GeometricStabilizer,
     after_restart: usize,
     restart_step: usize,
+    restart_waiting: usize,
     initial_restart_step: usize,
     stb_expansion_factor: f64,
 
@@ -726,6 +709,7 @@ impl Default for Restarter {
             stb: GeometricStabilizer::default(),
             after_restart: 0,
             restart_step: 0,
+            restart_waiting: 0,
             initial_restart_step: 0,
             stb_expansion_factor: 1.0,
 
@@ -769,7 +753,7 @@ impl Instantiate for Restarter {
                 {
                     self.luby_blocking.reset_progress();
                 }
-                // self.stb.reset_progress();
+                self.restart_waiting = self.stb.step;
             }
             SolverEvent::Restart => {
                 self.after_restart = 0;
@@ -787,8 +771,9 @@ pub enum RestartDecision {
     Block,
     /// We should restart now.
     Force,
-    /// TODO
-    Postpone,
+    // TODO
+    // Postpone,
+    #[cfg(feature = "pure_stabilization")]
     /// We are in stabilization mode.
     Stabilize,
 }
@@ -811,12 +796,16 @@ impl RestartIF for Restarter {
             self.acc.shift();
         }
 
-        if self.stb.active {
-            return Some(RestartDecision::Stabilize);
+        #[cfg(feature = "pure_stabilization")]
+        {
+            if self.stb.active {
+                return Some(RestartDecision::Stabilize);
+            }
         }
 
         if self.asg.is_active() {
             self.num_block += 1;
+            self.restart_waiting = 0;
             self.after_restart = 0;
 
             #[cfg(feature = "luby_blocking")]
@@ -834,12 +823,18 @@ impl RestartIF for Restarter {
             {
                 self.restart_step = self.initial_restart_step;
             }
-            return Some(RestartDecision::Force);
+            self.restart_waiting += 1;
+            if self.stb.step <= self.restart_waiting {
+                self.restart_waiting = 0;
+                return Some(RestartDecision::Force);
+            }
+            self.after_restart = 0;
         }
-        Some(RestartDecision::Postpone)
+        // Some(RestartDecision::Postpone)
+        None
     }
-    fn stabilize(&mut self, now: usize) -> Option<(bool, bool)> {
-        self.stb.update(now)
+    fn stabilize(&mut self) -> Option<bool> {
+        self.stb.update(self.num_restart + self.num_block)
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
@@ -850,15 +845,12 @@ impl RestartIF for Restarter {
             ProgressUpdate::Temperature(c) => {
                 self.stb.depth = 1.0 + self.stb_expansion_factor * c;
             }
-
             #[cfg(feature = "progress_ACC")]
             ProgressUpdate::ACC(val) => self.acc.update(val),
 
             ProgressUpdate::ASG(val) => self.asg.update(val),
             ProgressUpdate::LBD(val) => {
-                if !self.stb.active {
-                    self.lbd.update(val);
-                }
+                self.lbd.update(val);
             }
             ProgressUpdate::Luby => self.luby.update(0),
 
@@ -898,10 +890,10 @@ impl Export<RestarterExports, (RestartMode, usize)> for Restarter {
     }
     fn mode(&self) -> (RestartMode, usize) {
         (
-            match self.stb.active {
-                true => RestartMode::Stabilize,
-                false if self.luby.enable => RestartMode::Luby,
-                false => RestartMode::Dynamic,
+            if self.luby.enable {
+                RestartMode::Luby
+            } else {
+                RestartMode::Dynamic
             },
             self.stb.span(),
         )
@@ -911,12 +903,15 @@ impl Export<RestarterExports, (RestartMode, usize)> for Restarter {
 pub type RestarterEMAs<'a> = (&'a Ema2, &'a Ema2);
 
 impl<'a> ExportBox<'a, RestarterEMAs<'a>> for Restarter {
+    // returns references to EMAs:
+    // 1. asg
+    // 1. lbd
     fn exports_box(&'a self) -> Box<RestarterEMAs<'a>> {
         Box::from((&self.asg.ema, &self.lbd.ema))
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct LubySeries {
     index: usize,
     seq: isize,
@@ -940,7 +935,7 @@ impl fmt::Display for LubySeries {
 }
 
 impl LubySeries {
-    fn next(&mut self) -> Option<usize> {
+    fn next(&mut self) -> usize {
         self.index += 1;
         let mut seq = self.seq;
         let mut size = self.size;
@@ -956,7 +951,7 @@ impl LubySeries {
             seq -= 1;
             index %= size;
         }
-        Some(2usize.pow(seq as u32))
+        2usize.pow(seq as u32)
     }
     #[allow(dead_code)]
     fn reset(&mut self) {
@@ -993,9 +988,7 @@ mod tests {
         let v = vec![1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8];
         let mut l: Vec<usize> = vec![];
         for _ in 1..15 {
-            if let Some(x) = luby.next() {
-                l.push(x);
-            }
+            l.push(luby.next());
         }
         assert_eq!(l, v);
     }

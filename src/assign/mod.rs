@@ -24,29 +24,8 @@ use {
     std::{collections::HashMap, ops::Range, slice::Iter},
 };
 
-/// API for var rewarding.
-pub trait VarRewardIF {
-    /// return var's activity.
-    fn activity(&self, vi: VarId) -> f64;
-    /// initialize rewards based on an order of vars.
-    fn initialize_reward(&mut self, iterator: Iter<'_, usize>);
-    /// clear var's activity
-    fn clear_reward(&mut self, vi: VarId);
-    /// modify var's activity at conflict analysis in `conflict_analyze` in [`solver`](`crate::solver`).
-    fn reward_at_analysis(&mut self, vi: VarId);
-    /// modify var's activity at value assignment in unit propagation.
-    fn reward_at_assign(&mut self, vi: VarId);
-    /// modify var's activity at value un-assignment in [`cancel_until`](`crate::assign::PropagateIF::cancel_until`).
-    fn reward_at_unassign(&mut self, vi: VarId);
-    /// update internal counter.
-    fn reward_update(&mut self);
-    #[cfg(feature = "moving_var_reward_rate")]
-    /// update reward setting as a part of module adaptation.
-    fn adjust_reward(&mut self, state: &State);
-}
-
 /// API about assignment like [`decision_level`](`crate::assign::AssignIF::decision_level`), [`stack`](`crate::assign::AssignIF::stack`), [`best_assigned`](`crate::assign::AssignIF::best_assigned`), and so on.
-pub trait AssignIF: ClauseManipulateIF + PropagateIF + VarManipulateIF + VarRewardIF {
+pub trait AssignIF: ActivityIF<VarId> + ClauseManipulateIF + PropagateIF + VarManipulateIF {
     /// return a literal in the stack.
     fn stack(&self, i: usize) -> Lit;
     /// return literals in the range of stack.
@@ -90,7 +69,7 @@ pub enum AssignReason {
 }
 
 /// Object representing a variable.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Var {
     /// reverse conversion to index. Note `VarId` must be `usize`.
     pub index: VarId,
@@ -113,7 +92,7 @@ pub struct Var {
 }
 
 /// A record of assignment. It's called 'trail' in Glucose.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AssignStack {
     /// assigns of vars
     assign: Vec<Option<bool>>,
@@ -160,9 +139,13 @@ pub struct AssignStack {
     pub num_asserted_vars: usize,
     /// the number of eliminated vars.
     pub num_eliminated_vars: usize,
-    pub num_conflict: usize,
+    num_decision: usize,
     num_propagation: usize,
+    pub num_conflict: usize,
     num_restart: usize,
+    dpc_ema: EmaSU,
+    ppc_ema: EmaSU,
+    cpr_ema: EmaSU,
 
     //
     //## Var DB
@@ -177,6 +160,8 @@ pub struct AssignStack {
     //
     /// var activity decay
     activity_decay: f64,
+    /// its diff
+    activity_anti_decay: f64,
 
     #[cfg(feature = "moving_var_reward_rate")]
     /// maximum var activity decay
@@ -194,6 +179,7 @@ pub struct AssignStack {
     //
     //## Vivification
     //
+    during_vivification: bool,
     /// save old num_conflict, num_propagation, num_restart
     vivify_sandbox: (usize, usize, usize),
 }
@@ -203,11 +189,25 @@ pub struct AssignStack {
 // - both fields has a fixed length. Don't use push and pop.
 // - `idxs[0]` contains the number of alive elements
 //   `indx` is positions. So the unused field 0 can hold the last position as a special case.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct VarIdHeap {
     /// order : usize -> VarId, -- Which var is the n-th best?
     heap: Vec<VarId>,
     /// VarId : -> order : usize -- How good is the var?
     /// `idxs[0]` holds the number of alive elements
     idxs: Vec<usize>,
+}
+
+impl<'a> ExportBox<'a, (&'a Ema, &'a Ema, &'a Ema)> for AssignStack {
+    // returns references to EMAs:
+    // 1. dpc = decision / conflict
+    // 1. ppc = propagation / conflict
+    // 1. cpr = conflict / restart
+    fn exports_box(&'a self) -> Box<(&'a Ema, &'a Ema, &'a Ema)> {
+        Box::from((
+            self.dpc_ema.get_ema(),
+            self.ppc_ema.get_ema(),
+            self.cpr_ema.get_ema(),
+        ))
+    }
 }

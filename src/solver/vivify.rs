@@ -4,13 +4,28 @@ use {
     super::{SolverEvent, Stat, State},
     crate::{
         assign::{AssignIF, AssignStack, ClauseManipulateIF, PropagateIF, VarManipulateIF},
-        cdb::{ClauseDB, ClauseDBIF},
+        cdb::{ClauseDB, ClauseDBIF, ClauseIF},
         processor::Eliminator,
         state::StateIF,
         types::*,
     },
     std::borrow::Cow,
 };
+
+#[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
+struct ClauseProxy {
+    val: usize,
+    cid: ClauseId,
+}
+
+impl Default for ClauseProxy {
+    fn default() -> Self {
+        ClauseProxy {
+            val: 0,
+            cid: ClauseId::default(),
+        }
+    }
+}
 
 /// vivify clauses in `cdb` under `asg`
 pub fn vivify(
@@ -19,50 +34,55 @@ pub fn vivify(
     elim: &mut Eliminator,
     state: &mut State,
 ) -> MaybeInconsistent {
+    let mut clauses: Vec<ClauseProxy> = Vec::new();
+    let mut num_clause = 0;
+    for (i, c) in cdb.iter().enumerate().skip(1) {
+        if !c.is(Flag::DEAD) {
+            num_clause += 1;
+        }
+        if let Some(act_c) = c.to_vivify(60) {
+            let mut act_v: f64 = 0.0;
+            for l in c.iter() {
+                act_v = act_v.max(asg.activity(l.vi()));
+            }
+            if act_v * 1.4 < act_c {
+                clauses.push(ClauseProxy {
+                    val: (1_000_000.0 * (1.0 - act_c + act_v)) as usize,
+                    cid: ClauseId::from(i),
+                });
+            }
+        }
+    }
+    if clauses.is_empty() {
+        return Ok(());
+    }
+    clauses.sort_unstable();
+    let num_target = clauses
+        .len()
+        .min(5_000_000_000 / ((num_clause as f64).powf(1.15) as usize));
+    clauses.resize(num_target, ClauseProxy::default());
     asg.handle(SolverEvent::Vivify(true));
     state[Stat::Vivification] += 1;
+
     let dl = asg.decision_level();
     debug_assert_eq!(dl, 0);
     // This is a reusable vector to reduce memory consumption, the key is the number of invocation
     let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
-    let mut check_thr = state.vivify_thr;
-    let check_max = 4 * state.vivify_thr;
-    let display_step: usize = 250.max(check_thr / 5);
+    let display_step: usize = 1000;
     let mut num_check = 0;
     let mut num_purge = 0;
     let mut num_shrink = 0;
     let mut num_assert = 0;
-    let mut to_display = display_step;
-    let mut clauses: Vec<ClauseId> = Vec::new();
-    for (i, c) in cdb.iter_mut().enumerate().skip(1) {
-        if c.to_vivify() {
-            clauses.push(ClauseId::from(i));
-        }
-    }
-    /*
-    clauses.sort_by_cached_key(|c| {
-        cdb[c]
-            .iter()
-            .map(|l| (asg.activity(l.vi()) * -1_000_000.0) as isize)
-            .min()
-            .unwrap()
-    });
-    */
-    // clauses.sort_by_cached_key(|ci| (cdb.activity(*ci).log(10.0) * -100_000.0) as isize);
-    clauses.sort_by_key(|ci| cdb[*ci].rank);
-    clauses.resize(clauses.len() / 2, ClauseId::default());
-    while let Some(ci) = clauses.pop() {
-        let c: &mut Clause = &mut cdb[ci];
+    let mut to_display = 0;
+
+    while let Some(cs) = clauses.pop() {
+        let c: &mut Clause = &mut cdb[cs.cid];
         // Since GC can make `clauses` out of date, we need to check its aliveness here.
         if c.is(Flag::DEAD) {
             continue;
         }
-        c.turn_on(Flag::VIVIFIED);
-        c.turn_off(Flag::VIVIFIED2);
         let is_learnt = c.is(Flag::LEARNT);
-        if !is_learnt {
-            c.turn_off(Flag::DERIVE20);
-        }
+        c.vivified();
         let clits = c.lits.clone();
         let mut copied: Vec<Lit> = Vec::new();
         let mut flipped = true;
@@ -75,7 +95,7 @@ pub fn vivify(
                 state.flush("");
                 state.flush(format!(
                     "vivifying(assert:{}, purge:{} shorten:{}, check:{}/{})...",
-                    num_assert, num_purge, num_shrink, num_check, check_thr,
+                    num_assert, num_purge, num_shrink, num_check, num_target,
                 ));
                 to_display = num_check + display_step;
             }
@@ -131,7 +151,7 @@ pub fn vivify(
                         }
                         flipped = false;
                     }
-                    asg.cancel_until(asg.root_level);
+                    asg.backtrack_sandbox();
                     if let Some(cj) = cid {
                         debug_assert!(cdb[cj].is(Flag::VIV_ASSUMED));
                         cdb.detach(cj);
@@ -157,8 +177,8 @@ pub fn vivify(
                 return Err(SolverError::Inconsistent);
             }
             0 => {
-                if !cdb[ci].is(Flag::DEAD) {
-                    cdb.detach(ci);
+                if !cdb[cs.cid].is(Flag::DEAD) {
+                    cdb.detach(cs.cid);
                     cdb.garbage_collect();
                     num_purge += 1;
                 }
@@ -169,7 +189,6 @@ pub fn vivify(
                 debug_assert_eq!(asg.decision_level(), asg.root_level);
                 if asg.assigned(l0) == None {
                     num_assert += 1;
-                    check_thr = ((check_thr as f64 * 1.2) as usize).min(check_max);
                     cdb.certificate_add(&copied);
                     asg.assign_at_root_level(l0)?;
                     if !asg.propagate(cdb).is_none() {
@@ -178,44 +197,40 @@ pub fn vivify(
                     }
                     state[Stat::VivifiedVar] += 1;
                 }
-                debug_assert!(!cdb[ci].is(Flag::DEAD));
-                cdb.detach(ci);
+                debug_assert!(!cdb[cs.cid].is(Flag::DEAD));
+                cdb.detach(cs.cid);
                 cdb.garbage_collect();
             }
             n if n == clits.len() => (),
             n => {
+                num_shrink += 1;
                 if n == 2 && cdb.registered_bin_clause(copied[0], copied[1]) {
-                    num_purge += 1;
-                    check_thr = (check_thr + 1).min(check_max);
-                    elim.to_simplify += 1.0;
+                    elim.to_simplify += 1.0 / 2.0;
                 } else {
-                    num_shrink += 1;
-                    check_thr = (check_thr + state.vivify_thr / 10).min(check_max);
                     cdb.certificate_add(&copied);
                     cdb.handle(SolverEvent::Vivify(true));
                     let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
                     cdb.handle(SolverEvent::Vivify(false));
                     cdb[cj].turn_on(Flag::VIVIFIED);
-                    elim.to_simplify += 1.0 / ((n - 1) as f64).powf(1.6);
-                    debug_assert!(!cdb[ci].is(Flag::DEAD));
-                    cdb.detach(ci);
+                    elim.to_simplify += 1.0 / (n as f64).powf(1.5);
+                    debug_assert!(!cdb[cs.cid].is(Flag::DEAD));
+                    cdb.detach(cs.cid);
                     cdb.garbage_collect();
                 }
             }
         }
-        if check_thr <= num_check {
-            break;
-        }
-        clauses.retain(|ci| !cdb[ci].is(Flag::DEAD));
+        clauses.retain(|ci| !cdb[ci.cid].is(Flag::DEAD));
     }
-    // if 0 < num_assert || 0 < num_purge || 0 < num_shrink {
-    //     state.flush("");
-    //     state.flush(format!(
-    //         "vivified(assert:{}, purge:{}, shorten:{})...",
-    //         num_assert, num_purge, num_shrink,
-    //     ));
-    // }
     asg.handle(SolverEvent::Vivify(false));
+    if 0 < num_assert || 0 < num_purge || 0 < num_shrink {
+        state.log(
+            state[Stat::Vivification],
+            format!(
+                "vivification #:{:>6}, assert:{:>5}, purge:{:>5}, shrink:{:>5}",
+                num_check, num_assert, num_purge, num_shrink
+            ),
+        );
+    }
     Ok(())
 }
 
@@ -224,16 +239,6 @@ fn flip(vec: &mut [Lit]) -> &mut [Lit] {
         *l = !*l;
     }
     vec
-}
-
-impl Clause {
-    fn to_vivify(&self) -> bool {
-        if self.is(Flag::DEAD) {
-            return false;
-        }
-        self.is(Flag::VIVIFIED) == self.is(Flag::VIVIFIED2)
-            && (self.is(Flag::LEARNT) || self.is(Flag::DERIVE20))
-    }
 }
 
 impl AssignStack {

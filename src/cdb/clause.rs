@@ -1,7 +1,6 @@
 use {
     crate::{assign::AssignIF, types::*},
     std::{
-        cmp::Ordering,
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::Iter,
@@ -20,6 +19,10 @@ pub trait ClauseIF {
     fn update_lbd<A>(&mut self, asg: &A, lbd_temp: &mut [usize]) -> usize
     where
         A: AssignIF;
+    /// return `true` if the clause should try vivification
+    fn to_vivify(&self, threshold: usize) -> Option<f64>;
+    /// clear flags about vivification
+    fn vivified(&mut self);
 }
 
 impl Default for Clause {
@@ -29,6 +32,7 @@ impl Default for Clause {
             rank: 0,
             search_from: 2,
             reward: 0.0,
+            timestamp: 0,
             flags: Flag::empty(),
         }
     }
@@ -135,6 +139,23 @@ impl ClauseIF for Clause {
             cnt as usize
         }
     }
+    fn to_vivify(&self, threshold: usize) -> Option<f64> {
+        if !self.is(Flag::DEAD)
+            && self.is(Flag::VIVIFIED) == self.is(Flag::VIVIFIED2)
+            && (self.is(Flag::LEARNT) || self.is(Flag::DERIVE20))
+            && 3 * (self.rank as usize) + self.len() <= threshold
+        {
+            return Some(self.reward);
+        }
+        None
+    }
+    fn vivified(&mut self) {
+        self.turn_on(Flag::VIVIFIED);
+        self.turn_off(Flag::VIVIFIED2);
+        if !self.is(Flag::LEARNT) {
+            self.turn_off(Flag::DERIVE20);
+        }
+    }
 }
 
 impl FlagIF for Clause {
@@ -149,46 +170,6 @@ impl FlagIF for Clause {
     }
     fn turn_on(&mut self, flag: Flag) {
         self.flags.insert(flag);
-    }
-}
-
-impl PartialEq for Clause {
-    fn eq(&self, other: &Clause) -> bool {
-        self == other
-    }
-}
-
-impl Eq for Clause {}
-
-impl PartialOrd for Clause {
-    fn partial_cmp(&self, other: &Clause) -> Option<Ordering> {
-        if self.rank < other.rank {
-            Some(Ordering::Less)
-        } else if other.rank < self.rank {
-            Some(Ordering::Greater)
-        } else if self.reward > other.reward {
-            Some(Ordering::Less)
-        } else if other.reward > self.reward {
-            Some(Ordering::Greater)
-        } else {
-            Some(Ordering::Equal)
-        }
-    }
-}
-
-impl Ord for Clause {
-    fn cmp(&self, other: &Clause) -> Ordering {
-        if self.rank < other.rank {
-            Ordering::Less
-        } else if other.rank > self.rank {
-            Ordering::Greater
-        } else if self.reward > other.reward {
-            Ordering::Less
-        } else if other.reward > self.reward {
-            Ordering::Greater
-        } else {
-            Ordering::Equal
-        }
     }
 }
 

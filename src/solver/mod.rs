@@ -86,7 +86,7 @@ pub enum SolverEvent {
 /// }
 /// assert_eq!(Solver::try_from("tests/unsat.cnf").expect("can't load").solve(), Ok(Certificate::UNSAT));
 /// ```
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Solver {
     /// assignment management
     pub asg: AssignStack,

@@ -4,16 +4,13 @@ use {
     super::{CertifiedRecord, Clause, ClauseDB, ClauseId, WatchDBIF},
     crate::{assign::AssignIF, solver::SolverEvent, types::*},
     std::{
-        cmp::Ordering,
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::{Iter, IterMut},
     },
 };
 
-const ACTIVITY_MAX: f64 = 1e308;
-
-/// API for clause management like [`check_and_reduce`](`crate::cdb::ClauseDBIF::check_and_reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`watcher_list`](`crate::cdb::ClauseDBIF::watcher_list`), and so on.
-pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
+/// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`watcher_list`](`crate::cdb::ClauseDBIF::watcher_list`), and so on.
+pub trait ClauseDBIF: ActivityIF<ClauseId> + IndexMut<ClauseId, Output = Clause> {
     /// return the length of `clause`.
     fn len(&self) -> usize;
     /// return true if it's empty.
@@ -36,7 +33,7 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     ///
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn check_and_reduce<A>(&mut self, asg: &A, nc: usize) -> bool
+    fn reduce<A>(&mut self, asg: &mut A, nc: usize) -> bool
     where
         A: AssignIF;
     fn reset(&mut self);
@@ -107,8 +104,10 @@ impl Default for ClauseDB {
             use_chan_seok: false,
             co_lbd_bound: 5,
             // lbd_frozen_clause: 30,
+            ordinal: 0,
             activity_inc: 1.0,
-            activity_decay: 0.999,
+            activity_decay: 0.99,
+            activity_anti_decay: 0.01,
             touched: Vec::new(),
             lbd_temp: Vec::new(),
             num_lbd_update: 0,
@@ -190,31 +189,29 @@ impl IndexMut<RangeFrom<usize>> for ClauseDB {
     }
 }
 
-impl ActivityIF for ClauseDB {
-    type Ix = ClauseId;
-    type Inc = ();
-    fn activity(&mut self, ci: Self::Ix) -> f64 {
-        self[ci].reward
+impl ActivityIF<ClauseId> for ClauseDB {
+    fn activity(&mut self, cid: ClauseId) -> f64 {
+        let t = self.ordinal;
+        self.clause[cid.ordinal as usize].update_activity(
+            t,
+            self.activity_decay,
+            self.activity_anti_decay,
+        )
     }
-    fn set_activity(&mut self, ci: Self::Ix, val: f64) {
-        self[ci].reward = val;
+    fn clear_reward(&mut self, cid: ClauseId) {
+        self[cid].reward = 0.0;
     }
-    fn bump_activity(&mut self, cid: Self::Ix, _: Self::Inc) {
-        let c = &mut self.clause[cid.ordinal as usize];
-        let a = c.reward + self.activity_inc;
-        c.reward = a;
-        if ACTIVITY_MAX < a {
-            let scale = 1.0 / self.activity_inc;
-            for c in &mut self.clause[1..] {
-                if c.is(Flag::LEARNT) {
-                    c.reward *= scale;
-                }
-            }
-            self.activity_inc *= scale;
-        }
+    fn reward_at_analysis(&mut self, cid: ClauseId) {
+        // Note: vivifier has its own conflict analyzer, which never call reward functions.
+        let t = self.ordinal;
+        self.clause[cid.ordinal as usize].update_activity(
+            t,
+            self.activity_decay,
+            self.activity_anti_decay,
+        );
     }
-    fn scale_activity(&mut self) {
-        self.activity_inc /= self.activity_decay;
+    fn update_rewards(&mut self) {
+        self.ordinal += 1;
     }
 }
 
@@ -238,13 +235,16 @@ impl Instantiate for ClauseDB {
         }
         ClauseDB {
             clause,
-            touched,
-            lbd_temp: vec![0; nv + 1],
             bin_watcher,
             watcher,
             certified,
-            reducible: config.use_reduce(),
             soft_limit: config.c_cls_lim,
+            activity_decay: config.crw_dcy_rat,
+            activity_anti_decay: 1.0 - config.crw_dcy_rat,
+            touched,
+            lbd_temp: vec![0; nv + 1],
+            reducible: config.use_reduce(),
+
             ..ClauseDB::default()
         }
     }
@@ -463,7 +463,6 @@ impl ClauseDBIF for ClauseDB {
     where
         A: AssignIF,
     {
-        let reward = self.activity_inc;
         if level_sort {
             #[cfg(feature = "boundary_check")]
             debug_assert!(1 < vec.len());
@@ -507,13 +506,11 @@ impl ClauseDBIF for ClauseDB {
             c.flags = Flag::empty();
             debug_assert!(c.lits.is_empty()); // c.lits.clear();
             std::mem::swap(&mut c.lits, vec);
-            c.reward = reward;
             c.search_from = 2;
         } else {
             cid = ClauseId::from(self.clause.len());
             let mut c = Clause {
                 flags: Flag::empty(),
-                reward,
                 ..Clause::default()
             };
             std::mem::swap(&mut c.lits, vec);
@@ -543,7 +540,6 @@ impl ClauseDBIF for ClauseDB {
             }
             if learnt {
                 c.turn_on(Flag::LEARNT);
-                c.turn_on(Flag::JUST_USED);
 
                 if len2 {
                     *num_bi_learnt += 1;
@@ -555,11 +551,23 @@ impl ClauseDBIF for ClauseDB {
             }
             if len2 {
                 *num_bi_clause += 1;
-                bin_watcher[!l0].register(l1, cid);
-                bin_watcher[!l1].register(l0, cid);
+                bin_watcher[!l0].register(Watch {
+                    blocker: l1,
+                    c: cid,
+                });
+                bin_watcher[!l1].register(Watch {
+                    blocker: l0,
+                    c: cid,
+                });
             } else {
-                watcher[!l0].register(l1, cid);
-                watcher[!l1].register(l0, cid);
+                watcher[!l0].register(Watch {
+                    blocker: l1,
+                    c: cid,
+                });
+                watcher[!l1].register(Watch {
+                    blocker: l0,
+                    c: cid,
+                });
             }
             *num_active += 1;
         }
@@ -597,13 +605,15 @@ impl ClauseDBIF for ClauseDB {
                 (true, false) => c.turn_on(Flag::VIVIFIED),
                 (true, true) => (),
             }
-            if !c.is(Flag::JUST_USED) && c.is(Flag::LEARNT) {
-                c.turn_on(Flag::JUST_USED);
-                // chan_seok_condition is zero if !use_chan_seok
+            // chan_seok_condition is zero if !use_chan_seok
+            if c.is(Flag::LEARNT) {
                 if nlevels < chan_seok_condition {
                     c.turn_off(Flag::LEARNT);
                     self.num_learnt -= 1;
                     return true;
+                } else {
+                    #[cfg(feature = "just_used")]
+                    c.turn_on(Flag::JUST_USED);
                 }
             }
         }
@@ -629,7 +639,7 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
     }
-    fn check_and_reduce<A>(&mut self, asg: &A, nc: usize) -> bool
+    fn reduce<A>(&mut self, asg: &mut A, nc: usize) -> bool
     where
         A: AssignIF,
     {
@@ -643,8 +653,7 @@ impl ClauseDBIF for ClauseDB {
         };
         if go {
             self.reduction_coeff = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
-            self.reduce(asg);
-            self.num_reduction += 1;
+            self.reduce_db(asg, nc);
         }
         go
     }
@@ -703,7 +712,6 @@ impl ClauseDBIF for ClauseDB {
         if (*c).is(Flag::DEAD) {
             return false;
         }
-        (*c).turn_on(Flag::JUST_USED);
         debug_assert!(1 < usize::from(!p));
         (*c).search_from = 2;
         let lits = &mut (*c).lits;
@@ -725,13 +733,16 @@ impl ClauseDBIF for ClauseDB {
             };
             debug_assert!(1 < usize::from(!p));
             if 2 == lits.len() {
-                self.watcher[!p].detach_with(cid);
-                self.watcher[!r].detach_with(cid);
-                self.bin_watcher[!q].register(r, cid);
-                self.bin_watcher[!r].register(q, cid);
+                let mut w1 = self.watcher[!p].detach_with(cid);
+                w1.blocker = r;
+                let mut w2 = self.watcher[!r].detach_with(cid);
+                w2.blocker = q;
+                self.bin_watcher[!q].register(w1);
+                self.bin_watcher[!r].register(w2);
             } else {
-                self.watcher[!p].detach_with(cid);
-                self.watcher[!q].register(r, cid);
+                let mut w0 = self.watcher[!p].detach_with(cid);
+                w0.blocker = r;
+                self.watcher[!q].register(w0);
                 self.watcher[!r].update_blocker(cid, q);
             }
         } else {
@@ -739,10 +750,12 @@ impl ClauseDBIF for ClauseDB {
             if 2 == lits.len() {
                 let q = lits[0];
                 let r = lits[1];
-                self.watcher[!q].detach_with(cid);
-                self.watcher[!r].detach_with(cid);
-                self.bin_watcher[!q].register(r, cid);
-                self.bin_watcher[!r].register(q, cid);
+                let mut w1 = self.watcher[!q].detach_with(cid);
+                w1.blocker = r;
+                let mut w2 = self.watcher[!r].detach_with(cid);
+                w2.blocker = q;
+                self.bin_watcher[!q].register(w1);
+                self.bin_watcher[!r].register(w2);
             }
         }
         false
@@ -785,51 +798,72 @@ impl ClauseDBIF for ClauseDB {
 
 impl ClauseDB {
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce<A>(&mut self, asg: &A)
+    fn reduce_db<A>(&mut self, asg: &mut A, nc: usize)
     where
         A: AssignIF,
     {
+        const SCALE_UP: f64 = 100_000_000.0;
+
+        #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+        struct ClauseProxy {
+            weight: usize,
+            index: usize,
+        }
+
         let ClauseDB {
             ref mut clause,
             ref mut lbd_temp,
             ref mut touched,
+            ref ordinal,
+            ref activity_decay,
+            ref activity_anti_decay,
             ..
         } = self;
+        self.num_reduction += 1;
         self.next_reduction += self.inc_step;
-        let mut perm = Vec::with_capacity(clause.len());
+        let mut perm: Vec<ClauseProxy> = Vec::with_capacity(clause.len());
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
-            let used = c.is(Flag::JUST_USED);
-            if c.is(Flag::LEARNT) && !c.is(Flag::DEAD) && !asg.locked(c, ClauseId::from(i)) && !used
+            if !c.is(Flag::LEARNT) || c.is(Flag::DEAD) || asg.locked(c, ClauseId::from(i)) {
+                continue;
+            }
+
+            #[cfg(feature = "just_used")]
             {
-                c.update_lbd(asg, lbd_temp);
-                perm.push(i);
+                let used = c.is(Flag::JUST_USED);
+                if used {
+                    c.turn_off(Flag::JUST_USED);
+                    continue;
+                }
             }
-            if used {
-                c.turn_off(Flag::JUST_USED)
+
+            let mut act_v: f64 = 0.0;
+            for l in c.lits.iter() {
+                act_v = act_v.max(asg.activity(l.vi()));
             }
+            let rank = c.update_lbd(asg, lbd_temp) as f64;
+            let act_c = c.update_activity(*ordinal, *activity_decay, *activity_anti_decay);
+            let weight = (SCALE_UP * rank / (act_v + act_c)) as usize;
+            perm.push(ClauseProxy { weight, index: i });
         }
-        if perm.is_empty() {
-            return;
-        }
-        let keep = perm.len() / 2;
-        if self.use_chan_seok {
-            perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
-        } else {
-            perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
-            if clause[perm[keep]].rank <= 3 {
+        let keep = (perm.len() / 2).min(nc / 2);
+        if !self.use_chan_seok {
+            if clause[perm[keep].index].rank <= 3 {
                 self.next_reduction += self.extra_inc;
             }
-            if clause[perm[0]].rank <= 5 {
+            if clause[perm[0].index].rank <= 5 {
                 self.next_reduction += self.extra_inc;
             };
         }
+        perm.sort_unstable_by_key(|c| c.weight);
         for i in &perm[keep..] {
-            let c = &mut clause[*i];
+            let c = &mut clause[i.index];
             if 2 < c.rank {
                 c.kill(touched);
             }
         }
-        debug_assert!(perm[0..keep].iter().all(|cid| !clause[*cid].is(Flag::DEAD)));
+        debug_assert!(perm[0..keep]
+            .iter()
+            .all(|c| !clause[c.index].is(Flag::DEAD)));
         self.garbage_collect();
     }
 
@@ -854,15 +888,15 @@ impl ClauseDB {
 }
 
 impl Clause {
-    #[allow(clippy::comparison_chain)]
-    fn cmp_activity(&self, other: &Clause) -> Ordering {
-        if self.reward > other.reward {
-            Ordering::Less
-        } else if other.reward > self.reward {
-            Ordering::Greater
-        } else {
-            Ordering::Equal
+    fn update_activity(&mut self, t: usize, decay: f64, anti_decay: f64) -> f64 {
+        if self.timestamp < t {
+            let duration = (t - self.timestamp) as f64;
+            // self.reward *= decay.powf(duration.log(2.0));
+            self.reward *= decay.powf(duration);
+            self.reward += anti_decay;
+            self.timestamp = t;
         }
+        self.reward
     }
     /// make a clause *dead*; the clause still exists in clause database as a garbage.
     fn kill(&mut self, touched: &mut [bool]) {

@@ -17,7 +17,7 @@ pub use self::{
 use crate::types::*;
 
 /// Record of clause operations to build DRAT certifications.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CertifiedRecord {
     /// placed at the end.
     SENTINEL,
@@ -45,7 +45,7 @@ impl ClauseId {
 }
 
 /// A representation of 'clause'
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Clause {
     /// The literals in a clause.
     pub lits: Vec<Lit>,
@@ -55,6 +55,8 @@ pub struct Clause {
     pub search_from: usize,
     /// A dynamic clause evaluation criterion based on the number of references.
     reward: f64,
+    /// the number of conflicts at which this clause was used in [`conflict_analyze`](`crate::solver::conflict::conflict_analyze`)
+    timestamp: usize,
     /// Flags
     flags: Flag,
 }
@@ -66,7 +68,7 @@ pub struct Clause {
 /// use crate::splr::cdb::ClauseDB;
 /// let cdb = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
 ///```
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ClauseDB {
     /// container of clauses
     clause: Vec<Clause>,
@@ -88,8 +90,11 @@ pub struct ClauseDB {
     //
     //## clause rewarding
     //
+    /// an index for counting elapsed time
+    ordinal: usize,
     activity_inc: f64,
     activity_decay: f64,
+    activity_anti_decay: f64,
 
     //
     //## Elimination
@@ -184,6 +189,7 @@ mod tests {
         assert_eq!(c.rank, 2);
         assert!(!c.is(Flag::DEAD));
         assert!(!c.is(Flag::LEARNT));
+        #[cfg(feature = "just_used")]
         assert!(!c.is(Flag::JUST_USED));
 
         let c2 = cdb.new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true, true);
@@ -191,7 +197,8 @@ mod tests {
         assert_eq!(c.rank, 2);
         assert!(!c.is(Flag::DEAD));
         assert!(c.is(Flag::LEARNT));
-        assert!(c.is(Flag::JUST_USED));
+        #[cfg(feature = "just_used")]
+        assert!(!c.is(Flag::JUST_USED));
     }
     #[test]
     fn test_clause_equality() -> () {
