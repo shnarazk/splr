@@ -12,15 +12,19 @@ use {
     std::borrow::Cow,
 };
 
-fn distortion(asg: &mut AssignStack, c: &Clause) -> usize {
-    let mut low: f64 = 1.0;
-    let mut high: f64 = 0.0;
-    for lit in c.iter() {
-        let a = asg.activity(lit.vi());
-        low = low.min(a);
-        high = high.max(a);
+#[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
+struct ClauseProxy {
+    val: usize,
+    cid: ClauseId,
+}
+
+impl Default for ClauseProxy {
+    fn default() -> Self {
+        ClauseProxy {
+            val: 0,
+            cid: ClauseId::default(),
+        }
     }
-    (1_000_000.0 * (1.0 - high + low)) as usize
 }
 
 /// vivify clauses in `cdb` under `asg`
@@ -30,12 +34,7 @@ pub fn vivify(
     elim: &mut Eliminator,
     state: &mut State,
 ) -> MaybeInconsistent {
-    #[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
-    struct ClauseSorter {
-        val: usize,
-        cid: ClauseId,
-    }
-    let mut clauses: Vec<ClauseSorter> = Vec::new();
+    let mut clauses: Vec<ClauseProxy> = Vec::new();
     let mut num_clause = 0;
     for (i, c) in cdb.iter().enumerate().skip(1) {
         if !c.is(Flag::DEAD) {
@@ -47,28 +46,21 @@ pub fn vivify(
                 act_v = act_v.max(asg.activity(l.vi()));
             }
             if act_v * 1.4 < act_c {
-                clauses.push(ClauseSorter {
+                clauses.push(ClauseProxy {
                     val: (1_000_000.0 * (1.0 - act_c + act_v)) as usize,
                     cid: ClauseId::from(i),
                 });
             }
         }
     }
-    clauses.sort_unstable();
-    if clauses.len() == 0 {
+    if clauses.is_empty() {
         return Ok(());
     }
+    clauses.sort_unstable();
     let num_target = clauses
         .len()
         .min(5_000_000_000 / ((num_clause as f64).powf(1.15) as usize));
-    // clauses.resize(num_target, ClauseId::default());
-    clauses.resize(
-        num_target,
-        ClauseSorter {
-            val: 0,
-            cid: ClauseId::default(),
-        },
-    );
+    clauses.resize(num_target, ClauseProxy::default());
     asg.handle(SolverEvent::Vivify(true));
     state[Stat::Vivification] += 1;
 
@@ -234,14 +226,8 @@ pub fn vivify(
         state.log(
             state[Stat::Vivification],
             format!(
-                // "vivify #cls:{:>6}, assert:{:>6}, purge:{:>6}, shrink:{:>6}",
-                // "vivify target:{:>5}, assert:{:>5}, purged:{:>5}, shrink:{:>5}",
                 "vivification #:{:>6}, assert:{:>5}, purge:{:>5}, shrink:{:>5}",
-                // "vivification target:{:>4}, assert:{:>4}, purge:{:>4}, shrink:{:>4}",
-                num_check,
-                num_assert,
-                num_purge,
-                num_shrink
+                num_check, num_assert, num_purge, num_shrink
             ),
         );
     }

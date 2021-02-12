@@ -199,6 +199,10 @@ pub struct VarIdHeap {
 }
 
 impl<'a> ExportBox<'a, (&'a Ema, &'a Ema, &'a Ema)> for AssignStack {
+    // returns references to EMAs:
+    // 1. dpc = decision / conflict
+    // 1. ppc = propagation / conflict
+    // 1. cpr = conflict / restart
     fn exports_box(&'a self) -> Box<(&'a Ema, &'a Ema, &'a Ema)> {
         Box::from((
             self.dpc_ema.get_ema(),

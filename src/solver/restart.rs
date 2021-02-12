@@ -57,7 +57,7 @@ pub trait RestartIF: Export<RestarterExports, (RestartMode, usize)> {
     /// check stabilization mode and  return:
     /// - `Some(parity_bit, just_start_a_new_cycle)` if a stabilization phase has just ended.
     /// - `None` otherwise.
-    fn stabilize(&mut self, now: usize) -> Option<bool>;
+    fn stabilize(&mut self) -> Option<bool>;
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
 }
@@ -427,7 +427,7 @@ impl ProgressEvaluator for ProgressLuby {
     }
     fn shift(&mut self) {
         self.active = false;
-        self.next_restart = self.step * self.luby.next().unwrap();
+        self.next_restart = self.step * self.luby.next();
     }
 }
 
@@ -530,14 +530,14 @@ impl GeometricStabilizer {
                 self.num_cycle += 1;
                 self.longest_span = self.step;
             }
-            self.step = self.luby.next().unwrap();
+            self.step = self.luby.next();
             self.next_trigger = now + self.longest_span / self.step;
             return Some(new_cycle);
         }
         if self.reset_requested {
             self.luby.reset();
             self.longest_span = 1;
-            self.step = self.luby.next().unwrap();
+            self.step = self.luby.next();
             self.reset_requested = false;
             self.next_trigger = now;
         }
@@ -833,7 +833,7 @@ impl RestartIF for Restarter {
         // Some(RestartDecision::Postpone)
         None
     }
-    fn stabilize(&mut self, _now: usize) -> Option<bool> {
+    fn stabilize(&mut self) -> Option<bool> {
         self.stb.update(self.num_restart + self.num_block)
     }
     fn update(&mut self, kind: ProgressUpdate) {
@@ -903,6 +903,9 @@ impl Export<RestarterExports, (RestartMode, usize)> for Restarter {
 pub type RestarterEMAs<'a> = (&'a Ema2, &'a Ema2);
 
 impl<'a> ExportBox<'a, RestarterEMAs<'a>> for Restarter {
+    // returns references to EMAs:
+    // 1. asg
+    // 1. lbd
     fn exports_box(&'a self) -> Box<RestarterEMAs<'a>> {
         Box::from((&self.asg.ema, &self.lbd.ema))
     }
@@ -932,7 +935,7 @@ impl fmt::Display for LubySeries {
 }
 
 impl LubySeries {
-    fn next(&mut self) -> Option<usize> {
+    fn next(&mut self) -> usize {
         self.index += 1;
         let mut seq = self.seq;
         let mut size = self.size;
@@ -948,7 +951,7 @@ impl LubySeries {
             seq -= 1;
             index %= size;
         }
-        Some(2usize.pow(seq as u32))
+        2usize.pow(seq as u32)
     }
     #[allow(dead_code)]
     fn reset(&mut self) {

@@ -226,7 +226,6 @@ pub fn handle_conflict(
         } else {
             asg.assign_by_unitclause(l0);
         }
-        // state.to_vivify = 0.0;
         rst.handle(SolverEvent::Assert(l0.vi()))
     } else {
         {

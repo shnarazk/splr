@@ -239,7 +239,7 @@ fn search(
             asg.update_rewards();
             rst.update(ProgressUpdate::Remain(asg.var_stats().3));
             if let Some(decision) = rst.restart() {
-                if let Some(new_cycle) = rst.stabilize(asg.num_conflict) {
+                if let Some(new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);
                     let r = rst.exports();
                     if new_cycle {
@@ -329,7 +329,7 @@ fn search(
                 state.flush(format!("unreachable core: {}", na));
             }
             if asg.num_conflict % state.reflection_interval == 0 {
-                adapt_modules(asg, cdb, elim, rst, state)?;
+                adapt_modules(asg, cdb, elim, rst, state);
                 if let Some(p) = state.elapsed() {
                     if 1.0 <= p {
                         return Err(SolverError::TimeOut);
@@ -353,7 +353,7 @@ fn adapt_modules(
     elim: &mut Eliminator,
     rst: &mut Restarter,
     state: &mut State,
-) -> MaybeInconsistent {
+) {
     state.progress(asg, cdb, elim, rst);
     let asg_num_conflict = asg.num_conflict;
     if 10 * state.reflection_interval == asg_num_conflict {
@@ -375,8 +375,6 @@ fn adapt_modules(
         cdb.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
         rst.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
     }
-
-    Ok(())
 }
 
 fn analyze_final(asg: &mut AssignStack, state: &mut State, c: &Clause) {

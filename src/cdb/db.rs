@@ -805,7 +805,7 @@ impl ClauseDB {
         const SCALE_UP: f64 = 100_000_000.0;
 
         #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
-        struct ClauseSorter {
+        struct ClauseProxy {
             weight: usize,
             index: usize,
         }
@@ -821,7 +821,7 @@ impl ClauseDB {
         } = self;
         self.num_reduction += 1;
         self.next_reduction += self.inc_step;
-        let mut perm: Vec<ClauseSorter> = Vec::with_capacity(clause.len());
+        let mut perm: Vec<ClauseProxy> = Vec::with_capacity(clause.len());
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
             if !c.is(Flag::LEARNT) || c.is(Flag::DEAD) || asg.locked(c, ClauseId::from(i)) {
                 continue;
@@ -843,7 +843,7 @@ impl ClauseDB {
             let rank = c.update_lbd(asg, lbd_temp) as f64;
             let act_c = c.update_activity(*ordinal, *activity_decay, *activity_anti_decay);
             let weight = (SCALE_UP * rank / (act_v + act_c)) as usize;
-            perm.push(ClauseSorter { weight, index: i });
+            perm.push(ClauseProxy { weight, index: i });
         }
         let keep = (perm.len() / 2).min(nc / 2);
         if !self.use_chan_seok {

@@ -34,14 +34,14 @@ pub trait ExportBox<'a, T> {
 /// API for Literal like `from_int`, `from_assign`, `to_cid` and so on.
 pub trait LitIF {
     /// convert to bool
-    fn as_bool(self) -> bool;
+    fn as_bool(&self) -> bool;
     /// convert [VarId](../type.VarId.html) to [Lit](../type.Lit.html).
     /// It returns a positive literal if `p` is `TRUE` or `BOTTOM`.
     fn from_assign(vi: VarId, p: bool) -> Self;
     /// convert to var index.
     fn vi(self) -> VarId;
     /// return `true` if it is a valid literal, namely non-zero.
-    fn is_none(self) -> bool;
+    fn is_none(&self) -> bool;
 }
 
 /// API for reward based activity management.
@@ -346,7 +346,7 @@ impl IndexMut<Lit> for Vec<Vec<Watch>> {
 /// ```
 impl LitIF for Lit {
     #[inline]
-    fn as_bool(self) -> bool {
+    fn as_bool(&self) -> bool {
         self.ordinal & 1 == 1
     }
     #[inline]
@@ -360,7 +360,7 @@ impl LitIF for Lit {
         (self.ordinal >> 1) as VarId
     }
     #[inline]
-    fn is_none(self) -> bool {
+    fn is_none(&self) -> bool {
         self.ordinal == 0
     }
 }
@@ -772,7 +772,7 @@ bitflags! {
 
         #[cfg(feature = "just_used")]
         /// a clause is used recently in conflict analysis.
-        const JUST_USED    = 0b0000_0000_0000_0000;
+        const JUST_USED    = 0b0001_0000_0000_0000;
     }
 }
 

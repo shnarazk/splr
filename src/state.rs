@@ -805,7 +805,7 @@ impl State {
             _,
         ) = asg.var_stats();
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let (_num_decsion, _num_propagation, _num_conflict, asg_num_restart) = asg.exports();
+        let (_num_decision, _num_propagation, _num_conflict, asg_num_restart) = asg.exports();
         let (
             cdb_num_active,
             _num_bi_clause,

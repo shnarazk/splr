@@ -195,7 +195,7 @@ impl Export<(usize, usize, usize, usize), ()> for AssignStack {
     /// use crate::{splr::config::Config, splr::types::*};
     /// use crate::splr::assign::AssignStack;
     /// let asg = AssignStack::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (num_decsion, num_propagation, num_conflict, num_restart) = asg.exports();
+    /// let (num_decision, num_propagation, num_conflict, num_restart) = asg.exports();
     ///```
     #[inline]
     fn exports(&self) -> (usize, usize, usize, usize) {
