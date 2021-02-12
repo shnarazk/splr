@@ -201,7 +201,7 @@ impl VarSelectIF for AssignStack {
     }
     fn make_var_asserted(&mut self, vi: VarId) {
         self.num_asserted_vars += 1;
-        self.clear_reward(vi);
+        self.clear_activity(vi);
         self.remove_from_heap(vi);
         self.check_best_phase(vi);
     }

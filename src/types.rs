@@ -48,13 +48,17 @@ pub trait LitIF {
 pub trait ActivityIF<Ix> {
     /// return one's activity.
     fn activity(&mut self, ix: Ix) -> f64;
+    /// return average activity
+    fn average_activity(&self) -> f64;
+    /// clear one's activity
+    fn clear_activity(&mut self, ix: Ix);
     /// initialize one's reward.
-    fn initialize_reward(&mut self, _ix: Ix) {
+    fn initialize_activity(&mut self, _ix: Ix) {
         #[cfg(debug)]
         todo!()
     }
-    /// clear one's activity
-    fn clear_reward(&mut self, ix: Ix);
+    /// set activity
+    fn set_activity(&mut self, ix: Ix, val: f64);
     /// modify one's activity at conflict analysis in `conflict_analyze` in [`solver`](`crate::solver`).
     fn reward_at_analysis(&mut self, _ix: Ix) {
         #[cfg(debug)]
@@ -72,11 +76,9 @@ pub trait ActivityIF<Ix> {
     }
     /// update internal counter.
     fn update_rewards(&mut self);
+
     #[cfg(feature = "moving_var_reward_rate")]
     /// update reward setting as a part of module adaptation.
-    /// return average activities
-    fn average_activity(&self) -> f64;
-
     fn adjust_rewards(&mut self, state: &State) {
         #[cfg(debug)]
         todo!()

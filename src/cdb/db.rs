@@ -199,8 +199,14 @@ impl ActivityIF<ClauseId> for ClauseDB {
             self.activity_anti_decay,
         )
     }
-    fn clear_reward(&mut self, cid: ClauseId) {
+    fn average_activity(&self) -> f64 {
+        self.activity_ema.get()
+    }
+    fn clear_activity(&mut self, cid: ClauseId) {
         self[cid].reward = 0.0;
+    }
+    fn set_activity(&mut self, cid: ClauseId, val: f64) {
+        self[cid].reward = val;
     }
     fn reward_at_analysis(&mut self, cid: ClauseId) {
         // Note: vivifier has its own conflict analyzer, which never call reward functions.
@@ -214,9 +220,6 @@ impl ActivityIF<ClauseId> for ClauseDB {
     }
     fn update_rewards(&mut self) {
         self.ordinal += 1;
-    }
-    fn average_activity(&self) -> f64 {
-        self.activity_ema.get()
     }
 }
 

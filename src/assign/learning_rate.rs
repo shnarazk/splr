@@ -8,13 +8,19 @@ impl ActivityIF<VarId> for AssignStack {
         let v = &self.var[vi];
         v.reward.max(v.extra_reward)
     }
-    fn initialize_reward(&mut self, _ix: VarId) {}
     #[cfg(not(feature = "extra_var_reward"))]
     fn activity(&mut self, vi: VarId) -> f64 {
         self.var[vi].reward
     }
-    fn clear_reward(&mut self, vi: VarId) {
+    fn average_activity(&self) -> f64 {
+        self.activity_ema.get()
+    }
+    fn clear_activity(&mut self, vi: VarId) {
         self.var[vi].reward = 0.0;
+    }
+    fn initialize_activity(&mut self, _ix: VarId) {}
+    fn set_activity(&mut self, vi: VarId, val: f64) {
+        self.var[vi].reward = val;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
@@ -43,9 +49,7 @@ impl ActivityIF<VarId> for AssignStack {
                 .min(self.activity_decay + self.reward_step);
         }
     }
-    fn average_activity(&self) -> f64 {
-        self.activity_ema.get()
-    }
+
     #[cfg(feature = "moving_var_reward_rate")]
     fn adjust_rewards(&mut self, state: &State) {
         if state.strategy.1 == self.num_conflict {

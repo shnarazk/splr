@@ -76,6 +76,7 @@ pub fn vivify(
     let mut to_display = 0;
 
     while let Some(cs) = clauses.pop() {
+        let activity = cdb.activity(cs.cid);
         let c: &mut Clause = &mut cdb[cs.cid];
         // Since GC can make `clauses` out of date, we need to check its aliveness here.
         if c.is(Flag::DEAD) {
@@ -210,6 +211,7 @@ pub fn vivify(
                     cdb.certificate_add(&copied);
                     cdb.handle(SolverEvent::Vivify(true));
                     let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
+                    cdb.set_activity(cj, activity);
                     cdb.handle(SolverEvent::Vivify(false));
                     cdb[cj].turn_on(Flag::VIVIFIED);
                     elim.to_simplify += 1.0 / (n as f64).powf(1.5);

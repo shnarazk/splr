@@ -132,7 +132,7 @@ impl SolveIF for Solver {
                     }
                 }
                 for vi in elim.sorted_iterator() {
-                    asg.initialize_reward(*vi);
+                    asg.initialize_activity(*vi);
                 }
                 asg.rebuild_order();
             }
