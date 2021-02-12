@@ -32,6 +32,7 @@ impl ActivityIF<VarId> for AssignStack {
         v.reward *= self.activity_decay;
         v.reward += self.activity_anti_decay * rate.powf(self.occurrence_compression_rate);
         v.participated = 0;
+        self.activity_ema.update(v.reward);
     }
     fn update_rewards(&mut self) {
         self.ordinal += 1;
@@ -41,6 +42,9 @@ impl ActivityIF<VarId> for AssignStack {
                 .activity_decay_max
                 .min(self.activity_decay + self.reward_step);
         }
+    }
+    fn average_activity(&self) -> f64 {
+        self.activity_ema.get()
     }
     #[cfg(feature = "moving_var_reward_rate")]
     fn adjust_rewards(&mut self, state: &State) {

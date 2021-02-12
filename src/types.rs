@@ -74,6 +74,9 @@ pub trait ActivityIF<Ix> {
     fn update_rewards(&mut self);
     #[cfg(feature = "moving_var_reward_rate")]
     /// update reward setting as a part of module adaptation.
+    /// return average activities
+    fn average_activity(&self) -> f64;
+
     fn adjust_rewards(&mut self, state: &State) {
         #[cfg(debug)]
         todo!()

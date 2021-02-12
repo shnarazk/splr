@@ -78,6 +78,7 @@ impl Default for AssignStack {
 
             activity_decay: 0.0,
             activity_anti_decay: 1.0,
+            activity_ema: Ema::new(1000),
 
             #[cfg(feature = "moving_var_reward_rate")]
             activity_decay_max: 0.9,

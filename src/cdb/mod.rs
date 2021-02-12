@@ -95,6 +95,7 @@ pub struct ClauseDB {
     activity_inc: f64,
     activity_decay: f64,
     activity_anti_decay: f64,
+    activity_ema: Ema,
 
     //
     //## Elimination
