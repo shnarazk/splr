@@ -251,10 +251,10 @@ impl Config {
     pub fn inject_from_args(&mut self) {
         let mut help = false;
         let mut version = false;
-        if let Some(ref cnf) = std::env::args().last() {
-            let path = PathBuf::from(cnf.clone());
-            if path.exists() {
-                self.cnf_file = path;
+        if 1 < std::env::args().count() {
+            if let Some(ref cnf) = std::env::args().last() {
+                // we'll check the existence after parsing all args.
+                self.cnf_file = PathBuf::from(cnf.clone());
             }
         }
         let args = std::env::args();
@@ -449,12 +449,20 @@ impl Config {
                 } else {
                     panic!("unknown option name {}", name);
                 }
-            } else if !self.cnf_file.exists() || self.cnf_file.to_string_lossy() != arg {
+            } else if self.cnf_file.to_string_lossy() != arg {
                 panic!("invalid argument: {}", arg);
             }
         }
         if help {
             println!("{}\n{}", env!("CARGO_PKG_DESCRIPTION"), help_string());
+            std::process::exit(0);
+        }
+        if self.cnf_file.to_string_lossy().is_empty() {
+            println!("No target file specified. Run with '--help' to show help message.");
+            std::process::exit(0);
+        }
+        if !self.cnf_file.exists() {
+            println!("{} doesn't exist.", self.cnf_file.to_string_lossy());
             std::process::exit(0);
         }
         if version {
