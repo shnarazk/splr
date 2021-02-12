@@ -3,8 +3,8 @@
 - `Solver` and other structs implement `Clone`
 - `VarRewardIF` was merged into `ActivityIF`. `ClauseDB` implements it.
 - Learning-rate-based var rewarding uses the number of conflicts instead of the number of propagation, which was not intended.
-- switch to one-restarting-after-blocking-N-restarts stabilizer
-- switch to stabilization-mode-driven clause reduction, vivification and simplification
+- switch to a one-restarting-after-blocking-N-restarts stabilizer
+- switch to stabilization-mode-driven clause reduction, vivification, and simplification
 - disable re-phasing and vivification by default
 - recycle `Watch` data
 - handle '--no-color' and '--quiet' correctly
