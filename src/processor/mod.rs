@@ -673,7 +673,7 @@ impl Eliminator {
         let mut timedout: usize = {
             let nv = asg.var_stats().3 as f64; // un-asserted vars
             let nc = cdb.count() as f64;
-            (6.0 * nv.log(2.0) * nc) as usize
+            (6.0 * nv.log2() * nc) as usize
         };
         while self.bwdsub_assigns < asg.stack_len()
             || !self.var_queue.is_empty()

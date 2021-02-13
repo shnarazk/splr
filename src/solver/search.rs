@@ -345,6 +345,7 @@ fn search(
                 state.flush(format!("unreachable core: {}", na));
             }
             if asg.num_conflict % state.reflection_interval == 0 {
+                // println!("var:{:>10.4}, cls:{:>10.4}", asg.average_activity(), cdb.average_activity());
                 adapt_modules(asg, cdb, elim, rst, state);
                 if let Some(p) = state.elapsed() {
                     if 1.0 <= p {
