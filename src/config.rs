@@ -151,9 +151,9 @@ pub struct Config {
     //
     //## var staging
     //
-    /// Decay rate for Extra reward for vars on stage
+    /// Decay rate of the extra reward for staged vars
     pub stg_rwd_dcy: f64,
-    /// Initial value for the extra reward for vars on stage
+    /// Initial value of the extra reward for staged vars
     pub stg_rwd_val: f64,
 
     //
