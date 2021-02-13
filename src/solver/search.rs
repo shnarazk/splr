@@ -250,7 +250,7 @@ fn search(
                     {
                         let d = 1.0 / ((num_ion + 2) as f64).log2();
                         rst.update(ProgressUpdate::Temperature(d));
-                        asg.select_staged_vars(StagingTarget::AutoSelect, parity);
+                        asg.select_staged_vars(StagingTarget::AutoSelect, parity, num_ion);
                     }
 
                     if last_core != v.4 || 0 == v.4 {

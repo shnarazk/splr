@@ -23,7 +23,7 @@ pub trait VarSelectIF {
 
     #[cfg(feature = "var_staging")]
     /// select staged vars
-    fn select_staged_vars(&mut self, target: StagingTarget, rephasing: bool);
+    fn select_staged_vars(&mut self, target: StagingTarget, rephasing: bool, ions: usize);
 
     /// return the number of forgotton vars.
     fn num_staging_cands(&self) -> usize;
@@ -88,20 +88,25 @@ impl VarSelectIF for AssignStack {
             .count()
     }
     #[cfg(feature = "var_staging")]
-    fn select_staged_vars(&mut self, mut target: StagingTarget, rephasing: bool) {
+    fn select_staged_vars(&mut self, mut target: StagingTarget, rephasing: bool, ions: usize) {
         self.rephasing = rephasing;
         if !self.use_stage {
             return;
         } else if target == StagingTarget::AutoSelect {
             self.stage_mode_select += 1;
-            let n = self.num_unreachables().next_power_of_two().trailing_zeros() as usize;
-            match self.stage_mode_select % n {
-                0 => target = StagingTarget::Best(0),
-                8 => target = StagingTarget::Random,
-                // 3 => target = StagingTarget::Core,
-                // 4 => target = StagingTarget::LastAssigned,
-                _ => target = StagingTarget::Clear,
-                // _ => (),
+            // let n = self.num_unreachables().next_power_of_two().trailing_zeros() as usize;
+            let n = ions.next_power_of_two().trailing_zeros() as usize;
+            if n == 0 {
+                target = StagingTarget::Clear;
+            } else {
+                match self.stage_mode_select % n {
+                    2 => target = StagingTarget::Best(0),
+                    8 => target = StagingTarget::Random,
+                    // 3 => target = StagingTarget::Core,
+                    // 4 => target = StagingTarget::LastAssigned,
+                    _ => target = StagingTarget::Clear,
+                    // _ => (),
+                }
             }
         }
         for vi in self.staged_vars.keys() {
