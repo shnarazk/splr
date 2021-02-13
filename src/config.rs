@@ -187,7 +187,7 @@ impl Default for Config {
             a_rsr: 1,
             a_stabilize: 1,
             a_stage: 1,
-            a_vivify: 1,
+            a_vivify: 0,
 
             c_cbt_thr: 100,
             c_cls_lim: 0,
@@ -231,7 +231,7 @@ impl Default for Config {
             rst_stb_exp: 1.0,
             rst_stb_scl: 2.0,
 
-            stg_rwd_dcy: 0.5,
+            stg_rwd_dcy: 0.95,
             stg_rwd_val: 1.0,
 
             viv_thr: 1,
