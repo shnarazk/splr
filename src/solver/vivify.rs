@@ -36,6 +36,7 @@ pub fn vivify(
 ) -> MaybeInconsistent {
     let mut clauses: Vec<ClauseProxy> = Vec::new();
     let mut num_clause = 0;
+    let rate = cdb.average_activity() / asg.average_activity();
     for (i, c) in cdb.iter().enumerate().skip(1) {
         if !c.is(Flag::DEAD) {
             num_clause += 1;
@@ -45,7 +46,7 @@ pub fn vivify(
             for l in c.iter() {
                 act_v = act_v.max(asg.activity(l.vi()));
             }
-            if act_v * 1.4 < act_c {
+            if act_v * rate < act_c {
                 clauses.push(ClauseProxy {
                     val: (1_000_000.0 * (1.0 - act_c + act_v)) as usize,
                     cid: ClauseId::from(i),
