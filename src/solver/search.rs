@@ -239,26 +239,28 @@ fn search(
             asg.update_rewards();
             rst.update(ProgressUpdate::Remain(asg.var_stats().3));
             if let Some(decision) = rst.restart() {
-                if let Some(new_cycle) = rst.stabilize() {
+                if let Some(_new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);
                     let r = rst.exports();
-                    if new_cycle {
+                    let num_ion = {
+                        #[cfg(not(feature = "staging"))]
+                        {
+                            0
+                        }
+                        #[cfg(feature = "staging")]
+                        {
+                            asg.num_staging_cands()
+                        }
+                    };
+                    if true
+                    /* new_cycle */
+                    {
                         let v = asg.var_stats();
-                        let s = {
-                            #[cfg(not(feature = "staging"))]
-                            {
-                                0
-                            }
-                            #[cfg(feature = "staging")]
-                            {
-                                asg.num_staging_cands()
-                            }
-                        };
                         parity = !parity;
 
                         #[cfg(feature = "staging")]
                         {
-                            let d = 1.0 / ((s + 2) as f64).log(2.0);
+                            let d = 1.0 / ((num_ion + 2) as f64).log2();
                             rst.update(ProgressUpdate::Temperature(d));
                             asg.build_stage(StagingTarget::AutoSelect, parity);
                         }
@@ -270,7 +272,7 @@ fn search(
                                     "Lcycle:{:>6}, core:{:>9}, #ion: {:>9}, /cpr:{:>9.2}",
                                     r.3,
                                     v.4,
-                                    s,
+                                    num_ion,
                                     asg.exports_box().2.get(),
                                 ),
                             );
@@ -284,17 +286,23 @@ fn search(
                     }
 
                     if cdb.reduce(asg, asg.num_conflict) {
-                        state.to_vivify += 1.0;
-                    } else {
-                        state.to_vivify += 0.1;
-                    }
-                    if use_vivify && 1.0 <= state.to_vivify {
-                        if vivify(asg, cdb, elim, state).is_err() {
-                            // return Err(SolverError::UndescribedError);
-                            analyze_final(asg, state, &cdb[ci]);
-                            return Ok(false);
+                        #[cfg(not(feature = "staging"))]
+                        {
+                            state.to_vivify += 0.1;
                         }
-                        state.to_vivify = 0.0;
+                        #[cfg(feature = "staging")]
+                        {
+                            state.to_vivify += 0.5 / ((num_ion + 2) as f64).log2();
+                        }
+                    } else {
+                        #[cfg(not(feature = "staging"))]
+                        {
+                            state.to_vivify += 0.01;
+                        }
+                        #[cfg(feature = "staging")]
+                        {
+                            state.to_vivify += 0.05 / ((num_ion + 2) as f64).log2();
+                        }
                     }
                     // Simplification has been postponed because chronoBT was used.
                     // `elim.to_simplify` is increased much in particular
@@ -310,6 +318,14 @@ fn search(
 
                         elim.activate();
                         elim.simplify(asg, cdb, state)?;
+                    } else if use_vivify && 1.0 <= state.to_vivify {
+                        if vivify(asg, cdb, elim, state).is_err() {
+                            // return Err(SolverError::UndescribedError);
+                            analyze_final(asg, state, &cdb[ci]);
+                            return Ok(false);
+                        }
+                        state.to_vivify = 0.0;
+                        elim.to_simplify *= 1.2;
                     }
                 } else if RestartDecision::Force == decision {
                     RESTART!(asg, rst);

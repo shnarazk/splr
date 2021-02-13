@@ -278,7 +278,7 @@ pub fn handle_conflict(
             rst.update(ProgressUpdate::ACC(act));
         }
 
-        elim.to_simplify += 1.0 / (learnt_len as f64).powf(1.5);
+        elim.to_simplify += 1.0 / (learnt_len as f64).powf(1.4);
         if lbd <= 20 {
             for cid in &state.derive20 {
                 cdb[cid].turn_on(Flag::DERIVE20);

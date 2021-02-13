@@ -215,7 +215,7 @@ pub fn vivify(
                     cdb.set_activity(cj, activity);
                     cdb.handle(SolverEvent::Vivify(false));
                     cdb[cj].turn_on(Flag::VIVIFIED);
-                    elim.to_simplify += 1.0 / (n as f64).powf(1.5);
+                    elim.to_simplify += 1.0 / (n as f64).powf(1.4);
                     debug_assert!(!cdb[cs.cid].is(Flag::DEAD));
                     cdb.detach(cs.cid);
                     cdb.garbage_collect();
