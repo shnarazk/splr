@@ -16,12 +16,10 @@ impl Default for Var {
             timestamp: 0,
             flags: Flag::empty(),
             participated: 0,
+            extra_reward: 0.0,
 
             #[cfg(feature = "explore_timestamp")]
             assign_timestamp: 0,
-
-            #[cfg(feature = "extra_var_reward")]
-            extra_reward: 0.0,
         }
     }
 }

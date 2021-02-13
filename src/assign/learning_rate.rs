@@ -3,14 +3,9 @@ use {super::AssignStack, crate::types::*};
 
 impl ActivityIF<VarId> for AssignStack {
     #[inline]
-    #[cfg(feature = "extra_var_reward")]
     fn activity(&mut self, vi: VarId) -> f64 {
         let v = &self.var[vi];
         v.reward.max(v.extra_reward)
-    }
-    #[cfg(not(feature = "extra_var_reward"))]
-    fn activity(&mut self, vi: VarId) -> f64 {
-        self.var[vi].reward
     }
     fn average_activity(&self) -> f64 {
         self.activity_ema.get()
@@ -30,11 +25,7 @@ impl ActivityIF<VarId> for AssignStack {
         let t = self.ordinal;
         let v = &mut self.var[vi];
         v.timestamp = t;
-
-        #[cfg(feature = "extra_var_reward")]
-        {
-            v.extra_reward *= 0.98;
-        }
+        v.extra_reward *= self.staging_reward_decay;
     }
     fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];

@@ -81,14 +81,12 @@ pub struct Var {
     timestamp: usize,
     /// the `Flag`s
     flags: Flag,
+    /// a special reward given by aux rewarding mechanism
+    extra_reward: f64,
 
     #[cfg(feature = "explore_timestamp")]
     /// the number of conflicts at which this var was assigned lastly
     assign_timestamp: usize,
-
-    #[cfg(feature = "extra_var_reward")]
-    /// a special reward given by aux rewarding mechanism
-    extra_reward: f64,
 }
 
 /// A record of assignment. It's called 'trail' in Glucose.

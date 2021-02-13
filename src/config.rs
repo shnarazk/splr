@@ -149,7 +149,7 @@ pub struct Config {
     pub viv_thr: usize,
 
     //
-    //## staging
+    //## var staging
     //
     /// Decay rate for Extra reward for vars on stage
     pub stg_rwd_dcy: f64,

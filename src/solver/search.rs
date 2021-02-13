@@ -1,5 +1,5 @@
 //! Conflict-Driven Clause Learning Search engine
-#[cfg(feature = "staging")]
+#[cfg(feature = "var_staging")]
 use crate::state::StagingTarget;
 use {
     super::{
@@ -242,20 +242,11 @@ fn search(
                 if let Some(_new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);
                     let r = rst.exports();
-                    let num_ion = {
-                        #[cfg(not(feature = "staging"))]
-                        {
-                            0
-                        }
-                        #[cfg(feature = "staging")]
-                        {
-                            asg.num_staging_cands()
-                        }
-                    };
+                    let num_ion = asg.num_staging_cands();
                     let v = asg.var_stats();
                     parity = !parity;
 
-                    #[cfg(feature = "staging")]
+                    #[cfg(feature = "var_staging")]
                     {
                         let d = 1.0 / ((num_ion + 2) as f64).log2();
                         rst.update(ProgressUpdate::Temperature(d));
@@ -277,20 +268,20 @@ fn search(
                     }
 
                     if cdb.reduce(asg, asg.num_conflict) {
-                        #[cfg(not(feature = "staging"))]
+                        #[cfg(not(feature = "var_staging"))]
                         {
                             state.to_vivify += 0.1;
                         }
-                        #[cfg(feature = "staging")]
+                        #[cfg(feature = "var_staging")]
                         {
                             state.to_vivify += 0.5 / ((num_ion + 2) as f64).log2();
                         }
                     } else {
-                        #[cfg(not(feature = "staging"))]
+                        #[cfg(not(feature = "var_staging"))]
                         {
                             state.to_vivify += 0.01;
                         }
-                        #[cfg(feature = "staging")]
+                        #[cfg(feature = "var_staging")]
                         {
                             state.to_vivify += 0.05 / ((num_ion + 2) as f64).log2();
                         }

@@ -601,11 +601,11 @@ impl StateIF for State {
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
             im!("{:>9}", self, LogUsizeId::NumIon, {
-                #[cfg(not(feature = "staging"))]
+                #[cfg(not(feature = "var_staging"))]
                 {
                     0
                 }
-                #[cfg(feature = "staging")]
+                #[cfg(feature = "var_staging")]
                 {
                     asg.num_staging_cands()
                 }
