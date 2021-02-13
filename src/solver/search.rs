@@ -252,37 +252,28 @@ fn search(
                             asg.num_staging_cands()
                         }
                     };
-                    if true
-                    /* new_cycle */
+                    let v = asg.var_stats();
+                    parity = !parity;
+
+                    #[cfg(feature = "staging")]
                     {
-                        let v = asg.var_stats();
-                        parity = !parity;
+                        let d = 1.0 / ((num_ion + 2) as f64).log2();
+                        rst.update(ProgressUpdate::Temperature(d));
+                        asg.build_stage(StagingTarget::AutoSelect, parity);
+                    }
 
-                        #[cfg(feature = "staging")]
-                        {
-                            let d = 1.0 / ((num_ion + 2) as f64).log2();
-                            rst.update(ProgressUpdate::Temperature(d));
-                            asg.build_stage(StagingTarget::AutoSelect, parity);
-                        }
-
-                        if last_core != v.4 || 0 == v.4 {
-                            state.log(
-                                asg.num_conflict,
-                                format!(
-                                    "Lcycle:{:>6}, core:{:>9}, #ion: {:>9}, /cpr:{:>9.2}",
-                                    r.3,
-                                    v.4,
-                                    num_ion,
-                                    asg.exports_box().2.get(),
-                                ),
-                            );
-                            last_core = v.4;
-                        }
-                    } else {
-                        #[cfg(feature = "staging")]
-                        {
-                            asg.dissolve_stage(parity);
-                        }
+                    if last_core != v.4 || 0 == v.4 {
+                        state.log(
+                            asg.num_conflict,
+                            format!(
+                                "Lcycle:{:>6}, core:{:>9}, #ion: {:>9}, /cpr:{:>9.2}",
+                                r.3,
+                                v.4,
+                                num_ion,
+                                asg.exports_box().2.get(),
+                            ),
+                        );
+                        last_core = v.4;
                     }
 
                     if cdb.reduce(asg, asg.num_conflict) {
