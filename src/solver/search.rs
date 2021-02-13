@@ -270,20 +270,16 @@ fn search(
                     if cdb.reduce(asg, asg.num_conflict) {
                         #[cfg(not(feature = "var_staging"))]
                         {
-                            state.to_vivify += 0.1;
+                            state.to_vivify += 0.5;
                         }
                         #[cfg(feature = "var_staging")]
                         {
-                            state.to_vivify += 0.5 / ((num_ion + 2) as f64).log2();
+                            state.to_vivify += 1.0 / ((num_ion + 2) as f64).log2();
                         }
                     } else {
-                        #[cfg(not(feature = "var_staging"))]
-                        {
-                            state.to_vivify += 0.01;
-                        }
                         #[cfg(feature = "var_staging")]
                         {
-                            state.to_vivify += 0.05 / ((num_ion + 2) as f64).log2();
+                            state.to_vivify += 0.1 / ((num_ion + 2) as f64).log2();
                         }
                     }
                     // Simplification has been postponed because chronoBT was used.
