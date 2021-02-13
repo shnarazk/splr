@@ -30,6 +30,11 @@ impl ActivityIF<VarId> for AssignStack {
         let t = self.ordinal;
         let v = &mut self.var[vi];
         v.timestamp = t;
+
+        #[cfg(feature = "extra_var_reward")]
+        {
+            v.extra_reward *= 0.98;
+        }
     }
     fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
