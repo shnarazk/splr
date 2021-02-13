@@ -17,13 +17,13 @@ macro_rules! var_assign {
 
 /// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
-    #[cfg(feature = "staging")]
-    /// decay staging setting
-    fn dissolve_stage(&mut self, phasing: bool);
+    // #[cfg(feature = "staging")]
+    // /// decay staging setting
+    // fn dissolve_staged_vars(&mut self, phasing: bool);
 
     #[cfg(feature = "staging")]
     /// select staged vars
-    fn build_stage(&mut self, target: StagingTarget, rephasing: bool);
+    fn select_staged_vars(&mut self, target: StagingTarget, rephasing: bool);
 
     #[cfg(feature = "staging")]
     /// return the number of forgotton vars.
@@ -55,15 +55,16 @@ impl From<&Var> for VarTimestamp {
 }
 
 impl VarSelectIF for AssignStack {
-    #[cfg(feature = "staging")]
-    fn dissolve_stage(&mut self, rephasing: bool) {
-        self.rephasing = rephasing;
-        for (vi, b) in self.staged_vars.iter() {
-            let v = &mut self.var[*vi];
-            v.set(Flag::PHASE, *b);
-            v.extra_reward *= self.staging_reward_decay;
-        }
-    }
+    // #[cfg(feature = "staging")]
+    // fn dissolve_staged_vars(&mut self, rephasing: bool) {
+    //     self.rephasing = rephasing;
+    //     for (vi, b) in self.staged_vars.iter() {
+    //         let v = &mut self.var[*vi];
+    //         v.set(Flag::PHASE, *b);
+    //         v.extra_reward *= self.staging_reward_decay;
+    //     }
+    // }
+
     #[cfg(feature = "staging")]
     fn num_staging_cands(&self) -> usize {
         let mut best_act_min: f64 = 100_000_000.0;
@@ -82,7 +83,7 @@ impl VarSelectIF for AssignStack {
             .count()
     }
     #[cfg(feature = "staging")]
-    fn build_stage(&mut self, mut target: StagingTarget, rephasing: bool) {
+    fn select_staged_vars(&mut self, mut target: StagingTarget, rephasing: bool) {
         self.rephasing = rephasing;
         if !self.use_stage {
             return;
