@@ -71,8 +71,10 @@ impl VarSelectIF for AssignStack {
     #[cfg(feature = "var_staging")]
     fn num_staging_cands(&self) -> usize {
         let mut best_act_min: f64 = 100_000_000.0;
-        for vi in self.best_phases.iter() {
-            best_act_min = best_act_min.min(self.var[*vi.0].reward);
+        for (vi, (_, r)) in self.best_phases.iter() {
+            if matches!(r, AssignReason::None) {
+                best_act_min = best_act_min.min(self.var[*vi].reward);
+            }
         }
         self.var
             .iter()
@@ -107,19 +109,24 @@ impl VarSelectIF for AssignStack {
         }
         self.staged_vars.clear();
         // self.staging_reward_value = self.staging_reward_value.sqrt();
+        let base = self.average_activity();
         match target {
             StagingTarget::Best(mut limit) => {
-                for (vi, b) in self.best_phases.iter() {
-                    self.staged_vars.insert(*vi, *b);
-                    let v = &mut self.var[*vi];
-                    v.extra_reward = self.staging_reward_value;
-                    // v.reward = 0.0; // 1.0 - (1.0 - v.reward).sqrt();
-                    v.set(Flag::PHASE, *b);
+                for (vi, (b, r)) in self.best_phases.iter() {
+                    if matches!(r, AssignReason::None) {
+                        self.staged_vars.insert(*vi, *b);
+                        let v = &mut self.var[*vi];
+                        // v.extra_reward = self.staging_reward_value;
+                        v.extra_reward = (v.reward + base).clamp(0.0, 1.0);
+                        // v.reward = 0.0; // 1.0 - (1.0 - v.reward).sqrt();
+                        v.set(Flag::PHASE, *b);
+                    }
                 }
                 if 0 < limit {
                     let len = self.var_order.idxs[0];
                     for vi in self.var_order.heap[1..=len].iter() {
-                        if self.root_level < self.level[*vi] && self.best_phases.get(&vi).is_none()
+                        if self.root_level < self.level[*vi]
+                            && matches!(self.best_phases.get(&vi), Some((_, AssignReason::None)))
                         {
                             assert!(!self.var[*vi].is(Flag::ELIMINATED));
                             if limit == 0 {
@@ -186,7 +193,7 @@ impl VarSelectIF for AssignStack {
     fn select_decision_literal(&mut self) -> Lit {
         let vi = self.select_var();
         if self.use_rephase && self.rephasing {
-            if let Some(b) = self.best_phases.get(&vi) {
+            if let Some((b, AssignReason::None)) = self.best_phases.get(&vi) {
                 return Lit::from_assign(vi, *b);
             }
         }
@@ -221,7 +228,7 @@ impl AssignStack {
         if self.level[vi] == self.root_level {
             return false;
         }
-        if let Some(b) = self.best_phases.get(&vi) {
+        if let Some((b, _)) = self.best_phases.get(&vi) {
             debug_assert!(self.assign[vi].is_some());
             if self.assign[vi] != Some(*b) {
                 self.best_phases.clear();

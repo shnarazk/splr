@@ -345,7 +345,7 @@ impl AssignStack {
         for l in self.trail.iter().skip(self.len_upto(0)) {
             let vi = l.vi();
             if let Some(b) = self.assign[vi] {
-                self.best_phases.insert(vi, b);
+                self.best_phases.insert(vi, (b, self.reason[vi]));
             }
         }
         self.build_best_at = self.num_propagation;
