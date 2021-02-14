@@ -118,17 +118,14 @@ impl VarSelectIF for AssignStack {
             self.var[*vi].extra_reward = 0.0;
         }
         self.staged_vars.clear();
-        // self.staging_reward_value = self.staging_reward_value.sqrt();
-        let base = self.average_activity();
+        let base = self.staging_reward_value; // or self.average_activity()
         match target {
             StagingTarget::Best(mut limit) => {
                 for (vi, (b, r)) in self.best_phases.iter() {
                     if matches!(r, AssignReason::None) {
                         self.staged_vars.insert(*vi, *b);
                         let v = &mut self.var[*vi];
-                        // v.extra_reward = self.staging_reward_value;
-                        v.extra_reward = (v.reward + base).clamp(0.0, 1.0);
-                        // v.reward = 0.0; // 1.0 - (1.0 - v.reward).sqrt();
+                        v.extra_reward = v.reward + base;
                         v.set(Flag::PHASE, *b);
                     }
                 }
@@ -145,8 +142,7 @@ impl VarSelectIF for AssignStack {
                             limit -= 1;
                             let v = &mut self.var[*vi];
                             self.staged_vars.insert(*vi, v.is(Flag::PHASE));
-                            v.extra_reward = self.staging_reward_value;
-                            // v.reward = 1.0 - (1.0 - v.reward).sqrt();
+                            v.extra_reward = v.reward + base;
                             v.set(Flag::PHASE, v.is(Flag::PHASE));
                         }
                     }
