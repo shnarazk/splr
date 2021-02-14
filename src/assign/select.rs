@@ -154,13 +154,33 @@ impl VarSelectIF for AssignStack {
             }
             StagingTarget::Clear => (),
             StagingTarget::Core => {
-                let nc = self.num_unreachables();
-                let len = self.var_order.idxs[0];
-                if nc < len {
-                    for vi in self.var_order.heap[len - nc..=len].iter() {
-                        let v = &mut self.var[*vi];
-                        self.staged_vars.insert(*vi, v.is(Flag::PHASE));
-                        v.extra_reward = self.staging_reward_value;
+                let AssignStack {
+                    ref mut var,
+                    ref best_phases,
+                    ref level,
+                    root_level,
+                    ref mut staged_vars,
+                    staging_reward_value,
+                    ..
+                } = self;
+
+                let mut best_act_min: f64 = 100_000_000.0;
+                for (vi, (_, r)) in best_phases.iter() {
+                    if matches!(r, AssignReason::None) {
+                        best_act_min = best_act_min.min(var[*vi].reward);
+                    }
+                }
+
+                for v in var.iter_mut().skip(1) {
+                    if !v.is(Flag::ELIMINATED)
+                        && *root_level < level[v.index]
+                        && match best_phases.get(&v.index) {
+                            None => best_act_min <= v.reward,
+                            Some(_) => false,
+                        }
+                    {
+                        staged_vars.insert(v.index, v.is(Flag::PHASE));
+                        v.extra_reward = v.reward + *staging_reward_value;
                     }
                 }
             }
