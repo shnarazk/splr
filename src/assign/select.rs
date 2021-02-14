@@ -99,19 +99,11 @@ impl VarSelectIF for AssignStack {
             return;
         } else if target == StagingTarget::AutoSelect {
             self.stage_mode_select += 1;
-            // let n = self.num_unreachables().next_power_of_two().trailing_zeros() as usize;
             let n = ions.next_power_of_two().trailing_zeros() as usize;
-            if n == 0 {
-                target = StagingTarget::Clear;
-            } else {
-                match self.stage_mode_select % n {
-                    2 => target = StagingTarget::Best(0),
-                    8 => target = StagingTarget::Random,
-                    // 3 => target = StagingTarget::Core,
-                    // 4 => target = StagingTarget::LastAssigned,
-                    _ => target = StagingTarget::Clear,
-                    // _ => (),
-                }
+            match self.stage_mode_select % n.max(4) {
+                1 => target = StagingTarget::Best(0),
+                3 => target = StagingTarget::Core,
+                _ => target = StagingTarget::Clear,
             }
         }
         for vi in self.staged_vars.keys() {
