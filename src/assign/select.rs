@@ -105,7 +105,8 @@ impl VarSelectIF for AssignStack {
         let (neg_ion, pos_ion) = self.num_ion();
         if !self.use_stage {
             return;
-        } else if target == StagingTarget::AutoSelect {
+        }
+        if target == StagingTarget::AutoSelect {
             self.stage_mode_select += 1;
             target = if 0 == neg_ion {
                 StagingTarget::Backbone
@@ -133,7 +134,7 @@ impl VarSelectIF for AssignStack {
                 for (vi, (b, _)) in self.best_phases.iter() {
                     self.staged_vars.insert(*vi, *b);
                     let v = &mut self.var[*vi];
-                    v.extra_reward = base;
+                    v.extra_reward = v.reward + base;
                     v.set(Flag::PHASE, *b);
                 }
             }
