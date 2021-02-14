@@ -76,14 +76,19 @@ impl VarSelectIF for AssignStack {
                 best_act_min = best_act_min.min(self.var[*vi].reward);
             }
         }
+        let ave = self.average_activity();
         self.var
             .iter()
             .skip(1)
             .filter(|v| {
                 !v.is(Flag::ELIMINATED)
                     && self.root_level < self.level[v.index]
-                    && self.best_phases.get(&v.index).is_none()
-                    && best_act_min <= v.reward
+                    // && self.best_phases.get(&v.index).is_none()
+                    && match self.best_phases.get(&v.index) {
+                        Some((_, AssignReason::None)) => false,
+                        Some(_) => ave < v.reward,
+                        None => best_act_min <= v.reward,
+                    }
             })
             .count()
     }
