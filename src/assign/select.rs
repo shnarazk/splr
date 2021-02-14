@@ -83,7 +83,6 @@ impl VarSelectIF for AssignStack {
             .filter(|v| {
                 !v.is(Flag::ELIMINATED)
                     && self.root_level < self.level[v.index]
-                    // && self.best_phases.get(&v.index).is_none()
                     && match self.best_phases.get(&v.index) {
                         Some((_, AssignReason::None)) => false,
                         Some(_) => ave < v.reward,
@@ -124,8 +123,7 @@ impl VarSelectIF for AssignStack {
                 if 0 < limit {
                     let len = self.var_order.idxs[0];
                     for vi in self.var_order.heap[1..=len].iter() {
-                        if self.root_level < self.level[*vi]
-                            && matches!(self.best_phases.get(&vi), Some((_, AssignReason::None)))
+                        if self.root_level < self.level[*vi] && self.best_phases.get(&vi).is_none()
                         {
                             assert!(!self.var[*vi].is(Flag::ELIMINATED));
                             if limit == 0 {
