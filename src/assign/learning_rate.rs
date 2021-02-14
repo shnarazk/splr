@@ -25,7 +25,6 @@ impl ActivityIF<VarId> for AssignStack {
         let t = self.ordinal;
         let v = &mut self.var[vi];
         v.timestamp = t;
-        v.extra_reward *= self.staging_reward_decay;
     }
     fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
@@ -33,6 +32,7 @@ impl ActivityIF<VarId> for AssignStack {
         let rate = v.participated as f64 / duration;
         v.reward *= self.activity_decay;
         v.reward += self.activity_anti_decay * rate.powf(self.occurrence_compression_rate);
+        v.extra_reward *= self.staging_reward_decay;
         v.participated = 0;
         self.activity_ema.update(v.reward);
     }
