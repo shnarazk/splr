@@ -100,8 +100,8 @@ impl VarSelectIF for AssignStack {
             self.stage_mode_select += 1;
             let n = ions.next_power_of_two().trailing_zeros() as usize;
             match self.stage_mode_select % n.max(4) {
-                1 => target = StagingTarget::Best(0),
-                3 => target = StagingTarget::Core,
+                // 1 => target = StagingTarget::Backbone,
+                // 3 => target = StagingTarget::NegativeIons,
                 _ => target = StagingTarget::Clear,
             }
         }
@@ -111,7 +111,7 @@ impl VarSelectIF for AssignStack {
         self.staged_vars.clear();
         let base = self.staging_reward_value; // or self.average_activity()
         match target {
-            StagingTarget::Best(mut limit) => {
+            StagingTarget::Backbone => {
                 for (vi, (b, r)) in self.best_phases.iter() {
                     if matches!(r, AssignReason::None) {
                         self.staged_vars.insert(*vi, *b);
@@ -120,26 +120,9 @@ impl VarSelectIF for AssignStack {
                         v.set(Flag::PHASE, *b);
                     }
                 }
-                if 0 < limit {
-                    let len = self.var_order.idxs[0];
-                    for vi in self.var_order.heap[1..=len].iter() {
-                        if self.root_level < self.level[*vi] && self.best_phases.get(&vi).is_none()
-                        {
-                            assert!(!self.var[*vi].is(Flag::ELIMINATED));
-                            if limit == 0 {
-                                break;
-                            }
-                            limit -= 1;
-                            let v = &mut self.var[*vi];
-                            self.staged_vars.insert(*vi, v.is(Flag::PHASE));
-                            v.extra_reward = v.reward + base;
-                            v.set(Flag::PHASE, v.is(Flag::PHASE));
-                        }
-                    }
-                }
             }
             StagingTarget::Clear => (),
-            StagingTarget::Core => {
+            StagingTarget::NegativeIons => {
                 let AssignStack {
                     ref mut var,
                     ref best_phases,
@@ -170,11 +153,37 @@ impl VarSelectIF for AssignStack {
                     }
                 }
             }
-            StagingTarget::LastAssigned => {
-                for vi in self.trail.iter().map(|l| l.vi()) {
-                    let mut v = &mut self.var[vi];
-                    self.staged_vars.insert(vi, v.is(Flag::PHASE));
-                    v.extra_reward = self.staging_reward_value;
+            StagingTarget::PositiveIons => {
+                let AssignStack {
+                    ref mut var,
+                    ref best_phases,
+                    ref level,
+                    root_level,
+                    ref mut staged_vars,
+                    staging_reward_value,
+                    ..
+                } = self;
+
+                let mut best_act_min: f64 = 100_000_000.0;
+                for (vi, (_, r)) in best_phases.iter() {
+                    if matches!(r, AssignReason::None) {
+                        best_act_min = best_act_min.min(var[*vi].reward);
+                    }
+                }
+
+                for v in var.iter_mut().skip(1) {
+                    if !v.is(Flag::ELIMINATED)
+                        && *root_level < level[v.index]
+                        && match best_phases.get(&v.index) {
+                            Some((_, AssignReason::Implication(_, NULL_LIT))) => {
+                                best_act_min <= v.reward
+                            }
+                            _ => false,
+                        }
+                    {
+                        staged_vars.insert(v.index, v.is(Flag::PHASE));
+                        v.extra_reward = v.reward + *staging_reward_value;
+                    }
                 }
             }
             StagingTarget::Random => {

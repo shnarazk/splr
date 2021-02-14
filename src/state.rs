@@ -58,15 +58,15 @@ pub enum StagingTarget {
     /// select some targets cyclicly.
     AutoSelect,
     /// use best phases with some unsettled vars
-    Best(usize),
+    Backbone,
     /// unstage all vars.
     Clear,
-    /// choose vars in core
-    Core,
-    ///
-    LastAssigned,
     /// select random vars.
     Random,
+    /// high activated var out of best phases
+    NegativeIons,
+    /// non decision vars in best phases
+    PositiveIons,
 
     #[cfg(feature = "explore_timestamp")]
     /// seek unchecked vars.
@@ -79,15 +79,15 @@ impl fmt::Display for StagingTarget {
             formatter,
             "{}",
             match self {
-                StagingTarget::AutoSelect => "StageMode",
-                StagingTarget::Best(_) => "StageMode_top",
-                StagingTarget::Clear => "StageMode_Clear",
-                StagingTarget::Core => "StageMode_Core",
-                StagingTarget::LastAssigned => "StageMode_LA",
-                StagingTarget::Random => "Stage_Random",
+                StagingTarget::AutoSelect => "Staging_something",
+                StagingTarget::Backbone => "Staging_backbone",
+                StagingTarget::Clear => "Staging_none",
+                StagingTarget::Random => "Staging_random",
+                StagingTarget::NegativeIons => "StagingTarget +ions",
+                StagingTarget::PositiveIons => "Staging -ions",
 
                 #[cfg(feature = "explore_timestamp")]
-                StagingTarget::Explore => "StageMode_Exp",
+                StagingTarget::Explore => "Staging_unknowns",
             }
         )
     }
