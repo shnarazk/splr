@@ -607,7 +607,8 @@ impl StateIF for State {
                 }
                 #[cfg(feature = "var_staging")]
                 {
-                    asg.num_staging_cands()
+                    let (n, p) = asg.num_ion();
+                    n + p
                 }
             }),
             im!("{:>9}", self, LogUsizeId::LubySpan, rst_num_span),

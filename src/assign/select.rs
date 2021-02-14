@@ -26,7 +26,7 @@ pub trait VarSelectIF {
     fn select_staged_vars(&mut self, target: StagingTarget, rephasing: bool, ions: usize);
 
     /// return the number of forgotton vars.
-    fn num_staging_cands(&self) -> usize;
+    fn num_ion(&self) -> (usize, usize);
 
     /// select a new decision variable.
     fn select_decision_literal(&mut self) -> Lit;
@@ -69,7 +69,7 @@ impl VarSelectIF for AssignStack {
         0
     }
     #[cfg(feature = "var_staging")]
-    fn num_staging_cands(&self) -> usize {
+    fn num_ion(&self) -> (usize, usize) {
         let mut best_act_min: f64 = 100_000_000.0;
         for (vi, (_, r)) in self.best_phases.iter() {
             if matches!(r, AssignReason::None) {
@@ -77,19 +77,23 @@ impl VarSelectIF for AssignStack {
             }
         }
         let ave = self.average_activity();
-        self.var
-            .iter()
-            .skip(1)
-            .filter(|v| {
-                !v.is(Flag::ELIMINATED)
-                    && self.root_level < self.level[v.index]
-                    && match self.best_phases.get(&v.index) {
-                        Some((_, AssignReason::None)) => false,
-                        Some(_) => ave < v.reward,
-                        None => best_act_min <= v.reward,
+        let mut num_negative = 0; // unreachable core side
+        let mut num_positive = 0; // decision var side
+
+        for v in self.var.iter().skip(1) {
+            if !v.is(Flag::ELIMINATED) && self.root_level < self.level[v.index] {
+                match self.best_phases.get(&v.index) {
+                    Some((_, AssignReason::Implication(_, NULL_LIT))) if ave < v.reward => {
+                        num_positive += 1;
                     }
-            })
-            .count()
+                    None if best_act_min <= v.reward => {
+                        num_negative += 1;
+                    }
+                    _ => (),
+                }
+            }
+        }
+        (num_negative, num_positive)
     }
     #[cfg(feature = "var_staging")]
     fn select_staged_vars(&mut self, mut target: StagingTarget, rephasing: bool, ions: usize) {
@@ -187,7 +191,10 @@ impl VarSelectIF for AssignStack {
                 }
             }
             StagingTarget::Random => {
-                let limit = self.num_staging_cands();
+                let limit = {
+                    let (n, p) = self.num_ion();
+                    n + p
+                };
                 let _len = self.var_order.idxs[0].min(limit);
                 for vi in self.var_order.heap[1..].iter().rev() {
                     let b = self.var[*vi].timestamp % 2 == 0;

@@ -242,7 +242,10 @@ fn search(
                 if let Some(_new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);
                     let r = rst.exports();
-                    let num_ion = asg.num_staging_cands();
+                    let num_ion = {
+                        let (n, p) = asg.num_ion();
+                        n + p
+                    };
                     let v = asg.var_stats();
                     parity = !parity;
 
