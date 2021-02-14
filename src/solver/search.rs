@@ -242,28 +242,31 @@ fn search(
                 if let Some(_new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);
                     let r = rst.exports();
-                    let num_ion = {
-                        let (n, p) = asg.num_ion();
-                        n + p
-                    };
+                    let num_ion = asg.num_ion();
+                    let ion_index: f64 = ((num_ion.0 + num_ion.1 + 2) as f64).log2();
                     let v = asg.var_stats();
                     parity = !parity;
 
                     #[cfg(feature = "var_staging")]
                     {
-                        let d = 1.0 / ((num_ion + 2) as f64).log2();
+                        let d = 1.0 / ion_index;
                         rst.update(ProgressUpdate::Temperature(d));
-                        asg.select_staged_vars(StagingTarget::AutoSelect, parity, num_ion);
+                        asg.select_staged_vars(
+                            StagingTarget::AutoSelect,
+                            parity,
+                            num_ion.0 + num_ion.1,
+                        );
                     }
 
                     if last_core != v.4 || 0 == v.4 {
                         state.log(
                             asg.num_conflict,
                             format!(
-                                "Lcycle:{:>6}, core:{:>9}, #ion: {:>9}, /cpr:{:>9.2}",
+                                "Lcycle:{:>5}, core:{:>9}, #ion:{:>6}|{:<6},/cpr:{:>9.2}",
                                 r.3,
                                 v.4,
-                                num_ion,
+                                num_ion.0,
+                                num_ion.1,
                                 asg.exports_box().2.get(),
                             ),
                         );
@@ -277,12 +280,12 @@ fn search(
                         }
                         #[cfg(feature = "var_staging")]
                         {
-                            state.to_vivify += 1.0 / ((num_ion + 2) as f64).log2();
+                            state.to_vivify += 1.0 / ion_index;
                         }
                     } else {
                         #[cfg(feature = "var_staging")]
                         {
-                            state.to_vivify += 0.1 / ((num_ion + 2) as f64).log2();
+                            state.to_vivify += 0.1 / ion_index;
                         }
                     }
                     // Simplification has been postponed because chronoBT was used.

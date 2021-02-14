@@ -65,28 +65,32 @@ impl VarSelectIF for AssignStack {
     // }
 
     #[cfg(not(feature = "var_staging"))]
-    fn num_staging_cands(&self) -> usize {
+    fn num_ion(&self) -> usize {
         0
     }
     #[cfg(feature = "var_staging")]
     fn num_ion(&self) -> (usize, usize) {
-        let mut best_act_min: f64 = 100_000_000.0;
-        for (vi, (_, r)) in self.best_phases.iter() {
-            if matches!(r, AssignReason::None) {
-                best_act_min = best_act_min.min(self.var[*vi].reward);
-            }
+        let mut backbone_activity: f64 = 0.0;
+        let mut num_var = 0;
+        for (vi, _) in self
+            .best_phases
+            .iter()
+            .filter(|e| matches!(e.1 .1, AssignReason::None))
+        {
+            backbone_activity += self.var[*vi].reward;
+            num_var += 1;
         }
-        let ave = self.average_activity();
+        let thr = backbone_activity / (num_var as f64);
         let mut num_negative = 0; // unreachable core side
         let mut num_positive = 0; // decision var side
 
         for v in self.var.iter().skip(1) {
-            if !v.is(Flag::ELIMINATED) && self.root_level < self.level[v.index] {
+            if !v.is(Flag::ELIMINATED) && thr < v.reward && self.root_level < self.level[v.index] {
                 match self.best_phases.get(&v.index) {
-                    Some((_, AssignReason::Implication(_, NULL_LIT))) if ave < v.reward => {
+                    Some((_, AssignReason::Implication(_, NULL_LIT))) => {
                         num_positive += 1;
                     }
-                    None if best_act_min <= v.reward => {
+                    None => {
                         num_negative += 1;
                     }
                     _ => (),
