@@ -117,8 +117,8 @@ impl PropagateIF for AssignStack {
         // assert!(self.trail_lim.is_empty() || !cid.is_none());
         let vi = l.vi();
         let decided = self.root_level < self.level[vi]
-            && var_assign!(self, vi).is_some()
-            && self.reason[vi] == AssignReason::None;
+            && self.reason[vi] == AssignReason::None
+            && matches!(self.best_phases.get(&vi), Some((_, AssignReason::None)));
         self.level[vi] = lv;
         let v = &mut self.var[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
@@ -356,7 +356,9 @@ impl AssignStack {
             debug_assert!(self.assign[vi].is_some());
             if self.assign[vi] != Some(*b) {
                 self.best_phases.clear();
-                self.num_best_assign = 0;
+                if self.root_level == self.level[vi] {
+                    self.num_best_assign = 0;
+                }
                 self.stage_activity = 0.0;
                 return true;
             }
