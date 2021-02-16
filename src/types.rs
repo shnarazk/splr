@@ -815,6 +815,30 @@ impl Logger {
     }
 }
 
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct OrderedProxy<T: Clone + Default + Sized> {
+    index: usize,
+    body: T,
+}
+
+impl<T: Clone + Default + Sized> Default for OrderedProxy<T> {
+    fn default() -> Self {
+        OrderedProxy {
+            index: 0,
+            body: T::default(),
+        }
+    }
+}
+
+impl<T: Clone + Default + Sized> OrderedProxy<T> {
+    pub fn new(body: T, index: usize) -> Self {
+        OrderedProxy { index, body }
+    }
+    pub fn to(&self) -> T {
+        self.body.clone()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

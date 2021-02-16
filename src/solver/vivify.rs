@@ -12,21 +12,6 @@ use {
     std::borrow::Cow,
 };
 
-#[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
-struct ClauseProxy {
-    val: usize,
-    cid: ClauseId,
-}
-
-impl Default for ClauseProxy {
-    fn default() -> Self {
-        ClauseProxy {
-            val: 0,
-            cid: ClauseId::default(),
-        }
-    }
-}
-
 /// vivify clauses in `cdb` under `asg`
 pub fn vivify(
     asg: &mut AssignStack,
@@ -34,7 +19,7 @@ pub fn vivify(
     elim: &mut Eliminator,
     state: &mut State,
 ) -> MaybeInconsistent {
-    let mut clauses: Vec<ClauseProxy> = Vec::new();
+    let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
     let mut num_clause = 0;
     let rate = cdb.average_activity() / asg.average_activity();
     for (i, c) in cdb.iter().enumerate().skip(1) {
@@ -47,10 +32,10 @@ pub fn vivify(
                 act_v = act_v.max(asg.activity(l.vi()));
             }
             if act_v * rate < act_c {
-                clauses.push(ClauseProxy {
-                    val: (1_000_000.0 * (1.0 - act_c + act_v)) as usize,
-                    cid: ClauseId::from(i),
-                });
+                clauses.push(OrderedProxy::new(
+                    ClauseId::from(i),
+                    (1_000_000.0 * (1.0 - act_c + act_v)) as usize,
+                ));
             }
         }
     }
@@ -61,7 +46,7 @@ pub fn vivify(
     let num_target = clauses
         .len()
         .min(5_000_000_000 / ((num_clause as f64).powf(1.15) as usize));
-    clauses.resize(num_target, ClauseProxy::default());
+    clauses.resize(num_target, OrderedProxy::default());
     asg.handle(SolverEvent::Vivify(true));
     state[Stat::Vivification] += 1;
 
@@ -77,8 +62,8 @@ pub fn vivify(
     let mut to_display = 0;
 
     while let Some(cs) = clauses.pop() {
-        let activity = cdb.activity(cs.cid);
-        let c: &mut Clause = &mut cdb[cs.cid];
+        let activity = cdb.activity(cs.to());
+        let c: &mut Clause = &mut cdb[cs.to()];
         // Since GC can make `clauses` out of date, we need to check its aliveness here.
         if c.is(Flag::DEAD) {
             continue;
@@ -179,8 +164,8 @@ pub fn vivify(
                 return Err(SolverError::Inconsistent);
             }
             0 => {
-                if !cdb[cs.cid].is(Flag::DEAD) {
-                    cdb.detach(cs.cid);
+                if !cdb[cs.to()].is(Flag::DEAD) {
+                    cdb.detach(cs.to());
                     cdb.garbage_collect();
                     num_purge += 1;
                 }
@@ -199,8 +184,8 @@ pub fn vivify(
                     }
                     state[Stat::VivifiedVar] += 1;
                 }
-                debug_assert!(!cdb[cs.cid].is(Flag::DEAD));
-                cdb.detach(cs.cid);
+                debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
+                cdb.detach(cs.to());
                 cdb.garbage_collect();
             }
             n if n == clits.len() => (),
@@ -216,13 +201,13 @@ pub fn vivify(
                     cdb.handle(SolverEvent::Vivify(false));
                     cdb[cj].turn_on(Flag::VIVIFIED);
                     elim.to_simplify += 1.0 / (n as f64).powf(1.4);
-                    debug_assert!(!cdb[cs.cid].is(Flag::DEAD));
-                    cdb.detach(cs.cid);
+                    debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
+                    cdb.detach(cs.to());
                     cdb.garbage_collect();
                 }
             }
         }
-        clauses.retain(|ci| !cdb[ci.cid].is(Flag::DEAD));
+        clauses.retain(|ci| !cdb[ci.to()].is(Flag::DEAD));
     }
     asg.handle(SolverEvent::Vivify(false));
     if 0 < num_assert || 0 < num_purge || 0 < num_shrink {

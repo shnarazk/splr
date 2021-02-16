@@ -811,13 +811,6 @@ impl ClauseDB {
         A: AssignIF,
     {
         const SCALE_UP: f64 = 100_000_000.0;
-
-        #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
-        struct ClauseProxy {
-            weight: usize,
-            index: usize,
-        }
-
         let ClauseDB {
             ref mut clause,
             ref mut lbd_temp,
@@ -829,7 +822,7 @@ impl ClauseDB {
         } = self;
         self.num_reduction += 1;
         self.next_reduction += self.inc_step;
-        let mut perm: Vec<ClauseProxy> = Vec::with_capacity(clause.len());
+        let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
             if !c.is(Flag::LEARNT) || c.is(Flag::DEAD) || asg.locked(c, ClauseId::from(i)) {
                 continue;
@@ -851,27 +844,25 @@ impl ClauseDB {
             let rank = c.update_lbd(asg, lbd_temp) as f64;
             let act_c = c.update_activity(*ordinal, *activity_decay, *activity_anti_decay);
             let weight = (SCALE_UP * rank / (act_v + act_c)) as usize;
-            perm.push(ClauseProxy { weight, index: i });
+            perm.push(OrderedProxy::new(i, weight));
         }
         let keep = (perm.len() / 2).min(nc / 2);
         if !self.use_chan_seok {
-            if clause[perm[keep].index].rank <= 3 {
+            if clause[perm[keep].to()].rank <= 3 {
                 self.next_reduction += self.extra_inc;
             }
-            if clause[perm[0].index].rank <= 5 {
+            if clause[perm[0].to()].rank <= 5 {
                 self.next_reduction += self.extra_inc;
             };
         }
-        perm.sort_unstable_by_key(|c| c.weight);
+        perm.sort_unstable();
         for i in &perm[keep..] {
-            let c = &mut clause[i.index];
+            let c = &mut clause[i.to()];
             if 2 < c.rank {
                 c.kill(touched);
             }
         }
-        debug_assert!(perm[0..keep]
-            .iter()
-            .all(|c| !clause[c.index].is(Flag::DEAD)));
+        debug_assert!(perm[0..keep].iter().all(|c| !clause[c.to()].is(Flag::DEAD)));
         self.garbage_collect();
     }
 
