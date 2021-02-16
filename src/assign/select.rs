@@ -34,8 +34,6 @@ pub trait VarSelectIF {
     fn update_order(&mut self, v: VarId);
     /// rebuild the internal var_order
     fn rebuild_order(&mut self);
-    /// make a var asserted.
-    fn make_var_asserted(&mut self, vi: VarId);
 }
 
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -220,35 +218,9 @@ impl VarSelectIF for AssignStack {
             }
         }
     }
-    fn make_var_asserted(&mut self, vi: VarId) {
-        self.num_asserted_vars += 1;
-        self.clear_activity(vi);
-        self.remove_from_heap(vi);
-        self.check_best_phase(vi);
-    }
 }
 
 impl AssignStack {
-    /// check usability of the saved best phase.
-    /// return `true` if the current best phase got invalid.
-    fn check_best_phase(&mut self, vi: VarId) -> bool {
-        if self.var[vi].is(Flag::ELIMINATED) {
-            return false;
-        }
-        if self.level[vi] == self.root_level {
-            return false;
-        }
-        if let Some((b, _)) = self.best_phases.get(&vi) {
-            debug_assert!(self.assign[vi].is_some());
-            if self.assign[vi] != Some(*b) {
-                self.best_phases.clear();
-                self.num_best_assign = 0;
-                self.stage_activity = 0.0;
-                return true;
-            }
-        }
-        false
-    }
     /// select a decision var
     fn select_var(&mut self) -> VarId {
         loop {

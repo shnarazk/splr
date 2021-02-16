@@ -1,7 +1,7 @@
 /// implement boolean constraint propagation, backjump
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{AssignIF, AssignStack, VarHeapIF, VarSelectIF},
+    super::{AssignIF, AssignStack, VarHeapIF},
     crate::{
         cdb::{ClauseDBIF, WatchDBIF},
         types::*,
@@ -116,6 +116,9 @@ impl PropagateIF for AssignStack {
         // The following doesn't hold anymore by using chronoBT.
         // assert!(self.trail_lim.is_empty() || !cid.is_none());
         let vi = l.vi();
+        let decided = self.root_level < self.level[vi]
+            && var_assign!(self, vi).is_some()
+            && self.reason[vi] == AssignReason::None;
         self.level[vi] = lv;
         let v = &mut self.var[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
@@ -128,6 +131,9 @@ impl PropagateIF for AssignStack {
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
+        if decided {
+            self.check_best_phase(vi);
+        }
     }
     fn assign_by_decision(&mut self, l: Lit) {
         debug_assert!(l.vi() < self.var.len());
@@ -337,8 +343,35 @@ impl PropagateIF for AssignStack {
 }
 
 impl AssignStack {
+    /// check usability of the saved best phase.
+    /// return `true` if the current best phase got invalid.
+    pub fn check_best_phase(&mut self, vi: VarId) -> bool {
+        if self.var[vi].is(Flag::ELIMINATED) {
+            return false;
+        }
+        if self.level[vi] == self.root_level {
+            return false;
+        }
+        if let Some((b, _)) = self.best_phases.get(&vi) {
+            debug_assert!(self.assign[vi].is_some());
+            if self.assign[vi] != Some(*b) {
+                self.best_phases.clear();
+                self.num_best_assign = 0;
+                self.stage_activity = 0.0;
+                return true;
+            }
+        }
+        false
+    }
     fn level_up(&mut self) {
         self.trail_lim.push(self.trail.len());
+    }
+    /// make a var asserted.
+    pub fn make_var_asserted(&mut self, vi: VarId) {
+        self.num_asserted_vars += 1;
+        self.clear_activity(vi);
+        self.remove_from_heap(vi);
+        self.check_best_phase(vi);
     }
     /// save the current assignments as the best phases
     fn save_best_phases(&mut self) {
