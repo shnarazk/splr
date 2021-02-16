@@ -183,7 +183,7 @@ impl Default for Config {
             a_elim: 1,
             a_luby: 0,
             a_reduce: 1,
-            a_rephase: 0,
+            a_rephase: 1,
             a_rsr: 1,
             a_stabilize: 1,
             a_stage: 1,
@@ -231,7 +231,7 @@ impl Default for Config {
             rst_stb_exp: 1.0,
             rst_stb_scl: 2.0,
 
-            stg_rwd_dcy: 0.95,
+            stg_rwd_dcy: 0.998,
             stg_rwd_val: 1.0,
 
             viv_thr: 1,

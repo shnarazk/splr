@@ -251,11 +251,7 @@ fn search(
                     {
                         let d = 1.0 / ion_index;
                         rst.update(ProgressUpdate::Temperature(d));
-                        asg.select_staged_vars(
-                            StagingTarget::AutoSelect,
-                            parity,
-                            num_ion.0 + num_ion.1,
-                        );
+                        asg.select_staged_vars(StagingTarget::Clear, parity, num_ion.0 + num_ion.1);
                     }
 
                     if last_core != v.4 || 0 == v.4 {
