@@ -70,17 +70,7 @@ impl VarSelectIF for AssignStack {
     }
     #[cfg(feature = "var_staging")]
     fn num_ion(&self) -> (usize, usize) {
-        let mut backbone_activity: f64 = 0.0;
-        let mut num_var = 0;
-        for (vi, _) in self
-            .best_phases
-            .iter()
-            .filter(|e| matches!(e.1 .1, AssignReason::None))
-        {
-            backbone_activity += self.var[*vi].reward;
-            num_var += 1;
-        }
-        let thr = backbone_activity / (num_var as f64);
+        let thr = self.average_activity();
         let mut num_negative = 0; // unreachable core side
         let mut num_positive = 0; // decision var side
 
@@ -103,41 +93,48 @@ impl VarSelectIF for AssignStack {
     fn select_staged_vars(&mut self, mut target: StagingTarget, rephasing: bool, _ions: usize) {
         self.rephasing = rephasing;
         let (neg_ion, pos_ion) = self.num_ion();
+        self.rephasing = 0 == neg_ion;
         if !self.use_stage {
             return;
         }
         if target == StagingTarget::AutoSelect {
             self.stage_mode_select += 1;
-            target = if 0 == neg_ion {
-                StagingTarget::Backbone
-            } else {
-                StagingTarget::Clear
-            };
+            target = StagingTarget::Clear;
+            // if 0 == neg_ion {
+            //     // target = StagingTarget::BestPhases;
+            //     // target = StagingTarget::Ions;
+            //     target = StagingTarget::Clear;
+            // } else {
+            //     target = StagingTarget::Backbone;
+            // };
         }
         for vi in self.staged_vars.keys() {
-            self.var[*vi].extra_reward = 0.0;
+            // self.var[*vi].extra_reward = 0.0;
+            self.var[*vi].turn_off(Flag::STAGED);
         }
         self.staged_vars.clear();
-        let base = self.staging_reward_value; // or self.average_activity()
+        // let base = self.staging_reward_value; // or self.average_activity()
+        self.stage_activity = self.staging_reward_value;
         match target {
             StagingTarget::Backbone => {
                 for (vi, (b, r)) in self.best_phases.iter() {
                     if matches!(r, AssignReason::None) {
-                        self.staged_vars.insert(*vi, *b);
                         let v = &mut self.var[*vi];
-                        v.extra_reward = v.reward + base;
+                        v.turn_on(Flag::STAGED);
                         v.set(Flag::PHASE, *b);
+                        self.staged_vars.insert(*vi, *b);
                     }
                 }
             }
             StagingTarget::BestPhases => {
                 for (vi, (b, _)) in self.best_phases.iter() {
-                    self.staged_vars.insert(*vi, *b);
                     let v = &mut self.var[*vi];
-                    v.extra_reward = v.reward + base;
+                    v.turn_on(Flag::STAGED);
                     v.set(Flag::PHASE, *b);
+                    self.staged_vars.insert(*vi, *b);
                 }
             }
+
             StagingTarget::Clear => (),
             StagingTarget::Ions => {
                 let AssignStack {
@@ -146,7 +143,6 @@ impl VarSelectIF for AssignStack {
                     ref level,
                     root_level,
                     ref mut staged_vars,
-                    staging_reward_value,
                     ..
                 } = self;
 
@@ -171,7 +167,7 @@ impl VarSelectIF for AssignStack {
                         }
                     {
                         staged_vars.insert(v.index, v.is(Flag::PHASE));
-                        v.extra_reward = v.reward + *staging_reward_value;
+                        v.turn_on(Flag::STAGED);
                     }
                 }
             }
@@ -181,7 +177,7 @@ impl VarSelectIF for AssignStack {
                 for vi in self.var_order.heap[1..].iter().rev() {
                     let b = self.var[*vi].timestamp % 2 == 0;
                     self.staged_vars.insert(*vi, b);
-                    self.var[*vi].extra_reward = self.staging_reward_value;
+                    self.var[*vi].turn_on(Flag::STAGED);
                 }
             }
             #[cfg(feature = "explore_timestamp")]
@@ -247,6 +243,7 @@ impl AssignStack {
             if self.assign[vi] != Some(*b) {
                 self.best_phases.clear();
                 self.num_best_assign = 0;
+                self.stage_activity = 0.0;
                 return true;
             }
         }

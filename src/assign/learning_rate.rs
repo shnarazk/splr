@@ -5,7 +5,11 @@ impl ActivityIF<VarId> for AssignStack {
     #[inline]
     fn activity(&mut self, vi: VarId) -> f64 {
         let v = &self.var[vi];
-        v.reward.max(v.extra_reward)
+        if v.is(Flag::STAGED) {
+            v.reward + self.stage_activity
+        } else {
+            v.reward
+        }
     }
     fn average_activity(&self) -> f64 {
         self.activity_ema.get()
@@ -32,12 +36,12 @@ impl ActivityIF<VarId> for AssignStack {
         let rate = v.participated as f64 / duration;
         v.reward *= self.activity_decay;
         v.reward += self.activity_anti_decay * rate.powf(self.occurrence_compression_rate);
-        v.extra_reward *= self.staging_reward_decay;
         v.participated = 0;
         self.activity_ema.update(v.reward);
     }
     fn update_rewards(&mut self) {
         self.ordinal += 1;
+        self.stage_activity *= self.activity_decay;
         #[cfg(feature = "moving_var_reward_rate")]
         {
             self.activity_decay = self

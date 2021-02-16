@@ -61,6 +61,7 @@ impl Default for AssignStack {
             staged_vars: HashMap::new(),
             stage_mode_select: 0,
             num_stages: 0,
+            stage_activity: 0.0,
 
             num_vars: 0,
             num_asserted_vars: 0,

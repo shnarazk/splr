@@ -81,9 +81,6 @@ pub struct Var {
     timestamp: usize,
     /// the `Flag`s
     flags: Flag,
-    /// a special reward given by aux rewarding mechanism
-    extra_reward: f64,
-
     #[cfg(feature = "explore_timestamp")]
     /// the number of conflicts at which this var was assigned lastly
     assign_timestamp: usize,
@@ -127,6 +124,7 @@ pub struct AssignStack {
     staged_vars: HashMap<VarId, bool>,
     stage_mode_select: usize,
     num_stages: usize,
+    stage_activity: f64,
 
     //
     //## Statistics
