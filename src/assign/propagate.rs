@@ -356,11 +356,21 @@ impl AssignStack {
         if let Some((b, _)) = self.best_phases.get(&vi) {
             debug_assert!(self.assign[vi].is_some());
             if self.assign[vi] != Some(*b) {
-                self.best_phases.clear();
+                let lvl = self.level[vi];
                 if self.root_level == self.level[vi] {
-                    self.num_best_assign = 0;
+                    self.best_phases.clear();
+                    self.num_best_assign = self.num_eliminated_vars;
+                    // self.stage_activity = 0.0;
+                } else {
+                    let AssignStack {
+                        ref mut best_phases,
+                        ref level,
+                        ..
+                    } = self;
+                    best_phases.retain(|vj, _| level[*vj] < lvl);
+                    // self.best_phases.remove(&vi);
+                    self.num_best_assign = self.num_eliminated_vars + self.best_phases.len();
                 }
-                self.stage_activity = 0.0;
                 return true;
             }
         }

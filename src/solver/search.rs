@@ -209,6 +209,7 @@ fn search(
     let use_vivify = state.config.use_vivify();
     let mut parity = false;
     let mut last_core = 0;
+    let mut best_asserted = state.target.num_of_variables;
     rst.update(ProgressUpdate::Luby);
     rst.update(ProgressUpdate::Remain(asg.num_vars - asg.num_asserted_vars));
 
@@ -251,7 +252,11 @@ fn search(
                     {
                         let d = 1.0 / ion_index;
                         rst.update(ProgressUpdate::Temperature(d));
-                        asg.select_staged_vars(StagingTarget::Clear, parity, num_ion.0 + num_ion.1);
+                        asg.select_staged_vars(
+                            StagingTarget::AutoSelect,
+                            parity,
+                            num_ion.0 + num_ion.1,
+                        );
                     }
 
                     if last_core != v.4 || 0 == v.4 {
@@ -321,8 +326,11 @@ fn search(
                 state[Stat::NoDecisionConflict] += 1;
             }
             if let Some(na) = asg.best_assigned() {
-                state.flush("");
-                state.flush(format!("unreachable core: {}", na));
+                if na < best_asserted {
+                    state.flush("");
+                    state.flush(format!("unreachable core: {}", na));
+                    best_asserted = na;
+                }
             }
             if asg.num_conflict % state.reflection_interval == 0 {
                 // println!("var:{:>10.4}, cls:{:>10.4}", asg.average_activity(), cdb.average_activity());
