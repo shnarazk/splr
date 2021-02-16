@@ -116,7 +116,8 @@ impl PropagateIF for AssignStack {
         // The following doesn't hold anymore by using chronoBT.
         // assert!(self.trail_lim.is_empty() || !cid.is_none());
         let vi = l.vi();
-        let decided = self.root_level < self.level[vi]
+        let decided = self.use_rephase
+            && self.root_level < self.level[vi]
             && self.reason[vi] == AssignReason::None
             && matches!(self.best_phases.get(&vi), Some((_, AssignReason::None)));
         self.level[vi] = lv;
