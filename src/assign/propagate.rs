@@ -97,14 +97,14 @@ impl PropagateIF for AssignStack {
                 self.reason[vi] = AssignReason::None;
                 debug_assert!(!self.trail.contains(&!l));
                 self.trail.push(l);
-                //self.make_var_asserted(vi);
+                self.make_var_asserted(vi);
                 Ok(())
             }
             Some(x) if x == bool::from(l) => {
                 // Vivification tries to assign a var by propagation then can assert it.
                 // To make sure the var is asserted, we need to nullify its reason.
                 self.reason[vi] = AssignReason::None;
-                //self.make_var_asserted(vi);
+                // self.make_var_asserted(vi);
                 Ok(())
             }
             _ => Err(SolverError::Inconsistent),
