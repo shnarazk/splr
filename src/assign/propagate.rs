@@ -210,7 +210,6 @@ impl PropagateIF for AssignStack {
             let l = self.trail[i];
             let vi = l.vi();
             let v = &mut self.var[vi];
-            v.participated = 0;
             v.set(Flag::PHASE, var_assign!(self, vi).unwrap());
             unset_assign!(self, vi);
             self.reason[vi] = AssignReason::default();
@@ -259,6 +258,7 @@ impl PropagateIF for AssignStack {
                             return w.c;
                         }
                         None => {
+                            self.reward_at_propagation(false_lit.vi());
                             self.assign_by_implication(
                                 w.blocker,
                                 AssignReason::Implication(w.c, false_lit),
@@ -330,6 +330,7 @@ impl PropagateIF for AssignStack {
                         .map(|l| self.level[l.vi()])
                         .max()
                         .unwrap_or(0);
+                    self.reward_at_propagation(false_lit.vi());
                     self.assign_by_implication(first, AssignReason::Implication(w.c, NULL_LIT), lv);
                 }
             }
@@ -382,7 +383,7 @@ impl AssignStack {
     /// make a var asserted.
     pub fn make_var_asserted(&mut self, vi: VarId) {
         self.num_asserted_vars += 1;
-        self.clear_activity(vi);
+        self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
         self.check_best_phase(vi);
     }

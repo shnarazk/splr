@@ -132,7 +132,7 @@ impl SolveIF for Solver {
                     }
                 }
                 for vi in elim.sorted_iterator() {
-                    asg.initialize_activity(*vi);
+                    asg.set_activity(*vi, 0.0);
                 }
                 asg.rebuild_order();
             }
@@ -236,6 +236,7 @@ fn search(
                 return Ok(false);
             }
             cdb.update_rewards();
+            asg.update_rewards();
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
             asg.update_rewards();
             rst.update(ProgressUpdate::Remain(asg.var_stats().3));
@@ -247,6 +248,11 @@ fn search(
                     let ion_index: f64 = ((num_ion.0 + num_ion.1 + 2) as f64).log2();
                     let v = asg.var_stats();
                     parity = !parity;
+
+                    #[cfg(feature = "moving_var_reward_rate")]
+                    {
+                        asg.update_activity_decay();
+                    }
 
                     #[cfg(feature = "var_staging")]
                     {

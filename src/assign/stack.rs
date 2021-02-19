@@ -82,11 +82,11 @@ impl Default for AssignStack {
             activity_ema: Ema::new(1000),
 
             #[cfg(feature = "moving_var_reward_rate")]
-            activity_decay_max: 0.9,
+            activity_decay_max: 0.96,
             #[cfg(feature = "moving_var_reward_rate")]
-            activity_decay_min: 0.8,
+            activity_decay_min: 0.60,
             #[cfg(feature = "moving_var_reward_rate")]
-            reward_step: 0.0,
+            reward_step: 0.001,
 
             occurrence_compression_rate: 0.5,
 
@@ -125,11 +125,17 @@ impl Instantiate for AssignStack {
             staging_reward_value: config.stg_rwd_val,
             num_vars: cnf.num_of_variables,
             var: Var::new_vars(nv),
+
             #[cfg(not(feature = "moving_var_reward_rate"))]
             activity_decay: config.vrw_dcy_rat,
-            activity_anti_decay: 1.0 - config.vrw_dcy_rat,
             #[cfg(feature = "moving_var_reward_rate")]
             activity_decay: config.vrw_dcy_beg,
+
+            #[cfg(not(feature = "moving_var_reward_rate"))]
+            activity_anti_decay: 1.0 - config.vrw_dcy_rat,
+            #[cfg(feature = "moving_var_reward_rate")]
+            activity_anti_decay: 1.0 - config.vrw_dcy_beg,
+
             #[cfg(feature = "moving_var_reward_rate")]
             activity_decay_max: config.vrw_dcy_end,
             #[cfg(feature = "moving_var_reward_rate")]

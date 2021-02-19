@@ -50,13 +50,6 @@ pub trait ActivityIF<Ix> {
     fn activity(&mut self, ix: Ix) -> f64;
     /// return average activity
     fn average_activity(&self) -> f64;
-    /// clear one's activity
-    fn clear_activity(&mut self, ix: Ix);
-    /// initialize one's reward.
-    fn initialize_activity(&mut self, _ix: Ix) {
-        #[cfg(debug)]
-        todo!()
-    }
     /// set activity
     fn set_activity(&mut self, ix: Ix, val: f64);
     /// modify one's activity at conflict analysis in `conflict_analyze` in [`solver`](`crate::solver`).
@@ -64,8 +57,13 @@ pub trait ActivityIF<Ix> {
         #[cfg(debug)]
         todo!()
     }
-    /// modify one's activity at value assignment in unit propagation.
+    /// modify one's activity at value assignment in assign.
     fn reward_at_assign(&mut self, _ix: Ix) {
+        #[cfg(debug)]
+        todo!()
+    }
+    /// modify one's activity at value assignment in unit propagation.
+    fn reward_at_propagation(&mut self, _ix: Ix) {
         #[cfg(debug)]
         todo!()
     }

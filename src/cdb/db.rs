@@ -202,9 +202,6 @@ impl ActivityIF<ClauseId> for ClauseDB {
     fn average_activity(&self) -> f64 {
         self.activity_ema.get()
     }
-    fn clear_activity(&mut self, cid: ClauseId) {
-        self[cid].reward = 0.0;
-    }
     fn set_activity(&mut self, cid: ClauseId, val: f64) {
         self[cid].reward = val;
     }
