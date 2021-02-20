@@ -32,7 +32,6 @@ impl ActivityIF<VarId> for AssignStack {
         self.var[vi].timestamp = self.ordinal;
     }
     fn reward_at_propagation(&mut self, _vi: VarId) {
-        // self.var[vi].participated = 0.0;
     }
     // Note: `update_rewards` should be called befero `restart`
     fn reward_at_unassign(&mut self, vi: VarId) {
