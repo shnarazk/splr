@@ -73,6 +73,8 @@ pub enum AssignReason {
 pub struct Var {
     /// reverse conversion to index. Note `VarId` must be `usize`.
     pub index: VarId,
+    /// the number of participation in conflict analysis
+    participated: f64,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
     reward: f64,
     /// the number of conflicts at which this var was assigned an rewarded lastly.

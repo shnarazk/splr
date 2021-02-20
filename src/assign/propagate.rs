@@ -258,7 +258,7 @@ impl PropagateIF for AssignStack {
                             return w.c;
                         }
                         None => {
-                            self.reward_at_propagation(false_lit.vi());
+                            // self.reward_at_propagation(false_lit.vi());
                             self.assign_by_implication(
                                 w.blocker,
                                 AssignReason::Implication(w.c, false_lit),
@@ -330,7 +330,7 @@ impl PropagateIF for AssignStack {
                         .map(|l| self.level[l.vi()])
                         .max()
                         .unwrap_or(0);
-                    self.reward_at_propagation(false_lit.vi());
+                    // self.reward_at_propagation(false_lit.vi());
                     self.assign_by_implication(first, AssignReason::Implication(w.c, NULL_LIT), lv);
                 }
             }

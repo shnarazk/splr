@@ -76,8 +76,8 @@ pub trait ActivityIF<Ix> {
     fn update_rewards(&mut self);
 
     #[cfg(feature = "moving_var_reward_rate")]
-    /// update reward setting as a part of module adaptation.
-    fn adjust_rewards(&mut self, state: &State) {
+    /// update reward decay.
+    fn update_activity_decay(&mut self) {
         #[cfg(debug)]
         todo!()
     }

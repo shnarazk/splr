@@ -235,10 +235,9 @@ fn search(
                 analyze_final(asg, state, &cdb[ci]);
                 return Ok(false);
             }
+            asg.update_rewards();
             cdb.update_rewards();
-            asg.update_rewards();
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
-            asg.update_rewards();
             rst.update(ProgressUpdate::Remain(asg.var_stats().3));
             if let Some(decision) = rst.restart() {
                 if let Some(_new_cycle) = rst.stabilize() {
@@ -269,12 +268,13 @@ fn search(
                         state.log(
                             asg.num_conflict,
                             format!(
-                                "Lcycle:{:>5}, core:{:>9}, #ion:{:>6}|{:<6},/cpr:{:>9.2}",
+                                "Lcycle:{:>5}, core:{:>9}, #ion:{:>6}|{:<6},/cpr:{:>9.2}, {:>9.2}",
                                 r.3,
                                 v.4,
                                 num_ion.0,
                                 num_ion.1,
                                 asg.exports_box().2.get(),
+                                asg.average_activity(),
                             ),
                         );
                         last_core = v.4;

@@ -86,7 +86,7 @@ impl Default for AssignStack {
             #[cfg(feature = "moving_var_reward_rate")]
             activity_decay_min: 0.60,
             #[cfg(feature = "moving_var_reward_rate")]
-            reward_step: 0.001,
+            reward_step: 0.01,
 
             occurrence_compression_rate: 0.5,
 
@@ -137,9 +137,12 @@ impl Instantiate for AssignStack {
             activity_anti_decay: 1.0 - config.vrw_dcy_beg,
 
             #[cfg(feature = "moving_var_reward_rate")]
-            activity_decay_max: config.vrw_dcy_end,
+            activity_decay_max: config.vrw_dcy_rat,
             #[cfg(feature = "moving_var_reward_rate")]
             activity_decay_min: config.vrw_dcy_beg,
+            #[cfg(feature = "moving_var_reward_rate")]
+            reward_step: config.vrw_dcy_stp,
+
             occurrence_compression_rate: config.vrw_occ_cmp,
             ..AssignStack::default()
         }

@@ -10,11 +10,11 @@ impl VarRewardIF for AssignStack {
     fn activity(&self, vi: VarId) -> f64 {
         self.var[vi].reward
     }
-    fn initialize_reward(&mut self) {
-        self.reward_step = 1.0;
+    fn average_activity(&self) -> f64 {
+        self.activity_ema.get()
     }
-    fn clear_reward(&mut self, vi: VarId) {
-        self.var[vi].reward = 0.0;
+    fn set_activity(&mut self, vi: VarId, val: f64) {
+        self.var[vi].reward = val;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
         let s = self.reward_step;
@@ -34,12 +34,16 @@ impl VarRewardIF for AssignStack {
             self.reward_step *= SCALE;
         }
     }
-    fn reward_at_assign(&mut self, _: VarId) {}
-    fn reward_at_unassign(&mut self, _: VarId) {}
     fn reward_update(&mut self) {
         self.ordinal += 1;
         const INC_SCALE: f64 = 1.01;
         self.reward_step *= INC_SCALE;
     }
-    fn adjust_reward(&mut self, _: &State) {}
+    #[cfg(feature = "moving_var_reward_rate")]
+    fn update_activity_decay(&mut self) {
+        self.activity_decay = self
+            .activity_decay_max
+            .min(self.activity_decay + self.reward_step);
+        self.activity_anti_decay = 1.0 - self.activity_decay;
+    }
 }
