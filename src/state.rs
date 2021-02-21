@@ -508,7 +508,7 @@ impl StateIF for State {
 
         let rst_mode = rst.mode().0;
 
-        let (rst_num_blk, rst_num_rst, rst_num_span, rst_num_cycle, _stb_lspan) = rst.exports();
+        let (rst_num_blk, rst_num_rst, rst_num_span, _stb_shift, rst_num_cycle) = rst.exports();
         // let rst_num_stb = rst.mode().1;
 
         #[cfg(not(feature = "progress_ACC"))]

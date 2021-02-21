@@ -875,7 +875,7 @@ impl Export<RestarterExports, (RestartMode, usize)> for Restarter {
     ///```
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
     /// let rst = Restarter::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (num_blk_non, num_stb_non, num_blk_stb, num_rst_stb, num_rst_lng) = rst.exports();
+    /// let (num_blk_non, num_stb_non, num_blk_stb, num_rst_shift, num_rst_stb) = rst.exports();
     /// let (rst_mode, num_stb) = rst.mode();
     ///```
     #[inline]
@@ -884,8 +884,8 @@ impl Export<RestarterExports, (RestartMode, usize)> for Restarter {
             self.num_block,
             self.num_restart,
             self.stb.span(),
+            self.stb.num_shift,
             self.stb.num_cycle,
-            self.stb.longest_span,
         )
     }
     fn mode(&self) -> (RestartMode, usize) {
