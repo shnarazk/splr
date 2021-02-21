@@ -807,7 +807,6 @@ impl ClauseDB {
     where
         A: AssignIF,
     {
-        const SCALE_UP: f64 = 100_000_000.0;
         let ClauseDB {
             ref mut clause,
             ref mut lbd_temp,
@@ -840,7 +839,7 @@ impl ClauseDB {
             }
             let rank = c.update_lbd(asg, lbd_temp) as f64;
             let act_c = c.update_activity(*ordinal, *activity_decay, *activity_anti_decay);
-            let weight = (SCALE_UP * rank / (act_v + act_c)) as usize;
+            let weight = rank / (act_v + act_c);
             perm.push(OrderedProxy::new(i, weight));
         }
         let keep = (perm.len() / 2).min(nc / 2);
