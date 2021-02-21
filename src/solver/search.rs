@@ -269,7 +269,7 @@ fn search(
                             asg.num_conflict,
                             format!(
                                 "Lcycle:{:>5}, core:{:>9}, #ion:{:>6}|{:<6},/cpr:{:>9.2}, {:>9.2}",
-                                r.3,
+                                r.4,
                                 v.4,
                                 num_ion.0,
                                 num_ion.1,
