@@ -31,8 +31,7 @@ impl ActivityIF<VarId> for AssignStack {
     fn reward_at_assign(&mut self, vi: VarId) {
         self.var[vi].timestamp = self.ordinal;
     }
-    fn reward_at_propagation(&mut self, _vi: VarId) {
-    }
+    fn reward_at_propagation(&mut self, _vi: VarId) {}
     // Note: `update_rewards` should be called befero `restart`
     fn reward_at_unassign(&mut self, vi: VarId) {
         self.var[vi].update_activity(self.ordinal, self.activity_decay, self.activity_anti_decay);
@@ -60,11 +59,9 @@ impl Var {
     // But conflict_analyze can assert a new var. So we can't expect v.timestamp < self.num_conflict
     fn update_activity(&mut self, t: usize, decay: f64, reward: f64) -> f64 {
         if self.timestamp < t {
-            let duration = (t - self.timestamp) as f64;
-            let rate = self.participated as f64 / duration as f64;
-            self.reward *= decay.powf(duration);
-            // self.reward += (1.0 + rate).log2() * reward;
-            self.reward += rate * reward;
+            let rate = self.participated as f64 / (t - self.timestamp) as f64;
+            self.reward *= decay;
+            self.reward += (1.0 - (rate - 1.0).powf(2.0)).powf(0.5) * reward;
             self.participated = 0.0;
             self.timestamp = t;
         }
