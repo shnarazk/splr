@@ -102,7 +102,7 @@ impl Default for ClauseDB {
             certified: Vec::new(),
             soft_limit: 0, // 248_000_000
             use_chan_seok: false,
-            co_lbd_bound: 5,
+            co_lbd_bound: 4,
             // lbd_frozen_clause: 30,
             ordinal: 0,
             activity_inc: 1.0,
@@ -871,7 +871,7 @@ impl ClauseDB {
             if c.is(Flag::DEAD) || !c.is(Flag::LEARNT) {
                 continue;
             }
-            if c.rank <= self.co_lbd_bound as u16 {
+            if c.rank < self.co_lbd_bound as u16 {
                 c.turn_off(Flag::LEARNT);
                 self.num_learnt -= 1;
             } else if reinit {
