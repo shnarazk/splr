@@ -63,6 +63,8 @@ pub enum StagingTarget {
     BestPhases,
     /// unstage all vars.
     Clear,
+    ///
+    HighHalf,
     /// select random vars.
     Random,
     /// high activated var both of out of the best phases and in the best phase
@@ -83,6 +85,7 @@ impl fmt::Display for StagingTarget {
                 StagingTarget::Backbone => "Staging_backbone",
                 StagingTarget::BestPhases => "Staging_bestphase",
                 StagingTarget::Clear => "Staging_none",
+                StagingTarget::HighHalf => "Staging_highHalf",
                 StagingTarget::Random => "Staging_random",
                 StagingTarget::Ions => "StagingTarget ions",
 

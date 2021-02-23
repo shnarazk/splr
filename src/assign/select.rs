@@ -98,6 +98,9 @@ impl VarSelectIF for AssignStack {
         if target == StagingTarget::AutoSelect {
             self.stage_mode_select += 1;
             target = StagingTarget::Clear;
+            // if self.stage_mode_select % self.num_unreachables() == 0 {
+            //     target = StagingTarget::Backbone;
+            // }
             // if 0 == neg_ion {
             //     // target = StagingTarget::BestPhases;
             //     // target = StagingTarget::Ions;
@@ -134,6 +137,17 @@ impl VarSelectIF for AssignStack {
             }
 
             StagingTarget::Clear => (),
+            StagingTarget::HighHalf => {
+                let ave = self.average_activity();
+                for (vi, (b, _)) in self.best_phases.iter() {
+                    let v = &mut self.var[*vi];
+                    if ave < v.reward && self.root_level < self.level[*vi] {
+                        v.turn_on(Flag::STAGED);
+                        v.set(Flag::PHASE, *b);
+                        self.staged_vars.insert(*vi, *b);
+                    }
+                }
+            }
             StagingTarget::Ions => {
                 let AssignStack {
                     ref mut var,

@@ -318,6 +318,12 @@ fn search(
                         state.to_vivify = 0.0;
                         elim.to_simplify *= 1.2;
                     }
+                    // if rst.exports().3  % asg.num_unreachables() == 0 {
+                    // if parity {
+                    //     state.chrono_bt_threshold = 0;
+                    // } else {
+                    //     state.chrono_bt_threshold = state.config.c_cbt_thr;
+                    // }
                 } else if RestartDecision::Force == decision {
                     RESTART!(asg, rst);
                 }
