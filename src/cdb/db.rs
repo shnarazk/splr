@@ -833,15 +833,14 @@ impl ClauseDB {
                 }
             }
 
-            let mut act_v: f64 = 0.0;
-            for l in c.lits.iter() {
-                act_v = act_v.max(asg.activity(l.vi()));
-            }
+            // This is the best at least for 3SAT360.
             let rank = c.update_lbd(asg, lbd_temp) as f64;
+            let act_v: f64 = c
+                .lits
+                .iter()
+                .fold(0.0, |acc, l| acc.max(asg.activity(l.vi())));
             let act_c = c.update_activity(*ordinal, *activity_decay, *activity_anti_decay);
-            let ac = 2.0 * (0.1 + 0.9 * act_c.powf(1.6));
-            let av = 1.6 * (0.1 + 0.9 * act_v.powf(1.2));
-            let weight = (rank - ac) / av;
+            let weight = rank / (act_v + act_c);
             perm.push(OrderedProxy::new(i, weight));
         }
         let keep = (perm.len() / 2).min(nc / 2);
