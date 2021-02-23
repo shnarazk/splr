@@ -215,6 +215,8 @@ pub struct State {
     pub c_lvl: Ema,
     /// hold conflicting literals for UNSAT problems
     pub conflicts: Vec<Lit>,
+    /// choroBT threshold
+    pub chrono_bt_threshold: DecisionLevel,
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
     /// working place to build learnt clauses
@@ -249,6 +251,7 @@ impl Default for State {
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
             conflicts: Vec::new(),
+            chrono_bt_threshold: 100,
             last_asg: 0,
             new_learnt: Vec::new(),
             derive20: Vec::new(),

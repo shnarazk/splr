@@ -182,7 +182,7 @@ pub fn handle_conflict(
         return Err(SolverError::NullLearnt);
     }
     // asg.bump_vars(asg, cdb, ci);
-    let chrono_bt_threshold = state.config.c_cbt_thr;
+    let chrono_bt_threshold = state.chrono_bt_threshold;
     let new_learnt = &mut state.new_learnt;
     let l0 = new_learnt[0];
     // assert: 0 < cl, which was checked already by new_learnt.is_empty().
@@ -190,11 +190,7 @@ pub fn handle_conflict(
     // NCB places firstUIP on level bl, while CB does it on level cl.
     // Therefore the condition to use CB is: activity(firstUIP) < activity(v(bl)).
     // PREMISE: 0 < bl, because asg.decision_vi accepts only non-zero values.
-    use_chronobt &= switch_chronobt.unwrap_or_else(|| {
-        bl_a == 0
-            || chrono_bt_threshold + bl_a <= cl
-            || asg.activity(l0.vi()) < asg.activity(asg.decision_vi(bl_a))
-    });
+    use_chronobt &= switch_chronobt.unwrap_or(bl_a == 0 || chrono_bt_threshold + bl_a <= cl);
 
     // (assign level, backtrack level)
     let (al, bl) = if use_chronobt {
