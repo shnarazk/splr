@@ -203,7 +203,7 @@ impl Default for Config {
             use_certification: false,
             use_log: false,
 
-            crw_dcy_rat: 0.98,
+            crw_dcy_rat: 0.95,
 
             elm_cls_lim: 32,
             elm_grw_lim: 0,
@@ -234,7 +234,7 @@ impl Default for Config {
 
             viv_thr: 1,
 
-            vrw_dcy_rat: 0.96,
+            vrw_dcy_rat: 0.95,
 
             #[cfg(feature = "moving_var_reward_rate")]
             vrw_dcy_beg: 0.90,

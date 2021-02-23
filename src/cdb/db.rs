@@ -839,7 +839,10 @@ impl ClauseDB {
             }
             let rank = c.update_lbd(asg, lbd_temp) as f64;
             let act_c = c.update_activity(*ordinal, *activity_decay, *activity_anti_decay);
-            let weight = rank / (act_v + act_c);
+            let dr = 0.9;
+            let ac = 4.0 * (1.0 - dr + dr * act_c.powf(1.5));
+            let av = 1.6 * (1.0 - dr + dr * act_v.powf(1.2));
+            let weight = (rank - ac) / av;
             perm.push(OrderedProxy::new(i, weight));
         }
         let keep = (perm.len() / 2).min(nc / 2);
