@@ -260,7 +260,6 @@ fn search(
                         asg.select_staged_vars(
                             StagingTarget::AutoSelect,
                             parity,
-                            num_ion.0 + num_ion.1,
                             num_ion.0,
                             num_ion.1,
                         );

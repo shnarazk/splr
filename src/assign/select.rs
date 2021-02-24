@@ -27,7 +27,6 @@ pub trait VarSelectIF {
         &mut self,
         target: StagingTarget,
         rephasing: bool,
-        ions: usize,
         neg_ion: usize,
         pos_ion: usize,
     );
