@@ -10,13 +10,7 @@ use {
 impl ActivityIF<VarId> for AssignStack {
     #[inline]
     fn activity(&mut self, vi: VarId) -> f64 {
-        let v = &mut self.var[vi];
-        let val = v.reward;
-        if v.is(Flag::STAGED) {
-            val + self.stage_activity
-        } else {
-            val
-        }
+        self.var[vi].activity(self.stage_activity)
     }
     fn average_activity(&self) -> f64 {
         self.activity_ema.get()
@@ -66,5 +60,13 @@ impl Var {
             self.timestamp = t;
         }
         self.reward
+    }
+    pub fn activity(&self, extra: f64) -> f64 {
+        let val = self.reward;
+        if self.is(Flag::STAGED) {
+            val + extra
+        } else {
+            val
+        }
     }
 }

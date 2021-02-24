@@ -79,7 +79,10 @@ impl VarSelectIF for AssignStack {
         let mut num_positive = 0; // decision var side
 
         for v in self.var.iter().skip(1) {
-            if !v.is(Flag::ELIMINATED) && thr < v.reward && self.root_level < self.level[v.index] {
+            if !v.is(Flag::ELIMINATED)
+                && thr < v.activity(self.stage_activity)
+                && self.root_level < self.level[v.index]
+            {
                 match self.best_phases.get(&v.index) {
                     Some((_, AssignReason::Implication(_, NULL_LIT))) => {
                         num_positive += 1;
@@ -165,13 +168,14 @@ impl VarSelectIF for AssignStack {
                     ref level,
                     root_level,
                     ref mut staged_vars,
+                    ref stage_activity,
                     ..
                 } = self;
 
                 let mut best_act_min: f64 = 100_000_000.0;
                 for (vi, (_, r)) in best_phases.iter() {
                     if matches!(r, AssignReason::None) {
-                        best_act_min = best_act_min.min(var[*vi].reward);
+                        best_act_min = best_act_min.min(var[*vi].activity(*stage_activity));
                     }
                 }
 
@@ -181,10 +185,10 @@ impl VarSelectIF for AssignStack {
                         && match best_phases.get(&v.index) {
                             // negative
                             Some((_, AssignReason::Implication(_, NULL_LIT))) => {
-                                best_act_min <= v.reward
+                                best_act_min <= v.activity(*stage_activity)
                             }
                             // positive
-                            None => best_act_min <= v.reward,
+                            None => best_act_min <= v.activity(*stage_activity),
                             _ => false,
                         }
                     {
