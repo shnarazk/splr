@@ -23,7 +23,14 @@ pub trait VarSelectIF {
 
     #[cfg(feature = "var_staging")]
     /// select staged vars
-    fn select_staged_vars(&mut self, target: StagingTarget, rephasing: bool, ions: usize);
+    fn select_staged_vars(
+        &mut self,
+        target: StagingTarget,
+        rephasing: bool,
+        ions: usize,
+        neg_ion: usize,
+        pos_ion: usize,
+    );
 
     /// return the number of forgotton vars.
     fn num_ion(&self) -> (usize, usize);
@@ -88,15 +95,19 @@ impl VarSelectIF for AssignStack {
         (num_negative, num_positive)
     }
     #[cfg(feature = "var_staging")]
-    fn select_staged_vars(&mut self, mut target: StagingTarget, rephasing: bool, _ions: usize) {
+    fn select_staged_vars(
+        &mut self,
+        mut target: StagingTarget,
+        rephasing: bool,
+        neg_ion: usize,
+        pos_ion: usize,
+    ) {
         self.rephasing = rephasing;
-        let (neg_ion, pos_ion) = self.num_ion();
-        self.rephasing = 0 == neg_ion;
+        self.stage_mode_select += 1;
         if !self.use_stage {
             return;
         }
         if target == StagingTarget::AutoSelect {
-            self.stage_mode_select += 1;
             target = StagingTarget::Clear;
             // if self.stage_mode_select % self.num_unreachables() == 0 {
             //     target = StagingTarget::Backbone;
