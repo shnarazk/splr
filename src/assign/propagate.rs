@@ -348,12 +348,14 @@ impl AssignStack {
     /// check usability of the saved best phase.
     /// return `true` if the current best phase got invalid.
     pub fn check_best_phase(&mut self, vi: VarId) -> bool {
-        if self.var[vi].is(Flag::ELIMINATED) {
-            return false;
+        #[cfg(feature = "var_staging")]
+        {
+            if self.staged_vars.get(&vi).is_some() {
+                self.staged_vars.remove(&vi);
+                dbg!("got");
+            }
         }
-        if self.level[vi] == self.root_level {
-            return false;
-        }
+
         if let Some((b, _)) = self.best_phases.get(&vi) {
             debug_assert!(self.assign[vi].is_some());
             if self.assign[vi] != Some(*b) {
