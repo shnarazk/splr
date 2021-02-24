@@ -57,7 +57,7 @@ impl Default for AssignStack {
 
             use_stage: true,
             staging_reward_value: 1.0,
-            staging_reward_decay: 0.9,
+            staging_reward_decay: 0.99,
             staged_vars: HashMap::new(),
             stage_mode_select: 0,
             num_stages: 0,

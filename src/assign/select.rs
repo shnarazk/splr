@@ -27,6 +27,7 @@ pub trait VarSelectIF {
         &mut self,
         target: StagingTarget,
         rephasing: bool,
+        force_reset: bool,
         neg_ion: usize,
         pos_ion: usize,
     );
@@ -101,6 +102,7 @@ impl VarSelectIF for AssignStack {
         &mut self,
         mut target: StagingTarget,
         rephasing: bool,
+        force_reset: bool,
         neg_ion: usize,
         pos_ion: usize,
     ) {
@@ -109,26 +111,20 @@ impl VarSelectIF for AssignStack {
         if !self.use_stage {
             return;
         }
+        self.stage_activity = self.staging_reward_value;
+        if !force_reset && !self.staged_vars.is_empty() {
+            return;
+        }
         if target == StagingTarget::AutoSelect {
             target = StagingTarget::Clear;
-            // if self.stage_mode_select % self.num_unreachables() == 0 {
-            //     target = StagingTarget::Backbone;
-            // }
-            // if 0 == neg_ion {
-            //     // target = StagingTarget::BestPhases;
-            //     // target = StagingTarget::Ions;
-            //     target = StagingTarget::Clear;
-            // } else {
-            //     target = StagingTarget::Backbone;
-            // };
+            if (0 < neg_ion || 0 < pos_ion) && self.stage_mode_select % neg_ion.max(pos_ion) == 0 {
+                target = StagingTarget::BestPhases;
+            }
         }
         for vi in self.staged_vars.keys() {
-            // self.var[*vi].extra_reward = 0.0;
             self.var[*vi].turn_off(Flag::STAGED);
         }
         self.staged_vars.clear();
-        // let base = self.staging_reward_value; // or self.average_activity()
-        self.stage_activity = self.staging_reward_value;
         match target {
             StagingTarget::Backbone => {
                 for (vi, (b, r)) in self.best_phases.iter() {
@@ -152,13 +148,21 @@ impl VarSelectIF for AssignStack {
             StagingTarget::Clear => (),
             StagingTarget::HighHalf => {
                 let ave = self.average_activity();
-                for (vi, (b, _)) in self.best_phases.iter() {
-                    let v = &mut self.var[*vi];
-                    if ave < v.reward && self.root_level < self.level[*vi] {
-                        v.turn_on(Flag::STAGED);
-                        v.set(Flag::PHASE, *b);
-                        self.staged_vars.insert(*vi, *b);
-                    }
+                let vec: Vec<OrderedProxy<(VarId, bool)>> = self
+                    .best_phases
+                    .iter()
+                    .filter(|(vi, _)| self.var[**vi].activity(self.stage_activity) < ave)
+                    .map(|(vi, (b, _))| {
+                        OrderedProxy::new((*vi, *b), self.var[*vi].activity(self.stage_activity))
+                    })
+                    .collect::<Vec<OrderedProxy<(VarId, bool)>>>();
+                for ov in vec.iter() {
+                    let (vi, b) = ov.to();
+                    assert!(self.root_level < self.level[vi]);
+                    let v = &mut self.var[vi];
+                    v.turn_on(Flag::STAGED);
+                    v.set(Flag::PHASE, b);
+                    self.staged_vars.insert(vi, b);
                 }
             }
             StagingTarget::Ions => {

@@ -352,7 +352,6 @@ impl AssignStack {
         {
             if self.staged_vars.get(&vi).is_some() {
                 self.staged_vars.remove(&vi);
-                dbg!("got");
             }
         }
 
