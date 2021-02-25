@@ -23,14 +23,7 @@ pub trait VarSelectIF {
 
     #[cfg(feature = "var_staging")]
     /// select staged vars
-    fn select_staged_vars(
-        &mut self,
-        target: StagingTarget,
-        rephasing: bool,
-        force_reset: bool,
-        neg_ion: usize,
-        pos_ion: usize,
-    );
+    fn select_staged_vars(&mut self, target: StagingTarget, rephasing: bool, force_reset: bool);
 
     /// return the number of forgotton vars.
     fn num_ion(&self) -> (usize, usize);
@@ -69,11 +62,6 @@ impl VarSelectIF for AssignStack {
     //     }
     // }
 
-    #[cfg(not(feature = "var_staging"))]
-    fn num_ion(&self) -> usize {
-        0
-    }
-    #[cfg(feature = "var_staging")]
     fn num_ion(&self) -> (usize, usize) {
         let thr = self.average_activity();
         let mut num_negative = 0; // unreachable core side
@@ -103,8 +91,6 @@ impl VarSelectIF for AssignStack {
         mut target: StagingTarget,
         rephasing: bool,
         force_reset: bool,
-        neg_ion: usize,
-        pos_ion: usize,
     ) {
         self.rephasing = rephasing;
         self.stage_mode_select += 1;
@@ -116,9 +102,10 @@ impl VarSelectIF for AssignStack {
             return;
         }
         if target == StagingTarget::AutoSelect {
-            target = StagingTarget::Clear;
-            if (0 < neg_ion || 0 < pos_ion) && self.stage_mode_select % neg_ion.max(pos_ion) == 0 {
+            if self.stage_mode_select % 10 == 0 {
                 target = StagingTarget::BestPhases;
+            } else {
+                target = StagingTarget::Clear;
             }
         }
         for vi in self.staged_vars.keys() {
@@ -126,16 +113,7 @@ impl VarSelectIF for AssignStack {
         }
         self.staged_vars.clear();
         match target {
-            StagingTarget::Backbone => {
-                for (vi, (b, r)) in self.best_phases.iter() {
-                    if matches!(r, AssignReason::None) {
-                        let v = &mut self.var[*vi];
-                        v.turn_on(Flag::STAGED);
-                        v.set(Flag::PHASE, *b);
-                        self.staged_vars.insert(*vi, *b);
-                    }
-                }
-            }
+            StagingTarget::AutoSelect => (),
             StagingTarget::BestPhases => {
                 for (vi, (b, _)) in self.best_phases.iter() {
                     let v = &mut self.var[*vi];
@@ -144,72 +122,7 @@ impl VarSelectIF for AssignStack {
                     self.staged_vars.insert(*vi, *b);
                 }
             }
-
             StagingTarget::Clear => (),
-            StagingTarget::HighHalf => {
-                let ave = self.average_activity();
-                let vec: Vec<OrderedProxy<(VarId, bool)>> = self
-                    .best_phases
-                    .iter()
-                    .filter(|(vi, _)| self.var[**vi].activity(self.stage_activity) < ave)
-                    .map(|(vi, (b, _))| {
-                        OrderedProxy::new((*vi, *b), self.var[*vi].activity(self.stage_activity))
-                    })
-                    .collect::<Vec<OrderedProxy<(VarId, bool)>>>();
-                for ov in vec.iter() {
-                    let (vi, b) = ov.to();
-                    assert!(self.root_level < self.level[vi]);
-                    let v = &mut self.var[vi];
-                    v.turn_on(Flag::STAGED);
-                    v.set(Flag::PHASE, b);
-                    self.staged_vars.insert(vi, b);
-                }
-            }
-            StagingTarget::Ions => {
-                let AssignStack {
-                    ref mut var,
-                    ref best_phases,
-                    ref level,
-                    root_level,
-                    ref mut staged_vars,
-                    ref stage_activity,
-                    ..
-                } = self;
-
-                let mut best_act_min: f64 = 100_000_000.0;
-                for (vi, (_, r)) in best_phases.iter() {
-                    if matches!(r, AssignReason::None) {
-                        best_act_min = best_act_min.min(var[*vi].activity(*stage_activity));
-                    }
-                }
-
-                for v in var.iter_mut().skip(1) {
-                    if !v.is(Flag::ELIMINATED)
-                        && *root_level < level[v.index]
-                        && match best_phases.get(&v.index) {
-                            // negative
-                            Some((_, AssignReason::Implication(_, NULL_LIT))) => {
-                                best_act_min <= v.activity(*stage_activity)
-                            }
-                            // positive
-                            None => best_act_min <= v.activity(*stage_activity),
-                            _ => false,
-                        }
-                    {
-                        staged_vars.insert(v.index, v.is(Flag::PHASE));
-                        v.turn_on(Flag::STAGED);
-                    }
-                }
-            }
-            StagingTarget::Random => {
-                let limit = neg_ion.max(pos_ion) / 2;
-                let _len = self.var_order.idxs[0].min(limit);
-                for vi in self.var_order.heap[1..].iter().rev() {
-                    let b = self.var[*vi].timestamp % 2 == 0;
-                    self.staged_vars.insert(*vi, b);
-                    self.var[*vi].turn_on(Flag::STAGED);
-                }
-            }
             #[cfg(feature = "explore_timestamp")]
             StagingTarget::Explore => {
                 let since = self
@@ -227,13 +140,12 @@ impl VarSelectIF for AssignStack {
                     }
                 }
             }
-            _ => (),
         }
     }
     fn select_decision_literal(&mut self) -> Lit {
         let vi = self.select_var();
         if self.use_rephase && self.rephasing {
-            if let Some((b, AssignReason::None)) = self.best_phases.get(&vi) {
+            if let Some((b, _)) = self.best_phases.get(&vi) {
                 return Lit::from_assign(vi, *b);
             }
         }

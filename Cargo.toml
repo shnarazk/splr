@@ -15,7 +15,7 @@ categories = ["mathematics", "science"]
 bitflags = "1.2"
 
 [features]
-default = ["var_staging"]
+default = []
 var_staging = []
 boundary_check = []
 ema_calibration = []

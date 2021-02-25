@@ -244,9 +244,8 @@ fn search(
                     RESTART!(asg, rst);
                     let r = rst.exports();
                     let num_ion = asg.num_ion();
-                    let ion_index: f64 = ((num_ion.0 + num_ion.1 + 2) as f64).log2();
                     let v = asg.var_stats();
-                    parity = !parity;
+                    parity = !parity || new_cycle;
 
                     #[cfg(feature = "moving_var_reward_rate")]
                     {
@@ -255,15 +254,7 @@ fn search(
 
                     #[cfg(feature = "var_staging")]
                     {
-                        let d = 1.0 / ion_index;
-                        rst.update(ProgressUpdate::Temperature(d));
-                        asg.select_staged_vars(
-                            StagingTarget::AutoSelect,
-                            parity,
-                            new_cycle,
-                            num_ion.0,
-                            num_ion.1,
-                        );
+                        asg.select_staged_vars(StagingTarget::AutoSelect, parity, new_cycle);
                     }
 
                     if last_core != v.4 || 0 == v.4 {
@@ -286,15 +277,6 @@ fn search(
                         #[cfg(not(feature = "var_staging"))]
                         {
                             state.to_vivify += 0.5;
-                        }
-                        #[cfg(feature = "var_staging")]
-                        {
-                            state.to_vivify += 1.0 / ion_index;
-                        }
-                    } else {
-                        #[cfg(feature = "var_staging")]
-                        {
-                            state.to_vivify += 0.1 / ion_index;
                         }
                     }
                     // Simplification has been postponed because chronoBT was used.
