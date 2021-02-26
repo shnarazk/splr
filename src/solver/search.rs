@@ -1,6 +1,4 @@
 //! Conflict-Driven Clause Learning Search engine
-#[cfg(feature = "var_staging")]
-use crate::state::StagingTarget;
 use {
     super::{
         conflict::handle_conflict,
@@ -255,23 +253,17 @@ fn search(
 
                     #[cfg(feature = "var_staging")]
                     {
-                        asg.select_staged_vars(
-                            StagingTarget::AutoSelect,
-                            parity,
-                            num_ion.0,
-                            num_ion.1,
-                        );
+                        asg.select_staged_vars(None, parity);
                     }
 
                     if last_core != v.4 || 0 == v.4 {
                         state.log(
                             asg.num_conflict,
                             format!(
-                                "Lcycle:{:>5}, core:{:>9}, #ion:{:>6}|{:<6},/cpr:{:>9.2}, {:>9.2}",
+                                "Lcycle:{:>5}, core:{:>9}, span:{:>9},/cpr:{:>9.2}, {:>9.2}",
                                 r.4,
                                 v.4,
-                                num_ion.0,
-                                num_ion.1,
+                                r.2,
                                 asg.exports_box().2.get(),
                                 asg.average_activity(),
                             ),
