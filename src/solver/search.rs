@@ -255,8 +255,6 @@ fn search(
 
                     #[cfg(feature = "var_staging")]
                     {
-                        let d = 1.0 / ion_index;
-                        rst.update(ProgressUpdate::Temperature(d));
                         asg.select_staged_vars(
                             StagingTarget::AutoSelect,
                             parity,

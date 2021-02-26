@@ -355,7 +355,9 @@ impl AssignStack {
                 dbg!("got");
             }
         }
-
+        if !self.use_rephase {
+            return false;
+        }
         if let Some((b, _)) = self.best_phases.get(&vi) {
             debug_assert!(self.assign[vi].is_some());
             if self.assign[vi] != Some(*b) {
@@ -391,10 +393,12 @@ impl AssignStack {
     }
     /// save the current assignments as the best phases
     fn save_best_phases(&mut self) {
-        for l in self.trail.iter().skip(self.len_upto(0)) {
-            let vi = l.vi();
-            if let Some(b) = self.assign[vi] {
-                self.best_phases.insert(vi, (b, self.reason[vi]));
+        if self.use_rephase {
+            for l in self.trail.iter().skip(self.len_upto(0)) {
+                let vi = l.vi();
+                if let Some(b) = self.assign[vi] {
+                    self.best_phases.insert(vi, (b, self.reason[vi]));
+                }
             }
         }
         self.build_best_at = self.num_propagation;

@@ -514,7 +514,7 @@ impl StateIF for State {
 
         let rst_mode = rst.mode().0;
 
-        let (rst_num_blk, rst_num_rst, rst_num_span, _stb_shift, rst_num_cycle) = rst.exports();
+        let (rst_num_blk, rst_num_rst, rst_span_len, _num_stage, rst_num_cycle) = rst.exports();
         // let rst_num_stb = rst.mode().1;
 
         #[cfg(not(feature = "progress_ACC"))]
@@ -596,7 +596,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K {}|#BLK:{}, #RST:{}, #ion:{}, Lspn:{}",
+            "\x1B[2K {}|#BLK:{}, #RST:{}, Lstg:{}, Lcyc:{}",
             match rst_mode {
                 RestartMode::Dynamic => "    Restart",
                 RestartMode::Luby if self.config.no_color => "LubyRestart",
@@ -606,20 +606,9 @@ impl StateIF for State {
             },
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-            im!("{:>9}", self, LogUsizeId::NumIon, {
-                #[cfg(not(feature = "var_staging"))]
-                {
-                    0
-                }
-                #[cfg(feature = "var_staging")]
-                {
-                    let (n, p) = asg.num_ion();
-                    n + p
-                }
-            }),
-            im!("{:>9}", self, LogUsizeId::LubySpan, rst_num_span),
+            im!("{:>9}", self, LogUsizeId::LubySpan, rst_span_len),
+            im!("{:>9}", self, LogUsizeId::LubyCycle, rst_num_cycle),
         );
-        self[LogUsizeId::LubyCycle] = rst_num_cycle;
         println!(
             "\x1B[2K         EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{}",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
