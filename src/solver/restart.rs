@@ -526,17 +526,17 @@ impl GeometricStabilizer {
                 new_cycle = true;
                 self.num_cycle += 1;
                 self.longest_span = self.step;
+                if self.reset_requested {
+                    self.luby.reset();
+                    self.longest_span = 1;
+                    self.step = self.luby.next();
+                    self.reset_requested = false;
+                    self.next_trigger = now;
+                }
             }
             self.step = self.luby.next();
             self.next_trigger = now + self.longest_span / self.step;
             return Some(new_cycle);
-        }
-        if self.reset_requested {
-            self.luby.reset();
-            self.longest_span = 1;
-            self.step = self.luby.next();
-            self.reset_requested = false;
-            self.next_trigger = now;
         }
         None
     }
@@ -750,6 +750,7 @@ impl Instantiate for Restarter {
                 {
                     self.luby_blocking.reset_progress();
                 }
+                self.stb.reset_requested = true;
                 self.restart_waiting = self.stb.step;
             }
             SolverEvent::Restart => {
