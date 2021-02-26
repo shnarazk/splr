@@ -18,6 +18,7 @@ trait ProgressEvaluator {
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum ProgressUpdate {
     Counter,
+    Temperature(f64),
 
     #[cfg(feature = "progress_ACC")]
     ACC(f64),
@@ -471,6 +472,7 @@ struct GeometricStabilizer {
     next_trigger: usize,
     reset_requested: bool,
     step: usize,
+    depth: f64,
 }
 
 impl Default for GeometricStabilizer {
@@ -484,6 +486,7 @@ impl Default for GeometricStabilizer {
             next_trigger: 1,
             reset_requested: false,
             step: 1,
+            depth: 1.0,
         }
     }
 }
@@ -838,6 +841,9 @@ impl RestartIF for Restarter {
             ProgressUpdate::Counter => {
                 self.after_restart += 1;
                 self.luby.update(self.after_restart);
+            }
+            ProgressUpdate::Temperature(c) => {
+                self.stb.depth = 1.0 + self.stb_expansion_factor * c;
             }
             #[cfg(feature = "progress_ACC")]
             ProgressUpdate::ACC(val) => self.acc.update(val),

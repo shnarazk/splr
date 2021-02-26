@@ -57,10 +57,18 @@ pub trait StateIF {
 pub enum StagingTarget {
     /// select some targets cyclicly.
     AutoSelect,
+    /// use decision vars in best phases
+    Backbone,
     /// use best phases
     BestPhases,
     /// unstage all vars.
     Clear,
+    ///
+    HighHalf,
+    /// select random vars.
+    Random,
+    /// high activated var both of out of the best phases and in the best phase
+    Ions,
 
     #[cfg(feature = "explore_timestamp")]
     /// seek unchecked vars.
@@ -74,8 +82,12 @@ impl fmt::Display for StagingTarget {
             "{}",
             match self {
                 StagingTarget::AutoSelect => "Staging_something",
+                StagingTarget::Backbone => "Staging_backbone",
                 StagingTarget::BestPhases => "Staging_bestphase",
                 StagingTarget::Clear => "Staging_none",
+                StagingTarget::HighHalf => "Staging_highHalf",
+                StagingTarget::Random => "Staging_random",
+                StagingTarget::Ions => "StagingTarget ions",
 
                 #[cfg(feature = "explore_timestamp")]
                 StagingTarget::Explore => "Staging_unknowns",
