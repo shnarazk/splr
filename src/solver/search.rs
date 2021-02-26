@@ -240,7 +240,7 @@ fn search(
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
             rst.update(ProgressUpdate::Remain(asg.var_stats().3));
             if let Some(decision) = rst.restart() {
-                if let Some(new_cycle) = rst.stabilize() {
+                if let Some(_new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);
                     let r = rst.exports();
                     let num_ion = asg.num_ion();
@@ -260,7 +260,6 @@ fn search(
                         asg.select_staged_vars(
                             StagingTarget::AutoSelect,
                             parity,
-                            new_cycle,
                             num_ion.0,
                             num_ion.1,
                         );
