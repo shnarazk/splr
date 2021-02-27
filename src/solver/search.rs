@@ -241,8 +241,6 @@ fn search(
                 if let Some(_new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);
                     let r = rst.exports();
-                    let num_ion = asg.num_ion();
-                    let ion_index: f64 = ((num_ion.0 + num_ion.1 + 2) as f64).log2();
                     let v = asg.var_stats();
                     parity = !parity;
 
@@ -271,20 +269,15 @@ fn search(
                         last_core = v.4;
                     }
 
-                    if cdb.reduce(asg, asg.num_conflict) {
-                        #[cfg(not(feature = "var_staging"))]
-                        {
-                            state.to_vivify += 0.5;
-                        }
-                        #[cfg(feature = "var_staging")]
-                        {
-                            state.to_vivify += 1.0 / ion_index;
-                        }
-                    } else {
-                        #[cfg(feature = "var_staging")]
-                        {
-                            state.to_vivify += 0.1 / ion_index;
-                        }
+                    if cdb.reduce(asg, asg.num_conflict)
+                        && use_vivify
+                        && 1.0 <= state.to_vivify
+                        && vivify(asg, cdb, elim, state).is_err()
+                    {
+                        // return Err(SolverError::UndescribedError);
+                        analyze_final(asg, state, &cdb[ci]);
+                        state.to_vivify = 0.0;
+                        return Ok(false);
                     }
                     // Simplification has been postponed because chronoBT was used.
                     // `elim.to_simplify` is increased much in particular
@@ -300,14 +293,6 @@ fn search(
 
                         elim.activate();
                         elim.simplify(asg, cdb, state)?;
-                    } else if use_vivify && 1.0 <= state.to_vivify {
-                        if vivify(asg, cdb, elim, state).is_err() {
-                            // return Err(SolverError::UndescribedError);
-                            analyze_final(asg, state, &cdb[ci]);
-                            return Ok(false);
-                        }
-                        state.to_vivify = 0.0;
-                        elim.to_simplify *= 1.2;
                     }
                     // if rst.exports().3  % asg.num_unreachables() == 0 {
                     // if parity {
