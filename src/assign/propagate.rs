@@ -258,7 +258,7 @@ impl PropagateIF for AssignStack {
                             return w.c;
                         }
                         None => {
-                            self.reward_at_propagation(false_lit.vi());
+                            // self.reward_at_propagation(false_lit.vi());
                             self.assign_by_implication(
                                 w.blocker,
                                 AssignReason::Implication(w.c, false_lit),
@@ -330,7 +330,7 @@ impl PropagateIF for AssignStack {
                         .map(|l| self.level[l.vi()])
                         .max()
                         .unwrap_or(0);
-                    self.reward_at_propagation(false_lit.vi());
+                    // self.reward_at_propagation(false_lit.vi());
                     self.assign_by_implication(first, AssignReason::Implication(w.c, NULL_LIT), lv);
                 }
             }
@@ -348,10 +348,14 @@ impl AssignStack {
     /// check usability of the saved best phase.
     /// return `true` if the current best phase got invalid.
     pub fn check_best_phase(&mut self, vi: VarId) -> bool {
-        if self.var[vi].is(Flag::ELIMINATED) {
-            return false;
+        #[cfg(feature = "var_staging")]
+        {
+            if self.staged_vars.get(&vi).is_some() {
+                self.staged_vars.remove(&vi);
+                dbg!("got");
+            }
         }
-        if self.level[vi] == self.root_level {
+        if !self.use_rephase {
             return false;
         }
         if let Some((b, _)) = self.best_phases.get(&vi) {
@@ -389,10 +393,12 @@ impl AssignStack {
     }
     /// save the current assignments as the best phases
     fn save_best_phases(&mut self) {
-        for l in self.trail.iter().skip(self.len_upto(0)) {
-            let vi = l.vi();
-            if let Some(b) = self.assign[vi] {
-                self.best_phases.insert(vi, (b, self.reason[vi]));
+        if self.use_rephase {
+            for l in self.trail.iter().skip(self.len_upto(0)) {
+                let vi = l.vi();
+                if let Some(b) = self.assign[vi] {
+                    self.best_phases.insert(vi, (b, self.reason[vi]));
+                }
             }
         }
         self.build_best_at = self.num_propagation;

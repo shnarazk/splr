@@ -1,6 +1,4 @@
 //! Conflict-Driven Clause Learning Search engine
-#[cfg(feature = "var_staging")]
-use crate::state::StagingTarget;
 use {
     super::{
         conflict::handle_conflict,
@@ -209,6 +207,7 @@ fn search(
     let use_vivify = state.config.use_vivify();
     let mut parity = false;
     let mut last_core = 0;
+    let mut next_progress = 10_000;
     let mut best_asserted = state.target.num_of_variables;
     rst.update(ProgressUpdate::Luby);
     rst.update(ProgressUpdate::Remain(asg.num_vars - asg.num_asserted_vars));
@@ -235,45 +234,32 @@ fn search(
                 analyze_final(asg, state, &cdb[ci]);
                 return Ok(false);
             }
+            asg.update_rewards();
             cdb.update_rewards();
-            asg.update_rewards();
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
-            asg.update_rewards();
             rst.update(ProgressUpdate::Remain(asg.var_stats().3));
             if let Some(decision) = rst.restart() {
-                if let Some(_new_cycle) = rst.stabilize() {
+                if let Some(new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);
-                    let r = rst.exports();
-                    let num_ion = asg.num_ion();
-                    let ion_index: f64 = ((num_ion.0 + num_ion.1 + 2) as f64).log2();
+                    let (_blk, _rst, span_len, _stage, num_cycle) = rst.exports();
                     let v = asg.var_stats();
                     parity = !parity;
 
-                    #[cfg(feature = "moving_var_reward_rate")]
-                    {
-                        asg.update_activity_decay();
-                    }
+                    asg.update_activity_decay(if new_cycle { None } else { Some(span_len) });
 
                     #[cfg(feature = "var_staging")]
                     {
-                        let d = 1.0 / ion_index;
-                        rst.update(ProgressUpdate::Temperature(d));
-                        asg.select_staged_vars(
-                            StagingTarget::AutoSelect,
-                            parity,
-                            num_ion.0 + num_ion.1,
-                        );
+                        asg.select_staged_vars(None, parity);
                     }
 
                     if last_core != v.4 || 0 == v.4 {
                         state.log(
                             asg.num_conflict,
                             format!(
-                                "Lcycle:{:>5}, core:{:>9}, #ion:{:>6}|{:<6},/cpr:{:>9.2}",
-                                r.3,
+                                "#cycle:{:>5}, core:{:>9}, span len:{:>9},/cpr:{:>9.2}",
+                                num_cycle,
                                 v.4,
-                                num_ion.0,
-                                num_ion.1,
+                                span_len,
                                 asg.exports_box().2.get(),
                             ),
                         );
@@ -281,42 +267,24 @@ fn search(
                     }
 
                     if cdb.reduce(asg, asg.num_conflict) {
-                        #[cfg(not(feature = "var_staging"))]
-                        {
-                            state.to_vivify += 0.5;
-                        }
-                        #[cfg(feature = "var_staging")]
-                        {
-                            state.to_vivify += 1.0 / ion_index;
-                        }
-                    } else {
-                        #[cfg(feature = "var_staging")]
-                        {
-                            state.to_vivify += 0.1 / ion_index;
+                        // Simplification has been postponed because chronoBT was used.
+                        // `elim.to_simplify` is increased much in particular
+                        // when vars are asserted or learnts are small.
+                        // We don't need to count the number of asserted vars.
+                        if elim.enable && state.config.c_ip_int <= elim.to_simplify as usize {
+                            if use_vivify && vivify(asg, cdb, elim, state).is_err() {
+                                // return Err(SolverError::UndescribedError);
+                                analyze_final(asg, state, &cdb[ci]);
+                                return Ok(false);
+                            }
+                            elim.to_simplify = 0.0;
+                            elim.activate();
+                            elim.simplify(asg, cdb, state)?;
                         }
                     }
-                    // Simplification has been postponed because chronoBT was used.
-                    // `elim.to_simplify` is increased much in particular
-                    // when vars are asserted or learnts are small.
-                    // We don't need to count the number of asserted vars.
-                    if elim.enable && state.config.c_ip_int <= elim.to_simplify as usize {
-                        elim.to_simplify = 0.0;
-
-                        #[cfg(feature = "progress_MLD")]
-                        {
-                            elim.subsume_literal_limit = (rst.mld.get_slow() * 2.0) as usize;
-                        }
-
-                        elim.activate();
-                        elim.simplify(asg, cdb, state)?;
-                    } else if use_vivify && 1.0 <= state.to_vivify {
-                        if vivify(asg, cdb, elim, state).is_err() {
-                            // return Err(SolverError::UndescribedError);
-                            analyze_final(asg, state, &cdb[ci]);
-                            return Ok(false);
-                        }
-                        state.to_vivify = 0.0;
-                        elim.to_simplify *= 1.2;
+                    if next_progress < asg.num_conflict {
+                        state.progress(asg, cdb, elim, rst);
+                        next_progress = asg.num_conflict + 10_000;
                     }
                 } else if RestartDecision::Force == decision {
                     RESTART!(asg, rst);
@@ -340,7 +308,7 @@ fn search(
             }
             if asg.num_conflict % state.reflection_interval == 0 {
                 // println!("var:{:>10.4}, cls:{:>10.4}", asg.average_activity(), cdb.average_activity());
-                adapt_modules(asg, cdb, elim, rst, state);
+                adapt_modules(asg, rst, state);
                 if let Some(p) = state.elapsed() {
                     if 1.0 <= p {
                         return Err(SolverError::TimeOut);
@@ -358,14 +326,7 @@ fn search(
     }
 }
 
-fn adapt_modules(
-    asg: &mut AssignStack,
-    cdb: &mut ClauseDB,
-    elim: &mut Eliminator,
-    rst: &mut Restarter,
-    state: &mut State,
-) {
-    state.progress(asg, cdb, elim, rst);
+fn adapt_modules(asg: &mut AssignStack, rst: &mut Restarter, state: &mut State) {
     let asg_num_conflict = asg.num_conflict;
     if 10 * state.reflection_interval == asg_num_conflict {
         // Need to call it before `cdb.adapt_to`

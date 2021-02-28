@@ -18,7 +18,6 @@ trait ProgressEvaluator {
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum ProgressUpdate {
     Counter,
-    Temperature(f64),
 
     #[cfg(feature = "progress_ACC")]
     ACC(f64),
@@ -472,7 +471,6 @@ struct GeometricStabilizer {
     next_trigger: usize,
     reset_requested: bool,
     step: usize,
-    depth: f64,
 }
 
 impl Default for GeometricStabilizer {
@@ -486,7 +484,6 @@ impl Default for GeometricStabilizer {
             next_trigger: 1,
             reset_requested: false,
             step: 1,
-            depth: 1.0,
         }
     }
 }
@@ -529,17 +526,17 @@ impl GeometricStabilizer {
                 new_cycle = true;
                 self.num_cycle += 1;
                 self.longest_span = self.step;
+                if self.reset_requested {
+                    self.luby.reset();
+                    self.longest_span = 1;
+                    self.step = self.luby.next();
+                    self.reset_requested = false;
+                    self.next_trigger = now;
+                }
             }
             self.step = self.luby.next();
             self.next_trigger = now + self.longest_span / self.step;
             return Some(new_cycle);
-        }
-        if self.reset_requested {
-            self.luby.reset();
-            self.longest_span = 1;
-            self.step = self.luby.next();
-            self.reset_requested = false;
-            self.next_trigger = now;
         }
         None
     }
@@ -753,6 +750,7 @@ impl Instantiate for Restarter {
                 {
                     self.luby_blocking.reset_progress();
                 }
+                self.stb.reset_requested = true;
                 self.restart_waiting = self.stb.step;
             }
             SolverEvent::Restart => {
@@ -842,9 +840,6 @@ impl RestartIF for Restarter {
                 self.after_restart += 1;
                 self.luby.update(self.after_restart);
             }
-            ProgressUpdate::Temperature(c) => {
-                self.stb.depth = 1.0 + self.stb_expansion_factor * c;
-            }
             #[cfg(feature = "progress_ACC")]
             ProgressUpdate::ACC(val) => self.acc.update(val),
 
@@ -875,7 +870,7 @@ impl Export<RestarterExports, (RestartMode, usize)> for Restarter {
     ///```
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
     /// let rst = Restarter::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (num_blk_non, num_stb_non, num_blk_stb, num_rst_stb, num_rst_lng) = rst.exports();
+    /// let (num_blk_non, num_stb_non, num_blk_stb, num_rst_shift, num_rst_stb) = rst.exports();
     /// let (rst_mode, num_stb) = rst.mode();
     ///```
     #[inline]
@@ -884,8 +879,8 @@ impl Export<RestarterExports, (RestartMode, usize)> for Restarter {
             self.num_block,
             self.num_restart,
             self.stb.span(),
+            self.stb.num_shift,
             self.stb.num_cycle,
-            self.stb.longest_span,
         )
     }
     fn mode(&self) -> (RestartMode, usize) {

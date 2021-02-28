@@ -23,7 +23,7 @@ pub trait VarSelectIF {
 
     #[cfg(feature = "var_staging")]
     /// select staged vars
-    fn select_staged_vars(&mut self, target: StagingTarget, rephasing: bool, ions: usize);
+    fn select_staged_vars(&mut self, request: Option<StagingTarget>, rephasing: bool);
 
     /// return the number of forgotton vars.
     fn num_ion(&self) -> (usize, usize);
@@ -73,7 +73,10 @@ impl VarSelectIF for AssignStack {
         let mut num_positive = 0; // decision var side
 
         for v in self.var.iter().skip(1) {
-            if !v.is(Flag::ELIMINATED) && thr < v.reward && self.root_level < self.level[v.index] {
+            if !v.is(Flag::ELIMINATED)
+                && thr < v.activity(self.stage_activity)
+                && self.root_level < self.level[v.index]
+            {
                 match self.best_phases.get(&v.index) {
                     Some((_, AssignReason::Implication(_, NULL_LIT))) => {
                         num_positive += 1;
@@ -88,24 +91,13 @@ impl VarSelectIF for AssignStack {
         (num_negative, num_positive)
     }
     #[cfg(feature = "var_staging")]
-    fn select_staged_vars(&mut self, mut target: StagingTarget, rephasing: bool, _ions: usize) {
+    fn select_staged_vars(&mut self, request: Option<StagingTarget>, rephasing: bool) {
         self.rephasing = rephasing;
-        let (neg_ion, pos_ion) = self.num_ion();
-        self.rephasing = 0 == neg_ion;
+        self.stage_mode_select += 1;
         if !self.use_stage {
             return;
         }
-        if target == StagingTarget::AutoSelect {
-            self.stage_mode_select += 1;
-            target = StagingTarget::Clear;
-            // if 0 == neg_ion {
-            //     // target = StagingTarget::BestPhases;
-            //     // target = StagingTarget::Ions;
-            //     target = StagingTarget::Clear;
-            // } else {
-            //     target = StagingTarget::Backbone;
-            // };
-        }
+        let target = request.unwrap_or(StagingTarget::Clear);
         for vi in self.staged_vars.keys() {
             // self.var[*vi].extra_reward = 0.0;
             self.var[*vi].turn_off(Flag::STAGED);
@@ -134,50 +126,6 @@ impl VarSelectIF for AssignStack {
             }
 
             StagingTarget::Clear => (),
-            StagingTarget::Ions => {
-                let AssignStack {
-                    ref mut var,
-                    ref best_phases,
-                    ref level,
-                    root_level,
-                    ref mut staged_vars,
-                    ..
-                } = self;
-
-                let mut best_act_min: f64 = 100_000_000.0;
-                for (vi, (_, r)) in best_phases.iter() {
-                    if matches!(r, AssignReason::None) {
-                        best_act_min = best_act_min.min(var[*vi].reward);
-                    }
-                }
-
-                for v in var.iter_mut().skip(1) {
-                    if !v.is(Flag::ELIMINATED)
-                        && *root_level < level[v.index]
-                        && match best_phases.get(&v.index) {
-                            // negative
-                            Some((_, AssignReason::Implication(_, NULL_LIT))) => {
-                                best_act_min <= v.reward
-                            }
-                            // positive
-                            None => best_act_min <= v.reward,
-                            _ => false,
-                        }
-                    {
-                        staged_vars.insert(v.index, v.is(Flag::PHASE));
-                        v.turn_on(Flag::STAGED);
-                    }
-                }
-            }
-            StagingTarget::Random => {
-                let limit = neg_ion.max(pos_ion) / 2;
-                let _len = self.var_order.idxs[0].min(limit);
-                for vi in self.var_order.heap[1..].iter().rev() {
-                    let b = self.var[*vi].timestamp % 2 == 0;
-                    self.staged_vars.insert(*vi, b);
-                    self.var[*vi].turn_on(Flag::STAGED);
-                }
-            }
             #[cfg(feature = "explore_timestamp")]
             StagingTarget::Explore => {
                 let since = self
@@ -195,7 +143,6 @@ impl VarSelectIF for AssignStack {
                     }
                 }
             }
-            _ => (),
         }
     }
     fn select_decision_literal(&mut self) -> Lit {

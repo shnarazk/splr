@@ -55,18 +55,12 @@ pub trait StateIF {
 /// Phase saving modes.
 #[derive(Debug, Eq, PartialEq)]
 pub enum StagingTarget {
-    /// select some targets cyclicly.
-    AutoSelect,
     /// use decision vars in best phases
     Backbone,
     /// use best phases
     BestPhases,
     /// unstage all vars.
     Clear,
-    /// select random vars.
-    Random,
-    /// high activated var both of out of the best phases and in the best phase
-    Ions,
 
     #[cfg(feature = "explore_timestamp")]
     /// seek unchecked vars.
@@ -79,12 +73,9 @@ impl fmt::Display for StagingTarget {
             formatter,
             "{}",
             match self {
-                StagingTarget::AutoSelect => "Staging_something",
                 StagingTarget::Backbone => "Staging_backbone",
                 StagingTarget::BestPhases => "Staging_bestphase",
                 StagingTarget::Clear => "Staging_none",
-                StagingTarget::Random => "Staging_random",
-                StagingTarget::Ions => "StagingTarget ions",
 
                 #[cfg(feature = "explore_timestamp")]
                 StagingTarget::Explore => "Staging_unknowns",
@@ -215,6 +206,8 @@ pub struct State {
     pub c_lvl: Ema,
     /// hold conflicting literals for UNSAT problems
     pub conflicts: Vec<Lit>,
+    /// choroBT threshold
+    pub chrono_bt_threshold: DecisionLevel,
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
     /// working place to build learnt clauses
@@ -249,6 +242,7 @@ impl Default for State {
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
             conflicts: Vec::new(),
+            chrono_bt_threshold: 100,
             last_asg: 0,
             new_learnt: Vec::new(),
             derive20: Vec::new(),
@@ -508,7 +502,7 @@ impl StateIF for State {
 
         let rst_mode = rst.mode().0;
 
-        let (rst_num_blk, rst_num_rst, rst_num_span, rst_num_cycle, _stb_lspan) = rst.exports();
+        let (rst_num_blk, rst_num_rst, rst_span_len, _num_stage, rst_num_cycle) = rst.exports();
         // let rst_num_stb = rst.mode().1;
 
         #[cfg(not(feature = "progress_ACC"))]
@@ -590,7 +584,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K {}|#BLK:{}, #RST:{}, #ion:{}, Lspn:{}",
+            "\x1B[2K {}|#BLK:{}, #RST:{}, Lstg:{}, Lcyc:{}",
             match rst_mode {
                 RestartMode::Dynamic => "    Restart",
                 RestartMode::Luby if self.config.no_color => "LubyRestart",
@@ -600,20 +594,9 @@ impl StateIF for State {
             },
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-            im!("{:>9}", self, LogUsizeId::NumIon, {
-                #[cfg(not(feature = "var_staging"))]
-                {
-                    0
-                }
-                #[cfg(feature = "var_staging")]
-                {
-                    let (n, p) = asg.num_ion();
-                    n + p
-                }
-            }),
-            im!("{:>9}", self, LogUsizeId::LubySpan, rst_num_span),
+            im!("{:>9}", self, LogUsizeId::LubySpan, rst_span_len),
+            im!("{:>9}", self, LogUsizeId::LubyCycle, rst_num_cycle),
         );
-        self[LogUsizeId::LubyCycle] = rst_num_cycle;
         println!(
             "\x1B[2K         EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{}",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),

@@ -1,7 +1,4 @@
 /// Var Rewarding based on Learning Rate Rewarding and Reason Side Rewarding
-#[cfg(feature = "moving_var_reward_rate")]
-#[cfg(feature = "strategy_adaptation")]
-use crate::state::State;
 use {
     super::{AssignStack, Var},
     crate::types::*,
@@ -10,13 +7,7 @@ use {
 impl ActivityIF<VarId> for AssignStack {
     #[inline]
     fn activity(&mut self, vi: VarId) -> f64 {
-        let v = &mut self.var[vi];
-        let val = v.update_activity(self.ordinal, self.activity_decay, 0.0);
-        if v.is(Flag::STAGED) {
-            val + self.stage_activity
-        } else {
-            val
-        }
+        self.var[vi].activity(self.stage_activity)
     }
     fn average_activity(&self) -> f64 {
         self.activity_ema.get()
@@ -25,57 +16,56 @@ impl ActivityIF<VarId> for AssignStack {
         self.var[vi].reward = val;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
-        let r = self.var[vi].update_activity(
-            self.ordinal,
-            self.activity_decay,
-            self.activity_anti_decay,
-        );
-        self.activity_ema.update(r);
+        self.var[vi].participated += 1.0;
+        self.activity_ema.update(self.var[vi].reward);
     }
-    fn reward_at_propagation(&mut self, vi: VarId) {
-        self.var[vi].update_activity(
-            self.ordinal,
-            self.activity_decay,
-            0.9 * self.activity_anti_decay,
-        );
+    fn reward_at_assign(&mut self, vi: VarId) {
+        self.var[vi].timestamp = self.ordinal;
+    }
+    fn reward_at_propagation(&mut self, _vi: VarId) {}
+    // Note: `update_rewards` should be called befero `restart`
+    fn reward_at_unassign(&mut self, vi: VarId) {
+        self.var[vi].update_activity(self.ordinal, self.activity_decay, self.activity_anti_decay);
     }
     fn update_rewards(&mut self) {
         self.ordinal += 1;
         self.stage_activity *= self.activity_decay;
     }
-
-    #[cfg(feature = "moving_var_reward_rate")]
-    #[cfg(feature = "strategy_adaptation")]
-    fn adjust_rewards(&mut self, state: &State) {
-        if state.strategy.1 == self.num_conflict {
-            match state.strategy.0 {
-                SearchStrategy::LowDecisions => {
-                    self.activity_decay_max -= 0.02;
-                }
-                SearchStrategy::HighSuccessive => {
-                    self.activity_decay_max = (self.activity_decay_max + 0.005).min(0.999);
-                }
-                _ => (),
-            };
+    fn update_activity_decay(&mut self, index: Option<usize>) {
+        // asg.update_activity_decay();
+        if let Some(index) = index {
+            if self.reward_index < index {
+                self.activity_decay += (1.0 - self.activity_decay) * self.activity_decay_step;
+                self.reward_index += 1;
+            }
+        } else {
+            self.activity_decay = self.activity_decay_default;
+            self.reward_index = 1;
         }
-    }
-    #[cfg(feature = "moving_var_reward_rate")]
-    fn update_activity_decay(&mut self) {
-        self.activity_decay = self
-            .activity_decay_max
-            .min(self.activity_decay + self.reward_step);
         self.activity_anti_decay = 1.0 - self.activity_decay;
     }
 }
 
 impl Var {
+    // Note: `update_rewards` should be called befero `restart`
+    // Therefore timestamp must be smaller than t anytime.
+    // But conflict_analyze can assert a new var. So we can't expect v.timestamp < self.num_conflict
     fn update_activity(&mut self, t: usize, decay: f64, reward: f64) -> f64 {
         if self.timestamp < t {
-            let duration = (t - self.timestamp) as f64;
-            self.reward *= decay.powf(duration);
-            self.reward += reward;
+            let rate = self.participated as f64 / (t - self.timestamp) as f64;
+            self.reward *= decay;
+            self.reward += (1.0 - (rate - 1.0).powf(2.0)).powf(0.5) * reward;
+            self.participated = 0.0;
             self.timestamp = t;
         }
         self.reward
+    }
+    pub fn activity(&self, extra: f64) -> f64 {
+        let val = self.reward;
+        if self.is(Flag::STAGED) {
+            val + extra
+        } else {
+            val
+        }
     }
 }

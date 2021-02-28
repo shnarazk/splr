@@ -12,6 +12,7 @@ impl Default for Var {
     fn default() -> Var {
         Var {
             index: 0,
+            participated: 0.0,
             reward: 0.0,
             timestamp: 0,
             flags: Flag::empty(),

@@ -8,6 +8,7 @@ pub use crate::{
 use {
     crate::solver::SolverEvent,
     std::{
+        cmp::Ordering,
         convert::TryFrom,
         fmt,
         fs::File,
@@ -75,9 +76,8 @@ pub trait ActivityIF<Ix> {
     /// update internal counter.
     fn update_rewards(&mut self);
 
-    #[cfg(feature = "moving_var_reward_rate")]
-    /// update reward setting as a part of module adaptation.
-    fn adjust_rewards(&mut self, state: &State) {
+    /// update reward decay.
+    fn update_activity_decay(&mut self, _index: Option<usize>) {
         #[cfg(debug)]
         todo!()
     }
@@ -815,24 +815,62 @@ impl Logger {
     }
 }
 
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug)]
 pub struct OrderedProxy<T: Clone + Default + Sized> {
-    index: usize,
+    index: f64,
     body: T,
 }
 
 impl<T: Clone + Default + Sized> Default for OrderedProxy<T> {
     fn default() -> Self {
         OrderedProxy {
-            index: 0,
+            index: 0.0,
             body: T::default(),
         }
     }
 }
 
+impl<T: Clone + Default + Sized> PartialEq for OrderedProxy<T> {
+    fn eq(&self, other: &OrderedProxy<T>) -> bool {
+        self.index == other.index
+    }
+}
+
+impl<T: Clone + Default + Sized> Eq for OrderedProxy<T> {}
+
+impl<T: Clone + Default + PartialEq> PartialOrd for OrderedProxy<T> {
+    fn partial_cmp(&self, other: &OrderedProxy<T>) -> Option<Ordering> {
+        if (self.index - other.index).abs() < f64::EPSILON {
+            Some(Ordering::Equal)
+        } else if self.index < other.index {
+            Some(Ordering::Less)
+        } else {
+            Some(Ordering::Greater)
+        }
+    }
+}
+
+impl<T: Clone + Default + PartialEq> Ord for OrderedProxy<T> {
+    fn cmp(&self, other: &OrderedProxy<T>) -> Ordering {
+        if (self.index - other.index).abs() < f64::EPSILON {
+            Ordering::Equal
+        } else if self.index < other.index {
+            Ordering::Less
+        } else {
+            Ordering::Greater
+        }
+    }
+}
+
 impl<T: Clone + Default + Sized> OrderedProxy<T> {
-    pub fn new(body: T, index: usize) -> Self {
+    pub fn new(body: T, index: f64) -> Self {
         OrderedProxy { index, body }
+    }
+    pub fn new_invert(body: T, rindex: f64) -> Self {
+        OrderedProxy {
+            index: -rindex,
+            body,
+        }
     }
     pub fn to(&self) -> T {
         self.body.clone()

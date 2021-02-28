@@ -102,7 +102,7 @@ impl Default for ClauseDB {
             certified: Vec::new(),
             soft_limit: 0, // 248_000_000
             use_chan_seok: false,
-            co_lbd_bound: 5,
+            co_lbd_bound: 4,
             // lbd_frozen_clause: 30,
             ordinal: 0,
             activity_inc: 1.0,
@@ -807,7 +807,6 @@ impl ClauseDB {
     where
         A: AssignIF,
     {
-        const SCALE_UP: f64 = 100_000_000.0;
         let ClauseDB {
             ref mut clause,
             ref mut lbd_temp,
@@ -834,13 +833,14 @@ impl ClauseDB {
                 }
             }
 
-            let mut act_v: f64 = 0.0;
-            for l in c.lits.iter() {
-                act_v = act_v.max(asg.activity(l.vi()));
-            }
+            // This is the best at least for 3SAT360.
             let rank = c.update_lbd(asg, lbd_temp) as f64;
+            let act_v: f64 = c
+                .lits
+                .iter()
+                .fold(0.0, |acc, l| acc.max(asg.activity(l.vi())));
             let act_c = c.update_activity(*ordinal, *activity_decay, *activity_anti_decay);
-            let weight = (SCALE_UP * rank / (act_v + act_c)) as usize;
+            let weight = rank / (act_v + act_c);
             perm.push(OrderedProxy::new(i, weight));
         }
         let keep = (perm.len() / 2).min(nc / 2);
@@ -872,7 +872,7 @@ impl ClauseDB {
             if c.is(Flag::DEAD) || !c.is(Flag::LEARNT) {
                 continue;
             }
-            if c.rank <= self.co_lbd_bound as u16 {
+            if c.rank < self.co_lbd_bound as u16 {
                 c.turn_off(Flag::LEARNT);
                 self.num_learnt -= 1;
             } else if reinit {

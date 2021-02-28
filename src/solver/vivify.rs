@@ -32,10 +32,7 @@ pub fn vivify(
                 act_v = act_v.max(asg.activity(l.vi()));
             }
             if act_v * rate < act_c {
-                clauses.push(OrderedProxy::new(
-                    ClauseId::from(i),
-                    (1_000_000.0 * (1.0 - act_c + act_v)) as usize,
-                ));
+                clauses.push(OrderedProxy::new(ClauseId::from(i), act_v - act_c));
             }
         }
     }
