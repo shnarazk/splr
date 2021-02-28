@@ -125,6 +125,7 @@ pub struct AssignStack {
     stage_mode_select: usize,
     num_stages: usize,
     stage_activity: f64,
+    reward_index: usize,
 
     //
     //## Statistics

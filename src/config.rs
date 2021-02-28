@@ -234,10 +234,10 @@ impl Default for Config {
 
             viv_thr: 1,
 
-            vrw_dcy_rat: 0.95,
+            vrw_dcy_rat: 0.94,
 
             #[cfg(feature = "moving_var_reward_rate")]
-            vrw_dcy_beg: 0.90,
+            vrw_dcy_beg: 0.94,
             #[cfg(feature = "moving_var_reward_rate")]
             vrw_dcy_stp: 0.01,
 
