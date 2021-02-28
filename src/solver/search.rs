@@ -256,12 +256,11 @@ fn search(
                         state.log(
                             asg.num_conflict,
                             format!(
-                                "Lcycle:{:>5}, core:{:>9}, span:{:>9},/cpr:{:>9.2}, {:>9.2}",
+                                "#cycle:{:>5}, core:{:>9}, span len:{:>9},/cpr:{:>9.2}",
                                 num_cycle,
                                 v.4,
                                 span_len,
                                 asg.exports_box().2.get(),
-                                asg.average_activity(),
                             ),
                         );
                         last_core = v.4;
