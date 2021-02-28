@@ -1,13 +1,12 @@
 /// Var Rewarding based on EVSIDS
 use {
-    super::{AssignStack, VarRewardIF},
-    crate::{state::State, types::*},
-    std::slice::Iter,
+    super::{AssignStack, Var},
+    crate::types::*,
 };
 
-impl VarRewardIF for AssignStack {
+impl ActivityIF<VarId> for AssignStack {
     #[inline]
-    fn activity(&self, vi: VarId) -> f64 {
+    fn activity(&mut self, vi: VarId) -> f64 {
         self.var[vi].reward
     }
     fn average_activity(&self) -> f64 {
@@ -17,7 +16,7 @@ impl VarRewardIF for AssignStack {
         self.var[vi].reward = val;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
-        let s = self.reward_step;
+        let s = self.activity_decay_step;
         let t = self.ordinal;
         let v = &mut self.var[vi];
         if v.timestamp == t {
@@ -31,18 +30,33 @@ impl VarRewardIF for AssignStack {
             for v in &mut self.var[1..] {
                 v.reward *= SCALE;
             }
-            self.reward_step *= SCALE;
+            self.activity_decay_step *= SCALE;
         }
     }
-    fn reward_update(&mut self) {
-        self.ordinal += 1;
+    fn update_rewards(&mut self) {
         const INC_SCALE: f64 = 1.01;
-        self.reward_step *= INC_SCALE;
+        if self.ordinal == 0 {
+            self.activity_decay *= 0.5;
+            self.activity_anti_decay = 1.0 - self.activity_decay;
+        }
+        self.ordinal += 1;
+        self.activity_decay_step *= INC_SCALE;
     }
-    fn update_activity_decay(&mut self) {
+    fn update_activity_decay(&mut self, _index: Option<usize>) {
         self.activity_decay = self
-            .activity_decay_max
-            .min(self.activity_decay + self.reward_step);
+            .activity_decay_default
+            .min(self.activity_decay + self.activity_decay_step);
         self.activity_anti_decay = 1.0 - self.activity_decay;
+    }
+}
+
+impl Var {
+    pub fn activity(&self, extra: f64) -> f64 {
+        let val = self.reward;
+        if self.is(Flag::STAGED) {
+            val + extra
+        } else {
+            val
+        }
     }
 }
