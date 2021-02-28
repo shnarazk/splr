@@ -159,17 +159,10 @@ pub struct Config {
     //
     //## var rewarding
     //
+    /// Var Reward Decay Rate
     pub vrw_dcy_rat: f64,
-
-    #[cfg(feature = "moving_var_reward_rate")]
-    /// Initial var reward decay
-    pub vrw_dcy_beg: f64,
-    #[cfg(feature = "moving_var_reward_rate")]
     /// Decay increment step.
     pub vrw_dcy_stp: f64,
-
-    /// Occurrence compression rate in LR rewarding
-    pub vrw_occ_cmp: f64,
 }
 
 impl Default for Config {
@@ -235,13 +228,7 @@ impl Default for Config {
             viv_thr: 1,
 
             vrw_dcy_rat: 0.94,
-
-            #[cfg(feature = "moving_var_reward_rate")]
-            vrw_dcy_beg: 0.94,
-            #[cfg(feature = "moving_var_reward_rate")]
             vrw_dcy_stp: 0.01,
-
-            vrw_occ_cmp: 0.50,
         }
     }
 }
@@ -271,15 +258,9 @@ impl Config {
                     "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
                     "vit",
                 ];
-                #[cfg(not(feature = "moving_var_reward_rate"))]
                 let options_f64 = [
                     "timeout", "cdr", "rat", "rct", "rlt", "rms", "rmt", "rse", "rss", "srd",
-                    "srv", "vdr", "vro",
-                ];
-                #[cfg(feature = "moving_var_reward_rate")]
-                let options_f64 = [
-                    "timeout", "cdr", "rat", "rct", "rlt", "rms", "rmt", "rse", "rss", "srd",
-                    "srv", "vdr", "vri", "vro",
+                    "srv", "vdr", "vds",
                 ];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
@@ -380,11 +361,8 @@ impl Config {
                                         "srd" => self.stg_rwd_dcy = val,
                                         "srv" => self.stg_rwd_val = val,
                                         "vdr" => self.vrw_dcy_rat = val,
+                                        "vds" => self.vrw_dcy_stp = val,
 
-                                        #[cfg(feature = "moving_var_reward_rate")]
-                                        "vri" => self.vrw_dcy_beg = val,
-
-                                        "vro" => self.vrw_occ_cmp = val,
                                         _ => panic!("invalid option: {}", name),
                                     }
                                 } else {
@@ -516,9 +494,8 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --srd <stg-rwd-dcy>   Decay rate for staged var reward {:>10.2}
       --srv <stg-rwd-val>   Extra reward for staged vars      {:>10.2}
       --vit <viv-thr>       #clause to try to vivify       {:>10}
-      --vdr <vrw-dcy-rat>   var reward decay                  {:>10.2}
-      \x1B[000m\x1B[031m--vri <vrw-dcy-beg>   Initial var reward decay          {:>10.2}\x1B[000m
-      \x1B[000m\x1B[031m--vro <vrw-occ-cmp>   Occ. compression rate in LR       {:>10.2}\x1B[000m
+      --vdr <vrw-dcy-rat>   Var reward Decay                  {:>10.2}
+      --vds <vrw-dcy-stp>   Var reward Decay change Step      {:>10.2}
 ARGS:
   <cnf-file>    DIMACS CNF file
 ",
@@ -594,17 +571,7 @@ ARGS:
         config.stg_rwd_val,
         config.viv_thr,
         config.vrw_dcy_rat,
-        {
-            #[cfg(not(feature = "moving_var_reward_rate"))]
-            {
-                0.0
-            }
-            #[cfg(feature = "moving_var_reward_rate")]
-            {
-                config.vrw_dcy_beg
-            }
-        },
-        config.vrw_occ_cmp,
+        config.vrw_dcy_stp,
     )
 }
 

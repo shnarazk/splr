@@ -245,11 +245,7 @@ fn search(
                     let v = asg.var_stats();
                     parity = !parity;
 
-                    // asg.update_activity_decay();
-                    #[cfg(feature = "moving_var_reward_rate")]
-                    {
-                        asg.update_activity_decay(if new_cycle { None } else { Some(span_len) });
-                    }
+                    asg.update_activity_decay(if new_cycle { None } else { Some(span_len) });
 
                     #[cfg(feature = "var_staging")]
                     {

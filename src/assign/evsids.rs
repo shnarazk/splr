@@ -39,7 +39,6 @@ impl VarRewardIF for AssignStack {
         const INC_SCALE: f64 = 1.01;
         self.reward_step *= INC_SCALE;
     }
-    #[cfg(feature = "moving_var_reward_rate")]
     fn update_activity_decay(&mut self) {
         self.activity_decay = self
             .activity_decay_max

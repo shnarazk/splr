@@ -1,7 +1,4 @@
 /// Var Rewarding based on Learning Rate Rewarding and Reason Side Rewarding
-#[cfg(feature = "moving_var_reward_rate")]
-#[cfg(feature = "strategy_adaptation")]
-use crate::state::State;
 use {
     super::{AssignStack, Var},
     crate::types::*,
@@ -35,26 +32,17 @@ impl ActivityIF<VarId> for AssignStack {
         self.stage_activity *= self.activity_decay;
     }
     fn update_activity_decay(&mut self, index: Option<usize>) {
-        // self.activity_decay = self
-        //     .activity_decay_max
-        //     .min(self.activity_decay + self.reward_step);
-        // self.activity_anti_decay = 1.0 - self.activity_adecay;
-        // dbg!(&self.activity_decay);
-        // SELF.activity_decay = 0.5 * (self.activity_decay_max + self.activity_decay);
         // asg.update_activity_decay();
-        #[cfg(feature = "moving_var_reward_rate")]
-        {
-            if let Some(index) = index {
-                if self.reward_index < index {
-                    self.activity_decay += (1.0 - self.activity_decay) * 0.1;
-                    self.reward_index += 1;
-                }
-            } else {
-                self.activity_decay = self.activity_decay_max;
-                self.reward_index = 1;
+        if let Some(index) = index {
+            if self.reward_index < index {
+                self.activity_decay += (1.0 - self.activity_decay) * self.activity_decay_step;
+                self.reward_index += 1;
             }
-            self.activity_anti_decay = 1.0 - self.activity_decay;
+        } else {
+            self.activity_decay = self.activity_decay_default;
+            self.reward_index = 1;
         }
+        self.activity_anti_decay = 1.0 - self.activity_decay;
     }
 }
 

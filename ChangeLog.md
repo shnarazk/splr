@@ -1,5 +1,7 @@
-## 0.6.4, 2021-02-XX
+## 0.6.4, 2021-03-XX
 
+- abolish feature moving_var_reward_rate, switching to stage-based reward decay increment
+- ends of stages trigger in-processors like clause simplifier and clause vivifier
 - Learning Rate based var rewarding uses a a non-linear weight function.
 - Since Luby stabilization has long cycles, cycle-based tasks were organized. "Stage" is defined based on Luby-stabilization span. Updated terminology:
    - _Luby stabilization_ is a scheme that defines duration of stabilization modes based on Luby series.

@@ -157,23 +157,14 @@ pub struct AssignStack {
     //
     /// var activity decay
     activity_decay: f64,
+    /// the default value of var activity decay in configuration
+    activity_decay_default: f64,
     /// its diff
     activity_anti_decay: f64,
     /// EMA of activity
     activity_ema: Ema,
-
-    #[cfg(feature = "moving_var_reward_rate")]
-    /// maximum var activity decay
-    activity_decay_max: f64,
-    #[cfg(feature = "moving_var_reward_rate")]
-    /// minimum var activity decay
-    activity_decay_min: f64,
-    #[cfg(feature = "moving_var_reward_rate")]
     /// ONLY used in feature EVSIDS
-    reward_step: f64,
-
-    /// for LR
-    occurrence_compression_rate: f64,
+    activity_decay_step: f64,
 
     //
     //## Vivification
