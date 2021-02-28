@@ -228,7 +228,7 @@ impl Default for Config {
             viv_thr: 1,
 
             vrw_dcy_rat: 0.94,
-            vrw_dcy_stp: 0.01,
+            vrw_dcy_stp: 0.1,
         }
     }
 }
