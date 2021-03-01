@@ -12,11 +12,10 @@ impl Default for Var {
     fn default() -> Var {
         Var {
             index: 0,
+            participated: 0.0,
             reward: 0.0,
             timestamp: 0,
             flags: Flag::empty(),
-            participated: 0,
-            extra_reward: 0.0,
 
             #[cfg(feature = "explore_timestamp")]
             assign_timestamp: 0,
@@ -142,7 +141,7 @@ impl VarManipulateIF for AssignStack {
     fn set_eliminated(&mut self, vi: VarId) {
         if !self.var[vi].is(Flag::ELIMINATED) {
             self.var[vi].turn_on(Flag::ELIMINATED);
-            self.clear_activity(vi);
+            self.set_activity(vi, 0.0);
             self.remove_from_heap(vi);
             self.num_eliminated_vars += 1;
         } else {

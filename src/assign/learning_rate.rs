@@ -1,63 +1,71 @@
 /// Var Rewarding based on Learning Rate Rewarding and Reason Side Rewarding
-use {super::AssignStack, crate::types::*};
+use {
+    super::{AssignStack, Var},
+    crate::types::*,
+};
 
 impl ActivityIF<VarId> for AssignStack {
     #[inline]
     fn activity(&mut self, vi: VarId) -> f64 {
-        let v = &self.var[vi];
-        v.reward.max(v.extra_reward)
+        self.var[vi].activity(self.stage_activity)
     }
     fn average_activity(&self) -> f64 {
         self.activity_ema.get()
     }
-    fn clear_activity(&mut self, vi: VarId) {
-        self.var[vi].reward = 0.0;
-    }
-    fn initialize_activity(&mut self, _ix: VarId) {}
     fn set_activity(&mut self, vi: VarId, val: f64) {
         self.var[vi].reward = val;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
-        let v = &mut self.var[vi];
-        v.participated += 1;
+        self.var[vi].participated += 1.0;
+        self.activity_ema.update(self.var[vi].reward);
     }
     fn reward_at_assign(&mut self, vi: VarId) {
-        let t = self.ordinal;
-        let v = &mut self.var[vi];
-        v.timestamp = t;
-        v.extra_reward *= self.staging_reward_decay;
+        self.var[vi].timestamp = self.ordinal;
     }
+    fn reward_at_propagation(&mut self, _vi: VarId) {}
+    // Note: `update_rewards` should be called befero `restart`
     fn reward_at_unassign(&mut self, vi: VarId) {
-        let v = &mut self.var[vi];
-        let duration = (self.ordinal + 1 - v.timestamp) as f64;
-        let rate = v.participated as f64 / duration;
-        v.reward *= self.activity_decay;
-        v.reward += self.activity_anti_decay * rate.powf(self.occurrence_compression_rate);
-        v.participated = 0;
-        self.activity_ema.update(v.reward);
+        self.var[vi].update_activity(self.ordinal, self.activity_decay, self.activity_anti_decay);
     }
     fn update_rewards(&mut self) {
         self.ordinal += 1;
-        #[cfg(feature = "moving_var_reward_rate")]
-        {
-            self.activity_decay = self
-                .activity_decay_max
-                .min(self.activity_decay + self.reward_step);
-        }
+        self.stage_activity *= self.activity_decay;
     }
+    fn update_activity_decay(&mut self, index: Option<usize>) {
+        // asg.update_activity_decay();
+        if let Some(index) = index {
+            if self.reward_index < index {
+                self.activity_decay += (1.0 - self.activity_decay) * self.activity_decay_step;
+                self.reward_index += 1;
+            }
+        } else {
+            self.activity_decay = self.activity_decay_default;
+            self.reward_index = 1;
+        }
+        self.activity_anti_decay = 1.0 - self.activity_decay;
+    }
+}
 
-    #[cfg(feature = "moving_var_reward_rate")]
-    fn adjust_rewards(&mut self, state: &State) {
-        if state.strategy.1 == self.num_conflict {
-            match state.strategy.0 {
-                SearchStrategy::LowDecisions => {
-                    self.activity_decay_max -= 0.02;
-                }
-                SearchStrategy::HighSuccessive => {
-                    self.activity_decay_max = (self.activity_decay_max + 0.005).min(0.999);
-                }
-                _ => (),
-            };
+impl Var {
+    // Note: `update_rewards` should be called befero `restart`
+    // Therefore timestamp must be smaller than t anytime.
+    // But conflict_analyze can assert a new var. So we can't expect v.timestamp < self.num_conflict
+    fn update_activity(&mut self, t: usize, decay: f64, reward: f64) -> f64 {
+        if self.timestamp < t {
+            let rate = self.participated as f64 / (t - self.timestamp) as f64;
+            self.reward *= decay;
+            self.reward += (1.0 - (rate - 1.0).powf(2.0)).powf(0.5) * reward;
+            self.participated = 0.0;
+            self.timestamp = t;
+        }
+        self.reward
+    }
+    pub fn activity(&self, extra: f64) -> f64 {
+        let val = self.reward;
+        if self.is(Flag::STAGED) {
+            val + extra
+        } else {
+            val
         }
     }
 }

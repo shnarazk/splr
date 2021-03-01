@@ -23,10 +23,10 @@ pub trait VarSelectIF {
 
     #[cfg(feature = "var_staging")]
     /// select staged vars
-    fn select_staged_vars(&mut self, target: StagingTarget, rephasing: bool);
+    fn select_staged_vars(&mut self, request: Option<StagingTarget>, rephasing: bool);
 
     /// return the number of forgotton vars.
-    fn num_staging_cands(&self) -> usize;
+    fn num_ion(&self) -> (usize, usize);
 
     /// select a new decision variable.
     fn select_decision_literal(&mut self) -> Lit;
@@ -34,8 +34,6 @@ pub trait VarSelectIF {
     fn update_order(&mut self, v: VarId);
     /// rebuild the internal var_order
     fn rebuild_order(&mut self);
-    /// make a var asserted.
-    fn make_var_asserted(&mut self, vi: VarId);
 }
 
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -65,104 +63,69 @@ impl VarSelectIF for AssignStack {
     // }
 
     #[cfg(not(feature = "var_staging"))]
-    fn num_staging_cands(&self) -> usize {
+    fn num_ion(&self) -> usize {
         0
     }
     #[cfg(feature = "var_staging")]
-    fn num_staging_cands(&self) -> usize {
-        let mut best_act_min: f64 = 100_000_000.0;
-        for vi in self.best_phases.iter() {
-            best_act_min = best_act_min.min(self.var[*vi.0].reward);
+    fn num_ion(&self) -> (usize, usize) {
+        let thr = self.average_activity();
+        let mut num_negative = 0; // unreachable core side
+        let mut num_positive = 0; // decision var side
+
+        for v in self.var.iter().skip(1) {
+            if !v.is(Flag::ELIMINATED)
+                && thr < v.activity(self.stage_activity)
+                && self.root_level < self.level[v.index]
+            {
+                match self.best_phases.get(&v.index) {
+                    Some((_, AssignReason::Implication(_, NULL_LIT))) => {
+                        num_positive += 1;
+                    }
+                    None => {
+                        num_negative += 1;
+                    }
+                    _ => (),
+                }
+            }
         }
-        self.var
-            .iter()
-            .skip(1)
-            .filter(|v| {
-                !v.is(Flag::ELIMINATED)
-                    && self.root_level < self.level[v.index]
-                    && self.best_phases.get(&v.index).is_none()
-                    && best_act_min <= v.reward
-            })
-            .count()
+        (num_negative, num_positive)
     }
     #[cfg(feature = "var_staging")]
-    fn select_staged_vars(&mut self, mut target: StagingTarget, rephasing: bool) {
+    fn select_staged_vars(&mut self, request: Option<StagingTarget>, rephasing: bool) {
         self.rephasing = rephasing;
+        self.stage_mode_select += 1;
         if !self.use_stage {
             return;
-        } else if target == StagingTarget::AutoSelect {
-            self.stage_mode_select += 1;
-            let n = self.num_unreachables().next_power_of_two().trailing_zeros() as usize;
-            match self.stage_mode_select % n {
-                0 => target = StagingTarget::Best(0),
-                8 => target = StagingTarget::Random,
-                // 3 => target = StagingTarget::Core,
-                // 4 => target = StagingTarget::LastAssigned,
-                _ => target = StagingTarget::Clear,
-                // _ => (),
-            }
         }
+        let target = request.unwrap_or(StagingTarget::Clear);
         for vi in self.staged_vars.keys() {
-            self.var[*vi].extra_reward = 0.0;
+            // self.var[*vi].extra_reward = 0.0;
+            self.var[*vi].turn_off(Flag::STAGED);
         }
         self.staged_vars.clear();
-        // self.staging_reward_value = self.staging_reward_value.sqrt();
+        // let base = self.staging_reward_value; // or self.average_activity()
+        self.stage_activity = self.staging_reward_value;
         match target {
-            StagingTarget::Best(mut limit) => {
-                for (vi, b) in self.best_phases.iter() {
-                    self.staged_vars.insert(*vi, *b);
-                    let v = &mut self.var[*vi];
-                    v.extra_reward = self.staging_reward_value;
-                    // v.reward = 0.0; // 1.0 - (1.0 - v.reward).sqrt();
-                    v.set(Flag::PHASE, *b);
-                }
-                if 0 < limit {
-                    let len = self.var_order.idxs[0];
-                    for vi in self.var_order.heap[1..=len].iter() {
-                        if self.root_level < self.level[*vi] && self.best_phases.get(&vi).is_none()
-                        {
-                            assert!(!self.var[*vi].is(Flag::ELIMINATED));
-                            if limit == 0 {
-                                break;
-                            }
-                            limit -= 1;
-                            let v = &mut self.var[*vi];
-                            self.staged_vars.insert(*vi, v.is(Flag::PHASE));
-                            v.extra_reward = self.staging_reward_value;
-                            // v.reward = 1.0 - (1.0 - v.reward).sqrt();
-                            v.set(Flag::PHASE, v.is(Flag::PHASE));
-                        }
-                    }
-                }
-            }
-            StagingTarget::Clear => (),
-            StagingTarget::Core => {
-                let nc = self.num_unreachables();
-                let len = self.var_order.idxs[0];
-                if nc < len {
-                    for vi in self.var_order.heap[len - nc..=len].iter() {
+            StagingTarget::Backbone => {
+                for (vi, (b, r)) in self.best_phases.iter() {
+                    if matches!(r, AssignReason::None) {
                         let v = &mut self.var[*vi];
-                        self.staged_vars.insert(*vi, v.is(Flag::PHASE));
-                        v.extra_reward = self.staging_reward_value;
+                        v.turn_on(Flag::STAGED);
+                        v.set(Flag::PHASE, *b);
+                        self.staged_vars.insert(*vi, *b);
                     }
                 }
             }
-            StagingTarget::LastAssigned => {
-                for vi in self.trail.iter().map(|l| l.vi()) {
-                    let mut v = &mut self.var[vi];
-                    self.staged_vars.insert(vi, v.is(Flag::PHASE));
-                    v.extra_reward = self.staging_reward_value;
+            StagingTarget::BestPhases => {
+                for (vi, (b, _)) in self.best_phases.iter() {
+                    let v = &mut self.var[*vi];
+                    v.turn_on(Flag::STAGED);
+                    v.set(Flag::PHASE, *b);
+                    self.staged_vars.insert(*vi, *b);
                 }
             }
-            StagingTarget::Random => {
-                let limit = self.num_staging_cands();
-                let _len = self.var_order.idxs[0].min(limit);
-                for vi in self.var_order.heap[1..].iter().rev() {
-                    let b = self.var[*vi].timestamp % 2 == 0;
-                    self.staged_vars.insert(*vi, b);
-                    self.var[*vi].extra_reward = self.staging_reward_value;
-                }
-            }
+
+            StagingTarget::Clear => (),
             #[cfg(feature = "explore_timestamp")]
             StagingTarget::Explore => {
                 let since = self
@@ -180,13 +143,12 @@ impl VarSelectIF for AssignStack {
                     }
                 }
             }
-            _ => (),
         }
     }
     fn select_decision_literal(&mut self) -> Lit {
         let vi = self.select_var();
         if self.use_rephase && self.rephasing {
-            if let Some(b) = self.best_phases.get(&vi) {
+            if let Some((b, AssignReason::None)) = self.best_phases.get(&vi) {
                 return Lit::from_assign(vi, *b);
             }
         }
@@ -203,34 +165,9 @@ impl VarSelectIF for AssignStack {
             }
         }
     }
-    fn make_var_asserted(&mut self, vi: VarId) {
-        self.num_asserted_vars += 1;
-        self.clear_activity(vi);
-        self.remove_from_heap(vi);
-        self.check_best_phase(vi);
-    }
 }
 
 impl AssignStack {
-    /// check usability of the saved best phase.
-    /// return `true` if the current best phase got invalid.
-    fn check_best_phase(&mut self, vi: VarId) -> bool {
-        if self.var[vi].is(Flag::ELIMINATED) {
-            return false;
-        }
-        if self.level[vi] == self.root_level {
-            return false;
-        }
-        if let Some(b) = self.best_phases.get(&vi) {
-            debug_assert!(self.assign[vi].is_some());
-            if self.assign[vi] != Some(*b) {
-                self.best_phases.clear();
-                self.num_best_assign = 0;
-                return true;
-            }
-        }
-        false
-    }
     /// select a decision var
     fn select_var(&mut self) -> VarId {
         loop {

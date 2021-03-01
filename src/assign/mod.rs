@@ -74,16 +74,13 @@ pub struct Var {
     /// reverse conversion to index. Note `VarId` must be `usize`.
     pub index: VarId,
     /// the number of participation in conflict analysis
-    participated: u32,
+    participated: f64,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
     reward: f64,
     /// the number of conflicts at which this var was assigned an rewarded lastly.
     timestamp: usize,
     /// the `Flag`s
     flags: Flag,
-    /// a special reward given by aux rewarding mechanism
-    extra_reward: f64,
-
     #[cfg(feature = "explore_timestamp")]
     /// the number of conflicts at which this var was assigned lastly
     assign_timestamp: usize,
@@ -111,7 +108,7 @@ pub struct AssignStack {
     //
     use_rephase: bool,
     best_assign: bool,
-    best_phases: HashMap<VarId, bool>,
+    best_phases: HashMap<VarId, (bool, AssignReason)>,
     build_best_at: usize,
     num_best_assign: usize,
     rephasing: bool,
@@ -127,6 +124,8 @@ pub struct AssignStack {
     staged_vars: HashMap<VarId, bool>,
     stage_mode_select: usize,
     num_stages: usize,
+    stage_activity: f64,
+    reward_index: usize,
 
     //
     //## Statistics
@@ -158,23 +157,14 @@ pub struct AssignStack {
     //
     /// var activity decay
     activity_decay: f64,
+    /// the default value of var activity decay in configuration
+    activity_decay_default: f64,
     /// its diff
     activity_anti_decay: f64,
     /// EMA of activity
     activity_ema: Ema,
-
-    #[cfg(feature = "moving_var_reward_rate")]
-    /// maximum var activity decay
-    activity_decay_max: f64,
-    #[cfg(feature = "moving_var_reward_rate")]
-    /// minimum var activity decay
-    activity_decay_min: f64,
-    #[cfg(feature = "moving_var_reward_rate")]
     /// ONLY used in feature EVSIDS
-    reward_step: f64,
-
-    /// for LR
-    occurrence_compression_rate: f64,
+    activity_decay_step: f64,
 
     //
     //## Vivification
