@@ -100,7 +100,6 @@ pub struct AssignStack {
     trail_lim: Vec<usize>,
     q_head: usize,
     pub root_level: DecisionLevel,
-    last_conflict: VarId,
     var_order: VarIdHeap, // Variable Order
 
     //

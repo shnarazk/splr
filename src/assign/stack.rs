@@ -45,7 +45,6 @@ impl Default for AssignStack {
             trail_lim: Vec::new(),
             q_head: 0,
             root_level: 0,
-            last_conflict: VarId::default(),
             var_order: VarIdHeap::default(),
 
             use_rephase: true,

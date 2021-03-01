@@ -253,7 +253,6 @@ impl PropagateIF for AssignStack {
                     match lit_assign!(self, w.blocker) {
                         Some(true) => (),
                         Some(false) => {
-                            self.last_conflict = false_lit.vi();
                             self.num_conflict += 1;
                             return w.c;
                         }
@@ -319,7 +318,6 @@ impl PropagateIF for AssignStack {
 
                     if first_value == Some(false) {
                         let cid = w.c;
-                        self.last_conflict = false_lit.vi();
                         self.num_conflict += 1;
                         self.dpc_ema.update(self.num_decision);
                         self.ppc_ema.update(self.num_propagation);
