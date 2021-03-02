@@ -254,6 +254,8 @@ impl PropagateIF for AssignStack {
                         Some(true) => (),
                         Some(false) => {
                             self.num_conflict += 1;
+                            self.dpc_ema.update(self.num_decision);
+                            self.ppc_ema.update(self.num_propagation);
                             return w.c;
                         }
                         None => {
@@ -309,7 +311,8 @@ impl PropagateIF for AssignStack {
                             w.blocker = first;
                             (*watcher).get_unchecked_mut(usize::from(!*lk)).register(w);
                             lits.swap(1, k);
-                            // If `search_from` gets out of range, the next loop will ignore it safely;
+                            // If `search_from` gets out of range,
+                            // the next loop will ignore it safely;
                             // the first iteration loop becomes null.
                             *search_from = k + 1;
                             continue 'next_clause;
