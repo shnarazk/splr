@@ -10,9 +10,6 @@ pub struct Config {
     /// Eliminator switch
     a_elim: i32,
 
-    /// Re-phase switch
-    a_rephase: i32,
-
     /// Stabilization switch
     a_stabilize: i32,
 
@@ -156,7 +153,6 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             a_elim: 1,
-            a_rephase: 0,
             a_stabilize: 1,
             a_stage: 1,
             a_vivify: 0,
@@ -231,7 +227,7 @@ impl Config {
                 let flags = [
                     "no-color", "quiet", "certify", "journal", "log", "help", "version",
                 ];
-                let options_i32 = ["ELI", "RPH", "STB", "STG", "VIV"];
+                let options_i32 = ["ELI", "STB", "STG", "VIV"];
                 let options_u32 = ["cbt"];
                 let options_usize = [
                     "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
@@ -264,7 +260,6 @@ impl Config {
                                         #[cfg(feature = "strategy_adaptation")]
                                         "ADP" => self.a_adaptive = val,
                                         "ELI" => self.a_elim = val,
-                                        "RPH" => self.a_rephase = val,
                                         "STB" => self.a_stabilize = val,
                                         "STG" => self.a_stage = val,
                                         "VIV" => self.a_vivify = val,
@@ -435,7 +430,6 @@ FLAGS:
   -V, --version             Prints version information
 OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m):
       --ELI <a-elim>        Eliminator switch              {:>10}
-      --RPH <a-rephase>     Re-phase switch                {:>10}
       --STB <a-stabilize>   Stabilization switch           {:>10}
       --STG <a-stage>       Stage switch                   {:>10}
       --VIV <a-vivify>      Vivification switch            {:>10}
@@ -471,7 +465,6 @@ ARGS:
   <cnf-file>    DIMACS CNF file
 ",
         config.a_elim,
-        config.a_rephase,
         config.a_stabilize,
         config.a_stage,
         config.a_vivify,
@@ -566,9 +559,6 @@ impl Config {
     }
     pub fn use_elim(&self) -> bool {
         dispatch!(self.a_elim)
-    }
-    pub fn use_rephase(&self) -> bool {
-        dispatch!(self.a_rephase)
     }
     pub fn use_vivify(&self) -> bool {
         dispatch!(self.a_vivify)

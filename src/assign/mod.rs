@@ -105,7 +105,6 @@ pub struct AssignStack {
     //
     //## Phase handling
     //
-    use_rephase: bool,
     best_assign: bool,
     best_phases: HashMap<VarId, (bool, AssignReason)>,
     build_best_at: usize,

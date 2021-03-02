@@ -142,7 +142,8 @@ impl VarSelectIF for AssignStack {
     }
     fn select_decision_literal(&mut self) -> Lit {
         let vi = self.select_var();
-        if self.use_rephase && self.rephasing {
+        #[cfg(feature = "use_rephase")]
+        if self.rephasing {
             if let Some((b, AssignReason::None)) = self.best_phases.get(&vi) {
                 return Lit::from_assign(vi, *b);
             }

@@ -615,17 +615,10 @@ pub enum RestartDecision {
     Block,
     /// We should restart now.
     Force,
-    // TODO
-    // Postpone,
-    #[cfg(feature = "pure_stabilization")]
-    /// We are in stabilization mode.
-    Stabilize,
 }
 
 impl RestartIF for Restarter {
     type Exports = RestarterExports;
-    #[inline]
-    #[allow(clippy::collapsible_if)]
     fn restart(&mut self) -> Option<RestartDecision> {
         if self.luby.is_active() {
             self.luby.shift();
@@ -640,20 +633,12 @@ impl RestartIF for Restarter {
             self.acc.shift();
         }
 
-        #[cfg(feature = "pure_stabilization")]
-        {
-            if self.stb.active {
-                return Some(RestartDecision::Stabilize);
-            }
-        }
-
         if self.asg.is_active() {
             self.num_block += 1;
             self.restart_waiting = 0;
             self.after_restart = 0;
             return Some(RestartDecision::Block);
         }
-
         if self.lbd.is_active() {
             self.restart_waiting += 1;
             if self.stb.step <= self.restart_waiting {
@@ -662,7 +647,6 @@ impl RestartIF for Restarter {
             }
             self.after_restart = 0;
         }
-        // Some(RestartDecision::Postpone)
         None
     }
     fn stabilize(&mut self) -> Option<bool> {

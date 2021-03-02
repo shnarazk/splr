@@ -116,8 +116,8 @@ impl PropagateIF for AssignStack {
         // The following doesn't hold anymore by using chronoBT.
         // assert!(self.trail_lim.is_empty() || !cid.is_none());
         let vi = l.vi();
-        let decided = self.use_rephase
-            && self.root_level < self.level[vi]
+        #[cfg(feature = "use_rephase")]
+        let decided = self.root_level < self.level[vi]
             && self.reason[vi] == AssignReason::None
             && matches!(self.best_phases.get(&vi), Some((_, AssignReason::None)));
         debug_assert!(!self.var[vi].is(Flag::ELIMINATED));
@@ -131,6 +131,7 @@ impl PropagateIF for AssignStack {
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
+        #[cfg(feature = "use_rephase")]
         if decided {
             self.check_best_phase(vi);
         }
@@ -352,9 +353,6 @@ impl AssignStack {
                 dbg!("got");
             }
         }
-        if !self.use_rephase {
-            return false;
-        }
         if let Some((b, _)) = self.best_phases.get(&vi) {
             debug_assert!(self.assign[vi].is_some());
             if self.assign[vi] != Some(*b) {
@@ -390,12 +388,11 @@ impl AssignStack {
     }
     /// save the current assignments as the best phases
     fn save_best_phases(&mut self) {
-        if self.use_rephase {
-            for l in self.trail.iter().skip(self.len_upto(0)) {
-                let vi = l.vi();
-                if let Some(b) = self.assign[vi] {
-                    self.best_phases.insert(vi, (b, self.reason[vi]));
-                }
+        #[cfg(feature = "use_rephase")]
+        for l in self.trail.iter().skip(self.len_upto(0)) {
+            let vi = l.vi();
+            if let Some(b) = self.assign[vi] {
+                self.best_phases.insert(vi, (b, self.reason[vi]));
             }
         }
         self.build_best_at = self.num_propagation;

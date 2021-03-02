@@ -5,7 +5,6 @@ use {
 };
 
 impl ActivityIF<VarId> for AssignStack {
-    #[inline]
     fn activity(&mut self, vi: VarId) -> f64 {
         self.var[vi].activity(self.stage_activity)
     }
@@ -19,7 +18,6 @@ impl ActivityIF<VarId> for AssignStack {
         self.var[vi].participated += 1;
         self.activity_ema.update(self.var[vi].reward);
     }
-    #[inline]
     fn reward_at_assign(&mut self, vi: VarId) {
         self.var[vi].timestamp = self.ordinal;
     }

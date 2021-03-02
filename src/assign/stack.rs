@@ -47,7 +47,6 @@ impl Default for AssignStack {
             root_level: 0,
             var_order: VarIdHeap::default(),
 
-            use_rephase: true,
             best_assign: false,
             best_phases: HashMap::new(),
             build_best_at: 0,
@@ -112,7 +111,6 @@ impl Instantiate for AssignStack {
             reason: vec![AssignReason::default(); nv + 1],
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
-            use_rephase: config.use_rephase(),
             use_stage: config.use_stage(),
             staging_reward_decay: config.stg_rwd_dcy,
             staging_reward_value: config.stg_rwd_val,
