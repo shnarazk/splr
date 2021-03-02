@@ -24,6 +24,8 @@ pub enum ProgressUpdate {
 
     ASG(usize),
     LBD(u16),
+
+    #[cfg(feature = "use_luby")]
     Luby,
 
     #[cfg(feature = "progress_MLD")]
@@ -665,6 +667,7 @@ impl RestartIF for Restarter {
             ProgressUpdate::LBD(val) => {
                 self.lbd.update(val);
             }
+            #[cfg(feature = "use_luby")]
             ProgressUpdate::Luby => self.luby.update(0),
 
             #[cfg(feature = "progress_MLD")]

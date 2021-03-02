@@ -204,12 +204,17 @@ fn search(
     state: &mut State,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
-    let use_vivify = state.config.use_vivify();
-    let mut parity = false;
     let mut last_core = 0;
     let mut next_progress = 10_000;
     let mut best_asserted = state.target.num_of_variables;
+    let use_vivify = state.config.use_vivify();
+
+    #[cfg(feature = "var_staging")]
+    let mut parity = false;
+
+    #[cfg(feature = "use_luby")]
     rst.update(ProgressUpdate::Luby);
+
     rst.update(ProgressUpdate::Remain(asg.num_vars - asg.num_asserted_vars));
 
     loop {
@@ -243,12 +248,11 @@ fn search(
                     RESTART!(asg, rst);
                     let (_blk, _rst, span_len, _stage, num_cycle) = rst.exports();
                     let v = asg.var_stats();
-                    parity = !parity;
-
                     asg.update_activity_decay(if new_cycle { None } else { Some(span_len) });
 
                     #[cfg(feature = "var_staging")]
                     {
+                        parity = !parity;
                         asg.select_staged_vars(None, parity);
                     }
 
