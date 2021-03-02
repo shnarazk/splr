@@ -41,9 +41,6 @@ pub enum RestartMode {
     Luby,
     /// Controlled by CaDiCal-like Geometric Stabilizer
     Stabilize,
-
-    #[cfg(feature = "progress_Bucket")]
-    Bucket,
 }
 
 type RestarterExports = (usize, usize, usize, usize, usize);
@@ -383,7 +380,10 @@ impl Default for ProgressLuby {
 impl Instantiate for ProgressLuby {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressLuby {
-            enable: config.use_luby(),
+            #[cfg(feature = "use_luby")]
+            enable: true,
+            #[cfg(not(feature = "use_luby"))]
+            enable: false,
             step: config.rst_step,
             ..ProgressLuby::default()
         }
@@ -406,13 +406,6 @@ impl EmaIF for ProgressLuby {
         if !self.enable {
             return;
         }
-        /* if index == 0 {
-            self.index = 0;
-            self.next_restart = self.next_step();
-            self.active = false;
-        } else {
-            self.active = self.next_restart < index;
-        } */
         self.active = self.next_restart < now;
     }
     fn get(&self) -> f64 {
@@ -428,31 +421,6 @@ impl ProgressEvaluator for ProgressLuby {
         self.active = false;
         self.next_restart = self.step * self.luby.next();
     }
-}
-
-/// Find the finite subsequence that contains index 'x', and the
-/// size of that subsequence as: 1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8
-impl ProgressLuby {
-    /*
-    fn next_step(&self) -> usize {
-        if self.index == 0 {
-            return self.step;
-        }
-        let mut size: usize = 1;
-        let mut seq: usize = 0;
-        while size < self.index + 1 {
-            seq += 1;
-            size = 2 * size + 1;
-        }
-        let mut x = self.index;
-        while size - 1 != x {
-            size = (size - 1) >> 1;
-            seq -= 1;
-            x %= size;
-        }
-        (self.restart_inc.powf(seq as f64) * self.step as f64) as usize
-    }
-    */
 }
 
 /// An implementation of CaDiCaL-style blocker.
@@ -543,104 +511,6 @@ impl GeometricStabilizer {
     fn span(&self) -> usize {
         self.step
     }
-    #[cfg(feature = "luby_blocking")]
-    fn new(enable: bool, scale: usize) -> Self {
-        GeometricStabilizer {
-            enable,
-            active: false,
-            longest_span: 1,
-            luby: LubySeries::default(),
-            num_cycle: 0,
-            num_shift: 0,
-            next_trigger: scale,
-            reset_requested: false,
-            step: 1,
-        }
-    }
-}
-
-#[cfg(feature = "progress_Bucket")]
-/// Restart when the sum of LBDs is over a limit.
-#[derive(Debug)]
-struct ProgressBucket {
-    enable: bool,
-    num_shift: usize,
-    sum: f64,
-    power: f64,
-    power_factor: f64,
-    power_scale: f64,
-    step: f64,
-    threshold: f64,
-}
-
-#[cfg(feature = "progress_Bucket")]
-impl Default for ProgressBucket {
-    fn default() -> ProgressBucket {
-        ProgressBucket {
-            enable: false,
-            num_shift: 0,
-            sum: 0.0,
-            power: 1.25,
-            power_factor: 1.25,
-            power_scale: 0.0,
-            step: 1.0,
-            threshold: 2000.0,
-        }
-    }
-}
-
-#[cfg(feature = "progress_Bucket")]
-impl Instantiate for ProgressBucket {
-    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
-        ProgressBucket {
-            power: config.rst_bkt_pwr,
-            power_factor: (config.rst_bkt_pwr - 1.0).max(0.0),
-            power_scale: config.rst_bkt_scl,
-            step: config.rst_bkt_inc,
-            threshold: config.rst_bkt_thr as f64,
-            ..ProgressBucket::default()
-        }
-    }
-}
-
-#[cfg(feature = "progress_Bucket")]
-impl EmaIF for ProgressBucket {
-    type Input = usize;
-    fn update(&mut self, d: usize) {
-        self.sum += (d as f64).powf(self.power);
-    }
-    fn get(&self) -> f64 {
-        todo!()
-    }
-    fn trend(&self) -> f64 {
-        todo!()
-    }
-}
-
-#[cfg(feature = "progress_Bucket")]
-impl ProgressEvaluator for ProgressBucket {
-    fn is_active(&self) -> bool {
-        self.enable && self.threshold < self.sum
-    }
-    fn reset_progress(&mut self) {
-        if self.enable {
-            self.num_shift = 1;
-            self.threshold = 1000.0; // FIXME: we need the values in config
-            self.shift();
-        }
-    }
-    fn shift(&mut self) {
-        self.num_shift += 1;
-        self.sum = 0.0;
-        self.threshold += self.step;
-        // self.power = 1.0 + (self.num_shift as f64).powf(-0.2);
-        // self.power = 1.0 + (1.0 + 0.001 * self.num_shift as f64).powf(-1.0);
-        if 0.0 < self.power_factor {
-            // If power_scale == 0.0, then p == 1.0 and power == config.rst_bkt_pwr.
-            let p = (1.0 + self.power_scale * self.num_shift as f64).powf(-1.0);
-            self.power = 1.0 + self.power_factor * p;
-        }
-    }
 }
 
 /// `Restarter` provides restart API and holds data about restart conditions.
@@ -650,10 +520,6 @@ pub struct Restarter {
     acc: ProgressACC,
 
     asg: ProgressASG,
-
-    #[cfg(feature = "progress_Bucket")]
-    bkt: ProgressBucket,
-
     lbd: ProgressLBD,
 
     #[cfg(feature = "progress_MLD")]
@@ -662,10 +528,6 @@ pub struct Restarter {
     // pub blvl: ProgressLVL,
     // pub clvl: ProgressLVL,
     luby: ProgressLuby,
-
-    #[cfg(feature = "luby_blocking")]
-    luby_blocking: GeometricStabilizer,
-
     stb: GeometricStabilizer,
     after_restart: usize,
     restart_step: usize,
@@ -687,10 +549,6 @@ impl Default for Restarter {
             acc: ProgressACC::default(),
 
             asg: ProgressASG::default(),
-
-            #[cfg(feature = "progress_Bucket")]
-            bkt: ProgressBucket::default(),
-
             lbd: ProgressLBD::default(),
 
             #[cfg(feature = "progress_MLD")]
@@ -699,10 +557,6 @@ impl Default for Restarter {
             // blvl: ProgressLVL::default(),
             // clvl: ProgressLVL::default(),
             luby: ProgressLuby::default(),
-
-            #[cfg(feature = "luby_blocking")]
-            luby_blocking: GeometricStabilizer::new(true, 1000),
-
             stb: GeometricStabilizer::default(),
             after_restart: 0,
             restart_step: 0,
@@ -723,10 +577,6 @@ impl Instantiate for Restarter {
             acc: ProgressACC::instantiate(config, cnf),
 
             asg: ProgressASG::instantiate(config, cnf),
-
-            #[cfg(feature = "progress_Bucket")]
-            bkt: ProgressBucket::instantiate(config, cnf),
-
             lbd: ProgressLBD::instantiate(config, cnf),
 
             #[cfg(feature = "progress_MLD")]
@@ -746,10 +596,6 @@ impl Instantiate for Restarter {
     fn handle(&mut self, e: SolverEvent) {
         match e {
             SolverEvent::Assert(_) => {
-                #[cfg(feature = "luby_blocking")]
-                {
-                    self.luby_blocking.reset_progress();
-                }
                 self.stb.reset_requested = true;
                 self.restart_waiting = self.stb.step;
             }
@@ -805,22 +651,10 @@ impl RestartIF for Restarter {
             self.num_block += 1;
             self.restart_waiting = 0;
             self.after_restart = 0;
-
-            #[cfg(feature = "luby_blocking")]
-            {
-                self.luby_blocking.update(0);
-                self.restart_step = self.initial_restart_step
-                    * self.luby_blocking.span()
-                    * self.luby_blocking.scale;
-            }
             return Some(RestartDecision::Block);
         }
 
         if self.lbd.is_active() {
-            #[cfg(feature = "luby_blocking")]
-            {
-                self.restart_step = self.initial_restart_step;
-            }
             self.restart_waiting += 1;
             if self.stb.step <= self.restart_waiting {
                 self.restart_waiting = 0;
@@ -930,6 +764,8 @@ impl fmt::Display for LubySeries {
 }
 
 impl LubySeries {
+    /// Find the finite subsequence that contains index 'x', and the
+    /// size of that subsequence as: 1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8
     fn next(&mut self) -> usize {
         self.index += 1;
         let mut seq = self.seq;

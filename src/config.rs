@@ -7,24 +7,11 @@ pub struct Config {
     //
     // Switches
     //
-    #[cfg(feature = "strategy_adaptation")]
-    /// Strategy adaptation switch
-    a_adaptive: i32,
-
     /// Eliminator switch
     a_elim: i32,
 
-    /// Use Luby series forcibly
-    a_luby: i32,
-
-    /// Clause reduction switch
-    a_reduce: i32,
-
     /// Re-phase switch
     a_rephase: i32,
-
-    /// Reason-Side Rewarding switch
-    a_rsr: i32,
 
     /// Stabilization switch
     a_stabilize: i32,
@@ -168,14 +155,8 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            #[cfg(feature = "strategy_adaptation")]
-            a_adaptive: 0,
-
             a_elim: 1,
-            a_luby: 0,
-            a_reduce: 1,
             a_rephase: 0,
-            a_rsr: 1,
             a_stabilize: 1,
             a_stage: 1,
             a_vivify: 0,
@@ -250,9 +231,7 @@ impl Config {
                 let flags = [
                     "no-color", "quiet", "certify", "journal", "log", "help", "version",
                 ];
-                let options_i32 = [
-                    "ADP", "ELI", "LBY", "RDC", "RPH", "RSR", "STB", "STG", "VIV",
-                ];
+                let options_i32 = ["ELI", "RPH", "STB", "STG", "VIV"];
                 let options_u32 = ["cbt"];
                 let options_usize = [
                     "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
@@ -284,12 +263,8 @@ impl Config {
                                     match name {
                                         #[cfg(feature = "strategy_adaptation")]
                                         "ADP" => self.a_adaptive = val,
-
                                         "ELI" => self.a_elim = val,
-                                        "LBY" => self.a_luby = val,
-                                        "RDC" => self.a_reduce = val,
                                         "RPH" => self.a_rephase = val,
-                                        "RSR" => self.a_rsr = val,
                                         "STB" => self.a_stabilize = val,
                                         "STG" => self.a_stage = val,
                                         "VIV" => self.a_vivify = val,
@@ -459,12 +434,8 @@ FLAGS:
   -l, --log                 Uses Glucose-like progress report
   -V, --version             Prints version information
 OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m):
-      \x1B[000m\x1B[031m--ADP <a-adaptive>    Strategy adaptation switch     {:>10}\x1B[000m
       --ELI <a-elim>        Eliminator switch              {:>10}
-      --LBY <a-luby>        Use Luby series for restart    {:>10}
-      --RDC <a-reduce>      Clause reduction switch        {:>10}
       --RPH <a-rephase>     Re-phase switch                {:>10}
-      --RSR <a-rsr>         Reason-Side Rewarding switch   {:>10}
       --STB <a-stabilize>   Stabilization switch           {:>10}
       --STG <a-stage>       Stage switch                   {:>10}
       --VIV <a-vivify>      Vivification switch            {:>10}
@@ -499,21 +470,8 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
 ARGS:
   <cnf-file>    DIMACS CNF file
 ",
-        {
-            #[cfg(not(feature = "strategy_adaptation"))]
-            {
-                0.0
-            }
-            #[cfg(feature = "strategy_adaptation")]
-            {
-                config.a_adaptive
-            }
-        },
         config.a_elim,
-        config.a_luby,
-        config.a_reduce,
         config.a_rephase,
-        config.a_rsr,
         config.a_stabilize,
         config.a_stage,
         config.a_vivify,
@@ -609,29 +567,16 @@ impl Config {
     pub fn use_elim(&self) -> bool {
         dispatch!(self.a_elim)
     }
-    pub fn use_luby(&self) -> bool {
-        dispatch!(self.a_luby)
-    }
-    pub fn use_reduce(&self) -> bool {
-        dispatch!(self.a_reduce)
-    }
     pub fn use_rephase(&self) -> bool {
         dispatch!(self.a_rephase)
     }
     pub fn use_vivify(&self) -> bool {
         dispatch!(self.a_vivify)
     }
-    pub fn use_reason_side_rewarding(&self) -> bool {
-        dispatch!(self.a_rsr)
-    }
     pub fn use_stabilize(&self) -> bool {
         dispatch!(self.a_stabilize)
     }
     pub fn use_stage(&self) -> bool {
         dispatch!(self.a_stage)
-    }
-    #[cfg(feature = "strategy_adaptation")]
-    pub fn use_adaptive(&self) -> bool {
-        dispatch!(self.a_adaptive)
     }
 }

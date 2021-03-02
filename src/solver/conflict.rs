@@ -228,12 +228,15 @@ pub fn handle_conflict(
         {
             // At the present time, some reason clauses can contain first UIP or its negation.
             // So we have to filter vars instead of literals to avoid double counting.
+            #[cfg(feature = "reason_side_rewarding")]
             let mut bumped = new_learnt.iter().map(|l| l.vi()).collect::<Vec<VarId>>();
             for lit in new_learnt.iter() {
                 //
                 //## Learnt Literal Rewarding
                 //
                 asg.reward_at_analysis(lit.vi());
+
+                #[cfg(feature = "reason_side_rewarding")]
                 if let AssignReason::Implication(r, _) = asg.reason(lit.vi()) {
                     for l in &cdb[r].lits {
                         let vi = l.vi();

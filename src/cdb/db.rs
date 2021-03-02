@@ -248,7 +248,6 @@ impl Instantiate for ClauseDB {
             activity_anti_decay: 1.0 - config.crw_dcy_rat,
             touched,
             lbd_temp: vec![0; nv + 1],
-            reducible: config.use_reduce(),
 
             ..ClauseDB::default()
         }
@@ -648,19 +647,23 @@ impl ClauseDBIF for ClauseDB {
     where
         A: AssignIF,
     {
-        if !self.reducible || 0 == self.num_learnt {
+        #[cfg(feature = "clause_reduction")]
+        if 0 == self.num_learnt {
             return false;
-        }
-        let go = if self.use_chan_seok {
-            self.first_reduction < self.num_learnt
         } else {
-            self.reduction_coeff * self.next_reduction <= nc
-        };
-        if go {
-            self.reduction_coeff = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
-            self.reduce_db(asg, nc);
+            let go = if self.use_chan_seok {
+                self.first_reduction < self.num_learnt
+            } else {
+                self.reduction_coeff * self.next_reduction <= nc
+            };
+            if go {
+                self.reduction_coeff = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
+                self.reduce_db(asg, nc);
+            }
+            go
         }
-        go
+        #[cfg(not(feature = "clause_reduction"))]
+        false
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());

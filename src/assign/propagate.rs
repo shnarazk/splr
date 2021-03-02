@@ -120,13 +120,12 @@ impl PropagateIF for AssignStack {
             && self.root_level < self.level[vi]
             && self.reason[vi] == AssignReason::None
             && matches!(self.best_phases.get(&vi), Some((_, AssignReason::None)));
-        self.level[vi] = lv;
-        let v = &mut self.var[vi];
-        debug_assert!(!v.is(Flag::ELIMINATED));
+        debug_assert!(!self.var[vi].is(Flag::ELIMINATED));
         debug_assert!(
             var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
         );
         set_assign!(self, l);
+        self.level[vi] = lv;
         self.reason[vi] = reason;
         self.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
@@ -261,7 +260,7 @@ impl PropagateIF for AssignStack {
                             self.assign_by_implication(
                                 w.blocker,
                                 AssignReason::Implication(w.c, false_lit),
-                                self.level[false_lit.vi()],
+                                *self.level.get_unchecked(false_lit.vi()),
                             );
                         }
                     }
@@ -285,9 +284,9 @@ impl PropagateIF for AssignStack {
                         ..
                     } = cdb[w.c];
                     debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
-                    let mut first = lits[0];
+                    let mut first = *lits.get_unchecked_mut(0);
                     if first == false_lit {
-                        first = lits[1];
+                        first = *lits.get_unchecked(1);
                         lits.swap(0, 1);
                     }
                     let first_value = lit_assign!(self, first);
@@ -302,12 +301,12 @@ impl PropagateIF for AssignStack {
                     assert!(*search_from < lits.len());
                     let len = lits.len();
                     for k in (*search_from..len).chain(2..*search_from) {
-                        let lk = &lits[k];
+                        let lk = lits.get_unchecked(k);
                         if lit_assign!(self, *lk) != Some(false) {
                             n -= 1;
                             let mut w = source.detach(n);
                             w.blocker = first;
-                            (*watcher)[usize::from(!*lk)].register(w);
+                            (*watcher).get_unchecked_mut(usize::from(!*lk)).register(w);
                             lits.swap(1, k);
                             // If `search_from` gets out of range, the next loop will ignore it safely;
                             // the first iteration loop becomes null.

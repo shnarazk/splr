@@ -276,11 +276,7 @@ impl Instantiate for State {
             config: config.clone(),
 
             #[cfg(feature = "strategy_adaptation")]
-            strategy: if config.use_adaptive() {
-                (SearchStrategy::Initial, 0)
-            } else {
-                (SearchStrategy::Generic, 0)
-            },
+            strategy: (SearchStrategy::Initial, 0),
 
             vivify_thr: config.viv_thr,
             target: cnf.clone(),
@@ -411,9 +407,6 @@ impl StateIF for State {
         A: Export<(usize, usize, usize, f64), ()>,
         C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), bool>,
     {
-        if !self.config.use_adaptive() {
-            return;
-        }
         let (asg_num_decision, asg_num_propagation, asg_num_conflict, asg_num_restart) =
             asg.exports();
         let (_active, _bi_clause, cdb_num_bi_learnt, cdb_num_lbd2, _learnt, _reduction) =

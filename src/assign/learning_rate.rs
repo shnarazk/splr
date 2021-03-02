@@ -16,9 +16,10 @@ impl ActivityIF<VarId> for AssignStack {
         self.var[vi].reward = val;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
-        self.var[vi].participated += 1.0;
+        self.var[vi].participated += 1;
         self.activity_ema.update(self.var[vi].reward);
     }
+    #[inline]
     fn reward_at_assign(&mut self, vi: VarId) {
         self.var[vi].timestamp = self.ordinal;
     }
@@ -49,13 +50,14 @@ impl ActivityIF<VarId> for AssignStack {
 impl Var {
     // Note: `update_rewards` should be called befero `restart`
     // Therefore timestamp must be smaller than t anytime.
-    // But conflict_analyze can assert a new var. So we can't expect v.timestamp < self.num_conflict
+    // But conflict_analyze can assert a new var.
+    // So we can't expect v.timestamp < self.num_conflict.
     fn update_activity(&mut self, t: usize, decay: f64, reward: f64) -> f64 {
         if self.timestamp < t {
             let rate = self.participated as f64 / (t - self.timestamp) as f64;
             self.reward *= decay;
             self.reward += (1.0 - (rate - 1.0).powf(2.0)).powf(0.5) * reward;
-            self.participated = 0.0;
+            self.participated = 0;
             self.timestamp = t;
         }
         self.reward

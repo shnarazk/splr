@@ -62,11 +62,6 @@ impl VarSelectIF for AssignStack {
     //     }
     // }
 
-    #[cfg(not(feature = "var_staging"))]
-    fn num_ion(&self) -> usize {
-        0
-    }
-    #[cfg(feature = "var_staging")]
     fn num_ion(&self) -> (usize, usize) {
         let thr = self.average_activity();
         let mut num_negative = 0; // unreachable core side
