@@ -17,15 +17,12 @@ trait ProgressEvaluator {
 /// Update progress observer sub-modules
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum ProgressUpdate {
-    Counter,
     ASG(usize),
     LBD(u16),
+    Counter,
 
     #[cfg(feature = "use_luby")]
     Luby,
-
-    #[cfg(feature = "progress_MLD")]
-    MLD(u16),
 
     Remain(usize),
 }
@@ -166,75 +163,6 @@ impl ProgressEvaluator for ProgressLBD {
         self.enable && self.threshold < self.trend()
     }
     fn shift(&mut self) {}
-}
-
-#[cfg(feature = "progress_MLD")]
-/// An EMA of Maximum LBD of a Dependent graph, used in conflict analyze
-#[derive(Clone, Debug)]
-pub struct ProgressMLD {
-    enable: bool,
-    ema: Ema2,
-    num: usize,
-    sum: usize,
-    scaling: f64,
-    threshold: f64,
-}
-
-#[cfg(feature = "progress_MLD")]
-impl Default for ProgressMLD {
-    fn default() -> ProgressMLD {
-        ProgressMLD {
-            enable: true,
-            ema: Ema2::new(1),
-            num: 0,
-            sum: 0,
-            scaling: 0.20,
-            threshold: 2.0,
-        }
-    }
-}
-
-#[cfg(feature = "progress_MLD")]
-impl Instantiate for ProgressMLD {
-    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
-        ProgressMLD {
-            ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_slw),
-            scaling: config.rst_mld_scl,
-            threshold: config.rst_mld_thr,
-            ..ProgressMLD::default()
-        }
-    }
-}
-
-#[cfg(feature = "progress_MLD")]
-impl EmaIF for ProgressMLD {
-    type Input = u16;
-    fn update(&mut self, d: Self::Input) {
-        self.num += 1;
-        self.sum += d as usize;
-        self.ema.update(d as f64);
-    }
-    fn get(&self) -> f64 {
-        self.ema.get()
-    }
-    fn trend(&self) -> f64 {
-        self.ema.trend()
-    }
-}
-
-#[cfg(feature = "progress_MLD")]
-impl ProgressEvaluator for ProgressMLD {
-    fn is_active(&self) -> bool {
-        self.enable && self.threshold < self.ema.trend()
-    }
-    fn shift(&mut self) {}
-}
-
-#[cfg(feature = "progress_MLD")]
-impl ProgressMLD {
-    pub fn get_slow(&self) -> f64 {
-        self.ema.get_slow()
-    }
 }
 
 /// An EMA of decision level.
@@ -437,10 +365,6 @@ impl GeometricStabilizer {
 pub struct Restarter {
     asg: ProgressASG,
     lbd: ProgressLBD,
-
-    #[cfg(feature = "progress_MLD")]
-    pub mld: ProgressMLD,
-
     // pub blvl: ProgressLVL,
     // pub clvl: ProgressLVL,
     luby: ProgressLuby,
@@ -463,10 +387,6 @@ impl Default for Restarter {
         Restarter {
             asg: ProgressASG::default(),
             lbd: ProgressLBD::default(),
-
-            #[cfg(feature = "progress_MLD")]
-            mld: ProgressMLD::default(),
-
             // blvl: ProgressLVL::default(),
             // clvl: ProgressLVL::default(),
             luby: ProgressLuby::default(),
@@ -488,10 +408,6 @@ impl Instantiate for Restarter {
         Restarter {
             asg: ProgressASG::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
-
-            #[cfg(feature = "progress_MLD")]
-            mld: ProgressMLD::instantiate(config, cnf),
-
             // blvl: ProgressLVL::instantiate(config, cnf),
             // clvl: ProgressLVL::instantiate(config, cnf),
             luby: ProgressLuby::instantiate(config, cnf),
@@ -567,11 +483,9 @@ impl RestartIF for Restarter {
             ProgressUpdate::LBD(val) => {
                 self.lbd.update(val);
             }
+
             #[cfg(feature = "use_luby")]
             ProgressUpdate::Luby => self.luby.update(0),
-
-            #[cfg(feature = "progress_MLD")]
-            ProgressUpdate::MLD(val) => self.mld.update(val),
 
             ProgressUpdate::Remain(val) => {
                 self.asg.num_var = val;

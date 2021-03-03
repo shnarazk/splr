@@ -155,18 +155,9 @@ pub fn handle_conflict(
         )
     );
     asg.handle(SolverEvent::Conflict);
-    // backtrack level by analyze
 
-    let bl_a = {
-        #[cfg(not(feature = "progress_MLD"))]
-        {
-            conflict_analyze(asg, cdb, state, ci).max(asg.root_level)
-        }
-        #[cfg(feature = "progress_MLD")]
-        {
-            conflict_analyze(asg, cdb, rst, state, ci).max(asg.root_level)
-        }
-    };
+    // backtrack level by analyze
+    let bl_a = conflict_analyze(asg, cdb, state, ci).max(asg.root_level);
 
     if state.new_learnt.is_empty() {
         #[cfg(debug)]
@@ -289,9 +280,6 @@ pub fn handle_conflict(
 fn conflict_analyze(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
-
-    #[cfg(feature = "progress_MLD")] rst: &mut Restarter,
-
     state: &mut State,
     conflicting_clause: ClauseId,
 ) -> DecisionLevel {
@@ -306,10 +294,6 @@ fn conflict_analyze(
     println!("- analyze conflicting literal {}", p);
 
     let mut path_cnt = 0;
-
-    #[cfg(feature = "progress_MLD")]
-    let mut largest_clause: u16 = 2;
-
     let vi = p.vi();
     if !asg.var(vi).is(Flag::CA_SEEN) && 0 < asg.level(vi) {
         let lvl = asg.level(vi);
@@ -364,10 +348,6 @@ fn conflict_analyze(
                     state.derive20.push(cid);
                 }
                 let c = &cdb[cid];
-                #[cfg(feature = "progress_MLD")]
-                {
-                    largest_clause = largest_clause.max(c.rank);
-                }
 
                 #[cfg(feature = "boundary_check")]
                 assert!(
@@ -488,11 +468,6 @@ fn conflict_analyze(
     debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);
     learnt[0] = !p;
-
-    #[cfg(feature = "progress_MLD")]
-    {
-        rst.update(ProgressUpdate::MLD(largest_clause));
-    }
 
     #[cfg(feature = "trace_analysis")]
     println!("- appending {}, the result is {:?}", learnt[0], learnt);

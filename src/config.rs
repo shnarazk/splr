@@ -108,14 +108,6 @@ pub struct Config {
     /// Forcing restart threshold
     pub rst_lbd_thr: f64,
 
-    #[cfg(feature = "progress_MLD")]
-    /// Scaling for Maximum LBD of a Dep. graph
-    pub rst_mld_scl: f64,
-
-    #[cfg(feature = "progress_MLD")]
-    /// Threshold for Maximum LBD of a Dep. graph
-    pub rst_mld_thr: f64,
-
     /// Stabilizer scaling
     pub rst_stb_scl: f64,
 
@@ -182,12 +174,6 @@ impl Default for Config {
             rst_lbd_len: 24,
             rst_lbd_slw: 8192,
             rst_lbd_thr: 1.20,
-
-            #[cfg(feature = "progress_MLD")]
-            rst_mld_scl: 0.10,
-            #[cfg(feature = "progress_MLD")]
-            rst_mld_thr: 0.80,
-
             rst_stb_exp: 1.0,
             rst_stb_scl: 2.0,
 
@@ -226,8 +212,7 @@ impl Config {
                     "vit",
                 ];
                 let options_f64 = [
-                    "timeout", "cdr", "rat", "rlt", "rms", "rmt", "rse", "rss", "srd", "srv",
-                    "vdr", "vds",
+                    "timeout", "cdr", "rat", "rlt", "rse", "rss", "srd", "srv", "vdr", "vds",
                 ];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
@@ -307,13 +292,6 @@ impl Config {
                                         "cdr" => self.crw_dcy_rat = val,
                                         "rat" => self.rst_asg_thr = val,
                                         "rlt" => self.rst_lbd_thr = val,
-
-                                        #[cfg(feature = "progress_MLD")]
-                                        "rms" => self.rst_mld_scl = val,
-
-                                        #[cfg(feature = "progress_MLD")]
-                                        "rmt" => self.rst_mld_thr = val,
-
                                         "rse" => self.rst_stb_exp = val,
                                         "rss" => self.rst_stb_scl = val,
                                         "srd" => self.stg_rwd_dcy = val,
@@ -438,8 +416,6 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --rll <rst-lbd-len>   Length of LBD fast EMA         {:>10}
       --rls <rst-lbd-slw>   Length of LBD slow EMA         {:>10}
       --rlt <rst-lbd-thr>   Forcing restart threshold         {:>10.2}
-      \x1B[000m\x1B[031m--rms <rst-mld-scl>   Scaling for Max LBD of Dep.       {:>10.2}\x1B[000m
-      \x1B[000m\x1B[031m--rmt <rst-mld-thr>   Threshold for Max LBD of Dep.     {:>10.2}\x1B[000m
       --rse <rst-stb-exp>   Stabilizer expansion scale        {:>10.2}
       --rss <rst-stb-scl>   Stabilizer scaling                {:>10.2}
       --rs  <rst-step>      #conflicts between restarts    {:>10}
@@ -472,26 +448,6 @@ ARGS:
         config.rst_lbd_len,
         config.rst_lbd_slw,
         config.rst_lbd_thr,
-        {
-            #[cfg(feature = "progress_MLD")]
-            {
-                config.rst_mld_scl
-            }
-            #[cfg(not(feature = "progress_MLD"))]
-            {
-                0.0
-            }
-        },
-        {
-            #[cfg(feature = "progress_MLD")]
-            {
-                config.rst_mld_thr
-            }
-            #[cfg(not(feature = "progress_MLD"))]
-            {
-                0.0
-            }
-        },
         config.rst_stb_exp,
         config.rst_stb_scl,
         config.rst_step,
