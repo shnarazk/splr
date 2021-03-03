@@ -1,5 +1,7 @@
 ## 0.6.4, 2021-03-XX
 
+- rename feature use_luby to luby_restart
+- drop features: progress_ACC and progress_MLD
 - abolish feature moving_var_reward_rate, switching to stage-based reward decay increment
 - ends of stages trigger in-processors like clause simplifier and clause vivifier
 - Learning Rate based var rewarding uses a non-linear weight function.
