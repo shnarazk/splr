@@ -21,7 +21,7 @@ pub enum ProgressUpdate {
     LBD(u16),
     Counter,
 
-    #[cfg(feature = "use_luby")]
+    #[cfg(feature = "luby_restart")]
     Luby,
 
     Remain(usize),
@@ -227,9 +227,9 @@ impl Default for ProgressLuby {
 impl Instantiate for ProgressLuby {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressLuby {
-            #[cfg(feature = "use_luby")]
+            #[cfg(feature = "luby_restart")]
             enable: true,
-            #[cfg(not(feature = "use_luby"))]
+            #[cfg(not(feature = "luby_restart"))]
             enable: false,
             step: config.rst_step,
             ..ProgressLuby::default()
@@ -484,7 +484,7 @@ impl RestartIF for Restarter {
                 self.lbd.update(val);
             }
 
-            #[cfg(feature = "use_luby")]
+            #[cfg(feature = "luby_restart")]
             ProgressUpdate::Luby => self.luby.update(0),
 
             ProgressUpdate::Remain(val) => {
