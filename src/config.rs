@@ -99,10 +99,6 @@ pub struct Config {
     /// Blocking restart threshold. Originally this was the Glucose's R.
     pub rst_asg_thr: f64,
 
-    #[cfg(feature = "progress_ACC")]
-    /// Conflict Correlation threshold
-    pub rst_ccc_thr: f64,
-
     /// Length of LBD fast EMA
     pub rst_lbd_len: usize,
 
@@ -183,10 +179,6 @@ impl Default for Config {
             rst_asg_len: 24,
             rst_asg_slw: 8192,
             rst_asg_thr: 0.20,
-
-            #[cfg(feature = "progress_ACC")]
-            rst_ccc_thr: 0.7,
-
             rst_lbd_len: 24,
             rst_lbd_slw: 8192,
             rst_lbd_thr: 1.20,
@@ -234,8 +226,8 @@ impl Config {
                     "vit",
                 ];
                 let options_f64 = [
-                    "timeout", "cdr", "rat", "rct", "rlt", "rms", "rmt", "rse", "rss", "srd",
-                    "srv", "vdr", "vds",
+                    "timeout", "cdr", "rat", "rlt", "rms", "rmt", "rse", "rss", "srd", "srv",
+                    "vdr", "vds",
                 ];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
@@ -314,10 +306,6 @@ impl Config {
                                         "timeout" => self.c_timeout = val,
                                         "cdr" => self.crw_dcy_rat = val,
                                         "rat" => self.rst_asg_thr = val,
-
-                                        #[cfg(feature = "progress_ACC")]
-                                        "rct" => self.rst_ccc_thr = val,
-
                                         "rlt" => self.rst_lbd_thr = val,
 
                                         #[cfg(feature = "progress_MLD")]
@@ -447,7 +435,6 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --ral <rst-asg-len>   Length of assign. fast EMA     {:>10}
       --ras <rst-asg-slw>   Length of assign. slow EMA     {:>10}
       --rat <rst-asg-thr>   Blocking restart threshold        {:>10.2}
-      \x1B[000m\x1B[031m--rct <rst-ccc-thr>   Conflict Correlation threshold    {:>10.2}\x1B[000m
       --rll <rst-lbd-len>   Length of LBD fast EMA         {:>10}
       --rls <rst-lbd-slw>   Length of LBD slow EMA         {:>10}
       --rlt <rst-lbd-thr>   Forcing restart threshold         {:>10.2}
@@ -482,16 +469,6 @@ ARGS:
         config.rst_asg_len,
         config.rst_asg_slw,
         config.rst_asg_thr,
-        {
-            #[cfg(not(feature = "progress_ACC"))]
-            {
-                0.0
-            }
-            #[cfg(feature = "progress_ACC")]
-            {
-                config.rst_ccc_thr
-            }
-        },
         config.rst_lbd_len,
         config.rst_lbd_slw,
         config.rst_lbd_thr,

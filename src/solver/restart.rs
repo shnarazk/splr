@@ -18,10 +18,6 @@ trait ProgressEvaluator {
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum ProgressUpdate {
     Counter,
-
-    #[cfg(feature = "progress_ACC")]
-    ACC(f64),
-
     ASG(usize),
     LBD(u16),
 
@@ -241,85 +237,6 @@ impl ProgressMLD {
     }
 }
 
-#[cfg(feature = "progress_ACC")]
-/// An EMA of Activity-based Conflict Correlation, used for forcing restart.
-#[derive(Clone, Debug)]
-struct ProgressACC {
-    enable: bool,
-    ema: Ema2,
-    num: usize,
-    sum: f64,
-    // increment by update
-    val: f64,
-    // increment by update
-    inc: usize,
-    // storing the last check result
-    correlation: f64,
-    /// For force restart based on average LBD of newly generated clauses: 0.80.
-    /// This is called `K` in Glucose
-    threshold: f64,
-}
-
-#[cfg(feature = "progress_ACC")]
-impl Default for ProgressACC {
-    fn default() -> ProgressACC {
-        ProgressACC {
-            enable: true,
-            ema: Ema2::new(1),
-            num: 0,
-            sum: 0.0,
-            val: 0.0,
-            inc: 0,
-            correlation: 0.0,
-            threshold: 1.6,
-        }
-    }
-}
-
-#[cfg(feature = "progress_ACC")]
-impl Instantiate for ProgressACC {
-    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
-        ProgressACC {
-            ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_slw),
-            threshold: config.rst_ccc_thr,
-            ..ProgressACC::default()
-        }
-    }
-}
-
-#[cfg(feature = "progress_ACC")]
-impl EmaIF for ProgressACC {
-    type Input = f64;
-    fn update(&mut self, d: Self::Input) {
-        self.inc += 1;
-        self.val += d;
-    }
-    fn get(&self) -> f64 {
-        self.ema.get()
-    }
-    fn trend(&self) -> f64 {
-        self.ema.trend()
-    }
-}
-
-#[cfg(feature = "progress_ACC")]
-impl ProgressEvaluator for ProgressACC {
-    // Smaller core, larger value
-    fn is_active(&self) -> bool {
-        self.enable && self.threshold < self.correlation
-    }
-    fn shift(&mut self) {
-        if 0 < self.inc {
-            self.num += 1;
-            self.sum += self.val;
-            self.correlation = self.val / (self.inc as f64);
-            self.ema.update(self.correlation);
-            self.val = 0.0;
-            self.inc = 0;
-        }
-    }
-}
-
 /// An EMA of decision level.
 #[derive(Clone, Debug)]
 struct ProgressLVL {
@@ -518,9 +435,6 @@ impl GeometricStabilizer {
 /// `Restarter` provides restart API and holds data about restart conditions.
 #[derive(Clone, Debug)]
 pub struct Restarter {
-    #[cfg(feature = "progress_ACC")]
-    acc: ProgressACC,
-
     asg: ProgressASG,
     lbd: ProgressLBD,
 
@@ -547,9 +461,6 @@ pub struct Restarter {
 impl Default for Restarter {
     fn default() -> Restarter {
         Restarter {
-            #[cfg(feature = "progress_ACC")]
-            acc: ProgressACC::default(),
-
             asg: ProgressASG::default(),
             lbd: ProgressLBD::default(),
 
@@ -575,9 +486,6 @@ impl Default for Restarter {
 impl Instantiate for Restarter {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
         Restarter {
-            #[cfg(feature = "progress_ACC")]
-            acc: ProgressACC::instantiate(config, cnf),
-
             asg: ProgressASG::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
 
@@ -630,11 +538,6 @@ impl RestartIF for Restarter {
             return None;
         }
 
-        #[cfg(feature = "progress_ACC")]
-        {
-            self.acc.shift();
-        }
-
         if self.asg.is_active() {
             self.num_block += 1;
             self.restart_waiting = 0;
@@ -660,9 +563,6 @@ impl RestartIF for Restarter {
                 self.after_restart += 1;
                 self.luby.update(self.after_restart);
             }
-            #[cfg(feature = "progress_ACC")]
-            ProgressUpdate::ACC(val) => self.acc.update(val),
-
             ProgressUpdate::ASG(val) => self.asg.update(val),
             ProgressUpdate::LBD(val) => {
                 self.lbd.update(val);

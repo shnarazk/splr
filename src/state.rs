@@ -496,13 +496,7 @@ impl StateIF for State {
         let rst_mode = rst.mode().0;
 
         let (rst_num_blk, rst_num_rst, rst_span_len, _num_stage, rst_num_cycle) = rst.exports();
-        // let rst_num_stb = rst.mode().1;
-
-        #[cfg(not(feature = "progress_ACC"))]
         let (rst_asg, rst_lbd) = *rst.exports_box();
-
-        #[cfg(feature = "progress_ACC")]
-        let (_rst_acc, rst_asg, rst_lbd) = *rst.exports_box();
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -795,12 +789,7 @@ impl State {
             let e = rst.exports();
             e.0 + e.2
         };
-
-        #[cfg(not(feature = "progress_ACC"))]
         let (rst_asg, rst_lbd) = *rst.exports_box();
-
-        #[cfg(feature = "progress_ACC")]
-        let (_, rst_asg, rst_lbd) = *rst.exports_box();
 
         println!(
             "{:>3},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
