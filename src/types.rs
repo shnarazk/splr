@@ -81,6 +81,10 @@ pub trait ActivityIF<Ix> {
         #[cfg(debug)]
         todo!()
     }
+    // fn reward_actives(&mut self) {
+    //     #[cfg(debug)]
+    //     todo!()
+    // }
 }
 
 /// API for object instantiation based on `Configuration` and `CNFDescription`.

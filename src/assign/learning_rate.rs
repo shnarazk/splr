@@ -43,6 +43,16 @@ impl ActivityIF<VarId> for AssignStack {
         }
         self.activity_anti_decay = 1.0 - self.activity_decay;
     }
+    // fn reward_actives(&mut self) {
+    //     self.ordinal += 1;
+    //     for lit in self.trail[self.len_upto(self.root_level)..].iter() {
+    //         self.var[lit.vi()].update_activity(
+    //             self.ordinal,
+    //             self.activity_decay,
+    //             self.activity_anti_decay,
+    //         );
+    //     }
+    // }
 }
 
 impl Var {

@@ -52,16 +52,6 @@ impl From<&Var> for VarTimestamp {
 }
 
 impl VarSelectIF for AssignStack {
-    // #[cfg(feature = "var_staging")]
-    // fn dissolve_staged_vars(&mut self, rephasing: bool) {
-    //     self.rephasing = rephasing;
-    //     for (vi, b) in self.staged_vars.iter() {
-    //         let v = &mut self.var[*vi];
-    //         v.set(Flag::PHASE, *b);
-    //         v.extra_reward *= self.staging_reward_decay;
-    //     }
-    // }
-
     fn num_ion(&self) -> (usize, usize) {
         let thr = self.average_activity();
         let mut num_negative = 0; // unreachable core side
@@ -94,11 +84,9 @@ impl VarSelectIF for AssignStack {
         }
         let target = request.unwrap_or(StagingTarget::Clear);
         for vi in self.staged_vars.keys() {
-            // self.var[*vi].extra_reward = 0.0;
             self.var[*vi].turn_off(Flag::STAGED);
         }
         self.staged_vars.clear();
-        // let base = self.staging_reward_value; // or self.average_activity()
         self.stage_activity = self.staging_reward_value;
         match target {
             StagingTarget::Backbone => {

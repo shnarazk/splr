@@ -117,8 +117,11 @@ impl Instantiate for AssignStack {
             num_vars: cnf.num_of_variables,
             var: Var::new_vars(nv),
 
-            activity_decay: config.vrw_dcy_rat,
+            #[cfg(feature = "EVSIDS")]
+            activity_decay: config.vrw_dcy_rat * 0.6,
+            #[cfg(not(feature = "EVSIDS"))]
             activity_decay_default: config.vrw_dcy_rat,
+
             activity_anti_decay: 1.0 - config.vrw_dcy_rat,
             activity_decay_step: config.vrw_dcy_stp,
 

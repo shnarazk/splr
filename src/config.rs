@@ -182,7 +182,13 @@ impl Default for Config {
 
             viv_thr: 1,
 
+            #[cfg(feature = "EVSIDS")]
+            vrw_dcy_rat: 0.98,
+            #[cfg(not(feature = "EVSIDS"))]
             vrw_dcy_rat: 0.94,
+            #[cfg(feature = "EVSIDS")]
+            vrw_dcy_stp: 0.0001,
+            #[cfg(not(feature = "EVSIDS"))]
             vrw_dcy_stp: 0.1,
         }
     }
@@ -422,8 +428,8 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --srd <stg-rwd-dcy>   Decay rate for staged var reward {:>10.2}
       --srv <stg-rwd-val>   Extra reward for staged vars      {:>10.2}
       --vit <viv-thr>       #clause to try to vivify       {:>10}
-      --vdr <vrw-dcy-rat>   Var reward Decay                  {:>10.2}
-      --vds <vrw-dcy-stp>   Var reward Decay change Step      {:>10.2}
+      --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
+      --vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}
 ARGS:
   <cnf-file>    DIMACS CNF file
 ",
