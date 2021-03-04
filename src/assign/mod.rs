@@ -17,11 +17,12 @@ mod var;
 pub use self::{
     propagate::PropagateIF, select::VarSelectIF, stack::ClauseManipulateIF, var::VarManipulateIF,
 };
-
+#[cfg(any(feature = "best_phases_tracking", feature = "var_staging"))]
+use std::collections::HashMap;
 use {
     self::heap::{VarHeapIF, VarOrderIF},
     super::{cdb::ClauseDBIF, types::*},
-    std::{collections::HashMap, ops::Range, slice::Iter},
+    std::{ops::Range, slice::Iter},
 };
 
 /// API about assignment like [`decision_level`](`crate::assign::AssignIF::decision_level`), [`stack`](`crate::assign::AssignIF::stack`), [`best_assigned`](`crate::assign::AssignIF::best_assigned`), and so on.
@@ -106,20 +107,25 @@ pub struct AssignStack {
     //## Phase handling
     //
     best_assign: bool,
-    best_phases: HashMap<VarId, (bool, AssignReason)>,
     build_best_at: usize,
     num_best_assign: usize,
     rephasing: bool,
+    #[cfg(feature = "best_phases_tracking")]
+    best_phases: HashMap<VarId, (bool, AssignReason)>,
 
     //
     //## Stage handling
     //
     use_stage: bool,
+    #[cfg(feature = "var_staging")]
     /// Decay rate for staging reward
     staging_reward_decay: f64,
+    #[cfg(feature = "var_staging")]
     /// Bonus reward for vars on stage
     staging_reward_value: f64,
+    #[cfg(feature = "var_staging")]
     staged_vars: HashMap<VarId, bool>,
+    #[cfg(feature = "var_staging")]
     stage_mode_select: usize,
     num_stages: usize,
     stage_activity: f64,

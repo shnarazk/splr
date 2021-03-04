@@ -1,8 +1,10 @@
 /// main struct AssignStack
+#[cfg(any(feature = "best_phases_tracking", feature = "var_staging"))]
+use std::collections::HashMap;
 use {
     super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF, VarSelectIF},
     crate::{cdb::ClauseDBIF, solver::SolverEvent, types::*},
-    std::{collections::HashMap, fmt, ops::Range, slice::Iter},
+    std::{fmt, ops::Range, slice::Iter},
 };
 
 #[cfg(not(feature = "no_IO"))]
@@ -48,15 +50,20 @@ impl Default for AssignStack {
             var_order: VarIdHeap::default(),
 
             best_assign: false,
-            best_phases: HashMap::new(),
             build_best_at: 0,
             num_best_assign: 0,
             rephasing: false,
+            #[cfg(feature = "best_phases_tracking")]
+            best_phases: HashMap::new(),
 
             use_stage: true,
+            #[cfg(feature = "var_staging")]
             staging_reward_value: 1.0,
+            #[cfg(feature = "var_staging")]
             staging_reward_decay: 0.9,
+            #[cfg(feature = "var_staging")]
             staged_vars: HashMap::new(),
+            #[cfg(feature = "var_staging")]
             stage_mode_select: 0,
             num_stages: 0,
             stage_activity: 0.0,
@@ -112,8 +119,12 @@ impl Instantiate for AssignStack {
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
             use_stage: config.use_stage(),
+
+            #[cfg(feature = "var_staging")]
             staging_reward_decay: config.stg_rwd_dcy,
+            #[cfg(feature = "var_staging")]
             staging_reward_value: config.stg_rwd_val,
+
             num_vars: cnf.num_of_variables,
             var: Var::new_vars(nv),
 

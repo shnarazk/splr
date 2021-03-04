@@ -70,6 +70,11 @@ impl Var {
         }
         self.reward
     }
+    #[cfg(not(feature = "var_staging"))]
+    pub fn activity(&self, _: f64) -> f64 {
+        self.reward
+    }
+    #[cfg(feature = "var_staging")]
     pub fn activity(&self, extra: f64) -> f64 {
         let val = self.reward;
         if self.is(Flag::STAGED) {

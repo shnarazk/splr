@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.6.4-RC.1"
+version = "0.6.4-RC.2"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2018"
@@ -16,6 +16,7 @@ bitflags = "1.2"
 
 [features]
 default = ["clause_reduction", "reason_side_rewarding"]
+best_phases_tracking = []
 boundary_check = []
 clause_reduction = []
 ema_calibration = []

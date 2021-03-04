@@ -52,6 +52,11 @@ impl From<&Var> for VarTimestamp {
 }
 
 impl VarSelectIF for AssignStack {
+    #[cfg(not(feature = "best_phases_tracking"))]
+    fn num_ion(&self) -> (usize, usize) {
+        (0, 0)
+    }
+    #[cfg(feature = "best_phases_tracking")]
     fn num_ion(&self) -> (usize, usize) {
         let thr = self.average_activity();
         let mut num_negative = 0; // unreachable core side

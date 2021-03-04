@@ -348,12 +348,16 @@ impl PropagateIF for AssignStack {
 impl AssignStack {
     /// check usability of the saved best phase.
     /// return `true` if the current best phase got invalid.
+    #[cfg(not(feature = "best_phases_tracking"))]
+    pub fn check_best_phase(&mut self, _: VarId) -> bool {
+        false
+    }
+    #[cfg(feature = "best_phases_tracking")]
     pub fn check_best_phase(&mut self, vi: VarId) -> bool {
         #[cfg(feature = "var_staging")]
         {
             if self.staged_vars.get(&vi).is_some() {
                 self.staged_vars.remove(&vi);
-                dbg!("got");
             }
         }
         if let Some((b, _)) = self.best_phases.get(&vi) {
@@ -371,7 +375,6 @@ impl AssignStack {
                         ..
                     } = self;
                     best_phases.retain(|vj, _| level[*vj] < lvl);
-                    // self.best_phases.remove(&vi);
                     self.num_best_assign = self.num_eliminated_vars + self.best_phases.len();
                 }
                 return true;
