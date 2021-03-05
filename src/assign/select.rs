@@ -112,25 +112,7 @@ impl VarSelectIF for AssignStack {
                     self.staged_vars.insert(*vi, *b);
                 }
             }
-
             StagingTarget::Clear => (),
-            #[cfg(feature = "explore_timestamp")]
-            StagingTarget::Explore => {
-                let since = self
-                    .best_phases
-                    .iter()
-                    .map(|v| self.var[*v.0].assign_timestamp)
-                    .min()
-                    .unwrap_or(1);
-                let len = self.var_order.idxs[0];
-                for vi in self.var_order.heap[1..=len].iter() {
-                    let v = &mut self.var[*vi];
-                    if v.assign_timestamp < since {
-                        self.staged_vars.insert(*vi, v.assign_timestamp % 2 == 0);
-                        v.extra_reward = self.staging_reward_value;
-                    }
-                }
-            }
         }
     }
     fn select_decision_literal(&mut self) -> Lit {

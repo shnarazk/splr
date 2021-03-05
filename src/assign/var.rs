@@ -16,9 +16,6 @@ impl Default for Var {
             reward: 0.0,
             timestamp: 0,
             flags: Flag::empty(),
-
-            #[cfg(feature = "explore_timestamp")]
-            assign_timestamp: 0,
         }
     }
 }

@@ -1,9 +1,10 @@
 //! Conflict-Driven Clause Learning Search engine
+#[cfg(feature = "clause_vivification")]
+use super::vivify::vivify;
 use {
     super::{
         conflict::handle_conflict,
         restart::{ProgressUpdate, RestartDecision, RestartIF, Restarter},
-        vivify::vivify,
         Certificate, Solver, SolverEvent, SolverResult,
     },
     crate::{
@@ -207,7 +208,6 @@ fn search(
     let mut last_core = 0;
     let mut next_progress = 10_000;
     let mut best_asserted = state.target.num_of_variables;
-    let use_vivify = state.config.use_vivify();
 
     #[cfg(feature = "var_staging")]
     let mut parity = false;
@@ -276,7 +276,8 @@ fn search(
                         // when vars are asserted or learnts are small.
                         // We don't need to count the number of asserted vars.
                         if elim.enable && state.config.c_ip_int <= elim.to_simplify as usize {
-                            if use_vivify && vivify(asg, cdb, elim, state).is_err() {
+                            #[cfg(feature = "clause_vivification")]
+                            if vivify(asg, cdb, elim, state).is_err() {
                                 // return Err(SolverError::UndescribedError);
                                 analyze_final(asg, state, &cdb[ci]);
                                 return Ok(false);

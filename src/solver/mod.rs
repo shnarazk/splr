@@ -65,6 +65,8 @@ pub enum SolverEvent {
     Restart,
     /// stabilization update.
     Stabilize((bool, bool)),
+
+    #[cfg(feature = "clause_vivification")]
     /// Vivification: `true` for start, `false` for end.
     Vivify(bool),
 }

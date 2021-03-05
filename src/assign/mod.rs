@@ -5,7 +5,7 @@ mod heap;
 mod propagate;
 /// Var rewarding
 #[cfg_attr(feature = "EVSIDS", path = "evsids.rs")]
-#[cfg_attr(not(feature = "EVSIDS"), path = "learning_rate.rs")]
+#[cfg_attr(feature = "LR_rewarding", path = "learning_rate.rs")]
 mod reward;
 /// Decision var selection
 mod select;
@@ -82,9 +82,6 @@ pub struct Var {
     timestamp: usize,
     /// the `Flag`s
     flags: Flag,
-    #[cfg(feature = "explore_timestamp")]
-    /// the number of conflicts at which this var was assigned lastly
-    assign_timestamp: usize,
 }
 
 /// A record of assignment. It's called 'trail' in Glucose.

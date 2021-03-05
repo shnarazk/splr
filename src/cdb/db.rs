@@ -297,6 +297,7 @@ impl Instantiate for ClauseDB {
                 self.touched.push(false);
                 self.lbd_temp.push(0);
             }
+            #[cfg(feature = "clause_vivification")]
             SolverEvent::Vivify(on) => {
                 self.during_vivification = on;
             }
@@ -649,7 +650,7 @@ impl ClauseDBIF for ClauseDB {
     {
         #[cfg(feature = "clause_reduction")]
         if 0 == self.num_learnt {
-            return false;
+            false
         } else {
             let go = if self.use_chan_seok {
                 self.first_reduction < self.num_learnt

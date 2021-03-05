@@ -1,5 +1,6 @@
 //! Vivification
 #![allow(dead_code)]
+#![cfg(feature = "clause_vivification")]
 use {
     super::{SolverEvent, Stat, State},
     crate::{
@@ -13,6 +14,16 @@ use {
 };
 
 /// vivify clauses in `cdb` under `asg`
+#[cfg(not(feature = "clause_vivification"))]
+pub fn vivify(
+    _asg: &mut AssignStack,
+    _cdb: &mut ClauseDB,
+    _elim: &mut Eliminator,
+    _state: &mut State,
+) -> MaybeInconsistent {
+    Ok(())
+}
+
 pub fn vivify(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,

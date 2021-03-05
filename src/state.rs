@@ -61,10 +61,6 @@ pub enum StagingTarget {
     BestPhases,
     /// unstage all vars.
     Clear,
-
-    #[cfg(feature = "explore_timestamp")]
-    /// seek unchecked vars.
-    Explore,
 }
 
 impl fmt::Display for StagingTarget {
@@ -76,9 +72,6 @@ impl fmt::Display for StagingTarget {
                 StagingTarget::Backbone => "Staging_backbone",
                 StagingTarget::BestPhases => "Staging_bestphase",
                 StagingTarget::Clear => "Staging_none",
-
-                #[cfg(feature = "explore_timestamp")]
-                StagingTarget::Explore => "Staging_unknowns",
             }
         )
     }
@@ -193,10 +186,7 @@ pub struct State {
     pub target: CNFDescription,
     /// strategy adjustment interval in conflict
     pub reflection_interval: usize,
-    /// time to execute vivification
-    pub to_vivify: f64,
-    /// loop limit of vivification loop
-    pub vivify_thr: usize,
+
     //
     //## MISC
     //
@@ -237,8 +227,7 @@ impl Default for State {
 
             target: CNFDescription::default(),
             reflection_interval: 10_000,
-            to_vivify: 0.0,
-            vivify_thr: 0,
+
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
             conflicts: Vec::new(),
@@ -278,7 +267,6 @@ impl Instantiate for State {
             #[cfg(feature = "strategy_adaptation")]
             strategy: (SearchStrategy::Initial, 0),
 
-            vivify_thr: config.viv_thr,
             target: cnf.clone(),
             time_limit: config.c_timeout,
             ..State::default()
@@ -296,6 +284,8 @@ impl Instantiate for State {
             SolverEvent::Reinitialize => (),
             SolverEvent::Restart => (),
             SolverEvent::Stabilize((_, _)) => (),
+
+            #[cfg(feature = "clause_vivification")]
             SolverEvent::Vivify(_) => (),
 
             #[cfg(feature = "strategy_adaptation")]

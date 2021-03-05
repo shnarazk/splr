@@ -130,7 +130,7 @@ impl Instantiate for AssignStack {
 
             #[cfg(feature = "EVSIDS")]
             activity_decay: config.vrw_dcy_rat * 0.6,
-            #[cfg(not(feature = "EVSIDS"))]
+            #[cfg(feature = "LR_rewarding")]
             activity_decay_default: config.vrw_dcy_rat,
 
             activity_anti_decay: 1.0 - config.vrw_dcy_rat,
@@ -171,6 +171,7 @@ impl Instantiate for AssignStack {
                 };
                 self.rebuild_order();
             }
+            #[cfg(feature = "clause_vivification")]
             SolverEvent::Vivify(start) => {
                 if start {
                     self.during_vivification = true;

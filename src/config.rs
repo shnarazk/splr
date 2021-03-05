@@ -16,9 +16,6 @@ pub struct Config {
     /// Staging
     a_stage: i32,
 
-    /// Vivification switch
-    a_vivify: i32,
-
     //
     //## solver configuration
     //
@@ -117,8 +114,6 @@ pub struct Config {
     //
     //## vivifier
     //
-    /// #reduction for next vivification
-    pub viv_thr: usize,
 
     //
     //## var staging
@@ -143,7 +138,6 @@ impl Default for Config {
             a_elim: 1,
             a_stabilize: 1,
             a_stage: 1,
-            a_vivify: 0,
 
             c_cbt_thr: 100,
             c_cls_lim: 0,
@@ -180,15 +174,13 @@ impl Default for Config {
             stg_rwd_dcy: 0.5,
             stg_rwd_val: 1.0,
 
-            viv_thr: 1,
-
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_rat: 0.98,
-            #[cfg(not(feature = "EVSIDS"))]
+            #[cfg(feature = "LR_rewarding")]
             vrw_dcy_rat: 0.94,
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_stp: 0.0001,
-            #[cfg(not(feature = "EVSIDS"))]
+            #[cfg(feature = "LR_rewarding")]
             vrw_dcy_stp: 0.1,
         }
     }
@@ -211,11 +203,10 @@ impl Config {
                 let flags = [
                     "no-color", "quiet", "certify", "journal", "log", "help", "version",
                 ];
-                let options_i32 = ["ELI", "STB", "STG", "VIV"];
+                let options_i32 = ["ELI", "STB", "STG"];
                 let options_u32 = ["cbt"];
                 let options_usize = [
                     "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
-                    "vit",
                 ];
                 let options_f64 = [
                     "timeout", "cdr", "rat", "rlt", "rse", "rss", "srd", "srv", "vdr", "vds",
@@ -245,7 +236,6 @@ impl Config {
                                         "ELI" => self.a_elim = val,
                                         "STB" => self.a_stabilize = val,
                                         "STG" => self.a_stage = val,
-                                        "VIV" => self.a_vivify = val,
                                         _ => panic!("invalid option: {}", name),
                                     }
                                 } else {
@@ -281,7 +271,6 @@ impl Config {
                                         "ras" => self.rst_asg_slw = val,
                                         "rll" => self.rst_lbd_len = val,
                                         "rls" => self.rst_lbd_slw = val,
-                                        "vit" => self.viv_thr = val,
                                         _ => panic!("invalid option: {}", name),
                                     }
                                 } else {
@@ -404,7 +393,6 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --ELI <a-elim>        Eliminator switch              {:>10}
       --STB <a-stabilize>   Stabilization switch           {:>10}
       --STG <a-stage>       Stage switch                   {:>10}
-      --VIV <a-vivify>      Vivification switch            {:>10}
       --cbt <c-cbt-thr>     Dec. lvl to use chronoBT       {:>10}
       --cdr <crw-dcy-rat>   Clause reward decay               {:>10.2}
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
@@ -427,7 +415,6 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --rs  <rst-step>      #conflicts between restarts    {:>10}
       --srd <stg-rwd-dcy>   Decay rate for staged var reward {:>10.2}
       --srv <stg-rwd-val>   Extra reward for staged vars      {:>10.2}
-      --vit <viv-thr>       #clause to try to vivify       {:>10}
       --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
       --vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}
 ARGS:
@@ -436,7 +423,6 @@ ARGS:
         config.a_elim,
         config.a_stabilize,
         config.a_stage,
-        config.a_vivify,
         config.c_cbt_thr,
         config.crw_dcy_rat,
         config.c_cls_lim,
@@ -459,7 +445,6 @@ ARGS:
         config.rst_step,
         config.stg_rwd_dcy,
         config.stg_rwd_val,
-        config.viv_thr,
         config.vrw_dcy_rat,
         config.vrw_dcy_stp,
     )
@@ -498,9 +483,6 @@ impl Config {
     }
     pub fn use_elim(&self) -> bool {
         dispatch!(self.a_elim)
-    }
-    pub fn use_vivify(&self) -> bool {
-        dispatch!(self.a_vivify)
     }
     pub fn use_stabilize(&self) -> bool {
         dispatch!(self.a_stabilize)
