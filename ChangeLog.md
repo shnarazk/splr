@@ -11,7 +11,7 @@
     - Luby_stabilization
     - reason_side_rewarding
     - var_staging
-  - drop
+  - drop:
     - explore_timestamp
     - extra_var_reward
     - luby_blocking
