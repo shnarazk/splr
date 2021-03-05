@@ -350,7 +350,7 @@ impl Config {
                 "reason side rewarding",
                 #[cfg(feature = "strategy_adaptation")]
                 "strategy adaptation",
-                #[cfg(feature = "use_rephase")]
+                #[cfg(feature = "best_phases_reuse")]
                 "re-phasing",
                 #[cfg(feature = "var_staging")]
                 "stage-based var selection",

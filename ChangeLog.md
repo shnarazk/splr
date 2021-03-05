@@ -3,16 +3,22 @@
 - reorganize features:
   - add:
     - best_phases_tracking
+    - best_phases_reuse
     - clause_elimination
+    - clause_reduction
     - clause_vivification
     - LR_rewarding
     - Luby_stabilization
     - reason_side_rewarding
+    - var_staging
   - drop
     - explore_timestamp
+    - extra_var_reward
+    - luby_blocking
+    - moving_var_reward_rate (switching to stage-based reward decay increment)
     - progress_ACC
     - progress_MLD
-    - moving_var_reward_rate (switching to stage-based reward decay increment)
+    - pure_stabilization
   - rename feature use_luby to Luby_restart
 - clause simplifier and clause vivifier are called at the ends of stages
 - Learning Rate based var rewarding uses a non-linear weight function.
