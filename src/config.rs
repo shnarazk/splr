@@ -462,6 +462,7 @@ where
     }
 }
 
+#[allow(unused_macros)]
 macro_rules! dispatch {
     // from `0` and `1`
     ($field: expr) => {

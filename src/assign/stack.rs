@@ -56,7 +56,6 @@ impl Default for AssignStack {
             #[cfg(feature = "best_phases_tracking")]
             best_phases: HashMap::new(),
 
-            use_stage: true,
             #[cfg(feature = "var_staging")]
             staging_reward_value: 1.0,
             #[cfg(feature = "var_staging")]
@@ -118,7 +117,6 @@ impl Instantiate for AssignStack {
             reason: vec![AssignReason::default(); nv + 1],
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
-            use_stage: config.use_stage(),
 
             #[cfg(feature = "var_staging")]
             staging_reward_decay: config.stg_rwd_dcy,

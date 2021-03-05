@@ -113,7 +113,6 @@ pub struct AssignStack {
     //
     //## Stage handling
     //
-    use_stage: bool,
     #[cfg(feature = "var_staging")]
     /// Decay rate for staging reward
     staging_reward_decay: f64,

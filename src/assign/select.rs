@@ -84,9 +84,6 @@ impl VarSelectIF for AssignStack {
     fn select_staged_vars(&mut self, request: Option<StagingTarget>, rephasing: bool) {
         self.rephasing = rephasing;
         self.stage_mode_select += 1;
-        if !self.use_stage {
-            return;
-        }
         let target = request.unwrap_or(StagingTarget::Clear);
         for vi in self.staged_vars.keys() {
             self.var[*vi].turn_off(Flag::STAGED);

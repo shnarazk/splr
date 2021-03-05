@@ -21,7 +21,7 @@ pub enum ProgressUpdate {
     LBD(u16),
     Counter,
 
-    #[cfg(feature = "luby_restart")]
+    #[cfg(feature = "Luby_restart")]
     Luby,
 
     Remain(usize),
@@ -227,9 +227,9 @@ impl Default for ProgressLuby {
 impl Instantiate for ProgressLuby {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressLuby {
-            #[cfg(feature = "luby_restart")]
+            #[cfg(feature = "Luby_restart")]
             enable: true,
-            #[cfg(not(feature = "luby_restart"))]
+            #[cfg(not(feature = "Luby_restart"))]
             enable: false,
             step: config.rst_step,
             ..ProgressLuby::default()
@@ -291,7 +291,11 @@ struct GeometricStabilizer {
 impl Default for GeometricStabilizer {
     fn default() -> Self {
         GeometricStabilizer {
+            #[cfg(not(feature = "Luby_stabilization"))]
+            enable: false,
+            #[cfg(feature = "Luby_stabilization")]
             enable: true,
+
             longest_span: 1,
             luby: LubySeries::default(),
             num_cycle: 0,
@@ -304,11 +308,8 @@ impl Default for GeometricStabilizer {
 }
 
 impl Instantiate for GeometricStabilizer {
-    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
-        GeometricStabilizer {
-            enable: config.use_stabilize(),
-            ..GeometricStabilizer::default()
-        }
+    fn instantiate(_config: &Config, _: &CNFDescription) -> Self {
+        GeometricStabilizer::default()
     }
 }
 
@@ -484,7 +485,7 @@ impl RestartIF for Restarter {
                 self.lbd.update(val);
             }
 
-            #[cfg(feature = "luby_restart")]
+            #[cfg(feature = "Luby_restart")]
             ProgressUpdate::Luby => self.luby.update(0),
 
             ProgressUpdate::Remain(val) => {

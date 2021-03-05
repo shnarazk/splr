@@ -9,7 +9,7 @@
     - progress_ACC
     - progress_MLD
     - moving_var_reward_rate (switching to stage-based reward decay increment)
-  - rename feature use_luby to luby_restart
+  - rename feature use_luby to Luby_restart
 - clause simplifier and clause vivifier are called at the ends of stages
 - Learning Rate based var rewarding uses a non-linear weight function.
 - Since Luby stabilization has long cycles, cycle-based tasks were organized. "Stage" is defined based on Luby-stabilization span. Updated terminology:

@@ -212,7 +212,7 @@ fn search(
     #[cfg(feature = "var_staging")]
     let mut parity = false;
 
-    #[cfg(feature = "luby_restart")]
+    #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
 
     rst.update(ProgressUpdate::Remain(asg.num_vars - asg.num_asserted_vars));
