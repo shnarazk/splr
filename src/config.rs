@@ -5,18 +5,6 @@ use {crate::types::DecisionLevel, std::path::PathBuf};
 #[derive(Clone, Debug)]
 pub struct Config {
     //
-    // Switches
-    //
-    /// Eliminator switch
-    a_elim: i32,
-
-    /// Stabilization switch
-    a_stabilize: i32,
-
-    /// Staging
-    a_stage: i32,
-
-    //
     //## solver configuration
     //
     /// Dec. lvl to use chronoBT
@@ -135,10 +123,6 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            a_elim: 1,
-            a_stabilize: 1,
-            a_stage: 1,
-
             c_cbt_thr: 100,
             c_cls_lim: 0,
             c_ip_int: 5000,
@@ -203,7 +187,6 @@ impl Config {
                 let flags = [
                     "no-color", "quiet", "certify", "journal", "log", "help", "version",
                 ];
-                let options_i32 = ["ELI", "STB", "STG"];
                 let options_u32 = ["cbt"];
                 let options_usize = [
                     "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
@@ -226,23 +209,6 @@ impl Config {
                                 "help" => help = true,
                                 "version" => version = true,
                                 _ => panic!("invalid flag: {}", name),
-                            }
-                        } else if options_i32.contains(&name) {
-                            if let Some(str) = iter.next() {
-                                if let Ok(val) = str.parse::<i32>() {
-                                    match name {
-                                        #[cfg(feature = "strategy_adaptation")]
-                                        "ADP" => self.a_adaptive = val,
-                                        "ELI" => self.a_elim = val,
-                                        "STB" => self.a_stabilize = val,
-                                        "STG" => self.a_stage = val,
-                                        _ => panic!("invalid option: {}", name),
-                                    }
-                                } else {
-                                    panic!("invalid value {}", name);
-                                }
-                            } else {
-                                panic!("no argument for {}", name);
                             }
                         } else if options_u32.contains(&name) {
                             if let Some(str) = iter.next() {
@@ -357,7 +323,44 @@ impl Config {
             }
         }
         if help {
-            println!("{}\n{}", env!("CARGO_PKG_DESCRIPTION"), help_string());
+            let featuers = [
+                #[cfg(feature = "best_phases_tracking")]
+                "best phase tracking",
+                #[cfg(feature = "clause_elimination")]
+                "clause elimination",
+                #[cfg(feature = "clause_reduction")]
+                "clause reduction",
+                #[cfg(feature = "clause_vivification")]
+                "clause vivification",
+                #[cfg(feature = "ema_calibration")]
+                "EMA calibration",
+                #[cfg(feature = "EVSIDS")]
+                "EVSIDS rewarding",
+                #[cfg(feature = "incremental_solver")]
+                "incremental solver",
+                #[cfg(feature = "just_used")]
+                "use_just_used_flag",
+                #[cfg(feature = "LR_rewarding")]
+                "Learning-Rate based rewarding",
+                #[cfg(feature = "Luby_restart")]
+                "Luby restart",
+                #[cfg(feature = "Luby_stabilization")]
+                "Luby stabilization",
+                #[cfg(feature = "reason_side_rewarding")]
+                "reason side rewarding",
+                #[cfg(feature = "strategy_adaptation")]
+                "strategy adaptation",
+                #[cfg(feature = "use_rephase")]
+                "re-phasing",
+                #[cfg(feature = "var_staging")]
+                "stage-based var selection",
+            ];
+            println!(
+                "{}\nActivated features: {}\n{}",
+                env!("CARGO_PKG_DESCRIPTION"),
+                featuers.join(", "),
+                help_string()
+            );
             std::process::exit(0);
         }
         if version {
@@ -390,9 +393,6 @@ FLAGS:
   -l, --log                 Uses Glucose-like progress report
   -V, --version             Prints version information
 OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m):
-      --ELI <a-elim>        Eliminator switch              {:>10}
-      --STB <a-stabilize>   Stabilization switch           {:>10}
-      --STG <a-stage>       Stage switch                   {:>10}
       --cbt <c-cbt-thr>     Dec. lvl to use chronoBT       {:>10}
       --cdr <crw-dcy-rat>   Clause reward decay               {:>10.2}
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
@@ -420,9 +420,6 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
 ARGS:
   <cnf-file>    DIMACS CNF file
 ",
-        config.a_elim,
-        config.a_stabilize,
-        config.a_stage,
         config.c_cbt_thr,
         config.crw_dcy_rat,
         config.c_cls_lim,
@@ -481,14 +478,5 @@ impl Config {
     #[allow(unused_mut)]
     pub fn override_args(mut self) -> Config {
         self
-    }
-    pub fn use_elim(&self) -> bool {
-        dispatch!(self.a_elim)
-    }
-    pub fn use_stabilize(&self) -> bool {
-        dispatch!(self.a_stabilize)
-    }
-    pub fn use_stage(&self) -> bool {
-        dispatch!(self.a_stage)
     }
 }

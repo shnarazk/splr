@@ -223,6 +223,9 @@ pub struct Eliminator {
 impl Default for Eliminator {
     fn default() -> Eliminator {
         Eliminator {
+            #[cfg(not(feature = "clause_elimination"))]
+            enable: false,
+            #[cfg(feature = "clause_elimination")]
             enable: true,
             to_simplify: 0.0,
             mode: EliminatorMode::Dormant,
@@ -336,7 +339,6 @@ impl Instantiate for Eliminator {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Eliminator {
         let nv = cnf.num_of_variables;
         Eliminator {
-            enable: config.use_elim(),
             var_queue: VarOccHeap::new(nv, 0),
             eliminate_var_occurrence_limit: config.elm_var_occ,
             eliminate_grow_limit: config.elm_grw_lim,
@@ -450,12 +452,16 @@ impl EliminateIF for Eliminator {
                 }
             }
         }
-        if self.is_waiting() {
-            self.prepare(asg, cdb, true);
-        }
-        self.eliminate(asg, cdb, state)?;
-        if self.is_running() {
-            self.stop(asg, cdb);
+        if self.enable {
+            if self.is_waiting() {
+                self.prepare(asg, cdb, true);
+            }
+            self.eliminate(asg, cdb, state)?;
+            if self.is_running() {
+                self.stop(asg, cdb);
+            }
+        } else {
+            self.eliminate_satisfied_clauses(asg, cdb, true);
         }
         cdb.check_size().map(|_| ())
     }
