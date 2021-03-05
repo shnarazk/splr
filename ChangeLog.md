@@ -2,8 +2,12 @@
 
 - reorganize features:
   - add:
+    - best_phases_tracking
+    - clause_elimination
     - clause_vivification
     - LR_rewarding
+    - Luby_stabilization
+    - reason_side_rewarding
   - drop
     - explore_timestamp
     - progress_ACC
