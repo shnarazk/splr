@@ -214,6 +214,7 @@ pub fn handle_conflict(
         } else {
             asg.assign_by_unitclause(l0);
         }
+        elim.to_simplify += state.config.c_ip_int as f64;
         rst.handle(SolverEvent::Assert(l0.vi()))
     } else {
         {

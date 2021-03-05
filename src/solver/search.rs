@@ -270,22 +270,22 @@ fn search(
                         last_core = v.4;
                     }
 
-                    if cdb.reduce(asg, asg.num_conflict) {
+                    if cdb.reduce(asg, asg.num_conflict)
+                        || state.config.c_ip_int <= elim.to_simplify as usize
+                    {
                         // Simplification has been postponed because chronoBT was used.
                         // `elim.to_simplify` is increased much in particular
                         // when vars are asserted or learnts are small.
                         // We don't need to count the number of asserted vars.
-                        if elim.enable && state.config.c_ip_int <= elim.to_simplify as usize {
-                            #[cfg(feature = "clause_vivification")]
-                            if vivify(asg, cdb, elim, state).is_err() {
-                                // return Err(SolverError::UndescribedError);
-                                analyze_final(asg, state, &cdb[ci]);
-                                return Ok(false);
-                            }
-                            elim.to_simplify = 0.0;
-                            elim.activate();
-                            elim.simplify(asg, cdb, state)?;
+                        #[cfg(feature = "clause_vivification")]
+                        if vivify(asg, cdb, elim, state).is_err() {
+                            // return Err(SolverError::UndescribedError);
+                            analyze_final(asg, state, &cdb[ci]);
+                            return Ok(false);
                         }
+                        elim.to_simplify = 0.0;
+                        elim.activate();
+                        elim.simplify(asg, cdb, state)?;
                     }
                     if next_progress < asg.num_conflict {
                         state.progress(asg, cdb, elim, rst);

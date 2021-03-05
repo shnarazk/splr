@@ -125,7 +125,7 @@ impl Default for Config {
         Config {
             c_cbt_thr: 100,
             c_cls_lim: 0,
-            c_ip_int: 5000,
+            c_ip_int: 16384,
             c_timeout: 5000.0,
 
             splr_interface: false,
@@ -141,7 +141,7 @@ impl Default for Config {
 
             crw_dcy_rat: 0.95,
 
-            elm_cls_lim: 16,
+            elm_cls_lim: 10,
             elm_grw_lim: 0,
             elm_var_occ: 8192,
 
