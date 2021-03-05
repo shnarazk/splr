@@ -26,7 +26,7 @@ mod heap;
 mod subsume;
 
 use {
-    self::{eliminate::eliminate_var, heap::VarOrderIF, subsume::try_subsume},
+    self::{eliminate::eliminate_var, heap::VarOrderIF},
     crate::{
         assign::AssignIF,
         cdb::ClauseDBIF,
@@ -112,7 +112,7 @@ enum EliminatorMode {
     Running,
 }
 
-impl Export<(usize, usize, f64), ()> for Eliminator {
+impl Export<(usize, usize, usize, f64), ()> for Eliminator {
     /// exports:
     ///  1. the number of full eliminations
     ///  1. the number of satisfied clause eliminations
@@ -124,10 +124,11 @@ impl Export<(usize, usize, f64), ()> for Eliminator {
     /// let (elim_num_full_elimination, elim_num_sat_elimination, elim_to_simplify) = elim.exports();
     ///```
     #[inline]
-    fn exports(&self) -> (usize, usize, f64) {
+    fn exports(&self) -> (usize, usize, usize, f64) {
         (
             self.num_full_elimination,
             self.num_sat_elimination,
+            self.num_subsumed,
             self.to_simplify,
         )
     }
@@ -218,6 +219,7 @@ pub struct Eliminator {
     var: Vec<LitOccurs>,
     num_full_elimination: usize,
     num_sat_elimination: usize,
+    num_subsumed: usize,
 }
 
 impl Default for Eliminator {
@@ -241,6 +243,7 @@ impl Default for Eliminator {
             var: Vec::new(),
             num_full_elimination: 0,
             num_sat_elimination: 0,
+            num_subsumed: 0,
         }
     }
 }
@@ -623,7 +626,7 @@ impl Eliminator {
                             return Ok(());
                         }
                         if !d.is(Flag::DEAD) && d.len() <= self.subsume_literal_limit {
-                            try_subsume(asg, cdb, self, cid, *did)?;
+                            self.try_subsume(asg, cdb, cid, *did)?;
                         }
                     }
                 }

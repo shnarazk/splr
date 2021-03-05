@@ -44,7 +44,7 @@ pub trait StateIF {
             + Export<(usize, usize, usize, usize), ()>
             + ExportBox<'a, (&'a Ema, &'a Ema, &'a Ema)>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
-        E: Export<(usize, usize, f64), ()>,
+        E: Export<(usize, usize, usize, f64), ()>,
         R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
@@ -456,7 +456,7 @@ impl StateIF for State {
             + Export<(usize, usize, usize, usize), ()>
             + ExportBox<'a, (&'a Ema, &'a Ema, &'a Ema)>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
-        E: Export<(usize, usize, f64), ()>,
+        E: Export<(usize, usize, usize, f64), ()>,
         R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
@@ -481,7 +481,7 @@ impl StateIF for State {
         let (cdb_num_active, cdb_num_biclause, _num_bl, cdb_num_lbd2, cdb_num_learnt, _cdb_nr) =
             cdb.exports();
 
-        let (elim_num_full, _num_sat, _elim_to_simplify) = elim.exports();
+        let (elim_num_full, _num_sat, elim_num_sub, _elim_to_simplify) = elim.exports();
 
         let rst_mode = rst.mode().0;
 
@@ -599,9 +599,10 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|elim:{}, cviv:{}, #vbv:{}, /cpr:{}",
+            "\x1B[2K        misc|elim:{}, #sub:{}, #vbv:{}, /cpr:{}",
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
-            im!("{:>9}", self, LogUsizeId::Vivify, self[Stat::Vivification]),
+            // im!("{:>9}", self, LogUsizeId::Vivify, self[Stat::Vivification]),
+            im!("{:>9}", self, LogUsizeId::Vivify, elim_num_sub),
             im!(
                 "{:>9}",
                 self,
