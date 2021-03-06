@@ -5,7 +5,7 @@
 //!# Example
 //!
 //!```
-//!  use splr::{processor::EliminateIF, solver::Solver, types::Export};
+//!  use splr::{processor::{self, EliminateIF}, solver::Solver, types::PropertyDereference};
 //!  use std::convert::TryFrom;
 //!  let mut s = Solver::try_from("tests/sample.cnf").expect("failed to load");
 //!  let Solver {
@@ -17,7 +17,7 @@
 //!  } = s;
 //!  elim.activate();
 //!  elim.simplify(asg, cdb, state).expect("panic");
-//!  assert_eq!(*elim.refer(processor::property::Tusize::NumFullElimination), 1);
+//!  assert_eq!(elim.derefer(processor::property::Tusize::NumFullElimination), 1);
 //!  assert!(0 < asg.num_eliminated_vars);
 //!```
 

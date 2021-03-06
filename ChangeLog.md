@@ -29,6 +29,7 @@
    - _var boosting_ is to promote specific vars during a stage.
    - _boosted vars_ or _staged vars_ are the vars promoted by var boosting.
    - _rephrase_: is to promote specific literals during a stage.
+- replace trait {Export, ExportBox} with {PropertyDereference, PropertyReference}
 
 ## 0.6.3, 2021-02-12
 

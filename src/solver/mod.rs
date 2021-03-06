@@ -78,7 +78,8 @@ pub enum SolverEvent {
 /// use crate::splr::{assign::{AssignIF, VarManipulateIF}, state::{State, StateIF}, types::*};
 ///
 /// let mut s = Solver::try_from("tests/sample.cnf").expect("can't load");
-/// assert!(matches!(s.asg.var_stats(), (250,_, _, 250, _)));
+/// assert_eq!(s.asg.derefer(assign::property::Tusize::NumVar), 250);
+/// assert_eq!(s.asg.derefer(assign::property::Tusize::NumUnassertedVar), 250);
 /// if let Ok(Certificate::SAT(v)) = s.solve() {
 ///     assert_eq!(v.len(), 250);
 ///     // But don't expect `s.asg.var_stats().3 == 0` at this point.
@@ -168,14 +169,18 @@ impl<'a> Iterator for SolverIter<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assign::VarManipulateIF;
+    use crate::assign;
     use std::convert::{From, TryFrom};
 
     #[cfg_attr(not(feature = "no_IO"), test)]
     fn test_solver() {
         let config = Config::from("tests/sample.cnf");
         if let Ok(s) = Solver::build(&config) {
-            assert!(matches!(s.asg.var_stats(), (250, _, _, 250, 250)));
+            assert_eq!(s.asg.derefer(assign::property::Tusize::NumVar), 250);
+            assert_eq!(
+                s.asg.derefer(assign::property::Tusize::NumUnassertedVar),
+                250
+            );
         } else {
             panic!("failed to build a solver for tests/sample.cnf");
         }
