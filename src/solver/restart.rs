@@ -506,15 +506,15 @@ pub mod property {
         SpanLen,
     }
 
-    impl PropertyReference<Tusize, usize> for Restarter {
+    impl PropertyDereference<Tusize, usize> for Restarter {
         #[inline]
-        fn refer(&self, k: Tusize) -> &usize {
+        fn derefer(&self, k: Tusize) -> usize {
             match k {
-                Tusize::NumBlock => &self.num_block,
-                Tusize::NumCycle => &self.stb.num_cycle,
-                Tusize::NumRestart => &self.num_restart,
-                Tusize::NumStage => &self.stb.num_shift,
-                Tusize::SpanLen => &self.stb.step,
+                Tusize::NumBlock => self.num_block,
+                Tusize::NumCycle => self.stb.num_cycle,
+                Tusize::NumRestart => self.num_restart,
+                Tusize::NumStage => self.stb.num_shift,
+                Tusize::SpanLen => self.stb.step,
             }
         }
     }

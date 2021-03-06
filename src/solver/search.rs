@@ -242,13 +242,13 @@ fn search(
             asg.update_rewards();
             cdb.update_rewards();
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
-            rst.update(ProgressUpdate::Remain(asg.var_stats().3));
+            rst.update(ProgressUpdate::Remain(asg.num_unasserted()));
             if let Some(decision) = rst.restart() {
                 if let Some(new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);
-                    let span_len = *rst.refer(restart::property::Tusize::SpanLen);
-                    let num_cycle = *rst.refer(restart::property::Tusize::NumCycle);
-                    let v = asg.var_stats();
+                    let span_len = rst.derefer(restart::property::Tusize::SpanLen);
+                    let num_cycle = rst.derefer(restart::property::Tusize::NumCycle);
+                    let num_unreachable = asg.num_unreachables();
                     asg.update_activity_decay(if new_cycle { None } else { Some(span_len) });
 
                     #[cfg(feature = "var_staging")]
@@ -257,18 +257,18 @@ fn search(
                         asg.select_staged_vars(None, parity);
                     }
 
-                    if last_core != v.4 || 0 == v.4 {
+                    if last_core != num_unreachable || 0 == num_unreachable {
                         state.log(
                             asg.num_conflict,
                             format!(
                                 "#cycle:{:>5}, core:{:>9}, span len:{:>9},/cpr:{:>9.2}",
                                 num_cycle,
-                                v.4,
+                                num_unreachable,
                                 span_len,
-                                asg.refer(assign::property::T2Ema::PPC).get(),
+                                asg.refer(assign::property::TEma::PPC).get(),
                             ),
                         );
-                        last_core = v.4;
+                        last_core = num_unreachable;
                     }
 
                     if cdb.reduce(asg, asg.num_conflict) {

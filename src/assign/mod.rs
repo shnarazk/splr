@@ -27,7 +27,14 @@ use {
 };
 
 /// API about assignment like [`decision_level`](`crate::assign::AssignIF::decision_level`), [`stack`](`crate::assign::AssignIF::stack`), [`best_assigned`](`crate::assign::AssignIF::best_assigned`), and so on.
-pub trait AssignIF: ActivityIF<VarId> + ClauseManipulateIF + PropagateIF + VarManipulateIF {
+pub trait AssignIF:
+    ActivityIF<VarId>
+    + ClauseManipulateIF
+    + PropagateIF
+    + VarManipulateIF
+    + PropertyDereference<property::Tusize, usize>
+    + PropertyReference<property::TEma, Ema>
+{
     /// return a literal in the stack.
     fn stack(&self, i: usize) -> Lit;
     /// return literals in the range of stack.
@@ -199,34 +206,47 @@ pub mod property {
         NumDecision,
         NumPropagation,
         NumRestart,
+        //
+        //## var stat
+        //
+        NumVar,
+        NumAssertedVar,
+        NumEliminatedVar,
+        NumUnassertedVar,
+        NumUnreachableVar,
     }
 
-    impl PropertyReference<Tusize, usize> for AssignStack {
+    impl PropertyDereference<Tusize, usize> for AssignStack {
         #[inline]
-        fn refer(&self, k: Tusize) -> &usize {
+        fn derefer(&self, k: Tusize) -> usize {
             match k {
-                Tusize::NumConflict => &self.num_conflict,
-                Tusize::NumDecision => &self.num_decision,
-                Tusize::NumPropagation => &self.num_propagation,
-                Tusize::NumRestart => &self.num_restart,
+                Tusize::NumConflict => self.num_conflict,
+                Tusize::NumDecision => self.num_decision,
+                Tusize::NumPropagation => self.num_propagation,
+                Tusize::NumRestart => self.num_restart,
+                Tusize::NumVar => self.num_vars,
+                Tusize::NumAssertedVar => self.num_asserted_vars,
+                Tusize::NumEliminatedVar => self.num_eliminated_vars,
+                Tusize::NumUnassertedVar => self.num_unasserted(),
+                Tusize::NumUnreachableVar => self.num_unreachables(),
             }
         }
     }
 
     #[derive(Clone, Debug, PartialEq)]
-    pub enum T2Ema {
+    pub enum TEma {
         DPC,
         PPC,
         CPR,
     }
 
-    impl PropertyReference<T2Ema, Ema> for AssignStack {
+    impl PropertyReference<TEma, Ema> for AssignStack {
         #[inline]
-        fn refer(&self, k: T2Ema) -> &Ema {
+        fn refer(&self, k: TEma) -> &Ema {
             match k {
-                T2Ema::DPC => self.dpc_ema.get_ema(),
-                T2Ema::PPC => self.ppc_ema.get_ema(),
-                T2Ema::CPR => self.cpr_ema.get_ema(),
+                TEma::DPC => self.dpc_ema.get_ema(),
+                TEma::PPC => self.ppc_ema.get_ema(),
+                TEma::CPR => self.cpr_ema.get_ema(),
             }
         }
     }

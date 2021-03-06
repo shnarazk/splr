@@ -93,13 +93,10 @@ pub trait VarManipulateIF {
     fn var_iter_mut(&mut self) -> IterMut<'_, Var>;
     /// eliminate a var.
     fn set_eliminated(&mut self, vi: VarId);
-    /// return the following data:
-    /// * the number of vars
-    /// * the number of asserted vars
-    /// * the number of eliminated vars
-    /// * the number of un-asserted vars
-    /// * the number of unreachable unassigned vars or core
-    fn var_stats(&self) -> (usize, usize, usize, usize, usize);
+    /// return the number of unasserted (un-fixed) vars.
+    fn num_unasserted(&self) -> usize;
+    /// return the number of vars in `the unreachable core'.
+    fn num_unreachables(&self) -> usize;
 }
 
 impl VarManipulateIF for AssignStack {
@@ -147,19 +144,12 @@ impl VarManipulateIF for AssignStack {
         }
     }
     #[inline]
-    fn var_stats(&self) -> (usize, usize, usize, usize, usize) {
-        debug_assert!(
-            self.num_asserted_vars <= self.num_vars,
-            format!("nav.{}, nv.{}", self.num_asserted_vars, self.num_vars)
-        );
-        debug_assert!(self.num_eliminated_vars <= self.num_vars);
-        (
-            self.num_vars,
-            self.num_asserted_vars,
-            self.num_eliminated_vars,
-            self.num_unasserted(),
-            self.num_unreachables(),
-        )
+    fn num_unasserted(&self) -> usize {
+        self.num_vars - self.num_eliminated_vars - self.num_asserted_vars
+    }
+    #[inline]
+    fn num_unreachables(&self) -> usize {
+        self.num_vars - self.num_best_assign
     }
 }
 

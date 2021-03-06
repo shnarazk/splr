@@ -3,9 +3,8 @@ use {crate::cdb::ClauseDBIF, std::cmp::Ordering};
 /// Crate `state` is a collection of internal data.
 use {
     crate::{
-        assign::{self, AssignIF, VarSelectIF},
-        cdb, processor,
-        solver::{self, RestartIF, SolverEvent},
+        assign, cdb, processor,
+        solver::{self, SolverEvent},
         types::*,
     },
     std::{
@@ -32,22 +31,19 @@ pub trait StateIF {
     /// change heuristics based on stat data.
     fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
-        A: PropertyReference<assign::property::A2usize, usize>,
-        C: ClauseDBIF + PropertyReference<cdb::property::Tusize, usize>;
+        A: AssignIF,
+        C: PropertyDereference<cdb::property::Tusize, usize>;
 
     /// write a header of stat data to stdio.
     fn progress_header(&mut self);
     /// write stat data to stdio.
     fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R)
     where
-        A: AssignIF
-            + VarSelectIF
-            + PropertyReference<assign::property::Tusize, usize>
-            + PropertyReference<assign::property::T2Ema, Ema>,
-        C: PropertyReference<cdb::property::Tusize, usize>,
-        E: PropertyReference<processor::property::Tusize, usize>,
-        R: RestartIF
-            + PropertyReference<solver::restart::property::Tusize, usize>
+        A: PropertyDereference<assign::property::Tusize, usize>
+            + PropertyReference<assign::property::TEma, Ema>,
+        C: PropertyDereference<cdb::property::Tusize, usize>,
+        E: PropertyDereference<processor::property::Tusize, usize>,
+        R: PropertyDereference<solver::restart::property::Tusize, usize>
             + PropertyReference<solver::restart::property::TEma2, Ema2>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
@@ -397,8 +393,8 @@ impl StateIF for State {
     #[cfg(feature = "strategy_adaptation")]
     fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
-        A: PropertyReference<A2usize, usize>,
-        C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), bool>,
+        A: AssignIF,
+        C: PropertyDereference<cdb::property::Tusize, usize>,
     {
         let asg_num_conflict = asg.refer(assign::property::A2usize::NumConflict);
         let asg_num_decision = asg.refer(assign::property::A2usize::NumDecision);
@@ -457,14 +453,11 @@ impl StateIF for State {
     #[allow(clippy::cognitive_complexity)]
     fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R)
     where
-        A: AssignIF
-            + VarSelectIF
-            + PropertyReference<assign::property::Tusize, usize>
-            + PropertyReference<assign::property::T2Ema, Ema>,
-        C: PropertyReference<cdb::property::Tusize, usize>,
-        E: PropertyReference<processor::property::Tusize, usize>,
-        R: RestartIF
-            + PropertyReference<solver::restart::property::Tusize, usize>
+        A: PropertyDereference<assign::property::Tusize, usize>
+            + PropertyReference<assign::property::TEma, Ema>,
+        C: PropertyDereference<cdb::property::Tusize, usize>,
+        E: PropertyDereference<processor::property::Tusize, usize>,
+        R: PropertyDereference<solver::restart::property::Tusize, usize>
             + PropertyReference<solver::restart::property::TEma2, Ema2>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
@@ -474,34 +467,32 @@ impl StateIF for State {
         //
         //## Gather stats from all modules
         //
-        let (
-            asg_num_vars,
-            asg_num_asserted_vars,
-            asg_num_eliminated_vars,
-            asg_num_unasserted_vars,
-            asg_unreachables,
-        ) = asg.var_stats();
+        let asg_num_vars = asg.derefer(assign::property::Tusize::NumVar);
+        let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
+        let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
+        let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+        let asg_num_unreachables = asg.derefer(assign::property::Tusize::NumUnreachableVar);
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let asg_num_conflict = *asg.refer(assign::property::Tusize::NumConflict);
-        let asg_num_decision = *asg.refer(assign::property::Tusize::NumDecision);
-        let asg_num_propagation = *asg.refer(assign::property::Tusize::NumPropagation);
+        let asg_num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
+        let asg_num_decision = asg.derefer(assign::property::Tusize::NumDecision);
+        let asg_num_propagation = asg.derefer(assign::property::Tusize::NumPropagation);
 
-        let asg_dpc_ema = asg.refer(assign::property::T2Ema::DPC);
-        let asg_ppc_ema = asg.refer(assign::property::T2Ema::PPC);
-        let asg_cpr_ema = asg.refer(assign::property::T2Ema::CPR);
+        let asg_dpc_ema = asg.refer(assign::property::TEma::DPC);
+        let asg_ppc_ema = asg.refer(assign::property::TEma::PPC);
+        let asg_cpr_ema = asg.refer(assign::property::TEma::CPR);
 
-        let cdb_num_active = *cdb.refer(cdb::property::Tusize::NumActive);
-        let cdb_num_biclause = *cdb.refer(cdb::property::Tusize::NumBiClause);
-        let cdb_num_lbd2 = *cdb.refer(cdb::property::Tusize::NumLBD2);
-        let cdb_num_learnt = *cdb.refer(cdb::property::Tusize::NumLearnt);
+        let cdb_num_active = cdb.derefer(cdb::property::Tusize::NumActive);
+        let cdb_num_biclause = cdb.derefer(cdb::property::Tusize::NumBiClause);
+        let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
+        let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
 
-        let elim_num_full = *elim.refer(processor::property::Tusize::NumFullElimination);
-        let elim_num_sub = *elim.refer(processor::property::Tusize::NumClauseSubsumption);
+        let elim_num_full = elim.derefer(processor::property::Tusize::NumFullElimination);
+        let elim_num_sub = elim.derefer(processor::property::Tusize::NumClauseSubsumption);
 
-        let rst_num_blk: usize = *rst.refer(solver::restart::property::Tusize::NumBlock);
-        let rst_num_rst: usize = *rst.refer(solver::restart::property::Tusize::NumRestart);
-        let rst_span_len: usize = *rst.refer(solver::restart::property::Tusize::SpanLen);
-        let rst_num_cycle: usize = *rst.refer(solver::restart::property::Tusize::NumCycle);
+        let rst_num_blk: usize = rst.derefer(solver::restart::property::Tusize::NumBlock);
+        let rst_num_rst: usize = rst.derefer(solver::restart::property::Tusize::NumRestart);
+        let rst_span_len: usize = rst.derefer(solver::restart::property::Tusize::SpanLen);
+        let rst_num_cycle: usize = rst.derefer(solver::restart::property::Tusize::NumCycle);
         let rst_asg: &Ema2 = rst.refer(solver::restart::property::TEma2::ASG);
         let rst_lbd: &Ema2 = rst.refer(solver::restart::property::TEma2::LBD);
 
@@ -588,7 +579,12 @@ impl StateIF for State {
             "\x1B[2K         EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{}",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
-            im!("{:>9}", self, LogUsizeId::UnreachableCore, asg_unreachables),
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::UnreachableCore,
+                asg_num_unreachables
+            ),
             fm!(
                 "{:>9.2}",
                 self,
@@ -720,26 +716,23 @@ impl State {
     }
     fn dump<A, C, R>(&mut self, asg: &A, cdb: &C, rst: &R)
     where
-        A: AssignIF + PropertyReference<assign::property::Tusize, usize>,
-        C: PropertyReference<cdb::property::Tusize, usize>,
-        R: RestartIF + PropertyReference<solver::restart::property::Tusize, usize>,
+        A: PropertyDereference<assign::property::Tusize, usize>,
+        C: PropertyDereference<cdb::property::Tusize, usize>,
+        R: PropertyDereference<solver::restart::property::Tusize, usize>,
     {
         self.progress_cnt += 1;
-        let (
-            asg_num_vars,
-            asg_num_asserted_vars,
-            asg_num_eliminated_vars,
-            asg_num_unasserted_vars,
-            _,
-        ) = asg.var_stats();
+        let asg_num_vars = asg.derefer(assign::property::Tusize::NumVar);
+        let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
+        let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
+        let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let asg_num_conflict = *asg.refer(assign::property::Tusize::NumConflict);
-        let asg_num_restart = *asg.refer(assign::property::Tusize::NumRestart);
-        let cdb_num_active = *cdb.refer(cdb::property::Tusize::NumActive);
-        let cdb_num_lbd2 = *cdb.refer(cdb::property::Tusize::NumLBD2);
-        let cdb_num_learnt = *cdb.refer(cdb::property::Tusize::NumLearnt);
-        let cdb_num_reduction = *cdb.refer(cdb::property::Tusize::NumReduction);
-        let rst_num_block = *rst.refer(solver::restart::property::Tusize::NumBlock);
+        let asg_num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
+        let asg_num_restart = asg.derefer(assign::property::Tusize::NumRestart);
+        let cdb_num_active = cdb.derefer(cdb::property::Tusize::NumActive);
+        let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
+        let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
+        let cdb_num_reduction = cdb.derefer(cdb::property::Tusize::NumReduction);
+        let rst_num_block = rst.derefer(solver::restart::property::Tusize::NumBlock);
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
             asg_num_restart,                           // restart
@@ -758,25 +751,21 @@ impl State {
     #[allow(dead_code)]
     fn dump_details<'r, A, C, E, R, V>(&mut self, asg: &A, cdb: &C, rst: &'r R)
     where
-        A: AssignIF + PropertyReference<assign::property::Tusize, usize>,
-        C: PropertyReference<cdb::property::Tusize, usize>,
-        R: RestartIF
-            + PropertyReference<solver::restart::property::Tusize, usize>
+        A: PropertyDereference<assign::property::Tusize, usize>,
+        C: PropertyDereference<cdb::property::Tusize, usize>,
+        R: PropertyDereference<solver::restart::property::Tusize, usize>
             + PropertyReference<solver::restart::property::TEma2, Ema2>,
     {
         self.progress_cnt += 1;
-        let (
-            asg_num_vars,
-            asg_num_asserted_vars,
-            asg_num_eliminated_vars,
-            asg_num_unasserted_vars,
-            _,
-        ) = asg.var_stats();
+        let asg_num_vars = asg.derefer(assign::property::Tusize::NumVar);
+        let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
+        let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
+        let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let asg_num_restart = *asg.refer(assign::property::Tusize::NumRestart);
-        let cdb_num_active = *cdb.refer(cdb::property::Tusize::NumActive);
-        let cdb_num_learnt = *cdb.refer(cdb::property::Tusize::NumLearnt);
-        let rst_num_block = rst.refer(solver::restart::property::Tusize::NumBlock);
+        let asg_num_restart = asg.derefer(assign::property::Tusize::NumRestart);
+        let cdb_num_active = cdb.derefer(cdb::property::Tusize::NumActive);
+        let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
+        let rst_num_block = rst.derefer(solver::restart::property::Tusize::NumBlock);
         let rst_asg = rst.refer(solver::restart::property::TEma2::ASG);
         let rst_lbd = rst.refer(solver::restart::property::TEma2::LBD);
 

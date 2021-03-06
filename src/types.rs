@@ -25,6 +25,9 @@ use {
 pub trait PropertyReference<I, O> {
     fn refer(&self, key: I) -> &O;
 }
+pub trait PropertyDereference<I, O: Sized> {
+    fn derefer(&self, key: I) -> O;
+}
 
 /// API for Literal like `from_int`, `from_assign`, `to_cid` and so on.
 pub trait LitIF {

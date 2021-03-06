@@ -30,7 +30,7 @@ pub use self::property::*;
 use {
     self::{eliminate::eliminate_var, heap::VarOrderIF},
     crate::{
-        assign::AssignIF,
+        assign::{self, AssignIF},
         cdb::ClauseDBIF,
         solver::SolverEvent,
         state::{State, StateIF},
@@ -357,13 +357,13 @@ pub mod property {
         NumSatElimination,
     }
 
-    impl PropertyReference<Tusize, usize> for Eliminator {
+    impl PropertyDereference<Tusize, usize> for Eliminator {
         #[inline]
-        fn refer(&self, k: Tusize) -> &usize {
+        fn derefer(&self, k: Tusize) -> usize {
             match k {
-                Tusize::NumClauseSubsumption => &self.num_subsumed,
-                Tusize::NumFullElimination => &self.num_full_elimination,
-                Tusize::NumSatElimination => &self.num_sat_elimination,
+                Tusize::NumClauseSubsumption => self.num_subsumed,
+                Tusize::NumFullElimination => self.num_full_elimination,
+                Tusize::NumSatElimination => self.num_sat_elimination,
             }
         }
     }
@@ -420,7 +420,7 @@ impl EliminateIF for Eliminator {
             self.add_cid_occur(asg, ClauseId::from(cid), c, false);
         }
         if force {
-            for vi in 1..=asg.var_stats().0 {
+            for vi in 1..=asg.derefer(assign::property::Tusize::NumVar) {
                 if asg.var(vi).is(Flag::ELIMINATED) || asg.assign(vi).is_some() {
                     continue;
                 }
@@ -682,7 +682,7 @@ impl Eliminator {
             return Ok(());
         }
         let mut timedout: usize = {
-            let nv = asg.var_stats().3 as f64; // un-asserted vars
+            let nv = asg.num_unasserted() as f64;
             let nc = cdb.count() as f64;
             (6.0 * nv.log2() * nc) as usize
         };
