@@ -187,31 +187,6 @@ impl Instantiate for AssignStack {
     }
 }
 
-impl Export<(usize, usize, usize, usize), ()> for AssignStack {
-    /// exports:
-    ///  1. the number of decision
-    ///  1. the number of propagations
-    ///  1. the number of conflicts
-    ///  1. the number of restarts
-    ///
-    ///```
-    /// use crate::{splr::config::Config, splr::types::*};
-    /// use crate::splr::assign::AssignStack;
-    /// let asg = AssignStack::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (num_decision, num_propagation, num_conflict, num_restart) = asg.exports();
-    ///```
-    #[inline]
-    fn exports(&self) -> (usize, usize, usize, usize) {
-        (
-            self.num_decision,
-            self.num_propagation,
-            self.num_conflict,
-            self.num_restart,
-        )
-    }
-    fn mode(&self) {}
-}
-
 impl AssignIF for AssignStack {
     fn stack(&self, i: usize) -> Lit {
         self.trail[i]

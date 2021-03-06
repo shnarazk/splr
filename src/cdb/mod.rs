@@ -11,6 +11,7 @@ pub use self::{
     cid::ClauseIdIF,
     clause::ClauseIF,
     db::ClauseDBIF,
+    property::*,
     watch::{Watch, WatchDBIF},
 };
 
@@ -150,6 +151,35 @@ pub struct ClauseDB {
     //## incremental solving
     //
     pub eliminated_permanent: Vec<Vec<Lit>>,
+}
+
+pub mod property {
+    use super::ClauseDB;
+    use crate::types::*;
+
+    #[derive(Clone, Debug, PartialEq)]
+    pub enum Tusize {
+        NumActive,
+        NumBiClause,
+        NumBiLearnt,
+        NumLBD2,
+        NumLearnt,
+        NumReduction,
+    }
+
+    impl PropertyReference<Tusize, usize> for ClauseDB {
+        #[inline]
+        fn refer(&self, k: Tusize) -> &usize {
+            match k {
+                Tusize::NumActive => &self.num_active,
+                Tusize::NumBiClause => &self.num_bi_clause,
+                Tusize::NumBiLearnt => &self.num_bi_learnt,
+                Tusize::NumLBD2 => &self.num_lbd2,
+                Tusize::NumLearnt => &self.num_learnt,
+                Tusize::NumReduction => &self.num_reduction,
+            }
+        }
+    }
 }
 
 #[cfg(test)]

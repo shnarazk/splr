@@ -4,7 +4,7 @@ mod build;
 /// Crate 'conflict' handles conflicts.
 mod conflict;
 /// Crate `restart` provides restart heuristics.
-mod restart;
+pub mod restart;
 /// CDCL search engine
 mod search;
 /// Crate `validate` implements a model checker.
@@ -14,7 +14,7 @@ mod vivify;
 
 pub use self::{
     build::SatSolverIF,
-    restart::{R2Ema2, RestartIF, RestartMode, Restarter},
+    restart::{property::*, RestartIF, RestartMode, Restarter},
     search::SolveIF,
     validate::ValidateIF,
 };

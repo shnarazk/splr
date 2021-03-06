@@ -17,13 +17,15 @@
 //!  } = s;
 //!  elim.activate();
 //!  elim.simplify(asg, cdb, state).expect("panic");
-//!  assert_eq!(elim.exports().0, 1);
+//!  assert_eq!(*elim.refer(processor::property::Tusize::NumFullElimination), 1);
 //!  assert!(0 < asg.num_eliminated_vars);
 //!```
 
 mod eliminate;
 mod heap;
 mod subsume;
+
+pub use self::property::*;
 
 use {
     self::{eliminate::eliminate_var, heap::VarOrderIF},
@@ -110,29 +112,6 @@ enum EliminatorMode {
     Dormant,
     Waiting,
     Running,
-}
-
-impl Export<(usize, usize, usize, f64), ()> for Eliminator {
-    /// exports:
-    ///  1. the number of full eliminations
-    ///  1. the number of satisfied clause eliminations
-    ///
-    ///```
-    /// use crate::{splr::config::Config, splr::types::*};
-    /// use crate::splr::processor::Eliminator;
-    /// let elim = Eliminator::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (elim_num_full_elimination, elim_num_sat_elimination, elim_to_simplify) = elim.exports();
-    ///```
-    #[inline]
-    fn exports(&self) -> (usize, usize, usize, f64) {
-        (
-            self.num_full_elimination,
-            self.num_sat_elimination,
-            self.num_subsumed,
-            self.to_simplify,
-        )
-    }
-    fn mode(&self) {}
 }
 
 /// Mapping from Literal to Clauses.
@@ -363,6 +342,29 @@ impl Instantiate for Eliminator {
                 self.elim_lits.clear();
             }
             _ => (),
+        }
+    }
+}
+
+pub mod property {
+    use super::Eliminator;
+    use crate::types::*;
+
+    #[derive(Clone, Debug, PartialEq)]
+    pub enum Tusize {
+        NumClauseSubsumption,
+        NumFullElimination,
+        NumSatElimination,
+    }
+
+    impl PropertyReference<Tusize, usize> for Eliminator {
+        #[inline]
+        fn refer(&self, k: Tusize) -> &usize {
+            match k {
+                Tusize::NumClauseSubsumption => &self.num_subsumed,
+                Tusize::NumFullElimination => &self.num_full_elimination,
+                Tusize::NumSatElimination => &self.num_sat_elimination,
+            }
         }
     }
 }

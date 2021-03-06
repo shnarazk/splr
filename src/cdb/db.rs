@@ -307,38 +307,6 @@ impl Instantiate for ClauseDB {
     }
 }
 
-impl Export<(usize, usize, usize, usize, usize, usize), bool> for ClauseDB {
-    /// exports:
-    ///  1. the number of active clauses
-    ///  1. the number of binary clauses
-    ///  1. the number of binary learnt clauses
-    ///  1. the number of clauses which LBDs are 2
-    ///  1. the number of learnt clauses
-    ///  1. the number of clause reductions
-    ///
-    ///```
-    /// use crate::{splr::config::Config, splr::types::*};
-    /// use crate::splr::cdb::ClauseDB;
-    /// let cdb = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (_active, _bi_clause, _bi_learnt, _lbd2, _learnt, _reduction) = cdb.exports();
-    ///```
-    #[inline]
-    fn exports(&self) -> (usize, usize, usize, usize, usize, usize) {
-        (
-            self.num_active,
-            self.num_bi_clause,
-            self.num_bi_learnt,
-            self.num_lbd2,
-            self.num_learnt,
-            self.num_reduction,
-        )
-    }
-    /// return the value of `use_chan_seok`
-    fn mode(&self) -> bool {
-        self.use_chan_seok
-    }
-}
-
 impl ClauseDBIF for ClauseDB {
     fn len(&self) -> usize {
         self.clause.len()

@@ -38,11 +38,8 @@ pub enum RestartMode {
     Stabilize,
 }
 
-type RestarterExports = (usize, usize, usize, usize, usize);
-
 /// API for [`restart`](`crate::solver::RestartIF::restart`) and [`stabilize`](`crate::solver::RestartIF::stabilize`).
-pub trait RestartIF: Export<RestarterExports, (RestartMode, usize)> {
-    type Exports;
+pub trait RestartIF {
     /// check blocking and forcing restart condition.
     fn restart(&mut self) -> Option<RestartDecision>;
     /// check stabilization mode and  return:
@@ -356,9 +353,6 @@ impl GeometricStabilizer {
         }
         None
     }
-    fn span(&self) -> usize {
-        self.step
-    }
 }
 
 /// `Restarter` provides restart API and holds data about restart conditions.
@@ -445,7 +439,6 @@ pub enum RestartDecision {
 }
 
 impl RestartIF for Restarter {
-    type Exports = RestarterExports;
     fn restart(&mut self) -> Option<RestartDecision> {
         if self.luby.is_active() {
             self.luby.shift();
@@ -500,55 +493,45 @@ impl RestartIF for Restarter {
     }
 }
 
-impl Export<RestarterExports, (RestartMode, usize)> for Restarter {
-    /// exports:
-    ///  1. the number of blocking in non-stabilization
-    ///  1. the number of forcing restart non-stabilization
-    ///  1. the index of span of stabilization phase
-    ///  1. the number of stabilization cycle shifts
-    ///  1. the maximum length of stabilization span so far
-    ///
-    ///```
-    /// use crate::splr::{config::Config, solver::Restarter, types::*};
-    /// let rst = Restarter::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (num_blk_non, num_stb_non, num_blk_stb, num_rst_shift, num_rst_stb) = rst.exports();
-    /// let (rst_mode, num_stb) = rst.mode();
-    ///```
-    #[inline]
-    fn exports(&self) -> RestarterExports {
-        (
-            self.num_block,
-            self.num_restart,
-            self.stb.span(),
-            self.stb.num_shift,
-            self.stb.num_cycle,
-        )
-    }
-    fn mode(&self) -> (RestartMode, usize) {
-        (
-            if self.luby.enable {
-                RestartMode::Luby
-            } else {
-                RestartMode::Dynamic
-            },
-            self.stb.span(),
-        )
-    }
-}
+pub mod property {
+    use super::Restarter;
+    use crate::types::*;
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum R2Ema2 {
-    ASG,
-    LBD,
-}
+    #[derive(Clone, Debug, PartialEq)]
+    pub enum Tusize {
+        NumBlock,
+        NumCycle,
+        NumRestart,
+        NumStage,
+        SpanLen,
+    }
 
-impl PropertyReference<Ema2> for Restarter {
-    type Index = R2Ema2;
-    #[inline]
-    fn refer(&self, k: Self::Index) -> &Ema2 {
-        match k {
-            R2Ema2::ASG => &self.asg.ema,
-            R2Ema2::LBD => &self.lbd.ema,
+    impl PropertyReference<Tusize, usize> for Restarter {
+        #[inline]
+        fn refer(&self, k: Tusize) -> &usize {
+            match k {
+                Tusize::NumBlock => &self.num_block,
+                Tusize::NumCycle => &self.stb.num_cycle,
+                Tusize::NumRestart => &self.num_restart,
+                Tusize::NumStage => &self.stb.num_shift,
+                Tusize::SpanLen => &self.stb.step,
+            }
+        }
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    pub enum TEma2 {
+        ASG,
+        LBD,
+    }
+
+    impl PropertyReference<TEma2, Ema2> for Restarter {
+        #[inline]
+        fn refer(&self, k: TEma2) -> &Ema2 {
+            match k {
+                TEma2::ASG => &self.asg.ema,
+                TEma2::LBD => &self.lbd.ema,
+            }
         }
     }
 }

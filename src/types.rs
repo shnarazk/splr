@@ -22,15 +22,8 @@ use {
 /// For example, `State::progress` needs to access misc parameters and statistics,
 /// which, however, should be used locally in the defining modules.
 /// To avoid to make them public, we define a generic accessor or exporter here.
-/// `T` is the list of exporting values.
-pub trait Export<T, Mode> {
-    fn exports(&self) -> T;
-    fn mode(&self) -> Mode;
-}
-
-pub trait PropertyReference<T> {
-    type Index;
-    fn refer(&self, key: Self::Index) -> &T;
+pub trait PropertyReference<I, O> {
+    fn refer(&self, key: I) -> &O;
 }
 
 /// API for Literal like `from_int`, `from_assign`, `to_cid` and so on.

@@ -4,7 +4,6 @@ use {
         cdb::CertifiedRecord,
         solver::*,
         state::{LogF64Id, LogUsizeId},
-        types::Export,
         Config, SolverError, VERSION,
     },
     std::{
@@ -293,12 +292,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c  {}|#BLK:{}, #RST:{}, #ion:{}, Lcyc:{},\n",
-            if s.rst.mode().0 == RestartMode::Luby {
-                "LubyRestart"
-            } else {
-                "    Restart"
-            },
+            "c      Restart|#BLK:{}, #RST:{}, #ion:{}, Lcyc:{},\n",
             format!("{:>9}", state[LogUsizeId::RestartBlock]),
             format!("{:>9}", state[LogUsizeId::Restart]),
             format!("{:>9}", state[LogUsizeId::NumIon]),

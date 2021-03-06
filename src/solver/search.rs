@@ -4,11 +4,11 @@ use super::vivify::vivify;
 use {
     super::{
         conflict::handle_conflict,
-        restart::{ProgressUpdate, RestartDecision, RestartIF, Restarter},
+        restart::{self, ProgressUpdate, RestartDecision, RestartIF, Restarter},
         Certificate, Solver, SolverEvent, SolverResult,
     },
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
+        assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
@@ -246,7 +246,8 @@ fn search(
             if let Some(decision) = rst.restart() {
                 if let Some(new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);
-                    let (_blk, _rst, span_len, _stage, num_cycle) = rst.exports();
+                    let span_len = *rst.refer(restart::property::Tusize::SpanLen);
+                    let num_cycle = *rst.refer(restart::property::Tusize::NumCycle);
                     let v = asg.var_stats();
                     asg.update_activity_decay(if new_cycle { None } else { Some(span_len) });
 
@@ -264,8 +265,7 @@ fn search(
                                 num_cycle,
                                 v.4,
                                 span_len,
-                                asg.refer(<AssignStack as PropertyReference<Ema>>::Index::PPC)
-                                    .get(),
+                                asg.refer(assign::property::T2Ema::PPC).get(),
                             ),
                         );
                         last_core = v.4;

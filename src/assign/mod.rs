@@ -15,7 +15,8 @@ mod stack;
 mod var;
 
 pub use self::{
-    propagate::PropagateIF, select::VarSelectIF, stack::ClauseManipulateIF, var::VarManipulateIF,
+    propagate::PropagateIF, property::*, select::VarSelectIF, stack::ClauseManipulateIF,
+    var::VarManipulateIF,
 };
 #[cfg(any(feature = "best_phases_tracking", feature = "var_staging"))]
 use std::collections::HashMap;
@@ -188,27 +189,45 @@ pub struct VarIdHeap {
     idxs: Vec<usize>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum AS2usize {}
+pub mod property {
+    use super::AssignStack;
+    use crate::types::*;
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum AS2f64 {}
+    #[derive(Clone, Debug, PartialEq)]
+    pub enum Tusize {
+        NumConflict,
+        NumDecision,
+        NumPropagation,
+        NumRestart,
+    }
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum AS2Ema {
-    DPC,
-    PPC,
-    CPR,
-}
+    impl PropertyReference<Tusize, usize> for AssignStack {
+        #[inline]
+        fn refer(&self, k: Tusize) -> &usize {
+            match k {
+                Tusize::NumConflict => &self.num_conflict,
+                Tusize::NumDecision => &self.num_decision,
+                Tusize::NumPropagation => &self.num_propagation,
+                Tusize::NumRestart => &self.num_restart,
+            }
+        }
+    }
 
-impl PropertyReference<Ema> for AssignStack {
-    type Index = AS2Ema;
-    #[inline]
-    fn refer(&self, k: Self::Index) -> &Ema {
-        match k {
-            AS2Ema::DPC => self.dpc_ema.get_ema(),
-            AS2Ema::PPC => self.ppc_ema.get_ema(),
-            AS2Ema::CPR => self.cpr_ema.get_ema(),
+    #[derive(Clone, Debug, PartialEq)]
+    pub enum T2Ema {
+        DPC,
+        PPC,
+        CPR,
+    }
+
+    impl PropertyReference<T2Ema, Ema> for AssignStack {
+        #[inline]
+        fn refer(&self, k: T2Ema) -> &Ema {
+            match k {
+                T2Ema::DPC => self.dpc_ema.get_ema(),
+                T2Ema::PPC => self.ppc_ema.get_ema(),
+                T2Ema::CPR => self.cpr_ema.get_ema(),
+            }
         }
     }
 }
