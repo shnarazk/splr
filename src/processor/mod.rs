@@ -446,6 +446,7 @@ impl EliminateIF for Eliminator {
         A: AssignIF,
         C: ClauseDBIF,
     {
+        self.to_simplify = 0.0;
         debug_assert_eq!(asg.decision_level(), 0);
         // we can reset all the reasons because decision level is zero.
         #[cfg(feature = "boundary_check")]

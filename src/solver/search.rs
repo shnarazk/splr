@@ -287,7 +287,6 @@ fn search(
                                 .config
                                 .elm_cls_lim
                                 .max(cdb.lbd_of_dp_ema.get() as usize);
-                            elim.to_simplify = 0.0;
                             elim.activate();
                             elim.simplify(asg, cdb, state)?;
                         }
