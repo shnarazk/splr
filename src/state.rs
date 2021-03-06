@@ -3,8 +3,8 @@ use {crate::cdb::ClauseDBIF, std::cmp::Ordering};
 /// Crate `state` is a collection of internal data.
 use {
     crate::{
-        assign::{AssignIF, VarSelectIF},
-        solver::{RestartIF, RestartMode, RestarterEMAs, SolverEvent},
+        assign::{AS2Ema, AssignIF, VarSelectIF},
+        solver::{R2Ema2, RestartIF, RestartMode, SolverEvent},
         types::*,
     },
     std::{
@@ -37,15 +37,15 @@ pub trait StateIF {
     /// write a header of stat data to stdio.
     fn progress_header(&mut self);
     /// write stat data to stdio.
-    fn progress<'a, 'r, A, C, E, R>(&mut self, asg: &'a A, cdb: &C, elim: &E, rst: &'r R)
+    fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R)
     where
         A: AssignIF
             + VarSelectIF
             + Export<(usize, usize, usize, usize), ()>
-            + ExportBox<'a, (&'a Ema, &'a Ema, &'a Ema)>,
+            + PropertyReference<Ema, Index = AS2Ema>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, usize, f64), ()>,
-        R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>;
+        R: RestartIF + PropertyReference<Ema2, Index = R2Ema2>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
     /// write a one-line message as log.
@@ -449,15 +449,15 @@ impl StateIF for State {
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
-    fn progress<'a, 'r, A, C, E, R>(&mut self, asg: &'a A, cdb: &C, elim: &E, rst: &'r R)
+    fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R)
     where
         A: AssignIF
             + VarSelectIF
             + Export<(usize, usize, usize, usize), ()>
-            + ExportBox<'a, (&'a Ema, &'a Ema, &'a Ema)>,
+            + PropertyReference<Ema, Index = AS2Ema>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, usize, f64), ()>,
-        R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>,
+        R: RestartIF + PropertyReference<Ema2, Index = R2Ema2>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
             return;
@@ -476,7 +476,9 @@ impl StateIF for State {
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let (asg_num_decision, asg_num_propagation, asg_num_conflict, _asg_num_restart) =
             asg.exports();
-        let (asg_dpc_ema, asg_ppc_ema, asg_cpr_ema) = *asg.exports_box();
+        let asg_dpc_ema = asg.refer(AS2Ema::DPC);
+        let asg_ppc_ema = asg.refer(AS2Ema::PPC);
+        let asg_cpr_ema = asg.refer(AS2Ema::CPR);
 
         let (cdb_num_active, cdb_num_biclause, _num_bl, cdb_num_lbd2, cdb_num_learnt, _cdb_nr) =
             cdb.exports();
@@ -486,7 +488,8 @@ impl StateIF for State {
         let rst_mode = rst.mode().0;
 
         let (rst_num_blk, rst_num_rst, rst_span_len, _num_stage, rst_num_cycle) = rst.exports();
-        let (rst_asg, rst_lbd) = *rst.exports_box();
+        let rst_asg = rst.refer(R2Ema2::ASG);
+        let rst_lbd = rst.refer(R2Ema2::LBD);
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -756,7 +759,7 @@ impl State {
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
-        R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>,
+        R: RestartIF + PropertyReference<Ema2, Index = R2Ema2>,
     {
         self.progress_cnt += 1;
         let (
@@ -780,7 +783,8 @@ impl State {
             let e = rst.exports();
             e.0 + e.2
         };
-        let (rst_asg, rst_lbd) = *rst.exports_box();
+        let rst_asg = rst.refer(R2Ema2::ASG);
+        let rst_lbd = rst.refer(R2Ema2::LBD);
 
         println!(
             "{:>3},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\

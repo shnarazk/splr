@@ -536,14 +536,20 @@ impl Export<RestarterExports, (RestartMode, usize)> for Restarter {
     }
 }
 
-pub type RestarterEMAs<'a> = (&'a Ema2, &'a Ema2);
+#[derive(Clone, Debug, PartialEq)]
+pub enum R2Ema2 {
+    ASG,
+    LBD,
+}
 
-impl<'a> ExportBox<'a, RestarterEMAs<'a>> for Restarter {
-    // returns references to EMAs:
-    // 1. asg
-    // 1. lbd
-    fn exports_box(&'a self) -> Box<RestarterEMAs<'a>> {
-        Box::from((&self.asg.ema, &self.lbd.ema))
+impl PropertyReference<Ema2> for Restarter {
+    type Index = R2Ema2;
+    #[inline]
+    fn refer(&self, k: Self::Index) -> &Ema2 {
+        match k {
+            R2Ema2::ASG => &self.asg.ema,
+            R2Ema2::LBD => &self.lbd.ema,
+        }
     }
 }
 

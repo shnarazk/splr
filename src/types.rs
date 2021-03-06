@@ -28,8 +28,9 @@ pub trait Export<T, Mode> {
     fn mode(&self) -> Mode;
 }
 
-pub trait ExportBox<'a, T> {
-    fn exports_box(&'a self) -> Box<T>;
+pub trait PropertyReference<T> {
+    type Index;
+    fn refer(&self, key: Self::Index) -> &T;
 }
 
 /// API for Literal like `from_int`, `from_assign`, `to_cid` and so on.

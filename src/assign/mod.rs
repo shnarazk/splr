@@ -188,16 +188,27 @@ pub struct VarIdHeap {
     idxs: Vec<usize>,
 }
 
-impl<'a> ExportBox<'a, (&'a Ema, &'a Ema, &'a Ema)> for AssignStack {
-    // returns references to EMAs:
-    // 1. dpc = decision / conflict
-    // 1. ppc = propagation / conflict
-    // 1. cpr = conflict / restart
-    fn exports_box(&'a self) -> Box<(&'a Ema, &'a Ema, &'a Ema)> {
-        Box::from((
-            self.dpc_ema.get_ema(),
-            self.ppc_ema.get_ema(),
-            self.cpr_ema.get_ema(),
-        ))
+#[derive(Clone, Debug, PartialEq)]
+pub enum AS2usize {}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum AS2f64 {}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum AS2Ema {
+    DPC,
+    PPC,
+    CPR,
+}
+
+impl PropertyReference<Ema> for AssignStack {
+    type Index = AS2Ema;
+    #[inline]
+    fn refer(&self, k: Self::Index) -> &Ema {
+        match k {
+            AS2Ema::DPC => self.dpc_ema.get_ema(),
+            AS2Ema::PPC => self.ppc_ema.get_ema(),
+            AS2Ema::CPR => self.cpr_ema.get_ema(),
+        }
     }
 }

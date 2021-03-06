@@ -264,7 +264,8 @@ fn search(
                                 num_cycle,
                                 v.4,
                                 span_len,
-                                asg.exports_box().2.get(),
+                                asg.refer(<AssignStack as PropertyReference<Ema>>::Index::PPC)
+                                    .get(),
                             ),
                         );
                         last_core = v.4;
