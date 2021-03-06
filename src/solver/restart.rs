@@ -471,8 +471,13 @@ impl RestartIF for Restarter {
         }
         None
     }
+    #[cfg(feature = "Luby_stabilization")]
     fn stabilize(&mut self) -> Option<bool> {
         self.stb.update(self.num_restart + self.num_block)
+    }
+    #[cfg(not(feature = "Luby_stabilization"))]
+    fn stabilize(&mut self) -> Option<bool> {
+        Some(false)
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
