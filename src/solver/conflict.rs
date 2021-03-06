@@ -214,7 +214,7 @@ pub fn handle_conflict(
         } else {
             asg.assign_by_unitclause(l0);
         }
-        elim.to_simplify += state.config.c_ip_int as f64;
+        elim.to_simplify += (state.config.c_ip_int / 2) as f64;
         rst.handle(SolverEvent::Assert(l0.vi()))
     } else {
         {
@@ -348,6 +348,7 @@ fn conflict_analyze(
                 } else {
                     state.derive20.push(cid);
                 }
+                cdb.lbd_of_dp_ema.update(cdb[cid].rank as f64);
                 let c = &cdb[cid];
 
                 #[cfg(feature = "boundary_check")]

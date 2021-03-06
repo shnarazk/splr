@@ -270,9 +270,7 @@ fn search(
                         last_core = v.4;
                     }
 
-                    if cdb.reduce(asg, asg.num_conflict)
-                        || state.config.c_ip_int <= elim.to_simplify as usize
-                    {
+                    if cdb.reduce(asg, asg.num_conflict) {
                         // Simplification has been postponed because chronoBT was used.
                         // `elim.to_simplify` is increased much in particular
                         // when vars are asserted or learnts are small.
@@ -283,9 +281,15 @@ fn search(
                             analyze_final(asg, state, &cdb[ci]);
                             return Ok(false);
                         }
-                        elim.to_simplify = 0.0;
-                        elim.activate();
-                        elim.simplify(asg, cdb, state)?;
+                        if state.config.c_ip_int <= elim.to_simplify as usize {
+                            elim.subsume_literal_limit = state
+                                .config
+                                .elm_cls_lim
+                                .max(cdb.lbd_of_dp_ema.get() as usize);
+                            elim.to_simplify = 0.0;
+                            elim.activate();
+                            elim.simplify(asg, cdb, state)?;
+                        }
                     }
                     if next_progress < asg.num_conflict {
                         state.progress(asg, cdb, elim, rst);

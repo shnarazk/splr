@@ -124,6 +124,7 @@ impl Default for ClauseDB {
             num_lbd2: 0,
             num_learnt: 0,
             num_reduction: 0,
+            lbd_of_dp_ema: Ema::new(10000),
             during_vivification: false,
             eliminated_permanent: Vec::new(),
         }

@@ -35,7 +35,6 @@ impl Eliminator {
                 println!("BackSubC subsumes {} from {} and {}", l, cid, did,);
                 strengthen_clause(asg, cdb, self, did, !l)?;
                 self.enqueue_var(asg, l.vi(), true);
-                self.num_subsumed += 1;
             }
             None => {}
         }

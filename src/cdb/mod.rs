@@ -138,6 +138,8 @@ pub struct ClauseDB {
     num_learnt: usize,
     /// the number of reductions.
     num_reduction: usize,
+    /// EMA of LBD of clauses used in conflict analysis (dependency graph)
+    pub lbd_of_dp_ema: Ema,
 
     //
     //## vivification
