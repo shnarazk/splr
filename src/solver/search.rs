@@ -283,10 +283,6 @@ fn search(
                             return Ok(false);
                         }
                         if state.config.c_ip_int <= elim.to_simplify as usize {
-                            elim.subsume_literal_limit = state
-                                .config
-                                .elm_cls_lim
-                                .max(cdb.lbd_of_dp_ema.get() as usize);
                             elim.activate();
                             elim.simplify(asg, cdb, state)?;
                         }

@@ -200,7 +200,7 @@ pub fn vivify(
             n => {
                 num_shrink += 1;
                 if n == 2 && cdb.registered_bin_clause(copied[0], copied[1]) {
-                    elim.to_simplify += 1.0 / 2.0;
+                    elim.to_simplify += 0.5;
                 } else {
                     cdb.certificate_add(&copied);
                     cdb.handle(SolverEvent::Vivify(true));

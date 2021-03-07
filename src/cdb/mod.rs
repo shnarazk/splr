@@ -27,6 +27,7 @@ pub trait ClauseDBIF:
     ActivityIF<ClauseId>
     + IndexMut<ClauseId, Output = Clause>
     + PropertyDereference<property::Tusize, usize>
+    + PropertyDereference<property::Tf64, f64>
 {
     /// return the length of `clause`.
     fn len(&self) -> usize;
@@ -270,6 +271,20 @@ pub mod property {
                 Tusize::NumLBD2 => self.num_lbd2,
                 Tusize::NumLearnt => self.num_learnt,
                 Tusize::NumReduction => self.num_reduction,
+            }
+        }
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    pub enum Tf64 {
+        DpAverageLBD,
+    }
+
+    impl PropertyDereference<Tf64, f64> for ClauseDB {
+        #[inline]
+        fn derefer(&self, k: Tf64) -> f64 {
+            match k {
+                Tf64::DpAverageLBD => self.lbd_of_dp_ema.get(),
             }
         }
     }

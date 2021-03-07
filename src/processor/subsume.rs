@@ -30,13 +30,14 @@ impl Eliminator {
                 }
                 self.num_subsumed += 1;
             }
-            Some(l) => {
+            // To avoid making a big clause, we have to add a condition for combining them.
+            Some(l) if cid.is_lifted_lit() => {
                 #[cfg(feature = "trace_elimination")]
-                println!("BackSubC subsumes {} from {} and {}", l, cid, did,);
+                println!("BackSubC subsumes {} from {} and {}", l, cid, did);
                 strengthen_clause(asg, cdb, self, did, !l)?;
                 self.enqueue_var(asg, l.vi(), true);
             }
-            None => {}
+            _ => {}
         }
         Ok(())
     }

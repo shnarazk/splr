@@ -469,7 +469,7 @@ impl StateIF for State {
         //
         let asg_num_vars = asg.derefer(assign::property::Tusize::NumVar);
         let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
-        let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
+        let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumEliminatedVar);
         let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
         let asg_num_unreachables = asg.derefer(assign::property::Tusize::NumUnreachableVar);
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;

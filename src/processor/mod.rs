@@ -31,7 +31,7 @@ use {
     self::{eliminate::eliminate_var, heap::VarOrderIF},
     crate::{
         assign::{self, AssignIF},
-        cdb::ClauseDBIF,
+        cdb::{self, ClauseDBIF},
         solver::SolverEvent,
         state::{State, StateIF},
         types::*,
@@ -193,7 +193,7 @@ pub struct Eliminator {
     /// A criteria by the product's of its positive occurrences and negative ones
     pub eliminate_occurrence_limit: usize,
     /// Stop subsumption if the size of a clause is over this
-    pub subsume_literal_limit: usize,
+    subsume_literal_limit: usize,
     /// var
     var: Vec<LitOccurs>,
     num_full_elimination: usize,
@@ -459,6 +459,13 @@ impl EliminateIF for Eliminator {
             }
         }
         if self.enable {
+            self.subsume_literal_limit = (state.config.elm_cls_lim
+                + cdb.derefer(cdb::property::Tf64::DpAverageLBD) as usize)
+                / 2;
+            self.subsume_literal_limit = state
+                .config
+                .elm_cls_lim
+                .max(cdb.derefer(cdb::property::Tf64::DpAverageLBD) as usize);
             if self.is_waiting() {
                 self.prepare(asg, cdb, true);
             }
@@ -685,7 +692,7 @@ impl Eliminator {
         let mut timedout: usize = {
             let nv = asg.num_unasserted() as f64;
             let nc = cdb.count() as f64;
-            (6.0 * nv.log2() * nc) as usize
+            (6.0 * nv.log(1.5) * nc) as usize
         };
         while self.bwdsub_assigns < asg.stack_len()
             || !self.var_queue.is_empty()
@@ -874,9 +881,6 @@ mod tests {
             ..
         } = s;
         assert!(elim.enable);
-        // elim.eliminate_combination_limit = 2;
-        // elim.eliminate_occurrence_limit = 1;
-        // elim.subsume_literal_limit = 1;
         elim.activate();
         elim.simplify(asg, cdb, state).expect("");
         assert_eq!(elim.num_full_elimination, 1);
