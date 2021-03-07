@@ -279,7 +279,7 @@ struct GeometricStabilizer {
     longest_span: usize,
     luby: LubySeries,
     num_cycle: usize,
-    num_shift: usize,
+    num_stage: usize,
     next_trigger: usize,
     reset_requested: bool,
     step: usize,
@@ -296,7 +296,7 @@ impl Default for GeometricStabilizer {
             longest_span: 1,
             luby: LubySeries::default(),
             num_cycle: 0,
-            num_shift: 0,
+            num_stage: 0,
             next_trigger: 1,
             reset_requested: false,
             step: 1,
@@ -333,7 +333,7 @@ impl fmt::Display for GeometricStabilizer {
 impl GeometricStabilizer {
     fn update(&mut self, now: usize) -> Option<bool> {
         if self.enable && self.next_trigger <= now {
-            self.num_shift += 1;
+            self.num_stage += 1;
             let mut new_cycle: bool = false;
             if self.longest_span < self.step {
                 new_cycle = true;
@@ -504,6 +504,7 @@ pub mod property {
         NumRestart,
         NumStage,
         SpanLen,
+        LongestSpan,
     }
 
     impl PropertyDereference<Tusize, usize> for Restarter {
@@ -513,8 +514,9 @@ pub mod property {
                 Tusize::NumBlock => self.num_block,
                 Tusize::NumCycle => self.stb.num_cycle,
                 Tusize::NumRestart => self.num_restart,
-                Tusize::NumStage => self.stb.num_shift,
+                Tusize::NumStage => self.stb.num_stage,
                 Tusize::SpanLen => self.stb.step,
+                Tusize::LongestSpan => self.stb.longest_span,
             }
         }
     }
