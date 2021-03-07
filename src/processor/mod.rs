@@ -462,10 +462,6 @@ impl EliminateIF for Eliminator {
             self.subsume_literal_limit = (state.config.elm_cls_lim
                 + cdb.derefer(cdb::property::Tf64::DpAverageLBD) as usize)
                 / 2;
-            self.subsume_literal_limit = state
-                .config
-                .elm_cls_lim
-                .max(cdb.derefer(cdb::property::Tf64::DpAverageLBD) as usize);
             if self.is_waiting() {
                 self.prepare(asg, cdb, true);
             }

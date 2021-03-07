@@ -141,7 +141,7 @@ impl Default for Config {
 
             crw_dcy_rat: 0.95,
 
-            elm_cls_lim: 8,
+            elm_cls_lim: 18,
             elm_grw_lim: 0,
             elm_var_occ: 20000,
 
