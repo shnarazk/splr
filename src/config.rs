@@ -413,7 +413,7 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --rse <rst-stb-exp>   Stabilizer expansion scale        {:>10.2}
       --rss <rst-stb-scl>   Stabilizer scaling                {:>10.2}
       --rs  <rst-step>      #conflicts between restarts    {:>10}
-      --srd <stg-rwd-dcy>   Decay rate for staged var reward {:>10.2}
+      --srd <stg-rwd-dcy>   Decay rate for staged var reward  {:>10.2}
       --srv <stg-rwd-val>   Extra reward for staged vars      {:>10.2}
       --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
       --vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}
