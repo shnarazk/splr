@@ -492,7 +492,7 @@ impl StateIF for State {
         let rst_num_blk: usize = rst.derefer(solver::restart::property::Tusize::NumBlock);
         let rst_num_rst: usize = rst.derefer(solver::restart::property::Tusize::NumRestart);
         let rst_span_len: usize = rst.derefer(solver::restart::property::Tusize::SpanLen);
-        let rst_num_cycle: usize = rst.derefer(solver::restart::property::Tusize::NumCycle);
+        let rst_span_max: usize = rst.derefer(solver::restart::property::Tusize::LongestSpan);
         let rst_asg: &Ema2 = rst.refer(solver::restart::property::TEma2::ASG);
         let rst_lbd: &Ema2 = rst.refer(solver::restart::property::TEma2::LBD);
 
@@ -569,11 +569,11 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, Lstg:{}, Lcyc:{}",
+            "\x1B[2K     Restart|#BLK:{}, #RST:{}, span:{}, peak:{}",
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-            im!("{:>9}", self, LogUsizeId::LubySpan, rst_span_len),
-            im!("{:>9}", self, LogUsizeId::LubyCycle, rst_num_cycle),
+            im!("{:>9}", self, LogUsizeId::LubySpanLen, rst_span_len),
+            im!("{:>9}", self, LogUsizeId::LubySpanMax, rst_span_max),
         );
         println!(
             "\x1B[2K         EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{}",
@@ -607,8 +607,7 @@ impl StateIF for State {
         println!(
             "\x1B[2K        misc|elim:{}, #sub:{}, #vbv:{}, /cpr:{}",
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
-            // im!("{:>9}", self, LogUsizeId::Vivify, self[Stat::Vivification]),
-            im!("{:>9}", self, LogUsizeId::Vivify, elim_num_sub),
+            im!("{:>9}", self, LogUsizeId::ClauseSubsumption, elim_num_sub),
             im!(
                 "{:>9}",
                 self,
@@ -823,9 +822,8 @@ pub enum LogUsizeId {
     //
     //## stabilization, staging and restart
     //
-    LubyCycle,
-    LubySpan,
-    NumIon,
+    LubySpanLen,
+    LubySpanMax,
     Restart,
     RestartBlock,
     RestartCancel,
@@ -836,7 +834,7 @@ pub enum LogUsizeId {
     //
     Simplify,
     Stabilize,
-    Vivify,
+    ClauseSubsumption,
     VivifiedVar,
 
     // the sentinel

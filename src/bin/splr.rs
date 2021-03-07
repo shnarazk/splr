@@ -292,11 +292,11 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c      Restart|#BLK:{}, #RST:{}, #ion:{}, Lcyc:{},\n",
+            "c      Restart|#BLK:{}, #RST:{}, span:{}, peak:{},\n",
             format!("{:>9}", state[LogUsizeId::RestartBlock]),
             format!("{:>9}", state[LogUsizeId::Restart]),
-            format!("{:>9}", state[LogUsizeId::NumIon]),
-            format!("{:>9}", state[LogUsizeId::LubyCycle]),
+            format!("{:>9}", state[LogUsizeId::LubySpanLen]),
+            format!("{:>9}", state[LogUsizeId::LubySpanMax]),
         )
         .as_bytes(),
     )?;
@@ -323,9 +323,9 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c         misc|elim:{}, cviv:{}, #vbv:{}, /cpr:{},\n",
+            "c         misc|elim:{}, #sub:{}, #vbv:{}, /cpr:{},\n",
             format!("{:>9}", state[LogUsizeId::Simplify]),
-            format!("{:>9}", state[LogUsizeId::Vivify]),
+            format!("{:>9}", state[LogUsizeId::ClauseSubsumption]),
             format!("{:>9}", state[LogUsizeId::VivifiedVar]),
             format!("{:>9.2}", state[LogF64Id::ConflictPerRestart]),
         )
