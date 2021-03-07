@@ -264,12 +264,11 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 | `bjmp`       | the EMA of decision levels to which backjumps go                                          |
 | `/ppc`       | the EMA of propagations per conflict                                                      |
 | `elim`       | the number of invocations of clause/var elimination                                       |
-| `s#ub`       | the number of subsumed clauses                                                            |
+| `#sub`       | the number of subsumed clauses                                                            |
 | `#vbv`       | the number of vars which were asserted by clause vivification                             |
 | `/cpr`       | the EMA of conflicts per restart                                                          |
 | `mode`       | Selected strategy's id                                                                    |
 | `time`       | the elapsed CPU time in seconds                                                           |
-| `#ion`       | the number of vars with high activities but aren't involved in best phase                 |
 
 ## Command line options
 
