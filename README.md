@@ -284,7 +284,7 @@ FLAGS:
   -C, --no-color            Disable coloring
   -q, --quiet               Disable any progress message
   -c, --certify             Writes a DRAT UNSAT certification file
-  -j, --journal             Show sub-module logs
+  -j, --journal             Shows sub-module logs
   -l, --log                 Uses Glucose-like progress report
   -V, --version             Prints version information
 OPTIONS (red options depend on features in Cargo.toml):
