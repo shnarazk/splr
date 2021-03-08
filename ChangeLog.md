@@ -1,5 +1,9 @@
-## 0.6.4, 2021-03-09
+## 0.7.0, 2021-03-09
 
+- reorganize trait
+  - replace {Export, ExportBox} with {PropertyDereference, PropertyReference}
+  - remove: ClauseManipulationIF
+  - export: Ema, Ema2, EmaIF, PropertyDereference, PropertyReference
 - reorganize features:
   - add:
     - best_phases_tracking
@@ -29,7 +33,6 @@
    - _var boosting_ is to promote specific vars during a stage.
    - _boosted vars_ or _staged vars_ are the vars promoted by var boosting.
    - _rephrase_: is to promote specific literals during a stage.
-- replace trait {Export, ExportBox} with {PropertyDereference, PropertyReference}
 
 ## 0.6.3, 2021-02-12
 
