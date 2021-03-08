@@ -13,14 +13,6 @@ use std::{
     io::{BufWriter, Write},
 };
 
-/// API for var manipulation
-pub trait ClauseManipulateIF {
-    /// return `true` if the set of literals is satisfiable under the current assignment.
-    fn satisfies(&self, c: &[Lit]) -> bool;
-    /// return `true` is the clause is the reason of the assignment.
-    fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
-}
-
 impl Default for AssignReason {
     fn default() -> AssignReason {
         AssignReason::None
@@ -319,6 +311,21 @@ impl AssignIF for AssignStack {
             i -= width;
         }
         extended_model
+    }
+    fn satisfies(&self, vec: &[Lit]) -> bool {
+        for l in vec {
+            if self.assigned(*l) == Some(true) {
+                return true;
+            }
+        }
+        false
+    }
+    fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
+        let lits = &c.lits;
+        debug_assert!(1 < lits.len());
+        let l0 = lits[0];
+        self.assigned(l0) == Some(true)
+            && matches!(self.reason(l0.vi()), AssignReason::Implication(x, _) if x == cid)
     }
 }
 

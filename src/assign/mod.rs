@@ -14,10 +14,7 @@ mod stack;
 /// var struct and its methods
 mod var;
 
-pub use self::{
-    propagate::PropagateIF, property::*, select::VarSelectIF, stack::ClauseManipulateIF,
-    var::VarManipulateIF,
-};
+pub use self::{propagate::PropagateIF, property::*, select::VarSelectIF, var::VarManipulateIF};
 #[cfg(any(feature = "best_phases_tracking", feature = "var_staging"))]
 use std::collections::HashMap;
 use {
@@ -29,7 +26,6 @@ use {
 /// API about assignment like [`decision_level`](`crate::assign::AssignIF::decision_level`), [`stack`](`crate::assign::AssignIF::stack`), [`best_assigned`](`crate::assign::AssignIF::best_assigned`), and so on.
 pub trait AssignIF:
     ActivityIF<VarId>
-    + ClauseManipulateIF
     + PropagateIF
     + VarManipulateIF
     + PropertyDereference<property::Tusize, usize>
@@ -66,6 +62,10 @@ pub trait AssignIF:
     fn extend_model<C>(&mut self, c: &mut C, lits: &[Lit]) -> Vec<Option<bool>>
     where
         C: ClauseDBIF;
+    /// return `true` if the set of literals is satisfiable under the current assignment.
+    fn satisfies(&self, c: &[Lit]) -> bool;
+    /// return `true` is the clause is the reason of the assignment.
+    fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
 }
 
 /// Reasons of assignments, two kinds

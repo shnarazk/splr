@@ -1,6 +1,6 @@
 /// Var struct and Database management API
 use {
-    super::{AssignStack, ClauseManipulateIF, Var, VarHeapIF},
+    super::{AssignStack, Var, VarHeapIF},
     crate::types::*,
     std::{
         fmt,
@@ -150,23 +150,5 @@ impl VarManipulateIF for AssignStack {
     #[inline]
     fn num_unreachables(&self) -> usize {
         self.num_vars - self.num_best_assign
-    }
-}
-
-impl ClauseManipulateIF for AssignStack {
-    fn satisfies(&self, vec: &[Lit]) -> bool {
-        for l in vec {
-            if self.assigned(*l) == Some(true) {
-                return true;
-            }
-        }
-        false
-    }
-    fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
-        let lits = &c.lits;
-        debug_assert!(1 < lits.len());
-        let l0 = lits[0];
-        self.assigned(l0) == Some(true)
-            && matches!(self.reason(l0.vi()), AssignReason::Implication(x, _) if x == cid)
     }
 }
