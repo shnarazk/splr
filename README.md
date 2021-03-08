@@ -292,11 +292,11 @@ OPTIONS (red options depend on features in Cargo.toml):
       --cdr <crw-dcy-rat>   Clause reward decay                     0.95
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB)         0
       --ii <c-ip-int>       #cls to start in-processor          16384
-  -t, --timeout <c-timeout> CPU time limit in sec.               5000
+  -t, --timeout <timeout>   CPU time limit in sec.               5000
       --ecl <elm-cls-lim>   Max #lit for clause subsume            18
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.         0
       --evo <elm-var-occ>   Max #cls for var elimination        20000
-  -o, --dir <io-odir>       Output directory                         .
+  -o, --dir <io-outdir>     Output directory                         .
   -p, --proof <io-pfile>    DRAT Cert. filename                 proof.out
   -r, --result <io-rfile>   Result filename/stdout                   
       --ral <rst-asg-len>   Length of assign. fast EMA             24
@@ -305,8 +305,6 @@ OPTIONS (red options depend on features in Cargo.toml):
       --rll <rst-lbd-len>   Length of LBD fast EMA                 24
       --rls <rst-lbd-slw>   Length of LBD slow EMA               8192
       --rlt <rst-lbd-thr>   Forcing restart threshold               1.20
-      --rse <rst-stb-exp>   Stabilizer expansion scale              1.00
-      --rss <rst-stb-scl>   Stabilizer scaling                      2.00
       --rs  <rst-step>      #conflicts between restarts            24
       --srd <stg-rwd-dcy>   Decay rate for staged var reward        0.50
       --srv <stg-rwd-val>   Extra reward for staged vars            1.00

@@ -93,12 +93,6 @@ pub struct Config {
     /// Forcing restart threshold
     pub rst_lbd_thr: f64,
 
-    /// Stabilizer scaling
-    pub rst_stb_scl: f64,
-
-    /// Stabilizer expansion scale
-    pub rst_stb_exp: f64,
-
     //
     //## vivifier
     //
@@ -152,8 +146,6 @@ impl Default for Config {
             rst_lbd_len: 24,
             rst_lbd_slw: 8192,
             rst_lbd_thr: 1.20,
-            rst_stb_exp: 1.0,
-            rst_stb_scl: 2.0,
 
             stg_rwd_dcy: 0.5,
             stg_rwd_val: 1.0,
@@ -192,7 +184,7 @@ impl Config {
                     "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
                 ];
                 let options_f64 = [
-                    "timeout", "cdr", "rat", "rlt", "rse", "rss", "srd", "srv", "vdr", "vds",
+                    "timeout", "cdr", "rat", "rlt",  "srd", "srv", "vdr", "vds",
                 ];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
@@ -253,8 +245,6 @@ impl Config {
                                         "cdr" => self.crw_dcy_rat = val,
                                         "rat" => self.rst_asg_thr = val,
                                         "rlt" => self.rst_lbd_thr = val,
-                                        "rse" => self.rst_stb_exp = val,
-                                        "rss" => self.rst_stb_scl = val,
                                         "srd" => self.stg_rwd_dcy = val,
                                         "srv" => self.stg_rwd_val = val,
                                         "vdr" => self.vrw_dcy_rat = val,
@@ -397,11 +387,11 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --cdr <crw-dcy-rat>   Clause reward decay               {:>10.2}
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
       --ii <c-ip-int>       #cls to start in-processor     {:>10}
-  -t, --timeout <c-timeout> CPU time limit in sec.         {:>10}
+  -t, --timeout <timeout>   CPU time limit in sec.         {:>10}
       --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
       --evo <elm-var-occ>   Max #cls for var elimination   {:>10}
-  -o, --dir <io-odir>       Output directory                {:>10}
+  -o, --dir <io-outdir>     Output directory                {:>10}
   -p, --proof <io-pfile>    DRAT Cert. filename                {:>10}
   -r, --result <io-rfile>   Result filename/stdout             {:>10}
       --ral <rst-asg-len>   Length of assign. fast EMA     {:>10}
@@ -410,8 +400,6 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --rll <rst-lbd-len>   Length of LBD fast EMA         {:>10}
       --rls <rst-lbd-slw>   Length of LBD slow EMA         {:>10}
       --rlt <rst-lbd-thr>   Forcing restart threshold         {:>10.2}
-      --rse <rst-stb-exp>   Stabilizer expansion scale        {:>10.2}
-      --rss <rst-stb-scl>   Stabilizer scaling                {:>10.2}
       --rs  <rst-step>      #conflicts between restarts    {:>10}
       --srd <stg-rwd-dcy>   Decay rate for staged var reward  {:>10.2}
       --srv <stg-rwd-val>   Extra reward for staged vars      {:>10.2}
@@ -437,8 +425,6 @@ ARGS:
         config.rst_lbd_len,
         config.rst_lbd_slw,
         config.rst_lbd_thr,
-        config.rst_stb_exp,
-        config.rst_stb_scl,
         config.rst_step,
         config.stg_rwd_dcy,
         config.stg_rwd_val,
