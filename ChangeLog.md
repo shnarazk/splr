@@ -2,7 +2,7 @@
 
 - reorganize trait
   - replace {Export, ExportBox} with {PropertyDereference, PropertyReference}
-  - remove: ClauseManipulationIF
+  - remove: ClauseManipulationIF, EliminatorStatIF
   - export: Ema, Ema2, EmaIF, PropertyDereference, PropertyReference
 - reorganize features:
   - add:

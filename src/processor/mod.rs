@@ -102,11 +102,6 @@ pub trait EliminateIF {
     fn eliminated_lits(&self) -> &[Lit];
 }
 
-/// API for getting stats about Eliminator's internal data.
-pub trait EliminatorStatIF {
-    fn stats(&self) -> (usize, usize);
-}
-
 #[derive(Copy, Clone, Eq, Debug, PartialEq)]
 enum EliminatorMode {
     Dormant,
