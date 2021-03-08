@@ -384,7 +384,7 @@ FLAGS:
   -V, --version             Prints version information
 OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m):
       --cbt <c-cbt-thr>     Dec. lvl to use chronoBT       {:>10}
-      --cdr <crw-dcy-rat>   Clause reward decay               {:>10.2}
+      --cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
       --ii <c-ip-int>       #cls to start in-processor     {:>10}
   -t, --timeout <timeout>   CPU time limit in sec.         {:>10}
