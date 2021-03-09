@@ -183,9 +183,7 @@ impl Config {
                 let options_usize = [
                     "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
                 ];
-                let options_f64 = [
-                    "timeout", "cdr", "rat", "rlt",  "srd", "srv", "vdr", "vds",
-                ];
+                let options_f64 = ["timeout", "cdr", "rat", "rlt", "srd", "srv", "vdr", "vds"];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
                 match seg.len() {

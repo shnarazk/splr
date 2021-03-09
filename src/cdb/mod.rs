@@ -150,7 +150,7 @@ pub struct Clause {
     pub search_from: usize,
     /// A dynamic clause evaluation criterion based on the number of references.
     reward: f64,
-    /// the number of conflicts at which this clause was used in [`conflict_analyze`](`crate::solver::conflict::conflict_analyze`)
+    /// the number of conflicts at which this clause was used in `conflict_analyze`
     timestamp: usize,
     /// Flags
     flags: Flag,
