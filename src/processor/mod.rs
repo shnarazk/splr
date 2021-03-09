@@ -28,7 +28,7 @@ mod subsume;
 pub use self::property::*;
 
 use {
-    self::{eliminate::eliminate_var, heap::VarOrderIF},
+    self::eliminate::eliminate_var,
     crate::{
         assign::{self, AssignIF},
         cdb::{self, ClauseDBIF},
@@ -164,6 +164,21 @@ impl LitOccurs {
 pub struct VarOccHeap {
     heap: Vec<VarId>, // order : usize -> VarId
     idxs: Vec<usize>, // VarId : -> order : usize
+}
+
+impl VarOccHeap {
+    pub fn new(n: usize, init: usize) -> Self {
+        let mut heap = Vec::with_capacity(n + 1);
+        let mut idxs = Vec::with_capacity(n + 1);
+        heap.push(0);
+        idxs.push(n);
+        for i in 1..=n {
+            heap.push(i);
+            idxs.push(i);
+        }
+        idxs[0] = init;
+        VarOccHeap { heap, idxs }
+    }
 }
 
 /// Literal eliminator
@@ -339,6 +354,21 @@ impl Instantiate for Eliminator {
             _ => (),
         }
     }
+}
+
+trait VarOrderIF {
+    fn clear<A>(&mut self, asg: &mut A)
+    where
+        A: AssignIF;
+    fn len(&self) -> usize;
+    fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upward: bool);
+    fn is_empty(&self) -> bool;
+    fn select_var<A>(&mut self, occur: &[LitOccurs], asg: &A) -> Option<VarId>
+    where
+        A: AssignIF;
+    fn rebuild<A>(&mut self, asg: &A, occur: &[LitOccurs])
+    where
+        A: AssignIF;
 }
 
 pub mod property {
