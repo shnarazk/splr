@@ -830,11 +830,12 @@ pub enum LogUsizeId {
     RestartStabilize,
 
     //
-    //## pre-in processor
+    //## pre(in)-processor
     //
     Simplify,
     Stabilize,
     ClauseSubsumption,
+    Vivify,
     VivifiedVar,
 
     // the sentinel

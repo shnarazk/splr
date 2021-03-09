@@ -165,7 +165,6 @@ impl Instantiate for ClauseDB {
             activity_anti_decay: 1.0 - config.crw_dcy_rat,
             touched,
             lbd_temp: vec![0; nv + 1],
-
             ..ClauseDB::default()
         }
     }
