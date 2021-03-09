@@ -25,7 +25,7 @@ impl ActivityIF<VarId> for AssignStack {
     fn reward_at_unassign(&mut self, vi: VarId) {
         self.var[vi].update_activity(self.ordinal, self.activity_decay, self.activity_anti_decay);
     }
-    // Note: `update_rewards` should be called befero `restart`
+    // Note: `update_rewards` should be called befere `cancel_until`
     fn update_rewards(&mut self) {
         self.ordinal += 1;
         self.stage_activity *= self.activity_decay;
@@ -43,24 +43,18 @@ impl ActivityIF<VarId> for AssignStack {
         }
         self.activity_anti_decay = 1.0 - self.activity_decay;
     }
-    // fn reward_actives(&mut self) {
-    //     self.ordinal += 1;
-    //     for lit in self.trail[self.len_upto(self.root_level)..].iter() {
-    //         self.var[lit.vi()].update_activity(
-    //             self.ordinal,
-    //             self.activity_decay,
-    //             self.activity_anti_decay,
-    //         );
-    //     }
-    // }
 }
 
 impl Var {
-    // Note: `update_rewards` should be called befero `restart`
-    // Therefore timestamp must be smaller than t anytime.
-    // But conflict_analyze can assert a new var.
-    // So we can't expect v.timestamp < self.num_conflict.
     fn update_activity(&mut self, t: usize, decay: f64, reward: f64) -> f64 {
+        // Note: why the condition can be broken.
+        //
+        // 1. asg.ordinal += 1;
+        // 1. handle_conflict -> cancel_until -> reward_at_unassign
+        // 1. assign_by_implication -> v.timestamp = asg.ordinal
+        // 1. restart
+        // 1. cancel_until -> reward_at_unassign -> assertion failed
+        //
         if self.timestamp < t {
             let rate = self.participated as f64 / (t - self.timestamp) as f64;
             self.reward *= decay;
@@ -69,18 +63,5 @@ impl Var {
             self.timestamp = t;
         }
         self.reward
-    }
-    #[cfg(not(feature = "var_staging"))]
-    pub fn activity(&self, _: f64) -> f64 {
-        self.reward
-    }
-    #[cfg(feature = "var_staging")]
-    pub fn activity(&self, extra: f64) -> f64 {
-        let val = self.reward;
-        if self.is(Flag::STAGED) {
-            val + extra
-        } else {
-            val
-        }
     }
 }

@@ -72,16 +72,11 @@ pub trait ActivityIF<Ix> {
     }
     /// update internal counter.
     fn update_rewards(&mut self);
-
     /// update reward decay.
     fn update_activity_decay(&mut self, _index: Option<usize>) {
         #[cfg(debug)]
         todo!()
     }
-    // fn reward_actives(&mut self) {
-    //     #[cfg(debug)]
-    //     todo!()
-    // }
 }
 
 /// API for object instantiation based on `Configuration` and `CNFDescription`.

@@ -48,14 +48,3 @@ impl ActivityIF<VarId> for AssignStack {
         self.activity_anti_decay = 1.0 - self.activity_decay;
     }
 }
-
-impl Var {
-    pub fn activity(&self, extra: f64) -> f64 {
-        let val = self.reward;
-        if self.is(Flag::STAGED) {
-            val + extra
-        } else {
-            val
-        }
-    }
-}
