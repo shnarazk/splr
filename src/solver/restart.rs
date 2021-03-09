@@ -144,10 +144,8 @@ impl EmaIF for ProgressASG {
         self.ema.get()
     }
     fn trend(&self) -> f64 {
-        // self.ema.trend()
         let nv = self.num_var as f64;
-        // (nv - self.ema.get_slow()) / (nv - self.ema.get())
-        (self.ema.get() - self.ema.get_slow()) / nv
+        (nv - self.ema.get_slow()) / (nv - self.ema.get())
     }
 }
 
