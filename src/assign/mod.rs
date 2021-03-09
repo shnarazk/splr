@@ -18,7 +18,7 @@ pub use self::{propagate::PropagateIF, property::*, select::VarSelectIF, var::Va
 #[cfg(any(feature = "best_phases_tracking", feature = "var_staging"))]
 use std::collections::HashMap;
 use {
-    self::heap::{VarHeapIF, VarOrderIF},
+    self::heap::VarHeapIF,
     super::{cdb::ClauseDBIF, types::*},
     std::{ops::Range, slice::Iter},
 };
@@ -194,6 +194,21 @@ pub struct VarIdHeap {
     /// VarId : -> order : usize -- How good is the var?
     /// `idxs[0]` holds the number of alive elements
     idxs: Vec<usize>,
+}
+
+impl VarIdHeap {
+    pub fn new(n: usize, init: usize) -> Self {
+        let mut heap = Vec::with_capacity(n + 1);
+        let mut idxs = Vec::with_capacity(n + 1);
+        heap.push(0);
+        idxs.push(n);
+        for i in 1..=n {
+            heap.push(i);
+            idxs.push(i);
+        }
+        idxs[0] = init;
+        VarIdHeap { heap, idxs }
+    }
 }
 
 pub mod property {

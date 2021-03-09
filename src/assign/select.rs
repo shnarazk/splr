@@ -2,7 +2,7 @@
 use crate::state::StagingTarget;
 /// Decision var selection
 use {
-    super::{AssignStack, Var, VarHeapIF, VarOrderIF},
+    super::{AssignStack, Var, VarHeapIF},
     crate::types::*,
 };
 
@@ -126,7 +126,7 @@ impl VarSelectIF for AssignStack {
         self.update_heap(v);
     }
     fn rebuild_order(&mut self) {
-        self.var_order.clear();
+        self.clear_heap();
         for vi in 1..self.var.len() {
             if var_assign!(self, vi).is_none() && !self.var[vi].is(Flag::ELIMINATED) {
                 self.insert_heap(vi);

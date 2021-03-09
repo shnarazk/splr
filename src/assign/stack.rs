@@ -2,7 +2,7 @@
 #[cfg(any(feature = "best_phases_tracking", feature = "var_staging"))]
 use std::collections::HashMap;
 use {
-    super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF, VarSelectIF},
+    super::{AssignIF, AssignStack, Var, VarHeapIF, VarIdHeap, VarManipulateIF, VarSelectIF},
     crate::{cdb::ClauseDBIF, solver::SolverEvent, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
@@ -143,9 +143,7 @@ impl Instantiate for AssignStack {
                 self.assign.push(None);
                 self.level.push(DecisionLevel::default());
                 self.reason.push(AssignReason::default());
-                self.var_order.heap.push(0);
-                self.var_order.idxs.push(0);
-                self.var_order.clear();
+                self.expand_heap();
                 self.num_vars += 1;
                 self.var.push(Var::from(self.num_vars));
             }
