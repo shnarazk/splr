@@ -4,6 +4,7 @@
   - replace {Export, ExportBox} with {PropertyDereference, PropertyReference}
   - remove: ClauseManipulationIF, EliminatorStatIF
   - export: Ema, Ema2, EmaIF, PropertyDereference, PropertyReference
+  - make private: assign::VarOrderIF, processor::VarOrderIF
 - reorganize features:
   - add:
     - best_phases_tracking
