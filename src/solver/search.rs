@@ -242,13 +242,15 @@ fn search(
             asg.update_rewards();
             cdb.update_rewards();
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
-            rst.update(ProgressUpdate::Remain(asg.num_unasserted()));
-            if let Some(decision) = rst.restart() {
+            rst.update(ProgressUpdate::Remain(
+                asg.derefer(assign::property::Tusize::NumUnassertedVar),
+            ));
+            if rst.restart() == Some(RestartDecision::Force) {
                 if let Some(new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);
                     let span_len = rst.derefer(restart::property::Tusize::SpanLen);
                     let num_cycle = rst.derefer(restart::property::Tusize::NumCycle);
-                    let num_unreachable = asg.num_unreachables();
+                    let num_unreachable = asg.derefer(assign::property::Tusize::NumUnreachableVar);
                     asg.update_activity_decay(if new_cycle { None } else { Some(span_len) });
 
                     #[cfg(feature = "var_staging")]
@@ -291,7 +293,7 @@ fn search(
                         state.progress(asg, cdb, elim, rst);
                         next_progress = asg.num_conflict + 10_000;
                     }
-                } else if RestartDecision::Force == decision {
+                } else {
                     RESTART!(asg, rst);
                 }
             }
@@ -312,8 +314,9 @@ fn search(
                 }
             }
             if asg.num_conflict % state.reflection_interval == 0 {
-                // println!("var:{:>10.4}, cls:{:>10.4}", asg.average_activity(), cdb.average_activity());
+                #[cfg(feature = "strategy_adaptation")]
                 adapt_modules(asg, rst, state);
+
                 if let Some(p) = state.elapsed() {
                     if 1.0 <= p {
                         return Err(SolverError::TimeOut);
@@ -331,27 +334,21 @@ fn search(
     }
 }
 
+#[cfg(feature = "strategy_adaptation")]
 fn adapt_modules(asg: &mut AssignStack, rst: &mut Restarter, state: &mut State) {
     let asg_num_conflict = asg.num_conflict;
     if 10 * state.reflection_interval == asg_num_conflict {
         // Need to call it before `cdb.adapt_to`
         // 'decision_level == 0' is required by `cdb.adapt_to`.
         RESTART!(asg, rst);
-
-        #[cfg(feature = "strategy_adaptation")]
-        {
-            state.select_strategy(asg, cdb);
-        }
+        state.select_strategy(asg, cdb);
     }
-    #[cfg(feature = "strategy_adaptation")]
-    {
-        #[cfg(feature = "boundary_check")]
-        debug_assert!(state.strategy.1 != asg_num_conflict || 0 == asg.decision_level());
+    #[cfg(feature = "boundary_check")]
+    debug_assert!(state.strategy.1 != asg_num_conflict || 0 == asg.decision_level());
 
-        asg.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
-        cdb.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
-        rst.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
-    }
+    asg.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
+    cdb.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
+    rst.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
 }
 
 fn analyze_final(asg: &mut AssignStack, state: &mut State, c: &Clause) {
