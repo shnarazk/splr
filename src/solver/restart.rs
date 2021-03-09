@@ -368,7 +368,6 @@ pub struct Restarter {
     restart_step: usize,
     restart_waiting: usize,
     initial_restart_step: usize,
-    stb_expansion_factor: f64,
 
     //
     //## statistics
@@ -390,7 +389,6 @@ impl Default for Restarter {
             restart_step: 0,
             restart_waiting: 0,
             initial_restart_step: 0,
-            stb_expansion_factor: 1.0,
 
             num_block: 0,
             num_restart: 0,
@@ -409,7 +407,6 @@ impl Instantiate for Restarter {
             stb: GeometricStabilizer::instantiate(config, cnf),
             restart_step: config.rst_step,
             initial_restart_step: config.rst_step,
-            stb_expansion_factor: config.rst_stb_exp,
 
             ..Restarter::default()
         }
