@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/splr/0.6.4")]
+#![doc(html_root_url = "https://docs.rs/splr/0.7.0")]
 /*!
 # A modern CDCL SAT solver in Rust
 
