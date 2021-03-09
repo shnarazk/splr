@@ -711,7 +711,7 @@ impl Eliminator {
             return Ok(());
         }
         let mut timedout: usize = {
-            let nv = asg.num_unasserted() as f64;
+            let nv = asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64;
             let nc = cdb.count() as f64;
             (6.0 * nv.log(1.5) * nc) as usize
         };

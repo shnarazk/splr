@@ -227,6 +227,7 @@ pub mod property {
         NumVar,
         NumAssertedVar,
         NumEliminatedVar,
+        /// the number of vars in `the unreachable core'
         NumUnassertedVar,
         NumUnreachableVar,
     }
@@ -242,8 +243,10 @@ pub mod property {
                 Tusize::NumVar => self.num_vars,
                 Tusize::NumAssertedVar => self.num_asserted_vars,
                 Tusize::NumEliminatedVar => self.num_eliminated_vars,
-                Tusize::NumUnassertedVar => self.num_unasserted(),
-                Tusize::NumUnreachableVar => self.num_unreachables(),
+                Tusize::NumUnassertedVar => {
+                    self.num_vars - self.num_eliminated_vars - self.num_asserted_vars
+                }
+                Tusize::NumUnreachableVar => self.num_vars - self.num_best_assign,
             }
         }
     }

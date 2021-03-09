@@ -106,10 +106,6 @@ pub trait VarManipulateIF {
     fn var_iter_mut(&mut self) -> IterMut<'_, Var>;
     /// eliminate a var.
     fn set_eliminated(&mut self, vi: VarId);
-    /// return the number of unasserted (un-fixed) vars.
-    fn num_unasserted(&self) -> usize;
-    /// return the number of vars in `the unreachable core'.
-    fn num_unreachables(&self) -> usize;
 }
 
 impl VarManipulateIF for AssignStack {
@@ -155,13 +151,5 @@ impl VarManipulateIF for AssignStack {
             #[cfg(feature = "boundary_check")]
             panic!("double elimination");
         }
-    }
-    #[inline]
-    fn num_unasserted(&self) -> usize {
-        self.num_vars - self.num_eliminated_vars - self.num_asserted_vars
-    }
-    #[inline]
-    fn num_unreachables(&self) -> usize {
-        self.num_vars - self.num_best_assign
     }
 }
