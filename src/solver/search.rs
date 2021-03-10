@@ -215,8 +215,6 @@ fn search(
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
 
-    rst.update(ProgressUpdate::Remain(asg.num_vars - asg.num_asserted_vars));
-
     loop {
         let ci = asg.propagate(cdb);
         if ci.is_none() {
@@ -232,7 +230,9 @@ fn search(
             //## CONFLICT
             //
             if 0 < state.last_asg {
-                rst.update(ProgressUpdate::ASG(state.last_asg));
+                rst.update(ProgressUpdate::ASG(
+                    asg.derefer(assign::property::Tusize::NumUnreachableVar),
+                ));
                 state.last_asg = 0;
             }
             if asg.decision_level() == asg.root_level {
@@ -242,9 +242,6 @@ fn search(
             asg.update_rewards();
             cdb.update_rewards();
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
-            rst.update(ProgressUpdate::Remain(
-                asg.derefer(assign::property::Tusize::NumUnassertedVar),
-            ));
             if rst.restart() == Some(RestartDecision::Force) {
                 if let Some(new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);

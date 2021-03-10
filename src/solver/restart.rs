@@ -75,8 +75,6 @@ pub enum ProgressUpdate {
 
     #[cfg(feature = "Luby_restart")]
     Luby,
-
-    Remain(usize),
 }
 
 /// Restart modes
@@ -110,7 +108,6 @@ struct ProgressASG {
     /// For block restart based on average assignments: 1.40.
     /// This is called `R` in Glucose
     threshold: f64,
-    num_var: usize,
 }
 
 impl Default for ProgressASG {
@@ -119,17 +116,15 @@ impl Default for ProgressASG {
             enable: true,
             ema: Ema2::new(1),
             threshold: 1.4,
-            num_var: 1,
         }
     }
 }
 
 impl Instantiate for ProgressASG {
-    fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
+    fn instantiate(config: &Config, _cnf: &CNFDescription) -> Self {
         ProgressASG {
             ema: Ema2::new(config.rst_asg_len).with_slow(config.rst_asg_slw),
             threshold: config.rst_asg_thr,
-            num_var: cnf.num_of_variables,
             ..ProgressASG::default()
         }
     }
@@ -144,14 +139,13 @@ impl EmaIF for ProgressASG {
         self.ema.get()
     }
     fn trend(&self) -> f64 {
-        let nv = self.num_var as f64;
-        (nv - self.ema.get_slow()) / (nv - self.ema.get())
+        self.ema.trend()
     }
 }
 
 impl ProgressEvaluator for ProgressASG {
     fn is_active(&self) -> bool {
-        self.enable && self.threshold < self.trend()
+        self.enable && self.trend() < self.threshold
     }
     fn shift(&mut self) {}
 }
@@ -532,10 +526,6 @@ impl RestartIF for Restarter {
 
             #[cfg(feature = "Luby_restart")]
             ProgressUpdate::Luby => self.luby.update(0),
-
-            ProgressUpdate::Remain(val) => {
-                self.asg.num_var = val;
-            }
         }
     }
 }

@@ -142,7 +142,7 @@ impl Default for Config {
             rst_step: 24,
             rst_asg_len: 24,
             rst_asg_slw: 8192,
-            rst_asg_thr: 1.20,
+            rst_asg_thr: 0.70,
             rst_lbd_len: 24,
             rst_lbd_slw: 8192,
             rst_lbd_thr: 1.20,
@@ -153,7 +153,7 @@ impl Default for Config {
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_rat: 0.98,
             #[cfg(feature = "LR_rewarding")]
-            vrw_dcy_rat: 0.92,
+            vrw_dcy_rat: 0.94,
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_stp: 0.0001,
             #[cfg(feature = "LR_rewarding")]
