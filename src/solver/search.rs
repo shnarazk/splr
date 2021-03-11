@@ -310,7 +310,7 @@ fn search(
                     best_asserted = na;
                 }
             }
-            if asg.num_conflict % state.reflection_interval == 0 {
+            if asg.num_conflict % (10 * state.reflection_interval) == 0 {
                 #[cfg(feature = "strategy_adaptation")]
                 adapt_modules(asg, rst, state);
 
