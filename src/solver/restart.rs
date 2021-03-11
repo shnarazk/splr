@@ -326,7 +326,7 @@ struct GeometricStabilizer {
     num_stage: usize,
     next_trigger: usize,
     reset_requested: bool,
-    step: usize,
+    span: usize,
 }
 
 impl Default for GeometricStabilizer {
@@ -343,7 +343,7 @@ impl Default for GeometricStabilizer {
             num_stage: 0,
             next_trigger: 1,
             reset_requested: false,
-            step: 1,
+            span: 1,
         }
     }
 }
@@ -362,13 +362,13 @@ impl fmt::Display for GeometricStabilizer {
             write!(
                 f,
                 "Stabilizer[step: {}, next:{}, on]",
-                self.step, self.next_trigger
+                self.span, self.next_trigger
             )
         } else {
             write!(
                 f,
                 "Stabilizer[step: {}, next:{}, off]",
-                self.step, self.next_trigger
+                self.span, self.next_trigger
             )
         }
     }
@@ -379,20 +379,20 @@ impl GeometricStabilizer {
         if self.enable && self.next_trigger <= now {
             self.num_stage += 1;
             let mut new_cycle: bool = false;
-            if self.longest_span < self.step {
+            if self.longest_span < self.span {
                 new_cycle = true;
                 self.num_cycle += 1;
-                self.longest_span = self.step;
+                self.longest_span = self.span;
                 if self.reset_requested {
                     self.luby.reset();
                     self.longest_span = 1;
-                    self.step = self.luby.next();
+                    self.span = self.luby.next();
                     self.reset_requested = false;
                     self.next_trigger = now;
                 }
             }
-            self.step = self.luby.next();
-            self.next_trigger = now + self.longest_span / self.step;
+            self.span = self.luby.next();
+            self.next_trigger = now + self.longest_span / self.span;
             return Some(new_cycle);
         }
         None
@@ -459,7 +459,7 @@ impl Instantiate for Restarter {
         match e {
             SolverEvent::Assert(_) => {
                 self.stb.reset_requested = true;
-                self.restart_waiting = self.stb.step;
+                self.restart_waiting = self.stb.span;
             }
             SolverEvent::Restart => {
                 self.after_restart = 0;
@@ -485,6 +485,7 @@ impl RestartIF for Restarter {
             self.luby.shift();
             return Some(RestartDecision::Force);
         }
+
         if self.after_restart < self.restart_step {
             return None;
         }
@@ -493,11 +494,13 @@ impl RestartIF for Restarter {
             self.num_block += 1;
             self.restart_waiting = 0;
             self.after_restart = 0;
+            self.restart_step = self.initial_restart_step * self.stb.span;
             return Some(RestartDecision::Block);
         }
+        self.restart_step = self.initial_restart_step;
         if self.lbd.is_active() {
             self.restart_waiting += 1;
-            if self.stb.step <= self.restart_waiting {
+            if self.stb.span <= self.restart_waiting {
                 self.restart_waiting = 0;
                 return Some(RestartDecision::Force);
             }
@@ -552,7 +555,7 @@ pub mod property {
                 Tusize::NumCycle => self.stb.num_cycle,
                 Tusize::NumRestart => self.num_restart,
                 Tusize::NumStage => self.stb.num_stage,
-                Tusize::SpanLen => self.stb.step,
+                Tusize::SpanLen => self.stb.span,
                 Tusize::LongestSpan => self.stb.longest_span,
             }
         }

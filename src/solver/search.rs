@@ -231,7 +231,7 @@ fn search(
             //
             if 0 < state.last_asg {
                 rst.update(ProgressUpdate::ASG(
-                    asg.derefer(assign::property::Tusize::NumUnreachableVar),
+                    asg.derefer(assign::property::Tusize::NumUnassignedVar),
                 ));
                 state.last_asg = 0;
             }

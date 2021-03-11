@@ -229,6 +229,7 @@ pub mod property {
         NumEliminatedVar,
         /// the number of vars in `the unreachable core'
         NumUnassertedVar,
+        NumUnassignedVar,
         NumUnreachableVar,
     }
 
@@ -245,6 +246,9 @@ pub mod property {
                 Tusize::NumEliminatedVar => self.num_eliminated_vars,
                 Tusize::NumUnassertedVar => {
                     self.num_vars - self.num_eliminated_vars - self.num_asserted_vars
+                }
+                Tusize::NumUnassignedVar => {
+                    self.num_vars - self.num_eliminated_vars - self.trail.len()
                 }
                 Tusize::NumUnreachableVar => self.num_vars - self.num_best_assign,
             }
