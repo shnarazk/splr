@@ -142,10 +142,10 @@ impl Default for Config {
             rst_step: 24,
             rst_asg_len: 24,
             rst_asg_slw: 8192,
-            rst_asg_thr: 0.50,
+            rst_asg_thr: 0.8,
             rst_lbd_len: 24,
             rst_lbd_slw: 8192,
-            rst_lbd_thr: 1.15,
+            rst_lbd_thr: 1.25,
 
             stg_rwd_dcy: 0.5,
             stg_rwd_val: 1.0,
