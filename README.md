@@ -313,6 +313,62 @@ ARGS:
   <cnf-file>    DIMACS CNF file
 ```
 
+## Solver description
+
+Splr-0.7.0 adopts the following feature by default:
+
+  - Learning-rate based var rewarding and clause rewarding
+  - Reason-side var rewarding
+  - dynamic restart blocking based on the number of remaining vars
+  - dynamic restart based on average LBDs of learnt clauses
+  - clause elimination and subsumption as pre-processor and in-processor
+  - stabilization based on Luby series, or LubyStabilization
+
+Among them, the unique feature is LubyStabilization. Let me explain it.
+
+To make special periods with very low restart rate, known as 'stabilization mode,' Splr changes
+the number of restart trigger to execute restart.
+Usually SAT solvers execute 'restart' when the average LBD of learnt clauses getting higher.
+Splr requires that the condition holds by *N* times, where N is a value in the Luby series, and is changed during problem-solving. 
+And, to avoid rapid parameters changes, Splr also introduces *stages* that share the same N. The length of stage is also controlled by Luby series as figured.
+Here are the relations of values.
+
+- 'cycle' is a segment of stages, which is separated by highest Luby values.
+- trigger_level *N* of stage *n* = Luby(*n*)
+- length_of_stage *n* = max(Luby[*1*, *n*]) / *n*
+
+
+| index *n* | Luby | cycle | stage | *N* | max *N* | stage len | restart cond. | restart |
+|----------:|-----:|------:|------:|----:|--------:|----------:|:-------------:|:-------:|
+|         1 |    1 |     1 |     1 |   1 |       1 |         1 |             1 |       1 |
+|         2 |    1 |     1 |     2 |   1 |       1 |         1 |             2 |       2 |
+|         3 |    2 |     2 |     3 |   2 |       2 |         1 |           3-4 |     3-4 |
+|         4 |    1 |     3 |     4 |   1 |       2 |         2 |           5-6 |       5 |
+|         5 |    1 |     3 |     5 |   1 |       2 |         2 |           7-8 |       6 |
+|         6 |    2 |     3 |     6 |   2 |       2 |         1 |          9-10 |     7-8 |
+|         7 |    4 |     3 |     7 |   4 |       4 |         1 |         11-14 |    9-12 |
+|         8 |    1 |     4 |     8 |   1 |       4 |         4 |         15-18 |      13 |
+|         9 |    1 |     4 |     9 |   1 |       4 |         4 |         19-22 |   14-15 |
+|         10|    2 |     4 |    10 |   2 |       4 |         2 |         23-26 |      16 |
+|         11|    1 |     4 |    11 |   1 |       4 |         4 |         27-30 |      17 |
+|         12|    1 |     4 |    12 |   1 |       4 |         4 |         31-34 |      18 |
+|         13|    2 |     4 |    13 |   2 |       4 |         2 |         35-38 |      20 |
+|         14|    4 |     4 |    14 |   4 |       4 |         1 |         39-42 |   21-24 |
+|         15|    8 |     4 |    15 |   8 |       8 |         1 |         43-50 |   25-32 |
+|         16|    1 |     5 |    16 |   1 |       8 |         8 |         51-58 |      33 |
+|         17|    1 |     5 |    17 |   1 |       8 |         8 |         59-66 |      34 |
+|         18|    2 |     5 |    18 |   2 |       8 |         4 |         67-74 |   35-36 |
+|         19|    1 |     5 |    19 |   1 |       8 |         8 |         75-82 |      37 |
+|         20|    1 |     5 |    20 |   1 |       8 |         8 |         83-90 |      38 |
+|         21|    2 |     5 |    21 |   2 |       8 |         4 |         91-98 |   39-40 |
+|         22|    4 |     5 |    22 |   4 |       8 |         2 |        99-106 |   41-44 |
+|         23|    1 |     5 |    23 |   1 |       8 |         8 |       107-114 |      45 |
+|         24|    1 |     5 |    24 |   1 |       8 |         8 |       115-122 |      46 |
+|         25|    2 |     5 |    25 |   2 |       8 |         4 |       123-130 |   47-48 |
+|         26|    1 |     5 |    26 |   1 |       8 |         8 |       131-138 |      49 |
+
+You can see the effects of LubyStabilization with the value of 'trgr', 'peak' and '/cpr'
+
 ## License
 
 This Source Code Form is subject to the terms of the Mozilla Public
