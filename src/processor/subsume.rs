@@ -4,39 +4,43 @@ use {
     crate::{assign::AssignIF, cdb::ClauseDBIF, types::*},
 };
 
-pub fn try_subsume<A, C>(
-    asg: &mut A,
-    cdb: &mut C,
-    elim: &mut Eliminator,
-    cid: ClauseId,
-    did: ClauseId,
-) -> MaybeInconsistent
-where
-    A: AssignIF,
-    C: ClauseDBIF,
-{
-    match subsume(cdb, cid, did) {
-        Some(NULL_LIT) => {
-            #[cfg(feature = "trace_elimination")]
-            println!(
-                "BackSubsC    => {} {} subsumed completely by {} {:#}",
-                did, cdb[did], cid, cdb[cid],
-            );
-            cdb.detach(did);
-            elim.remove_cid_occur(asg, did, &mut cdb[did]);
-            if !cdb[did].is(Flag::LEARNT) {
-                cdb[cid].turn_off(Flag::LEARNT);
+impl Eliminator {
+    pub fn try_subsume<A, C>(
+        &mut self,
+        asg: &mut A,
+        cdb: &mut C,
+        cid: ClauseId,
+        did: ClauseId,
+    ) -> MaybeInconsistent
+    where
+        A: AssignIF,
+        C: ClauseDBIF,
+    {
+        match subsume(cdb, cid, did) {
+            Some(NULL_LIT) => {
+                #[cfg(feature = "trace_elimination")]
+                println!(
+                    "BackSubsC    => {} {} subsumed completely by {} {:#}",
+                    did, cdb[did], cid, cdb[cid],
+                );
+                cdb.detach(did);
+                self.remove_cid_occur(asg, did, &mut cdb[did]);
+                if !cdb[did].is(Flag::LEARNT) {
+                    cdb[cid].turn_off(Flag::LEARNT);
+                }
+                self.num_subsumed += 1;
             }
+            // To avoid making a big clause, we have to add a condition for combining them.
+            Some(l) if cid.is_lifted_lit() => {
+                #[cfg(feature = "trace_elimination")]
+                println!("BackSubC subsumes {} from {} and {}", l, cid, did);
+                strengthen_clause(asg, cdb, self, did, !l)?;
+                self.enqueue_var(asg, l.vi(), true);
+            }
+            _ => {}
         }
-        Some(l) => {
-            #[cfg(feature = "trace_elimination")]
-            println!("BackSubC subsumes {} from {} and {}", l, cid, did,);
-            strengthen_clause(asg, cdb, elim, did, !l)?;
-            elim.enqueue_var(asg, l.vi(), true);
-        }
-        None => {}
+        Ok(())
     }
-    Ok(())
 }
 
 /// returns a literal if these clauses can be merged by the literal.

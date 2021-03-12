@@ -4,7 +4,6 @@ use {
         cdb::CertifiedRecord,
         solver::*,
         state::{LogF64Id, LogUsizeId},
-        types::Export,
         Config, SolverError, VERSION,
     },
     std::{
@@ -54,7 +53,7 @@ fn main() {
     let ans_file: Option<PathBuf> = match config.io_rfile.to_string_lossy().as_ref() {
         "-" => None,
         "" => Some(config.io_odir.join(PathBuf::from(format!(
-            ".ans_{}",
+            "ans_{}",
             config.cnf_file.file_name().unwrap().to_string_lossy(),
         )))),
         _ => Some(config.io_odir.join(&config.io_rfile)),
@@ -258,7 +257,14 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     out.write_all(
         format!(
             "c {:<43}, #var:{:9}, #cls:{:9}\n",
-            state.target.pathname, state.target.num_of_variables, state.target.num_of_clauses,
+            state
+                .config
+                .cnf_file
+                .file_name()
+                .map_or(Cow::from("file with strange chars"), |f| f
+                    .to_string_lossy()),
+            state.target.num_of_variables,
+            state.target.num_of_clauses,
         )
         .as_bytes(),
     )?;
@@ -293,25 +299,20 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c  {}|#BLK:{}, #RST:{}, #ion:{}, Lcyc:{},\n",
-            if s.rst.mode().0 == RestartMode::Luby {
-                "LubyRestart"
-            } else {
-                "    Restart"
-            },
+            "c      Restart|#BLK:{}, #RST:{}, trgr:{}, peak:{},\n",
             format!("{:>9}", state[LogUsizeId::RestartBlock]),
             format!("{:>9}", state[LogUsizeId::Restart]),
-            format!("{:>9}", state[LogUsizeId::NumIon]),
-            format!("{:>9}", state[LogUsizeId::LubyCycle]),
+            format!("{:>9}", state[LogUsizeId::RestartTriggerLevel]),
+            format!("{:>9}", state[LogUsizeId::RestartTriggerLevelMax]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c          EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{},\n",
+            "c          LBD|avrg:{}, trnd:{}, depG:{}, /dpc:{},\n",
+            format!("{:>9.4}", state[LogF64Id::EmaLBD]),
             format!("{:>9.4}", state[LogF64Id::TrendLBD]),
-            format!("{:>9.4}", state[LogF64Id::TrendASG]),
-            format!("{:>9.4}", state[LogUsizeId::UnreachableCore]),
+            format!("{:>9.4}", state[LogF64Id::DpAverageLBD]),
             format!("{:>9.2}", state[LogF64Id::DecisionPerConflict]),
         )
         .as_bytes(),
@@ -319,8 +320,8 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
 
     out.write_all(
         format!(
-            "c     Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{},\n",
-            format!("{:>9.2}", state[LogF64Id::EmaLBD]),
+            "c     Conflict|tASG:{}, cLvl:{}, bLvl:{}, /ppc:{},\n",
+            format!("{:>9.4}", state[LogF64Id::TrendASG]),
             format!("{:>9.2}", state[LogF64Id::CLevel]),
             format!("{:>9.2}", state[LogF64Id::BLevel]),
             format!("{:>9.2}", state[LogF64Id::PropagationPerConflict]),
@@ -329,10 +330,10 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c         misc|elim:{}, cviv:{}, #vbv:{}, /cpr:{},\n",
+            "c         misc|elim:{}, #sub:{}, core:{}, /cpr:{},\n",
             format!("{:>9}", state[LogUsizeId::Simplify]),
-            format!("{:>9}", state[LogUsizeId::Vivify]),
-            format!("{:>9}", state[LogUsizeId::VivifiedVar]),
+            format!("{:>9}", state[LogUsizeId::ClauseSubsumption]),
+            format!("{:>9}", state[LogUsizeId::UnreachableCore]),
             format!("{:>9.2}", state[LogF64Id::ConflictPerRestart]),
         )
         .as_bytes(),

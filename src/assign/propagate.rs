@@ -1,7 +1,7 @@
 /// implement boolean constraint propagation, backjump
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{AssignIF, AssignStack, VarHeapIF, VarSelectIF},
+    super::{AssignIF, AssignStack, VarHeapIF},
     crate::{
         cdb::{ClauseDBIF, WatchDBIF},
         types::*,
@@ -67,10 +67,6 @@ macro_rules! set_assign {
             l => unsafe {
                 let vi = l.vi();
                 *$asg.assign.get_unchecked_mut(vi) = Some(bool::from(l));
-                #[cfg(feature = "explore_timestamp")]
-                {
-                    $asg.var.get_unchecked_mut(vi).assign_timestamp = $asg.num_conflict;
-                }
             },
         }
     };
@@ -97,14 +93,14 @@ impl PropagateIF for AssignStack {
                 self.reason[vi] = AssignReason::None;
                 debug_assert!(!self.trail.contains(&!l));
                 self.trail.push(l);
-                //self.make_var_asserted(vi);
+                self.make_var_asserted(vi);
                 Ok(())
             }
             Some(x) if x == bool::from(l) => {
                 // Vivification tries to assign a var by propagation then can assert it.
                 // To make sure the var is asserted, we need to nullify its reason.
                 self.reason[vi] = AssignReason::None;
-                //self.make_var_asserted(vi);
+                // self.make_var_asserted(vi);
                 Ok(())
             }
             _ => Err(SolverError::Inconsistent),
@@ -116,18 +112,25 @@ impl PropagateIF for AssignStack {
         // The following doesn't hold anymore by using chronoBT.
         // assert!(self.trail_lim.is_empty() || !cid.is_none());
         let vi = l.vi();
-        self.level[vi] = lv;
-        let v = &mut self.var[vi];
-        debug_assert!(!v.is(Flag::ELIMINATED));
+        #[cfg(feature = "best_phases_reuse")]
+        let decided = self.root_level < self.level[vi]
+            && self.reason[vi] == AssignReason::None
+            && matches!(self.best_phases.get(&vi), Some((_, AssignReason::None)));
+        debug_assert!(!self.var[vi].is(Flag::ELIMINATED));
         debug_assert!(
             var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
         );
         set_assign!(self, l);
+        self.level[vi] = lv;
         self.reason[vi] = reason;
         self.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
+        #[cfg(feature = "best_phases_reuse")]
+        if decided {
+            self.check_best_phase(vi);
+        }
     }
     fn assign_by_decision(&mut self, l: Lit) {
         debug_assert!(l.vi() < self.var.len());
@@ -203,7 +206,6 @@ impl PropagateIF for AssignStack {
             let l = self.trail[i];
             let vi = l.vi();
             let v = &mut self.var[vi];
-            v.participated = 0;
             v.set(Flag::PHASE, var_assign!(self, vi).unwrap());
             unset_assign!(self, vi);
             self.reason[vi] = AssignReason::default();
@@ -247,15 +249,17 @@ impl PropagateIF for AssignStack {
                     match lit_assign!(self, w.blocker) {
                         Some(true) => (),
                         Some(false) => {
-                            self.last_conflict = false_lit.vi();
                             self.num_conflict += 1;
+                            self.dpc_ema.update(self.num_decision);
+                            self.ppc_ema.update(self.num_propagation);
                             return w.c;
                         }
                         None => {
+                            // self.reward_at_propagation(false_lit.vi());
                             self.assign_by_implication(
                                 w.blocker,
                                 AssignReason::Implication(w.c, false_lit),
-                                self.level[false_lit.vi()],
+                                *self.level.get_unchecked(false_lit.vi()),
                             );
                         }
                     }
@@ -279,9 +283,9 @@ impl PropagateIF for AssignStack {
                         ..
                     } = cdb[w.c];
                     debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
-                    let mut first = lits[0];
+                    let mut first = *lits.get_unchecked_mut(0);
                     if first == false_lit {
-                        first = lits[1];
+                        first = *lits.get_unchecked(1);
                         lits.swap(0, 1);
                     }
                     let first_value = lit_assign!(self, first);
@@ -296,14 +300,15 @@ impl PropagateIF for AssignStack {
                     assert!(*search_from < lits.len());
                     let len = lits.len();
                     for k in (*search_from..len).chain(2..*search_from) {
-                        let lk = &lits[k];
+                        let lk = lits.get_unchecked(k);
                         if lit_assign!(self, *lk) != Some(false) {
                             n -= 1;
                             let mut w = source.detach(n);
                             w.blocker = first;
-                            (*watcher)[usize::from(!*lk)].register(w);
+                            (*watcher).get_unchecked_mut(usize::from(!*lk)).register(w);
                             lits.swap(1, k);
-                            // If `search_from` gets out of range, the next loop will ignore it safely;
+                            // If `search_from` gets out of range,
+                            // the next loop will ignore it safely;
                             // the first iteration loop becomes null.
                             *search_from = k + 1;
                             continue 'next_clause;
@@ -312,7 +317,6 @@ impl PropagateIF for AssignStack {
 
                     if first_value == Some(false) {
                         let cid = w.c;
-                        self.last_conflict = false_lit.vi();
                         self.num_conflict += 1;
                         self.dpc_ema.update(self.num_decision);
                         self.ppc_ema.update(self.num_propagation);
@@ -323,6 +327,7 @@ impl PropagateIF for AssignStack {
                         .map(|l| self.level[l.vi()])
                         .max()
                         .unwrap_or(0);
+                    // self.reward_at_propagation(false_lit.vi());
                     self.assign_by_implication(first, AssignReason::Implication(w.c, NULL_LIT), lv);
                 }
             }
@@ -337,15 +342,59 @@ impl PropagateIF for AssignStack {
 }
 
 impl AssignStack {
+    /// check usability of the saved best phase.
+    /// return `true` if the current best phase got invalid.
+    #[cfg(not(feature = "best_phases_tracking"))]
+    pub fn check_best_phase(&mut self, _: VarId) -> bool {
+        false
+    }
+    #[cfg(feature = "best_phases_tracking")]
+    pub fn check_best_phase(&mut self, vi: VarId) -> bool {
+        #[cfg(feature = "var_staging")]
+        {
+            if self.staged_vars.get(&vi).is_some() {
+                self.staged_vars.remove(&vi);
+            }
+        }
+        if let Some((b, _)) = self.best_phases.get(&vi) {
+            debug_assert!(self.assign[vi].is_some());
+            if self.assign[vi] != Some(*b) {
+                let lvl = self.level[vi];
+                if self.root_level == self.level[vi] {
+                    self.best_phases.clear();
+                    self.num_best_assign = self.num_eliminated_vars;
+                    // self.stage_activity = 0.0;
+                } else {
+                    let AssignStack {
+                        ref mut best_phases,
+                        ref level,
+                        ..
+                    } = self;
+                    best_phases.retain(|vj, _| level[*vj] < lvl);
+                    self.num_best_assign = self.num_eliminated_vars + self.best_phases.len();
+                }
+                return true;
+            }
+        }
+        false
+    }
     fn level_up(&mut self) {
         self.trail_lim.push(self.trail.len());
     }
+    /// make a var asserted.
+    pub fn make_var_asserted(&mut self, vi: VarId) {
+        self.num_asserted_vars += 1;
+        self.set_activity(vi, 0.0);
+        self.remove_from_heap(vi);
+        self.check_best_phase(vi);
+    }
     /// save the current assignments as the best phases
     fn save_best_phases(&mut self) {
+        #[cfg(feature = "best_phases_reuse")]
         for l in self.trail.iter().skip(self.len_upto(0)) {
             let vi = l.vi();
             if let Some(b) = self.assign[vi] {
-                self.best_phases.insert(vi, b);
+                self.best_phases.insert(vi, (b, self.reason[vi]));
             }
         }
         self.build_best_at = self.num_propagation;

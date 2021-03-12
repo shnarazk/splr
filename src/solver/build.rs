@@ -286,6 +286,7 @@ impl Solver {
             _ => {
                 let cid = cdb.new_clause(asg, lits, false, false);
                 elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
+                cdb[cid].rank = 1;
                 Some(cid)
             }
         }

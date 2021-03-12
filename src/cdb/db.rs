@@ -1,97 +1,13 @@
 #[cfg(feature = "strategy_adaptation")]
 use crate::state::SearchStrategy;
 use {
-    super::{CertifiedRecord, Clause, ClauseDB, ClauseId, WatchDBIF},
+    super::{CertifiedRecord, Clause, ClauseDB, ClauseDBIF, ClauseId, WatchDBIF},
     crate::{assign::AssignIF, solver::SolverEvent, types::*},
     std::{
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::{Iter, IterMut},
     },
 };
-
-/// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`watcher_list`](`crate::cdb::ClauseDBIF::watcher_list`), and so on.
-pub trait ClauseDBIF: ActivityIF<ClauseId> + IndexMut<ClauseId, Output = Clause> {
-    /// return the length of `clause`.
-    fn len(&self) -> usize;
-    /// return true if it's empty.
-    fn is_empty(&self) -> bool;
-    /// return an iterator.
-    fn iter(&self) -> Iter<'_, Clause>;
-    /// return a mutable iterator.
-    fn iter_mut(&mut self) -> IterMut<'_, Clause>;
-    /// return the list of bin_watch lists
-    fn bin_watcher_lists(&self) -> &[Vec<Watch>];
-    /// return a watcher list
-    fn watcher_list(&self, l: Lit) -> &[Watch];
-    /// return the list of watch lists
-    fn watcher_lists_mut(&mut self) -> &mut [Vec<Watch>];
-    /// un-register a clause `cid` from clause database and make the clause dead.
-    fn detach(&mut self, cid: ClauseId);
-    /// check a condition to reduce.
-    /// * return `true` if reduction is done.
-    /// * Otherwise return `false`.
-    ///
-    /// # CAVEAT
-    /// *precondition*: decision level == 0.
-    fn reduce<A>(&mut self, asg: &mut A, nc: usize) -> bool
-    where
-        A: AssignIF;
-    fn reset(&mut self);
-    /// delete *dead* clauses from database, which are made by:
-    /// * `reduce`
-    /// * `simplify`
-    /// * `kill`
-    fn garbage_collect(&mut self);
-    /// return `true` if a literal pair `(l0, l1)` is registered.
-    fn registered_bin_clause(&self, l0: Lit, l1: Lit) -> bool;
-    /// allocate a new clause and return its id.
-    /// * If `level_sort` is on, register `v` as a learnt after sorting based on assign level.
-    /// * Otherwise, register `v` as a permanent clause, which rank is zero.
-    fn new_clause<A>(
-        &mut self,
-        asg: &mut A,
-        v: &mut Vec<Lit>,
-        learnt: bool,
-        level_sort: bool,
-    ) -> ClauseId
-    where
-        A: AssignIF;
-    /// update LBD then convert a learnt clause to permanent if needed.
-    fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
-    where
-        A: AssignIF;
-    /// return the number of alive clauses in the database.
-    fn count(&self) -> usize;
-    /// return the number of clauses which satisfy given flags and aren't DEAD.
-    fn countf(&self, mask: Flag) -> usize;
-    /// record a clause to unsat certification.
-    fn certificate_add(&mut self, vec: &[Lit]);
-    /// record a deleted clause to unsat certification.
-    fn certificate_delete(&mut self, vec: &[Lit]);
-    /// flag positive and negative literals of a var as dirty
-    fn touch_var(&mut self, vi: VarId);
-    /// check the number of clauses
-    /// * `Err(SolverError::OutOfMemory)` -- the db size is over the limit.
-    /// * `Ok(true)` -- enough small
-    /// * `Ok(false)` -- close to the limit
-    fn check_size(&self) -> Result<bool, SolverError>;
-    /// returns None if the given assignment is a model of a problem.
-    /// Otherwise returns a clause which is not satisfiable under a given assignment.
-    /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
-    fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId>;
-    /// removes Lit `p` from Clause *self*. This is an O(n) function!
-    /// This returns `true` if the clause became a unit clause.
-    /// And this is called only from `Eliminator::strengthen_clause`.
-    fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool;
-    /// minimize a clause.
-    fn minimize_with_biclauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
-    where
-        A: AssignIF;
-
-    #[cfg(feature = "incremental_solver")]
-    /// save an eliminated permanent clause to an extra space for incremental solving.
-    fn make_permanent_immortal(&mut self, cid: ClauseId);
-}
 
 impl Default for ClauseDB {
     fn default() -> ClauseDB {
@@ -102,12 +18,13 @@ impl Default for ClauseDB {
             certified: Vec::new(),
             soft_limit: 0, // 248_000_000
             use_chan_seok: false,
-            co_lbd_bound: 5,
+            co_lbd_bound: 4,
             // lbd_frozen_clause: 30,
             ordinal: 0,
             activity_inc: 1.0,
             activity_decay: 0.99,
             activity_anti_decay: 0.01,
+            activity_ema: Ema::new(1000),
             touched: Vec::new(),
             lbd_temp: Vec::new(),
             num_lbd_update: 0,
@@ -123,6 +40,7 @@ impl Default for ClauseDB {
             num_lbd2: 0,
             num_learnt: 0,
             num_reduction: 0,
+            lbd_of_dp_ema: Ema::new(10000),
             during_vivification: false,
             eliminated_permanent: Vec::new(),
         }
@@ -198,17 +116,21 @@ impl ActivityIF<ClauseId> for ClauseDB {
             self.activity_anti_decay,
         )
     }
-    fn clear_reward(&mut self, cid: ClauseId) {
-        self[cid].reward = 0.0;
+    fn average_activity(&self) -> f64 {
+        self.activity_ema.get()
+    }
+    fn set_activity(&mut self, cid: ClauseId, val: f64) {
+        self[cid].reward = val;
     }
     fn reward_at_analysis(&mut self, cid: ClauseId) {
         // Note: vivifier has its own conflict analyzer, which never call reward functions.
         let t = self.ordinal;
-        self.clause[cid.ordinal as usize].update_activity(
+        let r = self.clause[cid.ordinal as usize].update_activity(
             t,
             self.activity_decay,
             self.activity_anti_decay,
         );
+        self.activity_ema.update(r);
     }
     fn update_rewards(&mut self) {
         self.ordinal += 1;
@@ -243,12 +165,11 @@ impl Instantiate for ClauseDB {
             activity_anti_decay: 1.0 - config.crw_dcy_rat,
             touched,
             lbd_temp: vec![0; nv + 1],
-            reducible: config.use_reduce(),
-
             ..ClauseDB::default()
         }
     }
     fn handle(&mut self, e: SolverEvent) {
+        #[allow(clippy::single_match)]
         match e {
             #[cfg(feature = "strategy_adaptation")]
             SolverEvent::Adapt(strategy, num_conflict) => {
@@ -293,43 +214,12 @@ impl Instantiate for ClauseDB {
                 self.touched.push(false);
                 self.lbd_temp.push(0);
             }
+            #[cfg(feature = "clause_vivification")]
             SolverEvent::Vivify(on) => {
                 self.during_vivification = on;
             }
             _ => (),
         }
-    }
-}
-
-impl Export<(usize, usize, usize, usize, usize, usize), bool> for ClauseDB {
-    /// exports:
-    ///  1. the number of active clauses
-    ///  1. the number of binary clauses
-    ///  1. the number of binary learnt clauses
-    ///  1. the number of clauses which LBDs are 2
-    ///  1. the number of learnt clauses
-    ///  1. the number of clause reductions
-    ///
-    ///```
-    /// use crate::{splr::config::Config, splr::types::*};
-    /// use crate::splr::cdb::ClauseDB;
-    /// let cdb = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (_active, _bi_clause, _bi_learnt, _lbd2, _learnt, _reduction) = cdb.exports();
-    ///```
-    #[inline]
-    fn exports(&self) -> (usize, usize, usize, usize, usize, usize) {
-        (
-            self.num_active,
-            self.num_bi_clause,
-            self.num_bi_learnt,
-            self.num_lbd2,
-            self.num_learnt,
-            self.num_reduction,
-        )
-    }
-    /// return the value of `use_chan_seok`
-    fn mode(&self) -> bool {
-        self.use_chan_seok
     }
 }
 
@@ -643,19 +533,23 @@ impl ClauseDBIF for ClauseDB {
     where
         A: AssignIF,
     {
-        if !self.reducible || 0 == self.num_learnt {
-            return false;
-        }
-        let go = if self.use_chan_seok {
-            self.first_reduction < self.num_learnt
+        #[cfg(feature = "clause_reduction")]
+        if 0 == self.num_learnt {
+            false
         } else {
-            self.reduction_coeff * self.next_reduction <= nc
-        };
-        if go {
-            self.reduction_coeff = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
-            self.reduce_db(asg, nc);
+            let go = if self.use_chan_seok {
+                self.first_reduction < self.num_learnt
+            } else {
+                self.reduction_coeff * self.next_reduction <= nc
+            };
+            if go {
+                self.reduction_coeff = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
+                self.reduce_db(asg, nc);
+            }
+            go
         }
-        go
+        #[cfg(not(feature = "clause_reduction"))]
+        false
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
@@ -802,14 +696,6 @@ impl ClauseDB {
     where
         A: AssignIF,
     {
-        const SCALE_UP: f64 = 100_000_000.0;
-
-        #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
-        struct ClauseProxy {
-            weight: usize,
-            index: usize,
-        }
-
         let ClauseDB {
             ref mut clause,
             ref mut lbd_temp,
@@ -821,7 +707,7 @@ impl ClauseDB {
         } = self;
         self.num_reduction += 1;
         self.next_reduction += self.inc_step;
-        let mut perm: Vec<ClauseProxy> = Vec::with_capacity(clause.len());
+        let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
             if !c.is(Flag::LEARNT) || c.is(Flag::DEAD) || asg.locked(c, ClauseId::from(i)) {
                 continue;
@@ -836,34 +722,33 @@ impl ClauseDB {
                 }
             }
 
-            let mut act_v: f64 = 0.0;
-            for l in c.lits.iter() {
-                act_v = act_v.max(asg.activity(l.vi()));
-            }
+            // This is the best at least for 3SAT360.
             let rank = c.update_lbd(asg, lbd_temp) as f64;
+            let act_v: f64 = c
+                .lits
+                .iter()
+                .fold(0.0, |acc, l| acc.max(asg.activity(l.vi())));
             let act_c = c.update_activity(*ordinal, *activity_decay, *activity_anti_decay);
-            let weight = (SCALE_UP * rank / (act_v + act_c)) as usize;
-            perm.push(ClauseProxy { weight, index: i });
+            let weight = rank / (act_v + act_c);
+            perm.push(OrderedProxy::new(i, weight));
         }
         let keep = (perm.len() / 2).min(nc / 2);
         if !self.use_chan_seok {
-            if clause[perm[keep].index].rank <= 3 {
+            if clause[perm[keep].to()].rank <= 3 {
                 self.next_reduction += self.extra_inc;
             }
-            if clause[perm[0].index].rank <= 5 {
+            if clause[perm[0].to()].rank <= 5 {
                 self.next_reduction += self.extra_inc;
             };
         }
-        perm.sort_unstable_by_key(|c| c.weight);
+        perm.sort_unstable();
         for i in &perm[keep..] {
-            let c = &mut clause[i.index];
+            let c = &mut clause[i.to()];
             if 2 < c.rank {
                 c.kill(touched);
             }
         }
-        debug_assert!(perm[0..keep]
-            .iter()
-            .all(|c| !clause[c.index].is(Flag::DEAD)));
+        debug_assert!(perm[0..keep].iter().all(|c| !clause[c.to()].is(Flag::DEAD)));
         self.garbage_collect();
     }
 
@@ -876,7 +761,7 @@ impl ClauseDB {
             if c.is(Flag::DEAD) || !c.is(Flag::LEARNT) {
                 continue;
             }
-            if c.rank <= self.co_lbd_bound as u16 {
+            if c.rank < self.co_lbd_bound as u16 {
                 c.turn_off(Flag::LEARNT);
                 self.num_learnt -= 1;
             } else if reinit {
@@ -891,7 +776,6 @@ impl Clause {
     fn update_activity(&mut self, t: usize, decay: f64, anti_decay: f64) -> f64 {
         if self.timestamp < t {
             let duration = (t - self.timestamp) as f64;
-            // self.reward *= decay.powf(duration.log(2.0));
             self.reward *= decay.powf(duration);
             self.reward += anti_decay;
             self.timestamp = t;

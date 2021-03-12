@@ -1,6 +1,6 @@
 /// Var struct and Database management API
 use {
-    super::{AssignStack, ClauseManipulateIF, Var, VarHeapIF},
+    super::{AssignStack, Var, VarHeapIF},
     crate::types::*,
     std::{
         fmt,
@@ -12,16 +12,10 @@ impl Default for Var {
     fn default() -> Var {
         Var {
             index: 0,
+            participated: 0,
             reward: 0.0,
             timestamp: 0,
             flags: Flag::empty(),
-            participated: 0,
-
-            #[cfg(feature = "explore_timestamp")]
-            assign_timestamp: 0,
-
-            #[cfg(feature = "extra_var_reward")]
-            extra_reward: 0.0,
         }
     }
 }
@@ -57,6 +51,19 @@ impl Var {
             vec.push(Var::from(i));
         }
         vec
+    }
+    #[cfg(not(feature = "var_staging"))]
+    pub fn activity(&self, _: f64) -> f64 {
+        self.reward
+    }
+    #[cfg(feature = "var_staging")]
+    pub fn activity(&self, extra: f64) -> f64 {
+        let val = self.reward;
+        if self.is(Flag::STAGED) {
+            val + extra
+        } else {
+            val
+        }
     }
 }
 
@@ -99,13 +106,6 @@ pub trait VarManipulateIF {
     fn var_iter_mut(&mut self) -> IterMut<'_, Var>;
     /// eliminate a var.
     fn set_eliminated(&mut self, vi: VarId);
-    /// return the following data:
-    /// * the number of vars
-    /// * the number of asserted vars
-    /// * the number of eliminated vars
-    /// * the number of un-asserted vars
-    /// * the number of unreachable unassigned vars or core
-    fn var_stats(&self) -> (usize, usize, usize, usize, usize);
 }
 
 impl VarManipulateIF for AssignStack {
@@ -144,45 +144,12 @@ impl VarManipulateIF for AssignStack {
     fn set_eliminated(&mut self, vi: VarId) {
         if !self.var[vi].is(Flag::ELIMINATED) {
             self.var[vi].turn_on(Flag::ELIMINATED);
-            self.clear_reward(vi);
+            self.set_activity(vi, 0.0);
             self.remove_from_heap(vi);
             self.num_eliminated_vars += 1;
         } else {
             #[cfg(feature = "boundary_check")]
             panic!("double elimination");
         }
-    }
-    #[inline]
-    fn var_stats(&self) -> (usize, usize, usize, usize, usize) {
-        debug_assert!(
-            self.num_asserted_vars <= self.num_vars,
-            format!("nav.{}, nv.{}", self.num_asserted_vars, self.num_vars)
-        );
-        debug_assert!(self.num_eliminated_vars <= self.num_vars);
-        (
-            self.num_vars,
-            self.num_asserted_vars,
-            self.num_eliminated_vars,
-            self.num_unasserted(),
-            self.num_unreachables(),
-        )
-    }
-}
-
-impl ClauseManipulateIF for AssignStack {
-    fn satisfies(&self, vec: &[Lit]) -> bool {
-        for l in vec {
-            if self.assigned(*l) == Some(true) {
-                return true;
-            }
-        }
-        false
-    }
-    fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
-        let lits = &c.lits;
-        debug_assert!(1 < lits.len());
-        let l0 = lits[0];
-        self.assigned(l0) == Some(true)
-            && matches!(self.reason(l0.vi()), AssignReason::Implication(x, _) if x == cid)
     }
 }

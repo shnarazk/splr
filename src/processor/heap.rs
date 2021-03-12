@@ -1,39 +1,11 @@
 /// Crate `eliminator` implements clause subsumption and var elimination.
 use {
-    super::{LitOccurs, VarOccHeap},
+    super::{LitOccurs, VarOccHeap, VarOrderIF},
     crate::{assign::AssignIF, types::*},
     std::fmt,
 };
 
-pub trait VarOrderIF {
-    fn new(n: usize, init: usize) -> Self;
-    fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upward: bool);
-    fn clear<A>(&mut self, asg: &mut A)
-    where
-        A: AssignIF;
-    fn len(&self) -> usize;
-    fn is_empty(&self) -> bool;
-    fn select_var<A>(&mut self, occur: &[LitOccurs], asg: &A) -> Option<VarId>
-    where
-        A: AssignIF;
-    fn rebuild<A>(&mut self, asg: &A, occur: &[LitOccurs])
-    where
-        A: AssignIF;
-}
-
 impl VarOrderIF for VarOccHeap {
-    fn new(n: usize, init: usize) -> Self {
-        let mut heap = Vec::with_capacity(n + 1);
-        let mut idxs = Vec::with_capacity(n + 1);
-        heap.push(0);
-        idxs.push(n);
-        for i in 1..=n {
-            heap.push(i);
-            idxs.push(i);
-        }
-        idxs[0] = init;
-        VarOccHeap { heap, idxs }
-    }
     fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upward: bool) {
         debug_assert!(vi < self.heap.len());
         if self.contains(vi) {

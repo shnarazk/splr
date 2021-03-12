@@ -1,8 +1,10 @@
 /// main struct AssignStack
+#[cfg(any(feature = "best_phases_tracking", feature = "var_staging"))]
+use std::collections::HashMap;
 use {
-    super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF, VarSelectIF},
+    super::{AssignIF, AssignStack, Var, VarHeapIF, VarIdHeap, VarManipulateIF, VarSelectIF},
     crate::{cdb::ClauseDBIF, solver::SolverEvent, types::*},
-    std::{collections::HashMap, fmt, ops::Range, slice::Iter},
+    std::{fmt, ops::Range, slice::Iter},
 };
 
 #[cfg(not(feature = "no_IO"))]
@@ -10,14 +12,6 @@ use std::{
     fs::File,
     io::{BufWriter, Write},
 };
-
-/// API for var manipulation
-pub trait ClauseManipulateIF {
-    /// return `true` if the set of literals is satisfiable under the current assignment.
-    fn satisfies(&self, c: &[Lit]) -> bool;
-    /// return `true` is the clause is the reason of the assignment.
-    fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
-}
 
 impl Default for AssignReason {
     fn default() -> AssignReason {
@@ -45,22 +39,26 @@ impl Default for AssignStack {
             trail_lim: Vec::new(),
             q_head: 0,
             root_level: 0,
-            last_conflict: VarId::default(),
             var_order: VarIdHeap::default(),
 
-            use_rephase: true,
             best_assign: false,
-            best_phases: HashMap::new(),
             build_best_at: 0,
             num_best_assign: 0,
             rephasing: false,
+            #[cfg(feature = "best_phases_tracking")]
+            best_phases: HashMap::new(),
 
-            use_stage: true,
+            #[cfg(feature = "var_staging")]
             staging_reward_value: 1.0,
+            #[cfg(feature = "var_staging")]
             staging_reward_decay: 0.9,
+            #[cfg(feature = "var_staging")]
             staged_vars: HashMap::new(),
+            #[cfg(feature = "var_staging")]
             stage_mode_select: 0,
             num_stages: 0,
+            stage_activity: 0.0,
+            reward_index: 1,
 
             num_vars: 0,
             num_asserted_vars: 0,
@@ -76,17 +74,11 @@ impl Default for AssignStack {
             ordinal: 0,
             var: Vec::new(),
 
-            activity_decay: 0.0,
-            activity_anti_decay: 1.0,
-
-            #[cfg(feature = "moving_var_reward_rate")]
-            activity_decay_max: 0.9,
-            #[cfg(feature = "moving_var_reward_rate")]
-            activity_decay_min: 0.8,
-            #[cfg(feature = "moving_var_reward_rate")]
-            reward_step: 0.0,
-
-            occurrence_compression_rate: 0.5,
+            activity_decay: 0.94,
+            activity_decay_default: 0.94,
+            activity_anti_decay: 0.06,
+            activity_ema: Ema::new(1000),
+            activity_decay_step: 0.1,
 
             during_vivification: false,
             vivify_sandbox: (0, 0, 0),
@@ -117,22 +109,23 @@ impl Instantiate for AssignStack {
             reason: vec![AssignReason::default(); nv + 1],
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
-            use_rephase: config.use_rephase(),
-            use_stage: config.use_stage(),
+
+            #[cfg(feature = "var_staging")]
             staging_reward_decay: config.stg_rwd_dcy,
+            #[cfg(feature = "var_staging")]
             staging_reward_value: config.stg_rwd_val,
+
             num_vars: cnf.num_of_variables,
             var: Var::new_vars(nv),
-            #[cfg(not(feature = "moving_var_reward_rate"))]
-            activity_decay: config.vrw_dcy_rat,
+
+            #[cfg(feature = "EVSIDS")]
+            activity_decay: config.vrw_dcy_rat * 0.6,
+            #[cfg(feature = "LR_rewarding")]
+            activity_decay_default: config.vrw_dcy_rat,
+
             activity_anti_decay: 1.0 - config.vrw_dcy_rat,
-            #[cfg(feature = "moving_var_reward_rate")]
-            activity_decay: config.vrw_dcy_beg,
-            #[cfg(feature = "moving_var_reward_rate")]
-            activity_decay_max: config.vrw_dcy_end,
-            #[cfg(feature = "moving_var_reward_rate")]
-            activity_decay_min: config.vrw_dcy_beg,
-            occurrence_compression_rate: config.vrw_occ_cmp,
+            activity_decay_step: config.vrw_dcy_stp,
+
             ..AssignStack::default()
         }
     }
@@ -143,15 +136,14 @@ impl Instantiate for AssignStack {
             // So execute everything of `assign_by_unitclause` but cancel_until(root_level)
             SolverEvent::Assert(vi) => {
                 self.make_var_asserted(vi);
+                self.reward_index = 1;
             }
             SolverEvent::Conflict => (),
             SolverEvent::NewVar => {
                 self.assign.push(None);
                 self.level.push(DecisionLevel::default());
                 self.reason.push(AssignReason::default());
-                self.var_order.heap.push(0);
-                self.var_order.idxs.push(0);
-                self.var_order.clear();
+                self.expand_heap();
                 self.num_vars += 1;
                 self.var.push(Var::from(self.num_vars));
             }
@@ -167,6 +159,7 @@ impl Instantiate for AssignStack {
                 };
                 self.rebuild_order();
             }
+            #[cfg(feature = "clause_vivification")]
             SolverEvent::Vivify(start) => {
                 if start {
                     self.during_vivification = true;
@@ -182,31 +175,6 @@ impl Instantiate for AssignStack {
             _ => (),
         }
     }
-}
-
-impl Export<(usize, usize, usize, usize), ()> for AssignStack {
-    /// exports:
-    ///  1. the number of decision
-    ///  1. the number of propagations
-    ///  1. the number of conflicts
-    ///  1. the number of restarts
-    ///
-    ///```
-    /// use crate::{splr::config::Config, splr::types::*};
-    /// use crate::splr::assign::AssignStack;
-    /// let asg = AssignStack::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (num_decision, num_propagation, num_conflict, num_restart) = asg.exports();
-    ///```
-    #[inline]
-    fn exports(&self) -> (usize, usize, usize, usize) {
-        (
-            self.num_decision,
-            self.num_propagation,
-            self.num_conflict,
-            self.num_restart,
-        )
-    }
-    fn mode(&self) {}
 }
 
 impl AssignIF for AssignStack {
@@ -342,18 +310,24 @@ impl AssignIF for AssignStack {
         }
         extended_model
     }
+    fn satisfies(&self, vec: &[Lit]) -> bool {
+        for l in vec {
+            if self.assigned(*l) == Some(true) {
+                return true;
+            }
+        }
+        false
+    }
+    fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
+        let lits = &c.lits;
+        debug_assert!(1 < lits.len());
+        let l0 = lits[0];
+        self.assigned(l0) == Some(true)
+            && matches!(self.reason(l0.vi()), AssignReason::Implication(x, _) if x == cid)
+    }
 }
 
 impl AssignStack {
-    /// return the number of vars in `the unreachable core'
-    #[inline]
-    pub fn num_unasserted(&self) -> usize {
-        self.num_vars - self.num_eliminated_vars - self.num_asserted_vars
-    }
-    #[inline]
-    pub fn num_unreachables(&self) -> usize {
-        self.num_vars - self.num_best_assign
-    }
     #[cfg(feature = "boundary_check")]
     pub fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
         &mut self,

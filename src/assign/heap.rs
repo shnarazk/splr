@@ -26,8 +26,10 @@ impl fmt::Display for VarIdHeap {
 
 /// Internal heap manipulation API
 pub trait VarHeapIF {
-    fn update_heap(&mut self, v: VarId);
+    fn clear_heap(&mut self);
+    fn expand_heap(&mut self);
     fn insert_heap(&mut self, vi: VarId);
+    fn update_heap(&mut self, v: VarId);
     fn get_heap_root(&mut self) -> VarId;
     fn percolate_up(&mut self, start: usize);
     fn percolate_down(&mut self, start: usize);
@@ -35,6 +37,14 @@ pub trait VarHeapIF {
 }
 
 impl VarHeapIF for AssignStack {
+    fn clear_heap(&mut self) {
+        self.var_order.clear();
+    }
+    fn expand_heap(&mut self) {
+        self.var_order.heap.push(0);
+        self.var_order.idxs.push(0);
+        self.var_order.clear();
+    }
     fn update_heap(&mut self, v: VarId) {
         debug_assert!(v != 0, "Invalid VarId");
         let start = self.var_order.idxs[v];
@@ -43,30 +53,12 @@ impl VarHeapIF for AssignStack {
         }
     }
     fn insert_heap(&mut self, vi: VarId) {
-        if self.var_order.contains(vi) {
-            let i = self.var_order.idxs[vi];
-            self.percolate_up(i);
-            return;
-        }
-        let i = self.var_order.idxs[vi];
-        let n = self.var_order.idxs[0] + 1;
-        let vn = self.var_order.heap[n];
-        self.var_order.heap.swap(i, n);
-        self.var_order.idxs.swap(vi, vn);
-        self.var_order.idxs[0] = n;
-        self.percolate_up(n);
+        let i = self.var_order.insert(vi);
+        self.percolate_up(i);
     }
     fn get_heap_root(&mut self) -> VarId {
-        let s = 1;
-        let vs = self.var_order.heap[s];
-        let n = self.var_order.idxs[0];
-        let vn = self.var_order.heap[n];
-        debug_assert!(vn != 0, "Invalid VarId for heap");
-        debug_assert!(vs != 0, "Invalid VarId for heap");
-        self.var_order.heap.swap(n, s);
-        self.var_order.idxs.swap(vn, vs);
-        self.var_order.idxs[0] -= 1;
-        if 1 < self.var_order.idxs[0] {
+        let vs = self.var_order.get_root();
+        if 1 < self.var_order.len() {
             self.percolate_down(1);
         }
         vs
@@ -136,45 +128,24 @@ impl VarHeapIF for AssignStack {
             }
         }
     }
-    #[allow(dead_code)]
     fn remove_from_heap(&mut self, vi: VarId) {
-        let i = self.var_order.idxs[vi];
-        let n = self.var_order.idxs[0];
-        debug_assert_ne!(i, 0);
-        if n < i {
-            return;
-        }
-        let vn = self.var_order.heap[n];
-        self.var_order.heap.swap(n, i);
-        self.var_order.idxs.swap(vn, vi);
-        self.var_order.idxs[0] -= 1;
-        if 1 < self.var_order.idxs[0] {
+        if let Some(i) = self.var_order.remove(vi) {
             self.percolate_down(i);
         }
     }
 }
 
-pub trait VarOrderIF {
-    fn new(n: usize, init: usize) -> Self;
+trait VarOrderIF {
     fn clear(&mut self);
     fn contains(&self, v: VarId) -> bool;
+    fn get_root(&mut self) -> VarId;
     fn len(&self) -> usize;
+    fn insert(&mut self, vi: VarId) -> usize;
     fn is_empty(&self) -> bool;
+    fn remove(&mut self, vi: VarId) -> Option<usize>;
 }
 
 impl VarOrderIF for VarIdHeap {
-    fn new(n: usize, init: usize) -> Self {
-        let mut heap = Vec::with_capacity(n + 1);
-        let mut idxs = Vec::with_capacity(n + 1);
-        heap.push(0);
-        idxs.push(n);
-        for i in 1..=n {
-            heap.push(i);
-            idxs.push(i);
-        }
-        idxs[0] = init;
-        VarIdHeap { heap, idxs }
-    }
     fn clear(&mut self) {
         for i in 0..self.idxs.len() {
             self.idxs[i] = i;
@@ -184,11 +155,51 @@ impl VarOrderIF for VarIdHeap {
     fn contains(&self, v: VarId) -> bool {
         self.idxs[v] <= self.idxs[0]
     }
+    fn get_root(&mut self) -> VarId {
+        let s = 1;
+        let vs = self.heap[s];
+        let n = self.idxs[0];
+        let vn = self.heap[n];
+        debug_assert!(vn != 0, "Invalid VarId for heap");
+        debug_assert!(vs != 0, "Invalid VarId for heap");
+        self.heap.swap(n, s);
+        self.idxs.swap(vn, vs);
+        self.idxs[0] -= 1;
+        vs
+    }
     fn len(&self) -> usize {
         self.idxs[0]
     }
+    fn insert(&mut self, vi: VarId) -> usize {
+        if self.contains(vi) {
+            return self.idxs[vi];
+        }
+        let i = self.idxs[vi];
+        let n = self.idxs[0] + 1;
+        let vn = self.heap[n];
+        self.heap.swap(i, n);
+        self.idxs.swap(vi, vn);
+        self.idxs[0] = n;
+        return n;
+    }
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0
+    }
+    fn remove(&mut self, vi: VarId) -> Option<usize> {
+        let i = self.idxs[vi];
+        let n = self.idxs[0];
+        debug_assert_ne!(i, 0);
+        if n < i {
+            return None;
+        }
+        let vn = self.heap[n];
+        self.heap.swap(n, i);
+        self.idxs.swap(vn, vi);
+        self.idxs[0] -= 1;
+        if 1 < self.idxs[0] {
+            return Some(i);
+        }
+        None
     }
 }
 

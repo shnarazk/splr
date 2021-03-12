@@ -37,13 +37,13 @@ pub fn handle_conflict(
     let num_conflict = asg.num_conflict;
     // If we can settle this conflict w/o restart, solver will get a big progress.
     let switch_chronobt = if num_conflict < 1000 {
-        Some(false)
+        Some(false) // force normal backtrack
     } else {
-        None
+        None // a closure will determine
     };
     rst.update(ProgressUpdate::Counter);
     // rst.block_restart(); // to update asg progress_evaluator
-    let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.c_cbt_thr);
+    let mut use_chronobt = switch_chronobt.unwrap_or_else(|| 0 < state.config.c_cbt_thr);
     if use_chronobt {
         let level = asg.level_ref();
         let c = &mut cdb[ci];
@@ -155,18 +155,9 @@ pub fn handle_conflict(
         )
     );
     asg.handle(SolverEvent::Conflict);
-    // backtrack level by analyze
 
-    let bl_a = {
-        #[cfg(not(feature = "progress_MLD"))]
-        {
-            conflict_analyze(asg, cdb, state, ci).max(asg.root_level)
-        }
-        #[cfg(feature = "progress_MLD")]
-        {
-            conflict_analyze(asg, cdb, rst, state, ci).max(asg.root_level)
-        }
-    };
+    // backtrack level by analyze
+    let bl_a = conflict_analyze(asg, cdb, state, ci).max(asg.root_level);
 
     if state.new_learnt.is_empty() {
         #[cfg(debug)]
@@ -182,6 +173,7 @@ pub fn handle_conflict(
         return Err(SolverError::NullLearnt);
     }
     // asg.bump_vars(asg, cdb, ci);
+    let chrono_bt_threshold = state.chrono_bt_threshold;
     let new_learnt = &mut state.new_learnt;
     let l0 = new_learnt[0];
     // assert: 0 < cl, which was checked already by new_learnt.is_empty().
@@ -189,11 +181,7 @@ pub fn handle_conflict(
     // NCB places firstUIP on level bl, while CB does it on level cl.
     // Therefore the condition to use CB is: activity(firstUIP) < activity(v(bl)).
     // PREMISE: 0 < bl, because asg.decision_vi accepts only non-zero values.
-    use_chronobt &= switch_chronobt.unwrap_or(
-        bl_a == 0
-            || state.config.c_cbt_thr + bl_a <= cl
-            || asg.activity(l0.vi()) < asg.activity(asg.decision_vi(bl_a)),
-    );
+    use_chronobt &= switch_chronobt.unwrap_or(bl_a == 0 || chrono_bt_threshold + bl_a <= cl);
 
     // (assign level, backtrack level)
     let (al, bl) = if use_chronobt {
@@ -226,17 +214,21 @@ pub fn handle_conflict(
         } else {
             asg.assign_by_unitclause(l0);
         }
+        elim.to_simplify += (state.config.c_ip_int / 2) as f64;
         rst.handle(SolverEvent::Assert(l0.vi()))
     } else {
         {
             // At the present time, some reason clauses can contain first UIP or its negation.
             // So we have to filter vars instead of literals to avoid double counting.
+            #[cfg(feature = "reason_side_rewarding")]
             let mut bumped = new_learnt.iter().map(|l| l.vi()).collect::<Vec<VarId>>();
             for lit in new_learnt.iter() {
                 //
                 //## Learnt Literal Rewarding
                 //
                 asg.reward_at_analysis(lit.vi());
+
+                #[cfg(feature = "reason_side_rewarding")]
                 if let AssignReason::Implication(r, _) = asg.reason(lit.vi()) {
                     for l in &cdb[r].lits {
                         let vi = l.vi();
@@ -264,7 +256,6 @@ pub fn handle_conflict(
         asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), al);
         let lbd = cdb[cid].rank;
         rst.update(ProgressUpdate::LBD(lbd));
-
         let mut act: f64 = 0.0;
         for li in cdb[cid].iter() {
             let a = asg.activity(li.vi());
@@ -272,13 +263,7 @@ pub fn handle_conflict(
                 act = a;
             }
         }
-
-        #[cfg(feature = "progress_ACC")]
-        {
-            rst.update(ProgressUpdate::ACC(act));
-        }
-
-        elim.to_simplify += 1.0 / (learnt_len as f64).powf(1.5);
+        elim.to_simplify += 1.0 / (learnt_len as f64).powf(1.4);
         if lbd <= 20 {
             for cid in &state.derive20 {
                 cdb[cid].turn_on(Flag::DERIVE20);
@@ -295,9 +280,6 @@ pub fn handle_conflict(
 fn conflict_analyze(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
-
-    #[cfg(feature = "progress_MLD")] rst: &mut Restarter,
-
     state: &mut State,
     conflicting_clause: ClauseId,
 ) -> DecisionLevel {
@@ -312,10 +294,6 @@ fn conflict_analyze(
     println!("- analyze conflicting literal {}", p);
 
     let mut path_cnt = 0;
-
-    #[cfg(feature = "progress_MLD")]
-    let mut largest_clause: u16 = 2;
-
     let vi = p.vi();
     if !asg.var(vi).is(Flag::CA_SEEN) && 0 < asg.level(vi) {
         let lvl = asg.level(vi);
@@ -369,11 +347,8 @@ fn conflict_analyze(
                 } else {
                     state.derive20.push(cid);
                 }
+                cdb.lbd_of_dp_ema.update(cdb[cid].rank as f64);
                 let c = &cdb[cid];
-                #[cfg(feature = "progress_MLD")]
-                {
-                    largest_clause = largest_clause.max(c.rank);
-                }
 
                 #[cfg(feature = "boundary_check")]
                 assert!(
@@ -494,11 +469,6 @@ fn conflict_analyze(
     debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);
     learnt[0] = !p;
-
-    #[cfg(feature = "progress_MLD")]
-    {
-        rst.update(ProgressUpdate::MLD(largest_clause));
-    }
 
     #[cfg(feature = "trace_analysis")]
     println!("- appending {}, the result is {:?}", learnt[0], learnt);

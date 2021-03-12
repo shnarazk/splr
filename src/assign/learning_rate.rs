@@ -1,59 +1,67 @@
 /// Var Rewarding based on Learning Rate Rewarding and Reason Side Rewarding
-use {super::AssignStack, crate::types::*};
+use {
+    super::{AssignStack, Var},
+    crate::types::*,
+};
 
 impl ActivityIF<VarId> for AssignStack {
-    #[inline]
-    #[cfg(feature = "extra_var_reward")]
     fn activity(&mut self, vi: VarId) -> f64 {
-        let v = &self.var[vi];
-        v.reward.max(v.extra_reward)
+        self.var[vi].activity(self.stage_activity)
     }
-    fn initialize_reward(&mut self, _ix: VarId) {}
-    #[cfg(not(feature = "extra_var_reward"))]
-    fn activity(&mut self, vi: VarId) -> f64 {
-        self.var[vi].reward
+    fn average_activity(&self) -> f64 {
+        self.activity_ema.get()
     }
-    fn clear_reward(&mut self, vi: VarId) {
-        self.var[vi].reward = 0.0;
+    fn set_activity(&mut self, vi: VarId, val: f64) {
+        self.var[vi].reward = val;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
-        let v = &mut self.var[vi];
-        v.participated += 1;
+        self.var[vi].participated += 1;
+        self.activity_ema.update(self.var[vi].reward);
     }
     fn reward_at_assign(&mut self, vi: VarId) {
-        let t = self.ordinal;
-        let v = &mut self.var[vi];
-        v.timestamp = t;
+        self.var[vi].timestamp = self.ordinal;
     }
+    fn reward_at_propagation(&mut self, _vi: VarId) {}
     fn reward_at_unassign(&mut self, vi: VarId) {
-        let v = &mut self.var[vi];
-        let duration = (self.ordinal + 1 - v.timestamp) as f64;
-        let rate = v.participated as f64 / duration;
-        v.reward *= self.activity_decay;
-        v.reward += self.activity_anti_decay * rate.powf(self.occurrence_compression_rate);
-        v.participated = 0;
+        self.var[vi].update_activity(self.ordinal, self.activity_decay, self.activity_anti_decay);
     }
+    // Note: `update_rewards` should be called befere `cancel_until`
     fn update_rewards(&mut self) {
         self.ordinal += 1;
-        #[cfg(feature = "moving_var_reward_rate")]
-        {
-            self.activity_decay = self
-                .activity_decay_max
-                .min(self.activity_decay + self.reward_step);
-        }
+        self.stage_activity *= self.activity_decay;
     }
-    #[cfg(feature = "moving_var_reward_rate")]
-    fn adjust_rewards(&mut self, state: &State) {
-        if state.strategy.1 == self.num_conflict {
-            match state.strategy.0 {
-                SearchStrategy::LowDecisions => {
-                    self.activity_decay_max -= 0.02;
-                }
-                SearchStrategy::HighSuccessive => {
-                    self.activity_decay_max = (self.activity_decay_max + 0.005).min(0.999);
-                }
-                _ => (),
-            };
+    fn update_activity_decay(&mut self, index: Option<usize>) {
+        // asg.update_activity_decay();
+        if let Some(index) = index {
+            if self.reward_index < index {
+                self.activity_decay += (1.0 - self.activity_decay) * self.activity_decay_step;
+                self.reward_index += 1;
+            }
+        } else {
+            self.activity_decay = self.activity_decay_default;
+            self.reward_index = 1;
         }
+        self.activity_anti_decay = 1.0 - self.activity_decay;
+    }
+}
+
+impl Var {
+    fn update_activity(&mut self, t: usize, decay: f64, reward: f64) -> f64 {
+        // Note: why the condition can be broken.
+        //
+        // 1. asg.ordinal += 1;
+        // 1. handle_conflict -> cancel_until -> reward_at_unassign
+        // 1. assign_by_implication -> v.timestamp = asg.ordinal
+        // 1. restart
+        // 1. cancel_until -> reward_at_unassign -> assertion failed
+        //
+        if self.timestamp < t {
+            let rate = self.participated as f64 / (t - self.timestamp) as f64;
+            self.reward *= decay;
+            self.reward += (1.0 - (rate - 1.0).powf(2.0)).powf(0.5) * reward;
+            self.participated = 0;
+            self.timestamp = t;
+        }
+        self.reward
     }
 }

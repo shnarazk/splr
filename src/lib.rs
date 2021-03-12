@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/splr/0.4.1")]
+#![doc(html_root_url = "https://docs.rs/splr/0.7.0")]
 /*!
 # A modern CDCL SAT solver in Rust
 
@@ -68,7 +68,7 @@ pub mod types;
 pub use {
     config::Config,
     solver::{Certificate, SatSolverIF, SolveIF, Solver, ValidateIF},
-    types::SolverError,
+    types::{Ema, Ema2, EmaIF, PropertyDereference, PropertyReference, SolverError},
 };
 
 /// Splr version number.

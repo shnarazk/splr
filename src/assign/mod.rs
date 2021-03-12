@@ -5,7 +5,7 @@ mod heap;
 mod propagate;
 /// Var rewarding
 #[cfg_attr(feature = "EVSIDS", path = "evsids.rs")]
-#[cfg_attr(not(feature = "EVSIDS"), path = "learning_rate.rs")]
+#[cfg_attr(feature = "LR_rewarding", path = "learning_rate.rs")]
 mod reward;
 /// Decision var selection
 mod select;
@@ -14,18 +14,23 @@ mod stack;
 /// var struct and its methods
 mod var;
 
-pub use self::{
-    propagate::PropagateIF, select::VarSelectIF, stack::ClauseManipulateIF, var::VarManipulateIF,
-};
-
+pub use self::{propagate::PropagateIF, property::*, select::VarSelectIF, var::VarManipulateIF};
+#[cfg(any(feature = "best_phases_tracking", feature = "var_staging"))]
+use std::collections::HashMap;
 use {
-    self::heap::{VarHeapIF, VarOrderIF},
+    self::heap::VarHeapIF,
     super::{cdb::ClauseDBIF, types::*},
-    std::{collections::HashMap, ops::Range, slice::Iter},
+    std::{ops::Range, slice::Iter},
 };
 
 /// API about assignment like [`decision_level`](`crate::assign::AssignIF::decision_level`), [`stack`](`crate::assign::AssignIF::stack`), [`best_assigned`](`crate::assign::AssignIF::best_assigned`), and so on.
-pub trait AssignIF: ActivityIF<VarId> + ClauseManipulateIF + PropagateIF + VarManipulateIF {
+pub trait AssignIF:
+    ActivityIF<VarId>
+    + PropagateIF
+    + VarManipulateIF
+    + PropertyDereference<property::Tusize, usize>
+    + PropertyReference<property::TEma, Ema>
+{
     /// return a literal in the stack.
     fn stack(&self, i: usize) -> Lit;
     /// return literals in the range of stack.
@@ -57,6 +62,10 @@ pub trait AssignIF: ActivityIF<VarId> + ClauseManipulateIF + PropagateIF + VarMa
     fn extend_model<C>(&mut self, c: &mut C, lits: &[Lit]) -> Vec<Option<bool>>
     where
         C: ClauseDBIF;
+    /// return `true` if the set of literals is satisfiable under the current assignment.
+    fn satisfies(&self, c: &[Lit]) -> bool;
+    /// return `true` is the clause is the reason of the assignment.
+    fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
 }
 
 /// Reasons of assignments, two kinds
@@ -81,14 +90,6 @@ pub struct Var {
     timestamp: usize,
     /// the `Flag`s
     flags: Flag,
-
-    #[cfg(feature = "explore_timestamp")]
-    /// the number of conflicts at which this var was assigned lastly
-    assign_timestamp: usize,
-
-    #[cfg(feature = "extra_var_reward")]
-    /// a special reward given by aux rewarding mechanism
-    extra_reward: f64,
 }
 
 /// A record of assignment. It's called 'trail' in Glucose.
@@ -105,30 +106,34 @@ pub struct AssignStack {
     trail_lim: Vec<usize>,
     q_head: usize,
     pub root_level: DecisionLevel,
-    last_conflict: VarId,
     var_order: VarIdHeap, // Variable Order
 
     //
     //## Phase handling
     //
-    use_rephase: bool,
     best_assign: bool,
-    best_phases: HashMap<VarId, bool>,
     build_best_at: usize,
     num_best_assign: usize,
     rephasing: bool,
+    #[cfg(feature = "best_phases_tracking")]
+    best_phases: HashMap<VarId, (bool, AssignReason)>,
 
     //
     //## Stage handling
     //
-    use_stage: bool,
+    #[cfg(feature = "var_staging")]
     /// Decay rate for staging reward
     staging_reward_decay: f64,
+    #[cfg(feature = "var_staging")]
     /// Bonus reward for vars on stage
     staging_reward_value: f64,
+    #[cfg(feature = "var_staging")]
     staged_vars: HashMap<VarId, bool>,
+    #[cfg(feature = "var_staging")]
     stage_mode_select: usize,
     num_stages: usize,
+    stage_activity: f64,
+    reward_index: usize,
 
     //
     //## Statistics
@@ -160,21 +165,14 @@ pub struct AssignStack {
     //
     /// var activity decay
     activity_decay: f64,
+    /// the default value of var activity decay in configuration
+    activity_decay_default: f64,
     /// its diff
     activity_anti_decay: f64,
-
-    #[cfg(feature = "moving_var_reward_rate")]
-    /// maximum var activity decay
-    activity_decay_max: f64,
-    #[cfg(feature = "moving_var_reward_rate")]
-    /// minimum var activity decay
-    activity_decay_min: f64,
-    #[cfg(feature = "moving_var_reward_rate")]
+    /// EMA of activity
+    activity_ema: Ema,
     /// ONLY used in feature EVSIDS
-    reward_step: f64,
-
-    /// for LR
-    occurrence_compression_rate: f64,
+    activity_decay_step: f64,
 
     //
     //## Vivification
@@ -198,16 +196,80 @@ pub struct VarIdHeap {
     idxs: Vec<usize>,
 }
 
-impl<'a> ExportBox<'a, (&'a Ema, &'a Ema, &'a Ema)> for AssignStack {
-    // returns references to EMAs:
-    // 1. dpc = decision / conflict
-    // 1. ppc = propagation / conflict
-    // 1. cpr = conflict / restart
-    fn exports_box(&'a self) -> Box<(&'a Ema, &'a Ema, &'a Ema)> {
-        Box::from((
-            self.dpc_ema.get_ema(),
-            self.ppc_ema.get_ema(),
-            self.cpr_ema.get_ema(),
-        ))
+impl VarIdHeap {
+    pub fn new(n: usize, init: usize) -> Self {
+        let mut heap = Vec::with_capacity(n + 1);
+        let mut idxs = Vec::with_capacity(n + 1);
+        heap.push(0);
+        idxs.push(n);
+        for i in 1..=n {
+            heap.push(i);
+            idxs.push(i);
+        }
+        idxs[0] = init;
+        VarIdHeap { heap, idxs }
+    }
+}
+
+pub mod property {
+    use super::AssignStack;
+    use crate::types::*;
+
+    #[derive(Clone, Debug, PartialEq)]
+    pub enum Tusize {
+        NumConflict,
+        NumDecision,
+        NumPropagation,
+        NumRestart,
+        //
+        //## var stat
+        //
+        NumVar,
+        NumAssertedVar,
+        NumEliminatedVar,
+        /// the number of vars in `the unreachable core'
+        NumUnassertedVar,
+        NumUnassignedVar,
+        NumUnreachableVar,
+    }
+
+    impl PropertyDereference<Tusize, usize> for AssignStack {
+        #[inline]
+        fn derefer(&self, k: Tusize) -> usize {
+            match k {
+                Tusize::NumConflict => self.num_conflict,
+                Tusize::NumDecision => self.num_decision,
+                Tusize::NumPropagation => self.num_propagation,
+                Tusize::NumRestart => self.num_restart,
+                Tusize::NumVar => self.num_vars,
+                Tusize::NumAssertedVar => self.num_asserted_vars,
+                Tusize::NumEliminatedVar => self.num_eliminated_vars,
+                Tusize::NumUnassertedVar => {
+                    self.num_vars - self.num_eliminated_vars - self.num_asserted_vars
+                }
+                Tusize::NumUnassignedVar => {
+                    self.num_vars - self.num_eliminated_vars - self.trail.len()
+                }
+                Tusize::NumUnreachableVar => self.num_vars - self.num_best_assign,
+            }
+        }
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    pub enum TEma {
+        DPC,
+        PPC,
+        CPR,
+    }
+
+    impl PropertyReference<TEma, Ema> for AssignStack {
+        #[inline]
+        fn refer(&self, k: TEma) -> &Ema {
+            match k {
+                TEma::DPC => self.dpc_ema.get_ema(),
+                TEma::PPC => self.ppc_ema.get_ema(),
+                TEma::CPR => self.cpr_ema.get_ema(),
+            }
+        }
     }
 }

@@ -5,7 +5,7 @@
 //!# Example
 //!
 //!```
-//!  use splr::{processor::EliminateIF, solver::Solver, types::Export};
+//!  use splr::{processor::{self, EliminateIF}, solver::Solver, types::PropertyDereference};
 //!  use std::convert::TryFrom;
 //!  let mut s = Solver::try_from("tests/sample.cnf").expect("failed to load");
 //!  let Solver {
@@ -17,7 +17,7 @@
 //!  } = s;
 //!  elim.activate();
 //!  elim.simplify(asg, cdb, state).expect("panic");
-//!  assert_eq!(elim.exports().0, 1);
+//!  assert_eq!(elim.derefer(processor::property::Tusize::NumFullElimination), 1);
 //!  assert!(0 < asg.num_eliminated_vars);
 //!```
 
@@ -25,11 +25,13 @@ mod eliminate;
 mod heap;
 mod subsume;
 
+pub use self::property::*;
+
 use {
-    self::{eliminate::eliminate_var, heap::VarOrderIF, subsume::try_subsume},
+    self::eliminate::eliminate_var,
     crate::{
-        assign::AssignIF,
-        cdb::ClauseDBIF,
+        assign::{self, AssignIF},
+        cdb::{self, ClauseDBIF},
         solver::SolverEvent,
         state::{State, StateIF},
         types::*,
@@ -100,38 +102,11 @@ pub trait EliminateIF {
     fn eliminated_lits(&self) -> &[Lit];
 }
 
-/// API for getting stats about Eliminator's internal data.
-pub trait EliminatorStatIF {
-    fn stats(&self) -> (usize, usize);
-}
-
 #[derive(Copy, Clone, Eq, Debug, PartialEq)]
 enum EliminatorMode {
     Dormant,
     Waiting,
     Running,
-}
-
-impl Export<(usize, usize, f64), ()> for Eliminator {
-    /// exports:
-    ///  1. the number of full eliminations
-    ///  1. the number of satisfied clause eliminations
-    ///
-    ///```
-    /// use crate::{splr::config::Config, splr::types::*};
-    /// use crate::splr::processor::Eliminator;
-    /// let elim = Eliminator::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (elim_num_full_elimination, elim_num_sat_elimination, elim_to_simplify) = elim.exports();
-    ///```
-    #[inline]
-    fn exports(&self) -> (usize, usize, f64) {
-        (
-            self.num_full_elimination,
-            self.num_sat_elimination,
-            self.to_simplify,
-        )
-    }
-    fn mode(&self) {}
 }
 
 /// Mapping from Literal to Clauses.
@@ -191,6 +166,21 @@ pub struct VarOccHeap {
     idxs: Vec<usize>, // VarId : -> order : usize
 }
 
+impl VarOccHeap {
+    pub fn new(n: usize, init: usize) -> Self {
+        let mut heap = Vec::with_capacity(n + 1);
+        let mut idxs = Vec::with_capacity(n + 1);
+        heap.push(0);
+        idxs.push(n);
+        for i in 1..=n {
+            heap.push(i);
+            idxs.push(i);
+        }
+        idxs[0] = init;
+        VarOccHeap { heap, idxs }
+    }
+}
+
 /// Literal eliminator
 #[derive(Clone, Debug)]
 pub struct Eliminator {
@@ -213,16 +203,20 @@ pub struct Eliminator {
     /// A criteria by the product's of its positive occurrences and negative ones
     pub eliminate_occurrence_limit: usize,
     /// Stop subsumption if the size of a clause is over this
-    pub subsume_literal_limit: usize,
+    subsume_literal_limit: usize,
     /// var
     var: Vec<LitOccurs>,
     num_full_elimination: usize,
     num_sat_elimination: usize,
+    num_subsumed: usize,
 }
 
 impl Default for Eliminator {
     fn default() -> Eliminator {
         Eliminator {
+            #[cfg(not(feature = "clause_elimination"))]
+            enable: false,
+            #[cfg(feature = "clause_elimination")]
             enable: true,
             to_simplify: 0.0,
             mode: EliminatorMode::Dormant,
@@ -238,6 +232,7 @@ impl Default for Eliminator {
             var: Vec::new(),
             num_full_elimination: 0,
             num_sat_elimination: 0,
+            num_subsumed: 0,
         }
     }
 }
@@ -336,7 +331,6 @@ impl Instantiate for Eliminator {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Eliminator {
         let nv = cnf.num_of_variables;
         Eliminator {
-            enable: config.use_elim(),
             var_queue: VarOccHeap::new(nv, 0),
             eliminate_var_occurrence_limit: config.elm_var_occ,
             eliminate_grow_limit: config.elm_grw_lim,
@@ -358,6 +352,44 @@ impl Instantiate for Eliminator {
                 self.elim_lits.clear();
             }
             _ => (),
+        }
+    }
+}
+
+trait VarOrderIF {
+    fn clear<A>(&mut self, asg: &mut A)
+    where
+        A: AssignIF;
+    fn len(&self) -> usize;
+    fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upward: bool);
+    fn is_empty(&self) -> bool;
+    fn select_var<A>(&mut self, occur: &[LitOccurs], asg: &A) -> Option<VarId>
+    where
+        A: AssignIF;
+    fn rebuild<A>(&mut self, asg: &A, occur: &[LitOccurs])
+    where
+        A: AssignIF;
+}
+
+pub mod property {
+    use super::Eliminator;
+    use crate::types::*;
+
+    #[derive(Clone, Debug, PartialEq)]
+    pub enum Tusize {
+        NumClauseSubsumption,
+        NumFullElimination,
+        NumSatElimination,
+    }
+
+    impl PropertyDereference<Tusize, usize> for Eliminator {
+        #[inline]
+        fn derefer(&self, k: Tusize) -> usize {
+            match k {
+                Tusize::NumClauseSubsumption => self.num_subsumed,
+                Tusize::NumFullElimination => self.num_full_elimination,
+                Tusize::NumSatElimination => self.num_sat_elimination,
+            }
         }
     }
 }
@@ -413,7 +445,7 @@ impl EliminateIF for Eliminator {
             self.add_cid_occur(asg, ClauseId::from(cid), c, false);
         }
         if force {
-            for vi in 1..=asg.var_stats().0 {
+            for vi in 1..=asg.derefer(assign::property::Tusize::NumVar) {
                 if asg.var(vi).is(Flag::ELIMINATED) || asg.assign(vi).is_some() {
                     continue;
                 }
@@ -439,6 +471,7 @@ impl EliminateIF for Eliminator {
         A: AssignIF,
         C: ClauseDBIF,
     {
+        self.to_simplify = 0.0;
         debug_assert_eq!(asg.decision_level(), 0);
         // we can reset all the reasons because decision level is zero.
         #[cfg(feature = "boundary_check")]
@@ -450,12 +483,19 @@ impl EliminateIF for Eliminator {
                 }
             }
         }
-        if self.is_waiting() {
-            self.prepare(asg, cdb, true);
-        }
-        self.eliminate(asg, cdb, state)?;
-        if self.is_running() {
-            self.stop(asg, cdb);
+        if self.enable {
+            self.subsume_literal_limit = (state.config.elm_cls_lim
+                + cdb.derefer(cdb::property::Tf64::DpAverageLBD) as usize)
+                / 2;
+            if self.is_waiting() {
+                self.prepare(asg, cdb, true);
+            }
+            self.eliminate(asg, cdb, state)?;
+            if self.is_running() {
+                self.stop(asg, cdb);
+            }
+        } else {
+            self.eliminate_satisfied_clauses(asg, cdb, true);
         }
         cdb.check_size().map(|_| ())
     }
@@ -617,7 +657,7 @@ impl Eliminator {
                             return Ok(());
                         }
                         if !d.is(Flag::DEAD) && d.len() <= self.subsume_literal_limit {
-                            try_subsume(asg, cdb, self, cid, *did)?;
+                            self.try_subsume(asg, cdb, cid, *did)?;
                         }
                     }
                 }
@@ -671,9 +711,9 @@ impl Eliminator {
             return Ok(());
         }
         let mut timedout: usize = {
-            let nv = asg.var_stats().3 as f64; // un-asserted vars
+            let nv = asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64;
             let nc = cdb.count() as f64;
-            (6.0 * nv.log(2.0) * nc) as usize
+            (6.0 * nv.log(1.5) * nc) as usize
         };
         while self.bwdsub_assigns < asg.stack_len()
             || !self.var_queue.is_empty()
@@ -862,9 +902,6 @@ mod tests {
             ..
         } = s;
         assert!(elim.enable);
-        // elim.eliminate_combination_limit = 2;
-        // elim.eliminate_occurrence_limit = 1;
-        // elim.subsume_literal_limit = 1;
         elim.activate();
         elim.simplify(asg, cdb, state).expect("");
         assert_eq!(elim.num_full_elimination, 1);

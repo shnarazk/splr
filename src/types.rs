@@ -8,6 +8,7 @@ pub use crate::{
 use {
     crate::solver::SolverEvent,
     std::{
+        cmp::Ordering,
         convert::TryFrom,
         fmt,
         fs::File,
@@ -21,14 +22,11 @@ use {
 /// For example, `State::progress` needs to access misc parameters and statistics,
 /// which, however, should be used locally in the defining modules.
 /// To avoid to make them public, we define a generic accessor or exporter here.
-/// `T` is the list of exporting values.
-pub trait Export<T, Mode> {
-    fn exports(&self) -> T;
-    fn mode(&self) -> Mode;
+pub trait PropertyReference<I, O> {
+    fn refer(&self, key: I) -> &O;
 }
-
-pub trait ExportBox<'a, T> {
-    fn exports_box(&'a self) -> Box<T>;
+pub trait PropertyDereference<I, O: Sized> {
+    fn derefer(&self, key: I) -> O;
 }
 
 /// API for Literal like `from_int`, `from_assign`, `to_cid` and so on.
@@ -48,20 +46,22 @@ pub trait LitIF {
 pub trait ActivityIF<Ix> {
     /// return one's activity.
     fn activity(&mut self, ix: Ix) -> f64;
-    /// initialize one's reward.
-    fn initialize_reward(&mut self, _ix: Ix) {
-        #[cfg(debug)]
-        todo!()
-    }
-    /// clear one's activity
-    fn clear_reward(&mut self, ix: Ix);
+    /// return average activity
+    fn average_activity(&self) -> f64;
+    /// set activity
+    fn set_activity(&mut self, ix: Ix, val: f64);
     /// modify one's activity at conflict analysis in `conflict_analyze` in [`solver`](`crate::solver`).
     fn reward_at_analysis(&mut self, _ix: Ix) {
         #[cfg(debug)]
         todo!()
     }
-    /// modify one's activity at value assignment in unit propagation.
+    /// modify one's activity at value assignment in assign.
     fn reward_at_assign(&mut self, _ix: Ix) {
+        #[cfg(debug)]
+        todo!()
+    }
+    /// modify one's activity at value assignment in unit propagation.
+    fn reward_at_propagation(&mut self, _ix: Ix) {
         #[cfg(debug)]
         todo!()
     }
@@ -72,9 +72,8 @@ pub trait ActivityIF<Ix> {
     }
     /// update internal counter.
     fn update_rewards(&mut self);
-    #[cfg(feature = "moving_var_reward_rate")]
-    /// update reward setting as a part of module adaptation.
-    fn adjust_rewards(&mut self, state: &State) {
+    /// update reward decay.
+    fn update_activity_decay(&mut self, _index: Option<usize>) {
         #[cfg(debug)]
         todo!()
     }
@@ -767,12 +766,14 @@ bitflags! {
         const ELIMINATED   = 0b0000_0010_0000_0000;
         /// a var is checked during in the current conflict analysis.
         const CA_SEEN      = 0b0000_0100_0000_0000;
-        /// the previous assigned value of a Var.
+        /// * the previous assigned value of a Var.
         const PHASE        = 0b0000_1000_0000_0000;
+        /// * var is selected as a staged var
+        const STAGED       = 0b0001_0000_0000_0000;
 
         #[cfg(feature = "just_used")]
         /// a clause is used recently in conflict analysis.
-        const JUST_USED    = 0b0001_0000_0000_0000;
+        const JUST_USED    = 0b0010_0000_0000_0000;
     }
 }
 
@@ -807,6 +808,68 @@ impl Logger {
         } else {
             println!("{}", mes);
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct OrderedProxy<T: Clone + Default + Sized> {
+    index: f64,
+    body: T,
+}
+
+impl<T: Clone + Default + Sized> Default for OrderedProxy<T> {
+    fn default() -> Self {
+        OrderedProxy {
+            index: 0.0,
+            body: T::default(),
+        }
+    }
+}
+
+impl<T: Clone + Default + Sized> PartialEq for OrderedProxy<T> {
+    fn eq(&self, other: &OrderedProxy<T>) -> bool {
+        self.index == other.index
+    }
+}
+
+impl<T: Clone + Default + Sized> Eq for OrderedProxy<T> {}
+
+impl<T: Clone + Default + PartialEq> PartialOrd for OrderedProxy<T> {
+    fn partial_cmp(&self, other: &OrderedProxy<T>) -> Option<Ordering> {
+        if (self.index - other.index).abs() < f64::EPSILON {
+            Some(Ordering::Equal)
+        } else if self.index < other.index {
+            Some(Ordering::Less)
+        } else {
+            Some(Ordering::Greater)
+        }
+    }
+}
+
+impl<T: Clone + Default + PartialEq> Ord for OrderedProxy<T> {
+    fn cmp(&self, other: &OrderedProxy<T>) -> Ordering {
+        if (self.index - other.index).abs() < f64::EPSILON {
+            Ordering::Equal
+        } else if self.index < other.index {
+            Ordering::Less
+        } else {
+            Ordering::Greater
+        }
+    }
+}
+
+impl<T: Clone + Default + Sized> OrderedProxy<T> {
+    pub fn new(body: T, index: f64) -> Self {
+        OrderedProxy { index, body }
+    }
+    pub fn new_invert(body: T, rindex: f64) -> Self {
+        OrderedProxy {
+            index: -rindex,
+            body,
+        }
+    }
+    pub fn to(&self) -> T {
+        self.body.clone()
     }
 }
 

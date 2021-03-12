@@ -3,8 +3,8 @@ use {crate::cdb::ClauseDBIF, std::cmp::Ordering};
 /// Crate `state` is a collection of internal data.
 use {
     crate::{
-        assign::{AssignIF, VarSelectIF},
-        solver::{RestartIF, RestartMode, RestarterEMAs, SolverEvent},
+        assign, cdb, processor,
+        solver::{self, SolverEvent},
         types::*,
     },
     std::{
@@ -31,21 +31,21 @@ pub trait StateIF {
     /// change heuristics based on stat data.
     fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
-        A: Export<(usize, usize, usize, f64), ()>,
-        C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), bool>;
+        A: AssignIF,
+        C: PropertyDereference<cdb::property::Tusize, usize>;
 
     /// write a header of stat data to stdio.
     fn progress_header(&mut self);
     /// write stat data to stdio.
-    fn progress<'a, 'r, A, C, E, R>(&mut self, asg: &'a A, cdb: &C, elim: &E, rst: &'r R)
+    fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R)
     where
-        A: AssignIF
-            + VarSelectIF
-            + Export<(usize, usize, usize, usize), ()>
-            + ExportBox<'a, (&'a Ema, &'a Ema, &'a Ema)>,
-        C: Export<(usize, usize, usize, usize, usize, usize), bool>,
-        E: Export<(usize, usize, f64), ()>,
-        R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>;
+        A: PropertyDereference<assign::property::Tusize, usize>
+            + PropertyReference<assign::property::TEma, Ema>,
+        C: PropertyDereference<cdb::property::Tusize, usize>
+            + PropertyDereference<cdb::property::Tf64, f64>,
+        E: PropertyDereference<processor::property::Tusize, usize>,
+        R: PropertyDereference<solver::restart::property::Tusize, usize>
+            + PropertyReference<solver::restart::property::TEma2, Ema2>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
     /// write a one-line message as log.
@@ -55,22 +55,12 @@ pub trait StateIF {
 /// Phase saving modes.
 #[derive(Debug, Eq, PartialEq)]
 pub enum StagingTarget {
-    /// select some targets cyclicly.
-    AutoSelect,
-    /// use best phases with some unsettled vars
-    Best(usize),
+    /// use decision vars in best phases
+    Backbone,
+    /// use best phases
+    BestPhases,
     /// unstage all vars.
     Clear,
-    /// choose vars in core
-    Core,
-    ///
-    LastAssigned,
-    /// select random vars.
-    Random,
-
-    #[cfg(feature = "explore_timestamp")]
-    /// seek unchecked vars.
-    Explore,
 }
 
 impl fmt::Display for StagingTarget {
@@ -79,15 +69,9 @@ impl fmt::Display for StagingTarget {
             formatter,
             "{}",
             match self {
-                StagingTarget::AutoSelect => "StageMode",
-                StagingTarget::Best(_) => "StageMode_top",
-                StagingTarget::Clear => "StageMode_Clear",
-                StagingTarget::Core => "StageMode_Core",
-                StagingTarget::LastAssigned => "StageMode_LA",
-                StagingTarget::Random => "Stage_Random",
-
-                #[cfg(feature = "explore_timestamp")]
-                StagingTarget::Explore => "StageMode_Exp",
+                StagingTarget::Backbone => "Staging_backbone",
+                StagingTarget::BestPhases => "Staging_bestphase",
+                StagingTarget::Clear => "Staging_none",
             }
         )
     }
@@ -202,10 +186,7 @@ pub struct State {
     pub target: CNFDescription,
     /// strategy adjustment interval in conflict
     pub reflection_interval: usize,
-    /// time to execute vivification
-    pub to_vivify: f64,
-    /// loop limit of vivification loop
-    pub vivify_thr: usize,
+
     //
     //## MISC
     //
@@ -215,6 +196,8 @@ pub struct State {
     pub c_lvl: Ema,
     /// hold conflicting literals for UNSAT problems
     pub conflicts: Vec<Lit>,
+    /// choroBT threshold
+    pub chrono_bt_threshold: DecisionLevel,
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
     /// working place to build learnt clauses
@@ -244,11 +227,11 @@ impl Default for State {
 
             target: CNFDescription::default(),
             reflection_interval: 10_000,
-            to_vivify: 0.0,
-            vivify_thr: 0,
+
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
             conflicts: Vec::new(),
+            chrono_bt_threshold: 100,
             last_asg: 0,
             new_learnt: Vec::new(),
             derive20: Vec::new(),
@@ -265,14 +248,14 @@ impl Index<Stat> for State {
     type Output = usize;
     #[inline]
     fn index(&self, i: Stat) -> &usize {
-        &self.stats[i as usize]
+        unsafe { self.stats.get_unchecked(i as usize) }
     }
 }
 
 impl IndexMut<Stat> for State {
     #[inline]
     fn index_mut(&mut self, i: Stat) -> &mut usize {
-        &mut self.stats[i as usize]
+        unsafe { self.stats.get_unchecked_mut(i as usize) }
     }
 }
 
@@ -282,13 +265,8 @@ impl Instantiate for State {
             config: config.clone(),
 
             #[cfg(feature = "strategy_adaptation")]
-            strategy: if config.use_adaptive() {
-                (SearchStrategy::Initial, 0)
-            } else {
-                (SearchStrategy::Generic, 0)
-            },
+            strategy: (SearchStrategy::Initial, 0),
 
-            vivify_thr: config.viv_thr,
             target: cnf.clone(),
             time_limit: config.c_timeout,
             ..State::default()
@@ -306,6 +284,8 @@ impl Instantiate for State {
             SolverEvent::Reinitialize => (),
             SolverEvent::Restart => (),
             SolverEvent::Stabilize((_, _)) => (),
+
+            #[cfg(feature = "clause_vivification")]
             SolverEvent::Vivify(_) => (),
 
             #[cfg(feature = "strategy_adaptation")]
@@ -414,16 +394,16 @@ impl StateIF for State {
     #[cfg(feature = "strategy_adaptation")]
     fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
-        A: Export<(usize, usize, usize, f64), ()>,
-        C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), bool>,
+        A: AssignIF,
+        C: PropertyDereference<cdb::property::Tusize, usize>,
     {
-        if !self.config.use_adaptive() {
-            return;
-        }
-        let (asg_num_decision, asg_num_propagation, asg_num_conflict, asg_num_restart) =
-            asg.exports();
-        let (_active, _bi_clause, cdb_num_bi_learnt, cdb_num_lbd2, _learnt, _reduction) =
-            cdb.exports();
+        let asg_num_conflict = asg.refer(assign::property::A2usize::NumConflict);
+        let asg_num_decision = asg.refer(assign::property::A2usize::NumDecision);
+        let asg_num_propagation = asg.refer(assign::property::A2usize::NumPropergation);
+        let asg_num_restart = asg.refer(assign::property::A2usize::NumRestart);
+        let cdb_num_bi_learnt = cdb.refer(cdb::property::Tusize::NumBiLearnt);
+        let cdb_num_lbd2 = cdb.refer(cdb::property::Tusize::NumLBD2);
+
         debug_assert_eq!(self.strategy.0, SearchStrategy::Initial);
         self.strategy.0 = match () {
             _ if cdb_num_bi_learnt + 20_000 < cdb_num_lbd2 => SearchStrategy::ManyGlues,
@@ -472,15 +452,15 @@ impl StateIF for State {
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
-    fn progress<'a, 'r, A, C, E, R>(&mut self, asg: &'a A, cdb: &C, elim: &E, rst: &'r R)
+    fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R)
     where
-        A: AssignIF
-            + VarSelectIF
-            + Export<(usize, usize, usize, usize), ()>
-            + ExportBox<'a, (&'a Ema, &'a Ema, &'a Ema)>,
-        C: Export<(usize, usize, usize, usize, usize, usize), bool>,
-        E: Export<(usize, usize, f64), ()>,
-        R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>,
+        A: PropertyDereference<assign::property::Tusize, usize>
+            + PropertyReference<assign::property::TEma, Ema>,
+        C: PropertyDereference<cdb::property::Tusize, usize>
+            + PropertyDereference<cdb::property::Tf64, f64>,
+        E: PropertyDereference<processor::property::Tusize, usize>,
+        R: PropertyDereference<solver::restart::property::Tusize, usize>
+            + PropertyReference<solver::restart::property::TEma2, Ema2>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
             return;
@@ -489,33 +469,36 @@ impl StateIF for State {
         //
         //## Gather stats from all modules
         //
-        let (
-            asg_num_vars,
-            asg_num_asserted_vars,
-            asg_num_eliminated_vars,
-            asg_num_unasserted_vars,
-            asg_unreachables,
-        ) = asg.var_stats();
+        let asg_num_vars = asg.derefer(assign::property::Tusize::NumVar);
+        let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
+        let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumEliminatedVar);
+        let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+        let asg_num_unreachables = asg.derefer(assign::property::Tusize::NumUnreachableVar);
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let (asg_num_decision, asg_num_propagation, asg_num_conflict, _asg_num_restart) =
-            asg.exports();
-        let (asg_dpc_ema, asg_ppc_ema, asg_cpr_ema) = *asg.exports_box();
+        let asg_num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
+        let asg_num_decision = asg.derefer(assign::property::Tusize::NumDecision);
+        let asg_num_propagation = asg.derefer(assign::property::Tusize::NumPropagation);
 
-        let (cdb_num_active, cdb_num_biclause, _num_bl, cdb_num_lbd2, cdb_num_learnt, _cdb_nr) =
-            cdb.exports();
+        let asg_dpc_ema = asg.refer(assign::property::TEma::DPC);
+        let asg_ppc_ema = asg.refer(assign::property::TEma::PPC);
+        let asg_cpr_ema = asg.refer(assign::property::TEma::CPR);
 
-        let (elim_num_full, _num_sat, _elim_to_simplify) = elim.exports();
+        let cdb_num_active = cdb.derefer(cdb::property::Tusize::NumActive);
+        let cdb_num_biclause = cdb.derefer(cdb::property::Tusize::NumBiClause);
+        let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
+        let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
+        let cdb_lbd_of_dp: f64 = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
 
-        let rst_mode = rst.mode().0;
+        let elim_num_full = elim.derefer(processor::property::Tusize::NumFullElimination);
+        let elim_num_sub = elim.derefer(processor::property::Tusize::NumClauseSubsumption);
 
-        let (rst_num_blk, rst_num_rst, rst_num_span, rst_num_cycle, _stb_lspan) = rst.exports();
-        // let rst_num_stb = rst.mode().1;
-
-        #[cfg(not(feature = "progress_ACC"))]
-        let (rst_asg, rst_lbd) = *rst.exports_box();
-
-        #[cfg(feature = "progress_ACC")]
-        let (_rst_acc, rst_asg, rst_lbd) = *rst.exports_box();
+        let rst_num_blk: usize = rst.derefer(solver::restart::property::Tusize::NumBlock);
+        let rst_num_rst: usize = rst.derefer(solver::restart::property::Tusize::NumRestart);
+        let rst_trg_lvl: usize = rst.derefer(solver::restart::property::Tusize::TriggerLevel);
+        let rst_trg_lvl_max: usize =
+            rst.derefer(solver::restart::property::Tusize::TriggerLevelMax);
+        let rst_asg: &Ema2 = rst.refer(solver::restart::property::TEma2::ASG);
+        let rst_lbd: &Ema2 = rst.refer(solver::restart::property::TEma2::LBD);
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -590,34 +573,22 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K {}|#BLK:{}, #RST:{}, #ion:{}, Lspn:{}",
-            match rst_mode {
-                RestartMode::Dynamic => "    Restart",
-                RestartMode::Luby if self.config.no_color => "LubyRestart",
-                RestartMode::Luby => "\x1B[001m\x1B[035mLubyRestart\x1B[000m",
-                RestartMode::Stabilize if self.config.no_color => "  Stabilize",
-                RestartMode::Stabilize => "  \x1B[001m\x1B[036mStabilize\x1B[000m",
-            },
+            "\x1B[2K     Restart|#BLK:{}, #RST:{}, trgr:{}, peak:{}",
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-            im!("{:>9}", self, LogUsizeId::NumIon, {
-                #[cfg(not(feature = "staging"))]
-                {
-                    0
-                }
-                #[cfg(feature = "staging")]
-                {
-                    asg.num_staging_cands()
-                }
-            }),
-            im!("{:>9}", self, LogUsizeId::LubySpan, rst_num_span),
+            im!("{:>9}", self, LogUsizeId::RestartTriggerLevel, rst_trg_lvl),
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::RestartTriggerLevelMax,
+                rst_trg_lvl_max
+            ),
         );
-        self[LogUsizeId::LubyCycle] = rst_num_cycle;
         println!(
-            "\x1B[2K         EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{}",
+            "\x1B[2K         LBD|avrg:{}, trnd:{}, depG:{}, /dpc:{}",
+            fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd.get()),
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
-            fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
-            im!("{:>9}", self, LogUsizeId::UnreachableCore, asg_unreachables),
+            fm!("{:>9.4}", self, LogF64Id::DpAverageLBD, cdb_lbd_of_dp),
             fm!(
                 "{:>9.2}",
                 self,
@@ -626,8 +597,8 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{}",
-            fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get()),
+            "\x1B[2K    Conflict|tASG:{}, cLvl:{}, bLvl:{}, /ppc:{}",
+            fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
             fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
             fm!(
@@ -638,14 +609,14 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|elim:{}, cviv:{}, #vbv:{}, /cpr:{}",
+            "\x1B[2K        misc|elim:{}, #sub:{}, core:{}, /cpr:{}",
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
-            im!("{:>9}", self, LogUsizeId::Vivify, self[Stat::Vivification]),
+            im!("{:>9}", self, LogUsizeId::ClauseSubsumption, elim_num_sub),
             im!(
                 "{:>9}",
                 self,
-                LogUsizeId::VivifiedVar,
-                self[Stat::VivifiedVar]
+                LogUsizeId::UnreachableCore,
+                asg_num_unreachables
             ),
             fm!(
                 "{:>9.2}",
@@ -748,32 +719,23 @@ impl State {
     }
     fn dump<A, C, R>(&mut self, asg: &A, cdb: &C, rst: &R)
     where
-        A: AssignIF + Export<(usize, usize, usize, usize), ()>,
-        C: Export<(usize, usize, usize, usize, usize, usize), bool>,
-        R: RestartIF,
+        A: PropertyDereference<assign::property::Tusize, usize>,
+        C: PropertyDereference<cdb::property::Tusize, usize>,
+        R: PropertyDereference<solver::restart::property::Tusize, usize>,
     {
         self.progress_cnt += 1;
-        let (
-            asg_num_vars,
-            asg_num_asserted_vars,
-            asg_num_eliminated_vars,
-            asg_num_unasserted_vars,
-            _,
-        ) = asg.var_stats();
+        let asg_num_vars = asg.derefer(assign::property::Tusize::NumVar);
+        let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
+        let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumEliminatedVar);
+        let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let (_num_decision, _num_propagation, asg_num_conflict, asg_num_restart) = asg.exports();
-        let (
-            cdb_num_active,
-            _num_bi_clause,
-            _num_bi_learnt,
-            cdb_num_lbd2,
-            cdb_num_learnt,
-            cdb_num_reduction,
-        ) = cdb.exports();
-        let rst_num_block = {
-            let e = rst.exports();
-            e.0 + e.2
-        };
+        let asg_num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
+        let asg_num_restart = asg.derefer(assign::property::Tusize::NumRestart);
+        let cdb_num_active = cdb.derefer(cdb::property::Tusize::NumActive);
+        let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
+        let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
+        let cdb_num_reduction = cdb.derefer(cdb::property::Tusize::NumReduction);
+        let rst_num_block = rst.derefer(solver::restart::property::Tusize::NumBlock);
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
             asg_num_restart,                           // restart
@@ -792,38 +754,23 @@ impl State {
     #[allow(dead_code)]
     fn dump_details<'r, A, C, E, R, V>(&mut self, asg: &A, cdb: &C, rst: &'r R)
     where
-        A: AssignIF + Export<(usize, usize, usize, f64), ()>,
-        C: Export<(usize, usize, usize, usize, usize, usize), bool>,
-        R: RestartIF + ExportBox<'r, RestarterEMAs<'r>>,
+        A: PropertyDereference<assign::property::Tusize, usize>,
+        C: PropertyDereference<cdb::property::Tusize, usize>,
+        R: PropertyDereference<solver::restart::property::Tusize, usize>
+            + PropertyReference<solver::restart::property::TEma2, Ema2>,
     {
         self.progress_cnt += 1;
-        let (
-            asg_num_vars,
-            asg_num_asserted_vars,
-            asg_num_eliminated_vars,
-            asg_num_unasserted_vars,
-            _,
-        ) = asg.var_stats();
+        let asg_num_vars = asg.derefer(assign::property::Tusize::NumVar);
+        let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
+        let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumEliminatedVar);
+        let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let (_num_decision, _num_propagation, _num_conflict, asg_num_restart) = asg.exports();
-        let (
-            cdb_num_active,
-            _num_bi_clause,
-            _num_bi_learnt,
-            _num_lbd2,
-            cdb_num_learnt,
-            _num_reduction,
-        ) = cdb.exports();
-        let rst_num_block = {
-            let e = rst.exports();
-            e.0 + e.2
-        };
-
-        #[cfg(not(feature = "progress_ACC"))]
-        let (rst_asg, rst_lbd) = *rst.exports_box();
-
-        #[cfg(feature = "progress_ACC")]
-        let (_, rst_asg, rst_lbd) = *rst.exports_box();
+        let asg_num_restart = asg.derefer(assign::property::Tusize::NumRestart);
+        let cdb_num_active = cdb.derefer(cdb::property::Tusize::NumActive);
+        let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
+        let rst_num_block = rst.derefer(solver::restart::property::Tusize::NumBlock);
+        let rst_asg = rst.refer(solver::restart::property::TEma2::ASG);
+        let rst_lbd = rst.refer(solver::restart::property::TEma2::LBD);
 
         println!(
             "{:>3},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
@@ -879,19 +826,19 @@ pub enum LogUsizeId {
     //
     //## stabilization, staging and restart
     //
-    LubyCycle,
-    LubySpan,
-    NumIon,
     Restart,
     RestartBlock,
     RestartCancel,
     RestartStabilize,
+    RestartTriggerLevel,
+    RestartTriggerLevelMax,
 
     //
-    //## pre-in processor
+    //## pre(in)-processor
     //
     Simplify,
     Stabilize,
+    ClauseSubsumption,
     Vivify,
     VivifiedVar,
 
@@ -914,6 +861,7 @@ pub enum LogF64Id {
     DecisionPerConflict,
     ConflictPerRestart,
     PropagationPerConflict,
+    DpAverageLBD,
     End,
 }
 

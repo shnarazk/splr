@@ -140,7 +140,7 @@ fn main() {
     let mut s = Solver::build(&config).expect("failed to load");
     if args.assign == None {
         args.assign = Some(PathBuf::from(format!(
-            ".ans_{}",
+            "ans_{}",
             Path::new(&args.problem)
                 .file_name()
                 .unwrap()

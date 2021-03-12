@@ -1,3 +1,41 @@
+## 0.7.0, 2021-03-12
+
+- answer filenames start with "ans_" instead of ".ans_" by default.
+- reorganize trait
+  - replace {Export, ExportBox} with {PropertyDereference, PropertyReference}
+  - remove: ClauseManipulationIF, EliminatorStatIF
+  - export: Ema, Ema2, EmaIF, PropertyDereference, PropertyReference
+  - make private: assign::VarOrderIF, processor::VarOrderIF
+- reorganize features:
+  - add:
+    - best_phases_tracking
+    - best_phases_reuse
+    - clause_elimination
+    - clause_reduction
+    - clause_vivification
+    - LR_rewarding
+    - Luby_stabilization
+    - reason_side_rewarding
+    - var_staging
+  - drop:
+    - explore_timestamp
+    - extra_var_reward
+    - luby_blocking
+    - moving_var_reward_rate (switching to stage-based reward decay increment)
+    - progress_ACC
+    - progress_MLD
+    - pure_stabilization
+  - rename feature use_luby to Luby_restart
+- clause simplifier and clause vivifier are called at the ends of stages
+- Learning Rate based var rewarding uses a non-linear weight function.
+- Since Luby stabilization has long cycles, cycle-based tasks were organized. "Stage" is defined based on Luby-stabilization level. Updated terminology:
+   - _Luby stabilization_ is a scheme that defines duration of stabilization modes based on Luby series.
+   - Luby stabilization stage, or _stage_ is a span that shares a Luby value.
+   - _cycle_ is a span between two highest values in Luby series.
+   - _var boosting_ is to promote specific vars during a stage.
+   - _boosted vars_ or _staged vars_ are the vars promoted by var boosting.
+   - _rephrase_ is to promote specific literals during a stage.
+
 ## 0.6.3, 2021-02-12
 
 - `Solver` and other structs implement `Clone`
@@ -32,7 +70,7 @@
 - Solver::restart provides both of `restart` and `stabilize`
 - fix a bug in chronoBT, that occurred if a conflicting clause has just a single literal at the conflicting level.
 - revise command line option parser to handle the last option better
-- stabilization span and restart blocking spans are controlled with Luby sequence
+- stabilization span and restart blocking levels are controlled with Luby sequence
 - add an extra reward to vars involved in best phase
 - make the learning rate of var rewarding constant
 - change the definition of restart blocker and its default threshold
