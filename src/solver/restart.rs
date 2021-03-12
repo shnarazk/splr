@@ -383,13 +383,11 @@ impl GeometricStabilizer {
                 new_cycle = true;
                 self.num_cycle += 1;
                 self.longest_span = self.span;
-                if self.reset_requested {
-                    self.luby.reset();
-                    self.longest_span = 1;
-                    self.span = self.luby.next();
-                    self.reset_requested = false;
-                    self.next_trigger = now;
-                }
+            }
+            if self.reset_requested && self.span == 1 {
+                self.luby.reset();
+                self.longest_span = 1;
+                self.reset_requested = false;
             }
             self.span = self.luby.next();
             self.next_trigger = now + self.longest_span / self.span;
@@ -483,6 +481,7 @@ impl RestartIF for Restarter {
     fn restart(&mut self) -> Option<RestartDecision> {
         if self.luby.is_active() {
             self.luby.shift();
+            self.restart_step = self.initial_restart_step;
             return Some(RestartDecision::Force);
         }
 
@@ -493,12 +492,12 @@ impl RestartIF for Restarter {
         if self.asg.is_active() {
             self.num_block += 1;
             self.after_restart = 0;
-            self.restart_step = self.initial_restart_step * self.stb.span;
+            self.restart_step = self.initial_restart_step * self.stb.longest_span;
             self.restart_waiting = 0;
             return Some(RestartDecision::Block);
         }
-        self.restart_step = self.initial_restart_step;
         if self.lbd.is_active() {
+            self.restart_step = self.initial_restart_step;
             self.restart_waiting += 1;
             if self.stb.span <= self.restart_waiting {
                 self.restart_waiting = 0;
