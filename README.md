@@ -367,7 +367,7 @@ Here are the relations of values.
 |         25|    2 |     5 |    25 |   2 |       8 |         4 |       123-130 |   47-48 |
 |         26|    1 |     5 |    26 |   1 |       8 |         8 |       131-138 |      49 |
 
-You can see the effects of LubyStabilization with the value of 'trgr', 'peak' and '/cpr'
+You can see effects of LubyStabilization with the value of `trgr` for *N*, `peak` for max *N* and `/cpr` for 'conflict per restart'.
 
 ## License
 
