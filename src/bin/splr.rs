@@ -53,7 +53,7 @@ fn main() {
     let ans_file: Option<PathBuf> = match config.io_rfile.to_string_lossy().as_ref() {
         "-" => None,
         "" => Some(config.io_odir.join(PathBuf::from(format!(
-            ".ans_{}",
+            "ans_{}",
             config.cnf_file.file_name().unwrap().to_string_lossy(),
         )))),
         _ => Some(config.io_odir.join(&config.io_rfile)),
