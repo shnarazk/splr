@@ -215,26 +215,14 @@ fn search(
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
 
-    loop {
+    while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) {
+        if !asg.remains() {
+            let lit = asg.select_decision_literal();
+            asg.assign_by_decision(lit);
+            a_decision_was_made = true;
+        }
         let ci = asg.propagate(cdb);
-        if ci.is_none() {
-            //
-            //## NO CONFLICT PATH
-            //
-            state.last_asg = state.last_asg.max(asg.stack_len());
-            if asg.num_vars <= state.last_asg + asg.num_eliminated_vars {
-                return Ok(true);
-            }
-        } else {
-            //
-            //## CONFLICT
-            //
-            if 0 < state.last_asg {
-                rst.update(ProgressUpdate::ASG(
-                    asg.derefer(assign::property::Tusize::NumUnassignedVar),
-                ));
-                state.last_asg = 0;
-            }
+        if !ci.is_none() {
             if asg.decision_level() == asg.root_level {
                 analyze_final(asg, state, &cdb[ci]);
                 return Ok(false);
@@ -242,6 +230,9 @@ fn search(
             asg.update_rewards();
             cdb.update_rewards();
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
+            rst.update(ProgressUpdate::ASG(
+                asg.derefer(assign::property::Tusize::NumUnassignedVar),
+            ));
             if rst.restart() == Some(RestartDecision::Force) {
                 if let Some(new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);
@@ -323,12 +314,8 @@ fn search(
                 }
             }
         }
-        if !asg.remains() {
-            let lit = asg.select_decision_literal();
-            asg.assign_by_decision(lit);
-            a_decision_was_made = true;
-        }
     }
+    Ok(true)
 }
 
 #[cfg(feature = "strategy_adaptation")]
