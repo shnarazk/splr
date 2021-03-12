@@ -257,7 +257,14 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     out.write_all(
         format!(
             "c {:<43}, #var:{:9}, #cls:{:9}\n",
-            state.target.pathname, state.target.num_of_variables, state.target.num_of_clauses,
+            state
+                .config
+                .cnf_file
+                .file_name()
+                .map_or(Cow::from("file with strange chars"), |f| f
+                    .to_string_lossy()),
+            state.target.num_of_variables,
+            state.target.num_of_clauses,
         )
         .as_bytes(),
     )?;
