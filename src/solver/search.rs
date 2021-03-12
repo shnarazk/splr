@@ -236,10 +236,10 @@ fn search(
             if rst.restart() == Some(RestartDecision::Force) {
                 if let Some(new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);
-                    let span_len = rst.derefer(restart::property::Tusize::SpanLen);
+                    let block_level = rst.derefer(restart::property::Tusize::TriggerLevel);
                     let num_cycle = rst.derefer(restart::property::Tusize::NumCycle);
                     let num_unreachable = asg.derefer(assign::property::Tusize::NumUnreachableVar);
-                    asg.update_activity_decay(if new_cycle { None } else { Some(span_len) });
+                    asg.update_activity_decay(if new_cycle { None } else { Some(block_level) });
 
                     #[cfg(feature = "var_staging")]
                     {
@@ -251,10 +251,10 @@ fn search(
                         state.log(
                             asg.num_conflict,
                             format!(
-                                "#cycle:{:>5}, core:{:>9}, span len:{:>9},/cpr:{:>9.2}",
+                                "#cycle:{:>5}, core:{:>9}, level:{:>9},/cpr:{:>9.2}",
                                 num_cycle,
                                 num_unreachable,
-                                span_len,
+                                block_level,
                                 asg.refer(assign::property::TEma::PPC).get(),
                             ),
                         );

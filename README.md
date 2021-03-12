@@ -254,18 +254,18 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 | `Perm`       | the number of given clauses and binary learnt clauses                                     |
 | `#BLK`       | the number of blocking restart                                                            |
 | `#RST`       | the number of restart                                                                     |
-| `span`       | the length of the current stabilization stage                                             |
-| `peak`       | the longest length of stage                                                               |
-| `tLBD`       | the trend rate of learn clause's LBD                                                      |
-| `core`       | the least number of unassigned vars                                                       |
+| `trgr`       | the number of the restart trigger before executing restart                                |
+| `peak`       | the largest trigger so far                                                                |
+| `avrg`       | the EMA, Exponential Moving Average, of LBD of learnt clauses                             |
+| `depG'       | the EMA of LBD of the clauses used in conflict analysis                                   |
 | `/dpc`       | the EMA of decisions per conflict                                                         |
-| `eLBD`       | the EMA, Exponential Moving Average, of learn clauses' LBDs                               |
-| `cnfl`       | the EMA of decision levels at which conflicts occur                                       |
-| `bjmp`       | the EMA of decision levels to which backjumps go                                          |
+| `tASG`       | the current trend of the number of assigned vars after restart                            |
+| `cLvl`       | the EMA of decision levels at which conflicts occur                                       |
+| `bLvl`       | the EMA of decision levels to which backjumps go                                          |
 | `/ppc`       | the EMA of propagations per conflict                                                      |
 | `elim`       | the number of invocations of clause/var elimination                                       |
-| `#sub`       | the number of subsumed clauses                                                            |
-| `#vbv`       | the number of vars which were asserted by clause vivification                             |
+| `#sub`       | the number of the clauses subsumed by caluse elimination processor                        |
+| `core`       | the number of unreachable vars                                                            |
 | `/cpr`       | the EMA of conflicts per restart                                                          |
 | `mode`       | Selected strategy's id                                                                    |
 | `time`       | the elapsed CPU time in seconds                                                           |

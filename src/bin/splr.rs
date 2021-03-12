@@ -292,20 +292,20 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c      Restart|#BLK:{}, #RST:{}, span:{}, peak:{},\n",
+            "c      Restart|#BLK:{}, #RST:{}, trgr:{}, peak:{},\n",
             format!("{:>9}", state[LogUsizeId::RestartBlock]),
             format!("{:>9}", state[LogUsizeId::Restart]),
-            format!("{:>9}", state[LogUsizeId::LubySpanLen]),
-            format!("{:>9}", state[LogUsizeId::LubySpanMax]),
+            format!("{:>9}", state[LogUsizeId::RestartTriggerLevel]),
+            format!("{:>9}", state[LogUsizeId::RestartTriggerLevelMax]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c          EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{},\n",
+            "c          LBD|avrg:{}, trnd:{}, depG:{}, /dpc:{},\n",
+            format!("{:>9.4}", state[LogF64Id::EmaLBD]),
             format!("{:>9.4}", state[LogF64Id::TrendLBD]),
-            format!("{:>9.4}", state[LogF64Id::TrendASG]),
-            format!("{:>9.4}", state[LogUsizeId::UnreachableCore]),
+            format!("{:>9.4}", state[LogF64Id::DpAverageLBD]),
             format!("{:>9.2}", state[LogF64Id::DecisionPerConflict]),
         )
         .as_bytes(),
@@ -313,8 +313,8 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
 
     out.write_all(
         format!(
-            "c     Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{},\n",
-            format!("{:>9.2}", state[LogF64Id::EmaLBD]),
+            "c     Conflict|tASG:{}, cLvl:{}, bLvl:{}, /ppc:{},\n",
+            format!("{:>9.4}", state[LogF64Id::TrendASG]),
             format!("{:>9.2}", state[LogF64Id::CLevel]),
             format!("{:>9.2}", state[LogF64Id::BLevel]),
             format!("{:>9.2}", state[LogF64Id::PropagationPerConflict]),
@@ -323,10 +323,10 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c         misc|elim:{}, #sub:{}, #vbv:{}, /cpr:{},\n",
+            "c         misc|elim:{}, #sub:{}, core:{}, /cpr:{},\n",
             format!("{:>9}", state[LogUsizeId::Simplify]),
             format!("{:>9}", state[LogUsizeId::ClauseSubsumption]),
-            format!("{:>9}", state[LogUsizeId::VivifiedVar]),
+            format!("{:>9}", state[LogUsizeId::UnreachableCore]),
             format!("{:>9.2}", state[LogF64Id::ConflictPerRestart]),
         )
         .as_bytes(),

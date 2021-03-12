@@ -27,7 +27,7 @@
   - rename feature use_luby to Luby_restart
 - clause simplifier and clause vivifier are called at the ends of stages
 - Learning Rate based var rewarding uses a non-linear weight function.
-- Since Luby stabilization has long cycles, cycle-based tasks were organized. "Stage" is defined based on Luby-stabilization span. Updated terminology:
+- Since Luby stabilization has long cycles, cycle-based tasks were organized. "Stage" is defined based on Luby-stabilization level. Updated terminology:
    - _Luby stabilization_ is a scheme that defines duration of stabilization modes based on Luby series.
    - Luby stabilization stage, or _stage_ is a span that shares a Luby value.
    - _cycle_ is a span between two highest values in Luby series.
@@ -69,7 +69,7 @@
 - Solver::restart provides both of `restart` and `stabilize`
 - fix a bug in chronoBT, that occurred if a conflicting clause has just a single literal at the conflicting level.
 - revise command line option parser to handle the last option better
-- stabilization span and restart blocking spans are controlled with Luby sequence
+- stabilization span and restart blocking levels are controlled with Luby sequence
 - add an extra reward to vars involved in best phase
 - make the learning rate of var rewarding constant
 - change the definition of restart blocker and its default threshold

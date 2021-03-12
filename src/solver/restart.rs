@@ -320,13 +320,13 @@ impl ProgressEvaluator for ProgressLuby {
 #[derive(Clone, Debug)]
 struct GeometricStabilizer {
     enable: bool,
-    longest_span: usize,
     luby: LubySeries,
     num_cycle: usize,
     num_stage: usize,
     next_trigger: usize,
     reset_requested: bool,
-    span: usize,
+    step: usize,
+    step_max: usize,
 }
 
 impl Default for GeometricStabilizer {
@@ -337,13 +337,13 @@ impl Default for GeometricStabilizer {
             #[cfg(feature = "Luby_stabilization")]
             enable: true,
 
-            longest_span: 1,
             luby: LubySeries::default(),
             num_cycle: 0,
             num_stage: 0,
             next_trigger: 1,
             reset_requested: false,
-            span: 1,
+            step: 1,
+            step_max: 1,
         }
     }
 }
@@ -362,13 +362,13 @@ impl fmt::Display for GeometricStabilizer {
             write!(
                 f,
                 "Stabilizer[step: {}, next:{}, on]",
-                self.span, self.next_trigger
+                self.step, self.next_trigger
             )
         } else {
             write!(
                 f,
                 "Stabilizer[step: {}, next:{}, off]",
-                self.span, self.next_trigger
+                self.step, self.next_trigger
             )
         }
     }
@@ -379,18 +379,18 @@ impl GeometricStabilizer {
         if self.enable && self.next_trigger <= now {
             self.num_stage += 1;
             let mut new_cycle: bool = false;
-            if self.longest_span < self.span {
+            if self.step_max < self.step {
                 new_cycle = true;
                 self.num_cycle += 1;
-                self.longest_span = self.span;
+                self.step_max = self.step;
             }
-            if self.reset_requested && self.span == 1 {
+            if self.reset_requested && self.step == 1 {
                 self.luby.reset();
-                self.longest_span = 1;
                 self.reset_requested = false;
+                self.step_max = 1;
             }
-            self.span = self.luby.next();
-            self.next_trigger = now + self.longest_span / self.span;
+            self.step = self.luby.next();
+            self.next_trigger = now + self.step_max / self.step;
             return Some(new_cycle);
         }
         None
@@ -457,7 +457,7 @@ impl Instantiate for Restarter {
         match e {
             SolverEvent::Assert(_) => {
                 self.stb.reset_requested = true;
-                self.restart_waiting = self.stb.span;
+                self.restart_waiting = self.stb.step;
             }
             SolverEvent::Restart => {
                 self.after_restart = 0;
@@ -492,14 +492,14 @@ impl RestartIF for Restarter {
         if self.asg.is_active() {
             self.num_block += 1;
             self.after_restart = 0;
-            self.restart_step = self.initial_restart_step * self.stb.longest_span;
+            self.restart_step = self.initial_restart_step * self.stb.step_max;
             self.restart_waiting = 0;
             return Some(RestartDecision::Block);
         }
         if self.lbd.is_active() {
             self.restart_step = self.initial_restart_step;
             self.restart_waiting += 1;
-            if self.stb.span <= self.restart_waiting {
+            if self.stb.step <= self.restart_waiting {
                 self.restart_waiting = 0;
                 return Some(RestartDecision::Force);
             }
@@ -542,8 +542,8 @@ pub mod property {
         NumCycle,
         NumRestart,
         NumStage,
-        SpanLen,
-        LongestSpan,
+        TriggerLevel,
+        TriggerLevelMax,
     }
 
     impl PropertyDereference<Tusize, usize> for Restarter {
@@ -554,8 +554,8 @@ pub mod property {
                 Tusize::NumCycle => self.stb.num_cycle,
                 Tusize::NumRestart => self.num_restart,
                 Tusize::NumStage => self.stb.num_stage,
-                Tusize::SpanLen => self.stb.span,
-                Tusize::LongestSpan => self.stb.longest_span,
+                Tusize::TriggerLevel => self.stb.step,
+                Tusize::TriggerLevelMax => self.stb.step_max,
             }
         }
     }

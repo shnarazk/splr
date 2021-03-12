@@ -41,7 +41,8 @@ pub trait StateIF {
     where
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyReference<assign::property::TEma, Ema>,
-        C: PropertyDereference<cdb::property::Tusize, usize>,
+        C: PropertyDereference<cdb::property::Tusize, usize>
+            + PropertyDereference<cdb::property::Tf64, f64>,
         E: PropertyDereference<processor::property::Tusize, usize>,
         R: PropertyDereference<solver::restart::property::Tusize, usize>
             + PropertyReference<solver::restart::property::TEma2, Ema2>;
@@ -455,7 +456,8 @@ impl StateIF for State {
     where
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyReference<assign::property::TEma, Ema>,
-        C: PropertyDereference<cdb::property::Tusize, usize>,
+        C: PropertyDereference<cdb::property::Tusize, usize>
+            + PropertyDereference<cdb::property::Tf64, f64>,
         E: PropertyDereference<processor::property::Tusize, usize>,
         R: PropertyDereference<solver::restart::property::Tusize, usize>
             + PropertyReference<solver::restart::property::TEma2, Ema2>,
@@ -485,14 +487,16 @@ impl StateIF for State {
         let cdb_num_biclause = cdb.derefer(cdb::property::Tusize::NumBiClause);
         let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
+        let cdb_lbd_of_dp: f64 = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
 
         let elim_num_full = elim.derefer(processor::property::Tusize::NumFullElimination);
         let elim_num_sub = elim.derefer(processor::property::Tusize::NumClauseSubsumption);
 
         let rst_num_blk: usize = rst.derefer(solver::restart::property::Tusize::NumBlock);
         let rst_num_rst: usize = rst.derefer(solver::restart::property::Tusize::NumRestart);
-        let rst_span_len: usize = rst.derefer(solver::restart::property::Tusize::SpanLen);
-        let rst_span_max: usize = rst.derefer(solver::restart::property::Tusize::LongestSpan);
+        let rst_trg_lvl: usize = rst.derefer(solver::restart::property::Tusize::TriggerLevel);
+        let rst_trg_lvl_max: usize =
+            rst.derefer(solver::restart::property::Tusize::TriggerLevelMax);
         let rst_asg: &Ema2 = rst.refer(solver::restart::property::TEma2::ASG);
         let rst_lbd: &Ema2 = rst.refer(solver::restart::property::TEma2::LBD);
 
@@ -569,22 +573,22 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, span:{}, peak:{}",
+            "\x1B[2K     Restart|#BLK:{}, #RST:{}, trgr:{}, peak:{}",
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-            im!("{:>9}", self, LogUsizeId::LubySpanLen, rst_span_len),
-            im!("{:>9}", self, LogUsizeId::LubySpanMax, rst_span_max),
-        );
-        println!(
-            "\x1B[2K         EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{}",
-            fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
-            fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
+            im!("{:>9}", self, LogUsizeId::RestartTriggerLevel, rst_trg_lvl),
             im!(
                 "{:>9}",
                 self,
-                LogUsizeId::UnreachableCore,
-                asg_num_unreachables
+                LogUsizeId::RestartTriggerLevelMax,
+                rst_trg_lvl_max
             ),
+        );
+        println!(
+            "\x1B[2K         LBD|avrg:{}, trnd:{}, depG:{}, /dpc:{}",
+            fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd.get()),
+            fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
+            fm!("{:>9.4}", self, LogF64Id::DpAverageLBD, cdb_lbd_of_dp),
             fm!(
                 "{:>9.2}",
                 self,
@@ -593,8 +597,8 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{}",
-            fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get()),
+            "\x1B[2K    Conflict|tASG:{}, cLvl:{}, bLvl:{}, /ppc:{}",
+            fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
             fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
             fm!(
@@ -605,14 +609,14 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|elim:{}, #sub:{}, #vbv:{}, /cpr:{}",
+            "\x1B[2K        misc|elim:{}, #sub:{}, core:{}, /cpr:{}",
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
             im!("{:>9}", self, LogUsizeId::ClauseSubsumption, elim_num_sub),
             im!(
                 "{:>9}",
                 self,
-                LogUsizeId::VivifiedVar,
-                self[Stat::VivifiedVar]
+                LogUsizeId::UnreachableCore,
+                asg_num_unreachables
             ),
             fm!(
                 "{:>9.2}",
@@ -822,12 +826,12 @@ pub enum LogUsizeId {
     //
     //## stabilization, staging and restart
     //
-    LubySpanLen,
-    LubySpanMax,
     Restart,
     RestartBlock,
     RestartCancel,
     RestartStabilize,
+    RestartTriggerLevel,
+    RestartTriggerLevelMax,
 
     //
     //## pre(in)-processor
@@ -857,6 +861,7 @@ pub enum LogF64Id {
     DecisionPerConflict,
     ConflictPerRestart,
     PropagationPerConflict,
+    DpAverageLBD,
     End,
 }
 
