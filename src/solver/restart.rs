@@ -390,7 +390,7 @@ impl GeometricStabilizer {
                 self.step_max = 1;
             }
             self.step = self.luby.next();
-            self.next_trigger = now + self.step_max / self.step;
+            self.next_trigger = now + (self.step_max / self.step).max(1);
             return Some(new_cycle);
         }
         None
