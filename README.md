@@ -297,13 +297,13 @@ OPTIONS (red options depend on features in Cargo.toml):
       --evo <elm-var-occ>   Max #cls for var elimination        20000
   -o, --dir <io-outdir>     Output directory                         .
   -p, --proof <io-pfile>    DRAT Cert. filename                 proof.out
-  -r, --result <io-rfile>   Result filename/stdout                   
+  -r, --result <io-rfile>   Result filename/stdout                       
       --ral <rst-asg-len>   Length of assign. fast EMA             24
       --ras <rst-asg-slw>   Length of assign. slow EMA           8192
-      --rat <rst-asg-thr>   Blocking restart threshold              0.20
+      --rat <rst-asg-thr>   Blocking restart threshold              0.75
       --rll <rst-lbd-len>   Length of LBD fast EMA                 24
       --rls <rst-lbd-slw>   Length of LBD slow EMA               8192
-      --rlt <rst-lbd-thr>   Forcing restart threshold               1.20
+      --rlt <rst-lbd-thr>   Forcing restart threshold               1.10
       --rs  <rst-step>      #conflicts between restarts            24
       --srd <stg-rwd-dcy>   Decay rate for staged var reward        0.50
       --srv <stg-rwd-val>   Extra reward for staged vars            1.00
