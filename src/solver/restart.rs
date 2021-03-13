@@ -89,7 +89,7 @@ pub enum RestartMode {
 }
 
 /// API for [`restart`](`crate::solver::RestartIF::restart`) and [`stabilize`](`crate::solver::RestartIF::stabilize`).
-pub trait RestartIF {
+pub trait RestartIF: Instantiate {
     /// check blocking and forcing restart condition.
     fn restart(&mut self) -> Option<RestartDecision>;
     /// check stabilization mode and  return:
@@ -384,16 +384,19 @@ impl GeometricStabilizer {
                 self.num_cycle += 1;
                 self.step_max = self.step;
             }
-            if self.reset_requested && self.step == 1 {
+            if self.reset_requested {
                 self.luby.reset();
                 self.reset_requested = false;
                 self.step_max = 1;
             }
             self.step = self.luby.next();
-            self.next_trigger = now + (self.step_max / self.step).max(1);
+            self.next_trigger = now + (self.step_max * 2) / self.step;
             return Some(new_cycle);
         }
         None
+    }
+    fn reset_progress(&mut self) {
+        self.reset_requested = true;
     }
 }
 
@@ -455,9 +458,11 @@ impl Instantiate for Restarter {
     }
     fn handle(&mut self, e: SolverEvent) {
         match e {
-            SolverEvent::Assert(_) => {
-                self.stb.reset_requested = true;
+            SolverEvent::Assert(_) | SolverEvent::Eliminate(_) => {
                 self.restart_waiting = self.stb.step;
+            }
+            SolverEvent::ShrinkCore => {
+                self.stb.reset_progress();
             }
             SolverEvent::Restart => {
                 self.after_restart = 0;

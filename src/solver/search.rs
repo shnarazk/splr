@@ -109,7 +109,7 @@ impl SolveIF for Solver {
             //
             if USE_PRE_PROCESSING_ELIMINATOR {
                 state.flush("simplifying...");
-                if elim.simplify(asg, cdb, state).is_err() {
+                if elim.simplify(asg, cdb, rst, state).is_err() {
                     // Why inconsistent? Because the CNF contains a conflict, not an error!
                     // Or out of memory.
                     state.progress(asg, cdb, elim, rst);
@@ -274,7 +274,7 @@ fn search(
                         }
                         if state.config.c_ip_int <= elim.to_simplify as usize {
                             elim.activate();
-                            elim.simplify(asg, cdb, state)?;
+                            elim.simplify(asg, cdb, rst, state)?;
                         }
                     }
                     if next_progress < asg.num_conflict {
@@ -298,6 +298,7 @@ fn search(
                 if na < best_asserted {
                     state.flush("");
                     state.flush(format!("unreachable core: {}", na));
+                    rst.handle(SolverEvent::ShrinkCore);
                     best_asserted = na;
                 }
             }

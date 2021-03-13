@@ -139,6 +139,9 @@ impl Instantiate for AssignStack {
                 self.reward_index = 1;
             }
             SolverEvent::Conflict => (),
+            SolverEvent::Eliminate(vi) => {
+                self.make_var_eliminated(vi);
+            }
             SolverEvent::NewVar => {
                 self.assign.push(None);
                 self.level.push(DecisionLevel::default());

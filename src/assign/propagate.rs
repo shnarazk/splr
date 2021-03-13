@@ -381,13 +381,6 @@ impl AssignStack {
     fn level_up(&mut self) {
         self.trail_lim.push(self.trail.len());
     }
-    /// make a var asserted.
-    pub fn make_var_asserted(&mut self, vi: VarId) {
-        self.num_asserted_vars += 1;
-        self.set_activity(vi, 0.0);
-        self.remove_from_heap(vi);
-        self.check_best_phase(vi);
-    }
     /// save the current assignments as the best phases
     fn save_best_phases(&mut self) {
         #[cfg(feature = "best_phases_reuse")]

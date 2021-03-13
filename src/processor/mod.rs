@@ -12,11 +12,12 @@
 //!      ref mut asg,
 //!      ref mut cdb,
 //!      ref mut elim,
+//!      ref mut rst,
 //!      ref mut state,
 //!      ..
 //!  } = s;
 //!  elim.activate();
-//!  elim.simplify(asg, cdb, state).expect("panic");
+//!  elim.simplify(asg, cdb, rst, state).expect("panic");
 //!  assert_eq!(elim.derefer(processor::property::Tusize::NumFullElimination), 1);
 //!  assert!(0 < asg.num_eliminated_vars);
 //!```
@@ -32,7 +33,7 @@ use {
     crate::{
         assign::{self, AssignIF},
         cdb::{self, ClauseDBIF},
-        solver::SolverEvent,
+        solver::{restart::RestartIF, SolverEvent},
         state::{State, StateIF},
         types::*,
     },
@@ -54,9 +55,9 @@ use {
 /// elim.activate();
 /// // At this point, the `elim` is in `ready` mode, not `running`.
 /// assert_eq!(elim.is_running(), false);
-/// assert_eq!(elim.simplify(&mut s.asg, &mut s.cdb, &mut s.state), Ok(()));
+/// assert_eq!(elim.simplify(&mut s.asg, &mut s.cdb, &mut s.rst, &mut s.state), Ok(()));
 ///```
-pub trait EliminateIF {
+pub trait EliminateIF: Instantiate {
     /// set eliminator's mode to **ready**.
     fn activate(&mut self);
     /// set eliminator's mode to **dormant**.
@@ -82,10 +83,17 @@ pub trait EliminateIF {
     /// # Errors
     ///
     /// if solver becomes inconsistent.
-    fn simplify<A, C>(&mut self, asg: &mut A, cdb: &mut C, state: &mut State) -> MaybeInconsistent
+    fn simplify<A, C, R>(
+        &mut self,
+        asg: &mut A,
+        cdb: &mut C,
+        rst: &mut R,
+        state: &mut State,
+    ) -> MaybeInconsistent
     where
         A: AssignIF,
-        C: ClauseDBIF;
+        C: ClauseDBIF,
+        R: RestartIF;
     /// register a clause id to all corresponding occur lists.
     fn add_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause, enqueue: bool)
     where
@@ -466,10 +474,17 @@ impl EliminateIF for Eliminator {
             self.var_queue.insert(&self.var, vi, upward);
         }
     }
-    fn simplify<A, C>(&mut self, asg: &mut A, cdb: &mut C, state: &mut State) -> MaybeInconsistent
+    fn simplify<A, C, R>(
+        &mut self,
+        asg: &mut A,
+        cdb: &mut C,
+        rst: &mut R,
+        state: &mut State,
+    ) -> MaybeInconsistent
     where
         A: AssignIF,
         C: ClauseDBIF,
+        R: RestartIF,
     {
         self.to_simplify = 0.0;
         debug_assert_eq!(asg.decision_level(), 0);
@@ -490,7 +505,7 @@ impl EliminateIF for Eliminator {
             if self.is_waiting() {
                 self.prepare(asg, cdb, true);
             }
-            self.eliminate(asg, cdb, state)?;
+            self.eliminate(asg, cdb, rst, state)?;
             if self.is_running() {
                 self.stop(asg, cdb);
             }
@@ -670,15 +685,22 @@ impl Eliminator {
     /// # Errors
     ///
     /// if solver becomes inconsistent.
-    fn eliminate<A, C>(&mut self, asg: &mut A, cdb: &mut C, state: &mut State) -> MaybeInconsistent
+    fn eliminate<A, C, R>(
+        &mut self,
+        asg: &mut A,
+        cdb: &mut C,
+        rst: &mut R,
+        state: &mut State,
+    ) -> MaybeInconsistent
     where
         A: AssignIF,
         C: ClauseDBIF,
+        R: RestartIF,
     {
         let start = state.elapsed().unwrap_or(0.0);
         loop {
             let na = asg.stack_len();
-            self.eliminate_main(asg, cdb, state)?;
+            self.eliminate_main(asg, cdb, rst, state)?;
             self.eliminate_satisfied_clauses(asg, cdb, true);
             if na == asg.stack_len()
                 && (!self.is_running()
@@ -696,15 +718,17 @@ impl Eliminator {
         Ok(())
     }
     /// do the elimination task
-    fn eliminate_main<A, C>(
+    fn eliminate_main<A, C, R>(
         &mut self,
         asg: &mut A,
         cdb: &mut C,
+        rst: &mut R,
         state: &mut State,
     ) -> MaybeInconsistent
     where
         A: AssignIF,
         C: ClauseDBIF,
+        R: RestartIF,
     {
         debug_assert!(asg.decision_level() == 0);
         if self.mode == EliminatorMode::Dormant {
@@ -726,7 +750,7 @@ impl Eliminator {
                 let v = asg.var_mut(vi);
                 v.turn_off(Flag::ENQUEUED);
                 if !v.is(Flag::ELIMINATED) && asg.assign(vi).is_none() {
-                    eliminate_var(asg, cdb, self, state, vi, &mut timedout)?;
+                    eliminate_var(asg, cdb, self, rst, state, vi, &mut timedout)?;
                 }
             }
             self.backward_subsumption_check(asg, cdb, &mut timedout)?;
@@ -898,12 +922,13 @@ mod tests {
             ref mut asg,
             ref mut cdb,
             ref mut elim,
+            ref mut rst,
             ref mut state,
             ..
         } = s;
         assert!(elim.enable);
         elim.activate();
-        elim.simplify(asg, cdb, state).expect("");
+        elim.simplify(asg, cdb, rst, state).expect("");
         assert_eq!(elim.num_full_elimination, 1);
         assert!(!asg.var_iter().skip(1).all(|v| v.is(Flag::ELIMINATED)));
         assert!(0 < asg.num_eliminated_vars);

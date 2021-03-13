@@ -26,6 +26,7 @@ use {
 /// API about assignment like [`decision_level`](`crate::assign::AssignIF::decision_level`), [`stack`](`crate::assign::AssignIF::stack`), [`best_assigned`](`crate::assign::AssignIF::best_assigned`), and so on.
 pub trait AssignIF:
     ActivityIF<VarId>
+    + Instantiate
     + PropagateIF
     + VarManipulateIF
     + PropertyDereference<property::Tusize, usize>

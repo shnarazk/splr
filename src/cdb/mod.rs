@@ -26,6 +26,7 @@ use {
 pub trait ClauseDBIF:
     ActivityIF<ClauseId>
     + IndexMut<ClauseId, Output = Clause>
+    + Instantiate
     + PropertyDereference<property::Tusize, usize>
     + PropertyDereference<property::Tf64, f64>
 {

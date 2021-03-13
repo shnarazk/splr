@@ -104,8 +104,6 @@ pub trait VarManipulateIF {
     fn var_iter(&self) -> Iter<'_, Var>;
     /// return an mutable iterator over Vars.
     fn var_iter_mut(&mut self) -> IterMut<'_, Var>;
-    /// eliminate a var.
-    fn set_eliminated(&mut self, vi: VarId);
 }
 
 impl VarManipulateIF for AssignStack {
@@ -141,7 +139,17 @@ impl VarManipulateIF for AssignStack {
     fn var_iter_mut(&mut self) -> IterMut<'_, Var> {
         self.var.iter_mut()
     }
-    fn set_eliminated(&mut self, vi: VarId) {
+}
+
+impl AssignStack {
+    /// make a var asserted.
+    pub fn make_var_asserted(&mut self, vi: VarId) {
+        self.num_asserted_vars += 1;
+        self.set_activity(vi, 0.0);
+        self.remove_from_heap(vi);
+        self.check_best_phase(vi);
+    }
+    pub fn make_var_eliminated(&mut self, vi: VarId) {
         if !self.var[vi].is(Flag::ELIMINATED) {
             self.var[vi].turn_on(Flag::ELIMINATED);
             self.set_activity(vi, 0.0);

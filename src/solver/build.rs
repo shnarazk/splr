@@ -17,7 +17,7 @@ use std::{
 };
 
 /// API for SAT solver creation and modification.
-pub trait SatSolverIF {
+pub trait SatSolverIF: Instantiate {
     /// add an assignment to Solver.
     ///
     /// # Errors

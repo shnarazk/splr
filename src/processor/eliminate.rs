@@ -1,13 +1,20 @@
 /// Crate `eliminator` implements clause subsumption and var elimination.
 use {
     super::{EliminateIF, Eliminator},
-    crate::{assign::AssignIF, cdb::ClauseDBIF, state::State, types::*},
+    crate::{
+        assign::AssignIF,
+        cdb::ClauseDBIF,
+        solver::{restart::RestartIF, SolverEvent},
+        state::State,
+        types::*,
+    },
 };
 
-pub fn eliminate_var<A, C>(
+pub fn eliminate_var<A, C, R>(
     asg: &mut A,
     cdb: &mut C,
     elim: &mut Eliminator,
+    rst: &mut R,
     state: &mut State,
     vi: VarId,
     timedout: &mut usize,
@@ -15,6 +22,7 @@ pub fn eliminate_var<A, C>(
 where
     A: AssignIF,
     C: ClauseDBIF,
+    R: RestartIF,
 {
     let v = &mut asg.var(vi);
     let w = &mut elim[vi];
@@ -121,7 +129,8 @@ where
             elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
         }
         elim[vi].clear();
-        asg.set_eliminated(vi);
+        asg.handle(SolverEvent::Eliminate(vi));
+        rst.handle(SolverEvent::Eliminate(vi));
         elim.backward_subsumption_check(asg, cdb, timedout)
     }
 }
@@ -335,6 +344,7 @@ mod tests {
             ref mut asg,
             ref mut cdb,
             ref mut elim,
+            ref mut rst,
             ref mut state,
             ..
         } = Solver::try_from("tests/uf8.cnf").expect("failed to load");
@@ -343,7 +353,7 @@ mod tests {
 
         elim.activate();
         elim.prepare(asg, cdb, true);
-        eliminate_var(asg, cdb, elim, state, vi, &mut timedout).expect("panic");
+        eliminate_var(asg, cdb, elim, rst, state, vi, &mut timedout).expect("panic");
         cdb.garbage_collect();
         assert!(asg.var(vi).is(Flag::ELIMINATED));
         assert!(cdb
