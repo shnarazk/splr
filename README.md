@@ -325,6 +325,7 @@ Splr-0.7.0 adopts the following feature by default:
   - dynamic restart based on average LBDs of learnt clauses
   - clause elimination and subsumption as pre-processor and in-processor
   - stabilization based on Luby series, or LubyStabilization
+  - chronological backtrack and non-chronological backtrack
 
 Among them, the unique feature is LubyStabilization. Let me explain it.
 
