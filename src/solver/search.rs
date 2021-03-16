@@ -267,10 +267,25 @@ fn search(
                         // when vars are asserted or learnts are small.
                         // We don't need to count the number of asserted vars.
                         #[cfg(feature = "clause_vivification")]
-                        if vivify(asg, cdb, elim, state).is_err() {
-                            // return Err(SolverError::UndescribedError);
-                            analyze_final(asg, state, &cdb[ci]);
-                            return Ok(false);
+                        {
+                            let stat = (state[Stat::VivifiedClause], state[Stat::VivifiedVar]);
+
+                            if vivify(asg, cdb, elim, state).is_err() {
+                                // return Err(SolverError::UndescribedError);
+                                analyze_final(asg, state, &cdb[ci]);
+                                return Ok(false);
+                            }
+                            if stat != (state[Stat::VivifiedClause], state[Stat::VivifiedVar]) {
+                                state.log(
+                                    asg.num_conflict,
+                                    format!(
+                                        "#vivification:{:>8}, vivified var:{:>8}, clause:{:>8}",
+                                        state[Stat::Vivification],
+                                        state[Stat::VivifiedVar],
+                                        state[Stat::VivifiedClause],
+                                    ),
+                                );
+                            }
                         }
                         if state.config.c_ip_int <= elim.to_simplify as usize {
                             elim.activate();

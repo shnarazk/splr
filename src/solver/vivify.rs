@@ -4,7 +4,7 @@
 use {
     super::{SolverEvent, Stat, State},
     crate::{
-        assign::{AssignIF, AssignStack, ClauseManipulateIF, PropagateIF, VarManipulateIF},
+        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF, ClauseIF},
         processor::Eliminator,
         state::StateIF,
@@ -190,7 +190,6 @@ pub fn vivify(
                         // panic!("Vivification found an inconsistency.");
                         return Err(SolverError::Inconsistent);
                     }
-                    state[Stat::VivifiedVar] += 1;
                 }
                 debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
                 cdb.detach(cs.to());
@@ -227,6 +226,8 @@ pub fn vivify(
             ),
         );
     }
+    state[Stat::VivifiedClause] += num_shrink + num_purge;
+    state[Stat::VivifiedVar] += num_assert;
     Ok(())
 }
 

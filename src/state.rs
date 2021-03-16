@@ -149,6 +149,8 @@ pub enum Stat {
     NoDecisionConflict,
     /// the number of vivification
     Vivification,
+    /// the number of vivified (shrunk) clauses
+    VivifiedClause,
     /// the number of vivified (asserted) vars
     VivifiedVar,
     /// don't use this dummy (sentinel at the tail).
