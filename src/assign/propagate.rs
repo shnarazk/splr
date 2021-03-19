@@ -272,8 +272,7 @@ impl PropagateIF for AssignStack {
                 'next_clause: while n < source.len() {
                     let mut w = source.get_unchecked_mut(n);
                     n += 1;
-                    let blocker_value = lit_assign!(self, w.blocker);
-                    if blocker_value == Some(true) {
+                    if let Some(true) = lit_assign!(self, w.blocker) {
                         continue 'next_clause;
                     }
                     // debug_assert!(!cdb[w.c].is(Flag::DEAD));
@@ -289,9 +288,11 @@ impl PropagateIF for AssignStack {
                         lits.swap(0, 1);
                     }
                     let first_value = lit_assign!(self, first);
-                    if first != w.blocker && first_value == Some(true) {
+                    if first != w.blocker {
                         w.blocker = first;
-                        continue 'next_clause;
+                        if first_value == Some(true) {
+                            continue 'next_clause;
+                        }
                     }
                     //
                     //## Search an un-falsified literal
@@ -299,12 +300,12 @@ impl PropagateIF for AssignStack {
                     #[cfg(feature = "boundary_check")]
                     assert!(*search_from < lits.len());
                     let len = lits.len();
-                    for k in (*search_from..len).chain(2..*search_from) {
+                    // Gathering good literals at the beginning of lits.
+                    for k in (*search_from..len).chain((2..*search_from).rev()) {
                         let lk = lits.get_unchecked(k);
                         if lit_assign!(self, *lk) != Some(false) {
                             n -= 1;
-                            let mut w = source.detach(n);
-                            w.blocker = first;
+                            let w = source.detach(n);
                             (*watcher).get_unchecked_mut(usize::from(!*lk)).register(w);
                             lits.swap(1, k);
                             // If `search_from` gets out of range,
