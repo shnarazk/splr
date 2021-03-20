@@ -130,8 +130,9 @@ impl SolveIF for Solver {
                         _ => (),
                     }
                 }
+                let act = 1.0 / (asg.num_vars as f64).powf(0.2);
                 for vi in elim.sorted_iterator() {
-                    asg.set_activity(*vi, 0.0);
+                    asg.set_activity(*vi, act);
                 }
                 asg.rebuild_order();
             }
