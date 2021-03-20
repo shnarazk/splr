@@ -385,6 +385,7 @@ impl GeometricStabilizer {
                 self.step_max = self.step;
             }
             if self.reset_requested {
+                self.num_cycle = 0;
                 self.luby.reset();
                 self.reset_requested = false;
                 self.step_max = 1;
