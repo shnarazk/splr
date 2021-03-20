@@ -38,6 +38,10 @@ pub trait PropagateIF {
     fn propagate<C>(&mut self, cdb: &mut C) -> ClauseId
     where
         C: ClauseDBIF;
+    /// `propagate` for vivification, which allows dead clauses.
+    fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> ClauseId
+    where
+        C: ClauseDBIF;
 }
 
 macro_rules! var_assign {
@@ -272,8 +276,7 @@ impl PropagateIF for AssignStack {
                 'next_clause: while n < source.len() {
                     let mut w = source.get_unchecked_mut(n);
                     n += 1;
-                    let blocker_value = lit_assign!(self, w.blocker);
-                    if blocker_value == Some(true) {
+                    if let Some(true) = lit_assign!(self, w.blocker) {
                         continue 'next_clause;
                     }
                     // debug_assert!(!cdb[w.c].is(Flag::DEAD));
@@ -289,9 +292,11 @@ impl PropagateIF for AssignStack {
                         lits.swap(0, 1);
                     }
                     let first_value = lit_assign!(self, first);
-                    if first != w.blocker && first_value == Some(true) {
+                    if first != w.blocker {
                         w.blocker = first;
-                        continue 'next_clause;
+                        if first_value == Some(true) {
+                            continue 'next_clause;
+                        }
                     }
                     //
                     //## Search an un-falsified literal
@@ -299,12 +304,135 @@ impl PropagateIF for AssignStack {
                     #[cfg(feature = "boundary_check")]
                     assert!(*search_from < lits.len());
                     let len = lits.len();
-                    for k in (*search_from..len).chain(2..*search_from) {
+                    // Gathering good literals at the beginning of lits.
+                    for k in (*search_from..len).chain((2..*search_from).rev()) {
                         let lk = lits.get_unchecked(k);
                         if lit_assign!(self, *lk) != Some(false) {
                             n -= 1;
-                            let mut w = source.detach(n);
-                            w.blocker = first;
+                            let w = source.detach(n);
+                            (*watcher).get_unchecked_mut(usize::from(!*lk)).register(w);
+                            lits.swap(1, k);
+                            // If `search_from` gets out of range,
+                            // the next loop will ignore it safely;
+                            // the first iteration loop becomes null.
+                            *search_from = k + 1;
+                            continue 'next_clause;
+                        }
+                    }
+
+                    if first_value == Some(false) {
+                        let cid = w.c;
+                        self.num_conflict += 1;
+                        self.dpc_ema.update(self.num_decision);
+                        self.ppc_ema.update(self.num_propagation);
+                        return cid;
+                    }
+                    let lv = lits[1..]
+                        .iter()
+                        .map(|l| self.level[l.vi()])
+                        .max()
+                        .unwrap_or(0);
+                    // self.reward_at_propagation(false_lit.vi());
+                    self.assign_by_implication(first, AssignReason::Implication(w.c, NULL_LIT), lv);
+                }
+            }
+        }
+        let na = self.q_head + self.num_eliminated_vars;
+        if self.num_best_assign <= na && 0 < self.decision_level() {
+            self.best_assign = true;
+            self.num_best_assign = na;
+        }
+        ClauseId::default()
+    }
+    fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> ClauseId
+    where
+        C: ClauseDBIF,
+    {
+        let bin_watcher = cdb.bin_watcher_lists() as *const [Vec<Watch>];
+        let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
+        unsafe {
+            while let Some(p) = self.trail.get(self.q_head) {
+                self.num_propagation += 1;
+                self.q_head += 1;
+                let sweeping = usize::from(*p);
+                let false_lit = !*p;
+                // we have to drop `p` here to use self as a mutable reference again later.
+
+                //
+                //## binary loop
+                //
+                let bin_source = (*bin_watcher).get_unchecked(sweeping);
+                for w in bin_source.iter() {
+                    if cdb[w.c].is(Flag::DEAD) {
+                        continue;
+                    }
+                    debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
+                    debug_assert_ne!(w.blocker, false_lit);
+                    #[cfg(feature = "boundary_check")]
+                    debug_assert_eq!(cdb[w.c].lits.len(), 2);
+                    match lit_assign!(self, w.blocker) {
+                        Some(true) => (),
+                        Some(false) => {
+                            self.num_conflict += 1;
+                            self.dpc_ema.update(self.num_decision);
+                            self.ppc_ema.update(self.num_propagation);
+                            return w.c;
+                        }
+                        None => {
+                            // self.reward_at_propagation(false_lit.vi());
+                            self.assign_by_implication(
+                                w.blocker,
+                                AssignReason::Implication(w.c, false_lit),
+                                *self.level.get_unchecked(false_lit.vi()),
+                            );
+                        }
+                    }
+                }
+                //
+                //## normal clause loop
+                //
+                let source = (*watcher).get_unchecked_mut(sweeping);
+                let mut n = 0;
+                'next_clause: while n < source.len() {
+                    let mut w = source.get_unchecked_mut(n);
+                    n += 1;
+                    if cdb[w.c].is(Flag::DEAD) {
+                        continue 'next_clause;
+                    }
+                    if let Some(true) = lit_assign!(self, w.blocker) {
+                        continue 'next_clause;
+                    }
+                    // debug_assert!(!cdb[w.c].is(Flag::DEAD));
+                    let Clause {
+                        ref mut lits,
+                        ref mut search_from,
+                        ..
+                    } = cdb[w.c];
+                    debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
+                    let mut first = *lits.get_unchecked_mut(0);
+                    if first == false_lit {
+                        first = *lits.get_unchecked(1);
+                        lits.swap(0, 1);
+                    }
+                    let first_value = lit_assign!(self, first);
+                    if first != w.blocker {
+                        w.blocker = first;
+                        if first_value == Some(true) {
+                            continue 'next_clause;
+                        }
+                    }
+                    //
+                    //## Search an un-falsified literal
+                    //
+                    #[cfg(feature = "boundary_check")]
+                    assert!(*search_from < lits.len());
+                    let len = lits.len();
+                    // Gathering good literals at the beginning of lits.
+                    for k in (*search_from..len).chain((2..*search_from).rev()) {
+                        let lk = lits.get_unchecked(k);
+                        if lit_assign!(self, *lk) != Some(false) {
+                            n -= 1;
+                            let w = source.detach(n);
                             (*watcher).get_unchecked_mut(usize::from(!*lk)).register(w);
                             lits.swap(1, k);
                             // If `search_from` gets out of range,

@@ -262,36 +262,23 @@ fn search(
                     }
 
                     if cdb.reduce(asg, asg.num_conflict) {
-                        // Simplification has been postponed because chronoBT was used.
-                        // `elim.to_simplify` is increased much in particular
-                        // when vars are asserted or learnts are small.
-                        // We don't need to count the number of asserted vars.
-                        #[cfg(feature = "clause_vivification")]
-                        {
-                            let stat = (state[Stat::VivifiedClause], state[Stat::VivifiedVar]);
-
-                            if vivify(asg, cdb, elim, state).is_err() {
-                                // return Err(SolverError::UndescribedError);
-                                analyze_final(asg, state, &cdb[ci]);
-                                return Ok(false);
-                            }
-                            if stat != (state[Stat::VivifiedClause], state[Stat::VivifiedVar]) {
-                                state.log(
-                                    asg.num_conflict,
-                                    format!(
-                                        "#vivification:{:>8}, vivified var:{:>8}, clause:{:>8}",
-                                        state[Stat::Vivification],
-                                        state[Stat::VivifiedVar],
-                                        state[Stat::VivifiedClause],
-                                    ),
-                                );
-                            }
-                        }
                         if state.config.c_ip_int <= elim.to_simplify as usize {
                             elim.activate();
                             elim.simplify(asg, cdb, rst, state)?;
                         }
                     }
+
+                    // Simplification has been postponed because chronoBT was used.
+                    // `elim.to_simplify` is increased much in particular
+                    // when vars are asserted or learnts are small.
+                    // We don't need to count the number of asserted vars.
+                    #[cfg(feature = "clause_vivification")]
+                    if new_cycle && vivify(asg, cdb, elim, rst, state).is_err() {
+                        // return Err(SolverError::UndescribedError);
+                        analyze_final(asg, state, &cdb[ci]);
+                        return Ok(false);
+                    }
+
                     if next_progress < asg.num_conflict {
                         state.progress(asg, cdb, elim, rst);
                         next_progress = asg.num_conflict + 10_000;
@@ -315,6 +302,11 @@ fn search(
                     state.flush(format!("unreachable core: {}", na));
                     rst.handle(SolverEvent::ShrinkCore);
                     best_asserted = na;
+
+                    #[cfg(feature = "clause_vivification")]
+                    {
+                        state.vivify_threshold = 4.max(state.vivify_threshold / 2);
+                    }
                 }
             }
             if asg.num_conflict % (10 * state.reflection_interval) == 0 {

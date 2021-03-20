@@ -75,6 +75,10 @@ pub trait ClauseDBIF:
     ) -> ClauseId
     where
         A: AssignIF;
+    /// new_clause during vivification
+    fn new_clause_sandbox<A>(&mut self, asg: &mut A, vec: &mut Vec<Lit>) -> ClauseId
+    where
+        A: AssignIF;
     /// update LBD then convert a learnt clause to permanent if needed.
     fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where
@@ -236,11 +240,6 @@ pub struct ClauseDB {
     num_reduction: usize,
     /// EMA of LBD of clauses used in conflict analysis (dependency graph)
     pub lbd_of_dp_ema: Ema,
-
-    //
-    //## vivification
-    //
-    pub during_vivification: bool,
 
     //
     //## incremental solving
