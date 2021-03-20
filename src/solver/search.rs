@@ -263,11 +263,11 @@ fn search(
                         last_core = num_unreachable;
                     }
 
-                    if cdb.reduce(asg, asg.num_conflict) {
-                        if state.config.c_ip_int <= elim.to_simplify as usize {
-                            elim.activate();
-                            elim.simplify(asg, cdb, rst, state)?;
-                        }
+                    if cdb.reduce(asg, asg.num_conflict)
+                        && state.config.c_ip_int <= elim.to_simplify as usize
+                    {
+                        elim.activate();
+                        elim.simplify(asg, cdb, rst, state)?;
                     }
 
                     // Simplification has been postponed because chronoBT was used.
