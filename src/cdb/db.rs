@@ -41,7 +41,6 @@ impl Default for ClauseDB {
             num_learnt: 0,
             num_reduction: 0,
             lbd_of_dp_ema: Ema::new(10000),
-            during_vivification: false,
             eliminated_permanent: Vec::new(),
         }
     }
@@ -214,10 +213,6 @@ impl Instantiate for ClauseDB {
                 self.touched.push(false);
                 self.lbd_temp.push(0);
             }
-            #[cfg(feature = "clause_vivification")]
-            SolverEvent::Vivify(on) => {
-                self.during_vivification = on;
-            }
             _ => (),
         }
     }
@@ -335,6 +330,28 @@ impl ClauseDBIF for ClauseDB {
         self.num_active = self.clause.len() - recycled.len();
         // debug_assert!(self.check_liveness2());
     }
+    /// return `true` if a binary clause [l0, l1] has been registered.
+    ///```
+    /// use splr::types::*;
+    /// use crate::splr::cdb::ClauseDBIF;
+    ///
+    /// let config = Config::default();
+    /// let cnf = CNFDescription {
+    ///     num_of_variables: 4,
+    ///     ..CNFDescription::default()
+    /// };
+    /// let mut asg = splr::assign::AssignStack::instantiate(&config, &cnf);
+    /// let mut cdb = splr::cdb::ClauseDB::instantiate(&config, &cnf);
+    /// let l1 = splr::types::Lit::from(1);
+    /// let l2 = splr::types::Lit::from(2);
+    /// let l3 = splr::types::Lit::from(3);
+    /// cdb.new_clause(&mut asg, &mut vec![l1, l2], false, false);
+    /// cdb.new_clause(&mut asg, &mut vec![!l1, !l2, !l3], false, false);
+    /// assert!(cdb.registered_bin_clause(l1, l2));
+    /// assert!(!cdb.registered_bin_clause(!l1, l2));
+    /// assert!(!cdb.registered_bin_clause(l1, !l2));
+    /// assert!(!cdb.registered_bin_clause(!l1, !l2));
+    ///```
     fn registered_bin_clause(&self, l0: Lit, l1: Lit) -> bool {
         for w in &self.bin_watcher_lists()[usize::from(!l0)] {
             if w.blocker == l1 {
@@ -371,7 +388,7 @@ impl ClauseDBIF for ClauseDB {
             // }
             // vec.swap(1, i_max);
         }
-        if !self.certified.is_empty() && !self.during_vivification {
+        if !self.certified.is_empty() {
             let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
             debug_assert!(!temp.is_empty());
             self.certified.push((CertifiedRecord::ADD, temp));
@@ -406,9 +423,6 @@ impl ClauseDBIF for ClauseDB {
             std::mem::swap(&mut c.lits, vec);
             self.clause.push(c);
         };
-        if self.during_vivification {
-            self[cid].turn_on(Flag::VIV_ASSUMED);
-        }
         {
             let ClauseDB {
                 ref mut clause,
@@ -460,6 +474,64 @@ impl ClauseDBIF for ClauseDB {
                 });
             }
             *num_active += 1;
+        }
+        cid
+    }
+    fn new_clause_sandbox<A>(&mut self, asg: &mut A, vec: &mut Vec<Lit>) -> ClauseId
+    where
+        A: AssignIF,
+    {
+        let cid;
+        let l0 = vec[0];
+        let l1 = vec[1];
+        if let Some(w) = self.watcher[!NULL_LIT].pop() {
+            cid = w.c;
+            let c = &mut self[cid];
+            debug_assert!(c.is(Flag::DEAD));
+            c.flags = Flag::empty();
+            debug_assert!(c.lits.is_empty()); // c.lits.clear();
+            std::mem::swap(&mut c.lits, vec);
+            c.search_from = 2;
+        } else {
+            cid = ClauseId::from(self.clause.len());
+            let mut c = Clause {
+                flags: Flag::empty(),
+                ..Clause::default()
+            };
+            std::mem::swap(&mut c.lits, vec);
+            self.clause.push(c);
+        };
+        self[cid].turn_on(Flag::VIV_ASSUMED);
+        {
+            let ClauseDB {
+                ref mut clause,
+                ref mut lbd_temp,
+                ref mut bin_watcher,
+                ref mut watcher,
+                ..
+            } = self;
+            let c = &mut clause[cid.ordinal as usize];
+            c.update_lbd(asg, lbd_temp);
+            let len2 = c.lits.len() == 2;
+            if len2 {
+                bin_watcher[!l0].register(Watch {
+                    blocker: l1,
+                    c: cid,
+                });
+                bin_watcher[!l1].register(Watch {
+                    blocker: l0,
+                    c: cid,
+                });
+            } else {
+                watcher[!l0].register(Watch {
+                    blocker: l1,
+                    c: cid,
+                });
+                watcher[!l1].register(Watch {
+                    blocker: l0,
+                    c: cid,
+                });
+            }
         }
         cid
     }
@@ -561,14 +633,14 @@ impl ClauseDBIF for ClauseDB {
         self.garbage_collect();
     }
     fn certificate_add(&mut self, vec: &[Lit]) {
-        if !self.certified.is_empty() && !self.during_vivification {
+        if !self.certified.is_empty() {
             let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
             debug_assert!(!temp.is_empty());
             self.certified.push((CertifiedRecord::ADD, temp));
         }
     }
     fn certificate_delete(&mut self, vec: &[Lit]) {
-        if !self.certified.is_empty() && !self.during_vivification {
+        if !self.certified.is_empty() {
             let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
             self.certified.push((CertifiedRecord::DELETE, temp));
         }
