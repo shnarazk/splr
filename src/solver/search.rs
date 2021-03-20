@@ -206,7 +206,8 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
     let mut last_core = 0;
-    let mut next_progress = 10_000;
+    let progress_step = 5000;
+    let mut next_progress = progress_step;
     let mut best_asserted = state.target.num_of_variables;
 
     #[cfg(feature = "var_staging")]
@@ -281,7 +282,7 @@ fn search(
 
                     if next_progress < asg.num_conflict {
                         state.progress(asg, cdb, elim, rst);
-                        next_progress = asg.num_conflict + 10_000;
+                        next_progress = asg.num_conflict + progress_step;
                     }
                 } else {
                     RESTART!(asg, rst);
