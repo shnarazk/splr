@@ -2,9 +2,9 @@
 #![allow(dead_code)]
 #![cfg(feature = "clause_vivification")]
 use {
-    super::{SolverEvent, Stat, State},
+    super::{restart, Restarter, Stat, State},
     crate::{
-        assign::{AssignIF, AssignStack, ClauseManipulateIF, PropagateIF, VarManipulateIF},
+        assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF, ClauseIF},
         processor::Eliminator,
         state::StateIF,
@@ -28,22 +28,22 @@ pub fn vivify(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
+    rst: &mut Restarter,
     state: &mut State,
 ) -> MaybeInconsistent {
+    if rst.derefer(restart::property::Tusize::TriggerLevelMax) <= state.vivify_threshold {
+        return Ok(());
+    }
     let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
-    let mut num_clause = 0;
-    let rate = cdb.average_activity() / asg.average_activity();
-    for (i, c) in cdb.iter().enumerate().skip(1) {
-        if !c.is(Flag::DEAD) {
-            num_clause += 1;
-        }
-        if let Some(act_c) = c.to_vivify(60) {
-            let mut act_v: f64 = 0.0;
-            for l in c.iter() {
-                act_v = act_v.max(asg.activity(l.vi()));
+    {
+        let thr = (4000.0 / (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt())
+            as usize;
+        for (i, c) in cdb.iter().enumerate().skip(1) {
+            if c.is(Flag::DEAD) || c.is(Flag::VIVIFIED) {
+                continue;
             }
-            if act_v * rate < act_c {
-                clauses.push(OrderedProxy::new(ClauseId::from(i), act_v - act_c));
+            if let Some(act) = c.to_vivify(thr) {
+                clauses.push(OrderedProxy::new(ClauseId::from(i), -act));
             }
         }
     }
@@ -51,13 +51,8 @@ pub fn vivify(
         return Ok(());
     }
     clauses.sort_unstable();
-    let num_target = clauses
-        .len()
-        .min(5_000_000_000 / ((num_clause as f64).powf(1.15) as usize));
-    clauses.resize(num_target, OrderedProxy::default());
-    asg.handle(SolverEvent::Vivify(true));
+    let num_target = clauses.len();
     state[Stat::Vivification] += 1;
-
     let dl = asg.decision_level();
     debug_assert_eq!(dl, 0);
     // This is a reusable vector to reduce memory consumption, the key is the number of invocation
@@ -81,23 +76,26 @@ pub fn vivify(
         let clits = c.lits.clone();
         let mut copied: Vec<Lit> = Vec::new();
         let mut flipped = true;
-        // elim.eliminate_satisfied_clauses(asg, cdb, false);
+        if to_display <= num_check {
+            state.flush("");
+            state.flush(format!(
+                "clause vivifying(assert:{}, purge:{} shorten:{}, check:{}/{})...",
+                num_assert, num_purge, num_shrink, num_check, num_target,
+            ));
+            to_display = num_check + display_step;
+        }
         num_check += 1;
-        'this_clause: for l in clits.iter() {
+        'this_clause: for l in clits.iter().map(|ol| *ol) {
             debug_assert_eq!(0, asg.decision_level());
             seen[0] = num_check;
-            if to_display <= num_check {
-                state.flush("");
-                state.flush(format!(
-                    "vivifying(assert:{}, purge:{} shorten:{}, check:{}/{})...",
-                    num_assert, num_purge, num_shrink, num_check, num_target,
-                ));
-                to_display = num_check + display_step;
-            }
-            match asg.assigned(*l) {
-                // Rule 1
+            match asg.assigned(l) {
+                //
+                //## Rule 1
+                //
                 Some(false) => continue 'this_clause,
-                // Rule 2
+                //
+                //## Rule 2
+                //
                 Some(true) => {
                     //
                     // This path is optimized for the case the decision level is zero.
@@ -124,19 +122,18 @@ pub fn vivify(
                             None
                         }
                         _ => {
-                            cdb.handle(SolverEvent::Vivify(true));
-                            debug_assert!(cdb.during_vivification);
-                            let cid = cdb.new_clause(asg, &mut copied.clone(), true, false);
-                            cdb.handle(SolverEvent::Vivify(false));
+                            let cid = cdb.new_clause_sandbox(asg, &mut copied.clone());
                             Some(cid)
                         }
                     };
-                    debug_assert_eq!(asg.assigned(!*l), None);
-                    asg.assign_by_decision(!*l);
-                    let cc: ClauseId = asg.propagate(cdb);
-                    // Rule 3
+                    debug_assert_eq!(asg.assigned(!l), None);
+                    asg.assign_by_decision(!l);
+                    let cc: ClauseId = asg.propagate_sandbox(cdb);
+                    //
+                    //## Rule 3
+                    //
                     if !cc.is_none() {
-                        copied.push(!*l);
+                        copied.push(!l);
                         copied = asg.analyze(cdb, &copied, &cdb[cc].lits, &mut seen);
                         // this reverts dda678e
                         // Here we found an inconsistency.
@@ -157,8 +154,10 @@ pub fn vivify(
                     if !cc.is_none() {
                         break 'this_clause;
                     }
-                    // Rule 4
-                    copied.push(!*l);
+                    //
+                    //## Rule 4
+                    //
+                    copied.push(!l);
                 }
             }
         }
@@ -167,7 +166,8 @@ pub fn vivify(
         }
         match copied.len() {
             0 if flipped => {
-                cdb.certificate_add(&clits[0..1]);
+                cdb.garbage_collect();
+                cdb.certificate_add(&[clits[0], clits[1]]);
                 debug_assert!(asg.stack_iter().all(|l| asg.assigned(*l).is_some()));
                 return Err(SolverError::Inconsistent);
             }
@@ -186,47 +186,44 @@ pub fn vivify(
                     num_assert += 1;
                     cdb.certificate_add(&copied);
                     asg.assign_at_root_level(l0)?;
-                    if !asg.propagate(cdb).is_none() {
+                    if !asg.propagate_sandbox(cdb).is_none() {
                         // panic!("Vivification found an inconsistency.");
+                        cdb.garbage_collect();
                         return Err(SolverError::Inconsistent);
                     }
-                    state[Stat::VivifiedVar] += 1;
                 }
                 debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
                 cdb.detach(cs.to());
-                cdb.garbage_collect();
+                num_purge += 1;
             }
             n if n == clits.len() => (),
             n => {
-                num_shrink += 1;
                 if n == 2 && cdb.registered_bin_clause(copied[0], copied[1]) {
-                    elim.to_simplify += 0.5;
+                    num_purge += 1;
                 } else {
                     cdb.certificate_add(&copied);
-                    cdb.handle(SolverEvent::Vivify(true));
                     let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
                     cdb.set_activity(cj, activity);
-                    cdb.handle(SolverEvent::Vivify(false));
                     cdb[cj].turn_on(Flag::VIVIFIED);
-                    elim.to_simplify += 1.0 / (n as f64).powf(1.4);
-                    debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
-                    cdb.detach(cs.to());
-                    cdb.garbage_collect();
+                    num_shrink += 1;
                 }
+                elim.to_simplify += 1.0 / (n as f64).powf(1.4);
+                debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
+                cdb.detach(cs.to());
             }
         }
-        clauses.retain(|ci| !cdb[ci.to()].is(Flag::DEAD));
     }
-    asg.handle(SolverEvent::Vivify(false));
-    if 0 < num_assert || 0 < num_purge || 0 < num_shrink {
-        state.log(
-            state[Stat::Vivification],
-            format!(
-                "vivification #:{:>6}, assert:{:>5}, purge:{:>5}, shrink:{:>5}",
-                num_check, num_assert, num_purge, num_shrink
-            ),
-        );
-    }
+    state.log(
+        state[Stat::Vivification],
+        format!(
+            "vivify lv:{:>4}, pick:{:>6}, var:{:>4}, purge:{:>4}, shrink:{:>4}",
+            state.vivify_threshold, num_check, num_assert, num_purge, num_shrink,
+        ),
+    );
+    state[Stat::VivifiedClause] += num_shrink + num_purge;
+    state[Stat::VivifiedVar] += num_assert;
+    cdb.garbage_collect();
+    state.vivify_threshold = rst.derefer(restart::property::Tusize::TriggerLevelMax);
     Ok(())
 }
 

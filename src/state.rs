@@ -149,6 +149,8 @@ pub enum Stat {
     NoDecisionConflict,
     /// the number of vivification
     Vivification,
+    /// the number of vivified (shrunk) clauses
+    VivifiedClause,
     /// the number of vivified (asserted) vars
     VivifiedVar,
     /// don't use this dummy (sentinel at the tail).
@@ -212,6 +214,9 @@ pub struct State {
     pub start: Instant,
     /// upper limit for timeout handling
     pub time_limit: f64,
+    #[cfg(feature = "clause_vivification")]
+    // vivifier threshold
+    pub vivify_threshold: usize,
     /// logging facility.
     log_messages: Vec<String>,
 }
@@ -239,6 +244,10 @@ impl Default for State {
             record: ProgressRecord::default(),
             start: Instant::now(),
             time_limit: 0.0,
+
+            #[cfg(feature = "clause_vivification")]
+            vivify_threshold: 8,
+
             log_messages: Vec::new(),
         }
     }
