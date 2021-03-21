@@ -54,24 +54,24 @@ pub trait StateIF {
 
 /// Phase saving modes.
 #[derive(Debug, Eq, PartialEq)]
-pub enum StagingTarget {
-    /// use decision vars in best phases
-    Backbone,
+pub enum RephasingTarget {
     /// use best phases
     BestPhases,
     /// unstage all vars.
     Clear,
+    ///
+    Inverted,
 }
 
-impl fmt::Display for StagingTarget {
+impl fmt::Display for RephasingTarget {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(
             formatter,
             "{}",
             match self {
-                StagingTarget::Backbone => "Staging_backbone",
-                StagingTarget::BestPhases => "Staging_bestphase",
-                StagingTarget::Clear => "Staging_none",
+                RephasingTarget::BestPhases => "best-rephase",
+                RephasingTarget::Clear => "no-rephase",
+                RephasingTarget::Inverted => "inverted-rephase",
             }
         )
     }

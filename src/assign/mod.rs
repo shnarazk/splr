@@ -15,7 +15,7 @@ mod stack;
 mod var;
 
 pub use self::{propagate::PropagateIF, property::*, select::VarSelectIF, var::VarManipulateIF};
-#[cfg(any(feature = "best_phases_tracking", feature = "var_staging"))]
+#[cfg(any(feature = "best_phases_tracking", feature = "var_rephasing"))]
 use std::collections::HashMap;
 use {
     self::heap::VarHeapIF,
@@ -115,25 +115,15 @@ pub struct AssignStack {
     best_assign: bool,
     build_best_at: usize,
     num_best_assign: usize,
-    rephasing: bool,
     #[cfg(feature = "best_phases_tracking")]
     best_phases: HashMap<VarId, (bool, AssignReason)>,
 
     //
     //## Stage handling
     //
-    #[cfg(feature = "var_staging")]
-    /// Decay rate for staging reward
-    staging_reward_decay: f64,
-    #[cfg(feature = "var_staging")]
-    /// Bonus reward for vars on stage
-    staging_reward_value: f64,
-    #[cfg(feature = "var_staging")]
-    staged_vars: HashMap<VarId, bool>,
-    #[cfg(feature = "var_staging")]
+    #[cfg(feature = "var_rephasing")]
     stage_mode_select: usize,
     num_stages: usize,
-    stage_activity: f64,
     reward_index: usize,
 
     //

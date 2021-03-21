@@ -6,7 +6,7 @@ use {
 
 impl ActivityIF<VarId> for AssignStack {
     fn activity(&mut self, vi: VarId) -> f64 {
-        self.var[vi].activity(self.stage_activity)
+        self.var[vi].activity()
     }
     fn average_activity(&self) -> f64 {
         self.activity_ema.get()
@@ -28,7 +28,6 @@ impl ActivityIF<VarId> for AssignStack {
     // Note: `update_rewards` should be called befere `cancel_until`
     fn update_rewards(&mut self) {
         self.ordinal += 1;
-        self.stage_activity *= self.activity_decay;
     }
     fn update_activity_decay(&mut self, index: Option<usize>) {
         // asg.update_activity_decay();

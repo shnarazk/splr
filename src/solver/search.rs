@@ -211,9 +211,6 @@ fn search(
     let mut next_progress = progress_step;
     let mut best_asserted = state.target.num_of_variables;
 
-    #[cfg(feature = "var_staging")]
-    let mut parity = false;
-
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
 
@@ -243,10 +240,9 @@ fn search(
                     let num_unreachable = asg.derefer(assign::property::Tusize::NumUnreachableVar);
                     asg.update_activity_decay(if new_cycle { None } else { Some(block_level) });
 
-                    #[cfg(feature = "var_staging")]
-                    {
-                        parity = !parity;
-                        asg.select_staged_vars(None, parity);
+                    #[cfg(feature = "var_rephasing")]
+                    if new_cycle {
+                        asg.select_rephasing_target(None);
                     }
 
                     if last_core != num_unreachable || 0 == num_unreachable {

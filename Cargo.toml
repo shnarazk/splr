@@ -15,9 +15,8 @@ categories = ["mathematics", "science"]
 bitflags = "1.2"
 
 [features]
-default = ["clause_elimination", "clause_reduction", "clause_vivification", "LR_rewarding", "Luby_stabilization", "reason_side_rewarding"]
+default = ["clause_elimination", "clause_reduction", "LR_rewarding", "Luby_stabilization", "reason_side_rewarding"]
 best_phases_tracking = []
-best_phases_reuse = []
 boundary_check = []
 clause_elimination = []
 clause_reduction = []
@@ -34,7 +33,7 @@ reason_side_rewarding = []
 strategy_adaptation = []
 trace_analysis = []
 trace_elimination = []
-var_staging = []
+var_rephasing = ["best_phases_tracking"]
 
 [profile.release]
 lto = "fat"

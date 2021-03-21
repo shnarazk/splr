@@ -5,7 +5,7 @@ use {
     super::{restart, Restarter, Stat, State},
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-        cdb::{ClauseDB, ClauseDBIF, ClauseIF},
+        cdb::{self, ClauseDB, ClauseDBIF, ClauseIF},
         processor::Eliminator,
         state::StateIF,
         types::*,
@@ -36,8 +36,11 @@ pub fn vivify(
     }
     let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
     {
-        let thr = (4000.0 / (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt())
-            as usize;
+        let thr = 8 + 22usize.saturating_sub(
+            ((asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).log2()
+                + (cdb.derefer(cdb::property::Tusize::NumActive) as f64).log10())
+                as usize,
+        );
         for (i, c) in cdb.iter().enumerate().skip(1) {
             if c.is(Flag::DEAD) || c.is(Flag::VIVIFIED) {
                 continue;
