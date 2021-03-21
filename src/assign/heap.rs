@@ -180,7 +180,7 @@ impl VarOrderIF for VarIdHeap {
         self.heap.swap(i, n);
         self.idxs.swap(vi, vn);
         self.idxs[0] = n;
-        return n;
+        n
     }
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0

@@ -407,10 +407,10 @@ impl StateIF for State {
         A: AssignIF,
         C: PropertyDereference<cdb::property::Tusize, usize>,
     {
-        let asg_num_conflict = asg.refer(assign::property::A2usize::NumConflict);
-        let asg_num_decision = asg.refer(assign::property::A2usize::NumDecision);
-        let asg_num_propagation = asg.refer(assign::property::A2usize::NumPropergation);
-        let asg_num_restart = asg.refer(assign::property::A2usize::NumRestart);
+        let asg_num_conflict = asg.refer(assign::property::Tusize::NumConflict);
+        let asg_num_decision = asg.refer(assign::property::Tusize::NumDecision);
+        let asg_num_propagation = asg.refer(assign::property::Tusize::NumPropegation);
+        let asg_num_restart = asg.refer(assign::property::Tusize::NumRestart);
         let cdb_num_bi_learnt = cdb.refer(cdb::property::Tusize::NumBiLearnt);
         let cdb_num_lbd2 = cdb.refer(cdb::property::Tusize::NumLBD2);
 
