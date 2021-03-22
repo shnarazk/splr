@@ -94,9 +94,10 @@ impl VarSelectIF for AssignStack {
             t
         } else {
             self.stage_mode_select += 1;
-            match self.stage_mode_select % 3 {
+            match self.stage_mode_select % 4 {
                 1 => RephasingTarget::Inverted,
                 2 => RephasingTarget::BestPhases,
+                3 => RephasingTarget::Shift,
                 _ => RephasingTarget::Clear,
             }
         };
@@ -104,6 +105,11 @@ impl VarSelectIF for AssignStack {
             RephasingTarget::BestPhases => {
                 for (vi, (b, _)) in self.best_phases.iter() {
                     let v = &mut self.var[*vi];
+                    if self.assign[*vi] == Some(!*b) {
+                        self.best_phases.clear();
+                        self.num_best_assign = self.num_eliminated_vars;
+                        return;
+                    }
                     v.set(Flag::PHASE, *b);
                 }
                 self.num_rephase += 1;
@@ -112,6 +118,15 @@ impl VarSelectIF for AssignStack {
                 for (vi, (b, _)) in self.best_phases.iter() {
                     let v = &mut self.var[*vi];
                     v.set(Flag::PHASE, !*b);
+                }
+                self.num_rephase += 1;
+            }
+            RephasingTarget::Shift => {
+                let mut b = false;
+                for (vi, (s, _)) in self.best_phases.iter() {
+                    let v = &mut self.var[*vi];
+                    v.set(Flag::PHASE, b);
+                    b = *s;
                 }
                 self.num_rephase += 1;
             }

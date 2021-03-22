@@ -61,6 +61,8 @@ pub enum RephasingTarget {
     Clear,
     ///
     Inverted,
+    /// a kind of random shuffle
+    Shift,
 }
 
 impl fmt::Display for RephasingTarget {
@@ -72,6 +74,7 @@ impl fmt::Display for RephasingTarget {
                 RephasingTarget::BestPhases => "best-rephase",
                 RephasingTarget::Clear => "no-rephase",
                 RephasingTarget::Inverted => "inverted-rephase",
+                RephasingTarget::Shift => "inverted-shift",
             }
         )
     }
@@ -501,7 +504,7 @@ impl StateIF for State {
         let cdb_lbd_of_dp: f64 = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
 
         let elim_num_full = elim.derefer(processor::property::Tusize::NumFullElimination);
-        let elim_num_sub = elim.derefer(processor::property::Tusize::NumClauseSubsumption);
+        let elim_num_sub = elim.derefer(processor::property::Tusize::NumSubsumedClause);
 
         let rst_num_blk: usize = rst.derefer(solver::restart::property::Tusize::NumBlock);
         let rst_num_rst: usize = rst.derefer(solver::restart::property::Tusize::NumRestart);

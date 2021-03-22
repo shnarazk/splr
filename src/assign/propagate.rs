@@ -337,7 +337,7 @@ impl PropagateIF for AssignStack {
         let na = self.q_head + self.num_eliminated_vars;
         if (self.num_best_assign as usize) <= na && 0 < self.decision_level() {
             self.best_assign = true;
-            self.num_best_assign = na as f64 + 0.95;
+            self.num_best_assign = na;
         }
         ClauseId::default()
     }
@@ -472,16 +472,7 @@ impl AssignStack {
             if self.assign[vi] != Some(*b) {
                 if self.root_level == self.level[vi] {
                     self.best_phases.clear();
-                    self.num_best_assign = self.num_eliminated_vars as f64;
-                } else {
-                    // let lvl = self.level[vi];
-                    // let AssignStack {
-                    //     ref mut best_phases,
-                    //     ref level,
-                    //     ..
-                    // } = self;
-                    // best_phases.retain(|vj, _| level[*vj] < lvl);
-                    // self.num_best_assign = self.num_eliminated_vars + self.best_phases.len();
+                    self.num_best_assign = self.num_eliminated_vars;
                 }
                 return true;
             }

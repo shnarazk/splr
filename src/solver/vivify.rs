@@ -31,20 +31,14 @@ pub fn vivify(
     rst: &mut Restarter,
     state: &mut State,
 ) -> MaybeInconsistent {
-    if rst.derefer(restart::property::Tusize::TriggerLevelMax) <= state.vivify_threshold {
-        return Ok(());
-    }
     let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
     {
-        let thr = 8 + 22usize.saturating_sub(
+        let thr = 8 + 20usize.saturating_sub(
             ((asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).log2()
                 + (cdb.derefer(cdb::property::Tusize::NumClause) as f64).log10())
                 as usize,
         );
         for (i, c) in cdb.iter().enumerate().skip(1) {
-            if c.is(Flag::DEAD) || c.is(Flag::VIVIFIED) {
-                continue;
-            }
             if let Some(act) = c.to_vivify(thr) {
                 clauses.push(OrderedProxy::new(ClauseId::from(i), -act));
             }

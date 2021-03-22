@@ -43,7 +43,7 @@ impl Default for AssignStack {
 
             best_assign: false,
             build_best_at: 0,
-            num_best_assign: 0.0,
+            num_best_assign: 0,
             #[cfg(feature = "best_phases_tracking")]
             best_phases: HashMap::new(),
 
@@ -131,7 +131,6 @@ impl Instantiate for AssignStack {
                 self.make_var_eliminated(vi);
             }
             SolverEvent::NewStabilizationStage(lvl) => {
-                self.num_best_assign *= 0.999;
                 #[cfg(feature = "rephase")]
                 self.select_rephasing_target(None, lvl);
             }
@@ -210,7 +209,7 @@ impl AssignIF for AssignStack {
     }
     fn best_assigned(&mut self) -> Option<usize> {
         if self.build_best_at == self.num_propagation {
-            return Some(self.num_vars - self.num_best_assign as usize);
+            return Some(self.num_vars - self.num_best_assign);
         }
         None
     }

@@ -385,14 +385,12 @@ pub mod property {
 
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tusize {
-        NumClauseSubsumption,
         NumFullElimination,
         NumSatElimination,
         NumSubsumedClause,
     }
 
-    pub const USIZES: [Tusize; 4] = [
-        Tusize::NumClauseSubsumption,
+    pub const USIZES: [Tusize; 3] = [
         Tusize::NumFullElimination,
         Tusize::NumSatElimination,
         Tusize::NumSubsumedClause,
@@ -402,7 +400,6 @@ pub mod property {
         #[inline]
         fn derefer(&self, k: Tusize) -> usize {
             match k {
-                Tusize::NumClauseSubsumption => self.num_subsumed,
                 Tusize::NumFullElimination => self.num_full_elimination,
                 Tusize::NumSatElimination => self.num_sat_elimination,
                 Tusize::NumSubsumedClause => self.num_subsumed,

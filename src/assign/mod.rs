@@ -114,7 +114,7 @@ pub struct AssignStack {
     //
     best_assign: bool,
     build_best_at: usize,
-    num_best_assign: f64,
+    num_best_assign: usize,
     #[cfg(feature = "best_phases_tracking")]
     best_phases: HashMap<VarId, (bool, AssignReason)>,
 
@@ -258,7 +258,7 @@ pub mod property {
                 Tusize::NumUnassignedVar => {
                     self.num_vars - self.num_eliminated_vars - self.trail.len()
                 }
-                Tusize::NumUnreachableVar => self.num_vars - self.num_best_assign as usize,
+                Tusize::NumUnreachableVar => self.num_vars - self.num_best_assign,
             }
         }
     }
