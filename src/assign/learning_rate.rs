@@ -33,7 +33,7 @@ impl ActivityIF<VarId> for AssignStack {
         // asg.update_activity_decay();
         if let Some(index) = index {
             if self.reward_index < index {
-                self.activity_decay += (1.0 - self.activity_decay) * self.activity_decay_step;
+                self.activity_decay += self.activity_anti_decay * self.activity_decay_step;
                 self.reward_index += 1;
             }
         } else {

@@ -57,6 +57,8 @@ pub enum SolverEvent {
     Eliminate(VarId),
     /// Not in use
     Instantiate,
+    /// start a new stage of Luby stabilization.
+    NewStabilizationStage(usize),
     /// increment the number of vars.
     NewVar,
     /// re-initialization for incremental solving.

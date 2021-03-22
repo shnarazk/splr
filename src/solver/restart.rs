@@ -396,9 +396,9 @@ impl GeometricStabilizer {
         }
         None
     }
-    fn reset_progress(&mut self) {
-        self.reset_requested = true;
-    }
+    // fn reset_progress(&mut self) {
+    //     self.reset_requested = true;
+    // }
 }
 
 /// `Restarter` provides restart API and holds data about restart conditions.
@@ -463,7 +463,7 @@ impl Instantiate for Restarter {
                 self.restart_waiting = self.stb.step;
             }
             SolverEvent::ShrinkCore => {
-                self.stb.reset_progress();
+                // self.stb.reset_progress();
             }
             SolverEvent::Restart => {
                 self.after_restart = 0;
@@ -542,7 +542,7 @@ pub mod property {
     use super::Restarter;
     use crate::types::*;
 
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tusize {
         NumBlock,
         NumCycle,
@@ -551,6 +551,15 @@ pub mod property {
         TriggerLevel,
         TriggerLevelMax,
     }
+
+    pub const USIZES: [Tusize; 6] = [
+        Tusize::NumBlock,
+        Tusize::NumCycle,
+        Tusize::NumRestart,
+        Tusize::NumStage,
+        Tusize::TriggerLevel,
+        Tusize::TriggerLevelMax,
+    ];
 
     impl PropertyDereference<Tusize, usize> for Restarter {
         #[inline]

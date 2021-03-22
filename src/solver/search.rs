@@ -130,7 +130,7 @@ impl SolveIF for Solver {
                         _ => (),
                     }
                 }
-                let act = 1.0 / (asg.num_vars as f64).powf(0.2);
+                let act = 1.0 / (asg.num_vars as f64).powf(0.25);
                 for vi in elim.sorted_iterator() {
                     asg.set_activity(*vi, act);
                 }
@@ -209,7 +209,6 @@ fn search(
     let mut last_core = 0;
     let progress_step = 5000;
     let mut next_progress = progress_step;
-    let mut best_asserted = state.target.num_of_variables;
 
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
@@ -238,13 +237,8 @@ fn search(
                     let block_level = rst.derefer(restart::property::Tusize::TriggerLevel);
                     let num_cycle = rst.derefer(restart::property::Tusize::NumCycle);
                     let num_unreachable = asg.derefer(assign::property::Tusize::NumUnreachableVar);
+                    asg.handle(SolverEvent::NewStabilizationStage(block_level));
                     asg.update_activity_decay(if new_cycle { None } else { Some(block_level) });
-
-                    #[cfg(feature = "var_rephasing")]
-                    if new_cycle {
-                        asg.select_rephasing_target(None);
-                    }
-
                     if last_core != num_unreachable || 0 == num_unreachable {
                         state.log(
                             asg.num_conflict,
@@ -253,12 +247,12 @@ fn search(
                                 num_cycle,
                                 num_unreachable,
                                 block_level,
-                                asg.refer(assign::property::TEma::PPC).get(),
+                                asg.refer(assign::property::TEma::PropagationPerConflict)
+                                    .get(),
                             ),
                         );
                         last_core = num_unreachable;
                     }
-
                     if cdb.reduce(asg, asg.num_conflict)
                         && state.config.c_ip_int <= elim.to_simplify as usize
                     {
@@ -285,26 +279,19 @@ fn search(
                     RESTART!(asg, rst);
                 }
             }
-            // By simplification, we may get further solutions.
-            if asg.decision_level() == asg.root_level && asg.num_asserted_vars < asg.stack_len() {
-                asg.num_asserted_vars = asg.stack_len();
-            }
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
                 state[Stat::NoDecisionConflict] += 1;
             }
             if let Some(na) = asg.best_assigned() {
-                if na < best_asserted {
-                    state.flush("");
-                    state.flush(format!("unreachable core: {}", na));
-                    rst.handle(SolverEvent::ShrinkCore);
-                    best_asserted = na;
+                state.flush("");
+                state.flush(format!("unreachable core: {}", na));
+                rst.handle(SolverEvent::ShrinkCore);
 
-                    #[cfg(feature = "clause_vivification")]
-                    {
-                        state.vivify_threshold = 4.max(state.vivify_threshold / 2);
-                    }
+                #[cfg(feature = "clause_vivification")]
+                {
+                    state.vivify_threshold = 4.max(state.vivify_threshold / 2);
                 }
             }
             if asg.num_conflict % (10 * state.reflection_interval) == 0 {

@@ -383,12 +383,20 @@ pub mod property {
     use super::Eliminator;
     use crate::types::*;
 
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tusize {
         NumClauseSubsumption,
         NumFullElimination,
         NumSatElimination,
+        NumSubsumedClause,
     }
+
+    pub const USIZES: [Tusize; 4] = [
+        Tusize::NumClauseSubsumption,
+        Tusize::NumFullElimination,
+        Tusize::NumSatElimination,
+        Tusize::NumSubsumedClause,
+    ];
 
     impl PropertyDereference<Tusize, usize> for Eliminator {
         #[inline]
@@ -397,6 +405,7 @@ pub mod property {
                 Tusize::NumClauseSubsumption => self.num_subsumed,
                 Tusize::NumFullElimination => self.num_full_elimination,
                 Tusize::NumSatElimination => self.num_sat_elimination,
+                Tusize::NumSubsumedClause => self.num_subsumed,
             }
         }
     }

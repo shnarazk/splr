@@ -1,6 +1,8 @@
-#[cfg(feature = "var_rephasing")]
-use crate::state::RephasingTarget;
 /// Decision var selection
+
+#[cfg(feature = "rephase")]
+use {super::property, crate::state::RephasingTarget};
+
 use {
     super::{AssignStack, Var, VarHeapIF},
     crate::types::*,
@@ -17,10 +19,9 @@ macro_rules! var_assign {
 
 /// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
-    #[cfg(feature = "var_rephasing")]
+    #[cfg(feature = "rephase")]
     /// select rephasing target
-    fn select_rephasing_target(&mut self, request: Option<RephasingTarget>);
-
+    fn select_rephasing_target(&mut self, request: Option<RephasingTarget>, span: usize);
     /// return the number of forgotton vars.
     fn num_ion(&self) -> (usize, usize);
 
@@ -76,15 +77,26 @@ impl VarSelectIF for AssignStack {
         }
         (num_negative, num_positive)
     }
-    #[cfg(feature = "var_rephasing")]
-    fn select_rephasing_target(&mut self, request: Option<RephasingTarget>) {
-        self.stage_mode_select += 1;
+    #[cfg(feature = "rephase")]
+    fn select_rephasing_target(&mut self, request: Option<RephasingTarget>, span: usize) {
+        if self.best_phases.is_empty() {
+            return;
+        }
+        if self.derefer(property::Tusize::NumUnassertedVar) <= self.best_phases.len() {
+            self.best_phases.clear();
+            return;
+        }
+        let remain = self.derefer(property::Tusize::NumUnassertedVar) - self.best_phases.len() + 1;
+        if (remain as f64).log10() < span as f64 {
+            return;
+        }
         let target = if let Some(t) = request {
             t
         } else {
+            self.stage_mode_select += 1;
             match self.stage_mode_select % 3 {
-                1 => RephasingTarget::BestPhases,
-                2 => RephasingTarget::Inverted,
+                1 => RephasingTarget::Inverted,
+                2 => RephasingTarget::BestPhases,
                 _ => RephasingTarget::Clear,
             }
         };
@@ -94,12 +106,14 @@ impl VarSelectIF for AssignStack {
                     let v = &mut self.var[*vi];
                     v.set(Flag::PHASE, *b);
                 }
+                self.num_rephase += 1;
             }
             RephasingTarget::Inverted => {
                 for (vi, (b, _)) in self.best_phases.iter() {
                     let v = &mut self.var[*vi];
                     v.set(Flag::PHASE, !*b);
                 }
+                self.num_rephase += 1;
             }
             RephasingTarget::Clear => (),
         }

@@ -1,10 +1,12 @@
 // SAT solver for Propositional Logic in Rust
 use {
     splr::{
-        cdb::CertifiedRecord,
+        assign,
+        cdb::{self, CertifiedRecord},
+        config, processor,
         solver::*,
-        state::{LogF64Id, LogUsizeId},
-        Config, SolverError, VERSION,
+        state::{self, LogF64Id, LogUsizeId},
+        Config, EmaIF, PropertyDereference, PropertyReference, SolverError, VERSION,
     },
     std::{
         borrow::Cow,
@@ -317,7 +319,6 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
         )
         .as_bytes(),
     )?;
-
     out.write_all(
         format!(
             "c     Conflict|tASG:{}, cLvl:{}, bLvl:{}, /ppc:{},\n",
@@ -338,7 +339,6 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
         )
         .as_bytes(),
     )?;
-
     #[cfg(not(feature = "strategy_adaptation"))]
     {
         out.write_all(format!("c     Strategy|mode:  generic, time:{:9.2},\n", tm).as_bytes())?;
@@ -349,6 +349,97 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             format!(
                 "c     Strategy|mode:{:>15}, time:{:9.2},\n",
                 state.strategy.0, tm,
+            )
+            .as_bytes(),
+        )?;
+    }
+
+    for key in &config::property::F64S {
+        out.write_all(
+            format!(
+                "c   config::{:<27}{:>15}\n",
+                format!("{:?}", key),
+                s.state.config.derefer(*key),
+            )
+            .as_bytes(),
+        )?;
+    }
+    for key in &assign::property::USIZES {
+        out.write_all(
+            format!(
+                "c   assign::{:<27}{:>15}\n",
+                format!("{:?}", key),
+                s.asg.derefer(*key),
+            )
+            .as_bytes(),
+        )?;
+    }
+    for key in &assign::property::EMAS {
+        out.write_all(
+            format!(
+                "c   assign::{:<27}{:>19.3}\n",
+                format!("{:?}", key),
+                s.asg.refer(*key).get(),
+            )
+            .as_bytes(),
+        )?;
+    }
+    for key in &cdb::property::USIZES {
+        out.write_all(
+            format!(
+                "c   clause::{:<27}{:>15}\n",
+                format!("{:?}", key),
+                s.cdb.derefer(*key),
+            )
+            .as_bytes(),
+        )?;
+    }
+    for key in &cdb::property::F64 {
+        out.write_all(
+            format!(
+                "c   clause::{:<27}{:>19.3}\n",
+                format!("{:?}", key),
+                s.cdb.derefer(*key),
+            )
+            .as_bytes(),
+        )?;
+    }
+    for key in &processor::property::USIZES {
+        out.write_all(
+            format!(
+                "c   processor::{:<24}{:>15}\n",
+                format!("{:?}", key),
+                s.elim.derefer(*key),
+            )
+            .as_bytes(),
+        )?;
+    }
+    for key in &restart::property::USIZES {
+        out.write_all(
+            format!(
+                "c   restart::{:<26}{:>15}\n",
+                format!("{:?}", key),
+                s.rst.derefer(*key),
+            )
+            .as_bytes(),
+        )?;
+    }
+    for key in &state::property::USIZES {
+        out.write_all(
+            format!(
+                "c   state::{:<28}{:>15}\n",
+                format!("{:?}", key),
+                s.state.derefer(*key),
+            )
+            .as_bytes(),
+        )?;
+    }
+    for key in &state::property::EMAS {
+        out.write_all(
+            format!(
+                "c   state::{:<28}{:>19.3}\n",
+                format!("{:?}", key),
+                s.state.refer(*key).get(),
             )
             .as_bytes(),
         )?;

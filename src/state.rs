@@ -198,7 +198,7 @@ pub struct State {
     pub c_lvl: Ema,
     /// hold conflicting literals for UNSAT problems
     pub conflicts: Vec<Lit>,
-    /// choroBT threshold
+    /// chronoBT threshold
     pub chrono_bt_threshold: DecisionLevel,
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
@@ -290,6 +290,7 @@ impl Instantiate for State {
             SolverEvent::Conflict => (),
             SolverEvent::Eliminate(_) => (),
             SolverEvent::Instantiate => (),
+            SolverEvent::NewStabilizationStage(_) => (),
             SolverEvent::Reinitialize => (),
             SolverEvent::Restart => (),
             SolverEvent::ShrinkCore => (),
@@ -489,11 +490,11 @@ impl StateIF for State {
         let asg_num_decision = asg.derefer(assign::property::Tusize::NumDecision);
         let asg_num_propagation = asg.derefer(assign::property::Tusize::NumPropagation);
 
-        let asg_dpc_ema = asg.refer(assign::property::TEma::DPC);
-        let asg_ppc_ema = asg.refer(assign::property::TEma::PPC);
-        let asg_cpr_ema = asg.refer(assign::property::TEma::CPR);
+        let asg_dpc_ema = asg.refer(assign::property::TEma::DecisionPerConflict);
+        let asg_ppc_ema = asg.refer(assign::property::TEma::PropagationPerConflict);
+        let asg_cpr_ema = asg.refer(assign::property::TEma::ConflictPerRestart);
 
-        let cdb_num_active = cdb.derefer(cdb::property::Tusize::NumActive);
+        let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
         let cdb_num_biclause = cdb.derefer(cdb::property::Tusize::NumBiClause);
         let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
@@ -579,7 +580,7 @@ impl StateIF for State {
                 "{:>9}",
                 self,
                 LogUsizeId::PermanentClause,
-                cdb_num_active - cdb_num_learnt
+                cdb_num_clause - cdb_num_learnt
             ),
         );
         println!(
@@ -741,7 +742,7 @@ impl State {
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let asg_num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
         let asg_num_restart = asg.derefer(assign::property::Tusize::NumRestart);
-        let cdb_num_active = cdb.derefer(cdb::property::Tusize::NumActive);
+        let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
         let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
         let cdb_num_reduction = cdb.derefer(cdb::property::Tusize::NumReduction);
@@ -752,7 +753,7 @@ impl State {
             rst_num_block,                             // blocked
             asg_num_conflict / asg_num_restart.max(1), // average cfc (Conflict / Restart)
             asg_num_unasserted_vars,                   // alive vars
-            cdb_num_active - cdb_num_learnt,           // given clauses
+            cdb_num_clause - cdb_num_learnt,           // given clauses
             0,                                         // alive literals
             cdb_num_reduction,                         // clause reduction
             cdb_num_learnt,                            // alive learnts
@@ -776,7 +777,7 @@ impl State {
         let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let asg_num_restart = asg.derefer(assign::property::Tusize::NumRestart);
-        let cdb_num_active = cdb.derefer(cdb::property::Tusize::NumActive);
+        let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
         let rst_num_block = rst.derefer(solver::restart::property::Tusize::NumBlock);
         let rst_asg = rst.refer(solver::restart::property::TEma2::ASG);
@@ -792,7 +793,7 @@ impl State {
             asg_num_eliminated_vars,
             rate * 100.0,
             cdb_num_learnt,
-            cdb_num_active,
+            cdb_num_clause,
             0,
             rst_num_block,
             asg_num_restart,
@@ -918,5 +919,58 @@ impl IndexMut<LogF64Id> for ProgressRecord {
     #[inline]
     fn index_mut(&mut self, i: LogF64Id) -> &mut f64 {
         &mut self.valf[i as usize]
+    }
+}
+
+pub mod property {
+    use super::*;
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum Tusize {
+        /// the number of 'no decision conflict'
+        NoDecisionConflict,
+        /// the number of vivification
+        Vivification,
+        /// the number of vivified (shrunk) clauses
+        VivifiedClause,
+        /// the number of vivified (asserted) vars
+        VivifiedVar,
+    }
+
+    pub const USIZES: [Tusize; 4] = [
+        Tusize::NoDecisionConflict,
+        Tusize::Vivification,
+        Tusize::VivifiedClause,
+        Tusize::VivifiedVar,
+    ];
+
+    impl PropertyDereference<Tusize, usize> for State {
+        #[inline]
+        fn derefer(&self, k: Tusize) -> usize {
+            match k {
+                Tusize::NoDecisionConflict => self[Stat::NoDecisionConflict],
+                Tusize::Vivification => self[Stat::Vivification],
+                Tusize::VivifiedClause => self[Stat::VivifiedClause],
+                Tusize::VivifiedVar => self[Stat::VivifiedVar],
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum TEma {
+        BackjumpLevel,
+        ConflictLevel,
+    }
+
+    pub const EMAS: [TEma; 2] = [TEma::BackjumpLevel, TEma::ConflictLevel];
+
+    impl PropertyReference<TEma, Ema> for State {
+        #[inline]
+        fn refer(&self, k: TEma) -> &Ema {
+            match k {
+                TEma::BackjumpLevel => &self.b_lvl,
+                TEma::ConflictLevel => &self.c_lvl,
+            }
+        }
     }
 }

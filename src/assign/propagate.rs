@@ -116,10 +116,6 @@ impl PropagateIF for AssignStack {
         // The following doesn't hold anymore by using chronoBT.
         // assert!(self.trail_lim.is_empty() || !cid.is_none());
         let vi = l.vi();
-        #[cfg(feature = "best_phases_tracking")]
-        let decided = self.root_level < self.level[vi]
-            && self.reason[vi] == AssignReason::None
-            && matches!(self.best_phases.get(&vi), Some((_, AssignReason::None)));
         debug_assert!(!self.var[vi].is(Flag::ELIMINATED));
         debug_assert!(
             var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
@@ -132,7 +128,7 @@ impl PropagateIF for AssignStack {
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
         #[cfg(feature = "best_phases_tracking")]
-        if decided {
+        if self.root_level == lv {
             self.check_best_phase(vi);
         }
     }
@@ -202,6 +198,7 @@ impl PropagateIF for AssignStack {
         if lv == self.root_level {
             self.num_restart += 1;
             self.cpr_ema.update(self.num_conflict);
+            self.num_asserted_vars = self.stack_len();
         }
     }
     fn backtrack_sandbox(&mut self) {
@@ -305,7 +302,7 @@ impl PropagateIF for AssignStack {
                     assert!(*search_from < lits.len());
                     let len = lits.len();
                     // Gathering good literals at the beginning of lits.
-                    for k in (*search_from..len).chain((2..*search_from).rev()) {
+                    for k in (*search_from..len).chain(2..*search_from) {
                         let lk = lits.get_unchecked(k);
                         if lit_assign!(self, *lk) != Some(false) {
                             n -= 1;
@@ -338,9 +335,9 @@ impl PropagateIF for AssignStack {
             }
         }
         let na = self.q_head + self.num_eliminated_vars;
-        if self.num_best_assign <= na && 0 < self.decision_level() {
+        if (self.num_best_assign as usize) <= na && 0 < self.decision_level() {
             self.best_assign = true;
-            self.num_best_assign = na;
+            self.num_best_assign = na as f64 + 0.95;
         }
         ClauseId::default()
     }
@@ -475,7 +472,7 @@ impl AssignStack {
             if self.assign[vi] != Some(*b) {
                 if self.root_level == self.level[vi] {
                     self.best_phases.clear();
-                    self.num_best_assign = self.num_eliminated_vars;
+                    self.num_best_assign = self.num_eliminated_vars as f64;
                 } else {
                     // let lvl = self.level[vi];
                     // let AssignStack {

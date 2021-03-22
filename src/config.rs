@@ -336,10 +336,10 @@ impl Config {
                 "Luby stabilization",
                 #[cfg(feature = "reason_side_rewarding")]
                 "reason side rewarding",
+                #[cfg(feature = "rephase")]
+                "stage-based rephase",
                 #[cfg(feature = "strategy_adaptation")]
                 "strategy adaptation",
-                #[cfg(feature = "var_rephasing")]
-                "stage-based rephasing",
             ];
             println!(
                 "{}\nActivated features: {}\n{}",
@@ -460,5 +460,43 @@ impl Config {
     #[allow(unused_mut)]
     pub fn override_args(mut self) -> Config {
         self
+    }
+}
+
+pub mod property {
+    use super::Config;
+    use crate::types::*;
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum Tf64 {
+        ChronoBtThreshold,
+        ClauseRewardDecayRate,
+        InprocessorInterval,
+        RestartAsgThreshold,
+        RestartLbdThreshold,
+        VarRewardDecayRate,
+    }
+
+    pub const F64S: [Tf64; 6] = [
+        Tf64::ChronoBtThreshold,
+        Tf64::ClauseRewardDecayRate,
+        Tf64::InprocessorInterval,
+        Tf64::RestartAsgThreshold,
+        Tf64::RestartLbdThreshold,
+        Tf64::VarRewardDecayRate,
+    ];
+
+    impl PropertyDereference<Tf64, f64> for Config {
+        #[inline]
+        fn derefer(&self, k: Tf64) -> f64 {
+            match k {
+                Tf64::ChronoBtThreshold => self.c_cbt_thr as f64,
+                Tf64::ClauseRewardDecayRate => self.crw_dcy_rat,
+                Tf64::InprocessorInterval => self.c_ip_int as f64,
+                Tf64::RestartAsgThreshold => self.rst_asg_thr,
+                Tf64::RestartLbdThreshold => self.rst_lbd_thr,
+                Tf64::VarRewardDecayRate => self.vrw_dcy_rat,
+            }
+        }
     }
 }

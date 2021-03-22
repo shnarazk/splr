@@ -21,7 +21,6 @@ impl Default for ClauseDB {
             co_lbd_bound: 4,
             // lbd_frozen_clause: 30,
             ordinal: 0,
-            activity_inc: 1.0,
             activity_decay: 0.99,
             activity_anti_decay: 0.01,
             activity_ema: Ema::new(1000),
@@ -34,7 +33,7 @@ impl Default for ClauseDB {
             next_reduction: 1000,
             reducible: true,
             reduction_coeff: 1,
-            num_active: 0,
+            num_clause: 0,
             num_bi_clause: 0,
             num_bi_learnt: 0,
             num_lbd2: 0,
@@ -327,7 +326,7 @@ impl ClauseDBIF for ClauseDB {
                 ws.detach(n);
             }
         }
-        self.num_active = self.clause.len() - recycled.len();
+        self.num_clause = self.clause.len() - recycled.len();
         // debug_assert!(self.check_liveness2());
     }
     /// return `true` if a binary clause [l0, l1] has been registered.
@@ -427,7 +426,7 @@ impl ClauseDBIF for ClauseDB {
             let ClauseDB {
                 ref mut clause,
                 ref mut lbd_temp,
-                ref mut num_active,
+                ref mut num_clause,
                 ref mut num_bi_clause,
                 ref mut num_bi_learnt,
                 ref mut num_lbd2,
@@ -439,15 +438,15 @@ impl ClauseDBIF for ClauseDB {
             let c = &mut clause[cid.ordinal as usize];
             c.update_lbd(asg, lbd_temp);
             let len2 = c.lits.len() == 2;
-            if c.lits.len() <= 2 || (self.use_chan_seok && c.rank as usize <= self.co_lbd_bound) {
+            if learnt && len2 {
+                *num_bi_learnt += 1;
+            }
+            if c.lits.len() <= 2 || (self.use_chan_seok && c.rank <= self.co_lbd_bound) {
                 learnt = false;
             }
             if learnt {
                 c.turn_on(Flag::LEARNT);
 
-                if len2 {
-                    *num_bi_learnt += 1;
-                }
                 if c.rank <= 2 {
                     *num_lbd2 += 1;
                 }
@@ -473,7 +472,7 @@ impl ClauseDBIF for ClauseDB {
                     c: cid,
                 });
             }
-            *num_active += 1;
+            *num_clause += 1;
         }
         cid
     }
@@ -540,7 +539,7 @@ impl ClauseDBIF for ClauseDB {
         A: AssignIF,
     {
         let chan_seok_condition = if self.use_chan_seok {
-            self.co_lbd_bound
+            self.co_lbd_bound as usize
         } else {
             0
         };
@@ -626,7 +625,10 @@ impl ClauseDBIF for ClauseDB {
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
         for c in &mut self.clause[1..] {
-            if c.is(Flag::LEARNT) && !c.is(Flag::DEAD) && self.co_lbd_bound < c.lits.len() {
+            if c.is(Flag::LEARNT)
+                && !c.is(Flag::DEAD)
+                && (self.co_lbd_bound as usize) < c.lits.len()
+            {
                 c.kill(&mut self.touched);
             }
         }
@@ -770,6 +772,7 @@ impl ClauseDB {
     {
         let ClauseDB {
             ref mut clause,
+            ref co_lbd_bound,
             ref mut lbd_temp,
             ref mut touched,
             ref ordinal,
@@ -807,18 +810,15 @@ impl ClauseDB {
         let keep = (perm.len() / 2).min(nc / 2);
         if !self.use_chan_seok {
             if clause[perm[keep].to()].rank <= 3 {
-                self.next_reduction += self.extra_inc;
+                self.next_reduction += 2 * self.extra_inc;
             }
-            if clause[perm[0].to()].rank <= 5 {
+            if clause[perm[0].to()].rank <= *co_lbd_bound {
                 self.next_reduction += self.extra_inc;
             };
         }
         perm.sort_unstable();
         for i in &perm[keep..] {
-            let c = &mut clause[i.to()];
-            if 2 < c.rank {
-                c.kill(touched);
-            }
+            clause[i.to()].kill(touched);
         }
         debug_assert!(perm[0..keep].iter().all(|c| !clause[c.to()].is(Flag::DEAD)));
         self.garbage_collect();
@@ -833,7 +833,7 @@ impl ClauseDB {
             if c.is(Flag::DEAD) || !c.is(Flag::LEARNT) {
                 continue;
             }
-            if c.rank < self.co_lbd_bound as u16 {
+            if c.rank < self.co_lbd_bound {
                 c.turn_off(Flag::LEARNT);
                 self.num_learnt -= 1;
             } else if reinit {

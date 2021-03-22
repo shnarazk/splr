@@ -15,7 +15,7 @@ mod stack;
 mod var;
 
 pub use self::{propagate::PropagateIF, property::*, select::VarSelectIF, var::VarManipulateIF};
-#[cfg(any(feature = "best_phases_tracking", feature = "var_rephasing"))]
+#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
 use std::collections::HashMap;
 use {
     self::heap::VarHeapIF,
@@ -114,16 +114,17 @@ pub struct AssignStack {
     //
     best_assign: bool,
     build_best_at: usize,
-    num_best_assign: usize,
+    num_best_assign: f64,
     #[cfg(feature = "best_phases_tracking")]
     best_phases: HashMap<VarId, (bool, AssignReason)>,
 
     //
     //## Stage handling
     //
-    #[cfg(feature = "var_rephasing")]
+    #[cfg(feature = "rephase")]
     stage_mode_select: usize,
     num_stages: usize,
+    num_rephase: usize,
     reward_index: usize,
 
     //
@@ -206,11 +207,12 @@ pub mod property {
     use super::AssignStack;
     use crate::types::*;
 
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tusize {
         NumConflict,
         NumDecision,
         NumPropagation,
+        NumRephase,
         NumRestart,
         //
         //## var stat
@@ -224,6 +226,20 @@ pub mod property {
         NumUnreachableVar,
     }
 
+    pub const USIZES: [Tusize; 11] = [
+        Tusize::NumConflict,
+        Tusize::NumDecision,
+        Tusize::NumPropagation,
+        Tusize::NumRephase,
+        Tusize::NumRestart,
+        Tusize::NumVar,
+        Tusize::NumAssertedVar,
+        Tusize::NumEliminatedVar,
+        Tusize::NumUnassertedVar,
+        Tusize::NumUnassignedVar,
+        Tusize::NumUnreachableVar,
+    ];
+
     impl PropertyDereference<Tusize, usize> for AssignStack {
         #[inline]
         fn derefer(&self, k: Tusize) -> usize {
@@ -231,6 +247,7 @@ pub mod property {
                 Tusize::NumConflict => self.num_conflict,
                 Tusize::NumDecision => self.num_decision,
                 Tusize::NumPropagation => self.num_propagation,
+                Tusize::NumRephase => self.num_rephase,
                 Tusize::NumRestart => self.num_restart,
                 Tusize::NumVar => self.num_vars,
                 Tusize::NumAssertedVar => self.num_asserted_vars,
@@ -241,25 +258,31 @@ pub mod property {
                 Tusize::NumUnassignedVar => {
                     self.num_vars - self.num_eliminated_vars - self.trail.len()
                 }
-                Tusize::NumUnreachableVar => self.num_vars - self.num_best_assign,
+                Tusize::NumUnreachableVar => self.num_vars - self.num_best_assign as usize,
             }
         }
     }
 
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum TEma {
-        DPC,
-        PPC,
-        CPR,
+        DecisionPerConflict,
+        PropagationPerConflict,
+        ConflictPerRestart,
     }
+
+    pub const EMAS: [TEma; 3] = [
+        TEma::DecisionPerConflict,
+        TEma::PropagationPerConflict,
+        TEma::ConflictPerRestart,
+    ];
 
     impl PropertyReference<TEma, Ema> for AssignStack {
         #[inline]
         fn refer(&self, k: TEma) -> &Ema {
             match k {
-                TEma::DPC => self.dpc_ema.get_ema(),
-                TEma::PPC => self.ppc_ema.get_ema(),
-                TEma::CPR => self.cpr_ema.get_ema(),
+                TEma::DecisionPerConflict => self.dpc_ema.get_ema(),
+                TEma::PropagationPerConflict => self.ppc_ema.get_ema(),
+                TEma::ConflictPerRestart => self.cpr_ema.get_ema(),
             }
         }
     }

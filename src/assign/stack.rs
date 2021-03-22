@@ -1,5 +1,5 @@
 /// main struct AssignStack
-#[cfg(any(feature = "best_phases_tracking", feature = "var_rephasing"))]
+#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
 use std::collections::HashMap;
 use {
     super::{AssignIF, AssignStack, Var, VarHeapIF, VarIdHeap, VarManipulateIF, VarSelectIF},
@@ -43,13 +43,14 @@ impl Default for AssignStack {
 
             best_assign: false,
             build_best_at: 0,
-            num_best_assign: 0,
+            num_best_assign: 0.0,
             #[cfg(feature = "best_phases_tracking")]
             best_phases: HashMap::new(),
 
-            #[cfg(feature = "var_rephasing")]
+            #[cfg(feature = "rephase")]
             stage_mode_select: 0,
             num_stages: 0,
+            num_rephase: 0,
             reward_index: 1,
 
             num_vars: 0,
@@ -129,6 +130,11 @@ impl Instantiate for AssignStack {
             SolverEvent::Eliminate(vi) => {
                 self.make_var_eliminated(vi);
             }
+            SolverEvent::NewStabilizationStage(lvl) => {
+                self.num_best_assign *= 0.999;
+                #[cfg(feature = "rephase")]
+                self.select_rephasing_target(None, lvl);
+            }
             SolverEvent::NewVar => {
                 self.assign.push(None);
                 self.level.push(DecisionLevel::default());
@@ -204,7 +210,7 @@ impl AssignIF for AssignStack {
     }
     fn best_assigned(&mut self) -> Option<usize> {
         if self.build_best_at == self.num_propagation {
-            return Some(self.num_vars - self.num_best_assign);
+            return Some(self.num_vars - self.num_best_assign as usize);
         }
         None
     }

@@ -38,7 +38,7 @@ pub fn vivify(
     {
         let thr = 8 + 22usize.saturating_sub(
             ((asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).log2()
-                + (cdb.derefer(cdb::property::Tusize::NumActive) as f64).log10())
+                + (cdb.derefer(cdb::property::Tusize::NumClause) as f64).log10())
                 as usize,
         );
         for (i, c) in cdb.iter().enumerate().skip(1) {
