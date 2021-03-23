@@ -317,7 +317,7 @@ ARGS:
 
 ## Solver description
 
-Splr-0.7.0 adopts the following feature by default:
+Splr-0.7.1 adopts the following feature by default:
 
   - Learning-rate based var rewarding and clause rewarding
   - Reason-side var rewarding
@@ -326,6 +326,8 @@ Splr-0.7.0 adopts the following feature by default:
   - clause elimination and subsumption as pre-processor and in-processor
   - stabilization based on Luby series, or LubyStabilization
   - chronological backtrack and non-chronological backtrack
+  - clause vivification
+  - re-phase of best phases
 
 Among them, the unique feature is LubyStabilization. Let me explain it.
 

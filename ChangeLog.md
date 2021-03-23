@@ -1,3 +1,8 @@
+## 0.7.1, 2021-04-01
+
+- reactivate clause vivification
+- reactivate rephase of best phases
+
 ## 0.7.0, 2021-03-14
 
 - answer filenames start with "ans_" instead of ".ans_" by default.
