@@ -122,7 +122,7 @@ pub struct AssignStack {
     //## Stage handling
     //
     #[cfg(feature = "rephase")]
-    stage_mode_select: usize,
+    phase_age: usize,
     num_stages: usize,
     num_rephase: usize,
     reward_index: usize,

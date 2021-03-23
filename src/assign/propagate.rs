@@ -492,5 +492,6 @@ impl AssignStack {
             }
         }
         self.build_best_at = self.num_propagation;
+        self.phase_age = 0;
     }
 }

@@ -48,7 +48,7 @@ impl Default for AssignStack {
             best_phases: HashMap::new(),
 
             #[cfg(feature = "rephase")]
-            stage_mode_select: 0,
+            phase_age: 0,
             num_stages: 0,
             num_rephase: 0,
             reward_index: 1,

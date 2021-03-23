@@ -49,6 +49,8 @@ impl From<&Var> for VarTimestamp {
 /// Phase saving modes.
 #[derive(Debug, Eq, PartialEq)]
 pub enum RephasingTarget {
+    ///
+    AllTrue,
     /// use best phases
     BestPhases,
     /// unstage all vars.
@@ -57,8 +59,6 @@ pub enum RephasingTarget {
     Inverted,
     /// a kind of random shuffle
     Shift,
-    ///
-    AllTrue,
     ///
     XorShift,
 }
@@ -86,63 +86,41 @@ impl VarSelectIF for AssignStack {
         let target = if let Some(t) = request {
             t
         } else {
-            self.stage_mode_select += 1;
-            match self.stage_mode_select % 6 {
-                1 => RephasingTarget::Inverted,
-                2 => RephasingTarget::BestPhases,
-                3 => RephasingTarget::Shift,
-                4 => RephasingTarget::AllTrue,
-                5 => RephasingTarget::XorShift,
+            self.phase_age += 1;
+            match self.phase_age {
+                0 | 1 => RephasingTarget::Clear,
+                2 | 3 | 5 => RephasingTarget::BestPhases,
+                4 => RephasingTarget::Inverted,
+                6 => RephasingTarget::Shift,
+                x if x % 3 == 0 => RephasingTarget::BestPhases,
+                x if x % 3 == 1 => RephasingTarget::Inverted,
                 _ => RephasingTarget::Clear,
             }
         };
-        match target {
-            RephasingTarget::BestPhases => {
-                for (vi, (b, _)) in self.best_phases.iter() {
-                    let v = &mut self.var[*vi];
-                    if self.assign[*vi] == Some(!*b) {
-                        self.best_phases.clear();
-                        self.num_best_assign = self.num_eliminated_vars;
-                        return;
-                    }
-                    v.set(Flag::PHASE, *b);
-                }
-                self.num_rephase += 1;
+        let mut s = true;
+        for (vi, (b, _)) in self.best_phases.iter() {
+            let v = &mut self.var[*vi];
+            if self.assign[*vi] == Some(!*b) {
+                self.best_phases.clear();
+                self.num_best_assign = self.num_eliminated_vars;
+                return;
             }
-            RephasingTarget::Inverted => {
-                for (vi, (b, _)) in self.best_phases.iter() {
-                    let v = &mut self.var[*vi];
-                    v.set(Flag::PHASE, !*b);
+            match target {
+                RephasingTarget::AllTrue => v.set(Flag::PHASE, true),
+                RephasingTarget::BestPhases => v.set(Flag::PHASE, *b),
+                RephasingTarget::Inverted => v.set(Flag::PHASE, !*b),
+                RephasingTarget::Shift => {
+                    v.set(Flag::PHASE, s);
+                    s = *b;
                 }
-                self.num_rephase += 1;
-            }
-            RephasingTarget::Shift => {
-                let mut b = false;
-                for (vi, (s, _)) in self.best_phases.iter() {
-                    let v = &mut self.var[*vi];
-                    v.set(Flag::PHASE, b);
-                    b = *s;
+                RephasingTarget::XorShift => {
+                    v.set(Flag::PHASE, s);
+                    s ^= *b;
                 }
-                self.num_rephase += 1;
+                RephasingTarget::Clear => (),
             }
-            RephasingTarget::AllTrue => {
-                for (vi, _) in self.best_phases.iter() {
-                    let v = &mut self.var[*vi];
-                    v.set(Flag::PHASE, true);
-                }
-                self.num_rephase += 1;
-            }
-            RephasingTarget::XorShift => {
-                let mut b = true;
-                for (vi, (s, _)) in self.best_phases.iter() {
-                    let v = &mut self.var[*vi];
-                    v.set(Flag::PHASE, b ^ *s);
-                    b = *s;
-                }
-                self.num_rephase += 1;
-            }
-            RephasingTarget::Clear => (),
         }
+        self.num_rephase += 1;
     }
     fn select_decision_literal(&mut self) -> Lit {
         let vi = self.select_var();
