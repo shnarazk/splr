@@ -259,13 +259,11 @@ fn search(
                             elim.activate();
                             elim.simplify(asg, cdb, rst, state)?;
                         } else {
-                            // Simplification has been postponed because chronoBT was used.
-                            // `elim.to_simplify` is increased much in particular
-                            // when vars are asserted or learnts are small.
-                            // We don't need to count the number of asserted vars.
                             #[cfg(feature = "clause_vivification")]
                             if vivify(asg, cdb, elim, rst, state).is_err() {
-                                // return Err(SolverError::UndescribedError);
+                                #[cfg(feature = "boundary_check")]
+                                return Err(SolverError::UndescribedError);
+
                                 analyze_final(asg, state, &cdb[ci]);
                                 return Ok(false);
                             }
