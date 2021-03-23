@@ -324,7 +324,7 @@ struct GeometricStabilizer {
     num_cycle: usize,
     num_stage: usize,
     next_trigger: usize,
-    reset_requested: bool,
+    // reset_requested: bool,
     step: usize,
     step_max: usize,
 }
@@ -341,7 +341,7 @@ impl Default for GeometricStabilizer {
             num_cycle: 0,
             num_stage: 0,
             next_trigger: 1,
-            reset_requested: false,
+            // reset_requested: false,
             step: 1,
             step_max: 1,
         }
@@ -384,12 +384,12 @@ impl GeometricStabilizer {
                 self.num_cycle += 1;
                 self.step_max = self.step;
             }
-            if self.reset_requested {
-                self.num_cycle = 0;
-                self.luby.reset();
-                self.reset_requested = false;
-                self.step_max = 1;
-            }
+            // if self.reset_requested {
+            //     self.num_cycle = 0;
+            //     self.luby.reset();
+            //     self.reset_requested = false;
+            //     self.step_max = 1;
+            // }
             self.step = self.luby.next();
             self.next_trigger = now + (self.step_max * 2) / self.step;
             return Some(new_cycle);
@@ -461,9 +461,6 @@ impl Instantiate for Restarter {
         match e {
             SolverEvent::Assert(_) | SolverEvent::Eliminate(_) => {
                 self.restart_waiting = self.stb.step;
-            }
-            SolverEvent::ShrinkCore => {
-                // self.stb.reset_progress();
             }
             SolverEvent::Restart => {
                 self.after_restart = 0;

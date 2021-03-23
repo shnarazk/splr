@@ -270,7 +270,6 @@ fn search(
                             }
                         }
                     }
-
                     if next_progress < asg.num_conflict {
                         state.progress(asg, cdb, elim, rst);
                         next_progress = asg.num_conflict + progress_step;
@@ -287,7 +286,6 @@ fn search(
             if let Some(na) = asg.best_assigned() {
                 state.flush("");
                 state.flush(format!("unreachable core: {}", na));
-                rst.handle(SolverEvent::ShrinkCore);
 
                 #[cfg(feature = "clause_vivification")]
                 {

@@ -65,8 +65,6 @@ pub enum SolverEvent {
     Reinitialize,
     /// restart
     Restart,
-    /// the core size reduced.
-    ShrinkCore,
     /// stabilization update.
     Stabilize((bool, bool)),
 

@@ -22,9 +22,6 @@ pub trait VarSelectIF {
     #[cfg(feature = "rephase")]
     /// select rephasing target
     fn select_rephasing_target(&mut self, request: Option<RephasingTarget>, span: usize);
-    /// return the number of forgotton vars.
-    fn num_ion(&self) -> (usize, usize);
-
     /// select a new decision variable.
     fn select_decision_literal(&mut self) -> Lit;
     /// update the internal heap on var order.
@@ -49,36 +46,8 @@ impl From<&Var> for VarTimestamp {
 }
 
 impl VarSelectIF for AssignStack {
-    #[cfg(not(feature = "best_phases_tracking"))]
-    fn num_ion(&self) -> (usize, usize) {
-        (0, 0)
-    }
-    #[cfg(feature = "best_phases_tracking")]
-    fn num_ion(&self) -> (usize, usize) {
-        let thr = self.average_activity();
-        let mut num_negative = 0; // unreachable core side
-        let mut num_positive = 0; // decision var side
-
-        for v in self.var.iter().skip(1) {
-            if !v.is(Flag::ELIMINATED)
-                && thr < v.activity()
-                && self.root_level < self.level[v.index]
-            {
-                match self.best_phases.get(&v.index) {
-                    Some((_, AssignReason::Implication(_, NULL_LIT))) => {
-                        num_positive += 1;
-                    }
-                    None => {
-                        num_negative += 1;
-                    }
-                    _ => (),
-                }
-            }
-        }
-        (num_negative, num_positive)
-    }
     #[cfg(feature = "rephase")]
-    fn select_rephasing_target(&mut self, request: Option<RephasingTarget>, span: usize) {
+    fn select_rephasing_target(&mut self, request: Option<RephasingTarget>, level: usize) {
         if self.best_phases.is_empty() {
             return;
         }
@@ -87,7 +56,7 @@ impl VarSelectIF for AssignStack {
             return;
         }
         let remain = self.derefer(property::Tusize::NumUnassertedVar) - self.best_phases.len() + 1;
-        if (remain as f64).log10() < span as f64 {
+        if (remain as f64).log10() < level as f64 {
             return;
         }
         let target = if let Some(t) = request {
