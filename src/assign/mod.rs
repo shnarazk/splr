@@ -115,16 +115,12 @@ pub struct AssignStack {
     best_assign: bool,
     build_best_at: usize,
     num_best_assign: usize,
+    num_rephase: usize,
+
     #[cfg(feature = "best_phases_tracking")]
     best_phases: HashMap<VarId, (bool, AssignReason)>,
-
-    //
-    //## Stage handling
-    //
     #[cfg(feature = "rephase")]
     phase_age: usize,
-    num_stages: usize,
-    num_rephase: usize,
 
     //
     //## Statistics

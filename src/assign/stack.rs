@@ -44,13 +44,12 @@ impl Default for AssignStack {
             best_assign: false,
             build_best_at: 0,
             num_best_assign: 0,
+            num_rephase: 0,
+
             #[cfg(feature = "best_phases_tracking")]
             best_phases: HashMap::new(),
-
             #[cfg(feature = "rephase")]
             phase_age: 0,
-            num_stages: 0,
-            num_rephase: 0,
 
             num_vars: 0,
             num_asserted_vars: 0,
