@@ -52,34 +52,6 @@ pub trait StateIF {
     fn log<S: AsRef<str>>(&mut self, tick: usize, mes: S);
 }
 
-/// Phase saving modes.
-#[derive(Debug, Eq, PartialEq)]
-pub enum RephasingTarget {
-    /// use best phases
-    BestPhases,
-    /// unstage all vars.
-    Clear,
-    ///
-    Inverted,
-    /// a kind of random shuffle
-    Shift,
-}
-
-impl fmt::Display for RephasingTarget {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            formatter,
-            "{}",
-            match self {
-                RephasingTarget::BestPhases => "best-rephase",
-                RephasingTarget::Clear => "no-rephase",
-                RephasingTarget::Inverted => "inverted-rephase",
-                RephasingTarget::Shift => "inverted-shift",
-            }
-        )
-    }
-}
-
 #[cfg(feature = "strategy_adaptation")]
 /// A collection of named search heuristics.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

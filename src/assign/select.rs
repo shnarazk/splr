@@ -1,11 +1,12 @@
 /// Decision var selection
 
 #[cfg(feature = "rephase")]
-use {super::property, crate::state::RephasingTarget};
+use super::property;
 
 use {
     super::{AssignStack, Var, VarHeapIF},
     crate::types::*,
+    std::fmt,
 };
 
 /// ```
@@ -45,6 +46,29 @@ impl From<&Var> for VarTimestamp {
     }
 }
 
+/// Phase saving modes.
+#[derive(Debug, Eq, PartialEq)]
+pub enum RephasingTarget {
+    /// use best phases
+    BestPhases,
+    /// unstage all vars.
+    Clear,
+    ///
+    Inverted,
+    /// a kind of random shuffle
+    Shift,
+    ///
+    AllTrue,
+    ///
+    XorShift,
+}
+
+impl fmt::Display for RephasingTarget {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "{:?}", self)
+    }
+}
+
 impl VarSelectIF for AssignStack {
     #[cfg(feature = "rephase")]
     fn select_rephasing_target(&mut self, request: Option<RephasingTarget>, level: usize) {
@@ -63,10 +87,12 @@ impl VarSelectIF for AssignStack {
             t
         } else {
             self.stage_mode_select += 1;
-            match self.stage_mode_select % 4 {
+            match self.stage_mode_select % 6 {
                 1 => RephasingTarget::Inverted,
                 2 => RephasingTarget::BestPhases,
                 3 => RephasingTarget::Shift,
+                4 => RephasingTarget::AllTrue,
+                5 => RephasingTarget::XorShift,
                 _ => RephasingTarget::Clear,
             }
         };
@@ -95,6 +121,22 @@ impl VarSelectIF for AssignStack {
                 for (vi, (s, _)) in self.best_phases.iter() {
                     let v = &mut self.var[*vi];
                     v.set(Flag::PHASE, b);
+                    b = *s;
+                }
+                self.num_rephase += 1;
+            }
+            RephasingTarget::AllTrue => {
+                for (vi, _) in self.best_phases.iter() {
+                    let v = &mut self.var[*vi];
+                    v.set(Flag::PHASE, true);
+                }
+                self.num_rephase += 1;
+            }
+            RephasingTarget::XorShift => {
+                let mut b = true;
+                for (vi, (s, _)) in self.best_phases.iter() {
+                    let v = &mut self.var[*vi];
+                    v.set(Flag::PHASE, b ^ *s);
                     b = *s;
                 }
                 self.num_rephase += 1;
