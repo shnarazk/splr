@@ -183,21 +183,6 @@ pub struct VarIdHeap {
     idxs: Vec<usize>,
 }
 
-impl VarIdHeap {
-    pub fn new(n: usize, init: usize) -> Self {
-        let mut heap = Vec::with_capacity(n + 1);
-        let mut idxs = Vec::with_capacity(n + 1);
-        heap.push(0);
-        idxs.push(n);
-        for i in 1..=n {
-            heap.push(i);
-            idxs.push(i);
-        }
-        idxs[0] = init;
-        VarIdHeap { heap, idxs }
-    }
-}
-
 pub mod property {
     use super::AssignStack;
     use crate::types::*;
