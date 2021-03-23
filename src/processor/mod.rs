@@ -116,7 +116,7 @@ enum EliminatorMode {
 /// Literal eliminator
 #[derive(Clone, Debug)]
 pub struct Eliminator {
-    pub enable: bool,
+    enable: bool,
     pub to_simplify: f64,
     mode: EliminatorMode,
     clause_queue: Vec<ClauseId>,

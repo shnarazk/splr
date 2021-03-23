@@ -65,7 +65,9 @@ impl SolveIF for Solver {
         if 0 < asg.stack_len() {
             elim.eliminate_satisfied_clauses(asg, cdb, false);
         }
-        if elim.enable {
+
+        #[cfg(feature = "clause_elimination")]
+        {
             const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
 
             //
