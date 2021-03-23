@@ -232,13 +232,12 @@ fn search(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
             ));
             if rst.restart() == Some(RestartDecision::Force) {
-                if let Some(new_cycle) = rst.stabilize() {
+                if let Some(_new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);
                     let block_level = rst.derefer(restart::property::Tusize::TriggerLevel);
                     let num_cycle = rst.derefer(restart::property::Tusize::NumCycle);
                     let num_unreachable = asg.derefer(assign::property::Tusize::NumUnreachableVar);
                     asg.handle(SolverEvent::NewStabilizationStage(block_level));
-                    asg.update_activity_decay(if new_cycle { None } else { Some(block_level) });
                     if last_core != num_unreachable || 0 == num_unreachable {
                         state.log(
                             asg.num_conflict,
