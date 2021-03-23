@@ -51,7 +51,6 @@ impl Default for AssignStack {
             phase_age: 0,
             num_stages: 0,
             num_rephase: 0,
-            reward_index: 1,
 
             num_vars: 0,
             num_asserted_vars: 0,
@@ -124,7 +123,6 @@ impl Instantiate for AssignStack {
             // So execute everything of `assign_by_unitclause` but cancel_until(root_level)
             SolverEvent::Assert(vi) => {
                 self.make_var_asserted(vi);
-                self.reward_index = 1;
             }
             SolverEvent::Conflict => (),
             SolverEvent::Eliminate(vi) => {

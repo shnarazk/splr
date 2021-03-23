@@ -29,19 +29,6 @@ impl ActivityIF<VarId> for AssignStack {
     fn update_rewards(&mut self) {
         self.ordinal += 1;
     }
-    fn update_activity_decay(&mut self, index: Option<usize>) {
-        // asg.update_activity_decay();
-        if let Some(index) = index {
-            if self.reward_index < index {
-                self.activity_decay += self.activity_anti_decay * self.activity_decay_step;
-                self.reward_index += 1;
-            }
-        } else {
-            self.activity_decay = self.activity_decay_default;
-            self.reward_index = 1;
-        }
-        self.activity_anti_decay = 1.0 - self.activity_decay;
-    }
 }
 
 impl Var {

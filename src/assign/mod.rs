@@ -125,7 +125,6 @@ pub struct AssignStack {
     phase_age: usize,
     num_stages: usize,
     num_rephase: usize,
-    reward_index: usize,
 
     //
     //## Statistics
