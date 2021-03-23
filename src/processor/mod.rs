@@ -125,15 +125,15 @@ pub struct Eliminator {
     /// constraints on eliminated var. It is used by `extend_model`.
     elim_lits: Vec<Lit>,
     /// Maximum number of clauses to try to eliminate a var
-    pub eliminate_var_occurrence_limit: usize,
+    eliminate_var_occurrence_limit: usize,
     /// 0 for no limit
     /// Stop elimination if a generated resolvent is larger than this
     /// 0 means no limit.
-    pub eliminate_combination_limit: usize,
+    eliminate_combination_limit: usize,
     /// Stop elimination if the increase of clauses is over this
-    pub eliminate_grow_limit: usize,
+    eliminate_grow_limit: usize,
     /// A criteria by the product's of its positive occurrences and negative ones
-    pub eliminate_occurrence_limit: usize,
+    eliminate_occurrence_limit: usize,
     /// Stop subsumption if the size of a clause is over this
     subsume_literal_limit: usize,
     /// var
