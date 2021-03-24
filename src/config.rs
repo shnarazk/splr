@@ -320,7 +320,7 @@ impl Config {
                 "clause reduction",
                 #[cfg(feature = "clause_vivification")]
                 "clause vivification",
-                #[cfg(feature = "ema_calibration")]
+                #[cfg(feature = "EMA_calibration")]
                 "EMA calibration",
                 #[cfg(feature = "EVSIDS")]
                 "EVSIDS rewarding",
