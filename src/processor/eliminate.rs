@@ -347,7 +347,7 @@ mod tests {
             ref mut rst,
             ref mut state,
             ..
-        } = Solver::try_from("tests/uf8.cnf").expect("failed to load");
+        } = Solver::try_from("cnfs/uf8.cnf").expect("failed to load");
         let mut timedout = 10_000;
         let vi = 4;
 

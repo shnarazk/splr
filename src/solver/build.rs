@@ -32,7 +32,7 @@ pub trait SatSolverIF: Instantiate {
     /// use std::convert::TryFrom;
     /// use crate::splr::assign::VarManipulateIF;    // for s.asg.assign()
     ///
-    /// let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
+    /// let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
     /// assert!(s.add_assignment(1).is_ok());
     /// assert_eq!(s.asg.assign(1), Some(true));
     /// assert!(s.add_assignment(2).is_ok());
@@ -58,7 +58,7 @@ pub trait SatSolverIF: Instantiate {
     /// use crate::splr::*;
     /// use std::convert::TryFrom;
     ///
-    /// let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
+    /// let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
     /// assert!(s.add_clause(vec![1, -2]).is_ok());
     /// assert!(s.add_clause(vec![2, -3]).is_ok());
     /// assert!(s.add_clause(vec![3, 4]).is_ok());
@@ -80,7 +80,7 @@ pub trait SatSolverIF: Instantiate {
     /// use crate::splr::*;
     /// use std::convert::TryFrom;
     ///
-    /// let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
+    /// let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
     /// assert_eq!(s.asg.num_vars, 8);
     /// assert!(matches!(s.add_assignment(9), Err(SolverError::OutOfRange)));
     /// s.add_assignment(1).expect("panic");
@@ -161,7 +161,7 @@ impl TryFrom<&str> for Solver {
     /// use std::convert::TryFrom;
     /// use crate::splr::solver::{SatSolverIF, Solver};
     ///
-    /// let mut s = Solver::try_from("tests/sample.cnf").expect("fail to load");
+    /// let mut s = Solver::try_from("cnfs/sample.cnf").expect("fail to load");
     ///```
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         let config = Config::from(s);
@@ -215,7 +215,7 @@ impl SatSolverIF for Solver {
     /// use splr::config::Config;
     /// use splr::solver::{SatSolverIF, Solver};
     ///
-    /// let config = Config::from("tests/sample.cnf");
+    /// let config = Config::from("cnfs/sample.cnf");
     /// assert!(Solver::build(&config).is_ok());
     ///```
     #[cfg(not(feature = "no_IO"))]
@@ -376,7 +376,7 @@ mod tests {
     #[cfg(not(feature = "no_IO"))]
     #[test]
     fn test_add_var() {
-        let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
+        let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
         assert_eq!(s.asg.num_vars, 8);
         assert!(matches!(s.add_assignment(9), Err(SolverError::OutOfRange)));
         s.add_assignment(1).expect("panic");

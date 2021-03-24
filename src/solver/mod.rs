@@ -79,7 +79,7 @@ pub enum SolverEvent {
 /// use crate::splr::*;
 /// use crate::splr::{assign::{AssignIF, VarManipulateIF}, state::{State, StateIF}, types::*};
 ///
-/// let mut s = Solver::try_from("tests/sample.cnf").expect("can't load");
+/// let mut s = Solver::try_from("cnfs/sample.cnf").expect("can't load");
 /// assert_eq!(s.asg.derefer(assign::property::Tusize::NumVar), 250);
 /// assert_eq!(s.asg.derefer(assign::property::Tusize::NumUnassertedVar), 250);
 /// if let Ok(Certificate::SAT(v)) = s.solve() {
@@ -89,7 +89,7 @@ pub enum SolverEvent {
 /// } else {
 ///     panic!("It should be satisfied!");
 /// }
-/// assert_eq!(Solver::try_from("tests/unsat.cnf").expect("can't load").solve(), Ok(Certificate::UNSAT));
+/// assert_eq!(Solver::try_from("cnfs/unsat.cnf").expect("can't load").solve(), Ok(Certificate::UNSAT));
 /// ```
 #[derive(Clone, Debug)]
 pub struct Solver {
@@ -132,7 +132,7 @@ pub struct SolverIter<'a> {
 impl Solver {
     /// return an iterator on Solver. **Requires 'incremental_solver' feature**
     ///```
-    ///for v in Solver::try_from("tests/sample.cnf").expect("panic").iter() {
+    ///for v in Solver::try_from("cnfs/sample.cnf").expect("panic").iter() {
     ///    println!(" - answer: {:?}", v);
     ///}
     ///```
@@ -176,7 +176,7 @@ mod tests {
 
     #[cfg_attr(not(feature = "no_IO"), test)]
     fn test_solver() {
-        let config = Config::from("tests/sample.cnf");
+        let config = Config::from("cnfs/sample.cnf");
         if let Ok(s) = Solver::build(&config) {
             assert_eq!(s.asg.derefer(assign::property::Tusize::NumVar), 250);
             assert_eq!(
@@ -184,7 +184,7 @@ mod tests {
                 250
             );
         } else {
-            panic!("failed to build a solver for tests/sample.cnf");
+            panic!("failed to build a solver for cnfs/sample.cnf");
         }
     }
 

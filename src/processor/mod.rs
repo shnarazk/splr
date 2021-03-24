@@ -7,7 +7,7 @@
 //!```
 //!  use splr::{processor::{self, EliminateIF}, solver::Solver, types::PropertyDereference};
 //!  use std::convert::TryFrom;
-//!  let mut s = Solver::try_from("tests/sample.cnf").expect("failed to load");
+//!  let mut s = Solver::try_from("cnfs/sample.cnf").expect("failed to load");
 //!  let Solver {
 //!      ref mut asg,
 //!      ref mut cdb,
@@ -183,7 +183,7 @@ mod tests {
     fn check_elimination() {
         let mut config = Config::default();
         config.quiet_mode = true;
-        let mut s = Solver::try_from("tests/sample.cnf").expect("failed to load");
+        let mut s = Solver::try_from("cnfs/sample.cnf").expect("failed to load");
         let Solver {
             ref mut asg,
             ref mut cdb,

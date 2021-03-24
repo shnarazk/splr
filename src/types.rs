@@ -876,11 +876,11 @@ mod tests {
     use super::*;
     #[test]
     fn test_cnf() {
-        if let Ok(reader) = CNFReader::try_from("tests/sample.cnf") {
+        if let Ok(reader) = CNFReader::try_from("cnfs/sample.cnf") {
             assert_eq!(reader.cnf.num_of_variables, 250);
             assert_eq!(reader.cnf.num_of_clauses, 1065);
         } else {
-            panic!("failed to load tests/sample.cnf");
+            panic!("failed to load cnfs/sample.cnf");
         }
     }
 }
