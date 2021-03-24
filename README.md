@@ -327,7 +327,7 @@ Splr-0.7.1 adopts the following feature by default:
   - stabilization based on Luby series, or LubyStabilization
   - chronological backtrack and non-chronological backtrack
   - clause vivification
-  - re-phase of best phases
+  - re-phase the best phases
 
 Among them, the unique feature is LubyStabilization. Let me explain it.
 
