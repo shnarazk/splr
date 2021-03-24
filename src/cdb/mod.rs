@@ -183,7 +183,7 @@ pub struct ClauseDB {
     /// flag for Chan Seok heuristics; this value is exported with `Export:mode`
     use_chan_seok: bool,
     /// 'small' clause threshold
-    co_lbd_bound: usize,
+    co_lbd_bound: u16,
     // not in use
     // lbd_frozen_clause: usize,
 
@@ -192,7 +192,6 @@ pub struct ClauseDB {
     //
     /// an index for counting elapsed time
     ordinal: usize,
-    activity_inc: f64,
     activity_decay: f64,
     activity_anti_decay: f64,
     activity_ema: Ema,
@@ -227,7 +226,7 @@ pub struct ClauseDB {
     //## statistics
     //
     /// the number of active (not DEAD) clauses.
-    num_active: usize,
+    num_clause: usize,
     /// the number of binary clauses.
     num_bi_clause: usize,
     /// the number of binary learnt clauses.
@@ -251,21 +250,30 @@ pub mod property {
     use super::ClauseDB;
     use crate::types::*;
 
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tusize {
-        NumActive,
         NumBiClause,
         NumBiLearnt,
+        NumClause,
         NumLBD2,
         NumLearnt,
         NumReduction,
     }
 
+    pub const USIZES: [Tusize; 6] = [
+        Tusize::NumBiClause,
+        Tusize::NumBiLearnt,
+        Tusize::NumClause,
+        Tusize::NumLBD2,
+        Tusize::NumLearnt,
+        Tusize::NumReduction,
+    ];
+
     impl PropertyDereference<Tusize, usize> for ClauseDB {
         #[inline]
         fn derefer(&self, k: Tusize) -> usize {
             match k {
-                Tusize::NumActive => self.num_active,
+                Tusize::NumClause => self.num_clause,
                 Tusize::NumBiClause => self.num_bi_clause,
                 Tusize::NumBiLearnt => self.num_bi_learnt,
                 Tusize::NumLBD2 => self.num_lbd2,
@@ -275,10 +283,12 @@ pub mod property {
         }
     }
 
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tf64 {
         DpAverageLBD,
     }
+
+    pub const F64: [Tf64; 1] = [Tf64::DpAverageLBD];
 
     impl PropertyDereference<Tf64, f64> for ClauseDB {
         #[inline]

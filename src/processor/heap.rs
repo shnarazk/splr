@@ -1,9 +1,96 @@
 /// Crate `eliminator` implements clause subsumption and var elimination.
 use {
-    super::{LitOccurs, VarOccHeap, VarOrderIF},
     crate::{assign::AssignIF, types::*},
     std::fmt,
 };
+
+pub trait VarOrderIF {
+    fn clear<A>(&mut self, asg: &mut A)
+    where
+        A: AssignIF;
+    fn len(&self) -> usize;
+    fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upward: bool);
+    fn is_empty(&self) -> bool;
+    fn select_var<A>(&mut self, occur: &[LitOccurs], asg: &A) -> Option<VarId>
+    where
+        A: AssignIF;
+    fn rebuild<A>(&mut self, asg: &A, occur: &[LitOccurs])
+    where
+        A: AssignIF;
+}
+
+/// Mapping from Literal to Clauses.
+#[derive(Clone, Debug)]
+pub struct LitOccurs {
+    pub aborted: bool,
+    pub pos_occurs: Vec<ClauseId>,
+    pub neg_occurs: Vec<ClauseId>,
+}
+
+impl Default for LitOccurs {
+    fn default() -> LitOccurs {
+        LitOccurs {
+            aborted: false,
+            pos_occurs: Vec::new(),
+            neg_occurs: Vec::new(),
+        }
+    }
+}
+
+impl LitOccurs {
+    /// return a new vector of $n$ `LitOccurs`s.
+    pub fn new(n: usize) -> Vec<LitOccurs> {
+        let mut vec = Vec::with_capacity(n + 1);
+        for _ in 0..=n {
+            vec.push(LitOccurs::default());
+        }
+        vec
+    }
+    pub fn clear(&mut self) {
+        self.aborted = false;
+        self.pos_occurs.clear();
+        self.neg_occurs.clear();
+    }
+    pub fn activity(&self) -> usize {
+        if self.aborted {
+            std::usize::MAX
+        } else {
+            self.pos_occurs.len().min(self.neg_occurs.len())
+        }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.pos_occurs.is_empty() && self.neg_occurs.is_empty()
+    }
+    pub fn len(&self) -> usize {
+        self.pos_occurs.len() + self.neg_occurs.len()
+    }
+}
+
+/// Var heap structure based on the number of occurrences
+/// # Note
+/// - both fields has a fixed length. Don't use push and pop.
+/// - `idxs[0]` contains the number of alive elements
+///   `indx` is positions. So the unused field 0 can hold the last position as a special case.
+#[derive(Clone, Debug)]
+pub struct VarOccHeap {
+    pub heap: Vec<VarId>, // order : usize -> VarId
+    pub idxs: Vec<usize>, // VarId : -> order : usize
+}
+
+impl VarOccHeap {
+    pub fn new(n: usize, init: usize) -> Self {
+        let mut heap = Vec::with_capacity(n + 1);
+        let mut idxs = Vec::with_capacity(n + 1);
+        heap.push(0);
+        idxs.push(n);
+        for i in 1..=n {
+            heap.push(i);
+            idxs.push(i);
+        }
+        idxs[0] = init;
+        VarOccHeap { heap, idxs }
+    }
+}
 
 impl VarOrderIF for VarOccHeap {
     fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upward: bool) {

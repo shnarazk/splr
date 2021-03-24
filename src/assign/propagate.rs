@@ -116,10 +116,6 @@ impl PropagateIF for AssignStack {
         // The following doesn't hold anymore by using chronoBT.
         // assert!(self.trail_lim.is_empty() || !cid.is_none());
         let vi = l.vi();
-        #[cfg(feature = "best_phases_reuse")]
-        let decided = self.root_level < self.level[vi]
-            && self.reason[vi] == AssignReason::None
-            && matches!(self.best_phases.get(&vi), Some((_, AssignReason::None)));
         debug_assert!(!self.var[vi].is(Flag::ELIMINATED));
         debug_assert!(
             var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
@@ -131,8 +127,8 @@ impl PropagateIF for AssignStack {
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
-        #[cfg(feature = "best_phases_reuse")]
-        if decided {
+        #[cfg(feature = "best_phases_tracking")]
+        if self.root_level == lv {
             self.check_best_phase(vi);
         }
     }
@@ -202,6 +198,7 @@ impl PropagateIF for AssignStack {
         if lv == self.root_level {
             self.num_restart += 1;
             self.cpr_ema.update(self.num_conflict);
+            self.num_asserted_vars = self.stack_len();
         }
     }
     fn backtrack_sandbox(&mut self) {
@@ -305,7 +302,7 @@ impl PropagateIF for AssignStack {
                     assert!(*search_from < lits.len());
                     let len = lits.len();
                     // Gathering good literals at the beginning of lits.
-                    for k in (*search_from..len).chain((2..*search_from).rev()) {
+                    for k in (*search_from..len).chain(2..*search_from) {
                         let lk = lits.get_unchecked(k);
                         if lit_assign!(self, *lk) != Some(false) {
                             n -= 1;
@@ -379,7 +376,6 @@ impl PropagateIF for AssignStack {
                             return w.c;
                         }
                         None => {
-                            // self.reward_at_propagation(false_lit.vi());
                             self.assign_by_implication(
                                 w.blocker,
                                 AssignReason::Implication(w.c, false_lit),
@@ -402,7 +398,6 @@ impl PropagateIF for AssignStack {
                     if let Some(true) = lit_assign!(self, w.blocker) {
                         continue 'next_clause;
                     }
-                    // debug_assert!(!cdb[w.c].is(Flag::DEAD));
                     let Clause {
                         ref mut lits,
                         ref mut search_from,
@@ -455,15 +450,9 @@ impl PropagateIF for AssignStack {
                         .map(|l| self.level[l.vi()])
                         .max()
                         .unwrap_or(0);
-                    // self.reward_at_propagation(false_lit.vi());
                     self.assign_by_implication(first, AssignReason::Implication(w.c, NULL_LIT), lv);
                 }
             }
-        }
-        let na = self.q_head + self.num_eliminated_vars;
-        if self.num_best_assign <= na && 0 < self.decision_level() {
-            self.best_assign = true;
-            self.num_best_assign = na;
         }
         ClauseId::default()
     }
@@ -478,28 +467,12 @@ impl AssignStack {
     }
     #[cfg(feature = "best_phases_tracking")]
     pub fn check_best_phase(&mut self, vi: VarId) -> bool {
-        #[cfg(feature = "var_staging")]
-        {
-            if self.staged_vars.get(&vi).is_some() {
-                self.staged_vars.remove(&vi);
-            }
-        }
         if let Some((b, _)) = self.best_phases.get(&vi) {
             debug_assert!(self.assign[vi].is_some());
             if self.assign[vi] != Some(*b) {
-                let lvl = self.level[vi];
                 if self.root_level == self.level[vi] {
                     self.best_phases.clear();
                     self.num_best_assign = self.num_eliminated_vars;
-                    // self.stage_activity = 0.0;
-                } else {
-                    let AssignStack {
-                        ref mut best_phases,
-                        ref level,
-                        ..
-                    } = self;
-                    best_phases.retain(|vj, _| level[*vj] < lvl);
-                    self.num_best_assign = self.num_eliminated_vars + self.best_phases.len();
                 }
                 return true;
             }
@@ -511,7 +484,7 @@ impl AssignStack {
     }
     /// save the current assignments as the best phases
     fn save_best_phases(&mut self) {
-        #[cfg(feature = "best_phases_reuse")]
+        #[cfg(feature = "best_phases_tracking")]
         for l in self.trail.iter().skip(self.len_upto(0)) {
             let vi = l.vi();
             if let Some(b) = self.assign[vi] {
@@ -519,5 +492,6 @@ impl AssignStack {
             }
         }
         self.build_best_at = self.num_propagation;
+        self.phase_age = 0;
     }
 }

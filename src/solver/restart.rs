@@ -324,7 +324,7 @@ struct GeometricStabilizer {
     num_cycle: usize,
     num_stage: usize,
     next_trigger: usize,
-    reset_requested: bool,
+    // reset_requested: bool,
     step: usize,
     step_max: usize,
 }
@@ -341,7 +341,7 @@ impl Default for GeometricStabilizer {
             num_cycle: 0,
             num_stage: 0,
             next_trigger: 1,
-            reset_requested: false,
+            // reset_requested: false,
             step: 1,
             step_max: 1,
         }
@@ -384,21 +384,21 @@ impl GeometricStabilizer {
                 self.num_cycle += 1;
                 self.step_max = self.step;
             }
-            if self.reset_requested {
-                self.num_cycle = 0;
-                self.luby.reset();
-                self.reset_requested = false;
-                self.step_max = 1;
-            }
+            // if self.reset_requested {
+            //     self.num_cycle = 0;
+            //     self.luby.reset();
+            //     self.reset_requested = false;
+            //     self.step_max = 1;
+            // }
             self.step = self.luby.next();
             self.next_trigger = now + (self.step_max * 2) / self.step;
             return Some(new_cycle);
         }
         None
     }
-    fn reset_progress(&mut self) {
-        self.reset_requested = true;
-    }
+    // fn reset_progress(&mut self) {
+    //     self.reset_requested = true;
+    // }
 }
 
 /// `Restarter` provides restart API and holds data about restart conditions.
@@ -461,9 +461,6 @@ impl Instantiate for Restarter {
         match e {
             SolverEvent::Assert(_) | SolverEvent::Eliminate(_) => {
                 self.restart_waiting = self.stb.step;
-            }
-            SolverEvent::ShrinkCore => {
-                self.stb.reset_progress();
             }
             SolverEvent::Restart => {
                 self.after_restart = 0;
@@ -542,7 +539,7 @@ pub mod property {
     use super::Restarter;
     use crate::types::*;
 
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tusize {
         NumBlock,
         NumCycle,
@@ -551,6 +548,15 @@ pub mod property {
         TriggerLevel,
         TriggerLevelMax,
     }
+
+    pub const USIZES: [Tusize; 6] = [
+        Tusize::NumBlock,
+        Tusize::NumCycle,
+        Tusize::NumRestart,
+        Tusize::NumStage,
+        Tusize::TriggerLevel,
+        Tusize::TriggerLevelMax,
+    ];
 
     impl PropertyDereference<Tusize, usize> for Restarter {
         #[inline]

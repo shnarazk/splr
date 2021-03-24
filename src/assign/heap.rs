@@ -24,6 +24,21 @@ impl fmt::Display for VarIdHeap {
     }
 }
 
+impl VarIdHeap {
+    pub fn new(n: usize, init: usize) -> Self {
+        let mut heap = Vec::with_capacity(n + 1);
+        let mut idxs = Vec::with_capacity(n + 1);
+        heap.push(0);
+        idxs.push(n);
+        for i in 1..=n {
+            heap.push(i);
+            idxs.push(i);
+        }
+        idxs[0] = init;
+        VarIdHeap { heap, idxs }
+    }
+}
+
 /// Internal heap manipulation API
 pub trait VarHeapIF {
     fn clear_heap(&mut self);
@@ -180,7 +195,7 @@ impl VarOrderIF for VarIdHeap {
         self.heap.swap(i, n);
         self.idxs.swap(vi, vn);
         self.idxs[0] = n;
-        return n;
+        n
     }
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0

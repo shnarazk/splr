@@ -1,5 +1,5 @@
 /// main struct AssignStack
-#[cfg(any(feature = "best_phases_tracking", feature = "var_staging"))]
+#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
 use std::collections::HashMap;
 use {
     super::{AssignIF, AssignStack, Var, VarHeapIF, VarIdHeap, VarManipulateIF, VarSelectIF},
@@ -44,21 +44,12 @@ impl Default for AssignStack {
             best_assign: false,
             build_best_at: 0,
             num_best_assign: 0,
-            rephasing: false,
+            num_rephase: 0,
+
             #[cfg(feature = "best_phases_tracking")]
             best_phases: HashMap::new(),
-
-            #[cfg(feature = "var_staging")]
-            staging_reward_value: 1.0,
-            #[cfg(feature = "var_staging")]
-            staging_reward_decay: 0.9,
-            #[cfg(feature = "var_staging")]
-            staged_vars: HashMap::new(),
-            #[cfg(feature = "var_staging")]
-            stage_mode_select: 0,
-            num_stages: 0,
-            stage_activity: 0.0,
-            reward_index: 1,
+            #[cfg(feature = "rephase")]
+            phase_age: 0,
 
             num_vars: 0,
             num_asserted_vars: 0,
@@ -110,11 +101,6 @@ impl Instantiate for AssignStack {
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
 
-            #[cfg(feature = "var_staging")]
-            staging_reward_decay: config.stg_rwd_dcy,
-            #[cfg(feature = "var_staging")]
-            staging_reward_value: config.stg_rwd_val,
-
             num_vars: cnf.num_of_variables,
             var: Var::new_vars(nv),
 
@@ -136,11 +122,14 @@ impl Instantiate for AssignStack {
             // So execute everything of `assign_by_unitclause` but cancel_until(root_level)
             SolverEvent::Assert(vi) => {
                 self.make_var_asserted(vi);
-                self.reward_index = 1;
             }
             SolverEvent::Conflict => (),
             SolverEvent::Eliminate(vi) => {
                 self.make_var_eliminated(vi);
+            }
+            SolverEvent::NewStabilizationStage(lvl) => {
+                #[cfg(feature = "rephase")]
+                self.select_rephasing_target(None, lvl);
             }
             SolverEvent::NewVar => {
                 self.assign.push(None);

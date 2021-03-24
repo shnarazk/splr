@@ -1,9 +1,12 @@
-#[cfg(feature = "var_staging")]
-use crate::state::StagingTarget;
 /// Decision var selection
+
+#[cfg(feature = "rephase")]
+use super::property;
+
 use {
     super::{AssignStack, Var, VarHeapIF},
     crate::types::*,
+    std::fmt,
 };
 
 /// ```
@@ -17,17 +20,9 @@ macro_rules! var_assign {
 
 /// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
-    // #[cfg(feature = "var_staging")]
-    // /// decay staging setting
-    // fn dissolve_staged_vars(&mut self, phasing: bool);
-
-    #[cfg(feature = "var_staging")]
-    /// select staged vars
-    fn select_staged_vars(&mut self, request: Option<StagingTarget>, rephasing: bool);
-
-    /// return the number of forgotton vars.
-    fn num_ion(&self) -> (usize, usize);
-
+    #[cfg(feature = "rephase")]
+    /// select rephasing target
+    fn select_rephasing_target(&mut self, request: Option<RephasingTarget>, span: usize);
     /// select a new decision variable.
     fn select_decision_literal(&mut self) -> Lit;
     /// update the internal heap on var order.
@@ -51,75 +46,84 @@ impl From<&Var> for VarTimestamp {
     }
 }
 
-impl VarSelectIF for AssignStack {
-    #[cfg(not(feature = "best_phases_tracking"))]
-    fn num_ion(&self) -> (usize, usize) {
-        (0, 0)
-    }
-    #[cfg(feature = "best_phases_tracking")]
-    fn num_ion(&self) -> (usize, usize) {
-        let thr = self.average_activity();
-        let mut num_negative = 0; // unreachable core side
-        let mut num_positive = 0; // decision var side
+/// Phase saving modes.
+#[derive(Debug, Eq, PartialEq)]
+pub enum RephasingTarget {
+    ///
+    AllTrue,
+    /// use best phases
+    BestPhases,
+    /// unstage all vars.
+    Clear,
+    ///
+    Inverted,
+    /// a kind of random shuffle
+    Shift,
+    ///
+    XorShift,
+}
 
-        for v in self.var.iter().skip(1) {
-            if !v.is(Flag::ELIMINATED)
-                && thr < v.activity(self.stage_activity)
-                && self.root_level < self.level[v.index]
-            {
-                match self.best_phases.get(&v.index) {
-                    Some((_, AssignReason::Implication(_, NULL_LIT))) => {
-                        num_positive += 1;
-                    }
-                    None => {
-                        num_negative += 1;
-                    }
-                    _ => (),
-                }
-            }
-        }
-        (num_negative, num_positive)
+impl fmt::Display for RephasingTarget {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "{:?}", self)
     }
-    #[cfg(feature = "var_staging")]
-    fn select_staged_vars(&mut self, request: Option<StagingTarget>, rephasing: bool) {
-        self.rephasing = rephasing;
-        self.stage_mode_select += 1;
-        let target = request.unwrap_or(StagingTarget::Clear);
-        for vi in self.staged_vars.keys() {
-            self.var[*vi].turn_off(Flag::STAGED);
+}
+
+impl VarSelectIF for AssignStack {
+    #[cfg(feature = "rephase")]
+    fn select_rephasing_target(&mut self, request: Option<RephasingTarget>, level: usize) {
+        if self.best_phases.is_empty() {
+            return;
         }
-        self.staged_vars.clear();
-        self.stage_activity = self.staging_reward_value;
-        match target {
-            StagingTarget::Backbone => {
-                for (vi, (b, r)) in self.best_phases.iter() {
-                    if matches!(r, AssignReason::None) {
-                        let v = &mut self.var[*vi];
-                        v.turn_on(Flag::STAGED);
-                        v.set(Flag::PHASE, *b);
-                        self.staged_vars.insert(*vi, *b);
-                    }
-                }
-            }
-            StagingTarget::BestPhases => {
-                for (vi, (b, _)) in self.best_phases.iter() {
-                    let v = &mut self.var[*vi];
-                    v.turn_on(Flag::STAGED);
-                    v.set(Flag::PHASE, *b);
-                    self.staged_vars.insert(*vi, *b);
-                }
-            }
-            StagingTarget::Clear => (),
+        if self.derefer(property::Tusize::NumUnassertedVar) <= self.best_phases.len() {
+            self.best_phases.clear();
+            return;
         }
+        let remain = self.derefer(property::Tusize::NumUnassertedVar) - self.best_phases.len() + 1;
+        if (remain as f64).log10() < level as f64 {
+            return;
+        }
+        let target = if let Some(t) = request {
+            t
+        } else {
+            self.phase_age += 1;
+            match self.phase_age {
+                0 | 1 => RephasingTarget::Clear,
+                2 | 3 | 5 => RephasingTarget::BestPhases,
+                4 => RephasingTarget::Inverted,
+                6 => RephasingTarget::Shift,
+                x if x % 3 == 0 => RephasingTarget::BestPhases,
+                x if x % 3 == 1 => RephasingTarget::Inverted,
+                _ => RephasingTarget::Clear,
+            }
+        };
+        let mut s = true;
+        for (vi, (b, _)) in self.best_phases.iter() {
+            let v = &mut self.var[*vi];
+            if self.assign[*vi] == Some(!*b) {
+                self.best_phases.clear();
+                self.num_best_assign = self.num_eliminated_vars;
+                return;
+            }
+            match target {
+                RephasingTarget::AllTrue => v.set(Flag::PHASE, true),
+                RephasingTarget::BestPhases => v.set(Flag::PHASE, *b),
+                RephasingTarget::Inverted => v.set(Flag::PHASE, !*b),
+                RephasingTarget::Shift => {
+                    v.set(Flag::PHASE, s);
+                    s = *b;
+                }
+                RephasingTarget::XorShift => {
+                    v.set(Flag::PHASE, s);
+                    s ^= *b;
+                }
+                RephasingTarget::Clear => (),
+            }
+        }
+        self.num_rephase += 1;
     }
     fn select_decision_literal(&mut self) -> Lit {
         let vi = self.select_var();
-        #[cfg(feature = "best_phases_reuse")]
-        if self.rephasing {
-            if let Some((b, AssignReason::None)) = self.best_phases.get(&vi) {
-                return Lit::from_assign(vi, *b);
-            }
-        }
         Lit::from_assign(vi, self.var[vi].is(Flag::PHASE))
     }
     fn update_order(&mut self, v: VarId) {
