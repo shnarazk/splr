@@ -448,6 +448,7 @@ impl StateIF for State {
             + PropertyReference<solver::restart::property::TEma2, Ema2>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
+            self.record_stats(asg, cdb, elim, rst);
             return;
         }
 
@@ -615,6 +616,64 @@ impl StateIF for State {
             println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
         }
         self.flush("");
+    }
+}
+
+impl State {
+    #[allow(clippy::cognitive_complexity)]
+    fn record_stats<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R)
+    where
+        A: PropertyDereference<assign::property::Tusize, usize>
+            + PropertyReference<assign::property::TEma, Ema>,
+        C: PropertyDereference<cdb::property::Tusize, usize>
+            + PropertyDereference<cdb::property::Tf64, f64>,
+        E: PropertyDereference<processor::property::Tusize, usize>,
+        R: PropertyDereference<solver::restart::property::Tusize, usize>
+            + PropertyReference<solver::restart::property::TEma2, Ema2>,
+    {
+        self[LogUsizeId::NumConflict] = asg.derefer(assign::property::Tusize::NumConflict);
+        self[LogUsizeId::NumDecision] = asg.derefer(assign::property::Tusize::NumDecision);
+        self[LogUsizeId::NumPropagate] = asg.derefer(assign::property::Tusize::NumPropagation);
+        self[LogUsizeId::RemainingVar] = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+        self[LogUsizeId::AssertedVar] = asg.derefer(assign::property::Tusize::NumAssertedVar);
+        self[LogUsizeId::EliminatedVar] = asg.derefer(assign::property::Tusize::NumEliminatedVar);
+        self[LogF64Id::Progress] = 100.0
+            * (self[LogUsizeId::AssertedVar]
+                + asg.derefer(assign::property::Tusize::NumEliminatedVar)) as f64
+            / asg.derefer(assign::property::Tusize::NumVar) as f64;
+        self[LogUsizeId::RemovableClause] = cdb.derefer(cdb::property::Tusize::NumLearnt);
+        self[LogUsizeId::LBD2Clause] = cdb.derefer(cdb::property::Tusize::NumLBD2);
+        self[LogUsizeId::Binclause] = cdb.derefer(cdb::property::Tusize::NumBiClause);
+        self[LogUsizeId::PermanentClause] =
+            cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
+        self[LogUsizeId::RestartBlock] = rst.derefer(solver::restart::property::Tusize::NumBlock);
+        self[LogUsizeId::Restart] = rst.derefer(solver::restart::property::Tusize::NumRestart);
+        self[LogUsizeId::RestartTriggerLevel] =
+            rst.derefer(solver::restart::property::Tusize::TriggerLevel);
+        self[LogUsizeId::RestartTriggerLevelMax] =
+            rst.derefer(solver::restart::property::Tusize::TriggerLevelMax);
+
+        let rst_lbd: &Ema2 = rst.refer(solver::restart::property::TEma2::LBD);
+        self[LogF64Id::EmaLBD] = rst_lbd.get();
+        self[LogF64Id::TrendLBD] = rst_lbd.trend();
+
+        self[LogF64Id::DpAverageLBD] = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
+        self[LogF64Id::DecisionPerConflict] =
+            asg.refer(assign::property::TEma::DecisionPerConflict).get();
+
+        self[LogF64Id::TrendASG] = rst.refer(solver::restart::property::TEma2::ASG).trend();
+        self[LogF64Id::CLevel] = self.c_lvl.get();
+        self[LogF64Id::BLevel] = self.b_lvl.get();
+        self[LogF64Id::PropagationPerConflict] = asg
+            .refer(assign::property::TEma::PropagationPerConflict)
+            .get();
+        self[LogUsizeId::Simplify] = elim.derefer(processor::property::Tusize::NumFullElimination);
+        self[LogUsizeId::ClauseSubsumption] =
+            elim.derefer(processor::property::Tusize::NumSubsumedClause);
+        self[LogUsizeId::UnreachableCore] =
+            asg.derefer(assign::property::Tusize::NumUnreachableVar);
+        self[LogF64Id::ConflictPerRestart] =
+            asg.refer(assign::property::TEma::ConflictPerRestart).get();
     }
 }
 
