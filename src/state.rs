@@ -448,6 +448,7 @@ impl StateIF for State {
             + PropertyReference<solver::restart::property::TEma2, Ema2>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
+            self.log_messages.clear();
             self.record_stats(asg, cdb, elim, rst);
             return;
         }
