@@ -135,7 +135,10 @@ impl PropagateIF for AssignStack {
     fn assign_by_decision(&mut self, l: Lit) {
         debug_assert!(l.vi() < self.var.len());
         debug_assert!(!self.trail.contains(&l));
-        debug_assert!(!self.trail.contains(&!l), format!("{:?}", l));
+        debug_assert!(
+            !self.trail.contains(&!l),
+            "asg.trail contains a strange literal",
+        );
         self.level_up();
         let dl = self.trail_lim.len() as DecisionLevel;
         let vi = l.vi();

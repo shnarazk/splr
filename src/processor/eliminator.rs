@@ -296,13 +296,13 @@ impl EliminateIF for Eliminator {
                 if bool::from(*l) {
                     debug_assert!(
                         !w.pos_occurs.contains(&cid),
-                        format!("{} {:?} {}", cid, c, v.index,)
+                        "elim.add_cid_occur found a strange positive clause"
                     );
                     w.pos_occurs.push(cid);
                 } else {
                     debug_assert!(
                         !w.neg_occurs.contains(&cid),
-                        format!("{} {:?} {}", cid, c, v.index,)
+                        "elim.add_cid_occur found a strange negative clause"
                     );
                     w.neg_occurs.push(cid);
                 }

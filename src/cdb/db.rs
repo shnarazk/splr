@@ -551,7 +551,10 @@ impl ClauseDBIF for ClauseDB {
         let c = &mut clause[cid.ordinal as usize];
         let old_rank = c.rank as usize;
         let nlevels = c.update_lbd(asg, lbd_temp);
-        debug_assert!(!c.is(Flag::DEAD), format!("found {} is dead: {}", cid, c));
+        debug_assert!(
+            !c.is(Flag::DEAD),
+            "cdb.make_clause_as_dead received a dead clause"
+        );
         if nlevels < old_rank {
             match (c.is(Flag::VIVIFIED2), c.is(Flag::VIVIFIED)) {
                 _ if nlevels == 1 || nlevels + 1 < old_rank => {

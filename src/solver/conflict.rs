@@ -67,23 +67,12 @@ pub fn handle_conflict(
                 asg.cancel_until(snd_l);
                 debug_assert!(
                     asg.stack_iter().all(|l| l.vi() != decision.vi()),
-                    format!(
-                        "assign stack contains a strange lit: level {}, stack level {}",
-                        original_dl, snd_l
-                    )
+                    "assign stack contains a strange lito",
                 );
                 debug_assert!(asg.assign(decision.vi()).is_none());
-                debug_assert!(
-                    c.iter()
-                        .all(|l| *l != decision || asg.assigned(*l).is_none()),
-                    format!(
-                        "{} maps to {:?} {:?}: decision {}",
-                        c,
-                        c.iter().map(|l| asg.assigned(*l)).collect::<Vec<_>>(),
-                        c.iter().map(|l| asg.assign(l.vi())).collect::<Vec<_>>(),
-                        decision,
-                    )
-                );
+                debug_assert!(c
+                    .iter()
+                    .all(|l| *l != decision || asg.assigned(*l).is_none()));
                 let l0 = c.lits[0];
                 let l1 = c.lits[1];
                 if c.lits.len() == 2 {
@@ -142,18 +131,7 @@ pub fn handle_conflict(
             cl
         }
     };
-    debug_assert!(
-        cdb[ci].iter().any(|l| asg.level(l.vi()) == cl),
-        format!(
-            "use_{}: {:?}, {:?}",
-            use_chronobt,
-            cl,
-            cdb[ci]
-                .iter()
-                .map(|l| (i32::from(*l), asg.level(l.vi())))
-                .collect::<Vec<_>>(),
-        )
-    );
+    debug_assert!(cdb[ci].iter().any(|l| asg.level(l.vi()) == cl),);
     asg.handle(SolverEvent::Conflict);
 
     // backtrack level by analyze
