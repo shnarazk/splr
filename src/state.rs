@@ -190,8 +190,6 @@ pub struct State {
     /// upper limit for timeout handling
     pub time_limit: f64,
     #[cfg(feature = "clause_vivification")]
-    // vivifier threshold
-    pub vivify_threshold: usize,
     /// logging facility.
     log_messages: Vec<String>,
 }
@@ -219,10 +217,6 @@ impl Default for State {
             record: ProgressRecord::default(),
             start: Instant::now(),
             time_limit: 0.0,
-
-            #[cfg(feature = "clause_vivification")]
-            vivify_threshold: 8,
-
             log_messages: Vec::new(),
         }
     }

@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 #![cfg(feature = "clause_vivification")]
 use {
-    super::{restart, Restarter, Stat, State},
+    super::{Stat, State},
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{self, ClauseDB, ClauseDBIF, ClauseIF},
@@ -28,7 +28,6 @@ pub fn vivify(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
-    rst: &mut Restarter,
     state: &mut State,
 ) -> MaybeInconsistent {
     let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
@@ -213,14 +212,13 @@ pub fn vivify(
     state.log(
         state[Stat::Vivification],
         format!(
-            "vivify lv:{:>4}, pick:{:>6}, var:{:>4}, purge:{:>4}, shrink:{:>4}",
-            state.vivify_threshold, num_check, num_assert, num_purge, num_shrink,
+            "vivify, pick:{:>8}, var:{:>6}, purge:{:>6}, shrink:{:>6}",
+            num_check, num_assert, num_purge, num_shrink,
         ),
     );
     state[Stat::VivifiedClause] += num_shrink + num_purge;
     state[Stat::VivifiedVar] += num_assert;
     cdb.garbage_collect();
-    state.vivify_threshold = rst.derefer(restart::property::Tusize::TriggerLevelMax);
     Ok(())
 }
 

@@ -266,7 +266,7 @@ fn search(
                             elim.simplify(asg, cdb, rst, state)?;
                         } else {
                             #[cfg(feature = "clause_vivification")]
-                            if vivify(asg, cdb, elim, rst, state).is_err() {
+                            if vivify(asg, cdb, elim, state).is_err() {
                                 #[cfg(feature = "boundary_check")]
                                 return Err(SolverError::UndescribedError);
 
@@ -291,11 +291,6 @@ fn search(
             if let Some(na) = asg.best_assigned() {
                 state.flush("");
                 state.flush(format!("unreachable core: {}", na));
-
-                #[cfg(feature = "clause_vivification")]
-                {
-                    state.vivify_threshold = 4.max(state.vivify_threshold / 2);
-                }
             }
             #[cfg(feature = "strategy_adaptation")]
             if asg.num_conflict % (10 * state.reflection_interval) == 0 {
