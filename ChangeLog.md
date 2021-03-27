@@ -1,8 +1,9 @@
-## 0.7.1, 2021-03-26
+## 0.7.1, 2021-03-28
 
-- activate clause vivification
-- activate rephasing the best phases and its variants
-- abandon stage-based var-boosting
+- activate feature 'clause vivification'
+- activate feature 'rephase', which selects the best phases and its variants
+- delete features 'var-boosting' and 'best_phases_reuse'
+- rename feature 'ema_calibration' to 'EMA_calibration'
 - var reward decay rate has a static value
 - dump all stats data into the answer file
 - slim down */mod.rs
