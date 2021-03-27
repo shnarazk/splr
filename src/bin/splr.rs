@@ -233,7 +233,7 @@ fn save_proof<S: AsRef<str> + std::fmt::Display>(s: &Solver, input: S, output: &
         )?;
         buf.write_all(b"s UNSATISFIABLE\n")?;
         for (f, x) in &s.cdb.certified[1..] {
-            if *f == CertifiedRecord::DELETE {
+            if *f == CertifiedRecord::Delete {
                 buf.write_all(b"d ")?;
             }
             for l in x {

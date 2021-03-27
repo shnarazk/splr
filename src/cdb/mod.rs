@@ -120,11 +120,11 @@ pub trait ClauseDBIF:
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CertifiedRecord {
     /// placed at the end.
-    SENTINEL,
+    Sentinel,
     /// added a (learnt) clause.
-    ADD,
+    Add,
     /// deleted a clause.
-    DELETE,
+    Delete,
 }
 
 type DRAT = Vec<(CertifiedRecord, Vec<i32>)>;

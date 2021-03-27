@@ -151,7 +151,7 @@ impl Instantiate for ClauseDB {
         }
         let mut certified = Vec::new();
         if config.use_certification {
-            certified.push((CertifiedRecord::SENTINEL, Vec::new()));
+            certified.push((CertifiedRecord::Sentinel, Vec::new()));
         }
         ClauseDB {
             clause,
@@ -282,7 +282,7 @@ impl ClauseDBIF for ClauseDB {
                     if !certified.is_empty() && !c.is(Flag::VIV_ASSUMED) {
                         let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
                         debug_assert!(!temp.is_empty());
-                        certified.push((CertifiedRecord::DELETE, temp));
+                        certified.push((CertifiedRecord::Delete, temp));
                     }
                     c.lits.clear();
                 }
@@ -319,7 +319,7 @@ impl ClauseDBIF for ClauseDB {
                     if !certified.is_empty() && !c.is(Flag::VIV_ASSUMED) {
                         let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
                         debug_assert!(!temp.is_empty());
-                        certified.push((CertifiedRecord::DELETE, temp));
+                        certified.push((CertifiedRecord::Delete, temp));
                     }
                     c.lits.clear();
                 }
@@ -390,7 +390,7 @@ impl ClauseDBIF for ClauseDB {
         if !self.certified.is_empty() {
             let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
             debug_assert!(!temp.is_empty());
-            self.certified.push((CertifiedRecord::ADD, temp));
+            self.certified.push((CertifiedRecord::Add, temp));
         }
         let cid;
         let l0 = vec[0];
@@ -641,13 +641,13 @@ impl ClauseDBIF for ClauseDB {
         if !self.certified.is_empty() {
             let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
             debug_assert!(!temp.is_empty());
-            self.certified.push((CertifiedRecord::ADD, temp));
+            self.certified.push((CertifiedRecord::Add, temp));
         }
     }
     fn certificate_delete(&mut self, vec: &[Lit]) {
         if !self.certified.is_empty() {
             let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
-            self.certified.push((CertifiedRecord::DELETE, temp));
+            self.certified.push((CertifiedRecord::Delete, temp));
         }
     }
     fn touch_var(&mut self, vi: VarId) {
