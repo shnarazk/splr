@@ -253,6 +253,12 @@ fn search(
                             ),
                         );
                         last_core = num_unreachable;
+                    } else if let Some(p) = state.elapsed() {
+                        if 1.0 <= p {
+                            return Err(SolverError::TimeOut);
+                        }
+                    } else {
+                        return Err(SolverError::UndescribedError);
                     }
                     if cdb.reduce(asg, asg.num_conflict) {
                         if state.config.c_ip_int <= elim.to_simplify as usize {
@@ -291,17 +297,9 @@ fn search(
                     state.vivify_threshold = 4.max(state.vivify_threshold / 2);
                 }
             }
+            #[cfg(feature = "strategy_adaptation")]
             if asg.num_conflict % (10 * state.reflection_interval) == 0 {
-                #[cfg(feature = "strategy_adaptation")]
                 adapt_modules(asg, rst, state);
-
-                if let Some(p) = state.elapsed() {
-                    if 1.0 <= p {
-                        return Err(SolverError::TimeOut);
-                    }
-                } else {
-                    return Err(SolverError::UndescribedError);
-                }
             }
         }
     }
