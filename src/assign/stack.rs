@@ -127,6 +127,7 @@ impl Instantiate for AssignStack {
             SolverEvent::Eliminate(vi) => {
                 self.make_var_eliminated(vi);
             }
+            #[allow(unused_variables)]
             SolverEvent::NewStabilizationStage(lvl) => {
                 #[cfg(feature = "rephase")]
                 self.select_rephasing_target(None, lvl);

@@ -6,7 +6,6 @@ use super::property;
 use {
     super::{AssignStack, Var, VarHeapIF},
     crate::types::*,
-    std::fmt,
 };
 
 /// ```
@@ -47,6 +46,7 @@ impl From<&Var> for VarTimestamp {
 }
 
 /// Phase saving modes.
+#[cfg(feature = "rephase")]
 #[derive(Debug, Eq, PartialEq)]
 pub enum RephasingTarget {
     ///
@@ -63,7 +63,8 @@ pub enum RephasingTarget {
     XorShift,
 }
 
-impl fmt::Display for RephasingTarget {
+#[cfg(feature = "rephase")]
+impl std::fmt::Display for RephasingTarget {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{:?}", self)
     }
