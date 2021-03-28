@@ -189,7 +189,6 @@ pub struct State {
     pub start: Instant,
     /// upper limit for timeout handling
     pub time_limit: f64,
-    #[cfg(feature = "clause_vivification")]
     /// logging facility.
     log_messages: Vec<String>,
 }
