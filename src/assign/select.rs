@@ -65,7 +65,7 @@ pub enum RephasingTarget {
 
 #[cfg(feature = "rephase")]
 impl std::fmt::Display for RephasingTarget {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(formatter, "{:?}", self)
     }
 }
