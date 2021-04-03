@@ -208,9 +208,10 @@ pub mod property {
         NumUnassertedVar,
         NumUnassignedVar,
         NumUnreachableVar,
+        RootLevel,
     }
 
-    pub const USIZES: [Tusize; 11] = [
+    pub const USIZES: [Tusize; 12] = [
         Tusize::NumConflict,
         Tusize::NumDecision,
         Tusize::NumPropagation,
@@ -222,6 +223,7 @@ pub mod property {
         Tusize::NumUnassertedVar,
         Tusize::NumUnassignedVar,
         Tusize::NumUnreachableVar,
+        Tusize::RootLevel,
     ];
 
     impl PropertyDereference<Tusize, usize> for AssignStack {
@@ -243,6 +245,7 @@ pub mod property {
                     self.num_vars - self.num_eliminated_vars - self.trail.len()
                 }
                 Tusize::NumUnreachableVar => self.num_vars - self.num_best_assign,
+                Tusize::RootLevel => self.root_level as usize,
             }
         }
     }
