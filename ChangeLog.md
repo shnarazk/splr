@@ -1,5 +1,6 @@
-## 0.7.1, 2021-03-28
+## 0.7.1, 2021-0X-XX
 
+- NOW WORKING ON fixing a bug which has been rarely emitted by eliminator.
 - activate feature 'clause vivification'
 - activate feature 'rephase', which selects the best phases and its variants
 - delete features 'var-boosting' and 'best_phases_reuse'
