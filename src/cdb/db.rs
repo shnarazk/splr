@@ -877,6 +877,113 @@ impl ClauseDB {
         }
         self.garbage_collect();
     }
+    pub fn has_consistent_watcher<A>(&self, asg: &A, cid: ClauseId) -> bool
+    where
+        A: AssignIF,
+    {
+        let mut found = 0;
+        let lits = &self.clause[cid.ordinal as usize].lits;
+        let is_2 = lits.len() == 2;
+        for (l, wl) in self.bin_watcher.iter().enumerate().skip(2) {
+            for w in wl.iter() {
+                if w.c == cid {
+                    if !is_2 {
+                        return false;
+                    }
+                    if asg.var(w.blocker.vi()).is(Flag::ELIMINATED) {
+                        return false;
+                    }
+                    if !lits.contains(&w.blocker) || !lits.contains(&!Lit::from(l)) {
+                        return false;
+                    }
+                    found += 1;
+                }
+            }
+        }
+        for (l, wl) in self.watcher.iter().enumerate().skip(2) {
+            for w in wl.iter() {
+                if w.c == cid {
+                    if is_2 {
+                        return false;
+                    }
+                    if asg.var(w.blocker.vi()).is(Flag::ELIMINATED) {
+                        return false;
+                    }
+                    if !lits.contains(&w.blocker) || !lits.contains(&!Lit::from(l)) {
+                        return false;
+                    }
+                    found += 1;
+                }
+            }
+        }
+        found == 2
+    }
+    pub fn check_consistency<A>(&self, asg: &A, msg: &str)
+    where
+        A: AssignIF,
+    {
+        /* if let Some(cid) = self.validate(asg.assign_ref(), false) */
+        {
+            let mut hash: std::collections::HashMap<u32, usize> = std::collections::HashMap::new();
+            /* for (l, wl) in self.bin_watcher.iter().enumerate().skip(2) {
+                for w in wl.iter() {
+                    let c = &self[w.c];
+                    if c.lits.len() != 2 {
+                        dbg!((l, w.blocker, w.c, &c.lits));
+                        panic!("aoa")
+                    }
+
+                    if !c.lits.contains(&w.blocker) || !c.lits.contains(&!Lit::from(l)) {
+                        dbg!((l, w.blocker, w.c, &c.lits));
+                        panic!("found");
+                    }
+                    *hash.entry(w.c.ordinal).or_insert(0) += 1;
+                }
+            } */
+            for (l, wl) in self.watcher.iter().enumerate().skip(2) {
+                for w in wl.iter() {
+                    let c = &self[w.c];
+                    if c.lits.len() == 2 {
+                        dbg!((l, w.blocker, w.c, &c.lits));
+                        panic!("found");
+                    }
+                    if !c.lits.contains(&w.blocker) || !c.lits.contains(&!Lit::from(l)) {
+                        dbg!((l, w.blocker, w.c, &c.lits));
+                        panic!("found after {}", msg);
+                    }
+                    *hash.entry(w.c.ordinal).or_insert(0) += 1;
+                }
+            }
+            for (cid, n) in hash.iter() {
+                let c = &self.clause[*cid as usize];
+                if c.is(Flag::DEAD) {
+                    continue;
+                }
+                assert!(*n == 2 || *n == 0);
+            }
+            for (cid, c) in self.clause.iter().enumerate().skip(1) {
+                if c.is(Flag::DEAD) {
+                    continue;
+                }
+                if !self.has_consistent_watcher(
+                    asg,
+                    ClauseId {
+                        ordinal: cid as u32,
+                    },
+                ) {
+                    panic!("{}{:?} doesn't have a valid watches", cid, c);
+                }
+            }
+        }
+        if let Some(cid) = self.validate(asg.assign_ref(), false) {
+            panic!(
+                "{:?}{:?} is falsified {}!",
+                cid,
+                &self[cid],
+                self.has_consistent_watcher(asg, cid),
+            );
+        }
+    }
 }
 
 impl Clause {
