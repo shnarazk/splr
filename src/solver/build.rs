@@ -13,7 +13,7 @@ use {
 #[cfg(not(feature = "no_IO"))]
 use std::{
     fs::File,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Write},
 };
 
 /// API for SAT solver creation and modification.
@@ -94,6 +94,7 @@ pub trait SatSolverIF: Instantiate {
     /// assert_eq!(s.solve(), Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8, -9])));
     /// ```
     fn add_var(&mut self) -> usize;
+    #[cfg(not(feature = "no_IO"))]
     /// make a solver and load a CNF into it.
     ///
     /// # Errors
@@ -101,10 +102,10 @@ pub trait SatSolverIF: Instantiate {
     /// * `SolverError::IOError` if it failed to load a CNF file.
     /// * `SolverError::Inconsistent` if the CNF is conflicting.
     /// * `SolverError::OutOfRange` if any literal used in the CNF is out of range for var index.
-    #[cfg(not(feature = "no_IO"))]
     fn build(config: &Config) -> Result<Solver, SolverError>;
     /// reinitialize a solver for incremental solving. **Requires 'incremental_solver' feature**
     fn reset(&mut self);
+    #[cfg(not(feature = "no_IO"))]
     /// dump the current status as a CNF
     fn dump_cnf(&self, fname: &str);
 }
@@ -245,6 +246,7 @@ impl SatSolverIF for Solver {
             cdb.new_clause(asg, &mut vec, false, false);
         }
     }
+    #[cfg(not(feature = "no_IO"))]
     fn dump_cnf(&self, fname: &str) {
         let nv = self.asg.derefer(crate::assign::property::Tusize::NumVar);
         for vi in 1..nv {
