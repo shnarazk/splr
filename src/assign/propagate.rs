@@ -302,8 +302,6 @@ impl PropagateIF for AssignStack {
                     //
                     //## Search an un-falsified literal
                     //
-                    #[cfg(feature = "boundary_check")]
-                    assert!(*search_from < lits.len());
                     let len = lits.len();
                     // Gathering good literals at the beginning of lits.
                     for k in (*search_from..len).chain(2..*search_from) {
@@ -423,8 +421,6 @@ impl PropagateIF for AssignStack {
                     //
                     //## Search an un-falsified literal
                     //
-                    #[cfg(feature = "boundary_check")]
-                    assert!(*search_from < lits.len());
                     let len = lits.len();
                     // Gathering good literals at the beginning of lits.
                     for k in (*search_from..len).chain((2..*search_from).rev()) {
