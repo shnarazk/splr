@@ -362,6 +362,11 @@ impl AssignIF for AssignStack {
 
 #[cfg(feature = "boundary_check")]
 impl AssignStack {
+    // return the list of
+    // 1. literal in Clause of cid
+    // 2. its level
+    // 3. it is not assigned,  assigned by decision, or asserted.
+    // 4. value
     pub fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
         &mut self,
         v: V,
