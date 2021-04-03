@@ -7,9 +7,9 @@ pub trait WatchDBIF {
     /// remove *n*-th clause from the watcher list. *O(1)* operation.
     fn detach(&mut self, n: usize) -> Watch;
     /// remove a clause which id is `cid` from the watcher list. *O(n)* operation.
-    fn detach_with(&mut self, cid: ClauseId) -> Watch;
+    fn detach_with(&mut self, cid: ClauseId) -> Option<Watch>;
     /// update blocker of cid.
-    fn update_blocker(&mut self, cid: ClauseId, l: Lit);
+    fn update_blocker(&mut self, cid: ClauseId, l: Lit) -> MaybeInconsistent;
 }
 
 /// 'Watch literal' structure
@@ -37,21 +37,16 @@ impl WatchDBIF for Vec<Watch> {
     fn detach(&mut self, n: usize) -> Watch {
         self.swap_remove(n)
     }
-    fn detach_with(&mut self, cid: ClauseId) -> Watch {
+    fn detach_with(&mut self, cid: ClauseId) -> Option<Watch> {
         for (n, w) in self.iter().enumerate() {
             if w.c == cid {
-                return self.swap_remove(n);
+                return Some(self.swap_remove(n));
             }
         }
-        #[cfg(feature = "boundary_check")]
-        panic!("detach_with failed to seek");
-        Watch {
-            blocker: Lit::default(),
-            c: cid,
-        }
+        None
     }
     /// This O(n) function is used only in Eliminator. So the cost can be ignored.
-    fn update_blocker(&mut self, cid: ClauseId, l: Lit) {
+    fn update_blocker(&mut self, cid: ClauseId, l: Lit) -> MaybeInconsistent {
         for w in &mut self[..] {
             if w.c == cid {
                 w.blocker = l;
