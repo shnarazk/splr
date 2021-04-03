@@ -142,6 +142,7 @@ impl AssignStack {
     pub fn make_var_eliminated(&mut self, vi: VarId) {
         if !self.var[vi].is(Flag::ELIMINATED) {
             self.var[vi].turn_on(Flag::ELIMINATED);
+            self.var[vi].timestamp = self.ordinal;
             self.set_activity(vi, 0.0);
             self.remove_from_heap(vi);
             self.num_eliminated_vars += 1;
