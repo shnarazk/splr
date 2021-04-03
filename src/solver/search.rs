@@ -285,9 +285,22 @@ fn search(
                         return Err(SolverError::UndescribedError);
                     }
                     if cdb.reduce(asg, asg.num_conflict) {
+                        #[cfg(feature = "trace_equivalency")]
+                        if false {
+                            state.progress(asg, cdb, elim, rst);
+                            cdb.check_consistency(asg, "before simplify");
+                        }
                         if state.config.c_ip_int <= elim.to_simplify as usize {
                             elim.activate();
                             elim.simplify(asg, cdb, rst, state)?;
+                            #[cfg(feature = "trace_equivalency")]
+                            if false {
+                                state.progress(asg, cdb, elim, rst);
+                                cdb.check_consistency(
+                                    asg,
+                                    &format!("simplify nc:{}", asg.num_conflict),
+                                );
+                            }
                         } else {
                             #[cfg(feature = "clause_vivification")]
                             if vivify(asg, cdb, elim, state).is_err() {
