@@ -88,9 +88,10 @@ impl PropagateIF for AssignStack {
     fn assign_at_root_level(&mut self, l: Lit) -> MaybeInconsistent {
         let vi = l.vi();
         debug_assert!(vi < self.var.len());
-        self.level[vi] = 0;
         debug_assert!(!self.var[vi].is(Flag::ELIMINATED));
         debug_assert_eq!(self.root_level, self.decision_level());
+        debug_assert!(self.trail_lim.is_empty());
+        self.level[vi] = self.root_level;
         match var_assign!(self, vi) {
             None => {
                 set_assign!(self, l);
