@@ -315,10 +315,51 @@ impl AssignIF for AssignStack {
         self.assigned(l0) == Some(true)
             && matches!(self.reason(l0.vi()), AssignReason::Implication(x, _) if x == cid)
     }
+    /// dump all active clauses and assertions as a CNF file.
+    #[cfg(not(feature = "no_IO"))]
+    fn dump_cnf<C>(&mut self, cdb: &C, fname: &str)
+    where
+        C: ClauseDBIF,
+    {
+        for vi in 1..self.var.len() {
+            if self.var(vi).is(Flag::ELIMINATED) {
+                if self.assign[vi].is_some() {
+                    panic!("conflicting var {} {:?}", vi, self.assign[vi]);
+                    // } else {
+                    //     println!("eliminate var {}", vi);
+                }
+            }
+        }
+        if let Ok(out) = File::create(&fname) {
+            let mut buf = BufWriter::new(out);
+            let nv = self.num_vars;
+            let na = self.len_upto(0);
+            // let nc: usize = cdb.derefer(cdb::property::Tusize::NumClause);
+            let nc = cdb.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count();
+
+            buf.write_all(format!("p cnf {} {}\n", nv, nc + na).as_bytes())
+                .unwrap();
+            for c in cdb.iter().skip(1) {
+                if c.is(Flag::DEAD) {
+                    continue;
+                }
+                for l in &c.lits {
+                    buf.write_all(format!("{} ", i32::from(*l)).as_bytes())
+                        .unwrap();
+                }
+                buf.write_all(b"0\n").unwrap();
+            }
+            buf.write_all(b"c from trail\n").unwrap();
+            for x in &self.trail {
+                buf.write_all(format!("{} 0\n", i32::from(*x)).as_bytes())
+                    .unwrap();
+            }
+        }
+    }
 }
 
+#[cfg(feature = "boundary_check")]
 impl AssignStack {
-    #[cfg(feature = "boundary_check")]
     pub fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
         &mut self,
         v: V,
@@ -333,43 +374,6 @@ impl AssignStack {
                 )
             })
             .collect::<Vec<(i32, DecisionLevel, bool, Option<bool>)>>()
-    }
-
-    /// dump all active clauses and assertions as a CNF file.
-    #[cfg(not(feature = "no_IO"))]
-    #[allow(dead_code)]
-    fn dump_cnf<C, V>(&mut self, cdb: &C, fname: &str)
-    where
-        C: ClauseDBIF,
-    {
-        for vi in 1..self.var.len() {
-            if self.var(vi).is(Flag::ELIMINATED) {
-                if self.assign.get(vi).is_some() {
-                    panic!("conflicting var {} {:?}", vi, self.assign.get(vi));
-                } else {
-                    println!("eliminate var {}", vi);
-                }
-            }
-        }
-        if let Ok(out) = File::create(&fname) {
-            let mut buf = BufWriter::new(out);
-            let nv = self.num_vars;
-            let nc: usize = cdb.len() - 1;
-            buf.write_all(format!("p cnf {} {}\n", self.num_vars, nc + nv).as_bytes())
-                .unwrap();
-            for c in cdb.iter().skip(1) {
-                for l in &c.lits {
-                    buf.write_all(format!("{} ", i32::from(*l)).as_bytes())
-                        .unwrap();
-                }
-                buf.write_all(b"0\n").unwrap();
-            }
-            buf.write_all(b"c from trail\n").unwrap();
-            for x in &self.trail {
-                buf.write_all(format!("{} 0\n", i32::from(*x)).as_bytes())
-                    .unwrap();
-            }
-        }
     }
 }
 

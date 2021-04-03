@@ -149,6 +149,10 @@ impl SolveIF for Solver {
         state.progress(asg, cdb, elim, rst);
         match answer {
             Ok(true) => {
+                #[cfg(feature = "trace_equivalency")]
+                {
+                    asg.dump_cnf(cdb, "laststep.cnf");
+                }
                 // As a preparation for incremental solving, we need to backtrack to the
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
@@ -234,11 +238,26 @@ fn search(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
             ));
             if rst.restart() == Some(RestartDecision::Force) {
-                if let Some(_new_cycle) = rst.stabilize() {
+                #[allow(unused_variables)]
+                if let Some(new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);
                     let block_level = rst.derefer(restart::property::Tusize::TriggerLevel);
                     let num_cycle = rst.derefer(restart::property::Tusize::NumCycle);
                     let num_unreachable = asg.derefer(assign::property::Tusize::NumUnreachableVar);
+                    #[cfg(feature = "trace_equivalency")]
+                    {
+                        let num_stage = rst.derefer(restart::property::Tusize::NumStage);
+                        if new_cycle {
+                            asg.dump_cnf(
+                                cdb,
+                                &format!(
+                                    "{}-stage{}.cnf",
+                                    state.config.cnf_file.file_stem().unwrap().to_string_lossy(),
+                                    num_stage
+                                ),
+                            );
+                        }
+                    }
                     asg.handle(SolverEvent::NewStabilizationStage(block_level));
                     if last_core != num_unreachable || 0 == num_unreachable {
                         state.log(

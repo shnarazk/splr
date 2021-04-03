@@ -67,6 +67,10 @@ pub trait AssignIF:
     fn satisfies(&self, c: &[Lit]) -> bool;
     /// return `true` is the clause is the reason of the assignment.
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
+    /// dump the status as a CNF
+    fn dump_cnf<C>(&mut self, cdb: &C, fname: &str)
+    where
+        C: ClauseDBIF;
 }
 
 /// Reasons of assignments, two kinds
