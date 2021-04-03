@@ -50,8 +50,9 @@ impl WatchDBIF for Vec<Watch> {
         for w in &mut self[..] {
             if w.c == cid {
                 w.blocker = l;
-                return;
+                return Ok(());
             }
         }
+        Err(SolverError::Inconsistent)
     }
 }
