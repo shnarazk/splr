@@ -181,7 +181,9 @@ impl AssignIF for AssignStack {
         self.trail.len()
     }
     fn len_upto(&self, n: DecisionLevel) -> usize {
-        self.trail_lim[n as usize]
+        self.trail_lim
+            .get(n as usize)
+            .map_or(self.trail.len(), |n| *n)
     }
     fn stack_is_empty(&self) -> bool {
         self.trail.is_empty()
@@ -350,7 +352,7 @@ impl AssignIF for AssignStack {
                 buf.write_all(b"0\n").unwrap();
             }
             buf.write_all(b"c from trail\n").unwrap();
-            for x in &self.trail {
+            for x in self.trail.iter().take(self.len_upto(0)) {
                 buf.write_all(format!("{} 0\n", i32::from(*x)).as_bytes())
                     .unwrap();
             }
