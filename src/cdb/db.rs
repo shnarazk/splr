@@ -259,10 +259,10 @@ impl ClauseDBIF for ClauseDB {
         //
         let (recycles, wss) = bin_watcher.split_at_mut(2);
         let recycled = &mut recycles[1];
-        for (i, ws) in &mut wss.iter_mut().enumerate() {
-            if !touched[i + 2] {
-                continue;
-            }
+        for ws in &mut wss.iter_mut() {
+            // if !touched[i + 2] {
+            //     continue;
+            // }
             let mut n = 0;
             while n < ws.len() {
                 let cid = ws[n].c;
@@ -290,15 +290,16 @@ impl ClauseDBIF for ClauseDB {
                 ws.detach(n);
             }
         }
+        let nrb = recycles.len();
         //
         //## normal clauses
         //
         let (recycles, wss) = watcher.split_at_mut(2);
         let recycled = &mut recycles[1];
         for (i, ws) in &mut wss.iter_mut().enumerate() {
-            if !touched[i + 2] {
-                continue;
-            }
+            // if !touched[i + 2] {
+            //     continue;
+            // }
             touched[i + 2] = false;
             let mut n = 0;
             while n < ws.len() {
