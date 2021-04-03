@@ -67,6 +67,7 @@ pub fn vivify(
         if c.is(Flag::DEAD) {
             continue;
         }
+        assert!(!c.is(Flag::ELIMINATED));
         let is_learnt = c.is(Flag::LEARNT);
         c.vivified();
         let clits = c.lits.clone();
@@ -168,11 +169,10 @@ pub fn vivify(
                 return Err(SolverError::Inconsistent);
             }
             0 => {
-                if !cdb[cs.to()].is(Flag::DEAD) {
-                    cdb.detach(cs.to());
-                    cdb.garbage_collect();
-                    num_purge += 1;
-                }
+                assert!(!cdb[cs.to()].is(Flag::DEAD));
+                cdb.detach(cs.to());
+                cdb.garbage_collect();
+                num_purge += 1;
             }
             1 => {
                 let l0 = copied[0];
