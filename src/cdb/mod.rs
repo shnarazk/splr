@@ -83,8 +83,6 @@ pub trait ClauseDBIF:
     fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where
         A: AssignIF;
-    /// return the number of alive clauses in the database.
-    fn count(&self) -> usize;
     /// return the number of clauses which satisfy given flags and aren't DEAD.
     fn countf(&self, mask: Flag) -> usize;
     /// record a clause to unsat certification.
@@ -273,7 +271,12 @@ pub mod property {
         #[inline]
         fn derefer(&self, k: Tusize) -> usize {
             match k {
-                Tusize::NumClause => self.num_clause,
+                Tusize::NumClause => {
+                    // let n = self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count();
+                    // assert_eq!(n, self.num_clause);
+                    // n
+                    self.num_clause
+                }
                 Tusize::NumBiClause => self.num_bi_clause,
                 Tusize::NumBiLearnt => self.num_bi_learnt,
                 Tusize::NumLBD2 => self.num_lbd2,

@@ -243,6 +243,7 @@ impl ClauseDBIF for ClauseDB {
         &mut self.watcher
     }
     fn garbage_collect(&mut self) {
+        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count(), self.num_clause);
         // debug_assert!(self.check_liveness1());
         let ClauseDB {
             ref mut bin_watcher,
@@ -326,8 +327,13 @@ impl ClauseDBIF for ClauseDB {
                 ws.detach(n);
             }
         }
-        self.num_clause = self.clause.len() - recycled.len();
+        let nrc = recycles.len();
+        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count(), self.num_clause);
+        self.num_clause = self.clause.len() - nrb - nrc - 1;
+        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count(), self.num_clause);
         // debug_assert!(self.check_liveness2());
+
+        // self.num_clause = self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count();
     }
     /// return `true` if a binary clause [l0, l1] has been registered.
     ///```
@@ -474,6 +480,7 @@ impl ClauseDBIF for ClauseDB {
             }
             *num_clause += 1;
         }
+        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count(), self.num_clause);
         cid
     }
     fn new_clause_sandbox<A>(&mut self, asg: &mut A, vec: &mut Vec<Lit>) -> ClauseId
@@ -583,9 +590,6 @@ impl ClauseDBIF for ClauseDB {
         }
         false
     }
-    fn count(&self) -> usize {
-        self.clause.len() - self.watcher[!NULL_LIT].len() - 1
-    }
     fn countf(&self, mask: Flag) -> usize {
         self.clause
             .iter()
@@ -598,10 +602,15 @@ impl ClauseDBIF for ClauseDB {
     /// `garbage_collect` which erases all the `DEAD` flags. So you must care about how and when
     /// `garbage_collect` is called.
     fn detach(&mut self, cid: ClauseId) {
+        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count(), self.num_clause);
         let c = &mut self.clause[cid.ordinal as usize];
         debug_assert!(!c.is(Flag::DEAD));
         debug_assert!(1 < c.lits.len());
-        c.kill(&mut self.touched);
+        if !c.is(Flag::DEAD) {
+            c.kill(&mut self.touched);
+            self.num_clause -= 1;
+        }
+        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count(), self.num_clause);
     }
     fn reduce<A>(&mut self, asg: &mut A, nc: usize) -> bool
     where
@@ -633,6 +642,7 @@ impl ClauseDBIF for ClauseDB {
                 && (self.co_lbd_bound as usize) < c.lits.len()
             {
                 c.kill(&mut self.touched);
+                self.num_clause -= 1;
             }
         }
         self.garbage_collect();
@@ -656,7 +666,8 @@ impl ClauseDBIF for ClauseDB {
     }
     fn check_size(&self) -> Result<bool, SolverError> {
         if self.soft_limit == 0 || self.len() <= self.soft_limit {
-            Ok(0 == self.soft_limit || 4 * self.count() < 3 * self.soft_limit)
+            let nc = self.derefer(property::Tusize::NumClause);
+            Ok(0 == self.soft_limit || 4 * nc < 3 * self.soft_limit)
         } else {
             Err(SolverError::OutOfMemory)
         }
@@ -821,7 +832,7 @@ impl ClauseDB {
         }
         perm.sort_unstable();
         for i in &perm[keep..] {
-            clause[i.to()].kill(touched);
+            self.detach(ClauseId::from(i.to()));
         }
         debug_assert!(perm[0..keep].iter().all(|c| !clause[c.to()].is(Flag::DEAD)));
         self.garbage_collect();
@@ -841,6 +852,7 @@ impl ClauseDB {
                 self.num_learnt -= 1;
             } else if reinit {
                 c.kill(&mut self.touched);
+                self.num_clause -= 1;
             }
         }
         self.garbage_collect();
