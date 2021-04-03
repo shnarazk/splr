@@ -1,7 +1,5 @@
-#[cfg(feature = "strategy_adaptation")]
-use crate::state::SearchStrategy;
 use {
-    super::{CertifiedRecord, Clause, ClauseDB, ClauseDBIF, ClauseId, WatchDBIF},
+    super::{property, CertifiedRecord, Clause, ClauseDB, ClauseDBIF, ClauseId, WatchDBIF},
     crate::{assign::AssignIF, solver::SolverEvent, types::*},
     std::{
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -175,9 +173,9 @@ impl Instantiate for ClauseDB {
                 // decision level must be 0 if `state.strategy.1` == `state[Stat::Conflict]`
                 match strategy {
                     (_, n) if n != num_conflict => (),
-                    (SearchStrategy::Initial, _) => (),
-                    (SearchStrategy::Generic, _) => (),
-                    (SearchStrategy::LowDecisions, _) => {
+                    (crate::state::SearchStrategy::Initial, _) => (),
+                    (crate::state::SearchStrategy::Generic, _) => (),
+                    (crate::state::SearchStrategy::LowDecisions, _) => {
                         self.co_lbd_bound = 4;
                         self.reduction_coeff =
                             (num_conflict as f64 / self.next_reduction as f64 + 1.0) as usize;
@@ -188,15 +186,15 @@ impl Instantiate for ClauseDB {
                         // This call requires 'decision level == 0'.
                         self.make_permanent(true);
                     }
-                    (SearchStrategy::HighSuccessive, _) => {
+                    (crate::state::SearchStrategy::HighSuccessive, _) => {
                         self.co_lbd_bound = 3;
                         self.first_reduction = 30000;
                         self.use_chan_seok = true;
                         // This call requires 'decision level == 0'.
                         self.make_permanent(false);
                     }
-                    (SearchStrategy::LowSuccessive, _) => (),
-                    (SearchStrategy::ManyGlues, _) => (),
+                    (crate::state::SearchStrategy::LowSuccessive, _) => (),
+                    (crate::state::SearchStrategy::ManyGlues, _) => (),
                 }
             }
             SolverEvent::NewVar => {
