@@ -687,7 +687,13 @@ impl ClauseDBIF for ClauseDB {
     fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool {
         debug_assert!(!self[cid].is(Flag::DEAD));
         debug_assert!(1 < self[cid].len());
-        let c = &mut self[cid];
+        let ClauseDB {
+            ref mut clause,
+            ref mut bin_watcher,
+            ref mut watcher,
+            ..
+        } = self;
+        let c = &mut clause[cid.ordinal as usize];
         // debug_assert!((*ch).lits.contains(&p));
         // debug_assert!(1 < (*ch).len());
         if (*c).is(Flag::DEAD) {
@@ -704,40 +710,41 @@ impl ClauseDBIF for ClauseDB {
             debug_assert!(1 < usize::from(!lits[0]));
             return true;
         }
-        if lits[0] == p || lits[1] == p {
-            let (q, r) = if lits[0] == p {
-                lits.swap_remove(0);
-                (lits[0], lits[1])
-            } else {
-                lits.swap_remove(1);
-                (lits[1], lits[0])
-            };
-            debug_assert!(1 < usize::from(!p));
-            if 2 == lits.len() {
-                let mut w1 = self.watcher[!p].detach_with(cid);
-                w1.blocker = r;
-                let mut w2 = self.watcher[!r].detach_with(cid);
-                w2.blocker = q;
-                self.bin_watcher[!q].register(w1);
-                self.bin_watcher[!r].register(w2);
-            } else {
-                let mut w0 = self.watcher[!p].detach_with(cid);
-                w0.blocker = r;
-                self.watcher[!q].register(w0);
-                self.watcher[!r].update_blocker(cid, q);
+
+        // FIX THE LONGSTANDING BUG.
+        // It was occured by failing to retrieve two `Watch`es.
+        let mut w1: Option<Watch> = None;
+        let mut w2: Option<Watch> = None;
+        let mut found = false;
+        for l in lits.iter() {
+            let w = watcher[!*l].detach_with(cid);
+            if w.is_some() {
+                if found {
+                    w2 = w;
+                    break;
+                } else {
+                    found = true;
+                    w1 = w;
+                }
             }
-        } else {
-            lits.delete_unstable(|&x| x == p);
-            if 2 == lits.len() {
-                let q = lits[0];
-                let r = lits[1];
-                let mut w1 = self.watcher[!q].detach_with(cid);
+        }
+
+        lits.delete_unstable(|&x| x == p);
+        let q = lits[0];
+        let r = lits[1];
+        match (w1, w2) {
+            (Some(mut w1), Some(mut w2)) => {
                 w1.blocker = r;
-                let mut w2 = self.watcher[!r].detach_with(cid);
                 w2.blocker = q;
-                self.bin_watcher[!q].register(w1);
-                self.bin_watcher[!r].register(w2);
+                if lits.len() == 2 {
+                    bin_watcher[!q].register(w1);
+                    bin_watcher[!r].register(w2);
+                } else {
+                    watcher[!q].register(w1);
+                    watcher[!r].register(w2);
+                }
             }
+            _ => panic!("fix me"),
         }
         false
     }
