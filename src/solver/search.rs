@@ -228,7 +228,10 @@ fn search(
         let ci = asg.propagate(cdb);
         if !ci.is_none() {
             if asg.decision_level() == asg.root_level {
-                analyze_final(asg, state, &cdb[ci]);
+                #[cfg(feature = "support_user_assumption")]
+                {
+                    analyze_final(asg, state, &cdb[ci]);
+                }
                 return Ok(false);
             }
             asg.update_rewards();
@@ -289,7 +292,10 @@ fn search(
                                 #[cfg(feature = "boundary_check")]
                                 return Err(SolverError::UndescribedError);
 
-                                analyze_final(asg, state, &cdb[ci]);
+                                #[cfg(feature = "support_user_assumption")]
+                                {
+                                    analyze_final(asg, state, &cdb[ci]);
+                                }
                                 return Ok(false);
                             }
                         }
@@ -337,24 +343,24 @@ fn adapt_modules(asg: &mut AssignStack, rst: &mut Restarter, state: &mut State) 
     rst.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
 }
 
+#[cfg(feature = "support_user_assumption")]
+// Build a conflict clause caused by *assumed* literals UNDER ROOT_LEVEL.
+// So we use zero instead of root_level sometimes in this function.
 fn analyze_final(asg: &mut AssignStack, state: &mut State, c: &Clause) {
     let mut seen = vec![false; asg.num_vars + 1];
     state.conflicts.clear();
     if asg.decision_level() == 0 {
         return;
     }
-    for l in &c.lits {
-        let vi = l.vi();
-        if 0 < asg.level(vi) {
-            asg.var_mut(vi).turn_on(Flag::CA_SEEN);
-        }
-    }
-    let end = if asg.decision_level() <= asg.root_level {
-        asg.stack_len()
-    } else {
-        asg.len_upto(asg.root_level)
-    };
-    for l in asg.stack_range(asg.len_upto(0)..end) {
+    // ??
+    // for l in &c.lits {
+    //     let vi = l.vi();
+    //     if asg.root_level < asg.level(vi) {
+    //         asg.var_mut(vi).turn_on(Flag::CA_SEEN);
+    //     }
+    // }
+    // FIXME: asg.stack_range().rev() is correct.
+    for l in asg.stack_range(0..asg.len_upto(asg.root_level)) {
         let vi = l.vi();
         if seen[vi] {
             if asg.reason(vi) == AssignReason::default() {
