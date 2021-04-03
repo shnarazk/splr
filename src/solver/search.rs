@@ -219,7 +219,7 @@ fn search(
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
 
-    while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) {
+    while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
             let lit = asg.select_decision_literal();
             asg.assign_by_decision(lit);
