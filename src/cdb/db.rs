@@ -794,7 +794,6 @@ impl ClauseDB {
             ref mut clause,
             ref co_lbd_bound,
             ref mut lbd_temp,
-            ref mut touched,
             ref ordinal,
             ref activity_decay,
             ref activity_anti_decay,
@@ -803,7 +802,11 @@ impl ClauseDB {
         self.num_reduction += 1;
         self.next_reduction += self.inc_step;
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
+        let mut ndead = 0;
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
+            if c.is(Flag::DEAD) {
+                ndead += 1;
+            }
             if !c.is(Flag::LEARNT) || c.is(Flag::DEAD) || asg.locked(c, ClauseId::from(i)) {
                 continue;
             }
@@ -827,7 +830,16 @@ impl ClauseDB {
             let weight = rank / (act_v + act_c);
             perm.push(OrderedProxy::new(i, weight));
         }
-        let keep = (perm.len() / 2).min(nc / 2);
+        if nc / 2 < ndead {
+            self.garbage_collect();
+            return;
+        }
+        let keep = if perm.len() < (nc / 2 - ndead) {
+            perm.len() / 2
+        } else {
+            perm.len() - (nc / 2 - ndead)
+        };
+        // let keep = (perm.len() / 2 - ndead).min(nc / 2);
         if !self.use_chan_seok {
             if clause[perm[keep].to()].rank <= 3 {
                 self.next_reduction += 2 * self.extra_inc;
@@ -840,7 +852,9 @@ impl ClauseDB {
         for i in &perm[keep..] {
             self.detach(ClauseId::from(i.to()));
         }
-        debug_assert!(perm[0..keep].iter().all(|c| !clause[c.to()].is(Flag::DEAD)));
+        debug_assert!(perm[0..keep]
+            .iter()
+            .all(|c| !self.clause[c.to()].is(Flag::DEAD)));
         self.garbage_collect();
     }
 
