@@ -1,5 +1,8 @@
 use {
-    super::{property, CertifiedRecord, Clause, ClauseDB, ClauseDBIF, ClauseId, WatchDBIF},
+    super::{
+        property, CertificationDumper, CertifiedRecord, Clause, ClauseDB, ClauseDBIF, ClauseId,
+        WatchDBIF,
+    },
     crate::{assign::AssignIF, solver::SolverEvent, types::*},
     std::{
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -14,6 +17,7 @@ impl Default for ClauseDB {
             bin_watcher: Vec::new(),
             watcher: Vec::new(),
             certified: Vec::new(),
+            certification_store: CertificationDumper::default(),
             soft_limit: 0, // 248_000_000
             use_chan_seok: false,
             co_lbd_bound: 4,
@@ -156,6 +160,7 @@ impl Instantiate for ClauseDB {
             bin_watcher,
             watcher,
             certified,
+            certification_store: CertificationDumper::instantiate(config, cnf),
             soft_limit: config.c_cls_lim,
             activity_decay: config.crw_dcy_rat,
             activity_anti_decay: 1.0 - config.crw_dcy_rat,
@@ -690,16 +695,32 @@ impl ClauseDBIF for ClauseDB {
         self.garbage_collect();
     }
     fn certificate_add(&mut self, vec: &[Lit]) {
+        #[cfg(feature = "no_IO")]
         if !self.certified.is_empty() {
             let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
             debug_assert!(!temp.is_empty());
             self.certified.push((CertifiedRecord::Add, temp));
         }
+        #[cfg(not(feature = "no_IO"))]
+        {
+            self.certification_store.push_add(vec);
+        }
     }
     fn certificate_delete(&mut self, vec: &[Lit]) {
+        #[cfg(feature = "no_IO")]
         if !self.certified.is_empty() {
             let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
             self.certified.push((CertifiedRecord::Delete, temp));
+        }
+        #[cfg(not(feature = "no_IO"))]
+        {
+            self.certification_store.push_delete(vec);
+        }
+    }
+    fn certificate_save(&mut self) {
+        #[cfg(not(feature = "no_IO"))]
+        {
+            self.certification_store.close();
         }
     }
     fn touch_var(&mut self, vi: VarId) {

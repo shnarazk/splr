@@ -81,7 +81,7 @@ fn main() {
     }
     let mut s = Solver::build(&config).expect("failed to load");
     let res = s.solve();
-    save_result(&s, &res, &cnf_file, ans_file);
+    save_result(&mut s, &res, &cnf_file, ans_file);
     std::process::exit(match res {
         Ok(Certificate::SAT(_)) => 10,
         Ok(Certificate::UNSAT) => 20,
@@ -90,7 +90,7 @@ fn main() {
 }
 
 fn save_result<S: AsRef<str> + std::fmt::Display>(
-    s: &Solver,
+    s: &mut Solver,
     res: &SolverResult,
     input: S,
     output: Option<PathBuf>,
@@ -157,8 +157,9 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                 _ => (),
             }
             if s.state.config.use_certification {
-                let proof_file: PathBuf = s.state.config.io_odir.join(&s.state.config.io_pfile);
-                save_proof(&s, &input, &proof_file);
+                // let proof_file: PathBuf = s.state.config.io_odir.join(&s.state.config.io_pfile);
+                // save_proof(&s, &input, &proof_file);
+                s.save_certification();
                 println!(
                     " Certificate|file: {}",
                     s.state.config.io_pfile.to_string_lossy()
@@ -215,6 +216,7 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
     }
 }
 
+#[allow(dead_code)]
 fn save_proof<S: AsRef<str> + std::fmt::Display>(s: &Solver, input: S, output: &PathBuf) {
     let mut buf = match File::create(output) {
         Ok(out) => BufWriter::new(out),

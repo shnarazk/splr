@@ -106,6 +106,9 @@ pub trait SatSolverIF: Instantiate {
     /// reinitialize a solver for incremental solving. **Requires 'incremental_solver' feature**
     fn reset(&mut self);
     #[cfg(not(feature = "no_IO"))]
+    /// dump an UNSAT certification file
+    fn save_certification(&mut self);
+    #[cfg(not(feature = "no_IO"))]
     /// dump the current status as a CNF
     fn dump_cnf(&self, fname: &str);
 }
@@ -245,6 +248,11 @@ impl SatSolverIF for Solver {
         while let Some(mut vec) = tmp.pop() {
             cdb.new_clause(asg, &mut vec, false, false);
         }
+    }
+    #[cfg(not(feature = "no_IO"))]
+    /// dump an UNSAT certification file
+    fn save_certification(&mut self) {
+        self.cdb.certificate_save();
     }
     #[cfg(not(feature = "no_IO"))]
     fn dump_cnf(&self, fname: &str) {

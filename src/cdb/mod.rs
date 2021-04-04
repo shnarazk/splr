@@ -4,6 +4,8 @@ mod cid;
 mod clause;
 /// methods on `ClauseDB`
 mod db;
+/// methods for UNSAT certification
+mod unsat_certificate;
 /// methods on `Watch` and `WatchDB`
 mod watch;
 
@@ -11,6 +13,7 @@ pub use self::{
     cid::ClauseIdIF,
     clause::ClauseIF,
     property::*,
+    unsat_certificate::CertificationDumper,
     watch::{Watch, WatchDBIF},
 };
 
@@ -93,6 +96,8 @@ pub trait ClauseDBIF:
     fn certificate_add(&mut self, vec: &[Lit]);
     /// record a deleted clause to unsat certification.
     fn certificate_delete(&mut self, vec: &[Lit]);
+    /// save the certification record to a file.
+    fn certificate_save(&mut self);
     /// flag positive and negative literals of a var as dirty
     fn touch_var(&mut self, vi: VarId);
     /// check the number of clauses
@@ -180,6 +185,7 @@ pub struct ClauseDB {
     pub watcher: Vec<Vec<Watch>>,
     /// clause history to make certification
     pub certified: DRAT,
+    certification_store: CertificationDumper,
     /// a number of clauses to emit out-of-memory exception
     soft_limit: usize,
     /// flag for Chan Seok heuristics; this value is exported with `Export:mode`
