@@ -93,8 +93,7 @@ impl VarSelectIF for AssignStack {
                 2 | 3 | 5 => RephasingTarget::BestPhases,
                 4 => RephasingTarget::Inverted,
                 6 => RephasingTarget::Shift,
-                x if x % 3 == 0 => RephasingTarget::BestPhases,
-                x if x % 3 == 1 => RephasingTarget::Inverted,
+                x if x % 3 == 2 => RephasingTarget::BestPhases,
                 _ => RephasingTarget::Clear,
             }
         };
