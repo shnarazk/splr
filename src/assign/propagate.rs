@@ -249,8 +249,10 @@ impl PropagateIF for AssignStack {
                     debug_assert!(!cdb[w.c].is(Flag::DEAD));
                     debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
                     debug_assert_ne!(w.blocker, false_lit);
+
                     #[cfg(feature = "boundary_check")]
                     debug_assert_eq!(cdb[w.c].lits.len(), 2);
+
                     match lit_assign!(self, w.blocker) {
                         Some(true) => (),
                         Some(false) => {
@@ -282,7 +284,7 @@ impl PropagateIF for AssignStack {
                         // In this path, we use only `AssignStack::assign`.
                         continue 'next_clause;
                     }
-                    // debug_assert!(!cdb[w.c].is(Flag::DEAD));
+                    debug_assert!(!cdb[w.c].is(Flag::DEAD));
                     let Clause {
                         ref mut lits,
                         ref mut search_from,
@@ -353,7 +355,6 @@ impl PropagateIF for AssignStack {
         let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
         unsafe {
             while let Some(p) = self.trail.get(self.q_head) {
-                self.num_propagation += 1;
                 self.q_head += 1;
                 let sweeping = usize::from(*p);
                 let false_lit = !*p;
@@ -369,14 +370,13 @@ impl PropagateIF for AssignStack {
                     }
                     debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
                     debug_assert_ne!(w.blocker, false_lit);
+
                     #[cfg(feature = "boundary_check")]
                     debug_assert_eq!(cdb[w.c].lits.len(), 2);
+
                     match lit_assign!(self, w.blocker) {
                         Some(true) => (),
                         Some(false) => {
-                            self.num_conflict += 1;
-                            self.dpc_ema.update(self.num_decision);
-                            self.ppc_ema.update(self.num_propagation);
                             return w.c;
                         }
                         None => {
@@ -426,7 +426,7 @@ impl PropagateIF for AssignStack {
                     //
                     let len = lits.len();
                     // Gathering good literals at the beginning of lits.
-                    for k in (*search_from..len).chain((2..*search_from).rev()) {
+                    for k in (*search_from..len).chain(2..*search_from) {
                         let lk = lits.get_unchecked(k);
                         if lit_assign!(self, *lk) != Some(false) {
                             n -= 1;
@@ -443,9 +443,6 @@ impl PropagateIF for AssignStack {
 
                     if first_value == Some(false) {
                         let cid = w.c;
-                        self.num_conflict += 1;
-                        self.dpc_ema.update(self.num_decision);
-                        self.ppc_ema.update(self.num_propagation);
                         return cid;
                     }
                     let lv = lits[1..]
