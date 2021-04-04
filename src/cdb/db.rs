@@ -37,7 +37,7 @@ impl Default for ClauseDB {
             num_lbd2: 0,
             num_learnt: 0,
             num_reduction: 0,
-            lbd_of_dp_ema: Ema::new(10000),
+            lbd_of_dp_ema: Ema::new(100_000),
             eliminated_permanent: Vec::new(),
         }
     }
@@ -289,7 +289,7 @@ impl ClauseDBIF for ClauseDB {
         for (i, ws) in &mut wss.iter_mut().enumerate() {
             #[cfg(not(feature = "boundary_check"))]
             if !touched[i + 2] {
-                 continue;
+                continue;
             }
             let mut n = 0;
             while n < ws.len() {
@@ -331,7 +331,7 @@ impl ClauseDBIF for ClauseDB {
         for (i, ws) in &mut wss.iter_mut().enumerate() {
             #[cfg(not(feature = "boundary_check"))]
             if !touched[i + 2] {
-                 continue;
+                continue;
             }
             let mut n = 0;
             while n < ws.len() {
@@ -855,11 +855,7 @@ impl ClauseDB {
         self.num_reduction += 1;
         self.next_reduction += self.inc_step;
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
-        let mut ndead = 0;
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
-            if c.is(Flag::DEAD) {
-                ndead += 1;
-            }
             if !c.is(Flag::LEARNT) || c.is(Flag::DEAD) || asg.locked(c, ClauseId::from(i)) {
                 continue;
             }
@@ -883,16 +879,7 @@ impl ClauseDB {
             let weight = rank / (act_v + act_c);
             perm.push(OrderedProxy::new(i, weight));
         }
-        if nc / 2 < ndead {
-            self.garbage_collect();
-            return;
-        }
-        let keep = if perm.len() < (nc / 2 - ndead) {
-            perm.len() / 2
-        } else {
-            perm.len() - (nc / 2 - ndead)
-        };
-        // let keep = (perm.len() / 2 - ndead).min(nc / 2);
+        let keep = perm.len().min(nc) / 2;
         if !self.use_chan_seok {
             if clause[perm[keep].to()].rank <= 3 {
                 self.next_reduction += 2 * self.extra_inc;
@@ -902,8 +889,11 @@ impl ClauseDB {
             };
         }
         perm.sort_unstable();
+        let thr = self.lbd_of_dp_ema.get() as u16;
         for i in &perm[keep..] {
-            self.detach(ClauseId::from(i.to()));
+            if thr <= self.clause[i.to()].rank {
+                self.detach(ClauseId::from(i.to()));
+            }
         }
         debug_assert!(perm[0..keep]
             .iter()
