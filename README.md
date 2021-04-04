@@ -144,16 +144,10 @@ unif-k3-r4.25-v360-c1530-S1028159446-096.cnf       360,1530 |time:   124.06
 s UNSATISFIABLE: cnfs/unif-k3-r4.25-v360-c1530-S1028159446-096.cnf
 ```
 
-2. Trim comments from the output
+2. Convert the drat file to a grat file.
 
 ```plain
-$ egrep -v '^[cs]' < proof.out > proof.drat
-```
-
-3. Convert the drat file to a grat file.
-
-```plain
-$ gratgen cnfs/unif-k3-r4.25-v360-c1530-S1028159446-096.cnf proof.drat -o proof.grat
+$ gratgen cnfs/unif-k3-r4.25-v360-c1530-S1028159446-096.cnf proof.out -o proof.grat
 c sizeof(cdb_t) = 4
 c sizeof(cdb_t*) = 8
 c Using RAT run heuristics
@@ -188,7 +182,7 @@ c Item list:       54569664
 c Pivots store:    8388608
 ```
 
-4. Verify it with `gratchk`
+3. Verify it with `gratchk`
 
 ```plain
 $ gratchk unsat cnfs/unif-k3-r4.25-v360-c1530-S1028159446-096.cnf proof.grat
