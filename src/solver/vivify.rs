@@ -145,7 +145,6 @@ pub fn vivify(
                         debug_assert!(cdb[cj].is(Flag::VIV_ASSUMED));
                         cdb.detach(cj);
                         debug_assert!(!asg.locked(&cdb[cj], cj));
-                        cdb.garbage_collect();
                         debug_assert!(cdb[cj].is(Flag::DEAD));
                     }
                     if !cc.is_none() {
@@ -171,7 +170,6 @@ pub fn vivify(
             0 => {
                 assert!(!cdb[cs.to()].is(Flag::DEAD));
                 cdb.detach(cs.to());
-                cdb.garbage_collect();
                 num_purge += 1;
             }
             1 => {
