@@ -229,16 +229,45 @@ impl ClauseDBIF for ClauseDB {
         self.clause.iter_mut()
     }
     #[inline]
-    fn watcher_list(&self, l: Lit) -> &[Watch] {
-        &self.watcher[l]
+    fn bin_watcher_list(&self, l: Lit) -> &Vec<Watch> {
+        &self.bin_watcher[l]
     }
     #[inline]
     fn bin_watcher_lists(&self) -> &[Vec<Watch>] {
         &self.bin_watcher
     }
     #[inline]
+    fn watcher_list_mut(&mut self, l: Lit) -> &mut Vec<Watch> {
+        &mut self.watcher[l]
+    }
+    #[inline]
     fn watcher_lists_mut(&mut self) -> &mut [Vec<Watch>] {
         &mut self.watcher
+    }
+    fn detach_watches(&mut self, cid: ClauseId) -> (Watch, Watch) {
+        let ClauseDB {
+            ref clause,
+            ref mut watcher,
+            ..
+        } = self;
+        let mut w1: Option<Watch> = None;
+        let mut w2: Option<Watch> = None;
+        let mut found = false;
+        let lits = &clause[cid.ordinal as usize].lits;
+        assert!(2 < lits.len());
+        for l in lits.iter() {
+            let w = watcher[!*l].detach_with(cid);
+            if w.is_some() {
+                if found {
+                    w2 = w;
+                    break;
+                } else {
+                    found = true;
+                    w1 = w;
+                }
+            }
+        }
+        (w1.unwrap(), w2.unwrap())
     }
     fn garbage_collect(&mut self) {
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count(), self.num_clause);
@@ -257,10 +286,11 @@ impl ClauseDBIF for ClauseDB {
         //
         let (recycles, wss) = bin_watcher.split_at_mut(2);
         let recycled = &mut recycles[1];
-        for ws in &mut wss.iter_mut() {
-            // if !touched[i + 2] {
-            //     continue;
-            // }
+        for (i, ws) in &mut wss.iter_mut().enumerate() {
+            #[cfg(not(feature = "boundary_check"))]
+            if !touched[i + 2] {
+                 continue;
+            }
             let mut n = 0;
             while n < ws.len() {
                 let cid = ws[n].c;
@@ -269,6 +299,10 @@ impl ClauseDBIF for ClauseDB {
                     n += 1;
                     continue;
                 }
+
+                #[cfg(feature = "boundary_check")]
+                assert!(touched[i + 2]);
+
                 if !c.lits.is_empty() {
                     debug_assert!(c.is(Flag::DEAD));
                     recycled.push(Watch {
@@ -295,10 +329,10 @@ impl ClauseDBIF for ClauseDB {
         let (recycles, wss) = watcher.split_at_mut(2);
         let recycled = &mut recycles[1];
         for (i, ws) in &mut wss.iter_mut().enumerate() {
-            // if !touched[i + 2] {
-            //     continue;
-            // }
-            touched[i + 2] = false;
+            #[cfg(not(feature = "boundary_check"))]
+            if !touched[i + 2] {
+                 continue;
+            }
             let mut n = 0;
             while n < ws.len() {
                 let cid = ws[n].c;
@@ -307,6 +341,10 @@ impl ClauseDBIF for ClauseDB {
                     n += 1;
                     continue;
                 }
+
+                #[cfg(feature = "boundary_check")]
+                assert!(touched[i + 2]);
+
                 if !c.lits.is_empty() {
                     debug_assert!(c.is(Flag::DEAD));
                     recycled.push(Watch {
@@ -325,6 +363,7 @@ impl ClauseDBIF for ClauseDB {
                 }
                 ws.detach(n);
             }
+            touched[i + 2] = false;
         }
         let nrc = recycles.len();
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count(), self.num_clause);
@@ -357,7 +396,7 @@ impl ClauseDBIF for ClauseDB {
     /// assert!(!cdb.registered_bin_clause(!l1, !l2));
     ///```
     fn registered_bin_clause(&self, l0: Lit, l1: Lit) -> bool {
-        for w in &self.bin_watcher_lists()[usize::from(!l0)] {
+        for w in self.bin_watcher_list(!l0) {
             if w.blocker == l1 {
                 return true;
             }
@@ -441,8 +480,12 @@ impl ClauseDBIF for ClauseDB {
                 ..
             } = self;
             let c = &mut clause[cid.ordinal as usize];
-            c.update_lbd(asg, lbd_temp);
             let len2 = c.lits.len() == 2;
+            if len2 {
+                c.rank = 1;
+            } else {
+                c.update_lbd(asg, lbd_temp);
+            }
             if learnt && len2 {
                 *num_bi_learnt += 1;
             }
@@ -684,7 +727,7 @@ impl ClauseDBIF for ClauseDB {
         }
         None
     }
-    fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool {
+    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> bool {
         debug_assert!(!self[cid].is(Flag::DEAD));
         debug_assert!(1 < self[cid].len());
         let ClauseDB {
@@ -713,6 +756,10 @@ impl ClauseDBIF for ClauseDB {
 
         // FIX THE LONGSTANDING BUG.
         // It was occured by failing to retrieve two `Watch`es.
+        //
+        // Since we can't hold an eliminated var in Watch::blocker
+        // by following 'WATCHING LITERAL LIST MANAGEMENT RULES',
+        // we have to update BOTH watching literals even if this is an O(n) operation.
         let mut w1: Option<Watch> = None;
         let mut w2: Option<Watch> = None;
         let mut found = false;
@@ -739,6 +786,12 @@ impl ClauseDBIF for ClauseDB {
                 if lits.len() == 2 {
                     bin_watcher[!q].register(w1);
                     bin_watcher[!r].register(w2);
+                    if c.is(Flag::LEARNT) {
+                        c.turn_off(Flag::LEARNT);
+                        c.rank = 1;
+                        self.num_bi_clause += 1;
+                        self.num_bi_learnt += 1;
+                    }
                 } else {
                     watcher[!q].register(w1);
                     watcher[!r].register(w2);

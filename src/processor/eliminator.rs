@@ -382,7 +382,10 @@ impl Eliminator {
                 return Ok(());
             }
             let best = if cid.is_lifted_lit() {
-                Lit::from(cid).vi()
+                let vi = Lit::from(cid).vi();
+                debug_assert!(!asg.var(vi).is(Flag::DEAD));
+                debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
+                vi
             } else {
                 let mut tmp = cdb.derefer(cdb::property::Tusize::NumClause);
                 let c = &mut cdb[cid];

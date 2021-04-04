@@ -38,12 +38,16 @@ pub trait ClauseDBIF:
     fn iter(&self) -> Iter<'_, Clause>;
     /// return a mutable iterator.
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
+    /// return a watcher list for binclauses
+    fn bin_watcher_list(&self, l: Lit) -> &Vec<Watch>;
     /// return the list of bin_watch lists
     fn bin_watcher_lists(&self) -> &[Vec<Watch>];
-    /// return a watcher list
-    fn watcher_list(&self, l: Lit) -> &[Watch];
-    /// return the list of watch lists
+    /// return a mutable watcher list
+    fn watcher_list_mut(&mut self, l: Lit) -> &mut Vec<Watch>;
+    /// return the mutable list of watch lists
     fn watcher_lists_mut(&mut self) -> &mut [Vec<Watch>];
+    /// detach the two watches of the clause
+    fn detach_watches(&mut self, cid: ClauseId) -> (Watch, Watch);
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
     /// check a condition to reduce.
@@ -100,10 +104,10 @@ pub trait ClauseDBIF:
     /// Otherwise returns a clause which is not satisfiable under a given assignment.
     /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
     fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId>;
-    /// removes Lit `p` from Clause *self*. This is an O(n) function!
+    /// removes an eliminated Lit `p` from a clause. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
     /// And this is called only from `Eliminator::strengthen_clause`.
-    fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool;
+    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> bool;
     /// minimize a clause.
     fn minimize_with_biclauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
     where

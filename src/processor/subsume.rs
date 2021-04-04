@@ -96,7 +96,7 @@ where
     debug_assert!(1 < cdb[cid].len());
     cdb.touch_var(l.vi());
     debug_assert!(!cid.is_none());
-    if cdb.strengthen(cid, l) {
+    if cdb.strengthen_by_elimination(cid, l) {
         // Vaporize the binary clause
         debug_assert!(2 == cdb[cid].len());
         let c0 = cdb[cid][0];

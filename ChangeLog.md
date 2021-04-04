@@ -1,6 +1,11 @@
-## 0.7.1, 2021-0X-XX
+## 0.7.1, 2021-04-XX
 
-- NOW WORKING ON fixing a bug which has been rarely emitted by eliminator.
+- fix a bug which has been rarely emitted by eliminator.
+   - Splrs-0.7.0 shows that ans_aes_equiv_encry_3_rounds.debugged-sc2012.cnf
+     is satisfiable. But it's not.
+   - `AssignIF::propagate` skipped clause-level satisfiability checking,
+     if its watch's `blocker` held an eliminated var, which was never falsified.
+   - `ClauseDB::strengthen_by_elimination` didn't turn `LEARNT` off when a clause became a binclause.
 - activate feature 'clause vivification'
 - activate feature 'rephase', which selects the best phases and its variants
 - delete features 'var-boosting' and 'best_phases_reuse'

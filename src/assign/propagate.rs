@@ -277,7 +277,9 @@ impl PropagateIF for AssignStack {
                 'next_clause: while n < source.len() {
                     let mut w = source.get_unchecked_mut(n);
                     n += 1;
+                    debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
                     if let Some(true) = lit_assign!(self, w.blocker) {
+                        // In this path, we use only `AssignStack::assign`.
                         continue 'next_clause;
                     }
                     // debug_assert!(!cdb[w.c].is(Flag::DEAD));
@@ -397,6 +399,7 @@ impl PropagateIF for AssignStack {
                     if cdb[w.c].is(Flag::DEAD) {
                         continue 'next_clause;
                     }
+                    debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
                     if let Some(true) = lit_assign!(self, w.blocker) {
                         continue 'next_clause;
                     }

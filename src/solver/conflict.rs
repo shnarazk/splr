@@ -98,10 +98,12 @@ pub fn handle_conflict(
                             let l = c.lits[i];
                             if l == decision {
                                 c.lits.swap(0, i);
-                                let mut w =
-                                    cdb.watcher_lists_mut()[usize::from(!l0)].detach_with(ci);
-                                w.blocker = l0;
-                                cdb.watcher_lists_mut()[usize::from(!decision)].register(w);
+
+                                let w = cdb.watcher_list_mut(!l0).detach_with(ci).unwrap();
+                                debug_assert_ne!(l0.vi(), decision.vi());
+                                debug_assert!(!asg.var(l0.vi()).is(Flag::ELIMINATED));
+                                debug_assert_ne!(w.blocker, l0);
+                                cdb.watcher_list_mut(!decision).register(w);
                                 break;
                             }
                         }

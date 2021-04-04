@@ -1,6 +1,10 @@
 use {super::ClauseId, crate::types::*};
 
 /// API for 'watcher list' like [`register`](`crate::cdb::WatchDBIF::register`), [`detach`](`crate::cdb::WatchDBIF::detach`), [`update_blocker`](`crate::cdb::WatchDBIF::update_blocker`) and so on.
+///
+///## WATCHING LITERAL LIST MANAGEMENT RULES:
+///  - Watching literals are lits[0] and lits[1] anytime anywhere.
+///  - Watching literals must not be eliminated vars.
 pub trait WatchDBIF {
     /// make a new 'watch', and add it to this watcher list.
     fn register(&mut self, w: Watch);
