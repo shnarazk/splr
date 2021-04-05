@@ -65,7 +65,7 @@ pub enum RephasingTarget {
 
 #[cfg(feature = "rephase")]
 impl std::fmt::Display for RephasingTarget {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(formatter, "{:?}", self)
     }
 }
@@ -93,8 +93,7 @@ impl VarSelectIF for AssignStack {
                 2 | 3 | 5 => RephasingTarget::BestPhases,
                 4 => RephasingTarget::Inverted,
                 6 => RephasingTarget::Shift,
-                x if x % 3 == 0 => RephasingTarget::BestPhases,
-                x if x % 3 == 1 => RephasingTarget::Inverted,
+                x if x % 3 == 2 => RephasingTarget::BestPhases,
                 _ => RephasingTarget::Clear,
             }
         };

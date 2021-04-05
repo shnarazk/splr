@@ -134,7 +134,9 @@ impl SolveIF for Solver {
                 }
                 let act = 1.0 / (asg.num_vars as f64).powf(0.25);
                 for vi in elim.sorted_iterator() {
-                    asg.set_activity(*vi, act);
+                    if !asg.var(*vi).is(Flag::ELIMINATED) {
+                        asg.set_activity(*vi, act);
+                    }
                 }
                 asg.rebuild_order();
             }
@@ -149,6 +151,10 @@ impl SolveIF for Solver {
         state.progress(asg, cdb, elim, rst);
         match answer {
             Ok(true) => {
+                #[cfg(feature = "trace_equivalency")]
+                {
+                    asg.dump_cnf(cdb, "laststep.cnf");
+                }
                 // As a preparation for incremental solving, we need to backtrack to the
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
@@ -215,7 +221,7 @@ fn search(
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
 
-    while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) {
+    while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
             let lit = asg.select_decision_literal();
             asg.assign_by_decision(lit);
@@ -224,7 +230,10 @@ fn search(
         let ci = asg.propagate(cdb);
         if !ci.is_none() {
             if asg.decision_level() == asg.root_level {
-                analyze_final(asg, state, &cdb[ci]);
+                #[cfg(feature = "support_user_assumption")]
+                {
+                    analyze_final(asg, state, &cdb[ci]);
+                }
                 return Ok(false);
             }
             asg.update_rewards();
@@ -234,12 +243,58 @@ fn search(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
             ));
             if rst.restart() == Some(RestartDecision::Force) {
-                if let Some(_new_cycle) = rst.stabilize() {
+                #[allow(unused_variables)]
+                if let Some(new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);
                     let block_level = rst.derefer(restart::property::Tusize::TriggerLevel);
                     let num_cycle = rst.derefer(restart::property::Tusize::NumCycle);
                     let num_unreachable = asg.derefer(assign::property::Tusize::NumUnreachableVar);
+                    #[cfg(feature = "trace_equivalency")]
+                    {
+                        let num_stage = rst.derefer(restart::property::Tusize::NumStage);
+                        if new_cycle {
+                            asg.dump_cnf(
+                                cdb,
+                                &format!(
+                                    "{}-stage{}.cnf",
+                                    state.config.cnf_file.file_stem().unwrap().to_string_lossy(),
+                                    num_stage
+                                ),
+                            );
+                        }
+                    }
                     asg.handle(SolverEvent::NewStabilizationStage(block_level));
+                    if cdb.reduce(asg, asg.num_conflict) {
+                        #[cfg(feature = "trace_equivalency")]
+                        if false {
+                            state.progress(asg, cdb, elim, rst);
+                            cdb.check_consistency(asg, "before simplify");
+                        }
+                        if state.config.c_ip_int <= elim.to_simplify as usize {
+                            elim.activate();
+                            elim.simplify(asg, cdb, rst, state)?;
+                            #[cfg(feature = "trace_equivalency")]
+                            if false {
+                                state.progress(asg, cdb, elim, rst);
+                                cdb.check_consistency(
+                                    asg,
+                                    &format!("simplify nc:{}", asg.num_conflict),
+                                );
+                            }
+                        } else {
+                            #[cfg(feature = "clause_vivification")]
+                            if vivify(asg, cdb, elim, state).is_err() {
+                                #[cfg(feature = "boundary_check")]
+                                return Err(SolverError::UndescribedError);
+
+                                #[cfg(feature = "support_user_assumption")]
+                                {
+                                    analyze_final(asg, state, &cdb[ci]);
+                                }
+                                return Ok(false);
+                            }
+                        }
+                    }
                     if last_core != num_unreachable || 0 == num_unreachable {
                         state.log(
                             asg.num_conflict,
@@ -259,21 +314,6 @@ fn search(
                         }
                     } else {
                         return Err(SolverError::UndescribedError);
-                    }
-                    if cdb.reduce(asg, asg.num_conflict) {
-                        if state.config.c_ip_int <= elim.to_simplify as usize {
-                            elim.activate();
-                            elim.simplify(asg, cdb, rst, state)?;
-                        } else {
-                            #[cfg(feature = "clause_vivification")]
-                            if vivify(asg, cdb, elim, state).is_err() {
-                                #[cfg(feature = "boundary_check")]
-                                return Err(SolverError::UndescribedError);
-
-                                analyze_final(asg, state, &cdb[ci]);
-                                return Ok(false);
-                            }
-                        }
                     }
                     if next_progress < asg.num_conflict {
                         state.progress(asg, cdb, elim, rst);
@@ -318,24 +358,24 @@ fn adapt_modules(asg: &mut AssignStack, rst: &mut Restarter, state: &mut State) 
     rst.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
 }
 
+#[cfg(feature = "support_user_assumption")]
+// Build a conflict clause caused by *assumed* literals UNDER ROOT_LEVEL.
+// So we use zero instead of root_level sometimes in this function.
 fn analyze_final(asg: &mut AssignStack, state: &mut State, c: &Clause) {
     let mut seen = vec![false; asg.num_vars + 1];
     state.conflicts.clear();
     if asg.decision_level() == 0 {
         return;
     }
-    for l in &c.lits {
-        let vi = l.vi();
-        if 0 < asg.level(vi) {
-            asg.var_mut(vi).turn_on(Flag::CA_SEEN);
-        }
-    }
-    let end = if asg.decision_level() <= asg.root_level {
-        asg.stack_len()
-    } else {
-        asg.len_upto(asg.root_level)
-    };
-    for l in asg.stack_range(asg.len_upto(0)..end) {
+    // ??
+    // for l in &c.lits {
+    //     let vi = l.vi();
+    //     if asg.root_level < asg.level(vi) {
+    //         asg.var_mut(vi).turn_on(Flag::CA_SEEN);
+    //     }
+    // }
+    // FIXME: asg.stack_range().rev() is correct.
+    for l in asg.stack_range(0..asg.len_upto(asg.root_level)) {
         let vi = l.vi();
         if seen[vi] {
             if asg.reason(vi) == AssignReason::default() {

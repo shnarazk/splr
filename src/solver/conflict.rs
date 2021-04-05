@@ -98,10 +98,12 @@ pub fn handle_conflict(
                             let l = c.lits[i];
                             if l == decision {
                                 c.lits.swap(0, i);
-                                let mut w =
-                                    cdb.watcher_lists_mut()[usize::from(!l0)].detach_with(ci);
-                                w.blocker = l0;
-                                cdb.watcher_lists_mut()[usize::from(!decision)].register(w);
+
+                                let w = cdb.watcher_list_mut(!l0).detach_with(ci).unwrap();
+                                debug_assert_ne!(l0.vi(), decision.vi());
+                                debug_assert!(!asg.var(l0.vi()).is(Flag::ELIMINATED));
+                                debug_assert_ne!(w.blocker, l0);
+                                cdb.watcher_list_mut(!decision).register(w);
                                 break;
                             }
                         }
@@ -329,9 +331,8 @@ fn conflict_analyze(
                 let c = &cdb[cid];
 
                 #[cfg(feature = "boundary_check")]
-                assert!(
-                    0 < c.len(),
-                    format!(
+                if c.len() == 0 {
+                    panic!(
                         "Level {} I-graph reaches {}:{} for {}:{}",
                         asg.decision_level(),
                         cid,
@@ -339,7 +340,7 @@ fn conflict_analyze(
                         p,
                         asg.var(p.vi())
                     )
-                );
+                }
 
                 #[cfg(feature = "trace_analysis")]
                 println!("- handle {}", cid);
@@ -401,10 +402,9 @@ fn conflict_analyze(
             let vi = asg.stack(ti).vi();
 
             #[cfg(feature = "boundary_check")]
-            assert!(
-                vi < asg.level_ref().len(),
-                format!("ti:{}, lit:{}, len:{}", ti, asg.stack(ti), asg.stack_len())
-            );
+            if asg.level_ref().len() <= vi {
+                panic!("ti:{}, lit:{}, len:{}", ti, asg.stack(ti), asg.stack_len());
+            }
 
             let lvl = asg.level(vi);
             let v = asg.var(vi);
@@ -414,17 +414,16 @@ fn conflict_analyze(
             println!("- skip {} because it isn't flagged", asg.stack(ti));
 
             #[cfg(feature = "boundary_check")]
-            assert!(
-                0 < ti,
-                format!(
+            if 0 == ti {
+                panic!(
                     "p:{}, path_cnt:{}, lv:{}, learnt:{:?}\nconflict:{:?}",
                     p,
                     path_cnt,
                     dl,
                     asg.dump(&*learnt),
                     asg.dump(&cdb[conflicting_clause].lits),
-                ),
-            );
+                );
+            }
 
             ti -= 1;
         }

@@ -3,7 +3,8 @@ use {
     splr::{
         assign,
         cdb::{self, CertifiedRecord},
-        config, processor,
+        config::{self, CERTIFICATION_DEFAULT_FILENAME},
+        processor,
         solver::*,
         state::{self, LogF64Id, LogUsizeId},
         Config, EmaIF, PropertyDereference, PropertyReference, SolverError, VERSION,
@@ -60,7 +61,9 @@ fn main() {
         )))),
         _ => Some(config.io_odir.join(&config.io_rfile)),
     };
-    if config.io_pfile.to_string_lossy() != "proof.out" && !config.use_certification {
+    if config.io_pfile.to_string_lossy() != CERTIFICATION_DEFAULT_FILENAME
+        && !config.use_certification
+    {
         println!("Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good.");
         return;
     }
@@ -81,7 +84,7 @@ fn main() {
     }
     let mut s = Solver::build(&config).expect("failed to load");
     let res = s.solve();
-    save_result(&s, &res, &cnf_file, ans_file);
+    save_result(&mut s, &res, &cnf_file, ans_file);
     std::process::exit(match res {
         Ok(Certificate::SAT(_)) => 10,
         Ok(Certificate::UNSAT) => 20,
@@ -90,7 +93,7 @@ fn main() {
 }
 
 fn save_result<S: AsRef<str> + std::fmt::Display>(
-    s: &Solver,
+    s: &mut Solver,
     res: &SolverResult,
     input: S,
     output: Option<PathBuf>,
@@ -157,8 +160,9 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                 _ => (),
             }
             if s.state.config.use_certification {
-                let proof_file: PathBuf = s.state.config.io_odir.join(&s.state.config.io_pfile);
-                save_proof(&s, &input, &proof_file);
+                // let proof_file: PathBuf = s.state.config.io_odir.join(&s.state.config.io_pfile);
+                // save_proof(&s, &input, &proof_file);
+                s.save_certification();
                 println!(
                     " Certificate|file: {}",
                     s.state.config.io_pfile.to_string_lossy()
@@ -215,6 +219,7 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
     }
 }
 
+#[allow(dead_code)]
 fn save_proof<S: AsRef<str> + std::fmt::Display>(s: &Solver, input: S, output: &PathBuf) {
     let mut buf = match File::create(output) {
         Ok(out) => BufWriter::new(out),

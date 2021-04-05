@@ -13,7 +13,7 @@ use {
 #[cfg(not(feature = "no_IO"))]
 use std::{
     fs::File,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Write},
 };
 
 /// API for SAT solver creation and modification.
@@ -94,6 +94,7 @@ pub trait SatSolverIF: Instantiate {
     /// assert_eq!(s.solve(), Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8, -9])));
     /// ```
     fn add_var(&mut self) -> usize;
+    #[cfg(not(feature = "no_IO"))]
     /// make a solver and load a CNF into it.
     ///
     /// # Errors
@@ -101,10 +102,15 @@ pub trait SatSolverIF: Instantiate {
     /// * `SolverError::IOError` if it failed to load a CNF file.
     /// * `SolverError::Inconsistent` if the CNF is conflicting.
     /// * `SolverError::OutOfRange` if any literal used in the CNF is out of range for var index.
-    #[cfg(not(feature = "no_IO"))]
     fn build(config: &Config) -> Result<Solver, SolverError>;
     /// reinitialize a solver for incremental solving. **Requires 'incremental_solver' feature**
     fn reset(&mut self);
+    #[cfg(not(feature = "no_IO"))]
+    /// dump an UNSAT certification file
+    fn save_certification(&mut self);
+    #[cfg(not(feature = "no_IO"))]
+    /// dump the current status as a CNF
+    fn dump_cnf(&self, fname: &str);
 }
 
 impl Default for Solver {
@@ -243,6 +249,51 @@ impl SatSolverIF for Solver {
             cdb.new_clause(asg, &mut vec, false, false);
         }
     }
+    #[cfg(not(feature = "no_IO"))]
+    /// dump an UNSAT certification file
+    fn save_certification(&mut self) {
+        self.cdb.certificate_save();
+    }
+    #[cfg(not(feature = "no_IO"))]
+    fn dump_cnf(&self, fname: &str) {
+        let nv = self.asg.derefer(crate::assign::property::Tusize::NumVar);
+        for vi in 1..nv {
+            if self.asg.var(vi).is(Flag::ELIMINATED) {
+                if self.asg.assign(vi).is_some() {
+                    panic!("conflicting var {} {:?}", vi, self.asg.assign(vi));
+                }
+            }
+        }
+        if let Ok(out) = File::create(&fname) {
+            let mut buf = std::io::BufWriter::new(out);
+            let na = self
+                .asg
+                .derefer(crate::assign::property::Tusize::NumAssertedVar);
+            let nc = self
+                .cdb
+                .iter()
+                .skip(1)
+                .filter(|c| !c.is(Flag::DEAD))
+                .count();
+            buf.write_all(format!("p cnf {} {}\n", nv, nc + na).as_bytes())
+                .unwrap();
+            for c in self.cdb.iter().skip(1) {
+                if c.is(Flag::DEAD) {
+                    continue;
+                }
+                for l in &c.lits {
+                    buf.write_all(format!("{} ", i32::from(*l)).as_bytes())
+                        .unwrap();
+                }
+                buf.write_all(b"0\n").unwrap();
+            }
+            buf.write_all(b"c from trail\n").unwrap();
+            for x in self.asg.stack_iter().take(self.asg.len_upto(0)) {
+                buf.write_all(format!("{} 0\n", i32::from(*x)).as_bytes())
+                    .unwrap();
+            }
+        }
+    }
 }
 
 impl Solver {
@@ -263,7 +314,7 @@ impl Solver {
         if lits.iter().any(|l| asg.assigned(*l).is_some()) {
             cdb.certificate_add(lits);
         }
-        lits.sort_unstable();
+        lits.sort();
         let mut j = 0;
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means tautology.
         for i in 0..lits.len() {

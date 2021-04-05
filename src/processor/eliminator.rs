@@ -382,9 +382,12 @@ impl Eliminator {
                 return Ok(());
             }
             let best = if cid.is_lifted_lit() {
-                Lit::from(cid).vi()
+                let vi = Lit::from(cid).vi();
+                debug_assert!(!asg.var(vi).is(Flag::DEAD));
+                debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
+                vi
             } else {
-                let mut tmp = cdb.count();
+                let mut tmp = cdb.derefer(cdb::property::Tusize::NumClause);
                 let c = &mut cdb[cid];
                 c.turn_off(Flag::ENQUEUED);
                 let lits = &c.lits;
@@ -496,7 +499,7 @@ impl Eliminator {
         }
         let mut timedout: usize = {
             let nv = asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64;
-            let nc = cdb.count() as f64;
+            let nc = cdb.derefer(cdb::property::Tusize::NumClause) as f64;
             (6.0 * nv.log(1.5) * nc) as usize
         };
         while self.bwdsub_assigns < asg.stack_len()

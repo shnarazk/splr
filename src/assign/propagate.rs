@@ -88,9 +88,10 @@ impl PropagateIF for AssignStack {
     fn assign_at_root_level(&mut self, l: Lit) -> MaybeInconsistent {
         let vi = l.vi();
         debug_assert!(vi < self.var.len());
-        self.level[vi] = 0;
         debug_assert!(!self.var[vi].is(Flag::ELIMINATED));
         debug_assert_eq!(self.root_level, self.decision_level());
+        debug_assert!(self.trail_lim.is_empty());
+        self.level[vi] = self.root_level;
         match var_assign!(self, vi) {
             None => {
                 set_assign!(self, l);
@@ -248,8 +249,10 @@ impl PropagateIF for AssignStack {
                     debug_assert!(!cdb[w.c].is(Flag::DEAD));
                     debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
                     debug_assert_ne!(w.blocker, false_lit);
+
                     #[cfg(feature = "boundary_check")]
                     debug_assert_eq!(cdb[w.c].lits.len(), 2);
+
                     match lit_assign!(self, w.blocker) {
                         Some(true) => (),
                         Some(false) => {
@@ -276,10 +279,12 @@ impl PropagateIF for AssignStack {
                 'next_clause: while n < source.len() {
                     let mut w = source.get_unchecked_mut(n);
                     n += 1;
+                    debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
                     if let Some(true) = lit_assign!(self, w.blocker) {
+                        // In this path, we use only `AssignStack::assign`.
                         continue 'next_clause;
                     }
-                    // debug_assert!(!cdb[w.c].is(Flag::DEAD));
+                    debug_assert!(!cdb[w.c].is(Flag::DEAD));
                     let Clause {
                         ref mut lits,
                         ref mut search_from,
@@ -301,8 +306,6 @@ impl PropagateIF for AssignStack {
                     //
                     //## Search an un-falsified literal
                     //
-                    #[cfg(feature = "boundary_check")]
-                    assert!(*search_from < lits.len());
                     let len = lits.len();
                     // Gathering good literals at the beginning of lits.
                     for k in (*search_from..len).chain(2..*search_from) {
@@ -352,7 +355,6 @@ impl PropagateIF for AssignStack {
         let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
         unsafe {
             while let Some(p) = self.trail.get(self.q_head) {
-                self.num_propagation += 1;
                 self.q_head += 1;
                 let sweeping = usize::from(*p);
                 let false_lit = !*p;
@@ -368,14 +370,13 @@ impl PropagateIF for AssignStack {
                     }
                     debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
                     debug_assert_ne!(w.blocker, false_lit);
+
                     #[cfg(feature = "boundary_check")]
                     debug_assert_eq!(cdb[w.c].lits.len(), 2);
+
                     match lit_assign!(self, w.blocker) {
                         Some(true) => (),
                         Some(false) => {
-                            self.num_conflict += 1;
-                            self.dpc_ema.update(self.num_decision);
-                            self.ppc_ema.update(self.num_propagation);
                             return w.c;
                         }
                         None => {
@@ -398,6 +399,7 @@ impl PropagateIF for AssignStack {
                     if cdb[w.c].is(Flag::DEAD) {
                         continue 'next_clause;
                     }
+                    debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
                     if let Some(true) = lit_assign!(self, w.blocker) {
                         continue 'next_clause;
                     }
@@ -422,11 +424,9 @@ impl PropagateIF for AssignStack {
                     //
                     //## Search an un-falsified literal
                     //
-                    #[cfg(feature = "boundary_check")]
-                    assert!(*search_from < lits.len());
                     let len = lits.len();
                     // Gathering good literals at the beginning of lits.
-                    for k in (*search_from..len).chain((2..*search_from).rev()) {
+                    for k in (*search_from..len).chain(2..*search_from) {
                         let lk = lits.get_unchecked(k);
                         if lit_assign!(self, *lk) != Some(false) {
                             n -= 1;
@@ -443,9 +443,6 @@ impl PropagateIF for AssignStack {
 
                     if first_value == Some(false) {
                         let cid = w.c;
-                        self.num_conflict += 1;
-                        self.dpc_ema.update(self.num_decision);
-                        self.ppc_ema.update(self.num_propagation);
                         return cid;
                     }
                     let lv = lits[1..]
@@ -488,16 +485,16 @@ impl AssignStack {
     /// save the current assignments as the best phases
     fn save_best_phases(&mut self) {
         #[cfg(feature = "best_phases_tracking")]
-        for l in self.trail.iter().skip(self.len_upto(0)) {
+        for l in self.trail.iter().skip(self.len_upto(self.root_level)) {
             let vi = l.vi();
             if let Some(b) = self.assign[vi] {
                 self.best_phases.insert(vi, (b, self.reason[vi]));
             }
         }
         self.build_best_at = self.num_propagation;
-	#[cfg(feature = "rephase")]
-	{
-	    self.phase_age = 0;
-	}
+        #[cfg(feature = "rephase")]
+        {
+            self.phase_age = 0;
+        }
     }
 }

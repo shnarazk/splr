@@ -142,9 +142,28 @@ impl AssignStack {
     pub fn make_var_eliminated(&mut self, vi: VarId) {
         if !self.var[vi].is(Flag::ELIMINATED) {
             self.var[vi].turn_on(Flag::ELIMINATED);
+            self.var[vi].timestamp = self.ordinal;
             self.set_activity(vi, 0.0);
             self.remove_from_heap(vi);
             self.num_eliminated_vars += 1;
+            #[cfg(feature = "trace_elimination")]
+            {
+                let lv = self.level[vi];
+                if self.root_level == self.level[vi] && self.assign[vi].is_some() {
+                    panic!("v:{}, dl:{}", self.var[vi], self.decision_level());
+                }
+                if !(self.root_level < self.level[vi] || self.assign[vi].is_none()) {
+                    panic!(
+                        "v:{}, lvl:{} => {}, dl:{}, assign:{:?} ",
+                        self.var[vi],
+                        lv,
+                        self.level[vi],
+                        self.decision_level(),
+                        self.assign[vi],
+                    );
+                }
+                assert!(self.root_level < self.level[vi] || self.assign[vi].is_none());
+            }
         } else {
             #[cfg(feature = "boundary_check")]
             panic!("double elimination");

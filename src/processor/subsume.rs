@@ -16,7 +16,7 @@ impl Eliminator {
         A: AssignIF,
         C: ClauseDBIF,
     {
-        match subsume(cdb, cid, did) {
+        match have_subsuming_lit(cdb, cid, did) {
             Some(NULL_LIT) => {
                 #[cfg(feature = "trace_elimination")]
                 println!(
@@ -44,7 +44,7 @@ impl Eliminator {
 }
 
 /// returns a literal if these clauses can be merged by the literal.
-fn subsume<C>(cdb: &mut C, cid: ClauseId, other: ClauseId) -> Option<Lit>
+fn have_subsuming_lit<C>(cdb: &mut C, cid: ClauseId, other: ClauseId) -> Option<Lit>
 where
     C: ClauseDBIF,
 {
@@ -96,7 +96,7 @@ where
     debug_assert!(1 < cdb[cid].len());
     cdb.touch_var(l.vi());
     debug_assert!(!cid.is_none());
-    if cdb.strengthen(cid, l) {
+    if cdb.strengthen_by_elimination(cid, l) {
         // Vaporize the binary clause
         debug_assert!(2 == cdb[cid].len());
         let c0 = cdb[cid][0];

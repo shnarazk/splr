@@ -46,7 +46,7 @@ pub fn vivify(
     if clauses.is_empty() {
         return Ok(());
     }
-    clauses.sort_unstable();
+    clauses.sort();
     let num_target = clauses.len();
     state[Stat::Vivification] += 1;
     let dl = asg.decision_level();
@@ -67,6 +67,7 @@ pub fn vivify(
         if c.is(Flag::DEAD) {
             continue;
         }
+        debug_assert!(!c.is(Flag::ELIMINATED));
         let is_learnt = c.is(Flag::LEARNT);
         c.vivified();
         let clits = c.lits.clone();
@@ -144,7 +145,6 @@ pub fn vivify(
                         debug_assert!(cdb[cj].is(Flag::VIV_ASSUMED));
                         cdb.detach(cj);
                         debug_assert!(!asg.locked(&cdb[cj], cj));
-                        cdb.garbage_collect();
                         debug_assert!(cdb[cj].is(Flag::DEAD));
                     }
                     if !cc.is_none() {
@@ -168,11 +168,9 @@ pub fn vivify(
                 return Err(SolverError::Inconsistent);
             }
             0 => {
-                if !cdb[cs.to()].is(Flag::DEAD) {
-                    cdb.detach(cs.to());
-                    cdb.garbage_collect();
-                    num_purge += 1;
-                }
+                debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
+                cdb.detach(cs.to());
+                num_purge += 1;
             }
             1 => {
                 let l0 = copied[0];

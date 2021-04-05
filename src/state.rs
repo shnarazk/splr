@@ -171,7 +171,8 @@ pub struct State {
     pub b_lvl: Ema,
     /// EMA of conflicting levels
     pub c_lvl: Ema,
-    /// hold conflicting literals for UNSAT problems
+    #[cfg(feature = "support_user_assumption")]
+    /// hold conflicting user-defined *assumed* literals for UNSAT problems
     pub conflicts: Vec<Lit>,
     /// chronoBT threshold
     pub chrono_bt_threshold: DecisionLevel,
@@ -207,6 +208,7 @@ impl Default for State {
 
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
+            #[cfg(feature = "support_user_assumption")]
             conflicts: Vec::new(),
             chrono_bt_threshold: 100,
             last_asg: 0,

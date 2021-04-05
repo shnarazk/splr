@@ -67,8 +67,12 @@ where
                             " - eliminate_var {}: found assign {} from {}{} and {}{}",
                             vi, lit, p, cdb[*p], n, cdb[*n],
                         );
+                        match asg.assigned(lit) {
+                            Some(true) => (),
+                            Some(false) => return Err(SolverError::Inconsistent),
+                            None => asg.assign_at_root_level(lit)?,
+                        }
                         cdb.certificate_add(&*vec);
-                        asg.assign_at_root_level(lit)?;
                     }
                     2 => {
                         if !cdb.registered_bin_clause((*vec)[0], (*vec)[1]) {
@@ -79,12 +83,12 @@ where
                                 true,
                             );
                             elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
+                            #[cfg(feature = "trace_elimination")]
+                            println!(
+                                " - eliminate_var {}: X {} from {} and {}",
+                                vi, cdb[cid], cdb[*p], cdb[*n],
+                            );
                         }
-                        #[cfg(feature = "trace_elimination")]
-                        println!(
-                            " - eliminate_var {}: X {} from {} and {}",
-                            vi, cdb[cid], cdb[*p], cdb[*n],
-                        );
                     }
                     _ => {
                         let cid = cdb.new_clause(
