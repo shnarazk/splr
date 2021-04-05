@@ -264,26 +264,6 @@ fn search(
                         }
                     }
                     asg.handle(SolverEvent::NewStabilizationStage(block_level));
-                    if last_core != num_unreachable || 0 == num_unreachable {
-                        state.log(
-                            asg.num_conflict,
-                            format!(
-                                "#cycle:{:>5}, core:{:>9}, level:{:>9},/cpr:{:>9.2}",
-                                num_cycle,
-                                num_unreachable,
-                                block_level,
-                                asg.refer(assign::property::TEma::PropagationPerConflict)
-                                    .get(),
-                            ),
-                        );
-                        last_core = num_unreachable;
-                    } else if let Some(p) = state.elapsed() {
-                        if 1.0 <= p {
-                            return Err(SolverError::TimeOut);
-                        }
-                    } else {
-                        return Err(SolverError::UndescribedError);
-                    }
                     if cdb.reduce(asg, asg.num_conflict) {
                         #[cfg(feature = "trace_equivalency")]
                         if false {
@@ -314,6 +294,26 @@ fn search(
                                 return Ok(false);
                             }
                         }
+                    }
+                    if last_core != num_unreachable || 0 == num_unreachable {
+                        state.log(
+                            asg.num_conflict,
+                            format!(
+                                "#cycle:{:>5}, core:{:>9}, level:{:>9},/cpr:{:>9.2}",
+                                num_cycle,
+                                num_unreachable,
+                                block_level,
+                                asg.refer(assign::property::TEma::PropagationPerConflict)
+                                    .get(),
+                            ),
+                        );
+                        last_core = num_unreachable;
+                    } else if let Some(p) = state.elapsed() {
+                        if 1.0 <= p {
+                            return Err(SolverError::TimeOut);
+                        }
+                    } else {
+                        return Err(SolverError::UndescribedError);
                     }
                     if next_progress < asg.num_conflict {
                         state.progress(asg, cdb, elim, rst);
