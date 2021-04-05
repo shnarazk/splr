@@ -283,6 +283,8 @@ impl ClauseDBIF for ClauseDB {
             ref mut clause,
             ref mut touched,
             ref mut certified,
+            #[cfg(not(feature = "no_IO"))]
+            ref mut certification_store,
             ..
         } = self;
         debug_assert_eq!(usize::from(!NULL_LIT), 1);
@@ -314,20 +316,24 @@ impl ClauseDBIF for ClauseDB {
                         blocker: NULL_LIT,
                         c: cid,
                     });
-                    if c.is(Flag::LEARNT) {
-                        self.num_learnt -= 1;
-                    }
+                    self.num_bi_clause -= 1;
+                    self.num_clause -= 1;
                     if !certified.is_empty() && !c.is(Flag::VIV_ASSUMED) {
-                        let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
-                        debug_assert!(!temp.is_empty());
-                        certified.push((CertifiedRecord::Delete, temp));
+                        #[cfg(not(feature = "no_IO"))]
+                        certification_store.push_delete(&c.lits);
+                        #[cfg(feature = "no_IO")]
+                        {
+                            let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
+                            debug_assert!(!temp.is_empty());
+                            certified.push((CertifiedRecord::Delete, temp));
+                        }
                     }
                     c.lits.clear();
                 }
                 ws.detach(n);
             }
         }
-        let nrb = recycles.len();
+
         //
         //## normal clauses
         //
@@ -356,13 +362,19 @@ impl ClauseDBIF for ClauseDB {
                         blocker: NULL_LIT,
                         c: cid,
                     });
+                    self.num_clause -= 1;
                     if c.is(Flag::LEARNT) {
                         self.num_learnt -= 1;
                     }
                     if !certified.is_empty() && !c.is(Flag::VIV_ASSUMED) {
-                        let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
-                        debug_assert!(!temp.is_empty());
-                        certified.push((CertifiedRecord::Delete, temp));
+                        #[cfg(not(feature = "no_IO"))]
+                        certification_store.push_delete(&c.lits);
+                        #[cfg(feature = "no_IO")]
+                        {
+                            let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
+                            debug_assert!(!temp.is_empty());
+                            certified.push((CertifiedRecord::Delete, temp));
+                        }
                     }
                     c.lits.clear();
                 }
@@ -370,13 +382,6 @@ impl ClauseDBIF for ClauseDB {
             }
             touched[i + 2] = false;
         }
-        let nrc = recycles.len();
-        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count(), self.num_clause);
-        self.num_clause = self.clause.len() - nrb - nrc - 1;
-        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count(), self.num_clause);
-        // debug_assert!(self.check_liveness2());
-
-        // self.num_clause = self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count();
     }
     /// return `true` if a binary clause [l0, l1] has been registered.
     ///```
@@ -437,9 +442,14 @@ impl ClauseDBIF for ClauseDB {
             // vec.swap(1, i_max);
         }
         if !self.certified.is_empty() {
-            let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
-            debug_assert!(!temp.is_empty());
-            self.certified.push((CertifiedRecord::Add, temp));
+            #[cfg(not(feature = "no_IO"))]
+            self.certification_store.push_add(vec);
+            #[cfg(feature = "no_IO")]
+            {
+                let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
+                debug_assert!(!temp.is_empty());
+                self.certified.push((CertifiedRecord::Add, temp));
+            }
         }
         let cid;
         let l0 = vec[0];
@@ -655,7 +665,6 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         if !c.is(Flag::DEAD) {
             c.kill(&mut self.touched);
-            self.num_clause -= 1;
         }
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count(), self.num_clause);
     }
@@ -689,7 +698,6 @@ impl ClauseDBIF for ClauseDB {
                 && (self.co_lbd_bound as usize) < c.lits.len()
             {
                 c.kill(&mut self.touched);
-                self.num_clause -= 1;
             }
         }
         self.garbage_collect();
@@ -936,7 +944,6 @@ impl ClauseDB {
                 self.num_learnt -= 1;
             } else if reinit {
                 c.kill(&mut self.touched);
-                self.num_clause -= 1;
             }
         }
         self.garbage_collect();
