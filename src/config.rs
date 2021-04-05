@@ -1,6 +1,8 @@
 /// Crate `config` provides solver's configuration and CLI.
 use {crate::types::DecisionLevel, std::path::PathBuf};
 
+pub const CERTIFICATION_DEFAULT_FILENAME: &str = "proof.drat";
+
 /// Configuration built from command line options
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -125,7 +127,7 @@ impl Default for Config {
             splr_interface: false,
             cnf_file: PathBuf::new(),
             io_odir: PathBuf::from("."),
-            io_pfile: PathBuf::from("proof.out"),
+            io_pfile: PathBuf::from(CERTIFICATION_DEFAULT_FILENAME),
             io_rfile: PathBuf::new(),
             no_color: false,
             quiet_mode: false,

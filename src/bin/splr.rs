@@ -3,7 +3,8 @@ use {
     splr::{
         assign,
         cdb::{self, CertifiedRecord},
-        config, processor,
+        config::{self, CERTIFICATION_DEFAULT_FILENAME},
+        processor,
         solver::*,
         state::{self, LogF64Id, LogUsizeId},
         Config, EmaIF, PropertyDereference, PropertyReference, SolverError, VERSION,
@@ -60,7 +61,9 @@ fn main() {
         )))),
         _ => Some(config.io_odir.join(&config.io_rfile)),
     };
-    if config.io_pfile.to_string_lossy() != "proof.out" && !config.use_certification {
+    if config.io_pfile.to_string_lossy() != CERTIFICATION_DEFAULT_FILENAME
+        && !config.use_certification
+    {
         println!("Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good.");
         return;
     }
