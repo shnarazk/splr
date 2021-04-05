@@ -709,13 +709,10 @@ impl<T> Delete<T> for Vec<T> {
     where
         F: FnMut(&T) -> bool,
     {
-        let mut i = 0;
-        while i != self.len() {
-            if filter(&mut self[i]) {
-                self.swap_remove(i); // self.remove(i) for stable deletion
-                break;
-            } else {
-                i += 1;
+        for (i, x) in self.iter().enumerate() {
+            if filter(x) {
+                self.swap_remove(i);
+                return;
             }
         }
     }
