@@ -822,11 +822,11 @@ impl ClauseDBIF for ClauseDB {
                 if lits.len() == 2 {
                     bin_watcher[!q].register(w1);
                     bin_watcher[!r].register(w2);
+                    self.num_bi_clause += 1;
                     if c.is(Flag::LEARNT) {
                         c.turn_off(Flag::LEARNT);
                         c.rank = 1;
                         self.num_learnt -= 1;
-                        self.num_bi_clause += 1;
                         self.num_bi_learnt += 1;
                     }
                 } else {
