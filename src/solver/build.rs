@@ -314,7 +314,7 @@ impl Solver {
         if lits.iter().any(|l| asg.assigned(*l).is_some()) {
             cdb.certificate_add(lits);
         }
-        lits.sort_unstable();
+        lits.sort();
         let mut j = 0;
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means tautology.
         for i in 0..lits.len() {

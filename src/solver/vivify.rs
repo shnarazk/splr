@@ -46,7 +46,7 @@ pub fn vivify(
     if clauses.is_empty() {
         return Ok(());
     }
-    clauses.sort_unstable();
+    clauses.sort();
     let num_target = clauses.len();
     state[Stat::Vivification] += 1;
     let dl = asg.decision_level();

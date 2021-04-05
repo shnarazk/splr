@@ -272,8 +272,8 @@ impl VarOccHeap {
     fn check(&self, s: &str) {
         let h = &mut self.heap.clone()[1..];
         let d = &mut self.idxs.clone()[1..];
-        h.sort_unstable();
-        d.sort_unstable();
+        h.sort();
+        d.sort();
         for i in 0..h.len() {
             if h[i] != i + 1 {
                 panic!("heap {} {} {:?}", i, h[i], h);

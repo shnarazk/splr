@@ -302,6 +302,7 @@ impl ClauseDBIF for ClauseDB {
             while n < ws.len() {
                 let cid = ws[n].c;
                 let c = &mut clause[cid.ordinal as usize];
+                debug_assert!(!c.is(Flag::VIV_ASSUMED) || c.is(Flag::DEAD));
                 if !c.is(Flag::DEAD) {
                     n += 1;
                     continue;
@@ -316,8 +317,11 @@ impl ClauseDBIF for ClauseDB {
                         blocker: NULL_LIT,
                         c: cid,
                     });
-                    self.num_bi_clause -= 1;
-                    self.num_clause -= 1;
+                    if !c.is(Flag::VIV_ASSUMED) {
+                        assert!(0 < self.num_bi_clause);
+                        self.num_bi_clause -= 1;
+                        self.num_clause -= 1;
+                    }
                     if !certified.is_empty() && !c.is(Flag::VIV_ASSUMED) {
                         #[cfg(not(feature = "no_IO"))]
                         certification_store.push_delete(&c.lits);
@@ -348,6 +352,7 @@ impl ClauseDBIF for ClauseDB {
             while n < ws.len() {
                 let cid = ws[n].c;
                 let c = &mut clause[cid.ordinal as usize];
+                debug_assert!(!c.is(Flag::VIV_ASSUMED) || c.is(Flag::DEAD));
                 if !c.is(Flag::DEAD) {
                     n += 1;
                     continue;
@@ -362,9 +367,11 @@ impl ClauseDBIF for ClauseDB {
                         blocker: NULL_LIT,
                         c: cid,
                     });
-                    self.num_clause -= 1;
-                    if c.is(Flag::LEARNT) {
-                        self.num_learnt -= 1;
+                    if !c.is(Flag::VIV_ASSUMED) {
+                        self.num_clause -= 1;
+                        if c.is(Flag::LEARNT) {
+                            self.num_learnt -= 1;
+                        }
                     }
                     if !certified.is_empty() && !c.is(Flag::VIV_ASSUMED) {
                         #[cfg(not(feature = "no_IO"))]
@@ -818,6 +825,7 @@ impl ClauseDBIF for ClauseDB {
                     if c.is(Flag::LEARNT) {
                         c.turn_off(Flag::LEARNT);
                         c.rank = 1;
+                        self.num_learnt -= 1;
                         self.num_bi_clause += 1;
                         self.num_bi_learnt += 1;
                     }
@@ -917,7 +925,7 @@ impl ClauseDB {
                 self.next_reduction += self.extra_inc;
             };
         }
-        perm.sort_unstable();
+        perm.sort();
         let thr = self.lbd_of_dp_ema.get() as u16;
         for i in &perm[keep..] {
             if thr <= self.clause[i.to()].rank {
