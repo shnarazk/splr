@@ -324,12 +324,8 @@ impl AssignIF for AssignStack {
         C: ClauseDBIF,
     {
         for vi in 1..self.var.len() {
-            if self.var(vi).is(Flag::ELIMINATED) {
-                if self.assign[vi].is_some() {
-                    panic!("conflicting var {} {:?}", vi, self.assign[vi]);
-                    // } else {
-                    //     println!("eliminate var {}", vi);
-                }
+            if self.var(vi).is(Flag::ELIMINATED) && self.assign[vi].is_some() {
+                panic!("conflicting var {} {:?}", vi, self.assign[vi]);
             }
         }
         if let Ok(out) = File::create(&fname) {

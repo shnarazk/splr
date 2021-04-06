@@ -14,7 +14,7 @@ use {
         env,
         fs::File,
         io::{BufWriter, Write},
-        path::PathBuf,
+        path::{Path, PathBuf},
         thread,
         time::Duration,
     },
@@ -220,7 +220,7 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
 }
 
 #[allow(dead_code)]
-fn save_proof<S: AsRef<str> + std::fmt::Display>(s: &Solver, input: S, output: &PathBuf) {
+fn save_proof<S: AsRef<str> + std::fmt::Display>(s: &Solver, input: S, output: &Path) {
     let mut buf = match File::create(output) {
         Ok(out) => BufWriter::new(out),
         Err(e) => {
