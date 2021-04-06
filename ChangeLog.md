@@ -1,15 +1,40 @@
-## 0.7.1, 2021-04-XX
+## 0.8.0, 2021-04-06
+
+### Incompatible API changes from 0.7.0
+
+- define assign::property
+- append AssignIF::dump_cnf
+- define cdb::property
+- append ClauseDB::bin_watcher_list
+- remove ClauseDB::watcher_list
+- append ClauseDB::watcher_list_mut
+- append ClauseDB::detach_watches
+- append ClauseDB::new_clause_sandbox
+- remove ClauseDB::count
+- append ClauseDB::certificate_save
+- rename ClauseDB::strengthen to ClauseDB::strengthen_by_elimination
+- screen Eliminator's fields
+- define processor::property
+- define restart::property
+- append SatSolverIF::save_certification
+- append SatSolverIF::dump_cnf
+
+### other changes
 
 - fix a bug which has been rarely emitted by eliminator.
    - Splrs-0.7.0 shows that ans_aes_equiv_encry_3_rounds.debugged-sc2012.cnf
      is satisfiable. But it's not.
    - `AssignIF::propagate` skipped clause-level satisfiability checking,
      if its watch's `blocker` held an eliminated var, which was never falsified.
-   - `ClauseDB::strengthen_by_elimination` didn't turn `LEARNT` off when a clause became a binclause.
+   - `ClauseDB::strengthen_by_elimination` didn't turn `LEARNT` off
+     when a clause became binary.
+- define feature 'trace_equivalency'
+- define (but incomplete) feature 'support_user_assumption'
 - activate feature 'clause vivification'
 - activate feature 'rephase', which selects the best phases and its variants
 - delete features 'var-boosting' and 'best_phases_reuse'
 - rename feature 'ema_calibration' to 'EMA_calibration'
+- remove comment lines from a generated UNSAT certification file, which default name is 'proof.drat'.
 - var reward decay rate has a static value
 - dump all stats data into the answer file
 - slim down */mod.rs
