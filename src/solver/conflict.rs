@@ -98,16 +98,26 @@ pub fn handle_conflict(
                             let l = c.lits[i];
                             if l == decision {
                                 c.lits.swap(0, i);
-
-                                let w = cdb.watcher_list_mut(!l0).detach_with(ci).unwrap();
-                                debug_assert_ne!(l0.vi(), decision.vi());
-                                debug_assert!(!asg.var(l0.vi()).is(Flag::ELIMINATED));
-                                debug_assert_ne!(w.blocker, l0);
-                                cdb.watcher_list_mut(!decision).register(w);
                                 break;
                             }
                         }
+                        /* let l1 = c.lits[1];
+                        assert_eq!(l0, c.lits[0]);
+                        let mut w = cdb.watcher_list_mut(!l0).detach_with(ci).unwrap();
+                        w.blocker = decision;
+                        debug_assert_ne!(l0.vi(), decision.vi());
+                        debug_assert!(!asg.var(l0.vi()).is(Flag::ELIMINATED));
+                        debug_assert_ne!(w.blocker, l0);
+                        assert_ne!(decision, w.blocker);
+                        cdb.watcher_list_mut(!decision).register(w); */
                     }
+                    let p = c.lits[0];
+                    let q = c.lits[1];
+                    let (mut w1, mut w2) = cdb.detach_watches(ci);
+                    w1.blocker = q;
+                    w2.blocker = p;
+                    cdb.watcher_list_mut(!p).register(w1);
+                    cdb.watcher_list_mut(!q).register(w2);
                     asg.assign_by_implication(
                         decision,
                         AssignReason::Implication(ci, NULL_LIT),

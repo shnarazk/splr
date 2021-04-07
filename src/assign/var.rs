@@ -134,6 +134,7 @@ impl VarManipulateIF for AssignStack {
 impl AssignStack {
     /// make a var asserted.
     pub fn make_var_asserted(&mut self, vi: VarId) {
+        self.var[vi].timestamp = self.ordinal;
         self.num_asserted_vars += 1;
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
@@ -168,5 +169,9 @@ impl AssignStack {
             #[cfg(feature = "boundary_check")]
             panic!("double elimination");
         }
+        assert_eq!(
+            self.num_eliminated_vars,
+            self.var.iter().filter(|v| v.is(Flag::ELIMINATED)).count()
+        );
     }
 }

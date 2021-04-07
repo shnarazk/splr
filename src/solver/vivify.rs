@@ -38,8 +38,10 @@ pub fn vivify(
                 as usize,
         );
         for (i, c) in cdb.iter().enumerate().skip(1) {
-            if let Some(act) = c.to_vivify(thr) {
-                clauses.push(OrderedProxy::new(ClauseId::from(i), -act));
+            if c.is(Flag::LEARNT) {
+                if let Some(act) = c.to_vivify(thr) {
+                    clauses.push(OrderedProxy::new(ClauseId::from(i), -act));
+                }
             }
         }
     }
@@ -53,7 +55,7 @@ pub fn vivify(
     debug_assert_eq!(dl, 0);
     // This is a reusable vector to reduce memory consumption, the key is the number of invocation
     let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
-    let display_step: usize = 1000;
+    let display_step: usize = 1;
     let mut num_check = 0;
     let mut num_purge = 0;
     let mut num_shrink = 0;
@@ -125,7 +127,9 @@ pub fn vivify(
                     };
                     debug_assert_eq!(asg.assigned(!l), None);
                     asg.assign_by_decision(!l);
+                    state.flush("<");
                     let cc: ClauseId = asg.propagate_sandbox(cdb);
+                    state.flush(">");
                     //
                     //## Rule 3
                     //

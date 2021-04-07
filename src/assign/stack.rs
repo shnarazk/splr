@@ -356,7 +356,7 @@ impl AssignIF for AssignStack {
     }
 }
 
-#[cfg(feature = "boundary_check")]
+// #[cfg(feature = "boundary_check")]
 impl AssignStack {
     // return the list of
     // 1. literal in Clause of cid
@@ -366,17 +366,21 @@ impl AssignStack {
     pub fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
         &mut self,
         v: V,
-    ) -> Vec<(i32, DecisionLevel, bool, Option<bool>)> {
-        v.into_iter()
+    ) -> Vec<(usize, DecisionLevel, i32, bool, Option<bool>)> {
+        let mut res = v
+            .into_iter()
             .map(|l| {
                 (
-                    i32::from(l),
+                    self.var(l.vi()).timestamp,
                     self.level(l.vi()),
-                    self.reason(l.vi()) == AssignReason::default(),
-                    self.assign(l.vi()),
+                    i32::from(l),
+                    self.reason(l.vi()) != AssignReason::default(),
+                    self.assigned(*l),
                 )
             })
-            .collect::<Vec<(i32, DecisionLevel, bool, Option<bool>)>>()
+            .collect::<Vec<(usize, DecisionLevel, i32, bool, Option<bool>)>>();
+        res.sort();
+        res
     }
 }
 

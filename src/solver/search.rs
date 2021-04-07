@@ -158,16 +158,35 @@ impl SolveIF for Solver {
                 // As a preparation for incremental solving, we need to backtrack to the
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
+                {
+                    if let Some(cid) = cdb.validate(asg.assign_ref(), true) {
+                        println!();
+                        println!("| Timestamp | Level | Decision | Literal |    value     |");
+                        for (t, lv, lit, reason, assign) in asg.dump(&cdb[cid]).iter() {
+                            println!(
+                                "|{:>10} |{:>5} | {:10} |     {:8}| {:?}|",
+                                t, lv, !reason, lit, assign
+                            );
+                        }
+                        panic!(
+                            "Before extending model, NC {}, Level {} generated assignment({:?}) falsifies by {}",
+                            asg.derefer(assign::property::Tusize::NumConflict),
+                            asg.decision_level(),
+                            cdb.validate(asg.assign_ref(), false).is_none(),
+                            cid,
+
+                        );
+                    }
+                }
                 let model = asg.extend_model(cdb, elim.eliminated_lits());
-                #[cfg(debug)]
                 {
                     if let Some(cid) = cdb.validate(&model, true) {
                         panic!(
-                            "Level {} generated assignment({:?}) falsifies {}:{:?}",
+                            "After extending model, Level {} generated assignment({:?}) falsifies {}:{:?}",
                             asg.decision_level(),
                             cdb.validate(&model, false).is_none(),
                             cid,
-                            "asg.dump(&cdb[cid])",
+                            asg.dump(&cdb[cid]),
                         );
                     }
                 }
@@ -264,6 +283,9 @@ fn search(
                         }
                     }
                     asg.handle(SolverEvent::NewStabilizationStage(block_level));
+                    if cdb.validate(asg.assign_ref(), false).is_some() {
+                        panic!("before reduction")
+                    }
                     if cdb.reduce(asg, asg.num_conflict) {
                         #[cfg(feature = "trace_equivalency")]
                         if false {
@@ -271,8 +293,14 @@ fn search(
                             cdb.check_consistency(asg, "before simplify");
                         }
                         if state.config.c_ip_int <= elim.to_simplify as usize {
+                            if cdb.validate(asg.assign_ref(), false).is_some() {
+                                panic!("before elimination")
+                            }
                             elim.activate();
                             elim.simplify(asg, cdb, rst, state)?;
+                            if cdb.validate(asg.assign_ref(), false).is_some() {
+                                panic!("after elimination")
+                            }
                             #[cfg(feature = "trace_equivalency")]
                             if false {
                                 state.progress(asg, cdb, elim, rst);
@@ -282,6 +310,9 @@ fn search(
                                 );
                             }
                         } else {
+                            if cdb.validate(asg.assign_ref(), false).is_some() {
+                                panic!("before vivification")
+                            }
                             #[cfg(feature = "clause_vivification")]
                             if vivify(asg, cdb, elim, state).is_err() {
                                 #[cfg(feature = "boundary_check")]
@@ -292,6 +323,9 @@ fn search(
                                     analyze_final(asg, state, &cdb[ci]);
                                 }
                                 return Ok(false);
+                            }
+                            if cdb.validate(asg.assign_ref(), false).is_some() {
+                                panic!("after vivification")
                             }
                         }
                     }
