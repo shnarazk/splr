@@ -158,9 +158,8 @@ impl PropagateIF for AssignStack {
         self.cancel_until(self.root_level);
         debug_assert!(self.trail.iter().all(|k| k.vi() != l.vi()));
         let vi = l.vi();
-        self.level[vi] = 0;
+        self.level[vi] = self.root_level;
         set_assign!(self, l);
-        self.reason[vi] = AssignReason::default();
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
         // NOTE: synchronize the following with handle(SolverEvent::Assert)
@@ -286,6 +285,7 @@ impl PropagateIF for AssignStack {
                     let mut another_watch_value = lit_assign!(self, w.blocker);
                     if let Some(true) = another_watch_value {
                         // In this path, we use only `AssignStack::assign`.
+                        assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
                         continue 'next_clause;
                     }
                     debug_assert!(!cdb[w.c].is(Flag::DEAD));
@@ -294,8 +294,10 @@ impl PropagateIF for AssignStack {
                         ref mut search_from,
                         ..
                     } = cdb[w.c];
+                    assert!(lits[0] == w.blocker || lits[1] == w.blocker);
                     debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                     let mut first = *lits.get_unchecked_mut(0);
+
                     if first == false_lit {
                         first = *lits.get_unchecked(1);
                         lits.swap(0, 1);
@@ -308,6 +310,7 @@ impl PropagateIF for AssignStack {
                             continue 'next_clause;
                         }
                     }
+                    assert_ne!(lit_assign!(self, w.blocker), Some(false));
 
                     // let first_value = lit_assign!(self, first);
                     // if first != w.blocker {
@@ -338,6 +341,8 @@ impl PropagateIF for AssignStack {
 
                             let p = lits[0];
                             let q = lits[1];
+                            assert_ne!(lit_assign!(self, p), Some(false));
+                            assert_ne!(lit_assign!(self, q), Some(false));
                             let (mut w1, mut w2) = cdb.detach_watches(w.c);
                             w1.blocker = q;
                             w2.blocker = p;

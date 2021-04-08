@@ -19,16 +19,6 @@ impl Default for AssignReason {
     }
 }
 
-impl fmt::Display for AssignReason {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            AssignReason::None => write!(f, "reason:none"),
-            AssignReason::Implication(c, NULL_LIT) => write!(f, "reason:{}", c),
-            AssignReason::Implication(c, _) => write!(f, "reason:biclause{}", c),
-        }
-    }
-}
-
 impl Default for AssignStack {
     fn default() -> AssignStack {
         AssignStack {
@@ -366,7 +356,7 @@ impl AssignStack {
     pub fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
         &mut self,
         v: V,
-    ) -> Vec<(usize, DecisionLevel, i32, bool, Option<bool>)> {
+    ) -> Vec<(usize, DecisionLevel, i32, AssignReason, Option<bool>)> {
         let mut res = v
             .into_iter()
             .map(|l| {
@@ -374,11 +364,11 @@ impl AssignStack {
                     self.var(l.vi()).timestamp,
                     self.level(l.vi()),
                     i32::from(l),
-                    self.reason(l.vi()) != AssignReason::default(),
+                    self.reason(l.vi()),
                     self.assigned(*l),
                 )
             })
-            .collect::<Vec<(usize, DecisionLevel, i32, bool, Option<bool>)>>();
+            .collect::<Vec<(usize, DecisionLevel, i32, AssignReason, Option<bool>)>>();
         res.sort();
         res
     }

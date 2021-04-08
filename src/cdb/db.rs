@@ -1063,6 +1063,29 @@ impl ClauseDB {
             );
         }
     }
+    pub fn dump(&self, cid: ClauseId) -> (Lit, Lit) {
+        let mut found = None;
+        if 2 == self[cid].lits.len() {
+            for (i, wl) in self.bin_watcher.iter().enumerate() {
+                if wl.iter().any(|w| w.c == cid) {
+                    if let Some(f) = found {
+                        return (f, Lit::from(i));
+                    }
+                    found = Some(Lit::from(i));
+                }
+            }
+        } else {
+            for (i, wl) in self.watcher.iter().enumerate() {
+                if wl.iter().any(|w| w.c == cid) {
+                    if let Some(f) = found {
+                        return (f, Lit::from(i));
+                    }
+                    found = Some(Lit::from(i));
+                }
+            }
+        }
+        (Lit::default(), Lit::default())
+    }
 }
 
 impl Clause {

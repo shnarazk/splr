@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use {
     self::heap::VarHeapIF,
     super::{cdb::ClauseDBIF, types::*},
-    std::{ops::Range, slice::Iter},
+    std::{fmt, ops::Range, slice::Iter},
 };
 
 /// API about assignment like [`decision_level`](`crate::assign::AssignIF::decision_level`), [`stack`](`crate::assign::AssignIF::stack`), [`best_assigned`](`crate::assign::AssignIF::best_assigned`), and so on.
@@ -74,12 +74,22 @@ pub trait AssignIF:
 }
 
 /// Reasons of assignments, two kinds
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum AssignReason {
     /// One of not assigned, assigned by decision, or asserted.
     None,
     /// Assigned by a clause. If it is binary, the reason literal is stored in the 2nd.
     Implication(ClauseId, Lit),
+}
+
+impl fmt::Display for AssignReason {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            AssignReason::None => write!(f, "Decision|NoAssign"),
+            AssignReason::Implication(cid, NULL_LIT) => write!(f, "Implicated by {}", cid),
+            AssignReason::Implication(cid, _) => write!(f, "Implicated by B{}", cid),
+        }
+    }
 }
 
 /// Object representing a variable.

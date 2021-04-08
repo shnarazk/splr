@@ -199,8 +199,7 @@ pub fn handle_conflict(
         if use_chronobt {
             asg.cancel_until(bl);
             debug_assert!(asg.stack_iter().all(|l| l.vi() != l0.vi()));
-            asg.assign_by_implication(l0, AssignReason::default(), 0);
-            asg.handle(SolverEvent::Assert(l0.vi()));
+            asg.assign_by_implication(l0, AssignReason::default(), asg.root_level);
         } else {
             asg.assign_by_unitclause(l0);
         }

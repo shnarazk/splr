@@ -158,38 +158,9 @@ impl SolveIF for Solver {
                 // As a preparation for incremental solving, we need to backtrack to the
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
-                {
-                    if let Some(cid) = cdb.validate(asg.assign_ref(), true) {
-                        println!();
-                        println!("| Timestamp | Level | Decision | Literal |    value     |");
-                        for (t, lv, lit, reason, assign) in asg.dump(&cdb[cid]).iter() {
-                            println!(
-                                "|{:>10} |{:>5} | {:10} |     {:8}| {:?}|",
-                                t, lv, !reason, lit, assign
-                            );
-                        }
-                        panic!(
-                            "Before extending model, NC {}, Level {} generated assignment({:?}) falsifies by {}",
-                            asg.derefer(assign::property::Tusize::NumConflict),
-                            asg.decision_level(),
-                            cdb.validate(asg.assign_ref(), false).is_none(),
-                            cid,
-
-                        );
-                    }
-                }
+                check(asg, cdb, false, "before");
                 let model = asg.extend_model(cdb, elim.eliminated_lits());
-                {
-                    if let Some(cid) = cdb.validate(&model, true) {
-                        panic!(
-                            "After extending model, Level {} generated assignment({:?}) falsifies {}:{:?}",
-                            asg.decision_level(),
-                            cdb.validate(&model, false).is_none(),
-                            cid,
-                            asg.dump(&cdb[cid]),
-                        );
-                    }
-                }
+                check(asg, cdb, true, "after");
 
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
@@ -237,6 +208,8 @@ fn search(
     let progress_step = 5000;
     let mut next_progress = progress_step;
 
+    check(asg, cdb, false, "starting search");
+
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
 
@@ -283,9 +256,7 @@ fn search(
                         }
                     }
                     asg.handle(SolverEvent::NewStabilizationStage(block_level));
-                    if cdb.validate(asg.assign_ref(), false).is_some() {
-                        panic!("before reduction")
-                    }
+                    check(asg, cdb, false, "before reduction");
                     if cdb.reduce(asg, asg.num_conflict) {
                         #[cfg(feature = "trace_equivalency")]
                         if false {
@@ -293,14 +264,10 @@ fn search(
                             cdb.check_consistency(asg, "before simplify");
                         }
                         if state.config.c_ip_int <= elim.to_simplify as usize {
-                            if cdb.validate(asg.assign_ref(), false).is_some() {
-                                panic!("before elimination")
-                            }
+                            check(asg, cdb, false, "before elimination");
                             elim.activate();
                             elim.simplify(asg, cdb, rst, state)?;
-                            if cdb.validate(asg.assign_ref(), false).is_some() {
-                                panic!("after elimination")
-                            }
+                            check(asg, cdb, false, "after elimination");
                             #[cfg(feature = "trace_equivalency")]
                             if false {
                                 state.progress(asg, cdb, elim, rst);
@@ -310,9 +277,7 @@ fn search(
                                 );
                             }
                         } else {
-                            if cdb.validate(asg.assign_ref(), false).is_some() {
-                                panic!("before vivification")
-                            }
+                            check(asg, cdb, false, "before vivification");
                             #[cfg(feature = "clause_vivification")]
                             if vivify(asg, cdb, elim, state).is_err() {
                                 #[cfg(feature = "boundary_check")]
@@ -324,9 +289,7 @@ fn search(
                                 }
                                 return Ok(false);
                             }
-                            if cdb.validate(asg.assign_ref(), false).is_some() {
-                                panic!("after vivification")
-                            }
+                            check(asg, cdb, false, "after vivification");
                         }
                     }
                     if last_core != num_unreachable || 0 == num_unreachable {
@@ -373,6 +336,39 @@ fn search(
         }
     }
     Ok(true)
+}
+
+fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
+    if let Some(cid) = cdb.validate(asg.assign_ref(), all) {
+        println!("{}", message);
+        println!("| timestamp | level | decision |  literal |  assignment |");
+        for (t, lv, lit, reason, assign) in asg.dump(&cdb[cid]).iter() {
+            println!(
+                "|{:>10} |{:>6} | {} | {:8} | {:?} |",
+                t, lv, reason, lit, assign
+            );
+        }
+        let (w1, w2) = cdb.dump(cid);
+        if w1 == Lit::default() && w2 == Lit::default() {
+            println!(
+                "clause {} watching: {} and {} but no registered watches",
+                cid, cdb[cid].lits[0], cdb[cid].lits[1],
+            );
+        } else {
+            println!(
+                "clause {} watching: {} and {}, at {} and {}",
+                cid, cdb[cid].lits[0], cdb[cid].lits[1], w1, w2,
+            );
+        }
+        println!("clause detail: {}", &cdb[cid]);
+        panic!(
+            "Before extending, NC {}, Level {} generated assignment({:?}) falsifies by {}",
+            asg.derefer(assign::property::Tusize::NumConflict),
+            asg.decision_level(),
+            cdb.validate(asg.assign_ref(), false).is_none(),
+            cid,
+        );
+    }
 }
 
 #[cfg(feature = "strategy_adaptation")]
