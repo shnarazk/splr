@@ -144,7 +144,7 @@ unif-k3-r4.25-v360-c1530-S1028159446-096.cnf       360,1530 |time:   124.06
 s UNSATISFIABLE: cnfs/unif-k3-r4.25-v360-c1530-S1028159446-096.cnf
 ```
 
-2. Convert the drat file to a grat file.
+2. Convert the generated DRAT file to a GRAT file.
 
 ```plain
 $ gratgen cnfs/unif-k3-r4.25-v360-c1530-S1028159446-096.cnf proof.out -o proof.grat
