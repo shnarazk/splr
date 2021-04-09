@@ -384,6 +384,16 @@ impl PropagateIF for AssignStack {
         }
         ClauseId::default()
     }
+    //
+    //## How to generate propagate_sandbox from propagate
+    //
+    // 1. copy it
+    // 1. delete codes about reward
+    // 1. delete codes about best-phases
+    // 1. delete codes about search_from
+    // 1. delete codes about stats: num_*, ema_*
+    // 1. delete comments
+    //
     fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> ClauseId
     where
         C: ClauseDBIF,
@@ -392,25 +402,21 @@ impl PropagateIF for AssignStack {
         let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
         unsafe {
             while let Some(p) = self.trail.get(self.q_head) {
-                assert!(self.trail.len() < self.num_vars);
                 self.q_head += 1;
                 let sweeping = usize::from(*p);
                 let false_lit = !*p;
-                // we have to drop `p` here to use self as a mutable reference again later.
 
                 //
                 //## binary loop
                 //
                 let bin_source = (*bin_watcher).get_unchecked(sweeping);
                 for w in bin_source.iter() {
-                    if cdb[w.c].is(Flag::DEAD) {
-                        continue;
-                    }
+                    debug_assert!(!cdb[w.c].is(Flag::DEAD));
                     debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
                     debug_assert_ne!(w.blocker, false_lit);
 
                     #[cfg(feature = "boundary_check")]
-                    debug_assert_eq!(cdb[w.c].lits.len(), 2);
+                    debug_assert_eq!(cdb[w.c].len(), 2);
 
                     match lit_assign!(self, w.blocker) {
                         Some(true) => (),
@@ -418,14 +424,12 @@ impl PropagateIF for AssignStack {
                             return w.c;
                         }
                         None => {
-                            assert_ne!(lit_assign!(self, w.blocker), Some(true));
+                            assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
                             self.assign_by_implication(
                                 w.blocker,
                                 AssignReason::Implication(w.c, false_lit),
-                                // *self.level.get_unchecked(false_lit.vi()),
-                                self.decision_level(),
+                                *self.level.get_unchecked(false_lit.vi()),
                             );
-                            assert_eq!(lit_assign!(self, w.blocker), Some(true));
                         }
                     }
                 }
@@ -435,67 +439,51 @@ impl PropagateIF for AssignStack {
                 let source = (*watcher).get_unchecked_mut(sweeping);
                 let mut n = 0;
                 'next_clause: while n < source.len() {
-                    // println!("swee: {}, len = {}, n = {}", sweeping, source.len(), n);
-                    let mut w = source.get_unchecked_mut(n);
+                    let w = source.get_unchecked_mut(n);
                     n += 1;
-                    if cdb[w.c].is(Flag::DEAD) {
-                        continue 'next_clause;
-                    }
                     assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
-                    if let Some(true) = lit_assign!(self, w.blocker) {
+                    assert_ne!(w.blocker.vi(), false_lit.vi());
+                    assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
+
+                    let other_watch = w.blocker;
+                    let other_watch_value = lit_assign!(self, other_watch);
+                    if let Some(true) = other_watch_value {
                         continue 'next_clause;
                     }
-                    let Clause {
-                        ref mut lits,
-                        ref mut search_from,
-                        ..
-                    } = cdb[w.c];
-                    debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
-                    let mut first = *lits.get_unchecked_mut(0);
-                    if first == false_lit {
-                        first = *lits.get_unchecked(1);
-                        lits.swap(0, 1);
-                    }
-                    let first_value = lit_assign!(self, first);
-                    if first != w.blocker {
-                        w.blocker = first;
-                        if first_value == Some(true) {
-                            continue 'next_clause;
-                        }
-                    }
-                    //
+                    assert!(!cdb[w.c].is(Flag::DEAD));
+                    let Clause { ref mut lits, .. } = cdb[w.c];
+                    assert!(lits[0] == false_lit || lits[1] == false_lit);
+                    let other_watch_pos = (lits[1] == w.blocker) as usize;
+                    // assert_ne!(lit_assign!(self, lits[0]), Some(false));
+
                     //## Search an un-falsified literal
                     //
                     let len = lits.len();
                     // Gathering good literals at the beginning of lits.
-                    for k in (*search_from..len).chain(2..*search_from) {
-                        let lk = lits.get_unchecked(k);
-                        if lit_assign!(self, *lk) != Some(false) {
+                    // for k in (*search_from..len).chain(2..*search_from) {
+                    let mut k = 2;
+                    while k < len {
+                        let lk = *lits.get_unchecked(k);
+                        if lit_assign!(self, lk) != Some(false) {
+                            let cid = w.c;
+                            (*watcher)
+                                .get_unchecked_mut(usize::from(!other_watch))
+                                .update_blocker(cid, lk)
+                                .unwrap();
                             n -= 1;
-                            // let w = source.detach(n);
-                            // assert_ne!(lk.vi(), false_lit.vi());
-                            // assert_ne!(sweeping, usize::from(!*lk));
-                            // assert_ne!(!*lk, w.blocker);
-                            // (*watcher).get_unchecked_mut(usize::from(!*lk)).register(w);
-                            lits.swap(1, k);
-                            // If `search_from` gets out of range,
-                            // the next loop will ignore it safely;
-                            // the first iteration loop becomes null.
-                            *search_from = k + 1;
-
-                            let p = lits[0];
-                            let q = lits[1];
-                            let (mut w1, mut w2) = cdb.detach_watches(w.c);
-                            w1.blocker = q;
-                            w2.blocker = p;
-                            (*watcher).get_unchecked_mut(usize::from(!p)).register(w1);
-                            (*watcher).get_unchecked_mut(usize::from(!q)).register(w2);
-
+                            let mut w = source.detach(n);
+                            w.blocker = other_watch;
+                            (*watcher).get_unchecked_mut(usize::from(!lk)).register(w);
+                            lits.swap(1 - other_watch_pos, k);
+                            cdb.watches(cid);
                             continue 'next_clause;
                         }
+                        k += 1;
                     }
-
-                    if first_value == Some(false) {
+                    if lits[0] == false_lit {
+                        lits.swap(0, 1);
+                    }
+                    if other_watch_value == Some(false) {
                         let cid = w.c;
                         return cid;
                     }
@@ -503,10 +491,12 @@ impl PropagateIF for AssignStack {
                         .iter()
                         .map(|l| self.level[l.vi()])
                         .max()
-                        .unwrap_or(0);
-                    assert_ne!(lit_assign!(self, first), Some(true));
-                    self.assign_by_implication(first, AssignReason::Implication(w.c, NULL_LIT), lv);
-                    assert_eq!(lit_assign!(self, first), Some(true));
+                        .unwrap_or(self.root_level);
+                    self.assign_by_implication(
+                        other_watch,
+                        AssignReason::Implication(w.c, NULL_LIT),
+                        lv,
+                    );
                 }
             }
         }

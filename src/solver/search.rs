@@ -256,7 +256,7 @@ fn search(
                         }
                     }
                     asg.handle(SolverEvent::NewStabilizationStage(block_level));
-                    check(asg, cdb, false, "before reduction");
+                    // check(asg, cdb, false, "before reduction");
                     if cdb.reduce(asg, asg.num_conflict) {
                         #[cfg(feature = "trace_equivalency")]
                         if false {
@@ -264,7 +264,7 @@ fn search(
                             cdb.check_consistency(asg, "before simplify");
                         }
                         if state.config.c_ip_int <= elim.to_simplify as usize {
-                            check(asg, cdb, false, "before elimination");
+                            // check(asg, cdb, false, "before elimination");
                             elim.activate();
                             elim.simplify(asg, cdb, rst, state)?;
                             check(asg, cdb, false, "after elimination");
@@ -277,7 +277,7 @@ fn search(
                                 );
                             }
                         } else {
-                            check(asg, cdb, false, "before vivification");
+                            // check(asg, cdb, false, "before vivification");
                             #[cfg(feature = "clause_vivification")]
                             if vivify(asg, cdb, elim, state).is_err() {
                                 #[cfg(feature = "boundary_check")]
