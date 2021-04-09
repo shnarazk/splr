@@ -316,10 +316,6 @@ impl PropagateIF for AssignStack {
                     let mut k = 2;
                     while k < len {
                         let lk = *lits.get_unchecked(k);
-                        // if *lk == w.blocker {
-                        //     lits.swap(0, k);
-                        //     continue;
-                        // }
                         if lit_assign!(self, lk) != Some(false) {
                             let cid = w.c;
                             // if lit_assign!(self, lits[0]) == Some(false) {
@@ -339,7 +335,7 @@ impl PropagateIF for AssignStack {
                             // assert_ne!(lit_assign!(self, lits[0]), Some(false));
                             (*watcher)
                                 .get_unchecked_mut(usize::from(!other_watch))
-                                .update_blocker(w.c, lk)
+                                .update_blocker(cid, lk)
                                 .unwrap();
                             n -= 1;
                             let mut w = source.detach(n);
@@ -352,16 +348,6 @@ impl PropagateIF for AssignStack {
                             // the next loop will ignore it safely;
                             // the first iteration loop becomes null.
                             *search_from = k + 1;
-
-                            // let p = lits[0];
-                            // let q = lits[1];
-                            // assert_ne!(lit_assign!(self, p), Some(false));
-                            // assert_ne!(lit_assign!(self, q), Some(false));
-                            // let (mut w1, mut w2) = cdb.detach_watches(w.c);
-                            // w1.blocker = q;
-                            // w2.blocker = p;
-                            // (*watcher).get_unchecked_mut(usize::from(!p)).register(w1);
-                            // (*watcher).get_unchecked_mut(usize::from(!q)).register(w2);
                             cdb.watches(cid);
                             continue 'next_clause;
                         }
@@ -384,7 +370,7 @@ impl PropagateIF for AssignStack {
                         .unwrap_or(self.root_level);
                     // self.reward_at_propagation(false_lit.vi());
                     self.assign_by_implication(
-                        lits[0],
+                        other_watch,
                         AssignReason::Implication(w.c, NULL_LIT),
                         lv,
                     );
