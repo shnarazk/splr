@@ -121,6 +121,7 @@ pub trait ClauseDBIF:
     #[cfg(feature = "incremental_solver")]
     /// save an eliminated permanent clause to an extra space for incremental solving.
     fn make_permanent_immortal(&mut self, cid: ClauseId);
+    fn watches(&self, cid: ClauseId) -> (Lit, Lit);
 }
 
 /// Record of clause operations to build DRAT certifications.

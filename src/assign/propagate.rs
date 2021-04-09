@@ -251,7 +251,7 @@ impl PropagateIF for AssignStack {
                     debug_assert_ne!(w.blocker, false_lit);
 
                     #[cfg(feature = "boundary_check")]
-                    debug_assert_eq!(cdb[w.c].lits.len(), 2);
+                    debug_assert_eq!(cdb[w.c].len(), 2);
 
                     match lit_assign!(self, w.blocker) {
                         Some(true) => (),
@@ -278,39 +278,40 @@ impl PropagateIF for AssignStack {
                 let source = (*watcher).get_unchecked_mut(sweeping);
                 let mut n = 0;
                 'next_clause: while n < source.len() {
-                    let mut w = source.get_unchecked_mut(n);
+                    let w = source.get_unchecked_mut(n);
                     n += 1;
                     assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
-                    assert_ne!(w.blocker.vi(), false_lit.vi());
+                    // assert_ne!(w.blocker.vi(), false_lit.vi());
                     let mut another_watch_value = lit_assign!(self, w.blocker);
                     if let Some(true) = another_watch_value {
                         // In this path, we use only `AssignStack::assign`.
-                        assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
+                        // assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
                         continue 'next_clause;
                     }
                     debug_assert!(!cdb[w.c].is(Flag::DEAD));
+                    cdb.watches(w.c);
+
                     let Clause {
                         ref mut lits,
                         ref mut search_from,
                         ..
                     } = cdb[w.c];
-                    assert!(lits[0] == w.blocker || lits[1] == w.blocker);
+                    // assert!(lits[0] == w.blocker || lits[1] == w.blocker);
                     debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
-                    let mut first = *lits.get_unchecked_mut(0);
 
-                    if first == false_lit {
-                        first = *lits.get_unchecked(1);
+                    if lits[0] == false_lit {
                         lits.swap(0, 1);
                     }
 
-                    if first != w.blocker {
-                        another_watch_value = lit_assign!(self, first);
-                        w.blocker = first;
+                    /* if l0 != w.blocker */
+                    {
+                        another_watch_value = lit_assign!(self, lits[0]);
+                        // w.blocker = lits[1];
                         if another_watch_value == Some(true) {
                             continue 'next_clause;
                         }
                     }
-                    assert_ne!(lit_assign!(self, w.blocker), Some(false));
+                    // assert_ne!(lit_assign!(self, lits[0]), Some(false));
 
                     // let first_value = lit_assign!(self, first);
                     // if first != w.blocker {
@@ -325,34 +326,84 @@ impl PropagateIF for AssignStack {
                     //
                     let len = lits.len();
                     // Gathering good literals at the beginning of lits.
-                    for k in (*search_from..len).chain(2..*search_from) {
-                        let lk = lits.get_unchecked(k);
-                        if lit_assign!(self, *lk) != Some(false) {
-                            n -= 1;
-                            // let w = source.detach(n);
-                            // assert_ne!(*lk, w.blocker);
-                            // (*watcher).get_unchecked_mut(usize::from(!*lk)).register(w);
-                            lits.swap(1, k);
+                    // for k in (*search_from..len).chain(2..*search_from) {
+                    let mut k = 2;
+                    while k < len {
+                        let lk = *lits.get_unchecked(k);
+                        // if *lk == w.blocker {
+                        //     lits.swap(0, k);
+                        //     continue;
+                        // }
+                        match lit_assign!(self, lk) {
+                            Some(false) => (),
+                            Some(true) => continue 'next_clause,
+                            None => {
+                                let cid = w.c;
+                                // if lit_assign!(self, lits[0]) == Some(false) {
+                                //     dbg!((w.c, &lits, false_lit));
+                                //     for l in lits.iter() {
+                                //         if let Some(pos) = self.trail.iter().position(|m| m.vi() == l.vi()) {
+                                //             if self.q_head < pos {
+                                //                 println!(" - {:>10} unchecked assign", l);
+                                //             } else {
+                                //                 println!(" - {:>10} checked assign", l);
+                                //             }
+                                //         } else {
+                                //             println!(" - {:>10} unassigned", l);
+                                //         }
+                                //     }
+                                // }
+                                // assert_ne!(lit_assign!(self, lits[0]), Some(false));
+                                n -= 1;
+                                let mut w = source.detach(n);
+                                // w.blocker = lits[0];
+                                // assert_ne!(*lk, w.blocker);
+                                (*watcher).get_unchecked_mut(usize::from(!lk)).register(w);
+                                lits.swap(1, k);
 
-                            // If `search_from` gets out of range,
-                            // the next loop will ignore it safely;
-                            // the first iteration loop becomes null.
-                            *search_from = k + 1;
+                                // If `search_from` gets out of range,
+                                // the next loop will ignore it safely;
+                                // the first iteration loop becomes null.
+                                *search_from = k + 1;
 
-                            let p = lits[0];
-                            let q = lits[1];
-                            assert_ne!(lit_assign!(self, p), Some(false));
-                            assert_ne!(lit_assign!(self, q), Some(false));
-                            let (mut w1, mut w2) = cdb.detach_watches(w.c);
-                            w1.blocker = q;
-                            w2.blocker = p;
-                            (*watcher).get_unchecked_mut(usize::from(!p)).register(w1);
-                            (*watcher).get_unchecked_mut(usize::from(!q)).register(w2);
+                                // let p = lits[0];
+                                // let q = lits[1];
+                                // assert_ne!(lit_assign!(self, p), Some(false));
+                                // assert_ne!(lit_assign!(self, q), Some(false));
+                                // let (mut w1, mut w2) = cdb.detach_watches(w.c);
+                                // w1.blocker = q;
+                                // w2.blocker = p;
+                                // (*watcher).get_unchecked_mut(usize::from(!p)).register(w1);
+                                // (*watcher).get_unchecked_mut(usize::from(!q)).register(w2);
+                                cdb.watches(cid);
+                                continue 'next_clause;
+                            } /* if lit_assign!(self, *lk) != Some(false) {
+                              assert_ne!(another_watch_value, Some(false));
+                              n -= 1;
+                              let w = source.detach(n);
+                              // assert_ne!(*lk, w.blocker);
+                              (*watcher).get_unchecked_mut(usize::from(!*lk)).register(w);
+                              lits.swap(1, k);
 
-                            continue 'next_clause;
+                              // If `search_from` gets out of range,
+                              // the next loop will ignore it safely;
+                              // the first iteration loop becomes null.
+                              *search_from = k + 1;
+
+                              // let p = lits[0];
+                              // let q = lits[1];
+                              // assert_ne!(lit_assign!(self, p), Some(false));
+                              // assert_ne!(lit_assign!(self, q), Some(false));
+                              // let (mut w1, mut w2) = cdb.detach_watches(w.c);
+                              // w1.blocker = q;
+                              // w2.blocker = p;
+                              // (*watcher).get_unchecked_mut(usize::from(!p)).register(w1);
+                              // (*watcher).get_unchecked_mut(usize::from(!q)).register(w2);
+
+                              continue 'next_clause; */
                         }
+                        k += 1;
                     }
-
                     if another_watch_value == Some(false) {
                         let cid = w.c;
                         self.num_conflict += 1;
@@ -364,9 +415,13 @@ impl PropagateIF for AssignStack {
                         .iter()
                         .map(|l| self.level[l.vi()])
                         .max()
-                        .unwrap_or(0);
+                        .unwrap_or(self.root_level);
                     // self.reward_at_propagation(false_lit.vi());
-                    self.assign_by_implication(first, AssignReason::Implication(w.c, NULL_LIT), lv);
+                    self.assign_by_implication(
+                        lits[0],
+                        AssignReason::Implication(w.c, NULL_LIT),
+                        lv,
+                    );
                 }
             }
         }

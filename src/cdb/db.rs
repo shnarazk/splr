@@ -872,6 +872,50 @@ impl ClauseDBIF for ClauseDB {
         self.eliminated_permanent
             .push(self.clause[cid.ordinal as usize].lits.clone());
     }
+    fn watches(&self, cid: ClauseId) -> (Lit, Lit) {
+        let mut found = None;
+        if 2 == self[cid].lits.len() {
+            for (i, wl) in self.bin_watcher.iter().enumerate() {
+                if wl.iter().any(|w| w.c == cid) {
+                    if let Some(f) = found {
+                        return (f, Lit::from(i));
+                    }
+                    found = Some(Lit::from(i));
+                }
+            }
+        } else {
+            let c = &self[cid];
+            let l0 = c.lits[0];
+            let l1 = c.lits[1];
+            for (i, wl) in self.watcher.iter().enumerate() {
+                if let Some(w) = wl.iter().find(|w| w.c == cid) {
+                    let watch = Lit::from(i);
+                    assert_ne!(watch, Lit::default());
+                    assert_ne!(watch, Lit::default());
+                    if !(!watch == l0 || !watch == l1) {
+                        dbg!((cid, l0, l1, w));
+                        panic!("done");
+                    }
+                    assert!(!watch == l0 || !watch == l1);
+                    // if !(w.blocker == l0 || w.blocker == l1) {
+                    //     dbg!((cid, watch, w, l0, l1));
+                    //     panic!("found");
+                    // }
+                    // assert!(w.blocker == l0 || w.blocker == l1);
+                    // if wl.iter().any(|w| w.c == cid) {
+                    if let Some(f) = found {
+                        let w0 = f;
+                        let w1 = Lit::from(i);
+                        assert_ne!(w0, w1);
+                        return (w0, w1);
+                    }
+                    // assert!(w.blocker == l0 || w.blocker == l1);
+                    found = Some(Lit::from(i));
+                }
+            }
+        }
+        (Lit::default(), Lit::default())
+    }
 }
 
 impl ClauseDB {
@@ -1063,7 +1107,7 @@ impl ClauseDB {
             );
         }
     }
-    pub fn dump(&self, cid: ClauseId) -> (Lit, Lit) {
+    pub fn watches(&self, cid: ClauseId) -> (Lit, Lit) {
         let mut found = None;
         if 2 == self[cid].lits.len() {
             for (i, wl) in self.bin_watcher.iter().enumerate() {

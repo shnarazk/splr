@@ -348,7 +348,7 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
                 t, lv, reason, lit, assign
             );
         }
-        let (w1, w2) = cdb.dump(cid);
+        let (w1, w2) = cdb.watches(cid);
         if w1 == Lit::default() && w2 == Lit::default() {
             println!(
                 "clause {} watching: {} and {} but no registered watches",

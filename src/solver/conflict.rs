@@ -44,7 +44,7 @@ pub fn handle_conflict(
     rst.update(ProgressUpdate::Counter);
     // rst.block_restart(); // to update asg progress_evaluator
     let mut use_chronobt = switch_chronobt.unwrap_or_else(|| 0 < state.config.c_cbt_thr);
-    if use_chronobt {
+    if use_chronobt && false {
         let level = asg.level_ref();
         let c = &mut cdb[ci];
         let lit_count = c.iter().filter(|l| level[l.vi()] == original_dl).count();
