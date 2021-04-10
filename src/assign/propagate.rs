@@ -348,7 +348,7 @@ impl PropagateIF for AssignStack {
                             // the next loop will ignore it safely;
                             // the first iteration loop becomes null.
                             *search_from = k + 1;
-                            cdb.watches(cid);
+                            // cdb.watches(cid);
                             continue 'next_clause;
                         }
                         k += 1;
@@ -393,6 +393,8 @@ impl PropagateIF for AssignStack {
     // 1. delete codes about search_from
     // 1. delete codes about stats: num_*, ema_*
     // 1. delete comments
+    // 1. allow dead clauses
+    // 1. (allow eliminated vars)
     //
     fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> ClauseId
     where
@@ -441,6 +443,9 @@ impl PropagateIF for AssignStack {
                 'next_clause: while n < source.len() {
                     let w = source.get_unchecked_mut(n);
                     n += 1;
+                    if cdb[w.c].is(Flag::DEAD) {
+                        continue;
+                    }
                     assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
                     assert_ne!(w.blocker.vi(), false_lit.vi());
                     assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
@@ -450,7 +455,6 @@ impl PropagateIF for AssignStack {
                     if let Some(true) = other_watch_value {
                         continue 'next_clause;
                     }
-                    assert!(!cdb[w.c].is(Flag::DEAD));
                     let Clause { ref mut lits, .. } = cdb[w.c];
                     assert!(lits[0] == false_lit || lits[1] == false_lit);
                     let other_watch_pos = (lits[1] == w.blocker) as usize;

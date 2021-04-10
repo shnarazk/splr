@@ -267,7 +267,7 @@ fn search(
                             // check(asg, cdb, false, "before elimination");
                             elim.activate();
                             elim.simplify(asg, cdb, rst, state)?;
-                            check(asg, cdb, false, "after elimination");
+                            // check(asg, cdb, false, "after elimination");
                             #[cfg(feature = "trace_equivalency")]
                             if false {
                                 state.progress(asg, cdb, elim, rst);
@@ -289,7 +289,7 @@ fn search(
                                 }
                                 return Ok(false);
                             }
-                            check(asg, cdb, false, "after vivification");
+                            // check(asg, cdb, false, "after vivification");
                         }
                     }
                     if last_core != num_unreachable || 0 == num_unreachable {
