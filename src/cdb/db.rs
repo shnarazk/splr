@@ -1,8 +1,5 @@
 use {
-    super::{
-        property, CertificationDumper, CertifiedRecord, Clause, ClauseDB, ClauseDBIF, ClauseId,
-        WatchDBIF,
-    },
+    super::{property, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId, WatchDBIF},
     crate::{assign::AssignIF, solver::SolverEvent, types::*},
     std::{
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -16,8 +13,7 @@ impl Default for ClauseDB {
             clause: Vec::new(),
             bin_watcher: Vec::new(),
             watcher: Vec::new(),
-            certified: Vec::new(),
-            certification_store: CertificationDumper::default(),
+            certification_store: CertificationStore::default(),
             soft_limit: 0, // 248_000_000
             use_chan_seok: false,
             co_lbd_bound: 4,
@@ -151,16 +147,11 @@ impl Instantiate for ClauseDB {
             watcher.push(Vec::new());
             touched.push(false);
         }
-        let mut certified = Vec::new();
-        if config.use_certification {
-            certified.push((CertifiedRecord::Sentinel, Vec::new()));
-        }
         ClauseDB {
             clause,
             bin_watcher,
             watcher,
-            certified,
-            certification_store: CertificationDumper::instantiate(config, cnf),
+            certification_store: CertificationStore::instantiate(config, cnf),
             soft_limit: config.c_cls_lim,
             activity_decay: config.crw_dcy_rat,
             activity_anti_decay: 1.0 - config.crw_dcy_rat,
@@ -282,8 +273,6 @@ impl ClauseDBIF for ClauseDB {
             ref mut watcher,
             ref mut clause,
             ref mut touched,
-            ref mut certified,
-            #[cfg(not(feature = "no_IO"))]
             ref mut certification_store,
             ..
         } = self;
@@ -322,15 +311,8 @@ impl ClauseDBIF for ClauseDB {
                         self.num_bi_clause -= 1;
                         self.num_clause -= 1;
                     }
-                    if !certified.is_empty() && !c.is(Flag::VIV_ASSUMED) {
-                        #[cfg(not(feature = "no_IO"))]
+                    if !c.is(Flag::VIV_ASSUMED) {
                         certification_store.push_delete(&c.lits);
-                        #[cfg(feature = "no_IO")]
-                        {
-                            let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
-                            debug_assert!(!temp.is_empty());
-                            certified.push((CertifiedRecord::Delete, temp));
-                        }
                     }
                     c.lits.clear();
                 }
@@ -373,15 +355,8 @@ impl ClauseDBIF for ClauseDB {
                             self.num_learnt -= 1;
                         }
                     }
-                    if !certified.is_empty() && !c.is(Flag::VIV_ASSUMED) {
-                        #[cfg(not(feature = "no_IO"))]
+                    if !c.is(Flag::VIV_ASSUMED) {
                         certification_store.push_delete(&c.lits);
-                        #[cfg(feature = "no_IO")]
-                        {
-                            let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
-                            debug_assert!(!temp.is_empty());
-                            certified.push((CertifiedRecord::Delete, temp));
-                        }
                     }
                     c.lits.clear();
                 }
@@ -448,16 +423,7 @@ impl ClauseDBIF for ClauseDB {
             // }
             // vec.swap(1, i_max);
         }
-        if !self.certified.is_empty() {
-            #[cfg(not(feature = "no_IO"))]
-            self.certification_store.push_add(vec);
-            #[cfg(feature = "no_IO")]
-            {
-                let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
-                debug_assert!(!temp.is_empty());
-                self.certified.push((CertifiedRecord::Add, temp));
-            }
-        }
+        self.certification_store.push_add(vec);
         let cid;
         let l0 = vec[0];
         let l1 = vec[1];
@@ -709,34 +675,11 @@ impl ClauseDBIF for ClauseDB {
         }
         self.garbage_collect();
     }
-    fn certificate_add(&mut self, vec: &[Lit]) {
-        #[cfg(feature = "no_IO")]
-        if !self.certified.is_empty() {
-            let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
-            debug_assert!(!temp.is_empty());
-            self.certified.push((CertifiedRecord::Add, temp));
-        }
-        #[cfg(not(feature = "no_IO"))]
-        {
-            self.certification_store.push_add(vec);
-        }
-    }
-    fn certificate_delete(&mut self, vec: &[Lit]) {
-        #[cfg(feature = "no_IO")]
-        if !self.certified.is_empty() {
-            let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
-            self.certified.push((CertifiedRecord::Delete, temp));
-        }
-        #[cfg(not(feature = "no_IO"))]
-        {
-            self.certification_store.push_delete(vec);
-        }
+    fn certificate_add_assertion(&mut self, lit: Lit) {
+        self.certification_store.push_add(&[lit]);
     }
     fn certificate_save(&mut self) {
-        #[cfg(not(feature = "no_IO"))]
-        {
-            self.certification_store.close();
-        }
+        self.certification_store.close();
     }
     fn touch_var(&mut self, vi: VarId) {
         self.touched[Lit::from_assign(vi, true)] = true;
@@ -770,6 +713,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut clause,
             ref mut bin_watcher,
             ref mut watcher,
+            ref mut certification_store,
             ..
         } = self;
         let c = &mut clause[cid.ordinal as usize];
@@ -789,6 +733,8 @@ impl ClauseDBIF for ClauseDB {
             debug_assert!(1 < usize::from(!lits[0]));
             return true;
         }
+
+        certification_store.push_delete(lits);
 
         // FIX THE LONGSTANDING BUG.
         // It was occured by failing to retrieve two `Watch`es.
@@ -836,6 +782,7 @@ impl ClauseDBIF for ClauseDB {
             }
             _ => panic!("fix me"),
         }
+        certification_store.push_add(&c.lits);
         false
     }
     fn minimize_with_biclauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)

@@ -199,7 +199,6 @@ pub fn vivify(
                 if n == 2 && cdb.registered_bin_clause(copied[0], copied[1]) {
                     num_purge += 1;
                 } else {
-                    cdb.certificate_add(&copied);
                     let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
                     cdb.set_activity(cj, activity);
                     cdb[cj].turn_on(Flag::VIVIFIED);

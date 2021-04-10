@@ -195,7 +195,7 @@ pub fn handle_conflict(
         //## A NEW ASSERTION by UNIT LEARNT CLAUSE GENERATION
         //
         // dump to certified even if it's a literal.
-        cdb.certificate_add(new_learnt);
+        cdb.certificate_add_assertion(new_learnt[0]);
         if use_chronobt {
             asg.cancel_until(bl);
             debug_assert!(asg.stack_iter().all(|l| l.vi() != l0.vi()));

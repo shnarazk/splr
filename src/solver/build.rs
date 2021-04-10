@@ -309,9 +309,6 @@ impl Solver {
             return None;
         }
         debug_assert!(asg.decision_level() == 0);
-        if lits.iter().any(|l| asg.assigned(*l).is_some()) {
-            cdb.certificate_add(lits);
-        }
         lits.sort();
         let mut j = 0;
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means tautology.
@@ -329,9 +326,11 @@ impl Solver {
         lits.truncate(j);
         match lits.len() {
             0 => None, // Empty clause is UNSAT.
-            1 => asg
-                .assign_at_root_level(lits[0])
-                .map_or(None, |_| Some(ClauseId::default())),
+            1 => {
+                cdb.certificate_add_assertion(lits[0]);
+                asg.assign_at_root_level(lits[0])
+                    .map_or(None, |_| Some(ClauseId::default()))
+            }
             _ => {
                 let cid = cdb.new_clause(asg, lits, false, false);
                 elim.add_cid_occur(asg, cid, &mut cdb[cid], true);

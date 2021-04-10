@@ -7,44 +7,67 @@ use std::{
 
 use crate::types::*;
 
+#[allow(dead_code)]
+/// Record of clause operations to build DRAT certifications.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CertifiedRecord {
+    /// placed at the end.
+    Sentinel,
+    /// added a (learnt) clause.
+    Add,
+    /// deleted a clause.
+    Delete,
+}
+
+type DRAT = Vec<(CertifiedRecord, Vec<i32>)>;
+
 #[derive(Debug)]
-pub struct CertificationDumper {
+pub struct CertificationStore {
+    /// clause history to make certification
+    queue: DRAT,
     target: Option<PathBuf>,
     buffer: Option<BufWriter<File>>,
 }
 
-impl Clone for CertificationDumper {
+impl Clone for CertificationStore {
     fn clone(&self) -> Self {
         Self::default()
     }
 }
 
-impl Default for CertificationDumper {
+impl Default for CertificationStore {
     fn default() -> Self {
-        CertificationDumper {
+        CertificationStore {
+            queue: Vec::new(),
             buffer: None,
             target: None,
         }
     }
 }
 
-impl Instantiate for CertificationDumper {
+impl Instantiate for CertificationStore {
     fn instantiate(config: &Config, _cnf: &CNFDescription) -> Self {
         #[cfg(not(feature = "no_IO"))]
         if config.use_certification {
+            let mut queue = Vec::new();
+            queue.push((CertifiedRecord::Sentinel, Vec::new()));
             let cert: PathBuf = config.io_odir.join(&config.io_pfile);
             if let Ok(out) = File::create(&cert) {
-                return CertificationDumper {
+                return CertificationStore {
+                    queue,
                     buffer: Some(BufWriter::new(out)),
                     target: Some(cert),
                 };
             }
         }
-        CertificationDumper::default()
+        CertificationStore::default()
     }
 }
 
-impl CertificationDumper {
+impl CertificationStore {
+    pub fn is_active(&self) -> bool {
+        self.buffer.is_some()
+    }
     #[cfg(feature = "no_IO")]
     pub fn push_add(&mut self, _vec: &[Lit]) {}
     #[cfg(not(feature = "no_IO"))]

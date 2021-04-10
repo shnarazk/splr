@@ -110,7 +110,7 @@ where
 
         cdb.detach(cid);
         elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
-        cdb.certificate_add(&[c0]);
+        cdb.certificate_add_assertion(c0);
         asg.assign_at_root_level(c0)
     } else {
         #[cfg(feature = "trace_elimination")]
@@ -121,10 +121,6 @@ where
 
         elim.enqueue_clause(cid, &mut cdb[cid]);
         elim.remove_lit_occur(asg, l, cid);
-        unsafe {
-            let vec = &cdb[cid].lits[..] as *const [Lit];
-            cdb.certificate_add(&*vec);
-        }
         Ok(())
     }
 }

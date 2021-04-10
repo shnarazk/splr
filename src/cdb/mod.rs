@@ -13,7 +13,7 @@ pub use self::{
     cid::ClauseIdIF,
     clause::ClauseIF,
     property::*,
-    unsat_certificate::CertificationDumper,
+    unsat_certificate::CertificationStore,
     watch::{Watch, WatchDBIF},
 };
 
@@ -92,10 +92,8 @@ pub trait ClauseDBIF:
         A: AssignIF;
     /// return the number of clauses which satisfy given flags and aren't DEAD.
     fn countf(&self, mask: Flag) -> usize;
-    /// record a clause to unsat certification.
-    fn certificate_add(&mut self, vec: &[Lit]);
-    /// record a deleted clause to unsat certification.
-    fn certificate_delete(&mut self, vec: &[Lit]);
+    /// record an asserted literal to unsat certification.
+    fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.
     fn certificate_save(&mut self);
     /// flag positive and negative literals of a var as dirty
@@ -123,19 +121,6 @@ pub trait ClauseDBIF:
     fn make_permanent_immortal(&mut self, cid: ClauseId);
     fn watches(&self, cid: ClauseId) -> (Lit, Lit);
 }
-
-/// Record of clause operations to build DRAT certifications.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum CertifiedRecord {
-    /// placed at the end.
-    Sentinel,
-    /// added a (learnt) clause.
-    Add,
-    /// deleted a clause.
-    Delete,
-}
-
-type DRAT = Vec<(CertifiedRecord, Vec<i32>)>;
 
 /// Clause identifier, or clause index, starting with one.
 /// Note: ids are re-used after 'garbage collection'.
@@ -184,9 +169,7 @@ pub struct ClauseDB {
     pub bin_watcher: Vec<Vec<Watch>>,
     /// container of watch literals
     pub watcher: Vec<Vec<Watch>>,
-    /// clause history to make certification
-    pub certified: DRAT,
-    certification_store: CertificationDumper,
+    certification_store: CertificationStore,
     /// a number of clauses to emit out-of-memory exception
     soft_limit: usize,
     /// flag for Chan Seok heuristics; this value is exported with `Export:mode`

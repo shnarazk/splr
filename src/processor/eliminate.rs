@@ -72,7 +72,7 @@ where
                             Some(false) => return Err(SolverError::Inconsistent),
                             None => asg.assign_at_root_level(lit)?,
                         }
-                        cdb.certificate_add(&*vec);
+                        cdb.certificate_add_assertion(lit);
                     }
                     2 => {
                         if !cdb.registered_bin_clause((*vec)[0], (*vec)[1]) {
