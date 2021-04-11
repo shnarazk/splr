@@ -77,14 +77,18 @@ pub fn vivify(
         let mut flipped = true;
         if to_display <= num_check {
             state.flush("");
+            if false && display_step <= to_display && num_check < 2 * num_purge {
+                state.flush(format!(
+                    "clause vivifying was canceled due to too high purge rate {:>5.3}. ",
+                    num_check as f64 / to_display as f64,
+                ));
+                cdb.garbage_collect();
+                return Ok(());
+            }
             state.flush(format!(
                 "clause vivifying(assert:{}, purge:{} shorten:{}, check:{}/{})...",
                 num_assert, num_purge, num_shrink, num_check, num_target,
             ));
-            if num_check < 2 * num_purge {
-                cdb.garbage_collect();
-                return Ok(());
-            }
             to_display = num_check + display_step;
         }
         num_check += 1;
@@ -131,7 +135,6 @@ pub fn vivify(
                     // // };
                     // debug_assert_eq!(asg.assigned(!l), None);
                     asg.assign_by_decision(!l);
-                    // state.flush("<");
                     copied.push(l);
                     let cc: ClauseId = asg.propagate_sandbox(cdb);
                     //
@@ -147,7 +150,7 @@ pub fn vivify(
                         // //     break 'this_clause;
                         // // }
                         flipped = false;
-                        // state.flush(">");
+                        break 'this_clause;
                     }
                     // // asg.backtrack_sandbox();
                     // // if let Some(cj) = cid {
@@ -156,9 +159,9 @@ pub fn vivify(
                     // //     debug_assert!(!asg.locked(&cdb[cj], cj));
                     // //     debug_assert!(cdb[cj].is(Flag::DEAD));
                     // // }
-                    if !cc.is_none() {
-                        break 'this_clause;
-                    }
+                    // if !cc.is_none() {
+                    //     break 'this_clause;
+                    // }
                     //
                     //## Rule 4
                     //
@@ -169,20 +172,21 @@ pub fn vivify(
         if flipped {
             flip(&mut copied);
         }
+        debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
         match copied.len() {
             0 if flipped => {
                 cdb.garbage_collect();
                 debug_assert!(asg.stack_iter().all(|l| asg.assigned(*l).is_some()));
                 return Err(SolverError::Inconsistent);
             }
-            0 => {
-                debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
+            0 if num_purge < num_shrink => {
                 cdb.detach(cs.to());
                 num_purge += 1;
             }
+            0 => (),
             1 => {
                 let l0 = copied[0];
-                debug_assert_ne!(asg.assigned(l0), Some(false));
+                assert_ne!(asg.assigned(l0), Some(false));
                 debug_assert_eq!(asg.decision_level(), asg.root_level);
                 if asg.assigned(l0) == None {
                     num_assert += 1;
@@ -197,25 +201,27 @@ pub fn vivify(
                         return Err(SolverError::Inconsistent);
                     }
                 }
-                debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
                 cdb.detach(cs.to());
                 num_purge += 1;
             }
             n if n == clits.len() => (),
-            2 => {
-                if cdb.registered_bin_clause(copied[0], copied[1]) {
-                    num_purge += 1;
-                } else {
-                    let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
-                    // cdb[cj].turn_on(Flag::VIVIFIED);
-                    // cdb.set_activity(cj, activity);
-                    num_shrink += 1;
-                }
+            2 if !cdb.registered_bin_clause(copied[0], copied[1]) => {
+                num_shrink += 1;
                 elim.to_simplify += 1.0 / (2 as f64).powf(1.4);
                 debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
-                // cdb.detach(cs.to());
+                cdb.detach(cs.to());
             }
-            n => {
+            2 if num_purge < num_shrink => {
+                num_purge += 1;
+                let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
+                cdb[cj].turn_on(Flag::VIVIFIED);
+                cdb.set_activity(cj, activity);
+                elim.to_simplify += 1.0 / (2 as f64).powf(1.4);
+                debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
+                cdb.detach(cs.to());
+            }
+            _n => {
+                num_shrink += 1;
                 /*if n == 2 && cdb.registered_bin_clause(copied[0], copied[1]) {
                     num_purge += 1;
                 } else {
@@ -224,11 +230,12 @@ pub fn vivify(
                     cdb.set_activity(cj, activity);
                     num_shrink += 1;
                 }
-                elim.to_simplify += 1.0 / (n as f64).powf(1.4);
-                debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
-                cdb.detach(cs.to()); */
+                if num_purge < num_shrink {
+                    elim.to_simplify += 1.0 / (n as f64).powf(1.4);
+                    debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
+                    cdb.detach(cs.to());
+                }*/
             }
-            _ => (),
         }
         asg.backtrack_sandbox();
     }

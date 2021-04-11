@@ -280,9 +280,9 @@ impl PropagateIF for AssignStack {
                 'next_clause: while n < source.len() {
                     let w = source.get_unchecked_mut(n);
                     n += 1;
-                    assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
-                    assert_ne!(w.blocker.vi(), false_lit.vi());
-                    assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
+                    debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
+                    debug_assert_ne!(w.blocker.vi(), false_lit.vi());
+                    debug_assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
 
                     let other_watch = w.blocker;
                     let other_watch_value = lit_assign!(self, other_watch);
