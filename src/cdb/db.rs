@@ -790,6 +790,42 @@ impl ClauseDBIF for ClauseDB {
         self.watches(cid, mes);
         false
     }
+
+    fn strengthen_by_vivification(&mut self, cid: ClauseId, length: usize) {
+        debug_assert!(!self[cid].is(Flag::DEAD));
+        debug_assert!(2 < self[cid].len());
+        assert!(1 < length);
+        self.watches(
+            cid,
+            &format!("before strengthen_by_elimination {}:{:?}", cid, &self[cid]),
+        );
+        let ClauseDB {
+            ref mut clause,
+            ref mut certification_store,
+            ..
+        } = self;
+        let c = &mut clause[cid.ordinal as usize];
+        assert!(length < c.len());
+        c.search_from = 2;
+        c.turn_on(Flag::VIVIFIED);
+        let old_lits = c.lits.clone();
+        if c.len() == 2 {
+            let lits = &mut (*c).lits;
+            let l0 = lits[0];
+            let l1 = lits[1];
+            // move from watcher for l0 to bin_watcher for l0
+            let w0 = self.watcher[!l0].detach_with(cid).unwrap();
+            self.bin_watcher[!lits[0]].register(w0);
+            // move from watcher for l1 to bin_watcher for l1
+            let w1 = self.watcher[!l1].detach_with(cid).unwrap();
+            self.bin_watcher[!lits[1]].register(w1);
+            self.num_bi_clause += 1;
+            c.turn_off(Flag::LEARNT);
+        }
+        certification_store.push_add(&c.lits);
+        certification_store.push_delete(&old_lits);
+        self.watches(cid, "vivification");
+    }
     fn minimize_with_biclauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
     where
         A: AssignIF,

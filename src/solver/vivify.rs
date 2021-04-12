@@ -10,7 +10,6 @@ use {
         state::StateIF,
         types::*,
     },
-    std::borrow::Cow,
 };
 
 /// vivify clauses in `cdb` under `asg`
@@ -30,6 +29,7 @@ pub fn vivify(
     elim: &mut Eliminator,
     state: &mut State,
 ) -> MaybeInconsistent {
+    let mut average_age: f64 = 0.0;
     let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
     {
         let thr = 8 + 20usize.saturating_sub(
@@ -40,6 +40,7 @@ pub fn vivify(
         for (i, c) in cdb.iter().enumerate().skip(1) {
             if c.is(Flag::LEARNT) {
                 if let Some(act) = c.to_vivify(thr) {
+                    average_age += c.timestamp() as f64;
                     clauses.push(OrderedProxy::new(ClauseId::from(i), -act));
                 }
             }
@@ -61,26 +62,26 @@ pub fn vivify(
     let mut num_shrink = 0;
     let mut num_assert = 0;
     let mut to_display = 0;
+    let average_timestamp = average_age as usize / num_target;
+    let _activity_thr = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
 
     while let Some(cs) = clauses.pop() {
-        let activity = cdb.activity(cs.to());
         let c: &mut Clause = &mut cdb[cs.to()];
         // Since GC can make `clauses` out of date, we need to check its aliveness here.
         if c.is(Flag::DEAD) {
             continue;
         }
         debug_assert!(!c.is(Flag::ELIMINATED));
-        let is_learnt = c.is(Flag::LEARNT);
+        let timestamp = c.timestamp();
         c.vivified();
-        let clits = c.lits.clone();
+        let clits = c.iter().map(|l| *l).collect::<Vec<Lit>>();
         let mut copied: Vec<Lit> = Vec::new();
-        let mut flipped = true;
         if to_display <= num_check {
             state.flush("");
-            if false && display_step <= to_display && num_check < 2 * num_purge {
+            if num_target < 2 * num_purge {
                 state.flush(format!(
                     "clause vivifying was canceled due to too high purge rate {:>5.3}. ",
-                    num_check as f64 / to_display as f64,
+                    num_purge as f64 / num_check as f64,
                 ));
                 cdb.garbage_collect();
                 return Ok(());
@@ -99,7 +100,11 @@ pub fn vivify(
                 //
                 //## Rule 1
                 //
-                Some(false) => continue 'this_clause,
+                Some(false) => {
+                    // This is not the optimal. But due to implementation of strengthen_by_vivification,
+                    // we must keep the literal order.
+                    copied.push(l);
+                }
                 //
                 //## Rule 2
                 //
@@ -115,126 +120,61 @@ pub fn vivify(
                     //     copied.clear();
                     // }
                     copied.clear();
-                    flipped = false;
                     break 'this_clause;
                 }
                 None => {
-                    // // let cid: Option<ClauseId> = match copied.len() {
-                    // //     0 => None,
-                    // //     1 => {
-                    // //         debug_assert!(flipped);
-                    // //         debug_assert_eq!(asg.assigned(copied[0]), None);
-                    // //         assert_eq!(copied.len() as u32, asg.decision_level());
-                    // //         asg.assign_by_decision(copied[0]);
-                    // //         None
-                    // //     }
-                    // //     _ => {
-                    // //         let cid = cdb.new_clause_sandbox(asg, &mut copied.clone());
-                    // //         Some(cid)
-                    // //     }
-                    // // };
-                    // debug_assert_eq!(asg.assigned(!l), None);
-                    asg.assign_by_decision(!l);
                     copied.push(l);
+                    asg.assign_by_decision(!l);
                     let cc: ClauseId = asg.propagate_sandbox(cdb);
                     //
                     //## Rule 3
                     //
                     if !cc.is_none() {
-                        // // copied.push(!l);
-                        // // copied = asg.analyze(cdb, &copied, &cdb[cc].lits, &mut seen);
-                        // this reverts dda678e
-                        // Here we found an inconsistency.
-                        // So we can abort this function without rolling back to level zero.
-                        // // if copied.is_empty() {
-                        // //     break 'this_clause;
-                        // // }
-                        flipped = false;
                         break 'this_clause;
                     }
-                    // // asg.backtrack_sandbox();
-                    // // if let Some(cj) = cid {
-                    // //     debug_assert!(cdb[cj].is(Flag::VIV_ASSUMED));
-                    // //     cdb.detach(cj);
-                    // //     debug_assert!(!asg.locked(&cdb[cj], cj));
-                    // //     debug_assert!(cdb[cj].is(Flag::DEAD));
-                    // // }
-                    // if !cc.is_none() {
-                    //     break 'this_clause;
-                    // }
+
                     //
                     //## Rule 4
                     //
-                    // // copied.push(!l);
+                    // nothing to do
                 }
             }
         }
-        if flipped {
-            flip(&mut copied);
-        }
         debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
         match copied.len() {
-            0 if flipped => {
-                cdb.garbage_collect();
-                debug_assert!(asg.stack_iter().all(|l| asg.assigned(*l).is_some()));
-                return Err(SolverError::Inconsistent);
-            }
-            0 if num_purge < num_shrink => {
-                cdb.detach(cs.to());
+            0 if timestamp < average_timestamp => {
+                cdb.kill_clause(cs.to());
                 num_purge += 1;
             }
             0 => (),
             1 => {
                 let l0 = copied[0];
-                assert_ne!(asg.assigned(l0), Some(false));
-                debug_assert_eq!(asg.decision_level(), asg.root_level);
-                if asg.assigned(l0) == None {
-                    num_assert += 1;
-                    cdb.certificate_add_assertion(l0);
-                    // `asg.assign_at_root_level` calls the normal `cancel_until`.
-                    // To avoid it, we call `asg.backtrack_sandbox` before it.
-                    asg.backtrack_sandbox();
-                    asg.assign_at_root_level(l0)?;
-                    if !asg.propagate_sandbox(cdb).is_none() {
-                        // panic!("Vivification found an inconsistency.");
-                        cdb.garbage_collect();
-                        return Err(SolverError::Inconsistent);
-                    }
+                assert_eq!(asg.assigned(l0), Some(false));
+                // `asg.assign_at_root_level` calls the normal `cancel_until`.
+                // To avoid it, we call `asg.backtrack_sandbox` before it.
+                asg.backtrack_sandbox();
+                cdb.certificate_add_assertion(l0);
+                cdb.kill_clause(cs.to());
+                // cdb.garbage_collect();
+                assert_eq!(asg.assigned(l0), None);
+                asg.assign_at_root_level(l0)?;
+                if !asg.propagate_sandbox(cdb).is_none() {
+                    // panic!("Vivification found an inconsistency.");
+                    return Err(SolverError::Inconsistent);
                 }
-                cdb.detach(cs.to());
                 num_purge += 1;
+                num_assert += 1;
             }
             n if n == clits.len() => (),
-            2 if !cdb.registered_bin_clause(copied[0], copied[1]) => {
-                num_shrink += 1;
-                elim.to_simplify += 1.0 / (2 as f64).powf(1.4);
-                debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
-                cdb.detach(cs.to());
-            }
-            2 if num_purge < num_shrink => {
-                num_purge += 1;
-                let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
-                cdb[cj].turn_on(Flag::VIVIFIED);
-                cdb.set_activity(cj, activity);
-                elim.to_simplify += 1.0 / (2 as f64).powf(1.4);
-                debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
-                cdb.detach(cs.to());
-            }
-            _n => {
-                num_shrink += 1;
-                /*if n == 2 && cdb.registered_bin_clause(copied[0], copied[1]) {
+            n => {
+                if n == 2 && cdb.registered_bin_clause(copied[0], copied[1]) {
+                    cdb.kill_clause(cs.to());
                     num_purge += 1;
                 } else {
-                    let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
-                    cdb[cj].turn_on(Flag::VIVIFIED);
-                    cdb.set_activity(cj, activity);
+                    cdb.strengthen_by_vivification(cs.to(), n);
+                    elim.to_simplify += 1.0 / (2 as f64).powf(1.4);
                     num_shrink += 1;
                 }
-                if num_purge < num_shrink {
-                    elim.to_simplify += 1.0 / (n as f64).powf(1.4);
-                    debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
-                    cdb.detach(cs.to());
-                }*/
             }
         }
         asg.backtrack_sandbox();
@@ -260,12 +200,6 @@ fn flip(vec: &mut [Lit]) -> &mut [Lit] {
 }
 
 impl AssignStack {
-    fn reason_literals<'a>(&self, cdb: &'a ClauseDB, l: Lit) -> Cow<'a, Vec<Lit>> {
-        match self.reason(l.vi()) {
-            AssignReason::Implication(cid, _) => Cow::Borrowed(&cdb[cid].lits),
-            AssignReason::None => Cow::Owned(vec![l]),
-        }
-    }
     /// inspect the complete implication graph to collect a disjunction of a subset of
     /// negated literals of `lits`
     fn analyze(
@@ -294,8 +228,16 @@ impl AssignStack {
             } else if lits.contains(&!*l) {
                 res.push(*l);
             }
-            for r in self.reason_literals(cdb, *l).iter() {
-                seen[r.vi()] = key;
+
+            match self.reason(l.vi()) {
+                AssignReason::Implication(cid, _) => {
+                    for r in cdb[cid].iter() {
+                        seen[r.vi()] = key;
+                    }
+                }
+                AssignReason::None => {
+                    seen[l.vi()] = key;
+                }
             }
         }
         res
