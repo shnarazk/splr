@@ -661,7 +661,7 @@ impl ClauseDBIF for ClauseDB {
             return true;
         }
 
-        certification_store.push_delete(lits);
+        let old_lits = lits.clone();
 
         // FIX THE LONGSTANDING BUG.
         // It was occured by failing to retrieve two `Watch`es.
@@ -714,6 +714,7 @@ impl ClauseDBIF for ClauseDB {
                     dbg!(l0, l1, lits);
                     panic!("impossible");
                 }
+                self.num_bi_clause += 1;
             } else if l0 == lits[0] {
                 if l1 == lits[1] {
                     // nothing to do
@@ -785,6 +786,7 @@ impl ClauseDBIF for ClauseDB {
         }
         } */
         certification_store.push_add(&c.lits);
+        certification_store.push_delete(&old_lits);
         self.watches(cid, mes);
         false
     }
