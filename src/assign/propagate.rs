@@ -203,6 +203,9 @@ impl PropagateIF for AssignStack {
         }
     }
     fn backtrack_sandbox(&mut self) {
+        if self.trail_lim.is_empty() {
+            return;
+        }
         let lim = self.trail_lim[self.root_level as usize];
         for i in lim..self.trail.len() {
             let l = self.trail[i];
