@@ -293,23 +293,12 @@ impl PropagateIF for AssignStack {
                     }
                     debug_assert!(!cdb[w.c].is(Flag::DEAD));
                     let cid = w.c;
-                    // cdb.watches(w.c);
-
-                    // let Clause {
-                    //     ref mut lits,
-                    //     ref mut search_from,
-                    //     ..
-                    // } = cdb[w.c];
-                    let c = &mut cdb[w.c];
+                    let c = &mut cdb[cid];
                     debug_assert!(c.lit0() == false_lit || c.lit1() == false_lit);
-
-                    // if lits[0] == false_lit {
-                    //     lits.swap(0, 1);
-                    // }
                     let other_watch_pos = (c.lit1() == w.blocker) as usize;
-
                     // assert_ne!(lit_assign!(self, lits[0]), Some(false));
 
+                    //
                     //## Search an un-falsified literal
                     //
                     // Gathering good literals at the beginning of lits.
@@ -319,46 +308,13 @@ impl PropagateIF for AssignStack {
                             n -= 1;
                             cdb.update_watch(cid, 1 - other_watch_pos, k, Some(source.detach(n)));
                             cdb.watches(cid, "propagate478");
-                            // if lit_assign!(self, lits[0]) == Some(false) {
-                            //     dbg!((w.c, &lits, false_lit));
-                            //     for l in lits.iter() {
-                            //         if let Some(pos) = self.trail.iter().position(|m| m.vi() == l.vi()) {
-                            //             if self.q_head < pos {
-                            //                 println!(" - {:>10} unchecked assign", l);
-                            //             } else {
-                            //                 println!(" - {:>10} checked assign", l);
-                            //             }
-                            //         } else {
-                            //             println!(" - {:>10} unassigned", l);
-                            //         }
-                            //     }
-                            // }
-                            // assert_ne!(lit_assign!(self, lits[0]), Some(false));
-                            // / (*watcher)
-                            // /     .get_unchecked_mut(usize::from(!other_watch))
-                            // /     .update_blocker(cid, *lk)
-                            // /     .unwrap();
-                            // / n -= 1;
-                            // / let mut w = source.detach(n);
-                            // / w.blocker = other_watch;
-                            // / // assert_ne!(*lk, w.blocker);
-                            // / (*watcher).get_unchecked_mut(usize::from(!*lk)).register(w);
-                            // / lits.swap(1 - other_watch_pos, k);
-                            // /
-                            // / // If `search_from` gets out of range,
-                            // / // the next loop will ignore it safely;
-                            // / // the first iteration loop becomes null.
-                            // / *search_from = k + 1;
-                            // / cdb.watches(cid, "propagate351");
                             continue 'next_clause;
                         }
                     }
                     if c.lit0() == false_lit {
-                        // lits.swap(0, 1);
                         cdb.update_watch(cid, 0, 1, None);
                     }
                     if other_watch_value == Some(false) {
-                        let cid = w.c;
                         self.num_conflict += 1;
                         self.dpc_ema.update(self.num_decision);
                         self.ppc_ema.update(self.num_propagation);
@@ -451,7 +407,6 @@ impl PropagateIF for AssignStack {
                         continue;
                     }
                     assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
-
                     assert_ne!(w.blocker.vi(), false_lit.vi());
                     assert!(w.blocker == cdb[w.c].lit0() || w.blocker == cdb[w.c].lit1());
 
@@ -461,35 +416,23 @@ impl PropagateIF for AssignStack {
                         continue 'next_clause;
                     }
                     let cid = w.c;
-                    // let Clause { ref mut lits, .. } = cdb[w.c];
-                    let c = &mut cdb[w.c];
-                    // assert!(lits[0] == false_lit || lits[1] == false_lit);
+                    let c = &mut cdb[cid];
                     assert!(c.lit0() == false_lit || c.lit1() == false_lit);
                     let other_watch_pos = (c.lit1() == w.blocker) as usize;
-                    // assert_ne!(lit_assign!(self, lits[0]), Some(false));
+
+                    //
                     //## Search an un-falsified literal
                     //
                     // Gathering good literals at the beginning of lits.
-                    // for k in (*search_from..len).chain(2..*search_from) {
                     for (k, lk) in c.iter().enumerate().skip(2) {
                         if lit_assign!(self, *lk) != Some(false) {
                             n -= 1;
                             cdb.update_watch(cid, 1 - other_watch_pos, k, Some(source.detach(n)));
-                            // / (*watcher)
-                            // /     .get_unchecked_mut(usize::from(!other_watch))
-                            // /     .update_blocker(cid, *lk)
-                            // /     .unwrap();
-                            // / n -= 1;
-                            // / let mut w = source.detach(n);
-                            // / w.blocker = other_watch;
-                            // / (*watcher).get_unchecked_mut(usize::from(!*lk)).register(w);
-                            // / lits.swap(1 - other_watch_pos, k);
                             cdb.watches(cid, "propagate478");
                             continue 'next_clause;
                         }
                     }
                     if c.lit0() == false_lit {
-                        // lits.swap(0, 1);
                         cdb.update_watch(cid, 0, 1, None);
                     }
                     if other_watch_value == Some(false) {

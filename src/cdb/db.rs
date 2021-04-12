@@ -290,7 +290,6 @@ impl ClauseDBIF for ClauseDB {
             .update_blocker(cid, c.lits[new])
             .unwrap();
         c.lits.swap(old, new);
-        self.watches(cid, "eae");
     }
     fn garbage_collect(&mut self) {
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count(), self.num_clause);
