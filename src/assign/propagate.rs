@@ -228,8 +228,6 @@ impl PropagateIF for AssignStack {
     where
         C: ClauseDBIF,
     {
-        let bin_watcher = cdb.bin_watcher_lists() as *const [Vec<Watch>];
-        let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
         unsafe {
             while let Some(p) = self.trail.get(self.q_head) {
                 self.num_propagation += 1;
@@ -241,7 +239,7 @@ impl PropagateIF for AssignStack {
                 //
                 //## binary loop
                 //
-                let bin_source = (*bin_watcher).get_unchecked(sweeping);
+                let bin_source = cdb.bin_watcher_list(*p);
                 for w in bin_source.iter() {
                     debug_assert!(!cdb[w.c].is(Flag::DEAD));
                     debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
@@ -272,7 +270,7 @@ impl PropagateIF for AssignStack {
                 //
                 //## normal clause loop
                 //
-                let source = (*watcher).get_unchecked_mut(sweeping);
+                let source = &mut *(cdb.watcher_list_mut(Lit::from(sweeping)) as *mut Vec<Watch>);
                 let mut n = 0;
                 'next_clause: while n < source.len() {
                     let w = source.get_unchecked_mut(n);
@@ -357,8 +355,6 @@ impl PropagateIF for AssignStack {
     where
         C: ClauseDBIF,
     {
-        let bin_watcher = cdb.bin_watcher_lists() as *const [Vec<Watch>];
-        let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
         unsafe {
             while let Some(p) = self.trail.get(self.q_head) {
                 self.q_head += 1;
@@ -368,7 +364,7 @@ impl PropagateIF for AssignStack {
                 //
                 //## binary loop
                 //
-                let bin_source = (*bin_watcher).get_unchecked(sweeping);
+                let bin_source = cdb.bin_watcher_list(*p);
                 for w in bin_source.iter() {
                     debug_assert!(!cdb[w.c].is(Flag::DEAD));
                     debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
@@ -395,7 +391,7 @@ impl PropagateIF for AssignStack {
                 //
                 //## normal clause loop
                 //
-                let source = (*watcher).get_unchecked_mut(sweeping);
+                let source = &mut *(cdb.watcher_list_mut(Lit::from(sweeping)) as *mut Vec<Watch>);
                 let mut n = 0;
                 'next_clause: while n < source.len() {
                     let w = source.get_unchecked_mut(n);

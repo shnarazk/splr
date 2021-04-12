@@ -229,41 +229,8 @@ impl ClauseDBIF for ClauseDB {
         &self.bin_watcher[l]
     }
     #[inline]
-    fn bin_watcher_lists(&self) -> &[Vec<Watch>] {
-        &self.bin_watcher
-    }
-    #[inline]
     fn watcher_list_mut(&mut self, l: Lit) -> &mut Vec<Watch> {
         &mut self.watcher[l]
-    }
-    #[inline]
-    fn watcher_lists_mut(&mut self) -> &mut [Vec<Watch>] {
-        &mut self.watcher
-    }
-    fn detach_watches(&mut self, cid: ClauseId) -> (Watch, Watch) {
-        let ClauseDB {
-            ref clause,
-            ref mut watcher,
-            ..
-        } = self;
-        let mut w1: Option<Watch> = None;
-        let mut w2: Option<Watch> = None;
-        let mut found = false;
-        let lits = &clause[cid.ordinal as usize].lits;
-        assert!(2 < lits.len());
-        for l in lits.iter() {
-            let w = watcher[!*l].detach_with(cid);
-            if w.is_some() {
-                if found {
-                    w2 = w;
-                    break;
-                } else {
-                    found = true;
-                    w1 = w;
-                }
-            }
-        }
-        (w1.unwrap(), w2.unwrap())
     }
     fn update_watch(&mut self, cid: ClauseId, old: usize, new: usize, watch: Option<usize>) {
         if old < 2 && new < 2 {

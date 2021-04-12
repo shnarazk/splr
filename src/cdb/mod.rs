@@ -38,10 +38,6 @@ pub trait ClauseIF {
     fn iter(&self) -> Iter<'_, Lit>;
     /// return the number of literals.
     fn len(&self) -> usize;
-    /// update rank field with the present LBD.
-    fn update_lbd<A>(&mut self, asg: &A, lbd_temp: &mut [usize]) -> usize
-    where
-        A: AssignIF;
     /// return timestamp
     fn timestamp(&self) -> usize;
     /// return `true` if the clause should try vivification
@@ -68,19 +64,25 @@ pub trait ClauseDBIF:
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
     /// return a watcher list for binclauses
     fn bin_watcher_list(&self, l: Lit) -> &Vec<Watch>;
-    /// return the list of bin_watch lists
-    fn bin_watcher_lists(&self) -> &[Vec<Watch>];
     /// return a mutable watcher list
     fn watcher_list_mut(&mut self, l: Lit) -> &mut Vec<Watch>;
-    /// return the mutable list of watch lists
-    fn watcher_lists_mut(&mut self) -> &mut [Vec<Watch>];
-    /// detach the two watches of the clause
-    fn detach_watches(&mut self, cid: ClauseId) -> (Watch, Watch);
     /// update watches of the clause
     fn update_watch(&mut self, cid: ClauseId, old: usize, new: usize, watch: Option<usize>);
+    /// allocate a new clause and return its id.
+    /// * If `level_sort` is on, register `v` as a learnt after sorting based on assign level.
+    /// * Otherwise, register `v` as a permanent clause, which rank is zero.
+    fn new_clause<A>(
+        &mut self,
+        asg: &mut A,
+        v: &mut Vec<Lit>,
+        learnt: bool,
+        level_sort: bool,
+    ) -> ClauseId
+    where
+        A: AssignIF;
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn kill_clause(&mut self, cid: ClauseId);
-    /// check a condition to reduce.
+    /// check the condition to reduce.
     /// * return `true` if reduction is done.
     /// * Otherwise return `false`.
     ///
@@ -97,18 +99,6 @@ pub trait ClauseDBIF:
     fn garbage_collect(&mut self);
     /// return `true` if a literal pair `(l0, l1)` is registered.
     fn registered_bin_clause(&self, l0: Lit, l1: Lit) -> bool;
-    /// allocate a new clause and return its id.
-    /// * If `level_sort` is on, register `v` as a learnt after sorting based on assign level.
-    /// * Otherwise, register `v` as a permanent clause, which rank is zero.
-    fn new_clause<A>(
-        &mut self,
-        asg: &mut A,
-        v: &mut Vec<Lit>,
-        learnt: bool,
-        level_sort: bool,
-    ) -> ClauseId
-    where
-        A: AssignIF;
     /// update LBD then convert a learnt clause to permanent if needed.
     fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where

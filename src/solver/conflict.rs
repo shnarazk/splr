@@ -7,7 +7,7 @@ use {
     },
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-        cdb::{ClauseDB, ClauseDBIF, WatchDBIF},
+        cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
         solver::SolverEvent,
         types::*,
@@ -92,49 +92,15 @@ pub fn handle_conflict(
                 } else {
                     if l0 == decision {
                     } else if l1 == decision {
-                        //c.lits.swap(0, 1);
                         cdb.update_watch(ci, 0, 1, None);
                     } else {
                         for (i, l) in c.iter().enumerate().skip(2) {
                             if *l == decision {
-                                // c.lits.swap(0, i);
                                 cdb.update_watch(ci, 0, i, None);
                                 break;
                             }
                         }
-                        // / for i in 2..c.len() {
-                        // /     let l = c.lits[i];
-                        // /     if l == decision {
-                        // /         // c.lits.swap(0, i);
-                        // /         cdb.update_watch(ci, 0, i);
-                        // /         break;
-                        // /     }
-                        // / }
-                        // / // update and move watch for l0 to watch for decision
-                        // / let mut w0 = cdb.watcher_list_mut(!l0).detach_with(ci).unwrap();
-                        // / w0.blocker = l1;
-                        // / cdb.watcher_list_mut(!decision).register(w0);
-                        // / // update watch for lits[1]
-                        // / cdb.watcher_list_mut(!l1)
-                        // /     .update_blocker(ci, decision)
-                        // /     .unwrap();
-                        // / /* let l1 = c.lits[1];
-                        // / assert_eq!(l0, c.lits[0]);
-                        // / let mut w = cdb.watcher_list_mut(!l0).detach_with(ci).unwrap();
-                        // / w.blocker = decision;
-                        // / debug_assert_ne!(l0.vi(), decision.vi());
-                        // / debug_assert!(!asg.var(l0.vi()).is(Flag::ELIMINATED));
-                        // / debug_assert_ne!(w.blocker, l0);
-                        // / assert_ne!(decision, w.blocker);
-                        // / cdb.watcher_list_mut(!decision).register(w); */
                     }
-                    // let p = c.lits[0];
-                    // let q = c.lits[1];
-                    // let (mut w1, mut w2) = cdb.detach_watches(ci);
-                    // w1.blocker = q;
-                    // w2.blocker = p;
-                    // cdb.watcher_list_mut(!p).register(w1);
-                    // cdb.watcher_list_mut(!q).register(w2);
                     asg.assign_by_implication(
                         decision,
                         AssignReason::Implication(ci, NULL_LIT),
