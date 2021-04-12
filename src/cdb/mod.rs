@@ -62,7 +62,7 @@ pub trait ClauseDBIF:
     fn iter(&self) -> Iter<'_, Clause>;
     /// return a mutable iterator.
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
-    /// return a watcher list for binclauses
+    /// return a watcher list for biclauses
     fn bin_watcher_list(&self, l: Lit) -> &Vec<Watch>;
     /// return a mutable watcher list
     fn watcher_list_mut(&mut self, l: Lit) -> &mut Vec<Watch>;
@@ -98,7 +98,7 @@ pub trait ClauseDBIF:
     /// * `kill`
     fn garbage_collect(&mut self);
     /// return `true` if a literal pair `(l0, l1)` is registered.
-    fn registered_bin_clause(&self, l0: Lit, l1: Lit) -> Option<ClauseId>;
+    fn registered_biclause(&self, l0: Lit, l1: Lit) -> Option<ClauseId>;
     /// update LBD then convert a learnt clause to permanent if needed.
     fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where

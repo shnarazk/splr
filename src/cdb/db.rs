@@ -362,12 +362,12 @@ impl ClauseDBIF for ClauseDB {
     /// let l3 = splr::types::Lit::from(3);
     /// cdb.new_clause(&mut asg, &mut vec![l1, l2], false, false);
     /// cdb.new_clause(&mut asg, &mut vec![!l1, !l2, !l3], false, false);
-    /// assert!(cdb.registered_bin_clause(l1, l2));
-    /// assert!(!cdb.registered_bin_clause(!l1, l2));
-    /// assert!(!cdb.registered_bin_clause(l1, !l2));
-    /// assert!(!cdb.registered_bin_clause(!l1, !l2));
+    /// assert!(cdb.registered_biclause(l1, l2));
+    /// assert!(!cdb.registered_biclause(!l1, l2));
+    /// assert!(!cdb.registered_biclause(l1, !l2));
+    /// assert!(!cdb.registered_biclause(!l1, !l2));
     ///```
-    fn registered_bin_clause(&self, l0: Lit, l1: Lit) -> Option<ClauseId> {
+    fn registered_biclause(&self, l0: Lit, l1: Lit) -> Option<ClauseId> {
         for w in self.bin_watcher_list(!l0) {
             if w.blocker == l1 {
                 return Some(w.c);
@@ -404,7 +404,7 @@ impl ClauseDBIF for ClauseDB {
             // vec.swap(1, i_max);
         }
         if vec.len() == 2 {
-            if let Some(cid) = self.registered_bin_clause(vec[0], vec[1]) {
+            if let Some(cid) = self.registered_biclause(vec[0], vec[1]) {
                 return cid;
             }
         }

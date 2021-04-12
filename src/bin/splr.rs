@@ -260,7 +260,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             "c       Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{},\n",
             format!("{:>9}", state[LogUsizeId::RemovableClause]),
             format!("{:>9}", state[LogUsizeId::LBD2Clause]),
-            format!("{:>9}", state[LogUsizeId::Binclause]),
+            format!("{:>9}", state[LogUsizeId::BiClause]),
             format!("{:>9}", state[LogUsizeId::PermanentClause]),
         )
         .as_bytes(),

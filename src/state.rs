@@ -544,7 +544,7 @@ impl StateIF for State {
             im!(
                 "{:>9}",
                 self,
-                LogUsizeId::Binclause,
+                LogUsizeId::BiClause,
                 cdb_num_biclause // cdb_num_bi_learnt
             ),
             im!(
@@ -639,7 +639,7 @@ impl State {
             / asg.derefer(assign::property::Tusize::NumVar) as f64;
         self[LogUsizeId::RemovableClause] = cdb.derefer(cdb::property::Tusize::NumLearnt);
         self[LogUsizeId::LBD2Clause] = cdb.derefer(cdb::property::Tusize::NumLBD2);
-        self[LogUsizeId::Binclause] = cdb.derefer(cdb::property::Tusize::NumBiClause);
+        self[LogUsizeId::BiClause] = cdb.derefer(cdb::property::Tusize::NumBiClause);
         self[LogUsizeId::PermanentClause] =
             cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
         self[LogUsizeId::RestartBlock] = rst.derefer(solver::restart::property::Tusize::NumBlock);
@@ -860,7 +860,7 @@ pub enum LogUsizeId {
     //
     RemovableClause,
     LBD2Clause,
-    Binclause,
+    BiClause,
     PermanentClause,
 
     //

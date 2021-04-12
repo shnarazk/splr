@@ -77,7 +77,7 @@ where
                         }
                     }
                     2 => {
-                        if cdb.registered_bin_clause((*vec)[0], (*vec)[1]).is_none() {
+                        if cdb.registered_biclause((*vec)[0], (*vec)[1]).is_none() {
                             let cid = cdb.new_clause(
                                 asg,
                                 &mut *vec,
