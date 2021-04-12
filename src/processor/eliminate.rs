@@ -118,7 +118,7 @@ where
                     cdb.make_permanent_immortal(*cid);
                 }
             }
-            cdb.detach(*cid);
+            cdb.kill_clause(*cid);
             elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
         }
         for cid in &*neg {
@@ -129,7 +129,7 @@ where
                     cdb.make_permanent_immortal(*cid);
                 }
             }
-            cdb.detach(*cid);
+            cdb.kill_clause(*cid);
             elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
         }
         elim[vi].clear();
@@ -189,13 +189,13 @@ where
     let qpb = &cdb[cq];
     let ps_smallest = pqb.len() < qpb.len();
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
-    let mut size = pb.lits.len() + 1;
-    'next_literal: for l in &qb.lits {
+    let mut size = pb.len() + 1;
+    'next_literal: for l in qb.iter() {
         if asg.var(l.vi()).is(Flag::ELIMINATED) {
             continue;
         }
         if l.vi() != v {
-            for j in &pb.lits {
+            for j in pb.iter() {
                 if asg.var(j.vi()).is(Flag::ELIMINATED) {
                     continue;
                 }
@@ -226,9 +226,9 @@ where
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
     #[cfg(feature = "trace_elimination")]
     println!("# merge {} & {}", pb, qb);
-    'next_literal: for l in &qb.lits {
+    'next_literal: for l in qb.iter() {
         if l.vi() != v {
-            for j in &pb.lits {
+            for j in pb.iter() {
                 if j.vi() == l.vi() {
                     if !*j == *l {
                         return 0;
@@ -240,7 +240,7 @@ where
             vec.push(*l);
         }
     }
-    for l in &pb.lits {
+    for l in pb.iter() {
         if l.vi() != v {
             vec.push(*l);
         }
@@ -296,7 +296,7 @@ where
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:
     let c = &cdb[cid];
     debug_assert!(!c.is_empty());
-    for l in &c.lits {
+    for l in c.iter() {
         vec.push(*l);
         if l.vi() == vi {
             let index = vec.len() - 1;

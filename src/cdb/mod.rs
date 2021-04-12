@@ -11,7 +11,6 @@ mod watch;
 
 pub use self::{
     cid::ClauseIdIF,
-    clause::ClauseIF,
     property::*,
     unsat_certificate::CertificationStore,
     watch::{Watch, WatchDBIF},
@@ -24,6 +23,36 @@ use {
         slice::{Iter, IterMut},
     },
 };
+
+/// API for Clause, providing literal accessors.
+pub trait ClauseIF {
+    /// return true if it contains no literals; a clause after unit propagation.
+    fn is_empty(&self) -> bool;
+    /// return 1st watch
+    fn lit0(&self) -> Lit;
+    /// return 2nd watch
+    fn lit1(&self) -> Lit;
+    /// terun true if the clause contanis the literal
+    fn contains(&self, lit: Lit) -> bool;
+    /// check clause satisfiability
+    fn is_satisfied_under<A>(&self, asg: &A) -> bool
+    where
+        A: AssignIF;
+    /// return an iterator over its literals.
+    fn iter(&self) -> Iter<'_, Lit>;
+    /// return the number of literals.
+    fn len(&self) -> usize;
+    /// update rank field with the present LBD.
+    fn update_lbd<A>(&mut self, asg: &A, lbd_temp: &mut [usize]) -> usize
+    where
+        A: AssignIF;
+    /// return timestamp
+    fn timestamp(&self) -> usize;
+    /// return `true` if the clause should try vivification
+    fn to_vivify(&self, threshold: usize) -> Option<f64>;
+    /// clear flags about vivification
+    fn vivified(&mut self);
+}
 
 /// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`watcher_list`](`crate::cdb::ClauseDBIF::watcher_list`), and so on.
 pub trait ClauseDBIF:
@@ -51,8 +80,10 @@ pub trait ClauseDBIF:
     fn watcher_lists_mut(&mut self) -> &mut [Vec<Watch>];
     /// detach the two watches of the clause
     fn detach_watches(&mut self, cid: ClauseId) -> (Watch, Watch);
+    /// update watches of the clause
+    fn update_watch(&mut self, cid: ClauseId, old: usize, new: usize, watch: Option<Watch>);
     /// un-register a clause `cid` from clause database and make the clause dead.
-    fn detach(&mut self, cid: ClauseId);
+    fn kill_clause(&mut self, cid: ClauseId);
     /// check a condition to reduce.
     /// * return `true` if reduction is done.
     /// * Otherwise return `false`.
@@ -82,16 +113,10 @@ pub trait ClauseDBIF:
     ) -> ClauseId
     where
         A: AssignIF;
-    /// new_clause during vivification
-    fn new_clause_sandbox<A>(&mut self, asg: &mut A, vec: &mut Vec<Lit>) -> ClauseId
-    where
-        A: AssignIF;
     /// update LBD then convert a learnt clause to permanent if needed.
     fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where
         A: AssignIF;
-    /// return the number of clauses which satisfy given flags and aren't DEAD.
-    fn countf(&self, mask: Flag) -> usize;
     /// record an asserted literal to unsat certification.
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.
@@ -119,7 +144,7 @@ pub trait ClauseDBIF:
     #[cfg(feature = "incremental_solver")]
     /// save an eliminated permanent clause to an extra space for incremental solving.
     fn make_permanent_immortal(&mut self, cid: ClauseId);
-    fn watches(&self, cid: ClauseId) -> (Lit, Lit);
+    fn watches(&self, cid: ClauseId, message: &str) -> (Lit, Lit);
 }
 
 /// Clause identifier, or clause index, starting with one.
@@ -141,7 +166,7 @@ impl ClauseId {
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Clause {
     /// The literals in a clause.
-    pub lits: Vec<Lit>,
+    lits: Vec<Lit>,
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: u16,
     /// the index from which `propagate` starts searching an un-falsified literal.

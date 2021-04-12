@@ -301,9 +301,7 @@ impl AssignIF for AssignStack {
         false
     }
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
-        let lits = &c.lits;
-        debug_assert!(1 < lits.len());
-        let l0 = lits[0];
+        let l0 = c.lit0();
         self.assigned(l0) == Some(true)
             && matches!(self.reason(l0.vi()), AssignReason::Implication(x, _) if x == cid)
     }
@@ -331,7 +329,7 @@ impl AssignIF for AssignStack {
                 if c.is(Flag::DEAD) {
                     continue;
                 }
-                for l in &c.lits {
+                for l in c.iter() {
                     buf.write_all(format!("{} ", i32::from(*l)).as_bytes())
                         .unwrap();
                 }

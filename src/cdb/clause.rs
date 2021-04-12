@@ -7,24 +7,6 @@ use {
     },
 };
 
-/// API for Clause, providing literal accessors.
-pub trait ClauseIF {
-    /// return true if it contains no literals; a clause after unit propagation.
-    fn is_empty(&self) -> bool;
-    /// return an iterator over its literals.
-    fn iter(&self) -> Iter<'_, Lit>;
-    /// return the number of literals.
-    fn len(&self) -> usize;
-    /// update rank field with the present LBD.
-    fn update_lbd<A>(&mut self, asg: &A, lbd_temp: &mut [usize]) -> usize
-    where
-        A: AssignIF;
-    /// return `true` if the clause should try vivification
-    fn to_vivify(&self, threshold: usize) -> Option<f64>;
-    /// clear flags about vivification
-    fn vivified(&mut self);
-}
-
 impl Default for Clause {
     fn default() -> Clause {
         Clause {
@@ -112,6 +94,28 @@ impl ClauseIF for Clause {
     fn iter(&self) -> Iter<'_, Lit> {
         self.lits.iter()
     }
+    #[inline]
+    fn lit0(&self) -> Lit {
+        self.lits[0]
+    }
+    #[inline]
+    fn lit1(&self) -> Lit {
+        self.lits[1]
+    }
+    fn contains(&self, lit: Lit) -> bool {
+        self.lits.contains(&lit)
+    }
+    fn is_satisfied_under<A>(&self, asg: &A) -> bool
+    where
+        A: AssignIF,
+    {
+        for l in self.lits.iter() {
+            if asg.assigned(*l) == Some(true) {
+                return true;
+            }
+        }
+        false
+    }
     fn len(&self) -> usize {
         self.lits.len()
     }
@@ -138,6 +142,9 @@ impl ClauseIF for Clause {
             self.rank = cnt;
             cnt as usize
         }
+    }
+    fn timestamp(&self) -> usize {
+        self.timestamp
     }
     fn to_vivify(&self, threshold: usize) -> Option<f64> {
         if !self.is(Flag::DEAD)

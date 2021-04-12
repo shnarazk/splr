@@ -282,7 +282,7 @@ impl EliminateIF for Eliminator {
             return;
         }
         let evo = self.eliminate_var_occurrence_limit;
-        for l in &c.lits {
+        for l in c.iter() {
             let v = &mut asg.var_mut(l.vi());
             let w = &mut self[l.vi()];
             v.turn_on(Flag::TOUCHED);
@@ -322,7 +322,7 @@ impl EliminateIF for Eliminator {
         debug_assert!(!cid.is_lifted_lit());
         c.turn_off(Flag::OCCUR_LINKED);
         debug_assert!(c.is(Flag::DEAD));
-        for l in &c.lits {
+        for l in c.iter() {
             if asg.assign(l.vi()).is_none() {
                 self.remove_lit_occur(asg, *l, cid);
                 self.enqueue_var(asg, l.vi(), true);
@@ -390,14 +390,13 @@ impl Eliminator {
                 let mut tmp = cdb.derefer(cdb::property::Tusize::NumClause);
                 let c = &mut cdb[cid];
                 c.turn_off(Flag::ENQUEUED);
-                let lits = &c.lits;
-                if c.is(Flag::DEAD) || self.subsume_literal_limit < lits.len() {
+                if c.is(Flag::DEAD) || self.subsume_literal_limit < c.len() {
                     continue;
                 }
                 // if c is subsumed by c', both of c and c' are included in the occurs of all literals of c
                 // so searching the shortest occurs is most efficient.
                 let mut b = 0;
-                for l in lits {
+                for l in c.iter() {
                     let v = &asg.var(l.vi());
                     let w = &self[l.vi()];
                     if asg.assign(l.vi()).is_some() || w.aborted {
@@ -546,17 +545,17 @@ impl Eliminator {
         self.num_sat_elimination += 1;
         for ci in 1..cdb.len() {
             let cid = ClauseId::from(ci);
-            if !cdb[cid].is(Flag::DEAD) && asg.satisfies(&cdb[cid].lits) {
-                cdb.detach(cid);
+            if !cdb[cid].is(Flag::DEAD) && cdb[cid].is_satisfied_under(asg) {
                 let c = &mut cdb[cid];
                 if self.is_running() {
                     if update_occur {
                         self.remove_cid_occur(asg, cid, c);
                     }
-                    for l in &c.lits {
+                    for l in c.iter() {
                         self.enqueue_var(asg, l.vi(), true);
                     }
                 }
+                cdb.kill_clause(cid);
             }
         }
         cdb.garbage_collect();
@@ -590,7 +589,7 @@ impl Eliminator {
     pub fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause) {
         if self.mode != EliminatorMode::Running
             || c.is(Flag::ENQUEUED)
-            || self.subsume_literal_limit < c.lits.len()
+            || self.subsume_literal_limit < c.len()
         {
             return;
         }
@@ -655,7 +654,7 @@ where
         if c.is(Flag::DEAD) {
             continue;
         }
-        for l in &c.lits {
+        for l in c.iter() {
             let v = l.vi();
             if bool::from(*l) {
                 if !elim[v].pos_occurs.contains(&(ClauseId::from(cid))) {

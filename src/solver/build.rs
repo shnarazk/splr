@@ -279,7 +279,7 @@ impl SatSolverIF for Solver {
                 if c.is(Flag::DEAD) {
                     continue;
                 }
-                for l in &c.lits {
+                for l in c.iter() {
                     buf.write_all(format!("{} ", i32::from(*l)).as_bytes())
                         .unwrap();
                 }

@@ -49,8 +49,7 @@ impl Instantiate for CertificationStore {
     fn instantiate(config: &Config, _cnf: &CNFDescription) -> Self {
         #[cfg(not(feature = "no_IO"))]
         if config.use_certification {
-            let mut queue = Vec::new();
-            queue.push((CertifiedRecord::Sentinel, Vec::new()));
+            let queue = vec![(CertifiedRecord::Sentinel, Vec::new())];
             let cert: PathBuf = config.io_odir.join(&config.io_pfile);
             if let Ok(out) = File::create(&cert) {
                 return CertificationStore {

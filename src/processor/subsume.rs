@@ -23,11 +23,11 @@ impl Eliminator {
                     "BackSubsC    => {} {} subsumed completely by {} {:#}",
                     did, cdb[did], cid, cdb[cid],
                 );
-                cdb.detach(did);
                 self.remove_cid_occur(asg, did, &mut cdb[did]);
                 if !cdb[did].is(Flag::LEARNT) {
                     cdb[cid].turn_off(Flag::LEARNT);
                 }
+                cdb.kill_clause(did);
                 self.num_subsumed += 1;
             }
             // To avoid making a big clause, we have to add a condition for combining them.
@@ -52,7 +52,7 @@ where
     if cid.is_lifted_lit() {
         let l = Lit::from(cid);
         let oh = &cdb[other];
-        for lo in &oh.lits {
+        for lo in oh.iter() {
             if l == !*lo {
                 return Some(l);
             }
@@ -62,10 +62,10 @@ where
     let mut ret: Lit = NULL_LIT;
     let ch = &cdb[cid];
     let ob = &cdb[other];
-    debug_assert!(ob.lits.contains(&ob[0]));
-    debug_assert!(ob.lits.contains(&ob[1]));
-    'next: for l in &ch.lits {
-        for lo in &ob.lits {
+    debug_assert!(ob.contains(ob[0]));
+    debug_assert!(ob.contains(ob[1]));
+    'next: for l in ch.iter() {
+        for lo in ob.iter() {
             if *l == *lo {
                 continue 'next;
             } else if ret == NULL_LIT && *l == !*lo {
@@ -108,9 +108,9 @@ where
             cid, cdb[cid], c0,
         );
 
-        cdb.detach(cid);
-        elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
         cdb.certificate_add_assertion(c0);
+        cdb.kill_clause(cid);
+        elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
         asg.assign_at_root_level(c0)
     } else {
         #[cfg(feature = "trace_elimination")]
