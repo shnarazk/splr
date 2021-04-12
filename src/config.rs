@@ -132,7 +132,7 @@ impl Default for Config {
             no_color: false,
             quiet_mode: false,
             show_journal: false,
-            use_certification: false,
+            use_certification: true,
             use_log: false,
 
             crw_dcy_rat: 0.95,
