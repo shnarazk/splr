@@ -265,7 +265,7 @@ impl ClauseDBIF for ClauseDB {
         }
         (w1.unwrap(), w2.unwrap())
     }
-    fn update_watch(&mut self, cid: ClauseId, old: usize, new: usize, watch: Option<Watch>) {
+    fn update_watch(&mut self, cid: ClauseId, old: usize, new: usize, watch: Option<usize>) {
         if old < 2 && new < 2 {
             self[cid].lits.swap(old, new);
             return;
@@ -279,9 +279,9 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         let c = &mut clause[cid.ordinal as usize];
         let other = (old == 0) as usize;
-        let w1 = if let Some(w) = watch {
+        let w1 = if let Some(n) = watch {
             // w.blocker = c.lits[other];
-            w
+            watcher[!c.lits[old]].detach(n)
         } else {
             watcher[!c.lits[old]].detach_with(cid).unwrap()
         };

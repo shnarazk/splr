@@ -2,10 +2,7 @@
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
     super::{AssignIF, AssignStack, VarHeapIF},
-    crate::{
-        cdb::{ClauseDBIF, WatchDBIF},
-        types::*,
-    },
+    crate::{cdb::ClauseDBIF, types::*},
 };
 
 /// API for Boolean Constraint Propagation like [`propagate`](`crate::assign::PropagateIF::propagate`), [`assign_by_decision`](`crate::assign::PropagateIF::assign_by_decision`), [`cancel_until`](`crate::assign::PropagateIF::cancel_until`), and so on.
@@ -306,7 +303,7 @@ impl PropagateIF for AssignStack {
                     for (k, lk) in c.iter().enumerate().skip(2) {
                         if lit_assign!(self, *lk) != Some(false) {
                             n -= 1;
-                            cdb.update_watch(cid, 1 - other_watch_pos, k, Some(source.detach(n)));
+                            cdb.update_watch(cid, 1 - other_watch_pos, k, Some(n));
                             cdb.watches(cid, "propagate478");
                             continue 'next_clause;
                         }
@@ -427,7 +424,7 @@ impl PropagateIF for AssignStack {
                     for (k, lk) in c.iter().enumerate().skip(2) {
                         if lit_assign!(self, *lk) != Some(false) {
                             n -= 1;
-                            cdb.update_watch(cid, 1 - other_watch_pos, k, Some(source.detach(n)));
+                            cdb.update_watch(cid, 1 - other_watch_pos, k, Some(n));
                             cdb.watches(cid, "propagate478");
                             continue 'next_clause;
                         }

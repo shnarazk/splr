@@ -9,14 +9,10 @@ mod unsat_certificate;
 /// methods on `Watch` and `WatchDB`
 mod watch;
 
-pub use self::{
-    cid::ClauseIdIF,
-    property::*,
-    unsat_certificate::CertificationStore,
-    watch::{Watch, WatchDBIF},
-};
+pub use self::{cid::ClauseIdIF, property::*, unsat_certificate::CertificationStore, watch::Watch};
 
 use {
+    self::watch::WatchDBIF,
     crate::{assign::AssignIF, types::*},
     std::{
         ops::IndexMut,
@@ -81,7 +77,7 @@ pub trait ClauseDBIF:
     /// detach the two watches of the clause
     fn detach_watches(&mut self, cid: ClauseId) -> (Watch, Watch);
     /// update watches of the clause
-    fn update_watch(&mut self, cid: ClauseId, old: usize, new: usize, watch: Option<Watch>);
+    fn update_watch(&mut self, cid: ClauseId, old: usize, new: usize, watch: Option<usize>);
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn kill_clause(&mut self, cid: ClauseId);
     /// check a condition to reduce.
