@@ -302,7 +302,7 @@ impl PropagateIF for AssignStack {
                         if lit_assign!(self, *lk) != Some(false) {
                             n -= 1;
                             cdb.update_watch(cid, 1 - other_watch_pos, k, Some(n));
-                            cdb.watches(cid, "propagate478");
+                            // cdb.watches(cid, "propagate478");
                             continue 'next_clause;
                         }
                     }
@@ -313,7 +313,7 @@ impl PropagateIF for AssignStack {
                         self.num_conflict += 1;
                         self.dpc_ema.update(self.num_decision);
                         self.ppc_ema.update(self.num_propagation);
-                        cdb.watches(w.c, "propagate363");
+                        // cdb.watches(w.c, "propagate363");
                         return cid;
                     }
                     let lv = cdb[cid]
@@ -328,7 +328,7 @@ impl PropagateIF for AssignStack {
                         AssignReason::Implication(w.c, NULL_LIT),
                         lv,
                     );
-                    cdb.watches(w.c, "propagate377");
+                    // cdb.watches(w.c, "propagate377");
                 }
             }
         }
@@ -421,7 +421,7 @@ impl PropagateIF for AssignStack {
                         if lit_assign!(self, *lk) != Some(false) {
                             n -= 1;
                             cdb.update_watch(cid, 1 - other_watch_pos, k, Some(n));
-                            cdb.watches(cid, "propagate478");
+                            // cdb.watches(cid, "propagate478");
                             continue 'next_clause;
                         }
                     }
@@ -429,7 +429,7 @@ impl PropagateIF for AssignStack {
                         cdb.update_watch(cid, 0, 1, None);
                     }
                     if other_watch_value == Some(false) {
-                        cdb.watches(w.c, "propagate488");
+                        // cdb.watches(w.c, "propagate488");
                         return cid;
                     }
                     let lv = cdb[cid]
@@ -443,7 +443,7 @@ impl PropagateIF for AssignStack {
                         AssignReason::Implication(w.c, NULL_LIT),
                         lv,
                     );
-                    cdb.watches(w.c, "propagate501");
+                    // cdb.watches(w.c, "propagate501");
                 }
             }
         }
