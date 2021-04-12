@@ -28,7 +28,7 @@ pub trait ClauseIF {
     fn lit0(&self) -> Lit;
     /// return 2nd watch
     fn lit1(&self) -> Lit;
-    /// terun true if the clause contanis the literal
+    /// return `true` if the clause contanis the literal
     fn contains(&self, lit: Lit) -> bool;
     /// check clause satisfiability
     fn is_satisfied_under<A>(&self, asg: &A) -> bool
@@ -81,7 +81,7 @@ pub trait ClauseDBIF:
     where
         A: AssignIF;
     /// un-register a clause `cid` from clause database and make the clause dead.
-    fn kill_clause(&mut self, cid: ClauseId);
+    fn delete_clause(&mut self, cid: ClauseId);
     /// check the condition to reduce.
     /// * return `true` if reduction is done.
     /// * Otherwise return `false`.
@@ -98,7 +98,7 @@ pub trait ClauseDBIF:
     /// * `kill`
     fn garbage_collect(&mut self);
     /// return `true` if a literal pair `(l0, l1)` is registered.
-    fn registered_bin_clause(&self, l0: Lit, l1: Lit) -> bool;
+    fn registered_bin_clause(&self, l0: Lit, l1: Lit) -> Option<ClauseId>;
     /// update LBD then convert a learnt clause to permanent if needed.
     fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where

@@ -555,7 +555,7 @@ impl Eliminator {
                         self.enqueue_var(asg, l.vi(), true);
                     }
                 }
-                cdb.kill_clause(cid);
+                cdb.delete_clause(cid);
             }
         }
         cdb.garbage_collect();

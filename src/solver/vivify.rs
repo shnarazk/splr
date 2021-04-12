@@ -143,7 +143,7 @@ pub fn vivify(
         debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
         match copied.len() {
             0 if timestamp < average_timestamp => {
-                cdb.kill_clause(cs.to());
+                cdb.delete_clause(cs.to());
                 num_purge += 1;
             }
             0 => (),
@@ -154,7 +154,7 @@ pub fn vivify(
                 // To avoid it, we call `asg.backtrack_sandbox` before it.
                 asg.backtrack_sandbox();
                 cdb.certificate_add_assertion(l0);
-                cdb.kill_clause(cs.to());
+                cdb.delete_clause(cs.to());
                 // cdb.garbage_collect();
                 assert_eq!(asg.assigned(l0), None);
                 asg.assign_at_root_level(l0)?;
@@ -167,8 +167,8 @@ pub fn vivify(
             }
             n if n == clits.len() => (),
             n => {
-                if n == 2 && cdb.registered_bin_clause(copied[0], copied[1]) {
-                    cdb.kill_clause(cs.to());
+                if n == 2 && cdb.registered_bin_clause(copied[0], copied[1]).is_some() {
+                    cdb.delete_clause(cs.to());
                     num_purge += 1;
                 } else {
                     cdb.strengthen_by_vivification(cs.to(), n);

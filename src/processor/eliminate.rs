@@ -77,7 +77,7 @@ where
                         }
                     }
                     2 => {
-                        if !cdb.registered_bin_clause((*vec)[0], (*vec)[1]) {
+                        if cdb.registered_bin_clause((*vec)[0], (*vec)[1]).is_none() {
                             let cid = cdb.new_clause(
                                 asg,
                                 &mut *vec,
@@ -120,7 +120,7 @@ where
                     cdb.make_permanent_immortal(*cid);
                 }
             }
-            cdb.kill_clause(*cid);
+            cdb.delete_clause(*cid);
             elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
         }
         for cid in &*neg {
@@ -131,7 +131,7 @@ where
                     cdb.make_permanent_immortal(*cid);
                 }
             }
-            cdb.kill_clause(*cid);
+            cdb.delete_clause(*cid);
             elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
         }
         elim[vi].clear();

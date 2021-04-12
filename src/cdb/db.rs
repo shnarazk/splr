@@ -367,13 +367,13 @@ impl ClauseDBIF for ClauseDB {
     /// assert!(!cdb.registered_bin_clause(l1, !l2));
     /// assert!(!cdb.registered_bin_clause(!l1, !l2));
     ///```
-    fn registered_bin_clause(&self, l0: Lit, l1: Lit) -> bool {
+    fn registered_bin_clause(&self, l0: Lit, l1: Lit) -> Option<ClauseId> {
         for w in self.bin_watcher_list(!l0) {
             if w.blocker == l1 {
-                return true;
+                return Some(w.c);
             }
         }
-        false
+        None
     }
     fn new_clause<A>(
         &mut self,
@@ -402,6 +402,11 @@ impl ClauseDBIF for ClauseDB {
             //     }
             // }
             // vec.swap(1, i_max);
+        }
+        if vec.len() == 2 {
+            if let Some(cid) = self.registered_bin_clause(vec[0], vec[1]) {
+                return cid;
+            }
         }
         self.certification_store.push_add(vec);
         let cid;
@@ -551,7 +556,7 @@ impl ClauseDBIF for ClauseDB {
     /// this function is the only function that turns `Flag::DEAD` on without calling
     /// `garbage_collect` which erases all the `DEAD` flags. So you must care about how and when
     /// `garbage_collect` is called.
-    fn kill_clause(&mut self, cid: ClauseId) {
+    fn delete_clause(&mut self, cid: ClauseId) {
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count(), self.num_clause);
         let c = &mut self.clause[cid.ordinal as usize];
         debug_assert!(!c.is(Flag::DEAD));
@@ -967,7 +972,7 @@ impl ClauseDB {
         let thr = self.lbd_of_dp_ema.get() as u16;
         for i in &perm[keep..] {
             if thr <= self.clause[i.to()].rank {
-                self.kill_clause(ClauseId::from(i.to()));
+                self.delete_clause(ClauseId::from(i.to()));
             }
         }
         debug_assert!(perm[0..keep]

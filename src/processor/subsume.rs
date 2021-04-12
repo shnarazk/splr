@@ -27,7 +27,7 @@ impl Eliminator {
                 if !cdb[did].is(Flag::LEARNT) {
                     cdb[cid].turn_off(Flag::LEARNT);
                 }
-                cdb.kill_clause(did);
+                cdb.delete_clause(did);
                 self.num_subsumed += 1;
             }
             // To avoid making a big clause, we have to add a condition for combining them.
@@ -109,7 +109,7 @@ where
         );
 
         cdb.certificate_add_assertion(c0);
-        cdb.kill_clause(cid);
+        cdb.delete_clause(cid);
         elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
         asg.assign_at_root_level(c0)
     } else {
