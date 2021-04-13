@@ -15,6 +15,7 @@ use {
     self::watch::WatchDBIF,
     crate::{assign::AssignIF, types::*},
     std::{
+        collections::HashMap,
         ops::IndexMut,
         slice::{Iter, IterMut},
     },
@@ -63,7 +64,7 @@ pub trait ClauseDBIF:
     /// return a mutable iterator.
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
     /// return a watcher list for biclauses
-    fn bin_watcher_list(&self, l: Lit) -> &Vec<Watch>;
+    fn bin_watcher_list(&self, l: Lit) -> &HashMap<Lit, ClauseId>;
     /// return a mutable watcher list
     fn watcher_list_mut(&mut self, l: Lit) -> &mut Vec<Watch>;
     /// update watches of the clause
@@ -139,7 +140,7 @@ pub trait ClauseDBIF:
 
 /// Clause identifier, or clause index, starting with one.
 /// Note: ids are re-used after 'garbage collection'.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ClauseId {
     /// a sequence number.
     pub ordinal: u32,
@@ -181,7 +182,7 @@ pub struct ClauseDB {
     /// container of clauses
     clause: Vec<Clause>,
     /// container of watch literals for binary clauses
-    pub bin_watcher: Vec<Vec<Watch>>,
+    pub bin_watcher: Vec<HashMap<Lit, ClauseId>>,
     /// container of watch literals
     pub watcher: Vec<Vec<Watch>>,
     certification_store: CertificationStore,

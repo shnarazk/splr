@@ -243,28 +243,28 @@ impl PropagateIF for AssignStack {
                 //## binary loop
                 //
                 let bin_source = cdb.bin_watcher_list(*p);
-                for w in bin_source.iter() {
-                    debug_assert!(!cdb[w.c].is(Flag::DEAD));
-                    debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
-                    debug_assert_ne!(w.blocker, false_lit);
+                for (&blocker, &cid) in bin_source.iter() {
+                    debug_assert!(!cdb[cid].is(Flag::DEAD));
+                    debug_assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
+                    debug_assert_ne!(blocker, false_lit);
 
                     #[cfg(feature = "boundary_check")]
                     debug_assert_eq!(cdb[w.c].len(), 2);
 
-                    match lit_assign!(self, w.blocker) {
+                    match lit_assign!(self, blocker) {
                         Some(true) => (),
                         Some(false) => {
                             self.num_conflict += 1;
                             self.dpc_ema.update(self.num_decision);
                             self.ppc_ema.update(self.num_propagation);
-                            return w.c;
+                            return cid;
                         }
                         None => {
                             // self.reward_at_propagation(false_lit.vi());
-                            assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
+                            assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
                             self.assign_by_implication(
-                                w.blocker,
-                                AssignReason::Implication(w.c, false_lit),
+                                blocker,
+                                AssignReason::Implication(cid, false_lit),
                                 *self.level.get_unchecked(false_lit.vi()),
                             );
                         }
@@ -368,24 +368,24 @@ impl PropagateIF for AssignStack {
                 //## binary loop
                 //
                 let bin_source = cdb.bin_watcher_list(*p);
-                for w in bin_source.iter() {
-                    debug_assert!(!cdb[w.c].is(Flag::DEAD));
-                    debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
-                    debug_assert_ne!(w.blocker, false_lit);
+                for (&blocker, &cid) in bin_source.iter() {
+                    debug_assert!(!cdb[cid].is(Flag::DEAD));
+                    debug_assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
+                    debug_assert_ne!(blocker, false_lit);
 
                     #[cfg(feature = "boundary_check")]
                     debug_assert_eq!(cdb[w.c].len(), 2);
 
-                    match lit_assign!(self, w.blocker) {
+                    match lit_assign!(self, blocker) {
                         Some(true) => (),
                         Some(false) => {
-                            return w.c;
+                            return cid;
                         }
                         None => {
-                            assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
+                            assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
                             self.assign_by_implication(
-                                w.blocker,
-                                AssignReason::Implication(w.c, false_lit),
+                                blocker,
+                                AssignReason::Implication(cid, false_lit),
                                 *self.level.get_unchecked(false_lit.vi()),
                             );
                         }
