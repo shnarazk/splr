@@ -330,6 +330,14 @@ impl Index<Lit> for Vec<HashMap<Lit, ClauseId>> {
     }
 }
 
+impl Index<Lit> for Vec<HashMap<ClauseId, Lit>> {
+    type Output = HashMap<ClauseId, Lit>;
+    #[inline]
+    fn index(&self, l: Lit) -> &Self::Output {
+        unsafe { self.get_unchecked(usize::from(l)) }
+    }
+}
+
 impl IndexMut<Lit> for Vec<Vec<Watch>> {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
@@ -338,6 +346,13 @@ impl IndexMut<Lit> for Vec<Vec<Watch>> {
 }
 
 impl IndexMut<Lit> for Vec<HashMap<Lit, ClauseId>> {
+    #[inline]
+    fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
+        unsafe { self.get_unchecked_mut(usize::from(l)) }
+    }
+}
+
+impl IndexMut<Lit> for Vec<HashMap<ClauseId, Lit>> {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
         unsafe { self.get_unchecked_mut(usize::from(l)) }

@@ -92,11 +92,12 @@ pub fn handle_conflict(
                 } else {
                     if l0 == decision {
                     } else if l1 == decision {
-                        cdb.update_watch(ci, 0, 1, None);
+                        cdb.update_watch(ci, 0, 1, false);
+                        // cdb.watches(ci, "after conflict analysis");
                     } else {
                         for (i, l) in c.iter().enumerate().skip(2) {
                             if *l == decision {
-                                cdb.update_watch(ci, 0, i, None);
+                                cdb.update_watch(ci, 0, i, false);
                                 break;
                             }
                         }

@@ -9,10 +9,14 @@ mod unsat_certificate;
 /// methods on `Watch` and `WatchDB`
 mod watch;
 
-pub use self::{cid::ClauseIdIF, property::*, unsat_certificate::CertificationStore, watch::Watch};
+pub use self::{
+    cid::ClauseIdIF,
+    property::*,
+    unsat_certificate::CertificationStore,
+    watch::{Watch, WatchDBIF},
+};
 
 use {
-    self::watch::WatchDBIF,
     crate::{assign::AssignIF, types::*},
     std::{
         collections::HashMap,
@@ -65,10 +69,12 @@ pub trait ClauseDBIF:
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
     /// return a watcher list for biclauses
     fn bin_watcher_list(&self, l: Lit) -> &HashMap<Lit, ClauseId>;
-    /// return a mutable watcher list
-    fn watcher_list_mut(&mut self, l: Lit) -> &mut Vec<Watch>;
+    /// replace the mutable watcher list with an empty one, and return the list
+    fn detach_watcher_list(&mut self, l: Lit) -> HashMap<ClauseId, Lit>;
+    ///
+    fn reregister_watch(&mut self, p: Lit, target: Option<(ClauseId, Lit)>) -> bool;
     /// update watches of the clause
-    fn update_watch(&mut self, cid: ClauseId, old: usize, new: usize, watch: Option<usize>);
+    fn update_watch(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool);
     /// allocate a new clause and return its id.
     /// * If `level_sort` is on, register `v` as a learnt after sorting based on assign level.
     /// * Otherwise, register `v` as a permanent clause, which rank is zero.
@@ -184,7 +190,7 @@ pub struct ClauseDB {
     /// container of watch literals for binary clauses
     pub bin_watcher: Vec<HashMap<Lit, ClauseId>>,
     /// container of watch literals
-    pub watcher: Vec<Vec<Watch>>,
+    pub watcher: Vec<HashMap<ClauseId, Lit>>,
     certification_store: CertificationStore,
     /// a number of clauses to emit out-of-memory exception
     soft_limit: usize,
