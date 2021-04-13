@@ -207,6 +207,7 @@ fn search(
     let mut last_core = 0;
     let progress_step = 5000;
     let mut next_progress = progress_step;
+    let mut vivification_turn = true;
 
     check(asg, cdb, false, "starting search");
 
@@ -267,6 +268,7 @@ fn search(
                             // check(asg, cdb, false, "before elimination");
                             elim.activate();
                             elim.simplify(asg, cdb, rst, state)?;
+                            vivification_turn = true;
                             // check(asg, cdb, false, "after elimination");
                             #[cfg(feature = "trace_equivalency")]
                             if false {
@@ -276,7 +278,8 @@ fn search(
                                     &format!("simplify nc:{}", asg.num_conflict),
                                 );
                             }
-                        } else {
+                        } else if true || vivification_turn {
+                            vivification_turn = false;
                             // check(asg, cdb, false, "before vivification");
                             #[cfg(feature = "clause_vivification")]
                             if vivify(asg, cdb, elim, state).is_err() {
