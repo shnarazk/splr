@@ -110,6 +110,7 @@ where
 
         cdb.certificate_add_assertion(l0);
         elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
+        cdb.delete_clause(cid);
         asg.assign_at_root_level(l0)
     } else {
         #[cfg(feature = "trace_elimination")]

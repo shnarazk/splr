@@ -281,36 +281,12 @@ impl ClauseDBIF for ClauseDB {
                     recycled.insert(blocker, cid);
                     assert!(0 < *num_bi_clause);
                     *num_bi_clause -= 1;
+                    assert!(0 < *num_clause);
                     *num_clause -= 1;
                     c.lits.clear();
                 }
                 false
             });
-            // /let mut n = 0;
-            // /while n < ws.len() {
-            // /    let cid = ws[n].c;
-            // /    let c = &mut clause[cid.ordinal as usize];
-            // /    if !c.is(Flag::DEAD) {
-            // /        n += 1;
-            // /        continue;
-            // /    }
-            // /
-            // /    #[cfg(feature = "boundary_check")]
-            // /    assert!(touched[i + 2]);
-            // /
-            // /    if !c.lits.is_empty() {
-            // /        debug_assert!(c.is(Flag::DEAD));
-            // /        recycled.push(Watch {
-            // /            blocker: NULL_LIT,
-            // /            c: cid,
-            // /        });
-            // /        assert!(0 < self.num_bi_clause);
-            // /        self.num_bi_clause -= 1;
-            // /        self.num_clause -= 1;
-            // /        c.lits.clear();
-            // /    }
-            // /    ws.detach(n);
-            // /}
         }
 
         //
@@ -333,9 +309,10 @@ impl ClauseDBIF for ClauseDB {
                 if !c.lits.is_empty() {
                     debug_assert!(c.is(Flag::DEAD));
                     recycled.insert(cid, blocker);
-                    assert!(0 < *num_bi_clause);
+                    assert!(0 < *num_clause);
                     *num_clause -= 1;
                     if c.is(Flag::LEARNT) {
+                        assert!(0 < *num_learnt);
                         *num_learnt -= 1;
                     }
                     c.lits.clear();
@@ -489,6 +466,193 @@ impl ClauseDBIF for ClauseDB {
         // self.watches(cid, "new_clause");
         cid
     }
+    fn update_watch(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool) {
+        if old < 2 && new < 2 {
+            self.num_reregistration += 1;
+            self[cid].lits.swap(old, new);
+            // self.watches(cid, "after update_watch");
+            return;
+        }
+        assert!(old < 2);
+        assert!(1 < new);
+        let ClauseDB {
+            ref mut clause,
+            ref mut watcher,
+            ..
+        } = self;
+        let c = &mut clause[cid.ordinal as usize];
+        let other = (old == 0) as usize;
+        if !removed {
+            watcher[!c.lits[old]].remove(&cid);
+        }
+        watcher[!c.lits[new]].insert(cid, c.lits[other]);
+        watcher[!c.lits[other]].insert(cid, c.lits[new]);
+        c.lits.swap(old, new);
+        // self.watches(cid, "after update_watch");
+    }
+    // return a Lit if the clause becomes a unit clause.
+    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> Option<Lit> {
+        // self.watches(cid, "before strengthen_by_elimination");
+        debug_assert!(!self[cid].is(Flag::DEAD));
+        debug_assert!(1 < self[cid].len());
+        let ClauseDB {
+            ref mut clause,
+            ref mut bin_watcher,
+            // ref mut watcher,
+            ref mut certification_store,
+            ..
+        } = self;
+        let c = &mut clause[cid.ordinal as usize];
+        // debug_assert!((*ch).lits.contains(&p));
+        // debug_assert!(1 < (*ch).len());
+        if (*c).is(Flag::DEAD) {
+            return None;
+        }
+        debug_assert!(1 < usize::from(!p));
+        let lits = &mut (*c).lits;
+        debug_assert!(1 < lits.len());
+        if lits.len() == 2 {
+            let l0 = lits[(lits[0] == p) as usize];
+            return Some(l0);
+        }
+
+        (*c).search_from = 2;
+        let old_lits = lits.clone();
+
+        // FIX THE LONGSTANDING BUG.
+        // It was occured by failing to retrieve two `Watch`es.
+        //
+        // Since we can't hold an eliminated var in Watch::blocker
+        // by following 'WATCHING LITERAL LIST MANAGEMENT RULES',
+        // we have to update BOTH watching literals even if this is an O(n) operation.
+        let l0 = lits[0];
+        let l1 = lits[1];
+        lits.retain(|&l| l != p);
+        let mut _mes = "strengthen_by_elimination";
+        {
+            if lits.len() == 2 {
+                // check registered biclause
+                // if bin_watcher[!l0].iter().any(|w| w.blocker == l1) {
+                if bin_watcher[!l0].get(&l1).is_some() {
+                    self.num_reregistration += 1;
+                    // `certificate` needs the original literal set.
+                    lits.push(p);
+                    self.delete_clause(cid);
+                    return None;
+                }
+                self.num_bi_clause += 1;
+                if l0 == lits[0] {
+                    if l1 == lits[1] {
+                        // move from watcher for l0 to bin_watcher for l0
+                        self.watcher[!l0].remove(&cid);
+                        self.bin_watcher[!lits[0]].insert(lits[1], cid);
+                        // move from watcher for l1 to bin_watcher for l1
+                        self.watcher[!l1].remove(&cid);
+                        self.bin_watcher[!lits[1]].insert(lits[0], cid);
+                    } else {
+                        // update and move watcher for l0 to bin_watcher from l0
+                        self.watcher[!l0].remove(&cid);
+                        // w0.blocker = lits[1];
+                        self.bin_watcher[!lits[0]].insert(lits[1], cid);
+                        // update and move watcher for l1 to bin_watcher for lits[1]
+                        self.watcher[!l1].remove(&cid);
+                        self.bin_watcher[!lits[1]].insert(lits[0], cid);
+                    }
+                } else if l1 == lits[0] {
+                    if l0 == lits[1] {
+                        // move from watcher for l0 to bin_watcher for l0
+                        self.watcher[!l0].remove(&cid);
+                        self.bin_watcher[!lits[1]].insert(lits[0], cid);
+                        // move from watcher for l1 to bin_watcher for l1
+                        self.watcher[!l1].remove(&cid);
+                        self.bin_watcher[!lits[0]].insert(lits[1], cid);
+                    } else {
+                        // update and move watcher for l0 to bin_watcher for lits[1]
+                        self.watcher[!l0].remove(&cid);
+                        // w0.blocker = lits[0];
+                        self.bin_watcher[!lits[1]].insert(lits[0], cid);
+                        // update and move watcher for l1 to bin_watcher from l1
+                        self.watcher[!l1].remove(&cid);
+                        // w0.blocker = lits[1];
+                        self.bin_watcher[!lits[0]].insert(lits[1], cid);
+                    }
+                } else {
+                    dbg!(l0, l1, lits);
+                    panic!("impossible");
+                }
+            } else if l0 == lits[0] {
+                if l1 == lits[1] {
+                    // nothing to do
+                    // mes = "db796";
+                } else {
+                    // update watch for l0
+                    self.watcher[!lits[0]].insert(cid, lits[1]).unwrap();
+                    // update and move watch for l1 to wactch lits[1]
+                    self.watcher[!l1].remove(&cid);
+                    // w.blocker = lits[0];
+                    self.watcher[!lits[1]].insert(cid, lits[0]);
+                }
+            } else if l1 == lits[0] {
+                if l0 == lits[1] {
+                    // nothing to do
+                    // mes = "db808";
+                } else {
+                    // update watch for l1
+                    self.watcher[!lits[0]].insert(cid, lits[1]);
+                    // update and move watch for l0 to watch for lits[1]
+                    self.watcher[!l0].remove(&cid);
+                    // w.blocker = lits[0];
+                    self.watcher[!lits[1]].insert(cid, lits[0]);
+                }
+            } else {
+                panic!("impossible");
+            }
+        }
+        certification_store.push_add(&c.lits);
+        certification_store.push_delete(&old_lits);
+        // self.watches(cid, mes);
+        None
+    }
+    fn strengthen_by_vivification(&mut self, cid: ClauseId, length: usize) -> Option<ClauseId> {
+        // self.watches(cid, "before strengthen_by_vivificationn");
+        debug_assert!(!self[cid].is(Flag::DEAD));
+        debug_assert!(2 < self[cid].len());
+        assert!(1 < length);
+        let ClauseDB {
+            ref mut clause,
+            ref bin_watcher,
+            ref mut certification_store,
+            ..
+        } = self;
+        let c = &mut clause[cid.ordinal as usize];
+        assert!(length < c.len());
+        c.search_from = 2;
+        c.turn_on(Flag::VIVIFIED);
+        let old_lits = c.lits.clone();
+        c.lits.resize(length, Lit::default());
+        if length == 2 {
+            let lits = &mut (*c).lits;
+            let l0 = lits[0];
+            let l1 = lits[1];
+            if let Some(&cid) = bin_watcher[!l0].get(&l1) {
+                self.num_reregistration += 1;
+                self.delete_clause(cid);
+                return Some(cid);
+            }
+            // move from watcher for l0 to bin_watcher for l0
+            self.watcher[!l0].remove(&cid);
+            self.bin_watcher[!lits[0]].insert(lits[1], cid);
+            // move from watcher for l1 to bin_watcher for l1
+            self.watcher[!l1].remove(&cid);
+            self.bin_watcher[!lits[1]].insert(lits[0], cid);
+            self.num_bi_clause += 1;
+            c.turn_off(Flag::LEARNT);
+        }
+        certification_store.push_add(&c.lits);
+        certification_store.push_delete(&old_lits);
+        // self.watches(cid, "after vivification");
+        None
+    }
     fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where
         A: AssignIF,
@@ -618,248 +782,6 @@ impl ClauseDBIF for ClauseDB {
                 _ => (),
             }
         }
-        None
-    }
-    fn update_watch(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool) {
-        if old < 2 && new < 2 {
-            self.num_reregistration += 1;
-            self[cid].lits.swap(old, new);
-            // self.watches(cid, "after update_watch");
-            return;
-        }
-        assert!(old < 2);
-        assert!(1 < new);
-        let ClauseDB {
-            ref mut clause,
-            ref mut watcher,
-            ..
-        } = self;
-        let c = &mut clause[cid.ordinal as usize];
-        let other = (old == 0) as usize;
-        if !removed {
-            watcher[!c.lits[old]].remove(&cid);
-        }
-        watcher[!c.lits[new]].insert(cid, c.lits[other]);
-        watcher[!c.lits[other]].insert(cid, c.lits[new]);
-        c.lits.swap(old, new);
-        // self.watches(cid, "after update_watch");
-    }
-    // return a Lit if the clause becomes a unit clause.
-    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> Option<Lit> {
-        // self.watches(cid, "before strengthen_by_elimination");
-        debug_assert!(!self[cid].is(Flag::DEAD));
-        debug_assert!(1 < self[cid].len());
-        // self.watches(
-        //     cid,
-        //     &format!("before strengthen_by_elimination {}:{:?}", cid, &self[cid]),
-        // );
-        let ClauseDB {
-            ref mut clause,
-            ref mut bin_watcher,
-            // ref mut watcher,
-            ref mut certification_store,
-            ..
-        } = self;
-        let c = &mut clause[cid.ordinal as usize];
-        // debug_assert!((*ch).lits.contains(&p));
-        // debug_assert!(1 < (*ch).len());
-        if (*c).is(Flag::DEAD) {
-            return None;
-        }
-        debug_assert!(1 < usize::from(!p));
-        let lits = &mut (*c).lits;
-        debug_assert!(1 < lits.len());
-        if lits.len() == 2 {
-            let l0 = lits[(lits[0] == p) as usize];
-            self.delete_clause(cid);
-            return Some(l0);
-        }
-
-        (*c).search_from = 2;
-        let old_lits = lits.clone();
-
-        // FIX THE LONGSTANDING BUG.
-        // It was occured by failing to retrieve two `Watch`es.
-        //
-        // Since we can't hold an eliminated var in Watch::blocker
-        // by following 'WATCHING LITERAL LIST MANAGEMENT RULES',
-        // we have to update BOTH watching literals even if this is an O(n) operation.
-        let l0 = lits[0];
-        let l1 = lits[1];
-        lits.retain(|&l| l != p);
-        let mut _mes = "strengthen_by_elimination";
-        {
-            if lits.len() == 2 {
-                // check registered biclause
-                // if bin_watcher[!l0].iter().any(|w| w.blocker == l1) {
-                if bin_watcher[!l0].get(&l1).is_some() {
-                    self.num_reregistration += 1;
-                    // `certificate` needs the original literal set.
-                    lits.push(p);
-                    self.delete_clause(cid);
-                    return None;
-                }
-
-                if l0 == lits[0] {
-                    if l1 == lits[1] {
-                        // move from watcher for l0 to bin_watcher for l0
-                        let _w0 = self.watcher[!l0].remove(&cid).unwrap();
-                        self.bin_watcher[!lits[0]].insert(lits[1], cid);
-                        // move from watcher for l1 to bin_watcher for l1
-                        let _w1 = self.watcher[!l1].remove(&cid).unwrap();
-                        self.bin_watcher[!lits[1]].insert(lits[0], cid);
-                    } else {
-                        // update and move watcher for l0 to bin_watcher from l0
-                        let mut _w0 = self.watcher[!l0].remove(&cid).unwrap();
-                        // w0.blocker = lits[1];
-                        self.bin_watcher[!lits[0]].insert(lits[1], cid);
-                        // update and move watcher for l1 to bin_watcher for lits[1]
-                        let _w1 = self.watcher[!l1].remove(&cid).unwrap();
-                        self.bin_watcher[!lits[1]].insert(lits[0], cid);
-                    }
-                } else if l1 == lits[0] {
-                    if l0 == lits[1] {
-                        // move from watcher for l0 to bin_watcher for l0
-                        let _w0 = self.watcher[!l0].remove(&cid).unwrap();
-                        self.bin_watcher[!lits[1]].insert(lits[0], cid);
-                        // move from watcher for l1 to bin_watcher for l1
-                        let _w1 = self.watcher[!l1].remove(&cid).unwrap();
-                        self.bin_watcher[!lits[0]].insert(lits[1], cid);
-                    } else {
-                        // update and move watcher for l0 to bin_watcher for lits[1]
-                        let mut _w0 = self.watcher[!l0].remove(&cid).unwrap();
-                        // w0.blocker = lits[0];
-                        self.bin_watcher[!lits[1]].insert(lits[0], cid);
-                        // update and move watcher for l1 to bin_watcher from l1
-                        let mut _w0 = self.watcher[!l1].remove(&cid).unwrap();
-                        // w0.blocker = lits[1];
-                        self.bin_watcher[!lits[0]].insert(lits[1], cid);
-                    }
-                } else {
-                    dbg!(l0, l1, lits);
-                    panic!("impossible");
-                }
-                self.num_bi_clause += 1;
-            } else if l0 == lits[0] {
-                if l1 == lits[1] {
-                    // nothing to do
-                    // mes = "db796";
-                } else {
-                    // update watch for l0
-                    self.watcher[!lits[0]].insert(cid, lits[1]).unwrap();
-                    // update and move watch for l1 to wactch lits[1]
-                    let mut _w = self.watcher[!l1].remove(&cid).unwrap();
-                    // w.blocker = lits[0];
-                    self.watcher[!lits[1]].insert(cid, lits[0]);
-                }
-            } else if l1 == lits[0] {
-                if l0 == lits[1] {
-                    // nothing to do
-                    // mes = "db808";
-                } else {
-                    // update watch for l1
-                    self.watcher[!lits[0]].insert(cid, lits[1]).unwrap();
-                    // update and move watch for l0 to watch for lits[1]
-                    let mut _w = self.watcher[!l0].remove(&cid).unwrap();
-                    // w.blocker = lits[0];
-                    self.watcher[!lits[1]].insert(cid, lits[0]);
-                }
-            } else {
-                panic!("impossible");
-            }
-        }
-        /* {
-        let mut w1: Option<Watch> = None;
-        let mut w2: Option<Watch> = None;
-        let mut found = false;
-        for l in lits.iter() {
-            let w = watcher[!*l].detach_with(cid);
-            if w.is_some() {
-                if found {
-                    w2 = w;
-                    break;
-                } else {
-                    found = true;
-                    w1 = w;
-                }
-            }
-        }
-
-        lits.delete_unstable(|&x| x == p);
-        let q = lits[0];
-        let r = lits[1];
-        match (w1, w2) {
-            (Some(mut w1), Some(mut w2)) => {
-                w1.blocker = r;
-                w2.blocker = q;
-                if lits.len() == 2 {
-                    bin_watcher[!q].register(w1);
-                    bin_watcher[!r].register(w2);
-                    self.num_bi_clause += 1;
-                    if c.is(Flag::LEARNT) {
-                        c.turn_off(Flag::LEARNT);
-                        c.rank = 1;
-                        self.num_learnt -= 1;
-                        self.num_bi_learnt += 1;
-                    }
-                } else {
-                    watcher[!q].register(w1);
-                    watcher[!r].register(w2);
-                }
-            }
-            _ => panic!("fix me"),
-        }
-        } */
-        certification_store.push_add(&c.lits);
-        certification_store.push_delete(&old_lits);
-        // self.watches(cid, mes);
-        None
-    }
-    fn strengthen_by_vivification(&mut self, cid: ClauseId, length: usize) -> Option<ClauseId> {
-        // self.watches(cid, "before strengthen_by_vivificationn");
-        debug_assert!(!self[cid].is(Flag::DEAD));
-        debug_assert!(2 < self[cid].len());
-        assert!(1 < length);
-        // self.watches(
-        //     cid,
-        //     &format!("before strengthen_by_elimination {}:{:?}", cid, &self[cid]),
-        // );
-        let ClauseDB {
-            ref mut clause,
-            ref bin_watcher,
-            ref mut certification_store,
-            ..
-        } = self;
-        let c = &mut clause[cid.ordinal as usize];
-        assert!(length < c.len());
-        c.search_from = 2;
-        c.turn_on(Flag::VIVIFIED);
-        let old_lits = c.lits.clone();
-        if c.len() == 2 {
-            let lits = &mut (*c).lits;
-            let l0 = lits[0];
-            let l1 = lits[1];
-
-            if length == 2 {
-                if let Some(&cid) = bin_watcher[!l0].get(&l1) {
-                    self.num_reregistration += 1;
-                    self.delete_clause(cid);
-                    return Some(cid);
-                }
-            }
-
-            // move from watcher for l0 to bin_watcher for l0
-            let _w0 = self.watcher[!l0].remove(&cid).unwrap();
-            self.bin_watcher[!lits[0]].insert(lits[1], cid);
-            // move from watcher for l1 to bin_watcher for l1
-            let _w1 = self.watcher[!l1].remove(&cid).unwrap();
-            self.bin_watcher[!lits[1]].insert(lits[0], cid);
-            self.num_bi_clause += 1;
-            c.turn_off(Flag::LEARNT);
-        }
-        certification_store.push_add(&c.lits);
-        certification_store.push_delete(&old_lits);
-        // self.watches(cid, "after vivification");
         None
     }
     fn minimize_with_biclauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)

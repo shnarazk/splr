@@ -2,7 +2,7 @@
 /// some common traits.
 pub use crate::{
     assign::AssignReason,
-    cdb::{Clause, ClauseIF, ClauseId, ClauseIdIF, Watch},
+    cdb::{Clause, ClauseIF, ClauseId, ClauseIdIF},
     config::Config,
 };
 use {
@@ -314,14 +314,6 @@ impl IndexMut<Lit> for Vec<bool> {
     }
 }
 
-impl Index<Lit> for Vec<Vec<Watch>> {
-    type Output = Vec<Watch>;
-    #[inline]
-    fn index(&self, l: Lit) -> &Self::Output {
-        unsafe { self.get_unchecked(usize::from(l)) }
-    }
-}
-
 impl Index<Lit> for Vec<HashMap<Lit, ClauseId>> {
     type Output = HashMap<Lit, ClauseId>;
     #[inline]
@@ -335,13 +327,6 @@ impl Index<Lit> for Vec<HashMap<ClauseId, Lit>> {
     #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
         unsafe { self.get_unchecked(usize::from(l)) }
-    }
-}
-
-impl IndexMut<Lit> for Vec<Vec<Watch>> {
-    #[inline]
-    fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        unsafe { self.get_unchecked_mut(usize::from(l)) }
     }
 }
 

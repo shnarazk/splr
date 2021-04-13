@@ -10,10 +10,7 @@ mod unsat_certificate;
 mod watch;
 
 pub use self::{
-    cid::ClauseIdIF,
-    property::*,
-    unsat_certificate::CertificationStore,
-    watch::{Watch, WatchDBIF},
+    cid::ClauseIdIF, property::*, unsat_certificate::CertificationStore, watch::WatchDBIF,
 };
 
 use {
