@@ -293,7 +293,7 @@ impl PropagateIF for AssignStack {
                     let cid = w.c;
                     let c = &mut cdb[cid];
                     debug_assert!(c.lit0() == false_lit || c.lit1() == false_lit);
-                    let other_watch_pos = (c.lit1() == w.blocker) as usize;
+                    let false_watch_pos = (c.lit0() == w.blocker) as usize;
                     // assert_ne!(lit_assign!(self, lits[0]), Some(false));
 
                     //
@@ -304,12 +304,12 @@ impl PropagateIF for AssignStack {
                     for (k, lk) in c.iter().enumerate().skip(2) {
                         if lit_assign!(self, *lk) != Some(false) {
                             n -= 1;
-                            cdb.update_watch(cid, 1 - other_watch_pos, k, Some(n));
+                            cdb.update_watch(cid, false_watch_pos, k, Some(n));
                             // cdb.watches(cid, "propagate478");
                             continue 'next_clause;
                         }
                     }
-                    if c.lit0() == false_lit {
+                    if false_watch_pos == 0 {
                         cdb.update_watch(cid, 0, 1, None);
                     }
                     if other_watch_value == Some(false) {
@@ -414,7 +414,7 @@ impl PropagateIF for AssignStack {
                     let cid = w.c;
                     let c = &mut cdb[cid];
                     assert!(c.lit0() == false_lit || c.lit1() == false_lit);
-                    let other_watch_pos = (c.lit1() == w.blocker) as usize;
+                    let false_watch_pos = (c.lit0() == w.blocker) as usize;
 
                     //
                     //## Search an un-falsified literal
@@ -423,12 +423,12 @@ impl PropagateIF for AssignStack {
                     for (k, lk) in c.iter().enumerate().skip(2) {
                         if lit_assign!(self, *lk) != Some(false) {
                             n -= 1;
-                            cdb.update_watch(cid, 1 - other_watch_pos, k, Some(n));
+                            cdb.update_watch(cid, false_watch_pos, k, Some(n));
                             // cdb.watches(cid, "propagate478");
                             continue 'next_clause;
                         }
                     }
-                    if c.lit0() == false_lit {
+                    if false_watch_pos == 0 {
                         cdb.update_watch(cid, 0, 1, None);
                     }
                     if other_watch_value == Some(false) {
