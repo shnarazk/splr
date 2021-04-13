@@ -121,10 +121,11 @@ pub trait ClauseDBIF:
     /// removes an eliminated Lit `p` from a clause. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
     /// And this is called only from `Eliminator::strengthen_clause`.
-    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> bool;
+    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> Option<Lit>;
     /// shorten a clause.
     /// None: new_size should be larger than or equal to 2.
-    fn strengthen_by_vivification(&mut self, cid: ClauseId, length: usize);
+    /// return `Some(cid)` if the new clause is equal to a registered binclause.
+    fn strengthen_by_vivification(&mut self, cid: ClauseId, length: usize) -> Option<ClauseId>;
     /// minimize a clause.
     fn minimize_with_biclauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
     where

@@ -167,11 +167,9 @@ pub fn vivify(
             }
             n if n == clits.len() => (),
             n => {
-                if n == 2 && cdb.registered_biclause(copied[0], copied[1]).is_some() {
-                    cdb.delete_clause(cs.to());
+                if cdb.strengthen_by_vivification(cs.to(), n).is_some() {
                     num_purge += 1;
                 } else {
-                    cdb.strengthen_by_vivification(cs.to(), n);
                     elim.to_simplify += 1.0 / (2 as f64).powf(1.4);
                     num_shrink += 1;
                 }

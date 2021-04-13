@@ -369,6 +369,9 @@ impl ClauseDBIF for ClauseDB {
     /// assert!(!cdb.registered_biclause(l1, !l2));
     /// assert!(!cdb.registered_biclause(!l1, !l2));
     ///```
+    ///
+    /// this is equivalent to the following:
+    /// bin_watcher[!l0].iter().any(|w| w.blocker == l1)
     fn registered_biclause(&self, l0: Lit, l1: Lit) -> Option<ClauseId> {
         for w in self.bin_watcher_list(!l0) {
             if w.blocker == l1 {
@@ -502,7 +505,7 @@ impl ClauseDBIF for ClauseDB {
             *num_clause += 1;
         }
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count(), self.num_clause);
-        self.watches(cid, "new_clause");
+        // self.watches(cid, "new_clause");
         cid
     }
     fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
@@ -636,16 +639,17 @@ impl ClauseDBIF for ClauseDB {
         }
         None
     }
-    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> bool {
+    // return a Lit if the clause becomes a unit clause.
+    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> Option<Lit> {
         debug_assert!(!self[cid].is(Flag::DEAD));
         debug_assert!(1 < self[cid].len());
-        self.watches(
-            cid,
-            &format!("before strengthen_by_elimination {}:{:?}", cid, &self[cid]),
-        );
+        // self.watches(
+        //     cid,
+        //     &format!("before strengthen_by_elimination {}:{:?}", cid, &self[cid]),
+        // );
         let ClauseDB {
             ref mut clause,
-            // ref mut bin_watcher,
+            ref mut bin_watcher,
             // ref mut watcher,
             ref mut certification_store,
             ..
@@ -654,20 +658,18 @@ impl ClauseDBIF for ClauseDB {
         // debug_assert!((*ch).lits.contains(&p));
         // debug_assert!(1 < (*ch).len());
         if (*c).is(Flag::DEAD) {
-            return false;
+            return None;
         }
         debug_assert!(1 < usize::from(!p));
-        (*c).search_from = 2;
         let lits = &mut (*c).lits;
         debug_assert!(1 < lits.len());
         if lits.len() == 2 {
-            if lits[0] == p {
-                lits.swap(0, 1);
-            }
-            debug_assert!(1 < usize::from(!lits[0]));
-            return true;
+            let l0 = lits[(lits[0] == p) as usize];
+            self.delete_clause(cid);
+            return Some(l0);
         }
 
+        (*c).search_from = 2;
         let old_lits = lits.clone();
 
         // FIX THE LONGSTANDING BUG.
@@ -682,6 +684,15 @@ impl ClauseDBIF for ClauseDB {
         let mut mes = "strengthen_by_elimination";
         {
             if lits.len() == 2 {
+                // check registered biclause
+                if bin_watcher[!l0].iter().any(|w| w.blocker == l1) {
+                    self.num_reregistration += 1;
+                    // `certificate` needs the original literal set.
+                    lits.push(p);
+                    self.delete_clause(cid);
+                    return None;
+                }
+
                 if l0 == lits[0] {
                     if l1 == lits[1] {
                         // move from watcher for l0 to bin_watcher for l0
@@ -794,20 +805,20 @@ impl ClauseDBIF for ClauseDB {
         } */
         certification_store.push_add(&c.lits);
         certification_store.push_delete(&old_lits);
-        self.watches(cid, mes);
-        false
+        // self.watches(cid, mes);
+        None
     }
-
-    fn strengthen_by_vivification(&mut self, cid: ClauseId, length: usize) {
+    fn strengthen_by_vivification(&mut self, cid: ClauseId, length: usize) -> Option<ClauseId> {
         debug_assert!(!self[cid].is(Flag::DEAD));
         debug_assert!(2 < self[cid].len());
         assert!(1 < length);
-        self.watches(
-            cid,
-            &format!("before strengthen_by_elimination {}:{:?}", cid, &self[cid]),
-        );
+        // self.watches(
+        //     cid,
+        //     &format!("before strengthen_by_elimination {}:{:?}", cid, &self[cid]),
+        // );
         let ClauseDB {
             ref mut clause,
+            ref bin_watcher,
             ref mut certification_store,
             ..
         } = self;
@@ -820,6 +831,16 @@ impl ClauseDBIF for ClauseDB {
             let lits = &mut (*c).lits;
             let l0 = lits[0];
             let l1 = lits[1];
+
+            if length == 2 {
+                if let Some(w) = bin_watcher[!l0].iter().find(|w| w.blocker == l1) {
+                    let bid = w.c;
+                    self.num_reregistration += 1;
+                    self.delete_clause(cid);
+                    return Some(bid);
+                }
+            }
+
             // move from watcher for l0 to bin_watcher for l0
             let w0 = self.watcher[!l0].detach_with(cid).unwrap();
             self.bin_watcher[!lits[0]].register(w0);
@@ -831,7 +852,8 @@ impl ClauseDBIF for ClauseDB {
         }
         certification_store.push_add(&c.lits);
         certification_store.push_delete(&old_lits);
-        self.watches(cid, "vivification");
+        // self.watches(cid, "vivification");
+        None
     }
     fn minimize_with_biclauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
     where

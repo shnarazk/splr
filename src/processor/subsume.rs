@@ -96,22 +96,21 @@ where
     debug_assert!(1 < cdb[cid].len());
     cdb.touch_var(l.vi());
     debug_assert!(!cid.is_none());
-    if cdb.strengthen_by_elimination(cid, l) {
+    if let Some(l0) = cdb.strengthen_by_elimination(cid, l) {
         // Vaporize the binary clause
-        debug_assert!(2 == cdb[cid].len());
-        let c0 = cdb[cid][0];
-        debug_assert_ne!(c0, l);
+        // debug_assert!(2 == cdb[cid].len());
+        // let c0 = cdb[cid][0];
+        // debug_assert_ne!(c0, l);
 
         #[cfg(feature = "trace_elimination")]
         println!(
             "{} {:?} is removed and its first literal {} is enqueued.",
-            cid, cdb[cid], c0,
+            cid, cdb[cid], l0,
         );
 
-        cdb.certificate_add_assertion(c0);
-        cdb.delete_clause(cid);
+        cdb.certificate_add_assertion(l0);
         elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
-        asg.assign_at_root_level(c0)
+        asg.assign_at_root_level(l0)
     } else {
         #[cfg(feature = "trace_elimination")]
         println!("cid {} drops literal {}", cid, l);
