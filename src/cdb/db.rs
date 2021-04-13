@@ -488,11 +488,11 @@ impl ClauseDBIF for ClauseDB {
         watcher[!c.lits[new]].insert(cid, c.lits[other]);
         watcher[!c.lits[other]].insert(cid, c.lits[new]);
         c.lits.swap(old, new);
-        // self.watches(cid, "after update_watch");
+        self.watches(cid, "after update_watch");
     }
     // return a Lit if the clause becomes a unit clause.
     fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> Option<Lit> {
-        // self.watches(cid, "before strengthen_by_elimination");
+        self.watches(cid, "before strengthen_by_elimination");
         debug_assert!(!self[cid].is(Flag::DEAD));
         debug_assert!(1 < self[cid].len());
         let ClauseDB {
@@ -513,6 +513,7 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < lits.len());
         if lits.len() == 2 {
             let l0 = lits[(lits[0] == p) as usize];
+            self.watches(cid, "strengthen_by_elimination biclause");
             return Some(l0);
         }
 
@@ -528,12 +529,12 @@ impl ClauseDBIF for ClauseDB {
         let l0 = lits[0];
         let l1 = lits[1];
         lits.retain(|&l| l != p);
-        let mut _mes = "strengthen_by_elimination";
+        let mes = "strengthen_by_elimination";
         {
             if lits.len() == 2 {
                 // check registered biclause
                 // if bin_watcher[!l0].iter().any(|w| w.blocker == l1) {
-                if bin_watcher[!l0].get(&l1).is_some() {
+                if bin_watcher[!l0].contains_key(&l1) {
                     self.num_reregistration += 1;
                     // `certificate` needs the original literal set.
                     lits.push(p);
@@ -610,13 +611,13 @@ impl ClauseDBIF for ClauseDB {
         }
         certification_store.push_add(&c.lits);
         certification_store.push_delete(&old_lits);
-        // self.watches(cid, mes);
+        self.watches(cid, mes);
         None
     }
     fn strengthen_by_vivification(&mut self, cid: ClauseId, length: usize) -> Option<ClauseId> {
-        // self.watches(cid, "before strengthen_by_vivificationn");
+        self.watches(cid, "before strengthen_by_vivificationn");
         debug_assert!(!self[cid].is(Flag::DEAD));
-        debug_assert!(2 < self[cid].len());
+        assert!(2 < self[cid].len());
         assert!(1 < length);
         let ClauseDB {
             ref mut clause,
@@ -650,7 +651,7 @@ impl ClauseDBIF for ClauseDB {
         }
         certification_store.push_add(&c.lits);
         certification_store.push_delete(&old_lits);
-        // self.watches(cid, "after vivification");
+        self.watches(cid, "after vivification");
         None
     }
     fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
@@ -824,8 +825,20 @@ impl ClauseDBIF for ClauseDB {
         let l0 = c.lits[0];
         let l1 = c.lits[1];
         if 2 == c.lits.len() {
-            assert!(self.bin_watcher[!l0].get(&l1).is_some(), "(a){}", mes);
-            assert!(self.bin_watcher[!l1].get(&l0).is_some(), "(b){}", mes);
+            assert!(
+                self.bin_watcher[!l0].contains_key(&l1),
+                "(a){}, cid{}{:?}",
+                mes,
+                cid,
+                c
+            );
+            assert!(
+                self.bin_watcher[!l1].contains_key(&l0),
+                "(b){}, cid{}{:?}",
+                mes,
+                cid,
+                c
+            );
             // for (i, wl) in self.bin_watcher.iter().enumerate() {
             //     if wl.iter().any(|w| w.c == cid) {
             //         if let Some(f) = found {
@@ -835,8 +848,20 @@ impl ClauseDBIF for ClauseDB {
             //     }
             // }
         } else {
-            assert!(self.watcher[!l0].get(&cid).is_some(), "(c){}", mes);
-            assert!(self.watcher[!l1].get(&cid).is_some(), "(d){}", mes);
+            assert!(
+                self.watcher[!l0].contains_key(&cid),
+                "(c){}, cid{}{:?}",
+                mes,
+                cid,
+                c
+            );
+            assert!(
+                self.watcher[!l1].contains_key(&cid),
+                "(d){}, cid{}{:?}",
+                mes,
+                cid,
+                c
+            );
             // for (i, wl) in self.watcher.iter().enumerate() {
             //     if let Some(w) = wl.iter().find(|w| w.c == cid) {
             //         let watch = Lit::from(i);

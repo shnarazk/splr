@@ -330,7 +330,7 @@ mod tests {
     impl Clause {
         #[allow(dead_code)]
         fn as_vec(&self) -> Vec<i32> {
-            self.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
+            self.iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
         }
     }
     impl ClauseDB {
@@ -370,7 +370,7 @@ mod tests {
         assert!(cdb
             .iter()
             .skip(1)
-            .all(|c| !c.lits.contains(&Lit::from_assign(vi, false))
-                && !c.lits.contains(&Lit::from_assign(vi, false))));
+            .all(|c| !c.iter().contains(&Lit::from_assign(vi, false))
+                && !c.iter().contains(&Lit::from_assign(vi, false))));
     }
 }
