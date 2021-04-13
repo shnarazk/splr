@@ -243,6 +243,8 @@ pub struct ClauseDB {
     num_learnt: usize,
     /// the number of reductions.
     num_reduction: usize,
+    /// the number of reregistration of a biclause
+    num_reregistration: usize,
     /// EMA of LBD of clauses used in conflict analysis (dependency graph)
     pub lbd_of_dp_ema: Ema,
 
@@ -264,32 +266,30 @@ pub mod property {
         NumLBD2,
         NumLearnt,
         NumReduction,
+        NumReRegistration,
     }
 
-    pub const USIZES: [Tusize; 6] = [
+    pub const USIZES: [Tusize; 7] = [
         Tusize::NumBiClause,
         Tusize::NumBiLearnt,
         Tusize::NumClause,
         Tusize::NumLBD2,
         Tusize::NumLearnt,
         Tusize::NumReduction,
+        Tusize::NumReRegistration,
     ];
 
     impl PropertyDereference<Tusize, usize> for ClauseDB {
         #[inline]
         fn derefer(&self, k: Tusize) -> usize {
             match k {
-                Tusize::NumClause => {
-                    // let n = self.clause.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count();
-                    // assert_eq!(n, self.num_clause);
-                    // n
-                    self.num_clause
-                }
+                Tusize::NumClause => self.num_clause,
                 Tusize::NumBiClause => self.num_bi_clause,
                 Tusize::NumBiLearnt => self.num_bi_learnt,
                 Tusize::NumLBD2 => self.num_lbd2,
                 Tusize::NumLearnt => self.num_learnt,
                 Tusize::NumReduction => self.num_reduction,
+                Tusize::NumReRegistration => self.num_reregistration,
             }
         }
     }

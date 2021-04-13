@@ -37,6 +37,7 @@ impl Default for ClauseDB {
             num_lbd2: 0,
             num_learnt: 0,
             num_reduction: 0,
+            num_reregistration: 0,
             lbd_of_dp_ema: Ema::new(100_000),
             eliminated_permanent: Vec::new(),
         }
@@ -234,6 +235,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn update_watch(&mut self, cid: ClauseId, old: usize, new: usize, watch: Option<usize>) {
         if old < 2 && new < 2 {
+            self.num_reregistration += 1;
             self[cid].lits.swap(old, new);
             return;
         }
