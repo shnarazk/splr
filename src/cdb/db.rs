@@ -507,6 +507,7 @@ impl ClauseDBIF for ClauseDB {
             let l0 = lits[0];
             let l1 = lits[1];
             if let Some(&cid) = bin_watcher[!l0].get(&l1) {
+                certification_store.push_delete(&c.lits);
                 self.num_reregistration += 1;
                 self.remove_clause(cid);
                 return Some(cid);
