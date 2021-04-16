@@ -1,7 +1,11 @@
 /// Crate `eliminator` implements clause subsumption and var elimination.
 use {
     super::{EliminateIF, Eliminator},
-    crate::{assign::AssignIF, cdb::ClauseDBIF, types::*},
+    crate::{
+        assign::AssignIF,
+        cdb::{ClauseDBIF, StrengthenResult},
+        types::*,
+    },
 };
 
 impl Eliminator {
@@ -28,6 +32,7 @@ impl Eliminator {
                 }
                 assert!(!cdb[did].is_dead());
                 self.remove_cid_occur(asg, did, &mut cdb[did]);
+                cdb.watches(did, "sub31");
                 cdb.remove_clause(did);
                 self.num_subsumed += 1;
             }
@@ -35,6 +40,7 @@ impl Eliminator {
             Some(l) if cid.is_lifted_lit() => {
                 #[cfg(feature = "trace_elimination")]
                 println!("BackSubC subsumes {} from {} and {}", l, cid, did);
+                cdb.watches(did, "subsume39");
                 strengthen_clause(asg, cdb, self, did, !l)?;
                 self.enqueue_var(asg, l.vi(), true);
             }
@@ -102,31 +108,40 @@ where
     debug_assert!(!cdb[cid].is_dead());
     debug_assert!(1 < cdb[cid].len());
     debug_assert!(!cid.is_none());
-    if let Some(l0) = cdb.strengthen_by_elimination(cid, l) {
-        // Vaporize the binary clause
-        // debug_assert!(2 == cdb[cid].len());
-        // let c0 = cdb[cid][0];
-        // debug_assert_ne!(c0, l);
 
-        #[cfg(feature = "trace_elimination")]
-        println!(
-            "{} {:?} is removed and its first literal {} is enqueued.",
-            cid, cdb[cid], l0,
-        );
+    match cdb.strengthen_by_elimination(cid, l) {
+        StrengthenResult::BecameUnitClause(l0) => {
+            // Vaporize the binary clause
+            // debug_assert!(2 == cdb[cid].len());
+            // let c0 = cdb[cid][0];
+            // debug_assert_ne!(c0, l);
 
-        cdb.certificate_add_assertion(l0);
-        elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
-        cdb.remove_clause(cid);
-        asg.assign_at_root_level(l0)
-    } else {
-        #[cfg(feature = "trace_elimination")]
-        println!("cid {} drops literal {}", cid, l);
+            #[cfg(feature = "trace_elimination")]
+            println!(
+                "{} {:?} is removed and its first literal {} is enqueued.",
+                cid, cdb[cid], l0,
+            );
 
-        #[cfg(feature = "boundary_check")]
-        assert!(1 < cdb[cid].len());
+            cdb.certificate_add_assertion(l0);
+            elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
+            cdb.remove_clause(cid);
+            asg.assign_at_root_level(l0)
+        }
+        StrengthenResult::MergedToRegisteredClause(_) => {
+            elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
+            cdb.remove_clause(cid);
+            Ok(())
+        }
+        StrengthenResult::Ok => {
+            #[cfg(feature = "trace_elimination")]
+            println!("cid {} drops literal {}", cid, l);
 
-        elim.enqueue_clause(cid, &mut cdb[cid]);
-        elim.remove_lit_occur(asg, l, cid);
-        Ok(())
+            #[cfg(feature = "boundary_check")]
+            assert!(1 < cdb[cid].len());
+
+            elim.enqueue_clause(cid, &mut cdb[cid]);
+            elim.remove_lit_occur(asg, l, cid);
+            Ok(())
+        }
     }
 }

@@ -138,6 +138,7 @@ where
             }
             assert!(!cdb[a].is_dead(), "eaeaeaebr!!!!{}{:?}", cid, cdb[a]);
             elim.remove_cid_occur(asg, a, &mut cdb[a]);
+            cdb.watches(a, "elm141");
             cdb.remove_clause(a);
         }
         for cid in neg.iter() {
@@ -150,6 +151,7 @@ where
             }
             assert!(!cdb[*cid].is_dead(), "{} is dead", *cid);
             elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
+            cdb.watches(*cid, "elm141");
             cdb.remove_clause(*cid);
         }
         elim[vi].clear();

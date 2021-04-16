@@ -22,6 +22,12 @@ use {
     },
 };
 
+pub enum StrengthenResult {
+    MergedToRegisteredClause(ClauseId),
+    BecameUnitClause(Lit),
+    Ok,
+}
+
 /// API for Clause, providing literal accessors.
 pub trait ClauseIF {
     /// return true if it contains no literals; a clause after unit propagation.
@@ -120,7 +126,7 @@ pub trait ClauseDBIF:
     /// removes an eliminated Lit `p` from a clause. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
     /// And this is called only from `Eliminator::strengthen_clause`.
-    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> Option<Lit>;
+    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> StrengthenResult;
     /// shorten a clause.
     /// None: new_size should be larger than or equal to 2.
     /// return `Some(cid)` if the new clause is equal to a registered binclause.

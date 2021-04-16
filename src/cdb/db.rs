@@ -1,5 +1,7 @@
 use {
-    super::{property, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId},
+    super::{
+        property, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId, StrengthenResult,
+    },
     crate::{assign::AssignIF, solver::SolverEvent, types::*},
     std::{
         collections::HashMap,
@@ -417,7 +419,7 @@ impl ClauseDBIF for ClauseDB {
         self.watches(cid, "after update_watch");
     }
     // return a Lit if the clause becomes a unit clause.
-    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> Option<Lit> {
+    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> StrengthenResult {
         self.watches(cid, "before strengthen_by_elimination");
         debug_assert!(!self[cid].is_dead());
         debug_assert!(1 < self[cid].len());
@@ -436,8 +438,7 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < lits.len());
         if lits.len() == 2 {
             let l0 = lits[(lits[0] == p) as usize];
-            self.watches(cid, "strengthen_by_elimination biclause");
-            return Some(l0);
+            return StrengthenResult::BecameUnitClause(l0);
         }
 
         (*c).search_from = 2;
@@ -449,6 +450,12 @@ impl ClauseDBIF for ClauseDB {
         // Since we can't hold an eliminated var in Watch::blocker
         // by following 'WATCHING LITERAL LIST MANAGEMENT RULES',
         // we have to update BOTH watching literals even if this is an O(n) operation.
+        if 3 == lits.len() {
+            let tmp = lits.iter().filter(|&l| *l != p).collect::<Vec<&Lit>>();
+            if let Some(reg) = bin_watcher[!*tmp[0]].get(tmp[1]) {
+                return StrengthenResult::MergedToRegisteredClause(*reg);
+            }
+        }
         let l0 = lits[0];
         let l1 = lits[1];
         if l0 == p || l1 == p {
@@ -478,7 +485,7 @@ impl ClauseDBIF for ClauseDB {
         certification_store.push_add(&c.lits);
         certification_store.push_delete(&old_lits);
         self.watches(cid, "after strengthen_by_elimination");
-        None
+        StrengthenResult::Ok
     }
     fn strengthen_by_vivification(&mut self, cid: ClauseId, length: usize) -> Option<ClauseId> {
         self.watches(cid, "before strengthen_by_vivificationn");
@@ -695,7 +702,6 @@ impl ClauseDBIF for ClauseDB {
             .push(self.clause[cid.ordinal as usize].lits.clone());
     }
     fn watches(&self, cid: ClauseId, mes: &str) -> (Lit, Lit) {
-        /*
         // let mut _found = None;
         let c = &self[cid];
         let l0 = c.lits[0];
@@ -788,7 +794,7 @@ impl ClauseDBIF for ClauseDB {
             //         found = Some(Lit::from(i));
             //     }
             // }
-        } */
+        }
         (Lit::default(), Lit::default())
     }
 }

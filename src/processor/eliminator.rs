@@ -585,6 +585,7 @@ impl Eliminator {
                         self.enqueue_var(asg, l.vi(), true);
                     }
                 }
+                cdb.watches(cid, "eliminator588");
                 cdb.remove_clause(cid);
             }
         }
