@@ -273,9 +273,9 @@ impl PropagateIF for AssignStack {
                 assert!(!self.var[other_watch.vi()].is(Flag::ELIMINATED));
                 assert_ne!(other_watch.vi(), false_lit.vi());
                 assert!(other_watch == cdb[cid].lit0() || other_watch == cdb[cid].lit1());
-                if !(2 < cdb[cid].len()) {
-                    panic!("len2:{}{:?}", cid, &cdb[cid]);
-                }
+                // if !(2 < cdb[cid].len()) {
+                //     panic!("len2:{}{:?}", cid, &cdb[cid]);
+                // }
                 let other_watch_value = lit_assign!(self, other_watch);
                 if let Some(true) = other_watch_value {
                     // In this path, we use only `AssignStack::assign`.

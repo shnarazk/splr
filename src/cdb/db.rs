@@ -267,8 +267,8 @@ impl ClauseDBIF for ClauseDB {
     /// bin_watcher[!l0].iter().any(|w| w.blocker == l1)
     fn registered_biclause(&self, l0: Lit, l1: Lit) -> Option<ClauseId> {
         let a = self.bin_watcher[!l0].get(&l1);
-        let b = self.bin_watcher[!l1].get(&l0);
-        assert_eq!(a, b);
+        // let b = self.bin_watcher[!l1].get(&l0);
+        // assert_eq!(a, b);
         if let Some(c) = a {
             return Some(*c);
         }
@@ -322,7 +322,7 @@ impl ClauseDBIF for ClauseDB {
             //     }
             //     panic!("done");
             // }
-            assert!(c.is_dead());
+            // assert!(c.is_dead());
             c.flags = Flag::empty();
             debug_assert!(c.lits.is_empty()); // c.lits.clear();
             std::mem::swap(&mut c.lits, vec);
@@ -375,12 +375,12 @@ impl ClauseDBIF for ClauseDB {
             let l0 = c.lits[0];
             let l1 = c.lits[1];
             if len2 {
-                assert_eq!(c.lits.len(), 2);
+                // assert_eq!(c.lits.len(), 2);
                 *num_bi_clause += 1;
                 bin_watcher[!l0].insert(l1, cid);
                 bin_watcher[!l1].insert(l0, cid);
             } else {
-                assert!(2 < c.lits.len());
+                // assert!(2 < c.lits.len());
                 watcher[!l0].insert(cid, l1);
                 watcher[!l1].insert(cid, l0);
             }
@@ -396,15 +396,15 @@ impl ClauseDBIF for ClauseDB {
             // self.watches(cid, "after update_watch");
             return;
         }
-        assert!(old < 2);
-        assert!(1 < new);
+        // assert!(old < 2);
+        // assert!(1 < new);
         let ClauseDB {
             ref mut clause,
             ref mut watcher,
             ..
         } = self;
         let c = &mut clause[cid.ordinal as usize];
-        assert!(2 < c.len());
+        // assert!(2 < c.len());
         let other = (old == 0) as usize;
         if !removed {
             watcher[!c.lits[old]].remove(&cid).expect("update_watch");
@@ -701,7 +701,8 @@ impl ClauseDBIF for ClauseDB {
         self.eliminated_permanent
             .push(self.clause[cid.ordinal as usize].lits.clone());
     }
-    fn watches(&self, cid: ClauseId, mes: &str) -> (Lit, Lit) {
+    fn watches(&self, _cid: ClauseId, _mes: &str) -> (Lit, Lit) {
+        /*
         // let mut _found = None;
         let c = &self[cid];
         let l0 = c.lits[0];
@@ -795,6 +796,7 @@ impl ClauseDBIF for ClauseDB {
             //     }
             // }
         }
+        */
         (Lit::default(), Lit::default())
     }
 }
@@ -1018,7 +1020,7 @@ fn remove_clause(
     cid: ClauseId,
     c: &mut Clause,
 ) {
-    assert!(!c.is_dead());
+    // assert!(!c.is_dead());
     let l0 = c.lits[0];
     let l1 = c.lits[1];
     if c.len() == 2 {
@@ -1035,7 +1037,7 @@ fn remove_clause(
     *num_clause -= 1;
     certificate_store.push_delete(&c.lits);
     c.lits.clear();
-    c.turn_on(Flag::DEAD);
+    // c.turn_on(Flag::DEAD);
 }
 
 impl Clause {
