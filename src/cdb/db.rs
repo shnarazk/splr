@@ -416,11 +416,11 @@ impl ClauseDBIF for ClauseDB {
             .insert(cid, c.lits[new])
             .expect("update_watch");
         c.lits.swap(old, new);
-        self.watches(cid, "after update_watch");
+        // self.watches(cid, "after update_watch");
     }
     // return a Lit if the clause becomes a unit clause.
     fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> StrengthenResult {
-        self.watches(cid, "before strengthen_by_elimination");
+        // self.watches(cid, "before strengthen_by_elimination");
         debug_assert!(!self[cid].is_dead());
         debug_assert!(1 < self[cid].len());
         let ClauseDB {
@@ -488,10 +488,10 @@ impl ClauseDBIF for ClauseDB {
         StrengthenResult::Ok
     }
     fn strengthen_by_vivification(&mut self, cid: ClauseId, length: usize) -> Option<ClauseId> {
-        self.watches(cid, "before strengthen_by_vivificationn");
+        // self.watches(cid, "before strengthen_by_vivificationn");
         debug_assert!(!self[cid].is_dead());
-        assert!(2 < self[cid].len());
-        assert!(1 < length);
+        // assert!(2 < self[cid].len());
+        // assert!(1 < length);
         let ClauseDB {
             ref mut clause,
             ref bin_watcher,
@@ -499,7 +499,7 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         let c = &mut clause[cid.ordinal as usize];
-        assert!(length < c.len());
+        // assert!(length < c.len());
         c.search_from = 2;
         c.turn_on(Flag::VIVIFIED);
         if length == 2 {
@@ -576,14 +576,12 @@ impl ClauseDBIF for ClauseDB {
         false
     }
     /// ## Warning
-    /// this function is the only function that turns `Flag::DEAD` on without calling
-    /// `garbage_collect` which erases all the `DEAD` flags. So you must care about how and when
-    /// `garbage_collect` is called.
+    /// this function is the only function that makes dead clauses
     fn remove_clause(&mut self, cid: ClauseId) {
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
-        if !self.clause[cid.ordinal as usize].is_dead() {
-            self.watches(cid, "before kill");
-        }
+        // if !self.clause[cid.ordinal as usize].is_dead() {
+        //     self.watches(cid, "before kill");
+        // }
         let c = &mut self.clause[cid.ordinal as usize];
         debug_assert!(!c.is_dead());
         debug_assert!(1 < c.lits.len());
@@ -1037,7 +1035,6 @@ fn remove_clause(
     *num_clause -= 1;
     certificate_store.push_delete(&c.lits);
     c.lits.clear();
-    // c.turn_on(Flag::DEAD);
 }
 
 impl Clause {

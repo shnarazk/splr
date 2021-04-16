@@ -108,8 +108,7 @@ pub fn handle_conflict(
                         snd_l,
                     );
                 }
-                panic!("why here");
-                // return Ok(());
+                return Ok(());
             }
         }
     }

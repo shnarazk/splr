@@ -92,7 +92,6 @@ impl ClauseIF for Clause {
         self.lits.is_empty()
     }
     fn is_dead(&self) -> bool {
-        // assert_eq!(self.lits.is_empty(), self.is(Flag::DEAD));
         self.lits.is_empty()
     }
     fn iter(&self) -> Iter<'_, Lit> {
@@ -165,10 +164,9 @@ impl fmt::Display for Clause {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
-            "{{{:?}{}{}{}}}",
+            "{{{:?}{}{}}}",
             i32s(&self.lits),
             st(Flag::LEARNT, ", learnt"),
-            st(Flag::DEAD, ", dead"),
             st(Flag::ENQUEUED, ", enqueued"),
         )
     }
