@@ -26,11 +26,13 @@ use {
 pub trait ClauseIF {
     /// return true if it contains no literals; a clause after unit propagation.
     fn is_empty(&self) -> bool;
+    /// return true if it contains no literals; a clause after unit propagation.
+    fn is_dead(&self) -> bool;
     /// return 1st watch
     fn lit0(&self) -> Lit;
     /// return 2nd watch
     fn lit1(&self) -> Lit;
-    /// return `true` if the clause contanis the literal
+    /// return `true` if the clause contains the literal
     fn contains(&self, lit: Lit) -> bool;
     /// check clause satisfiability
     fn is_satisfied_under<A>(&self, asg: &A) -> bool
@@ -85,7 +87,7 @@ pub trait ClauseDBIF:
     where
         A: AssignIF;
     /// un-register a clause `cid` from clause database and make the clause dead.
-    fn delete_clause(&mut self, cid: ClauseId);
+    fn remove_clause(&mut self, cid: ClauseId);
     /// check the condition to reduce.
     /// * return `true` if reduction is done.
     /// * Otherwise return `false`.
@@ -96,11 +98,6 @@ pub trait ClauseDBIF:
     where
         A: AssignIF;
     fn reset(&mut self);
-    /// delete *dead* clauses from database, which are made by:
-    /// * `reduce`
-    /// * `simplify`
-    /// * `kill`
-    fn garbage_collect(&mut self);
     /// return `true` if a literal pair `(l0, l1)` is registered.
     fn registered_biclause(&self, l0: Lit, l1: Lit) -> Option<ClauseId>;
     /// update LBD then convert a learnt clause to permanent if needed.
@@ -111,8 +108,6 @@ pub trait ClauseDBIF:
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.
     fn certificate_save(&mut self);
-    /// flag positive and negative literals of a var as dirty
-    fn touch_var(&mut self, vi: VarId);
     /// check the number of clauses
     /// * `Err(SolverError::OutOfMemory)` -- the db size is over the limit.
     /// * `Ok(true)` -- enough small
@@ -188,6 +183,7 @@ pub struct ClauseDB {
     pub bin_watcher: Vec<HashMap<Lit, ClauseId>>,
     /// container of watch literals
     pub watcher: Vec<HashMap<ClauseId, Lit>>,
+    freelist: Vec<ClauseId>,
     certification_store: CertificationStore,
     /// a number of clauses to emit out-of-memory exception
     soft_limit: usize,
@@ -206,12 +202,6 @@ pub struct ClauseDB {
     activity_decay: f64,
     activity_anti_decay: f64,
     activity_ema: Ema,
-
-    //
-    //## Elimination
-    //
-    /// dirty literals
-    touched: Vec<bool>,
 
     //
     //## LBD
@@ -354,7 +344,7 @@ mod tests {
         let c1 = cdb.new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false, false);
         let c = &cdb[c1];
         assert_eq!(c.rank, 2);
-        assert!(!c.is(Flag::DEAD));
+        assert!(!c.is_dead());
         assert!(!c.is(Flag::LEARNT));
         #[cfg(feature = "just_used")]
         assert!(!c.is(Flag::JUST_USED));
@@ -362,7 +352,7 @@ mod tests {
         let c2 = cdb.new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true, true);
         let c = &cdb[c2];
         assert_eq!(c.rank, 2);
-        assert!(!c.is(Flag::DEAD));
+        assert!(!c.is_dead());
         assert!(c.is(Flag::LEARNT));
         #[cfg(feature = "just_used")]
         assert!(!c.is(Flag::JUST_USED));

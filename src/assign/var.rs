@@ -98,9 +98,9 @@ pub trait VarManipulateIF {
 
 impl VarManipulateIF for AssignStack {
     fn assigned(&self, l: Lit) -> Option<bool> {
-        match unsafe { self.assign.get_unchecked(l.vi()) } {
+        match self.assign[l.vi()] {
             Some(x) if !bool::from(l) => Some(!x),
-            x => *x,
+            x => x,
         }
     }
     #[inline]

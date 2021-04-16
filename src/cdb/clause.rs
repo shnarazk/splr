@@ -24,14 +24,14 @@ impl Index<usize> for Clause {
     type Output = Lit;
     #[inline]
     fn index(&self, i: usize) -> &Lit {
-        unsafe { self.lits.get_unchecked(i) }
+        &self.lits[i]
     }
 }
 
 impl IndexMut<usize> for Clause {
     #[inline]
     fn index_mut(&mut self, i: usize) -> &mut Lit {
-        unsafe { self.lits.get_unchecked_mut(i) }
+        &mut self.lits[i]
     }
 }
 
@@ -91,6 +91,10 @@ impl ClauseIF for Clause {
     fn is_empty(&self) -> bool {
         self.lits.is_empty()
     }
+    fn is_dead(&self) -> bool {
+        assert_eq!(self.lits.is_empty(), self.is(Flag::DEAD));
+        self.lits.is_empty()
+    }
     fn iter(&self) -> Iter<'_, Lit> {
         self.lits.iter()
     }
@@ -123,7 +127,7 @@ impl ClauseIF for Clause {
         self.timestamp
     }
     fn to_vivify(&self, threshold: usize) -> Option<f64> {
-        if !self.is(Flag::DEAD)
+        if !self.is_dead()
             && self.is(Flag::VIVIFIED) == self.is(Flag::VIVIFIED2)
             && (self.is(Flag::LEARNT) || self.is(Flag::DERIVE20))
             && 3 * (self.rank as usize) + self.len() <= threshold
@@ -177,23 +181,21 @@ impl Clause {
         A: AssignIF,
     {
         let level = asg.level_ref();
-        unsafe {
-            let key: usize = lbd_temp.get_unchecked(0) + 1;
-            *lbd_temp.get_unchecked_mut(0) = key;
-            let mut cnt = 0;
-            for l in &self.lits {
-                let lv = level[l.vi()];
-                if lv == 0 {
-                    continue;
-                }
-                let p = lbd_temp.get_unchecked_mut(lv as usize);
-                if *p != key {
-                    *p = key;
-                    cnt += 1;
-                }
+        let key: usize = lbd_temp[0] + 1;
+        lbd_temp[0] = key;
+        let mut cnt = 0;
+        for l in &self.lits {
+            let lv = level[l.vi()];
+            if lv == 0 {
+                continue;
             }
-            self.rank = cnt;
-            cnt as usize
+            let p = &mut lbd_temp[lv as usize];
+            if *p != key {
+                *p = key;
+                cnt += 1;
+            }
         }
+        self.rank = cnt;
+        cnt as usize
     }
 }

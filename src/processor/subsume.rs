@@ -23,11 +23,12 @@ impl Eliminator {
                     "BackSubsC    => {} {} subsumed completely by {} {:#}",
                     did, cdb[did], cid, cdb[cid],
                 );
-                self.remove_cid_occur(asg, did, &mut cdb[did]);
                 if !cdb[did].is(Flag::LEARNT) {
                     cdb[cid].turn_off(Flag::LEARNT);
                 }
-                cdb.delete_clause(did);
+                assert!(!cdb[did].is_dead());
+                self.remove_cid_occur(asg, did, &mut cdb[did]);
+                cdb.remove_clause(did);
                 self.num_subsumed += 1;
             }
             // To avoid making a big clause, we have to add a condition for combining them.
@@ -61,7 +62,13 @@ where
     }
     let mut ret: Lit = NULL_LIT;
     let ch = &cdb[cid];
+    assert!(1 < ch.len());
     let ob = &cdb[other];
+    if ob.len() < 2 {
+        dbg!(other, ob);
+        panic!("hen");
+    }
+    assert!(1 < ob.len());
     debug_assert!(ob.contains(ob[0]));
     debug_assert!(ob.contains(ob[1]));
     'next: for l in ch.iter() {
@@ -92,9 +99,8 @@ where
     A: AssignIF,
     C: ClauseDBIF,
 {
-    debug_assert!(!cdb[cid].is(Flag::DEAD));
+    debug_assert!(!cdb[cid].is_dead());
     debug_assert!(1 < cdb[cid].len());
-    cdb.touch_var(l.vi());
     debug_assert!(!cid.is_none());
     if let Some(l0) = cdb.strengthen_by_elimination(cid, l) {
         // Vaporize the binary clause
@@ -110,7 +116,7 @@ where
 
         cdb.certificate_add_assertion(l0);
         elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
-        cdb.delete_clause(cid);
+        cdb.remove_clause(cid);
         asg.assign_at_root_level(l0)
     } else {
         #[cfg(feature = "trace_elimination")]

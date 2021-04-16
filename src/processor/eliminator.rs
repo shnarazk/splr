@@ -207,7 +207,7 @@ impl EliminateIF for Eliminator {
             w.clear();
         }
         for (cid, c) in &mut cdb.iter_mut().enumerate().skip(1) {
-            if c.is(Flag::DEAD) || c.is(Flag::OCCUR_LINKED) {
+            if c.is_dead() || c.is(Flag::OCCUR_LINKED) {
                 continue;
             }
             self.add_cid_occur(asg, ClauseId::from(cid), c, false);
@@ -294,13 +294,13 @@ impl EliminateIF for Eliminator {
             }
             if !v.is(Flag::ELIMINATED) {
                 if bool::from(*l) {
-                    debug_assert!(
+                    assert!(
                         !w.pos_occurs.contains(&cid),
                         "elim.add_cid_occur found a strange positive clause"
                     );
                     w.pos_occurs.push(cid);
                 } else {
-                    debug_assert!(
+                    assert!(
                         !w.neg_occurs.contains(&cid),
                         "elim.add_cid_occur found a strange negative clause"
                     );
@@ -320,8 +320,8 @@ impl EliminateIF for Eliminator {
     {
         debug_assert!(self.mode == EliminatorMode::Running);
         debug_assert!(!cid.is_lifted_lit());
+        assert!(!c.is_dead());
         c.turn_off(Flag::OCCUR_LINKED);
-        debug_assert!(c.is(Flag::DEAD));
         for l in c.iter() {
             if asg.assign(l.vi()).is_none() {
                 self.remove_lit_occur(asg, *l, cid);
@@ -383,14 +383,13 @@ impl Eliminator {
             }
             let best = if cid.is_lifted_lit() {
                 let vi = Lit::from(cid).vi();
-                debug_assert!(!asg.var(vi).is(Flag::DEAD));
                 debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
                 vi
             } else {
                 let mut tmp = cdb.derefer(cdb::property::Tusize::NumClause);
                 let c = &mut cdb[cid];
                 c.turn_off(Flag::ENQUEUED);
-                if c.is(Flag::DEAD) || self.subsume_literal_limit < c.len() {
+                if c.is_dead() || self.subsume_literal_limit < c.len() {
                     continue;
                 }
                 // if c is subsumed by c', both of c and c' are included in the occurs of all literals of c
@@ -417,28 +416,58 @@ impl Eliminator {
             if best == 0 || asg.var(best).is(Flag::ELIMINATED) {
                 continue;
             }
-            unsafe {
-                for cs in &[
-                    &mut self[best].pos_occurs as *mut Vec<ClauseId>,
-                    &mut self[best].neg_occurs as *mut Vec<ClauseId>,
-                ] {
-                    for did in &**cs {
-                        if *did == cid {
-                            continue;
-                        }
-                        let d = &cdb[*did];
-                        if d.len() <= *timedout {
-                            *timedout -= d.len();
-                        } else {
-                            *timedout = 0;
-                            return Ok(());
-                        }
-                        if !d.is(Flag::DEAD) && d.len() <= self.subsume_literal_limit {
-                            self.try_subsume(asg, cdb, cid, *did)?;
-                        }
-                    }
+            for did in self[best].pos_occurs.clone().iter() {
+                if *did == cid {
+                    continue;
+                }
+                let d = &cdb[*did];
+                if d.len() <= *timedout {
+                    *timedout -= d.len();
+                } else {
+                    *timedout = 0;
+                    return Ok(());
+                }
+                if !d.is_dead() && d.len() <= self.subsume_literal_limit {
+                    self.try_subsume(asg, cdb, cid, *did)?;
                 }
             }
+            for did in self[best].neg_occurs.clone().iter() {
+                if *did == cid {
+                    continue;
+                }
+                let d = &cdb[*did];
+                if d.len() <= *timedout {
+                    *timedout -= d.len();
+                } else {
+                    *timedout = 0;
+                    return Ok(());
+                }
+                if !d.is_dead() && d.len() <= self.subsume_literal_limit {
+                    self.try_subsume(asg, cdb, cid, *did)?;
+                }
+            }
+            // /
+            // /     for cs in &[
+            // /         &mut self[best].pos_occurs, // as *mut Vec<ClauseId>,
+            // /         &mut self[best].neg_occurs, //  as *mut Vec<ClauseId>,
+            // /     ] {
+            // /         for did in &*cs {
+            // /             if *did == cid {
+            // /                 continue;
+            // /             }
+            // /             let d = &cdb[*did];
+            // /             if d.len() <= *timedout {
+            // /                 *timedout -= d.len();
+            // /             } else {
+            // /                 *timedout = 0;
+            // /                 return Ok(());
+            // /             }
+            // /             if !d.is_dead() && d.len() <= self.subsume_literal_limit {
+            // /                 self.try_subsume(asg, cdb, cid, *did)?;
+            // /             }
+            // /         }
+            // /     }
+            // / }
         }
         Ok(())
     }
@@ -517,7 +546,6 @@ impl Eliminator {
             }
             self.backward_subsumption_check(asg, cdb, &mut timedout)?;
             debug_assert!(self.clause_queue.is_empty());
-            cdb.garbage_collect();
             if !asg.propagate(cdb).is_none() {
                 return Err(SolverError::Inconsistent);
             }
@@ -545,20 +573,21 @@ impl Eliminator {
         self.num_sat_elimination += 1;
         for ci in 1..cdb.len() {
             let cid = ClauseId::from(ci);
-            if !cdb[cid].is(Flag::DEAD) && cdb[cid].is_satisfied_under(asg) {
+            if !cdb[cid].is_dead() && cdb[cid].is_satisfied_under(asg) {
+                cdb.watches(cid, "eliminate_satisfied_clauses");
                 let c = &mut cdb[cid];
                 if self.is_running() {
                     if update_occur {
+                        assert!(!c.is_dead());
                         self.remove_cid_occur(asg, cid, c);
                     }
                     for l in c.iter() {
                         self.enqueue_var(asg, l.vi(), true);
                     }
                 }
-                cdb.delete_clause(cid);
+                cdb.remove_clause(cid);
             }
         }
-        cdb.garbage_collect();
     }
     /// remove a clause id from literal's occur list.
     pub fn remove_lit_occur<A>(&mut self, asg: &mut A, l: Lit, cid: ClauseId)
@@ -651,7 +680,7 @@ where
     // }
     // all clauses are registered in corresponding occur_lists
     for (cid, c) in cdb.iter().enumerate().skip(1) {
-        if c.is(Flag::DEAD) {
+        if c.is_dead() {
             continue;
         }
         for l in c.iter() {
