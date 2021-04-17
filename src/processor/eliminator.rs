@@ -285,7 +285,6 @@ impl EliminateIF for Eliminator {
         for l in c.iter() {
             let v = &mut asg.var_mut(l.vi());
             let w = &mut self[l.vi()];
-            v.turn_on(Flag::TOUCHED);
             let pl = w.pos_occurs.len();
             let nl = w.neg_occurs.len();
             if evo < pl * nl {

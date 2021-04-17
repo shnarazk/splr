@@ -728,8 +728,6 @@ bitflags! {
         const OCCUR_LINKED = 0b0000_0000_0000_0010;
         /// a clause or var is enqueued for eliminator.
         const ENQUEUED     = 0b0000_0000_0000_0100;
-        /// mark to run garbage collector on the corresponding watcher lists
-        const TOUCHED      = 0b0000_0000_0000_1000;
         /// for vivified clauses
         const VIVIFIED     = 0b0000_0000_0001_0000;
         /// for a clause which decreases LBD twice after vivification

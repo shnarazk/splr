@@ -25,9 +25,8 @@ impl fmt::Display for Var {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
-            "V{{{} {}{}}}",
+            "V{{{} {}}}",
             self.index,
-            st(Flag::TOUCHED, ", touched"),
             st(Flag::ELIMINATED, ", eliminated"),
         )
     }
