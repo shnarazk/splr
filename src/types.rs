@@ -9,7 +9,6 @@ use {
     crate::solver::SolverEvent,
     std::{
         cmp::Ordering,
-        collections::HashMap,
         convert::TryFrom,
         fmt,
         fs::File,
@@ -308,36 +307,6 @@ impl Index<Lit> for Vec<bool> {
 }
 
 impl IndexMut<Lit> for Vec<bool> {
-    #[inline]
-    fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        unsafe { self.get_unchecked_mut(usize::from(l)) }
-    }
-}
-
-impl Index<Lit> for Vec<HashMap<Lit, ClauseId>> {
-    type Output = HashMap<Lit, ClauseId>;
-    #[inline]
-    fn index(&self, l: Lit) -> &Self::Output {
-        unsafe { self.get_unchecked(usize::from(l)) }
-    }
-}
-
-impl Index<Lit> for Vec<HashMap<ClauseId, Lit>> {
-    type Output = HashMap<ClauseId, Lit>;
-    #[inline]
-    fn index(&self, l: Lit) -> &Self::Output {
-        unsafe { self.get_unchecked(usize::from(l)) }
-    }
-}
-
-impl IndexMut<Lit> for Vec<HashMap<Lit, ClauseId>> {
-    #[inline]
-    fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        unsafe { self.get_unchecked_mut(usize::from(l)) }
-    }
-}
-
-impl IndexMut<Lit> for Vec<HashMap<ClauseId, Lit>> {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
         unsafe { self.get_unchecked_mut(usize::from(l)) }

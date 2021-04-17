@@ -1,6 +1,7 @@
 use {
     super::{
-        property, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId, StrengthenResult,
+        property, watch_cache::*, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId,
+        StrengthenResult,
     },
     crate::{assign::AssignIF, solver::SolverEvent, types::*},
     std::{
@@ -14,8 +15,8 @@ impl Default for ClauseDB {
     fn default() -> ClauseDB {
         ClauseDB {
             clause: Vec::new(),
-            bin_watcher: Vec::new(),
-            watcher: Vec::new(),
+            bi_clause: Vec::new(),
+            watch_cache: Vec::new(),
             freelist: Vec::new(),
             certification_store: CertificationStore::default(),
             soft_limit: 0, // 248_000_000
@@ -146,13 +147,13 @@ impl Instantiate for ClauseDB {
         let mut bin_watcher = Vec::with_capacity(2 * (nv + 1));
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
         for _ in 0..2 * (nv + 1) {
-            bin_watcher.push(HashMap::new());
-            watcher.push(HashMap::new());
+            bin_watcher.push(BiClause::new());
+            watcher.push(WatchCache::new());
         }
         ClauseDB {
             clause,
-            bin_watcher,
-            watcher,
+            bi_clause: bin_watcher,
+            watch_cache: watcher,
             certification_store: CertificationStore::instantiate(config, cnf),
             soft_limit: config.c_cls_lim,
             activity_decay: config.crw_dcy_rat,
@@ -196,11 +197,11 @@ impl Instantiate for ClauseDB {
             }
             SolverEvent::NewVar => {
                 // for negated literal
-                self.bin_watcher.push(HashMap::new());
-                self.watcher.push(HashMap::new());
+                self.bi_clause.push(HashMap::new());
+                self.watch_cache.push(WatchCache::new());
                 // for positive literal
-                self.bin_watcher.push(HashMap::new());
-                self.watcher.push(HashMap::new());
+                self.bi_clause.push(HashMap::new());
+                self.watch_cache.push(WatchCache::new());
                 self.lbd_temp.push(0);
             }
             _ => (),
@@ -222,19 +223,18 @@ impl ClauseDBIF for ClauseDB {
         self.clause.iter_mut()
     }
     #[inline]
-    fn bin_watcher_list(&self, l: Lit) -> &HashMap<Lit, ClauseId> {
-        &self.bin_watcher[l]
+    fn bi_clause_map(&self, l: Lit) -> &HashMap<Lit, ClauseId> {
+        &self.bi_clause[l]
     }
     #[inline]
-    fn detach_watcher_list(&mut self, l: Lit) -> HashMap<ClauseId, Lit> {
-        let mut empty = HashMap::new();
-        std::mem::swap(&mut self.watcher[l], &mut empty);
-        // &mut self.watcher[l]
+    fn detach_watch_cache(&mut self, l: Lit) -> WatchCache {
+        let mut empty = WatchCache::new();
+        std::mem::swap(&mut self.watch_cache[l], &mut empty);
         empty
     }
-    fn reregister_watch(&mut self, p: Lit, target: Option<(ClauseId, Lit)>) -> bool {
+    fn reregister_watch_cache(&mut self, p: Lit, target: Option<(ClauseId, Lit)>) -> bool {
         if let Some((cid, lit)) = target {
-            self.watcher[p].insert(cid, lit);
+            self.watch_cache[p].insert_watch(cid, lit);
             self.watches(cid, "after rere");
             return true;
         }
@@ -266,7 +266,7 @@ impl ClauseDBIF for ClauseDB {
     /// this is equivalent to the following:
     /// bin_watcher[!l0].iter().any(|w| w.blocker == l1)
     fn registered_biclause(&self, l0: Lit, l1: Lit) -> Option<ClauseId> {
-        let a = self.bin_watcher[!l0].get(&l1);
+        let a = self.bi_clause[!l0].get(&l1);
         // let b = self.bin_watcher[!l1].get(&l0);
         // assert_eq!(a, b);
         if let Some(c) = a {
@@ -345,9 +345,9 @@ impl ClauseDBIF for ClauseDB {
                 ref mut num_bi_learnt,
                 ref mut num_lbd2,
                 ref mut num_learnt,
-                ref mut bin_watcher,
+                bi_clause: ref mut bin_watcher,
                 ref ordinal,
-                ref mut watcher,
+                watch_cache: ref mut watcher,
                 ..
             } = self;
             let c = &mut clause[cid.ordinal as usize];
@@ -381,8 +381,8 @@ impl ClauseDBIF for ClauseDB {
                 bin_watcher[!l1].insert(l0, cid);
             } else {
                 // assert!(2 < c.lits.len());
-                watcher[!l0].insert(cid, l1);
-                watcher[!l1].insert(cid, l0);
+                watcher[!l0].insert_watch(cid, l1);
+                watcher[!l1].insert_watch(cid, l0);
             }
             *num_clause += 1;
         }
@@ -402,8 +402,8 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         remove_clause_fn(
             &mut self.certification_store,
-            &mut self.bin_watcher,
-            &mut self.watcher,
+            &mut self.bi_clause,
+            &mut self.watch_cache,
             &mut self.num_bi_clause,
             &mut self.num_clause,
             &mut self.num_learnt,
@@ -422,26 +422,27 @@ impl ClauseDBIF for ClauseDB {
         // assert!(1 < new);
         let ClauseDB {
             ref mut clause,
-            ref mut watcher,
+            watch_cache: ref mut watcher,
             ..
         } = self;
         let c = &mut clause[cid.ordinal as usize];
         // assert!(2 < c.len());
         let other = (old == 0) as usize;
         if !removed {
-            watcher[!c.lits[old]].remove(&cid).expect("update_watch");
+            watcher[!c.lits[old]]
+                .remove_watch(&cid)
+                .expect("update_watch");
         } else {
-            debug_assert!(watcher[!c.lits[old]].get(&cid).is_none());
+            debug_assert!(watcher[!c.lits[old]].get_watch(&cid).is_none());
         }
-        watcher[!c.lits[new]].insert(cid, c.lits[other]);
+        watcher[!c.lits[new]].insert_watch(cid, c.lits[other]);
 
         #[cfg(feature = "maintain_watch_cache")]
         {
             watcher[!c.lits[other]].insert(cid, c.lits[new]); // .expect("update_other_watch");
         }
         #[cfg(not(feature = "maintain_watch_cache"))]
-        debug_assert!(watcher[!c.lits[other]].contains_key(&cid));
-
+        // debug_assert!(watcher[!c.lits[other]].contains_key(&cid));
         c.lits.swap(old, new);
         // self.watches(cid, "after update_watch");
     }
@@ -452,8 +453,8 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < self[cid].len());
         let ClauseDB {
             ref mut clause,
-            ref mut bin_watcher,
-            ref mut watcher,
+            bi_clause: ref mut bin_watcher,
+            watch_cache: ref mut watcher,
             ref mut certification_store,
             ref mut num_bi_clause,
             ..
@@ -484,28 +485,28 @@ impl ClauseDBIF for ClauseDB {
         let l0 = lits[0];
         let l1 = lits[1];
         if l0 == p || l1 == p {
-            watcher[!p].remove(&cid).expect("AA");
+            watcher[!p].remove_watch(&cid).expect("AA");
             let target = (l1 == p) as usize;
             let other = (l1 != p) as usize;
             lits.swap_remove(target);
             if 2 == lits.len() {
-                watcher[!lits[other]].remove(&cid).expect("AB");
+                watcher[!lits[other]].remove_watch(&cid).expect("AB");
                 bin_watcher[!lits[target]].insert(lits[other], cid);
                 bin_watcher[!lits[other]].insert(lits[target], cid);
                 *num_bi_clause += 1;
             } else {
-                watcher[!lits[target]].insert(cid, lits[other]);
-                watcher[!lits[other]].insert(cid, lits[target]);
+                watcher[!lits[target]].insert_or_update_watch(cid, lits[other]);
+                watcher[!lits[other]].insert_or_update_watch(cid, lits[target]);
             }
         } else if {
             lits.retain(|&l| l != p);
             lits.len() == 2
         } {
             // move from watcher for l0 to bin_watcher for l0
-            watcher[!l0].remove(&cid).expect("a");
+            watcher[!l0].remove_watch(&cid).expect("a");
             bin_watcher[!lits[0]].insert(lits[1], cid);
             // move from watcher for l1 to bin_watcher for l1
-            watcher[!l1].remove(&cid).expect("b");
+            watcher[!l1].remove_watch(&cid).expect("b");
             bin_watcher[!lits[1]].insert(lits[0], cid);
             *num_bi_clause += 1;
         }
@@ -523,7 +524,7 @@ impl ClauseDBIF for ClauseDB {
         // assert!(1 < length);
         let ClauseDB {
             ref mut clause,
-            ref bin_watcher,
+            bi_clause: ref bin_watcher,
             ref mut certification_store,
             ..
         } = self;
@@ -542,11 +543,11 @@ impl ClauseDBIF for ClauseDB {
                 return Some(cid);
             }
             // move from watcher for l0 to bin_watcher for l0
-            self.watcher[!l0].remove(&cid).expect("a");
-            self.bin_watcher[!lits[0]].insert(lits[1], cid);
+            self.watch_cache[!l0].remove_watch(&cid).expect("a");
+            self.bi_clause[!lits[0]].insert(lits[1], cid);
             // move from watcher for l1 to bin_watcher for l1
-            self.watcher[!l1].remove(&cid).expect("b");
-            self.bin_watcher[!lits[1]].insert(lits[0], cid);
+            self.watch_cache[!l1].remove_watch(&cid).expect("b");
+            self.bi_clause[!lits[1]].insert(lits[0], cid);
             self.num_bi_clause += 1;
             c.turn_off(Flag::LEARNT);
         }
@@ -635,8 +636,8 @@ impl ClauseDBIF for ClauseDB {
             if c.is(Flag::LEARNT) && !c.is_dead() && (self.co_lbd_bound as usize) < c.lits.len() {
                 remove_clause_fn(
                     &mut self.certification_store,
-                    &mut self.bin_watcher,
-                    &mut self.watcher,
+                    &mut self.bi_clause,
+                    &mut self.watch_cache,
                     &mut self.num_bi_clause,
                     &mut self.num_clause,
                     &mut self.num_learnt,
@@ -687,7 +688,7 @@ impl ClauseDBIF for ClauseDB {
         }
         let l0 = vec[0];
         let mut nsat = 0;
-        for (_, &cid) in self.bin_watcher[!l0].iter() {
+        for (_, &cid) in self.bi_clause[!l0].iter() {
             let c = &self.clause[cid.ordinal as usize];
             debug_assert!(c[0] == l0 || c[1] == l0);
             let other = c[(c[0] == l0) as usize];
@@ -906,120 +907,120 @@ impl ClauseDB {
             }
         }
     }
-    pub fn has_consistent_watcher<A>(&self, asg: &A, cid: ClauseId) -> bool
-    where
-        A: AssignIF,
-    {
-        let mut found = 0;
-        let lits = &self.clause[cid.ordinal as usize].lits;
-        let is_2 = lits.len() == 2;
-        for (l, wl) in self.bin_watcher.iter().enumerate().skip(2) {
-            for (&blocker, &d) in wl.iter() {
-                if d == cid {
-                    if !is_2 {
-                        return false;
-                    }
-                    if asg.var(blocker.vi()).is(Flag::ELIMINATED) {
-                        return false;
-                    }
-                    if !lits.contains(&blocker) || !lits.contains(&!Lit::from(l)) {
-                        return false;
-                    }
-                    found += 1;
-                }
-            }
-        }
-        for (l, wl) in self.watcher.iter().enumerate().skip(2) {
-            for (&c, &b) in wl.iter() {
-                if c == cid {
-                    if is_2 {
-                        return false;
-                    }
-                    if asg.var(b.vi()).is(Flag::ELIMINATED) {
-                        return false;
-                    }
-                    if !lits.contains(&b) || !lits.contains(&!Lit::from(l)) {
-                        return false;
-                    }
-                    found += 1;
-                }
-            }
-        }
-        found == 2
-    }
-    pub fn check_consistency<A>(&self, asg: &A, msg: &str)
-    where
-        A: AssignIF,
-    {
-        /* if let Some(cid) = self.validate(asg.assign_ref(), false) */
-        {
-            let mut hash: std::collections::HashMap<u32, usize> = std::collections::HashMap::new();
-            /* for (l, wl) in self.bin_watcher.iter().enumerate().skip(2) {
-                for w in wl.iter() {
-                    let c = &self[w.c];
-                    if c.lits.len() != 2 {
-                        dbg!((l, w.blocker, w.c, &c.lits));
-                        panic!("aoa")
-                    }
-
-                    if !c.lits.contains(&w.blocker) || !c.lits.contains(&!Lit::from(l)) {
-                        dbg!((l, w.blocker, w.c, &c.lits));
-                        panic!("found");
-                    }
-                    *hash.entry(w.c.ordinal).or_insert(0) += 1;
-                }
-            } */
-            for (l, wl) in self.watcher.iter().enumerate().skip(2) {
-                for (cid, blocker) in wl.iter() {
-                    let c = &self[cid];
-                    if c.lits.len() == 2 {
-                        dbg!((l, blocker, cid, &c.lits));
-                        panic!("found");
-                    }
-                    if !c.lits.contains(&blocker) || !c.lits.contains(&!Lit::from(l)) {
-                        dbg!((l, blocker, cid, &c.lits));
-                        panic!("found after {}", msg);
-                    }
-                    *hash.entry(cid.ordinal).or_insert(0) += 1;
-                }
-            }
-            for (cid, n) in hash.iter() {
-                let c = &self.clause[*cid as usize];
-                if c.is_dead() {
-                    continue;
-                }
-                assert!(*n == 2 || *n == 0);
-            }
-            for (cid, c) in self.clause.iter().enumerate().skip(1) {
-                if c.is_dead() {
-                    continue;
-                }
-                if !self.has_consistent_watcher(
-                    asg,
-                    ClauseId {
-                        ordinal: cid as u32,
-                    },
-                ) {
-                    panic!("{}{:?} doesn't have a valid watches", cid, c);
-                }
-            }
-        }
-        if let Some(cid) = self.validate(asg.assign_ref(), false) {
-            panic!(
-                "{:?}{:?} is falsified {}!",
-                cid,
-                &self[cid],
-                self.has_consistent_watcher(asg, cid),
-            );
-        }
-    }
+    // /    pub fn has_consistent_watcher<A>(&self, asg: &A, cid: ClauseId) -> bool
+    // /    where
+    // /        A: AssignIF,
+    // /    {
+    // /        let mut found = 0;
+    // /        let lits = &self.clause[cid.ordinal as usize].lits;
+    // /        let is_2 = lits.len() == 2;
+    // /        for (l, wl) in self.bin_watcher.iter().enumerate().skip(2) {
+    // /            for (&blocker, &d) in wl.iter() {
+    // /                if d == cid {
+    // /                    if !is_2 {
+    // /                        return false;
+    // /                    }
+    // /                    if asg.var(blocker.vi()).is(Flag::ELIMINATED) {
+    // /                        return false;
+    // /                    }
+    // /                    if !lits.contains(&blocker) || !lits.contains(&!Lit::from(l)) {
+    // /                        return false;
+    // /                    }
+    // /                    found += 1;
+    // /                }
+    // /            }
+    // /        }
+    // /        for (l, wl) in self.watcher.iter().enumerate().skip(2) {
+    // /            for (&c, &b) in wl.iter() {
+    // /                if c == cid {
+    // /                    if is_2 {
+    // /                        return false;
+    // /                    }
+    // /                    if asg.var(b.vi()).is(Flag::ELIMINATED) {
+    // /                        return false;
+    // /                    }
+    // /                    if !lits.contains(&b) || !lits.contains(&!Lit::from(l)) {
+    // /                        return false;
+    // /                    }
+    // /                    found += 1;
+    // /                }
+    // /            }
+    // /        }
+    // /        found == 2
+    // /    }
+    // /    pub fn check_consistency<A>(&self, asg: &A, msg: &str)
+    // /    where
+    // /        A: AssignIF,
+    // /    {
+    // /        /* if let Some(cid) = self.validate(asg.assign_ref(), false) */
+    // /        {
+    // /            let mut hash: std::collections::HashMap<u32, usize> = std::collections::HashMap::new();
+    // /            /* for (l, wl) in self.bin_watcher.iter().enumerate().skip(2) {
+    // /                for w in wl.iter() {
+    // /                    let c = &self[w.c];
+    // /                    if c.lits.len() != 2 {
+    // /                        dbg!((l, w.blocker, w.c, &c.lits));
+    // /                        panic!("aoa")
+    // /                    }
+    // /
+    // /                    if !c.lits.contains(&w.blocker) || !c.lits.contains(&!Lit::from(l)) {
+    // /                        dbg!((l, w.blocker, w.c, &c.lits));
+    // /                        panic!("found");
+    // /                    }
+    // /                    *hash.entry(w.c.ordinal).or_insert(0) += 1;
+    // /                }
+    // /            } */
+    // /            for (l, wl) in self.watcher.iter().enumerate().skip(2) {
+    // /                for (cid, blocker) in wl.iter() {
+    // /                    let c = &self[cid];
+    // /                    if c.lits.len() == 2 {
+    // /                        dbg!((l, blocker, cid, &c.lits));
+    // /                        panic!("found");
+    // /                    }
+    // /                    if !c.lits.contains(&blocker) || !c.lits.contains(&!Lit::from(l)) {
+    // /                        dbg!((l, blocker, cid, &c.lits));
+    // /                        panic!("found after {}", msg);
+    // /                    }
+    // /                    *hash.entry(cid.ordinal).or_insert(0) += 1;
+    // /                }
+    // /            }
+    // /            for (cid, n) in hash.iter() {
+    // /                let c = &self.clause[*cid as usize];
+    // /                if c.is_dead() {
+    // /                    continue;
+    // /                }
+    // /                assert!(*n == 2 || *n == 0);
+    // /            }
+    // /            for (cid, c) in self.clause.iter().enumerate().skip(1) {
+    // /                if c.is_dead() {
+    // /                    continue;
+    // /                }
+    // /                if !self.has_consistent_watcher(
+    // /                    asg,
+    // /                    ClauseId {
+    // /                        ordinal: cid as u32,
+    // /                    },
+    // /                ) {
+    // /                    panic!("{}{:?} doesn't have a valid watches", cid, c);
+    // /                }
+    // /            }
+    // /        }
+    // /        if let Some(cid) = self.validate(asg.assign_ref(), false) {
+    // /            panic!(
+    // /                "{:?}{:?} is falsified {}!",
+    // /                cid,
+    // /                &self[cid],
+    // /                self.has_consistent_watcher(asg, cid),
+    // /            );
+    // /        }
+    // /    }
 }
 
 #[inline]
 fn remove_clause_fn(
     certificate_store: &mut CertificationStore,
-    bin_watcher: &mut [HashMap<Lit, ClauseId>],
-    watcher: &mut [HashMap<ClauseId, Lit>],
+    bin_watcher: &mut [BiClause],
+    watcher: &mut [WatchCache],
     num_bi_clause: &mut usize,
     num_clause: &mut usize,
     num_learnt: &mut usize,
@@ -1034,8 +1035,8 @@ fn remove_clause_fn(
         bin_watcher[usize::from(!l1)].remove(&l0); // .expect("db1073");
         *num_bi_clause -= 1;
     } else {
-        watcher[usize::from(!l0)].remove(&cid); // .expect("db1076");
-        watcher[usize::from(!l1)].remove(&cid); // .expect("db1077");
+        watcher[usize::from(!l0)].remove_watch(&cid); // .expect("db1076");
+        watcher[usize::from(!l1)].remove_watch(&cid); // .expect("db1077");
     }
     if c.is(Flag::LEARNT) {
         *num_learnt -= 1;

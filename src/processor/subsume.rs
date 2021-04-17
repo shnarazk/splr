@@ -70,10 +70,6 @@ where
     let ch = &cdb[cid];
     assert!(1 < ch.len());
     let ob = &cdb[other];
-    if ob.len() < 2 {
-        dbg!(other, ob);
-        panic!("hen");
-    }
     assert!(1 < ob.len());
     debug_assert!(ob.contains(ob[0]));
     debug_assert!(ob.contains(ob[1]));

@@ -7,16 +7,17 @@ mod db;
 /// methods for UNSAT certification
 mod unsat_certificate;
 /// types about watching literal
-// mod watch_cache;
+mod watch_cache;
+
 pub use self::{cid::ClauseIdIF, property::*, unsat_certificate::CertificationStore};
 
 use {
     crate::{assign::AssignIF, types::*},
     std::{
-        collections::HashMap,
         ops::IndexMut,
         slice::{Iter, IterMut},
     },
+    watch_cache::*,
 };
 
 pub enum StrengthenResult {
@@ -70,11 +71,11 @@ pub trait ClauseDBIF:
     /// return a mutable iterator.
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
     /// return a watcher list for biclauses
-    fn bin_watcher_list(&self, l: Lit) -> &HashMap<Lit, ClauseId>;
+    fn bi_clause_map(&self, l: Lit) -> &BiClause;
     /// replace the mutable watcher list with an empty one, and return the list
-    fn detach_watcher_list(&mut self, l: Lit) -> HashMap<ClauseId, Lit>;
-    ///
-    fn reregister_watch(&mut self, p: Lit, target: Option<(ClauseId, Lit)>) -> bool;
+    fn detach_watch_cache(&mut self, l: Lit) -> WatchCache;
+    /// register the clase to the previous watch cache
+    fn reregister_watch_cache(&mut self, p: Lit, target: Option<(ClauseId, Lit)>) -> bool;
     /// update watches of the clause
     fn update_watch(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool);
     /// allocate a new clause and return its id.
@@ -183,9 +184,9 @@ pub struct ClauseDB {
     /// container of clauses
     clause: Vec<Clause>,
     /// container of watch literals for binary clauses
-    pub bin_watcher: Vec<HashMap<Lit, ClauseId>>,
+    pub bi_clause: Vec<BiClause>,
     /// container of watch literals
-    pub watcher: Vec<HashMap<ClauseId, Lit>>,
+    pub watch_cache: Vec<WatchCache>,
     freelist: Vec<ClauseId>,
     certification_store: CertificationStore,
     /// a number of clauses to emit out-of-memory exception
@@ -326,7 +327,7 @@ mod tests {
             return;
         }
         for l in &c.lits[0..=1] {
-            let ws = &cdb.watcher[!*l];
+            let ws = &cdb.watch_cache[!*l];
             assert!(ws.iter().any(|w| w.c == cid));
         }
         println!("pass to check watches");
