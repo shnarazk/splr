@@ -255,7 +255,6 @@ impl PropagateIF for AssignStack {
                     }
                     None => {
                         // self.reward_at_propagation(false_lit.vi());
-                        assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
                         self.assign_by_implication(
                             blocker,
                             AssignReason::Implication(cid, false_lit),
@@ -297,7 +296,7 @@ impl PropagateIF for AssignStack {
                 let other_watch_value = lit_assign!(self, other_watch);
                 #[cfg(not(feature = "maintain_watch_cache"))]
                 if let Some(true) = other_watch_value {
-                    assert!(!self.var[other_watch.vi()].is(Flag::ELIMINATED));
+                    debug_assert!(!self.var[other_watch.vi()].is(Flag::ELIMINATED));
                     // In this path, we use only `AssignStack::assign`.
                     // assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
                     cdb.reregister_watch_cache(sweeping, Some((cid, other_watch)));
@@ -385,7 +384,6 @@ impl PropagateIF for AssignStack {
                         return cid;
                     }
                     None => {
-                        assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
                         self.assign_by_implication(
                             blocker,
                             AssignReason::Implication(cid, false_lit),
