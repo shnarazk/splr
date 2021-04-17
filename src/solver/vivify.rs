@@ -33,11 +33,12 @@ pub fn vivify(
     // let mut average_age: f64 = 0.0;
     let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
     {
-        let thr = 8 + 22usize.saturating_sub(
-            ((asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).log2()
-                + (cdb.derefer(cdb::property::Tusize::NumClause) as f64).log10())
-                as usize,
-        );
+        let thr = 10
+            + 24usize.saturating_sub(
+                ((asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).log2()
+                    + (cdb.derefer(cdb::property::Tusize::NumClause) as f64).log10())
+                    as usize,
+            );
         for (i, c) in cdb.iter().enumerate().skip(1) {
             if c.is(Flag::LEARNT) {
                 if let Some(act) = c.to_vivify(thr) {
@@ -57,7 +58,7 @@ pub fn vivify(
     debug_assert_eq!(dl, 0);
     // This is a reusable vector to reduce memory consumption, the key is the number of invocation
     let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
-    let display_step: usize = 500;
+    let display_step: usize = 1000;
     let mut num_check = 0;
     let mut num_purge = 0;
     let mut num_shrink = 0;
