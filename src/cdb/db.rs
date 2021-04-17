@@ -250,13 +250,11 @@ impl ClauseDBIF for ClauseDB {
     ///```
     ///
     /// this is equivalent to the following:
-    /// bi_clause[!l0].iter().any(|w| w.blocker == l1)
+    ///```ignore
+    /// bi_clause[!l0].get(&l1).is_some()
+    ///```
     fn has_bi_clause(&self, l0: Lit, l1: Lit) -> Option<ClauseId> {
-        let a = self.bi_clause[!l0].get(&l1);
-        if let Some(c) = a {
-            return Some(*c);
-        }
-        None
+        self.bi_clause[!l0].get(&l1).map(|c| *c)
     }
     #[inline]
     fn detach_watch_cache(&mut self, l: Lit) -> WatchCache {
