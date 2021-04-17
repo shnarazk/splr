@@ -390,6 +390,28 @@ impl ClauseDBIF for ClauseDB {
         self.watches(cid, "new_clause");
         cid
     }
+    /// ## Warning
+    /// this function is the only function that makes dead clauses
+    fn remove_clause(&mut self, cid: ClauseId) {
+        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
+        // if !self.clause[cid.ordinal as usize].is_dead() {
+        //     self.watches(cid, "before kill");
+        // }
+        let c = &mut self.clause[cid.ordinal as usize];
+        debug_assert!(!c.is_dead());
+        debug_assert!(1 < c.lits.len());
+        remove_clause_fn(
+            &mut self.certification_store,
+            &mut self.bin_watcher,
+            &mut self.watcher,
+            &mut self.num_bi_clause,
+            &mut self.num_clause,
+            &mut self.num_learnt,
+            cid,
+            c,
+        );
+        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
+    }
     fn update_watch(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool) {
         if old < 2 && new < 2 {
             self[cid].lits.swap(old, new);
@@ -409,12 +431,17 @@ impl ClauseDBIF for ClauseDB {
         if !removed {
             watcher[!c.lits[old]].remove(&cid).expect("update_watch");
         } else {
-            assert!(watcher[!c.lits[old]].get(&cid).is_none());
+            debug_assert!(watcher[!c.lits[old]].get(&cid).is_none());
         }
         watcher[!c.lits[new]].insert(cid, c.lits[other]);
-        watcher[!c.lits[other]]
-            .insert(cid, c.lits[new])
-            .expect("update_watch");
+
+        #[cfg(feature = "maintain_watch_cache")]
+        {
+            watcher[!c.lits[other]].insert(cid, c.lits[new]); // .expect("update_other_watch");
+        }
+        #[cfg(not(feature = "maintain_watch_cache"))]
+        debug_assert!(watcher[!c.lits[other]].contains_key(&cid));
+
         c.lits.swap(old, new);
         // self.watches(cid, "after update_watch");
     }
@@ -443,14 +470,11 @@ impl ClauseDBIF for ClauseDB {
         }
 
         (*c).search_from = 2;
-        let old_lits = lits.clone();
-
-        // FIX THE LONGSTANDING BUG.
-        // It was occured by failing to retrieve two `Watch`es.
-        //
-        // Since we can't hold an eliminated var in Watch::blocker
-        // by following 'WATCHING LITERAL LIST MANAGEMENT RULES',
-        // we have to update BOTH watching literals even if this is an O(n) operation.
+        let old_lits = if certification_store.is_active() {
+            lits.clone()
+        } else {
+            Vec::new()
+        };
         if 3 == lits.len() {
             let tmp = lits.iter().filter(|&l| *l != p).collect::<Vec<&Lit>>();
             if let Some(reg) = bin_watcher[!*tmp[0]].get(tmp[1]) {
@@ -485,8 +509,10 @@ impl ClauseDBIF for ClauseDB {
             bin_watcher[!lits[1]].insert(lits[0], cid);
             *num_bi_clause += 1;
         }
-        certification_store.push_add(&c.lits);
-        certification_store.push_delete(&old_lits);
+        if certification_store.is_active() {
+            certification_store.push_add(&c.lits);
+            certification_store.push_delete(&old_lits);
+        }
         self.watches(cid, "after strengthen_by_elimination");
         StrengthenResult::Ok
     }
@@ -579,28 +605,6 @@ impl ClauseDBIF for ClauseDB {
         }
         false
     }
-    /// ## Warning
-    /// this function is the only function that makes dead clauses
-    fn remove_clause(&mut self, cid: ClauseId) {
-        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
-        // if !self.clause[cid.ordinal as usize].is_dead() {
-        //     self.watches(cid, "before kill");
-        // }
-        let c = &mut self.clause[cid.ordinal as usize];
-        debug_assert!(!c.is_dead());
-        debug_assert!(1 < c.lits.len());
-        remove_clause(
-            &mut self.certification_store,
-            &mut self.bin_watcher,
-            &mut self.watcher,
-            &mut self.num_bi_clause,
-            &mut self.num_clause,
-            &mut self.num_learnt,
-            cid,
-            c,
-        );
-        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
-    }
     fn reduce<A>(&mut self, asg: &mut A, nc: usize) -> bool
     where
         A: AssignIF,
@@ -629,7 +633,7 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < self.clause.len());
         for (i, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
             if c.is(Flag::LEARNT) && !c.is_dead() && (self.co_lbd_bound as usize) < c.lits.len() {
-                remove_clause(
+                remove_clause_fn(
                     &mut self.certification_store,
                     &mut self.bin_watcher,
                     &mut self.watcher,
@@ -1012,7 +1016,7 @@ impl ClauseDB {
 }
 
 #[inline]
-fn remove_clause(
+fn remove_clause_fn(
     certificate_store: &mut CertificationStore,
     bin_watcher: &mut [HashMap<Lit, ClauseId>],
     watcher: &mut [HashMap<ClauseId, Lit>],
@@ -1022,16 +1026,16 @@ fn remove_clause(
     cid: ClauseId,
     c: &mut Clause,
 ) {
-    // assert!(!c.is_dead());
+    debug_assert!(!c.is_dead());
     let l0 = c.lits[0];
     let l1 = c.lits[1];
     if c.len() == 2 {
-        bin_watcher[usize::from(!l0)].remove(&l1).expect("db1072");
-        bin_watcher[usize::from(!l1)].remove(&l0).expect("db1073");
+        bin_watcher[usize::from(!l0)].remove(&l1); // .expect("db1072");
+        bin_watcher[usize::from(!l1)].remove(&l0); // .expect("db1073");
         *num_bi_clause -= 1;
     } else {
-        watcher[usize::from(!l0)].remove(&cid).expect("db1076");
-        watcher[usize::from(!l1)].remove(&cid).expect("db1077");
+        watcher[usize::from(!l0)].remove(&cid); // .expect("db1076");
+        watcher[usize::from(!l1)].remove(&cid); // .expect("db1077");
     }
     if c.is(Flag::LEARNT) {
         *num_learnt -= 1;

@@ -275,6 +275,7 @@ impl PropagateIF for AssignStack {
                 // assert!(other_watch == cdb[cid].lit0() || other_watch == cdb[cid].lit1());
                 let other_watch_value = lit_assign!(self, other_watch);
                 if let Some(true) = other_watch_value {
+                    assert!(!self.var[other_watch.vi()].is(Flag::ELIMINATED));
                     // In this path, we use only `AssignStack::assign`.
                     // assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
                     cdb.reregister_watch(sweeping, Some((cid, other_watch)));
@@ -283,6 +284,27 @@ impl PropagateIF for AssignStack {
                 }
                 debug_assert!(!cdb[cid].is_dead());
                 let c = &mut cdb[cid];
+
+                #[cfg(not(feature = "maintain_watch_cache"))]
+                let other_watch = if false_lit == c.lit0() && other_watch != c.lit1() {
+                    c.lit1()
+                } else if false_lit == c.lit1() && other_watch != c.lit0() {
+                    c.lit0()
+                } else {
+                    other_watch
+                };
+                #[cfg(not(feature = "maintain_watch_cache"))]
+                let other_watch_value = lit_assign!(self, other_watch);
+                #[cfg(not(feature = "maintain_watch_cache"))]
+                if let Some(true) = other_watch_value {
+                    assert!(!self.var[other_watch.vi()].is(Flag::ELIMINATED));
+                    // In this path, we use only `AssignStack::assign`.
+                    // assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
+                    cdb.reregister_watch(sweeping, Some((cid, other_watch)));
+                    cdb.watches(cid, "after propagation: satisfying watch");
+                    continue 'next_clause;
+                }
+
                 debug_assert!(c.lit0() == false_lit || c.lit1() == false_lit);
                 let false_watch_pos = (c.lit0() == other_watch) as usize;
                 //
@@ -355,13 +377,15 @@ impl PropagateIF for AssignStack {
                 debug_assert!(!cdb[cid].is_dead());
                 debug_assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
+                #[cfg(feature = "boundary_check")]
+                debug_assert_eq!(cdb[w.c].len(), 2);
                 match lit_assign!(self, blocker) {
                     Some(true) => (),
                     Some(false) => {
                         return cid;
                     }
                     None => {
-                        // assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
+                        assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
                         self.assign_by_implication(
                             blocker,
                             AssignReason::Implication(cid, false_lit),
@@ -373,31 +397,44 @@ impl PropagateIF for AssignStack {
             let source = cdb.detach_watcher_list(sweeping);
             let mut watches = source.iter();
             'next_clause: while let Some((&cid, &other_watch)) = watches.next() {
-                if !(2 < cdb[cid].len()) {
-                    panic!("len2:{}{:?}", cid, &cdb[cid]);
-                }
                 let other_watch_value = lit_assign!(self, other_watch);
                 if let Some(true) = other_watch_value {
+                    assert!(!self.var[other_watch.vi()].is(Flag::ELIMINATED));
                     cdb.reregister_watch(sweeping, Some((cid, other_watch)));
-                    cdb.watches(cid, "after sandbox propagation: satisfying watch");
                     continue 'next_clause;
                 }
+                debug_assert!(!cdb[cid].is_dead());
                 let c = &mut cdb[cid];
+                #[cfg(not(feature = "maintain_watch_cache"))]
+                let other_watch = if false_lit == c.lit0() && other_watch != c.lit1() {
+                    c.lit1()
+                } else if false_lit == c.lit1() && other_watch != c.lit0() {
+                    c.lit0()
+                } else {
+                    other_watch
+                };
+                #[cfg(not(feature = "maintain_watch_cache"))]
+                let other_watch_value = lit_assign!(self, other_watch);
+                #[cfg(not(feature = "maintain_watch_cache"))]
+                if let Some(true) = other_watch_value {
+                    assert!(!self.var[other_watch.vi()].is(Flag::ELIMINATED));
+                    cdb.reregister_watch(sweeping, Some((cid, other_watch)));
+                    continue 'next_clause;
+                }
+                debug_assert!(c.lit0() == false_lit || c.lit1() == false_lit);
                 let false_watch_pos = (c.lit0() == other_watch) as usize;
                 for (k, lk) in c.iter().enumerate().skip(2) {
                     if lit_assign!(self, *lk) != Some(false) {
                         cdb.update_watch(cid, false_watch_pos, k, true);
-                        cdb.watches(cid, "after sandbox propagation: found another watch");
                         continue 'next_clause;
                     }
                 }
-                cdb.reregister_watch(sweeping, Some((cid, other_watch)));
                 if false_watch_pos == 0 {
                     cdb.update_watch(cid, 0, 1, false);
                 }
+                cdb.reregister_watch(sweeping, Some((cid, other_watch)));
                 if other_watch_value == Some(false) {
                     while cdb.reregister_watch(sweeping, watches.next().map(|(&c, &b)| (c, b))) {}
-                    cdb.watches(cid, "after sandbox propagation: conflicting");
                     return cid;
                 }
                 let lv = cdb[cid]
@@ -411,7 +448,6 @@ impl PropagateIF for AssignStack {
                     AssignReason::Implication(cid, NULL_LIT),
                     lv,
                 );
-                cdb.watches(cid, "after sandbox propagation: became an unit clause");
             }
         }
         ClauseId::default()

@@ -6,12 +6,9 @@ mod clause;
 mod db;
 /// methods for UNSAT certification
 mod unsat_certificate;
-/// methods on `Watch` and `WatchDB`
-mod watch;
-
-pub use self::{
-    cid::ClauseIdIF, property::*, unsat_certificate::CertificationStore, watch::WatchDBIF,
-};
+/// types about watching literal
+// mod watch_cache;
+pub use self::{cid::ClauseIdIF, property::*, unsat_certificate::CertificationStore};
 
 use {
     crate::{assign::AssignIF, types::*},
