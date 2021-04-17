@@ -513,9 +513,9 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(!c.is_dead());
         debug_assert!(1 < c.lits.len());
         let mut store = CertificationStore::default();
-        let mut dummy1 = 0;
-        let mut dummy2 = 0;
-        let mut dummy3 = 0;
+        let mut dummy1 = 1;
+        let mut dummy2 = 1;
+        let mut dummy3 = 1;
         remove_clause_fn(
             &mut store,
             &mut self.bi_clause,
