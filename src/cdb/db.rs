@@ -428,6 +428,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut bin_watcher,
             ref mut watcher,
             ref mut certification_store,
+            ref mut num_bi_clause,
             ..
         } = self;
         let c = &mut clause[cid.ordinal as usize];
@@ -467,6 +468,7 @@ impl ClauseDBIF for ClauseDB {
                 watcher[!lits[other]].remove(&cid).expect("AB");
                 bin_watcher[!lits[target]].insert(lits[other], cid);
                 bin_watcher[!lits[other]].insert(lits[target], cid);
+                *num_bi_clause += 1;
             } else {
                 watcher[!lits[target]].insert(cid, lits[other]);
                 watcher[!lits[other]].insert(cid, lits[target]);
@@ -481,6 +483,7 @@ impl ClauseDBIF for ClauseDB {
             // move from watcher for l1 to bin_watcher for l1
             watcher[!l1].remove(&cid).expect("b");
             bin_watcher[!lits[1]].insert(lits[0], cid);
+            *num_bi_clause += 1;
         }
         certification_store.push_add(&c.lits);
         certification_store.push_delete(&old_lits);
