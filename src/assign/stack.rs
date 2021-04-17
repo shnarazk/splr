@@ -321,12 +321,12 @@ impl AssignIF for AssignStack {
             let nv = self.num_vars;
             let na = self.len_upto(0);
             // let nc: usize = cdb.derefer(cdb::property::Tusize::NumClause);
-            let nc = cdb.iter().skip(1).filter(|c| !c.is(Flag::DEAD)).count();
+            let nc = cdb.iter().skip(1).filter(|c| !c.is_dead()).count();
 
             buf.write_all(format!("p cnf {} {}\n", nv, nc + na).as_bytes())
                 .unwrap();
             for c in cdb.iter().skip(1) {
-                if c.is(Flag::DEAD) {
+                if c.is_dead() {
                     continue;
                 }
                 for l in c.iter() {

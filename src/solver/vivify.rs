@@ -29,6 +29,7 @@ pub fn vivify(
     elim: &mut Eliminator,
     state: &mut State,
 ) -> MaybeInconsistent {
+    assert_eq!(asg.root_level, asg.decision_level());
     let mut average_age: f64 = 0.0;
     let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
     {
@@ -66,9 +67,10 @@ pub fn vivify(
     let _activity_thr = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
 
     while let Some(cs) = clauses.pop() {
+        assert_eq!(asg.root_level, asg.decision_level());
         let c: &mut Clause = &mut cdb[cs.to()];
         // Since GC can make `clauses` out of date, we need to check its aliveness here.
-        if c.is(Flag::DEAD) {
+        if c.is_dead() {
             continue;
         }
         debug_assert!(!c.is(Flag::ELIMINATED));
@@ -83,7 +85,6 @@ pub fn vivify(
                     "clause vivifying was canceled due to too high purge rate {:>5.3}. ",
                     num_purge as f64 / num_check as f64,
                 ));
-                cdb.garbage_collect();
                 return Ok(());
             }
             state.flush(format!(
@@ -93,8 +94,8 @@ pub fn vivify(
             to_display = num_check + display_step;
         }
         num_check += 1;
+        assert_eq!(asg.root_level, asg.decision_level());
         'this_clause: for l in clits.iter().map(|ol| *ol) {
-            debug_assert_eq!(asg.root_level, asg.decision_level());
             seen[0] = num_check;
             match asg.assigned(l) {
                 //
@@ -140,10 +141,10 @@ pub fn vivify(
                 }
             }
         }
-        debug_assert!(!cdb[cs.to()].is(Flag::DEAD));
+        debug_assert!(!cdb[cs.to()].is_dead());
         match copied.len() {
             0 if timestamp < average_timestamp => {
-                cdb.delete_clause(cs.to());
+                cdb.remove_clause(cs.to());
                 num_purge += 1;
             }
             0 => (),
@@ -154,7 +155,7 @@ pub fn vivify(
                 // To avoid it, we call `asg.backtrack_sandbox` before it.
                 asg.backtrack_sandbox();
                 cdb.certificate_add_assertion(l0);
-                cdb.delete_clause(cs.to());
+                cdb.remove_clause(cs.to());
                 // cdb.garbage_collect();
                 assert_eq!(asg.assigned(l0), None);
                 asg.assign_at_root_level(l0)?;
@@ -167,6 +168,8 @@ pub fn vivify(
             }
             n if n == clits.len() => (),
             n => {
+                assert!(2 < clits.len());
+                assert_eq!(clits[0..n], copied);
                 if cdb.strengthen_by_vivification(cs.to(), n).is_some() {
                     num_purge += 1;
                 } else {
@@ -176,6 +179,7 @@ pub fn vivify(
             }
         }
         asg.backtrack_sandbox();
+        assert_eq!(asg.root_level, asg.decision_level());
     }
     state.log(
         state[Stat::Vivification],
@@ -186,7 +190,6 @@ pub fn vivify(
     );
     state[Stat::VivifiedClause] += num_shrink + num_purge;
     state[Stat::VivifiedVar] += num_assert;
-    cdb.garbage_collect();
     Ok(())
 }
 

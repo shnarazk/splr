@@ -466,7 +466,7 @@ impl StateIF for State {
         let asg_cpr_ema = asg.refer(assign::property::TEma::ConflictPerRestart);
 
         let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
-        let cdb_num_biclause = cdb.derefer(cdb::property::Tusize::NumBiClause);
+        let cdb_num_bi_clause = cdb.derefer(cdb::property::Tusize::NumBiClause);
         let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
         let cdb_lbd_of_dp: f64 = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
@@ -545,7 +545,7 @@ impl StateIF for State {
                 "{:>9}",
                 self,
                 LogUsizeId::BiClause,
-                cdb_num_biclause // cdb_num_bi_learnt
+                cdb_num_bi_clause // cdb_num_bi_learnt
             ),
             im!(
                 "{:>9}",

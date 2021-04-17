@@ -258,6 +258,7 @@ fn search(
                     }
                     asg.handle(SolverEvent::NewStabilizationStage(block_level));
                     // check(asg, cdb, false, "before reduction");
+                    assert_eq!(asg.root_level, asg.decision_level());
                     if cdb.reduce(asg, asg.num_conflict) {
                         #[cfg(feature = "trace_equivalency")]
                         if false {
@@ -278,7 +279,8 @@ fn search(
                                     &format!("simplify nc:{}", asg.num_conflict),
                                 );
                             }
-                        } else if true || vivification_turn {
+                        } else if vivification_turn {
+                            assert_eq!(asg.root_level, asg.decision_level());
                             vivification_turn = false;
                             // check(asg, cdb, false, "before vivification");
                             #[cfg(feature = "clause_vivification")]

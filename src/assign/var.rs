@@ -25,9 +25,8 @@ impl fmt::Display for Var {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
-            "V{{{} {}{}}}",
+            "V{{{} {}}}",
             self.index,
-            st(Flag::TOUCHED, ", touched"),
             st(Flag::ELIMINATED, ", eliminated"),
         )
     }
@@ -98,9 +97,9 @@ pub trait VarManipulateIF {
 
 impl VarManipulateIF for AssignStack {
     fn assigned(&self, l: Lit) -> Option<bool> {
-        match unsafe { self.assign.get_unchecked(l.vi()) } {
+        match self.assign[l.vi()] {
             Some(x) if !bool::from(l) => Some(!x),
-            x => *x,
+            x => x,
         }
     }
     #[inline]

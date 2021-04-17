@@ -267,16 +267,11 @@ impl SatSolverIF for Solver {
             let na = self
                 .asg
                 .derefer(crate::assign::property::Tusize::NumAssertedVar);
-            let nc = self
-                .cdb
-                .iter()
-                .skip(1)
-                .filter(|c| !c.is(Flag::DEAD))
-                .count();
+            let nc = self.cdb.iter().skip(1).filter(|c| !c.is_dead()).count();
             buf.write_all(format!("p cnf {} {}\n", nv, nc + na).as_bytes())
                 .unwrap();
             for c in self.cdb.iter().skip(1) {
-                if c.is(Flag::DEAD) {
+                if c.is_dead() {
                     continue;
                 }
                 for l in c.iter() {

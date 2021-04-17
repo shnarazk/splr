@@ -2,14 +2,13 @@
 /// some common traits.
 pub use crate::{
     assign::AssignReason,
-    cdb::{Clause, ClauseIF, ClauseId, ClauseIdIF, Watch},
+    cdb::{Clause, ClauseIF, ClauseId, ClauseIdIF},
     config::Config,
 };
 use {
     crate::solver::SolverEvent,
     std::{
         cmp::Ordering,
-        collections::HashMap,
         convert::TryFrom,
         fmt,
         fs::File,
@@ -308,36 +307,6 @@ impl Index<Lit> for Vec<bool> {
 }
 
 impl IndexMut<Lit> for Vec<bool> {
-    #[inline]
-    fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        unsafe { self.get_unchecked_mut(usize::from(l)) }
-    }
-}
-
-impl Index<Lit> for Vec<Vec<Watch>> {
-    type Output = Vec<Watch>;
-    #[inline]
-    fn index(&self, l: Lit) -> &Self::Output {
-        unsafe { self.get_unchecked(usize::from(l)) }
-    }
-}
-
-impl Index<Lit> for Vec<HashMap<Lit, ClauseId>> {
-    type Output = HashMap<Lit, ClauseId>;
-    #[inline]
-    fn index(&self, l: Lit) -> &Self::Output {
-        unsafe { self.get_unchecked(usize::from(l)) }
-    }
-}
-
-impl IndexMut<Lit> for Vec<Vec<Watch>> {
-    #[inline]
-    fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        unsafe { self.get_unchecked_mut(usize::from(l)) }
-    }
-}
-
-impl IndexMut<Lit> for Vec<HashMap<Lit, ClauseId>> {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
         unsafe { self.get_unchecked_mut(usize::from(l)) }
@@ -753,22 +722,18 @@ bitflags! {
         //
         //## For Clause
         //
-        /// a clause is stored in DB, but is a garbage now.
-        const DEAD         = 0b0000_0000_0000_0001;
         /// a clause is a generated clause by conflict analysis and is removable.
-        const LEARNT       = 0b0000_0000_0000_0010;
+        const LEARNT       = 0b0000_0000_0000_0001;
         /// a clause is registered in vars' occurrence list.
-        const OCCUR_LINKED = 0b0000_0000_0000_0100;
+        const OCCUR_LINKED = 0b0000_0000_0000_0010;
         /// a clause or var is enqueued for eliminator.
-        const ENQUEUED     = 0b0000_0000_0000_1000;
-        /// mark to run garbage collector on the corresponding watcher lists
-        const TOUCHED      = 0b0000_0000_0001_0000;
+        const ENQUEUED     = 0b0000_0000_0000_0100;
         /// for vivified clauses
-        const VIVIFIED     = 0b0000_0000_0010_0000;
+        const VIVIFIED     = 0b0000_0000_0001_0000;
         /// for a clause which decreases LBD twice after vivification
-        const VIVIFIED2    = 0b0000_0000_0100_0000;
+        const VIVIFIED2    = 0b0000_0000_0010_0000;
         /// a given clause derived a learnt which LBD is smaller than 20.
-        const DERIVE20     = 0b0000_0000_1000_0000;
+        const DERIVE20     = 0b0000_0000_0100_0000;
 
         //
         //## For Var

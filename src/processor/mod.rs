@@ -211,8 +211,8 @@ mod tests {
             0,
             cdb.iter()
                 .skip(1)
-                .filter(|c| !c.is(Flag::DEAD))
-                .filter(|c| c.lits.iter().any(|l| elim_vars.contains(&l.vi())))
+                .filter(|c| !c.is_dead())
+                .filter(|c| c.iter().any(|l| elim_vars.contains(&l.vi())))
                 .count()
         );
     }
