@@ -238,8 +238,8 @@ impl PropagateIF for AssignStack {
             //
             //## binary loop
             //
-            let bin_source = cdb.bi_clause_map(*p);
-            for (&blocker, &cid) in bin_source.iter() {
+            let bi_clause = cdb.bi_clause_map(*p);
+            for (&blocker, &cid) in bi_clause.iter() {
                 debug_assert!(!cdb[cid].is_dead());
                 debug_assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
@@ -312,13 +312,13 @@ impl PropagateIF for AssignStack {
                 // Gathering good literals at the beginning of lits.
                 for (k, lk) in c.iter().enumerate().skip(2) {
                     if lit_assign!(self, *lk) != Some(false) {
-                        cdb.update_watch(cid, false_watch_pos, k, true);
+                        cdb.update_watch_cache(cid, false_watch_pos, k, true);
                         // cdb.watches(cid, "after propagagtion: found another watch");
                         continue 'next_clause;
                     }
                 }
                 if false_watch_pos == 0 {
-                    cdb.update_watch(cid, 0, 1, false);
+                    cdb.update_watch_cache(cid, 0, 1, false);
                 }
                 cdb.reregister_watch_cache(sweeping, Some((cid, other_watch)));
                 // cdb.watches(cid, "after propagation: push back");
@@ -371,8 +371,8 @@ impl PropagateIF for AssignStack {
             self.q_head += 1;
             let sweeping = Lit::from(usize::from(*p));
             let false_lit = !*p;
-            let bin_source = cdb.bi_clause_map(*p);
-            for (&blocker, &cid) in bin_source.iter() {
+            let bi_clause = cdb.bi_clause_map(*p);
+            for (&blocker, &cid) in bi_clause.iter() {
                 debug_assert!(!cdb[cid].is_dead());
                 debug_assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
@@ -423,12 +423,12 @@ impl PropagateIF for AssignStack {
                 let false_watch_pos = (c.lit0() == other_watch) as usize;
                 for (k, lk) in c.iter().enumerate().skip(2) {
                     if lit_assign!(self, *lk) != Some(false) {
-                        cdb.update_watch(cid, false_watch_pos, k, true);
+                        cdb.update_watch_cache(cid, false_watch_pos, k, true);
                         continue 'next_clause;
                     }
                 }
                 if false_watch_pos == 0 {
-                    cdb.update_watch(cid, 0, 1, false);
+                    cdb.update_watch_cache(cid, 0, 1, false);
                 }
                 cdb.reregister_watch_cache(sweeping, Some((cid, other_watch)));
                 if other_watch_value == Some(false) {
@@ -499,12 +499,12 @@ trait WatchCacheAdapter {
 
 impl WatchCacheAdapter for Option<(&ClauseId, &Lit)> {
     fn deref_watch(self) -> Option<(ClauseId, Lit)> {
-        self.and_then(|(c, i)| Some((*c, *i)))
+        self.map(|(c, i)| (*c, *i))
     }
 }
 
 impl WatchCacheAdapter for Option<&(ClauseId, Lit)> {
     fn deref_watch(self) -> Option<(ClauseId, Lit)> {
-        self.and_then(|(c, i)| Some((*c, *i)))
+        self.map(|(c, i)| (*c, *i))
     }
 }

@@ -90,7 +90,7 @@ where
                         }
                     }
                     2 => {
-                        if cdb.registered_biclause((*vec)[0], (*vec)[1]).is_none() {
+                        if cdb.has_bi_clause((*vec)[0], (*vec)[1]).is_none() {
                             let cid = cdb.new_clause(
                                 asg,
                                 vec,
@@ -388,7 +388,7 @@ mod tests {
         assert!(cdb
             .iter()
             .skip(1)
-            .all(|c| !c.iter().contains(&Lit::from_assign(vi, false))
-                && !c.iter().contains(&Lit::from_assign(vi, false))));
+            .all(|c| c.iter().all(|l| *l != Lit::from_assign(vi, false))
+                && c.iter().all(|l| *l != Lit::from_assign(vi, false))));
     }
 }

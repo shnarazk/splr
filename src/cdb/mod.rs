@@ -70,17 +70,21 @@ pub trait ClauseDBIF:
     fn iter(&self) -> Iter<'_, Clause>;
     /// return a mutable iterator.
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
-    /// return a watcher list for biclauses
+    /// return a watcher list for bi-clauses
     fn bi_clause_map(&self, l: Lit) -> &BiClause;
+    /// return `true` if a literal pair `(l0, l1)` is registered.
+    fn has_bi_clause(&self, l0: Lit, l1: Lit) -> Option<ClauseId>;
     /// replace the mutable watcher list with an empty one, and return the list
     fn detach_watch_cache(&mut self, l: Lit) -> WatchCache;
     /// register the clase to the previous watch cache
     fn reregister_watch_cache(&mut self, p: Lit, target: Option<(ClauseId, Lit)>) -> bool;
-    /// update watches of the clause
-    fn update_watch(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool);
     /// allocate a new clause and return its id.
     /// * If `level_sort` is on, register `v` as a learnt after sorting based on assign level.
     /// * Otherwise, register `v` as a permanent clause, which rank is zero.
+    fn update_watch_cache(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool);
+    /// removes an eliminated Lit `p` from a clause. This is an O(n) function!
+    /// This returns `true` if the clause became a unit clause.
+    /// And this is called only from `Eliminator::strengthen_clause`.
     fn new_clause<A>(
         &mut self,
         asg: &mut A,
@@ -92,6 +96,12 @@ pub trait ClauseDBIF:
         A: AssignIF;
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn remove_clause(&mut self, cid: ClauseId);
+    /// update watches of the clause
+    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> StrengthenResult;
+    /// shorten a clause.
+    /// None: new_size should be larger than or equal to 2.
+    /// return `Some(cid)` if the new clause is equal to a registered binclause.
+    fn strengthen_by_vivification(&mut self, cid: ClauseId, length: usize) -> Option<ClauseId>;
     /// check the condition to reduce.
     /// * return `true` if reduction is done.
     /// * Otherwise return `false`.
@@ -102,8 +112,6 @@ pub trait ClauseDBIF:
     where
         A: AssignIF;
     fn reset(&mut self);
-    /// return `true` if a literal pair `(l0, l1)` is registered.
-    fn registered_biclause(&self, l0: Lit, l1: Lit) -> Option<ClauseId>;
     /// update LBD then convert a learnt clause to permanent if needed.
     fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where
@@ -121,22 +129,15 @@ pub trait ClauseDBIF:
     /// Otherwise returns a clause which is not satisfiable under a given assignment.
     /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
     fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId>;
-    /// removes an eliminated Lit `p` from a clause. This is an O(n) function!
-    /// This returns `true` if the clause became a unit clause.
-    /// And this is called only from `Eliminator::strengthen_clause`.
-    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> StrengthenResult;
-    /// shorten a clause.
-    /// None: new_size should be larger than or equal to 2.
-    /// return `Some(cid)` if the new clause is equal to a registered binclause.
-    fn strengthen_by_vivification(&mut self, cid: ClauseId, length: usize) -> Option<ClauseId>;
     /// minimize a clause.
-    fn minimize_with_biclauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
+    fn minimize_with_bi_clauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
     where
         A: AssignIF;
 
     #[cfg(feature = "incremental_solver")]
     /// save an eliminated permanent clause to an extra space for incremental solving.
     fn make_permanent_immortal(&mut self, cid: ClauseId);
+    /// validate a clause's watches
     fn watches(&self, cid: ClauseId, message: &str) -> (Lit, Lit);
 }
 
@@ -242,7 +243,7 @@ pub struct ClauseDB {
     num_learnt: usize,
     /// the number of reductions.
     num_reduction: usize,
-    /// the number of reregistration of a biclause
+    /// the number of reregistration of a bi-clause
     num_reregistration: usize,
     /// EMA of LBD of clauses used in conflict analysis (dependency graph)
     pub lbd_of_dp_ema: Ema,
@@ -326,10 +327,9 @@ mod tests {
             println!("skip checking watches of an empty clause");
             return;
         }
-        for l in &c.lits[0..=1] {
-            let ws = &cdb.watch_cache[!*l];
-            assert!(ws.iter().any(|w| w.c == cid));
-        }
+        assert!(c.lits[0..2]
+            .iter()
+            .all(|l| cdb.watch_cache[!*l].iter().any(|(c, _)| *c == cid)));
         println!("pass to check watches");
     }
 

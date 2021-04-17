@@ -92,12 +92,12 @@ pub fn handle_conflict(
                 } else {
                     if l0 == decision {
                     } else if l1 == decision {
-                        cdb.update_watch(ci, 0, 1, false);
+                        cdb.update_watch_cache(ci, 0, 1, false);
                         // cdb.watches(ci, "after conflict analysis");
                     } else {
                         for (i, l) in c.iter().enumerate().skip(2) {
                             if *l == decision {
-                                cdb.update_watch(ci, 0, i, false);
+                                cdb.update_watch_cache(ci, 0, i, false);
                                 break;
                             }
                         }
@@ -466,7 +466,7 @@ impl State {
         new_learnt.retain(|l| *l == l0 || !l.is_redundant(asg, cdb, &mut to_clear, &levels));
         let len = new_learnt.len();
         if 2 < len && len < 30 {
-            cdb.minimize_with_biclauses(asg, new_learnt);
+            cdb.minimize_with_bi_clauses(asg, new_learnt);
         }
         // find correct backtrack level from remaining literals
         let mut level_to_return = 0;
@@ -503,8 +503,7 @@ impl Lit {
         if asg.reason(self.vi()) == AssignReason::default() {
             return false;
         }
-        let mut stack = Vec::new();
-        stack.push(self);
+        let mut stack = vec![self];
         let top = clear.len();
         while let Some(sl) = stack.pop() {
             match asg.reason(sl.vi()) {
