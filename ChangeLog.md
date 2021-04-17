@@ -1,18 +1,29 @@
-## 0.8.0, 2021-04-06
+## 0.8.0, 2021-05-XX
 
 ### Incompatible API changes from 0.7.0
 
 - define assign::property
 - append AssignIF::dump_cnf
 - define cdb::property
-- append ClauseDB::bin_watcher_list
+- append ClauseDB::bi_clause_map
+- remove ClauseDB::bin_watcher_lists
+- append ClauseDB::certificate_save
+- remove ClauseDB::count
+- remove ClauseDB::countf
+- rename ClauseDB::detach to remove_clause
+- append ClauseDB::detach_watch_cache
+- remove ClauseDB::garbage_collect
+- rename ClauseDB::minimize_with_biclauses to minimize_with_bi_clauses
+- remove ClauseDB::new_clause_sandbox
+- rename ClauseDB::registered_biclause to has_bi_clause
+- append ClauseDB::reregister_watch_cache
+- rename ClauseDB::strengthen to ClauseDB::strengthen_by_elimination
+- append ClauseDB::strengthen_by_vivification
+- remove ClauseDB::touch_var
+- append ClauseDB::update_watch_cache
 - remove ClauseDB::watcher_list
 - append ClauseDB::watcher_list_mut
-- append ClauseDB::detach_watches
-- append ClauseDB::new_clause_sandbox
-- remove ClauseDB::count
-- append ClauseDB::certificate_save
-- rename ClauseDB::strengthen to ClauseDB::strengthen_by_elimination
+- remove ClauseDB::watcher_lists_mut
 - screen Eliminator's fields
 - define processor::property
 - define restart::property
