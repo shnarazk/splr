@@ -422,7 +422,6 @@ impl ClauseDBIF for ClauseDB {
         asg: &mut A,
         vec: &mut Vec<Lit>,
         mut learnt: bool,
-        level_sort: bool,
     ) -> ClauseId
     where
         A: AssignIF,

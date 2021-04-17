@@ -94,13 +94,7 @@ pub trait ClauseDBIF:
     ) -> ClauseId
     where
         A: AssignIF;
-    fn new_clause_sandbox<A>(
-        &mut self,
-        asg: &mut A,
-        v: &mut Vec<Lit>,
-        learnt: bool,
-        level_sort: bool,
-    ) -> ClauseId
+    fn new_clause_sandbox<A>(&mut self, asg: &mut A, v: &mut Vec<Lit>, learnt: bool) -> ClauseId
     where
         A: AssignIF;
     /// un-register a clause `cid` from clause database and make the clause dead.

@@ -121,7 +121,7 @@ pub fn vivify(
                             None
                         }
                         2 if cdb.has_bi_clause(copied[0], copied[1]).is_some() => None,
-                        _ => Some(cdb.new_clause_sandbox(asg, &mut copied.clone(), true, false)),
+                        _ => Some(cdb.new_clause_sandbox(asg, &mut copied.clone(), true)),
                     };
                     asg.assign_by_decision(!l);
                     let cc: ClauseId = asg.propagate_sandbox(cdb);
