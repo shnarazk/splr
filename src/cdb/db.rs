@@ -417,6 +417,72 @@ impl ClauseDBIF for ClauseDB {
         self.watches(cid, "new_clause");
         cid
     }
+    fn new_clause_sandbox<A>(
+        &mut self,
+        asg: &mut A,
+        vec: &mut Vec<Lit>,
+        mut learnt: bool,
+        level_sort: bool,
+    ) -> ClauseId
+    where
+        A: AssignIF,
+    {
+        if vec.len() == 2 {
+            if let Some(cid) = self.has_bi_clause(vec[0], vec[1]) {
+                return cid;
+            }
+        }
+        let cid;
+        if let Some(cid_used) = self.freelist.pop() {
+            cid = cid_used;
+            let c = &mut self[cid];
+            c.flags = Flag::empty();
+            std::mem::swap(&mut c.lits, vec);
+            c.search_from = 2;
+        } else {
+            cid = ClauseId::from(self.clause.len());
+            let mut c = Clause {
+                flags: Flag::empty(),
+                ..Clause::default()
+            };
+            std::mem::swap(&mut c.lits, vec);
+            self.clause.push(c);
+        };
+        {
+            let ClauseDB {
+                ref mut clause,
+                ref mut lbd_temp,
+                ref mut bi_clause,
+                ref ordinal,
+                ref mut watch_cache,
+                ..
+            } = self;
+            let c = &mut clause[cid.ordinal as usize];
+            c.timestamp = *ordinal;
+            let len2 = c.lits.len() == 2;
+            if len2 {
+                c.rank = 1;
+            } else {
+                c.update_lbd(asg, lbd_temp);
+            }
+            if c.lits.len() <= 2 || (self.use_chan_seok && c.rank <= self.co_lbd_bound) {
+                learnt = false;
+            }
+            if learnt {
+                c.turn_on(Flag::LEARNT);
+            }
+            let l0 = c.lits[0];
+            let l1 = c.lits[1];
+            if len2 {
+                bi_clause[!l0].insert(l1, cid);
+                bi_clause[!l1].insert(l0, cid);
+            } else {
+                watch_cache[!l0].insert_watch(cid, l1);
+                watch_cache[!l1].insert_watch(cid, l0);
+            }
+        }
+        cid
+    }
     /// ## Warning
     /// this function is the only function that makes dead clauses
     fn remove_clause(&mut self, cid: ClauseId) {
@@ -434,6 +500,30 @@ impl ClauseDBIF for ClauseDB {
             &mut self.num_bi_clause,
             &mut self.num_clause,
             &mut self.num_learnt,
+            cid,
+            c,
+        );
+        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
+    }
+    fn remove_clause_sandbox(&mut self, cid: ClauseId) {
+        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
+        // if !self.clause[cid.ordinal as usize].is_dead() {
+        //     self.watches(cid, "before kill");
+        // }
+        let c = &mut self.clause[cid.ordinal as usize];
+        debug_assert!(!c.is_dead());
+        debug_assert!(1 < c.lits.len());
+        let mut store = CertificationStore::default();
+        let mut dummy1 = 0;
+        let mut dummy2 = 0;
+        let mut dummy3 = 0;
+        remove_clause_fn(
+            &mut store,
+            &mut self.bi_clause,
+            &mut self.watch_cache,
+            &mut dummy1,
+            &mut dummy2,
+            &mut dummy3,
             cid,
             c,
         );

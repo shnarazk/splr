@@ -279,7 +279,7 @@ fn search(
                                     &format!("simplify nc:{}", asg.num_conflict),
                                 );
                             }
-                        } else if vivification_turn {
+                        } else if vivification_turn || true {
                             assert_eq!(asg.root_level, asg.decision_level());
                             vivification_turn = false;
                             // check(asg, cdb, false, "before vivification");

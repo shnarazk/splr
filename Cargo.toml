@@ -15,7 +15,7 @@ categories = ["mathematics", "science"]
 bitflags = "1.2"
 
 [features]
-default = ["clause_elimination", "clause_reduction", "LR_rewarding", "Luby_stabilization", "reason_side_rewarding", "rephase"]
+default = ["clause_elimination", "clause_reduction", "clause_vivification", "LR_rewarding", "Luby_stabilization", "reason_side_rewarding", "rephase"]
 best_phases_tracking = []
 boundary_check = []
 clause_elimination = []

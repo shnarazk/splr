@@ -94,8 +94,19 @@ pub trait ClauseDBIF:
     ) -> ClauseId
     where
         A: AssignIF;
+    fn new_clause_sandbox<A>(
+        &mut self,
+        asg: &mut A,
+        v: &mut Vec<Lit>,
+        learnt: bool,
+        level_sort: bool,
+    ) -> ClauseId
+    where
+        A: AssignIF;
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn remove_clause(&mut self, cid: ClauseId);
+    /// un-register a clause `cid` from clause database and make the clause dead.
+    fn remove_clause_sandbox(&mut self, cid: ClauseId);
     /// update watches of the clause
     fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> StrengthenResult;
     /// shorten a clause.

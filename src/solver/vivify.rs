@@ -30,10 +30,10 @@ pub fn vivify(
     state: &mut State,
 ) -> MaybeInconsistent {
     assert_eq!(asg.root_level, asg.decision_level());
-    let mut average_age: f64 = 0.0;
+    // let mut average_age: f64 = 0.0;
     let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
     {
-        let thr = 8 + 20usize.saturating_sub(
+        let thr = 8 + 22usize.saturating_sub(
             ((asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).log2()
                 + (cdb.derefer(cdb::property::Tusize::NumClause) as f64).log10())
                 as usize,
@@ -41,7 +41,7 @@ pub fn vivify(
         for (i, c) in cdb.iter().enumerate().skip(1) {
             if c.is(Flag::LEARNT) {
                 if let Some(act) = c.to_vivify(thr) {
-                    average_age += c.timestamp() as f64;
+                    // average_age += c.timestamp() as f64;
                     clauses.push(OrderedProxy::new(ClauseId::from(i), -act));
                 }
             }
@@ -57,27 +57,30 @@ pub fn vivify(
     debug_assert_eq!(dl, 0);
     // This is a reusable vector to reduce memory consumption, the key is the number of invocation
     let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
-    let display_step: usize = 100;
+    let display_step: usize = 500;
     let mut num_check = 0;
     let mut num_purge = 0;
     let mut num_shrink = 0;
     let mut num_assert = 0;
     let mut to_display = 0;
-    let average_timestamp = average_age as usize / num_target;
+    // let average_timestamp = average_age as usize / num_target;
     let _activity_thr = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
 
     while let Some(cs) = clauses.pop() {
         assert_eq!(asg.root_level, asg.decision_level());
+        let activity = cdb.activity(cs.to());
+        let is_learnt = cdb[cs.to()].is(Flag::LEARNT);
         let c: &mut Clause = &mut cdb[cs.to()];
+        // let _timestamp = c.timestamp();
         // Since GC can make `clauses` out of date, we need to check its aliveness here.
         if c.is_dead() {
             continue;
         }
         debug_assert!(!c.is(Flag::ELIMINATED));
-        let timestamp = c.timestamp();
         c.vivified();
         let clits = c.iter().map(|l| *l).collect::<Vec<Lit>>();
         let mut copied: Vec<Lit> = Vec::new();
+        let mut flipped = true;
         if to_display <= num_check {
             state.flush("");
             if num_target < 2 * num_purge {
@@ -101,84 +104,101 @@ pub fn vivify(
                 //
                 //## Rule 1
                 //
-                Some(false) => {
-                    // This is not the optimal. But due to implementation of strengthen_by_vivification,
-                    // we must keep the literal order.
-                    copied.push(l);
-                }
+                Some(false) => continue 'this_clause,
                 //
                 //## Rule 2
                 //
                 Some(true) => {
-                    //
-                    // This path is optimized for the case the decision level is zero.
-                    //
-                    // copied.push(!*l);
-                    // let r = asg.reason_literals(cdb, *l);
-                    // copied = asg.minimize(cdb, &copied, &r, &mut seen);
-                    // if copied.len() == 1 {
-                    //     assert_eq!(copied[0], *l);
-                    //     copied.clear();
-                    // }
                     copied.clear();
+                    flipped = false;
                     break 'this_clause;
                 }
                 None => {
-                    copied.push(l);
+                    let cid: Option<ClauseId> = match copied.len() {
+                        0 => None,
+                        1 => {
+                            asg.assign_by_decision(copied[0]);
+                            None
+                        }
+                        2 if cdb.has_bi_clause(copied[0], copied[1]).is_some() => None,
+                        _ => Some(cdb.new_clause_sandbox(asg, &mut copied.clone(), true, false)),
+                    };
                     asg.assign_by_decision(!l);
                     let cc: ClauseId = asg.propagate_sandbox(cdb);
                     //
                     //## Rule 3
                     //
                     if !cc.is_none() {
-                        break 'this_clause;
+                        copied.push(!l);
+                        copied = asg.analyze(
+                            cdb,
+                            &copied,
+                            &cdb[cc].iter().map(|l| *l).collect::<Vec<Lit>>(),
+                            &mut seen,
+                        );
+                        if copied.is_empty() {
+                            break 'this_clause;
+                        }
+                        flipped = false;
                     }
-
+                    asg.backtrack_sandbox();
+                    cid.map(|cj| cdb.remove_clause_sandbox(cj));
                     //
                     //## Rule 4
                     //
-                    // nothing to do
+                    copied.push(!l);
                 }
             }
         }
         debug_assert!(!cdb[cs.to()].is_dead());
+        if flipped {
+            flip(&mut copied);
+        }
         match copied.len() {
-            0 if timestamp < average_timestamp => {
+            0 if flipped => {
+                cdb.certificate_add_assertion(clits[0]);
+                return Err(SolverError::Inconsistent);
+            }
+            0 => {
                 cdb.remove_clause(cs.to());
                 num_purge += 1;
             }
-            0 => (),
             1 => {
+                assert_eq!(asg.decision_level(), asg.root_level);
                 let l0 = copied[0];
-                assert_eq!(asg.assigned(l0), Some(false));
-                // `asg.assign_at_root_level` calls the normal `cancel_until`.
-                // To avoid it, we call `asg.backtrack_sandbox` before it.
-                asg.backtrack_sandbox();
-                cdb.certificate_add_assertion(l0);
+                match asg.assigned(l0) {
+                    None => {
+                        cdb.certificate_add_assertion(l0);
+                        if asg.assign_at_root_level(l0).is_err() {
+                            return Err(SolverError::Inconsistent);
+                        }
+                        num_assert += 1;
+                        state[Stat::VivifiedVar] += 1;
+                    }
+                    Some(false) => panic!("vivify176"),
+                    _ => (),
+                }
                 cdb.remove_clause(cs.to());
-                // cdb.garbage_collect();
-                assert_eq!(asg.assigned(l0), None);
-                asg.assign_at_root_level(l0)?;
                 if !asg.propagate_sandbox(cdb).is_none() {
                     // panic!("Vivification found an inconsistency.");
                     return Err(SolverError::Inconsistent);
                 }
                 num_purge += 1;
-                num_assert += 1;
             }
             n if n == clits.len() => (),
             n => {
-                assert!(2 < clits.len());
-                assert_eq!(clits[0..n], copied);
-                if cdb.strengthen_by_vivification(cs.to(), n).is_some() {
-                    num_purge += 1;
+                if n == 2 && cdb.has_bi_clause(copied[0], copied[1]).is_some() {
+                    elim.to_simplify += 0.5;
                 } else {
+                    let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
+                    cdb.set_activity(cj, activity);
+                    cdb[cj].turn_on(Flag::VIVIFIED);
                     elim.to_simplify += 1.0 / (2 as f64).powf(1.4);
-                    num_shrink += 1;
                 }
+                cdb.remove_clause(cs.to());
+                num_shrink += 1;
             }
         }
-        asg.backtrack_sandbox();
         assert_eq!(asg.root_level, asg.decision_level());
     }
     state.log(
