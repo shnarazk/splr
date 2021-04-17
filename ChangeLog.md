@@ -33,7 +33,7 @@
 ### other changes
 
 - fix a bug which has been rarely emitted by eliminator.
-   - Splrs-0.7.0 shows that ans_aes_equiv_encry_3_rounds.debugged-sc2012.cnf
+   - Splr-0.7.0 shows that ans_aes_equiv_encry_3_rounds.debugged-sc2012.cnf
      is satisfiable. But it's not.
    - `AssignIF::propagate` skipped clause-level satisfiability checking,
      if its watch's `blocker` held an eliminated var, which was never falsified.
