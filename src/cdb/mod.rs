@@ -286,9 +286,10 @@ pub mod property {
         NumLearnt,
         NumReduction,
         NumReRegistration,
+        Timestamp,
     }
 
-    pub const USIZES: [Tusize; 7] = [
+    pub const USIZES: [Tusize; 8] = [
         Tusize::NumBiClause,
         Tusize::NumBiLearnt,
         Tusize::NumClause,
@@ -296,6 +297,7 @@ pub mod property {
         Tusize::NumLearnt,
         Tusize::NumReduction,
         Tusize::NumReRegistration,
+        Tusize::Timestamp,
     ];
 
     impl PropertyDereference<Tusize, usize> for ClauseDB {
@@ -309,6 +311,7 @@ pub mod property {
                 Tusize::NumLearnt => self.num_learnt,
                 Tusize::NumReduction => self.num_reduction,
                 Tusize::NumReRegistration => self.num_reregistration,
+                Tusize::Timestamp => self.ordinal,
             }
         }
     }
