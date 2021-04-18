@@ -5,7 +5,7 @@ use {
     super::{Stat, State},
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-        cdb::{self, ClauseDB, ClauseDBIF, ClauseIF},
+        cdb::{self, ClauseDB, ClauseDBIF, ClauseIF, NewClauseResult},
         processor::Eliminator,
         state::StateIF,
         types::*,
@@ -121,8 +121,15 @@ pub fn vivify(
                             asg.assign_by_decision(copied[0]);
                             None
                         }
-                        2 if cdb.has_bi_clause(copied[0], copied[1]).is_some() => None,
-                        _ => Some(cdb.new_clause_sandbox(asg, &mut copied.clone(), true)),
+                        _ => {
+                            if let NewClauseResult::Generated(cid) =
+                                cdb.new_clause_sandbox(asg, &mut copied.clone())
+                            {
+                                Some(cid)
+                            } else {
+                                None
+                            }
+                        }
                     };
                     asg.assign_by_decision(!l);
                     let cc: ClauseId = asg.propagate_sandbox(cdb);
@@ -188,13 +195,16 @@ pub fn vivify(
             }
             n if n == clits.len() => (),
             n => {
-                if n == 2 && cdb.has_bi_clause(copied[0], copied[1]).is_some() {
-                    elim.to_simplify += 0.5;
-                } else {
-                    let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
-                    cdb.set_activity(cj, activity);
-                    cdb[cj].turn_on(Flag::VIVIFIED);
-                    elim.to_simplify += 1.0 / (2 as f64).powf(1.4);
+                match cdb.new_clause(asg, &mut copied, is_learnt, true) {
+                    NewClauseResult::Generated(ci) => {
+                        cdb.set_activity(ci, activity);
+                        cdb[ci].turn_on(Flag::VIVIFIED);
+                        elim.to_simplify += 1.0 / (n as f64).powf(1.4);
+                    }
+                    NewClauseResult::Merged(ci) => {
+                        cdb[ci].turn_on(Flag::VIVIFIED);
+                        elim.to_simplify += 0.5;
+                    }
                 }
                 cdb.remove_clause(cs.to());
                 num_shrink += 1;

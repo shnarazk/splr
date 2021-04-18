@@ -1,7 +1,7 @@
 use {
     super::{
         property, watch_cache::*, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId,
-        StrengthenResult,
+        NewClauseResult, StrengthenResult,
     },
     crate::{assign::AssignIF, solver::SolverEvent, types::*},
     std::{
@@ -307,7 +307,7 @@ impl ClauseDBIF for ClauseDB {
         vec: &mut Vec<Lit>,
         mut learnt: bool,
         level_sort: bool,
-    ) -> ClauseId
+    ) -> NewClauseResult
     where
         A: AssignIF,
     {
@@ -331,7 +331,7 @@ impl ClauseDBIF for ClauseDB {
         }
         if vec.len() == 2 {
             if let Some(cid) = self.has_bi_clause(vec[0], vec[1]) {
-                return cid;
+                return NewClauseResult::Merged(cid);
             }
         }
         self.certification_store.push_add(vec);
@@ -415,20 +415,16 @@ impl ClauseDBIF for ClauseDB {
         }
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
         self.watches(cid, "new_clause");
-        cid
+        NewClauseResult::Generated(cid)
     }
-    fn new_clause_sandbox<A>(
-        &mut self,
-        asg: &mut A,
-        vec: &mut Vec<Lit>,
-        mut learnt: bool,
-    ) -> ClauseId
+    fn new_clause_sandbox<A>(&mut self, asg: &mut A, vec: &mut Vec<Lit>) -> NewClauseResult
     where
         A: AssignIF,
     {
+        let mut learnt: bool = true;
         if vec.len() == 2 {
             if let Some(cid) = self.has_bi_clause(vec[0], vec[1]) {
-                return cid;
+                return NewClauseResult::Merged(cid);
             }
         }
         let cid;
@@ -480,7 +476,7 @@ impl ClauseDBIF for ClauseDB {
                 watch_cache[!l1].insert_watch(cid, l0);
             }
         }
-        cid
+        NewClauseResult::Generated(cid)
     }
     /// ## Warning
     /// this function is the only function that makes dead clauses

@@ -327,7 +327,7 @@ impl Solver {
                     .map_or(None, |_| Some(ClauseId::default()))
             }
             _ => {
-                let cid = cdb.new_clause(asg, lits, false, false);
+                let cid = cdb.new_clause(asg, lits, false, false).as_cid();
                 elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
                 cdb[cid].rank = 1;
                 Some(cid)

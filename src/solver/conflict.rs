@@ -222,7 +222,7 @@ pub fn handle_conflict(
         } else {
             NULL_LIT
         };
-        let cid = cdb.new_clause(asg, new_learnt, true, true);
+        let cid = cdb.new_clause(asg, new_learnt, true, true).as_cid();
         elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);

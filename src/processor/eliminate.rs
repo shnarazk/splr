@@ -3,7 +3,7 @@ use {
     super::{EliminateIF, Eliminator, LitOccurs},
     crate::{
         assign::AssignIF,
-        cdb::ClauseDBIF,
+        cdb::{ClauseDBIF, NewClauseResult},
         solver::{restart::RestartIF, SolverEvent},
         state::State,
         types::*,
@@ -90,13 +90,12 @@ where
                         }
                     }
                     2 => {
-                        if cdb.has_bi_clause((*vec)[0], (*vec)[1]).is_none() {
-                            let cid = cdb.new_clause(
-                                asg,
-                                vec,
-                                cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT),
-                                true,
-                            );
+                        if let NewClauseResult::Generated(cid) = cdb.new_clause(
+                            asg,
+                            vec,
+                            cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT),
+                            true,
+                        ) {
                             elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
                             #[cfg(feature = "trace_elimination")]
                             println!(
@@ -106,12 +105,14 @@ where
                         }
                     }
                     _ => {
-                        let cid = cdb.new_clause(
-                            asg,
-                            vec,
-                            cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT),
-                            true,
-                        );
+                        let cid = cdb
+                            .new_clause(
+                                asg,
+                                vec,
+                                cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT),
+                                true,
+                            )
+                            .as_cid();
                         elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
                         #[cfg(feature = "trace_elimination")]
                         println!(

@@ -20,10 +20,26 @@ use {
     watch_cache::*,
 };
 
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum StrengthenResult {
     MergedToRegisteredClause(ClauseId),
     BecameUnitClause(Lit),
     Ok,
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum NewClauseResult {
+    Generated(ClauseId),
+    Merged(ClauseId),
+}
+
+impl NewClauseResult {
+    pub fn as_cid(self) -> ClauseId {
+        match self {
+            NewClauseResult::Generated(cid) => cid,
+            NewClauseResult::Merged(cid) => cid,
+        }
+    }
 }
 
 /// API for Clause, providing literal accessors.
@@ -91,10 +107,10 @@ pub trait ClauseDBIF:
         v: &mut Vec<Lit>,
         learnt: bool,
         level_sort: bool,
-    ) -> ClauseId
+    ) -> NewClauseResult
     where
         A: AssignIF;
-    fn new_clause_sandbox<A>(&mut self, asg: &mut A, v: &mut Vec<Lit>, learnt: bool) -> ClauseId
+    fn new_clause_sandbox<A>(&mut self, asg: &mut A, v: &mut Vec<Lit>) -> NewClauseResult
     where
         A: AssignIF;
     /// un-register a clause `cid` from clause database and make the clause dead.
