@@ -316,6 +316,8 @@ impl Config {
             let featuers = [
                 #[cfg(feature = "best_phases_tracking")]
                 "best phase tracking",
+                #[cfg(feature = "bi_clause_completion")]
+                "binary clause completion",
                 #[cfg(feature = "clause_elimination")]
                 "clause elimination",
                 #[cfg(feature = "clause_reduction")]

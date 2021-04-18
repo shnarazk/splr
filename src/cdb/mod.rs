@@ -158,6 +158,10 @@ pub trait ClauseDBIF:
     fn make_permanent_immortal(&mut self, cid: ClauseId);
     /// validate a clause's watches
     fn watches(&self, cid: ClauseId, message: &str) -> (Lit, Lit);
+    /// complete bi-clause network
+    fn complete_bi_clauses<A>(&mut self, asg: &mut A)
+    where
+        A: AssignIF;
 }
 
 /// Clause identifier, or clause index, starting with one.
@@ -217,6 +221,10 @@ pub struct ClauseDB {
     co_lbd_bound: u16,
     // not in use
     // lbd_frozen_clause: usize,
+
+    // bi-clause completion
+    bi_clause_completion_queue: Vec<Lit>,
+    num_bi_clause_compeletion: usize,
 
     //
     //## clause rewarding
@@ -280,6 +288,7 @@ pub mod property {
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tusize {
         NumBiClause,
+        NumBiClauseCompletion,
         NumBiLearnt,
         NumClause,
         NumLBD2,
@@ -289,8 +298,9 @@ pub mod property {
         Timestamp,
     }
 
-    pub const USIZES: [Tusize; 8] = [
+    pub const USIZES: [Tusize; 9] = [
         Tusize::NumBiClause,
+        Tusize::NumBiClauseCompletion,
         Tusize::NumBiLearnt,
         Tusize::NumClause,
         Tusize::NumLBD2,
@@ -306,6 +316,7 @@ pub mod property {
             match k {
                 Tusize::NumClause => self.num_clause,
                 Tusize::NumBiClause => self.num_bi_clause,
+                Tusize::NumBiClauseCompletion => self.num_bi_clause_compeletion,
                 Tusize::NumBiLearnt => self.num_bi_learnt,
                 Tusize::NumLBD2 => self.num_lbd2,
                 Tusize::NumLearnt => self.num_learnt,

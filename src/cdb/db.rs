@@ -22,6 +22,8 @@ impl Default for ClauseDB {
             soft_limit: 0, // 248_000_000
             use_chan_seok: false,
             co_lbd_bound: 4,
+            bi_clause_completion_queue: Vec::new(),
+            num_bi_clause_compeletion: 0,
             // lbd_frozen_clause: 30,
             ordinal: 0,
             activity_decay: 0.99,
@@ -415,6 +417,7 @@ impl ClauseDBIF for ClauseDB {
         };
         {
             let ClauseDB {
+                ref mut bi_clause_completion_queue,
                 ref mut clause,
                 ref mut lbd_temp,
                 ref mut bi_clause,
@@ -427,6 +430,15 @@ impl ClauseDBIF for ClauseDB {
             let len2 = c.lits.len() == 2;
             if len2 {
                 c.rank = 1;
+
+                #[cfg(feature = "bi_clause_completion")]
+                {
+                    for lit in c.iter() {
+                        if !bi_clause_completion_queue.iter().any(|l| *l == *lit) {
+                            bi_clause_completion_queue.push(*lit);
+                        }
+                    }
+                }
             } else {
                 c.update_lbd(asg, lbd_temp);
             }
@@ -824,9 +836,36 @@ impl ClauseDBIF for ClauseDB {
         */
         (Lit::default(), Lit::default())
     }
+    fn complete_bi_clauses<A>(&mut self, asg: &mut A)
+    where
+        A: AssignIF,
+    {
+        while let Some(lit) = self.bi_clause_completion_queue.pop() {
+            self.complete_bi_clauses_with(asg, lit);
+        }
+    }
 }
 
 impl ClauseDB {
+    /// [a, b], [-b, c] implies [a, c]
+    /// -a => b !b => c  ==> [a, c]
+    fn complete_bi_clauses_with<A>(&mut self, asg: &mut A, lit: Lit)
+    where
+        A: AssignIF,
+    {
+        let mut vec: Vec<Vec<Lit>> = Vec::new();
+        for other in self.bi_clause[!lit].keys() {
+            for third in self.bi_clause[*other].keys() {
+                if !self.bi_clause[!lit].contains_key(&third) {
+                    vec.push(vec![lit, *third]);
+                }
+            }
+        }
+        for pair in vec.iter_mut() {
+            self.new_clause(asg, pair, false, false);
+            self.num_bi_clause_compeletion += 1;
+        }
+    }
     /// return `true` if a literal pair `(l0, l1)` is registered.
     ///```ignore
     /// use splr::types::*;
