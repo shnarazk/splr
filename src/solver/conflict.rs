@@ -247,6 +247,11 @@ pub fn handle_conflict(
                 cdb[cid].turn_on(Flag::DERIVE20);
             }
         }
+
+        #[cfg(feature = "bi_clause_completion")]
+        if !generated {
+            cdb.complete_bi_clauses(asg);
+        }
     }
     Ok(())
 }

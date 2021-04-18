@@ -209,8 +209,6 @@ fn search(
     let mut next_progress = progress_step;
     let mut vivification_turn = true;
 
-    check(asg, cdb, false, "starting search");
-
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
 
