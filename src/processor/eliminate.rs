@@ -1,6 +1,6 @@
 /// Crate `eliminator` implements clause subsumption and var elimination.
 use {
-    super::{EliminateIF, Eliminator, LitOccurs},
+    super::{Eliminator, LitOccurs},
     crate::{
         assign::AssignIF,
         cdb::{ClauseDBIF, NewClauseResult},
@@ -89,7 +89,7 @@ where
                             }
                         }
                     }
-                    2 => {
+                    _ => {
                         if let NewClauseResult::Generated(cid) = cdb.new_clause(
                             asg,
                             vec,
@@ -103,22 +103,6 @@ where
                                 vi, cdb[cid], cdb[*p], cdb[*n],
                             );
                         }
-                    }
-                    _ => {
-                        let cid = cdb
-                            .new_clause(
-                                asg,
-                                vec,
-                                cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT),
-                                true,
-                            )
-                            .as_cid();
-                        elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
-                        #[cfg(feature = "trace_elimination")]
-                        println!(
-                            " - eliminate_var {}: X {} from {} and {}",
-                            vi, cdb[cid], cdb[*p], cdb[*n],
-                        );
                     }
                 }
             }

@@ -274,7 +274,25 @@ impl EliminateIF for Eliminator {
         }
         cdb.check_size().map(|_| ())
     }
-    fn add_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause, enqueue: bool)
+    fn sorted_iterator(&self) -> Iter<'_, usize> {
+        self.var_queue.heap[1..].iter()
+    }
+    fn stats(&self, vi: VarId) -> Option<(usize, usize)> {
+        let w = &self[vi];
+        if w.aborted {
+            None
+        } else {
+            Some((w.pos_occurs.len(), w.neg_occurs.len()))
+        }
+    }
+    fn eliminated_lits(&self) -> &[Lit] {
+        &self.elim_lits
+    }
+}
+
+impl Eliminator {
+    /// register a clause id to all corresponding occur lists.
+    pub fn add_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause, enqueue: bool)
     where
         A: AssignIF,
     {
@@ -295,13 +313,17 @@ impl EliminateIF for Eliminator {
                 if bool::from(*l) {
                     assert!(
                         !w.pos_occurs.contains(&cid),
-                        "elim.add_cid_occur found a strange positive clause"
+                        "elim.add_cid_occur found a strange positive clause{}{}",
+                        cid,
+                        c,
                     );
                     w.pos_occurs.push(cid);
                 } else {
                     assert!(
                         !w.neg_occurs.contains(&cid),
-                        "elim.add_cid_occur found a strange negative clause"
+                        "elim.add_cid_occur found a strange negative clause{}{}",
+                        cid,
+                        c,
                     );
                     w.neg_occurs.push(cid);
                 }
@@ -313,7 +335,8 @@ impl EliminateIF for Eliminator {
             self.enqueue_clause(cid, c);
         }
     }
-    fn remove_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause)
+    /// remove a clause id from all corresponding occur lists.
+    pub fn remove_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause)
     where
         A: AssignIF,
     {
@@ -328,23 +351,7 @@ impl EliminateIF for Eliminator {
             }
         }
     }
-    fn sorted_iterator(&self) -> Iter<'_, usize> {
-        self.var_queue.heap[1..].iter()
-    }
-    fn stats(&self, vi: VarId) -> Option<(usize, usize)> {
-        let w = &self[vi];
-        if w.aborted {
-            None
-        } else {
-            Some((w.pos_occurs.len(), w.neg_occurs.len()))
-        }
-    }
-    fn eliminated_lits(&self) -> &[Lit] {
-        &self.elim_lits
-    }
-}
 
-impl Eliminator {
     /// check if the eliminator is active and waits for next `eliminate`.
     fn is_waiting(&self) -> bool {
         self.mode == EliminatorMode::Waiting

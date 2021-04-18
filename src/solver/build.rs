@@ -3,8 +3,8 @@ use {
     super::{restart::Restarter, Certificate, Solver, SolverEvent, SolverResult, State, StateIF},
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-        cdb::{ClauseDB, ClauseDBIF},
-        processor::{EliminateIF, Eliminator},
+        cdb::{ClauseDB, ClauseDBIF, NewClauseResult},
+        processor::Eliminator,
         types::*,
     },
     std::convert::TryFrom,
@@ -297,7 +297,6 @@ impl Solver {
         let Solver {
             ref mut asg,
             ref mut cdb,
-            ref mut elim,
             ..
         } = self;
         if lits.is_empty() {
@@ -326,12 +325,13 @@ impl Solver {
                 asg.assign_at_root_level(lits[0])
                     .map_or(None, |_| Some(ClauseId::default()))
             }
-            _ => {
-                let cid = cdb.new_clause(asg, lits, false, false).as_cid();
-                elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
-                cdb[cid].rank = 1;
-                Some(cid)
-            }
+            _ => match cdb.new_clause(asg, lits, false, false) {
+                NewClauseResult::Generated(cid) => {
+                    cdb[cid].rank = 1;
+                    Some(cid)
+                }
+                NewClauseResult::Merged(cid) => Some(cid),
+            },
         }
     }
     #[cfg(not(feature = "no_IO"))]

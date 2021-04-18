@@ -27,6 +27,8 @@
 - remove ClauseDB::watcher_list
 - append ClauseDB::watcher_list_mut
 - remove ClauseDB::watcher_lists_mut
+- remove EliminateIF::add_cid_occur
+- remove EliminateIF::remove_cid_occur
 - screen Eliminator's fields
 - define processor::property
 - define restart::property

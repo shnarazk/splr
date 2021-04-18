@@ -90,14 +90,6 @@ pub trait EliminateIF: Instantiate {
         A: AssignIF,
         C: ClauseDBIF,
         R: RestartIF;
-    /// register a clause id to all corresponding occur lists.
-    fn add_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause, enqueue: bool)
-    where
-        A: AssignIF;
-    /// remove a clause id from all corresponding occur lists.
-    fn remove_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause)
-    where
-        A: AssignIF;
     /// return the order of vars based on their occurrences
     fn sorted_iterator(&self) -> Iter<'_, usize>;
     /// return vi's stats

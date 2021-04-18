@@ -7,8 +7,8 @@ use {
     },
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-        cdb::{ClauseDB, ClauseDBIF},
-        processor::{EliminateIF, Eliminator},
+        cdb::{ClauseDB, ClauseDBIF, NewClauseResult},
+        processor::Eliminator,
         solver::SolverEvent,
         types::*,
     },
@@ -222,8 +222,13 @@ pub fn handle_conflict(
         } else {
             NULL_LIT
         };
-        let cid = cdb.new_clause(asg, new_learnt, true, true).as_cid();
-        elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
+        let new_clause = cdb.new_clause(asg, new_learnt, true, true);
+        let generated = matches!(new_clause, NewClauseResult::Generated(_));
+
+        let cid = new_clause.as_cid();
+        // // if generated {
+        // //     elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
+        // // }
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);
         asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), al);
