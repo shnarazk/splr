@@ -367,7 +367,9 @@ mod tests {
         asg.assign_by_decision(lit(1));
         asg.assign_by_decision(lit(-2));
 
-        let c1 = cdb.new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false, false);
+        let c1 = cdb
+            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false, false)
+            .as_cid();
         let c = &cdb[c1];
         assert_eq!(c.rank, 2);
         assert!(!c.is_dead());
@@ -375,7 +377,9 @@ mod tests {
         #[cfg(feature = "just_used")]
         assert!(!c.is(Flag::JUST_USED));
 
-        let c2 = cdb.new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true, true);
+        let c2 = cdb
+            .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true, true)
+            .as_cid();
         let c = &cdb[c2];
         assert_eq!(c.rank, 2);
         assert!(!c.is_dead());
@@ -392,8 +396,12 @@ mod tests {
         };
         let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        let c1 = cdb.new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false, false);
-        let c2 = cdb.new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false, false);
+        let c1 = cdb
+            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false, false)
+            .as_cid();
+        let c2 = cdb
+            .new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false, false)
+            .as_cid();
         cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_eq!(c1 == c1, true);
@@ -410,7 +418,9 @@ mod tests {
         };
         let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        let c1 = cdb.new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false, false);
+        let c1 = cdb
+            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false, false)
+            .as_cid();
         assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
         let mut iter = cdb[c1][0..].into_iter();
         assert_eq!(iter.next(), Some(&lit(1)));

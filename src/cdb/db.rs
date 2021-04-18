@@ -828,7 +828,7 @@ impl ClauseDBIF for ClauseDB {
 
 impl ClauseDB {
     /// return `true` if a literal pair `(l0, l1)` is registered.
-    ///```
+    ///```ignore
     /// use splr::types::*;
     /// use crate::splr::cdb::ClauseDBIF;
     ///
