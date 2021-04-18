@@ -5,6 +5,9 @@
 - define assign::property
 - append AssignIF::dump_cnf
 - define cdb::property
+- screen Clause::lits
+- append Clause::lit0
+- append Clause::lit1
 - append ClauseDB::bi_clause_map
 - remove ClauseDB::bin_watcher_lists
 - append ClauseDB::certificate_save
@@ -15,7 +18,7 @@
 - remove ClauseDB::garbage_collect
 - rename ClauseDB::minimize_with_biclauses to minimize_with_bi_clauses
 - remove ClauseDB::new_clause_sandbox
-- rename ClauseDB::registered_biclause to has_bi_clause
+- remove ClauseDB::registered_biclause
 - append ClauseDB::reregister_watch_cache
 - rename ClauseDB::strengthen to ClauseDB::strengthen_by_elimination
 - append ClauseDB::strengthen_by_vivification

@@ -226,36 +226,6 @@ impl ClauseDBIF for ClauseDB {
     fn bi_clause_map(&self, l: Lit) -> &HashMap<Lit, ClauseId> {
         &self.bi_clause[l]
     }
-    /// return `true` if a binary clause [l0, l1] has been registered.
-    ///```
-    /// use splr::types::*;
-    /// use crate::splr::cdb::ClauseDBIF;
-    ///
-    /// let config = Config::default();
-    /// let cnf = CNFDescription {
-    ///     num_of_variables: 4,
-    ///     ..CNFDescription::default()
-    /// };
-    /// let mut asg = splr::assign::AssignStack::instantiate(&config, &cnf);
-    /// let mut cdb = splr::cdb::ClauseDB::instantiate(&config, &cnf);
-    /// let l1 = splr::types::Lit::from(1);
-    /// let l2 = splr::types::Lit::from(2);
-    /// let l3 = splr::types::Lit::from(3);
-    /// cdb.new_clause(&mut asg, &mut vec![l1, l2], false, false);
-    /// cdb.new_clause(&mut asg, &mut vec![!l1, !l2, !l3], false, false);
-    /// assert!(cdb.has_bi_clause(l1, l2).is_some());
-    /// assert!(cdb.has_bi_clause(!l1, l2).is_none());
-    /// assert!(cdb.has_bi_clause(l1, !l2).is_none());
-    /// assert!(cdb.has_bi_clause(!l1, !l2).is_none());
-    ///```
-    ///
-    /// this is equivalent to the following:
-    ///```ignore
-    /// bi_clause[!l0].get(&l1).is_some()
-    ///```
-    fn has_bi_clause(&self, l0: Lit, l1: Lit) -> Option<ClauseId> {
-        self.bi_clause[!l0].get(&l1).map(|c| *c)
-    }
     #[inline]
     fn detach_watch_cache(&mut self, l: Lit) -> WatchCache {
         let mut empty = WatchCache::new();
@@ -857,6 +827,36 @@ impl ClauseDBIF for ClauseDB {
 }
 
 impl ClauseDB {
+    /// return `true` if a literal pair `(l0, l1)` is registered.
+    ///```
+    /// use splr::types::*;
+    /// use crate::splr::cdb::ClauseDBIF;
+    ///
+    /// let config = Config::default();
+    /// let cnf = CNFDescription {
+    ///     num_of_variables: 4,
+    ///     ..CNFDescription::default()
+    /// };
+    /// let mut asg = splr::assign::AssignStack::instantiate(&config, &cnf);
+    /// let mut cdb = splr::cdb::ClauseDB::instantiate(&config, &cnf);
+    /// let l1 = splr::types::Lit::from(1);
+    /// let l2 = splr::types::Lit::from(2);
+    /// let l3 = splr::types::Lit::from(3);
+    /// cdb.new_clause(&mut asg, &mut vec![l1, l2], false, false);
+    /// cdb.new_clause(&mut asg, &mut vec![!l1, !l2, !l3], false, false);
+    /// assert!(cdb.has_bi_clause(l1, l2).is_some());
+    /// assert!(cdb.has_bi_clause(!l1, l2).is_none());
+    /// assert!(cdb.has_bi_clause(l1, !l2).is_none());
+    /// assert!(cdb.has_bi_clause(!l1, !l2).is_none());
+    ///```
+    ///
+    /// this is equivalent to the following:
+    ///```ignore
+    /// bi_clause[!l0].get(&l1).is_some()
+    ///```
+    fn has_bi_clause(&self, l0: Lit, l1: Lit) -> Option<ClauseId> {
+        self.bi_clause[!l0].get(&l1).map(|c| *c)
+    }
     /// halve the number of 'learnt' or *removable* clauses.
     fn reduce_db<A>(&mut self, asg: &mut A, nc: usize)
     where

@@ -88,8 +88,6 @@ pub trait ClauseDBIF:
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
     /// return a watcher list for bi-clauses
     fn bi_clause_map(&self, l: Lit) -> &BiClause;
-    /// return `true` if a literal pair `(l0, l1)` is registered.
-    fn has_bi_clause(&self, l0: Lit, l1: Lit) -> Option<ClauseId>;
     /// replace the mutable watcher list with an empty one, and return the list
     fn detach_watch_cache(&mut self, l: Lit) -> WatchCache;
     /// register the clase to the previous watch cache
