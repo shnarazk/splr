@@ -140,7 +140,6 @@ impl SolveIF for Solver {
                 }
                 asg.rebuild_order();
             }
-            elim.stop(asg, cdb);
         }
 
         //

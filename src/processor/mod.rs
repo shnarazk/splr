@@ -56,11 +56,6 @@ use {
 pub trait EliminateIF: Instantiate {
     /// set eliminator's mode to **ready**.
     fn activate(&mut self);
-    /// set eliminator's mode to **dormant**.
-    fn stop<A, C>(&mut self, asg: &mut A, cdb: &mut C)
-    where
-        A: AssignIF,
-        C: ClauseDBIF;
     /// check if the eliminator is running.
     fn is_running(&self) -> bool;
     /// rebuild occur lists.

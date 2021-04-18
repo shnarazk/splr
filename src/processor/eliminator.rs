@@ -172,27 +172,6 @@ impl EliminateIF for Eliminator {
     fn is_running(&self) -> bool {
         self.enable && self.mode == EliminatorMode::Running
     }
-    // Due to a potential bug of killing clauses and difficulty about
-    // synchronization between 'garbage_collect' and clearing occur lists,
-    // 'stop' should purge all occur lists to purge any dead clauses for now.
-    fn stop<A, C>(&mut self, asg: &mut A, cdb: &mut C)
-    where
-        A: AssignIF,
-        C: ClauseDBIF,
-    {
-        let force: bool = true;
-        self.clear_clause_queue(cdb);
-        self.clear_var_queue(asg);
-        if force {
-            for c in &mut cdb.iter_mut().skip(1) {
-                c.turn_off(Flag::OCCUR_LINKED);
-            }
-            for w in &mut self[1..] {
-                w.clear();
-            }
-        }
-        self.mode = EliminatorMode::Dormant;
-    }
     fn prepare<A, C>(&mut self, asg: &mut A, cdb: &mut C, force: bool)
     where
         A: AssignIF,
@@ -271,6 +250,9 @@ impl EliminateIF for Eliminator {
             }
         } else {
             self.eliminate_satisfied_clauses(asg, cdb, true);
+        }
+        if self.mode != EliminatorMode::Dormant {
+            self.stop(asg, cdb);
         }
         cdb.check_size().map(|_| ())
     }
@@ -351,12 +333,32 @@ impl Eliminator {
             }
         }
     }
-
     /// check if the eliminator is active and waits for next `eliminate`.
     fn is_waiting(&self) -> bool {
         self.mode == EliminatorMode::Waiting
     }
-
+    /// set eliminator's mode to **dormant**.
+    // Due to a potential bug of killing clauses and difficulty about
+    // synchronization between 'garbage_collect' and clearing occur lists,
+    // 'stop' should purge all occur lists to purge any dead clauses for now.
+    fn stop<A, C>(&mut self, asg: &mut A, cdb: &mut C)
+    where
+        A: AssignIF,
+        C: ClauseDBIF,
+    {
+        let force: bool = true;
+        self.clear_clause_queue(cdb);
+        self.clear_var_queue(asg);
+        if force {
+            for c in &mut cdb.iter_mut().skip(1) {
+                c.turn_off(Flag::OCCUR_LINKED);
+            }
+            for w in &mut self[1..] {
+                w.clear();
+            }
+        }
+        self.mode = EliminatorMode::Dormant;
+    }
     /// returns false if solver is inconsistent
     /// - calls `clause_queue.pop`
     pub fn backward_subsumption_check<A, C>(
