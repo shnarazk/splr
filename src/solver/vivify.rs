@@ -30,11 +30,10 @@ pub fn vivify(
     state: &mut State,
 ) -> MaybeInconsistent {
     assert_eq!(asg.root_level, asg.decision_level());
-    // let mut average_age: f64 = 0.0;
     let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
     {
         let thr = 10
-            + 24usize.saturating_sub(
+            + 26usize.saturating_sub(
                 ((asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).log2()
                     + (cdb.derefer(cdb::property::Tusize::NumClause) as f64).log10())
                     as usize,
@@ -42,7 +41,6 @@ pub fn vivify(
         for (i, c) in cdb.iter().enumerate().skip(1) {
             if c.is(Flag::LEARNT) {
                 if let Some(act) = c.to_vivify(thr) {
-                    // average_age += c.timestamp() as f64;
                     clauses.push(OrderedProxy::new(ClauseId::from(i), -act));
                 }
             }
@@ -56,7 +54,8 @@ pub fn vivify(
     state[Stat::Vivification] += 1;
     let dl = asg.decision_level();
     debug_assert_eq!(dl, 0);
-    // This is a reusable vector to reduce memory consumption, the key is the number of invocation
+    // This is a reusable vector to reduce memory consumption,
+    // the key is the number of invocation
     let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
     let display_step: usize = 1000;
     let mut num_check = 0;
@@ -64,16 +63,13 @@ pub fn vivify(
     let mut num_shrink = 0;
     let mut num_assert = 0;
     let mut to_display = 0;
-    // let average_timestamp = average_age as usize / num_target;
-    let _activity_thr = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
+    // let activity_thr = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
 
     while let Some(cs) = clauses.pop() {
         assert_eq!(asg.root_level, asg.decision_level());
         let activity = cdb.activity(cs.to());
         let is_learnt = cdb[cs.to()].is(Flag::LEARNT);
         let c: &mut Clause = &mut cdb[cs.to()];
-        // let _timestamp = c.timestamp();
-        // Since GC can make `clauses` out of date, we need to check its aliveness here.
         if c.is_dead() {
             continue;
         }
@@ -167,6 +163,7 @@ pub fn vivify(
                 cdb.certificate_add_assertion(clits[0]);
                 return Err(SolverError::Inconsistent);
             }
+            // 0 if average_timestamp < timestamp => (),
             0 => {
                 cdb.remove_clause(cs.to());
                 num_purge += 1;
