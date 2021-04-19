@@ -858,7 +858,7 @@ impl ClauseDB {
         for other in self.bi_clause[!lit].keys() {
             // [!other, third]
             for third in self.bi_clause[*other].keys() {
-                if lit != *third && !self.bi_clause[!lit].contains_key(&third) {
+                if lit.vi() != third.vi() && !self.bi_clause[!lit].contains_key(&third) {
                     // the new [lit, third] should be added.
                     vec.push(vec![lit, *third]);
                 }
