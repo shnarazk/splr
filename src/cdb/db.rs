@@ -847,9 +847,10 @@ impl ClauseDBIF for ClauseDB {
 }
 
 impl ClauseDB {
-    /// -a => b and !b => c implies -a => c
-    /// [a, b] and [b, c] deduces [a, c]
-    /// lit == a, other == b, third == c
+    /// formula: -a => b and b => c implies -a => c
+    /// clause: [a, b] and [-b, c] deduces [a, c]
+    /// map: [!a].get(b), [b].get(c), [!a].get(c)
+    /// rename: [!lit].get(other), [other].get(third), [!a].get(third)
     fn complete_bi_clauses_with<A>(&mut self, asg: &mut A, lit: Lit)
     where
         A: AssignIF,
@@ -858,7 +859,7 @@ impl ClauseDB {
         // [lit, other]
         for other in self.bi_clause[!lit].keys() {
             // [!other, third]
-            for third in self.bi_clause[!*other].keys() {
+            for third in self.bi_clause[*other].keys() {
                 if lit.vi() != third.vi() && !self.bi_clause[!lit].contains_key(&third) {
                     // the new [lit, third] should be added.
                     vec.push(vec![lit, *third]);
