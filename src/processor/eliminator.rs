@@ -295,17 +295,21 @@ impl Eliminator {
                 if bool::from(*l) {
                     assert!(
                         !w.pos_occurs.contains(&cid),
-                        "elim.add_cid_occur found a strange positive clause{}{}",
+                        "elim.add_cid_occur for {:?} found a strange positive clause{}{}, {:?}",
+                        v,
                         cid,
                         c,
+                        w.pos_occurs,
                     );
                     w.pos_occurs.push(cid);
                 } else {
                     assert!(
                         !w.neg_occurs.contains(&cid),
-                        "elim.add_cid_occur found a strange negative clause{}{}",
+                        "elim.add_cid_occur for {:?} found a strange negative clause{}{}, {:?}",
+                        v,
                         cid,
                         c,
+                        w.pos_occurs,
                     );
                     w.neg_occurs.push(cid);
                 }
