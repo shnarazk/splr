@@ -135,7 +135,8 @@ where
                 }
             }
             if cdb[*cid].is_dead() {
-                assert!(pos.iter().all(|x| *x != *cid));
+                dbg!(&cdb[*cid], pos.contains(cid));
+                panic!("eliminate_var found a strange clause");
             }
             assert!(!cdb[*cid].is_dead(), "{} is dead", *cid);
             elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
