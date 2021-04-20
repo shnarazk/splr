@@ -27,17 +27,20 @@ pub enum StrengthenResult {
     Ok,
 }
 
+/// ClauseID with the information on generation kind
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum NewClauseResult {
+pub enum CID {
+    /// newly genereted
     Generated(ClauseId),
+    /// reference to aregistered bi-clause
     Merged(ClauseId),
 }
 
-impl NewClauseResult {
+impl CID {
     pub fn as_cid(self) -> ClauseId {
         match self {
-            NewClauseResult::Generated(cid) => cid,
-            NewClauseResult::Merged(cid) => cid,
+            CID::Generated(cid) => cid,
+            CID::Merged(cid) => cid,
         }
     }
 }
@@ -105,10 +108,10 @@ pub trait ClauseDBIF:
         v: &mut Vec<Lit>,
         learnt: bool,
         level_sort: bool,
-    ) -> NewClauseResult
+    ) -> CID
     where
         A: AssignIF;
-    fn new_clause_sandbox<A>(&mut self, asg: &mut A, v: &mut Vec<Lit>) -> NewClauseResult
+    fn new_clause_sandbox<A>(&mut self, asg: &mut A, v: &mut Vec<Lit>) -> CID
     where
         A: AssignIF;
     /// un-register a clause `cid` from clause database and make the clause dead.

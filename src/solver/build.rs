@@ -3,7 +3,7 @@ use {
     super::{restart::Restarter, Certificate, Solver, SolverEvent, SolverResult, State, StateIF},
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-        cdb::{ClauseDB, ClauseDBIF, NewClauseResult},
+        cdb::{ClauseDB, ClauseDBIF, CID},
         processor::Eliminator,
         types::*,
     },
@@ -326,11 +326,11 @@ impl Solver {
                     .map_or(None, |_| Some(ClauseId::default()))
             }
             _ => match cdb.new_clause(asg, lits, false, false) {
-                NewClauseResult::Generated(cid) => {
+                CID::Generated(cid) => {
                     cdb[cid].rank = 1;
                     Some(cid)
                 }
-                NewClauseResult::Merged(cid) => Some(cid),
+                CID::Merged(cid) => Some(cid),
             },
         }
     }

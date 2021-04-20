@@ -3,7 +3,7 @@ use {
     super::{Eliminator, LitOccurs},
     crate::{
         assign::AssignIF,
-        cdb::{ClauseDBIF, NewClauseResult},
+        cdb::{ClauseDBIF, CID},
         solver::{restart::RestartIF, SolverEvent},
         state::State,
         types::*,
@@ -90,7 +90,7 @@ where
                         }
                     }
                     _ => {
-                        if let NewClauseResult::Generated(cid) = cdb.new_clause(
+                        if let CID::Generated(cid) = cdb.new_clause(
                             asg,
                             vec,
                             cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT),
