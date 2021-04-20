@@ -134,6 +134,9 @@ where
                     cdb.make_permanent_immortal(*cid);
                 }
             }
+            if cdb[*cid].is_dead() {
+                assert!(pos.iter().all(|x| *x != *cid));
+            }
             assert!(!cdb[*cid].is_dead(), "{} is dead", *cid);
             elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
             cdb.watches(*cid, "elm141");

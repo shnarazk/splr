@@ -248,13 +248,16 @@ impl AssignStack {
             res.push(*l);
             seen[l.vi()] = 0;
         }
-        for l in self.stack_iter().rev() {
+        // sweep
+        for l in self.stack_iter().skip(self.len_upto(0)).rev() {
             if seen[l.vi()] != key {
                 continue;
             }
             if lits.contains(l) {
+                assert!(res.iter().all(|lit| lit.vi() != l.vi()));
                 res.push(!*l);
             } else if lits.contains(&!*l) {
+                assert!(res.iter().all(|lit| lit.vi() != l.vi()));
                 res.push(*l);
             }
 

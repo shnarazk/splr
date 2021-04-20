@@ -68,9 +68,9 @@ where
     }
     let mut ret: Lit = NULL_LIT;
     let ch = &cdb[cid];
-    assert!(1 < ch.len());
+    debug_assert!(1 < ch.len());
     let ob = &cdb[other];
-    assert!(1 < ob.len());
+    debug_assert!(1 < ob.len());
     debug_assert!(ob.contains(ob[0]));
     debug_assert!(ob.contains(ob[1]));
     'next: for l in ch.iter() {
