@@ -710,14 +710,14 @@ impl Index<LogUsizeId> for State {
     type Output = usize;
     #[inline]
     fn index(&self, i: LogUsizeId) -> &Self::Output {
-        &self.record[i]
+        unsafe { self.record.vali.get_unchecked(i as usize) }
     }
 }
 
 impl IndexMut<LogUsizeId> for State {
     #[inline]
     fn index_mut(&mut self, i: LogUsizeId) -> &mut Self::Output {
-        &mut self.record[i]
+        unsafe { self.record.vali.get_unchecked_mut(i as usize) }
     }
 }
 
@@ -725,14 +725,14 @@ impl Index<LogF64Id> for State {
     type Output = f64;
     #[inline]
     fn index(&self, i: LogF64Id) -> &Self::Output {
-        &self.record[i]
+        unsafe { self.record.valf.get_unchecked(i as usize) }
     }
 }
 
 impl IndexMut<LogF64Id> for State {
     #[inline]
     fn index_mut(&mut self, i: LogF64Id) -> &mut Self::Output {
-        &mut self.record[i]
+        unsafe { self.record.valf.get_unchecked_mut(i as usize) }
     }
 }
 
@@ -925,14 +925,14 @@ impl Index<LogUsizeId> for ProgressRecord {
     type Output = usize;
     #[inline]
     fn index(&self, i: LogUsizeId) -> &usize {
-        &self.vali[i as usize]
+        unsafe { self.vali.get_unchecked(i as usize) }
     }
 }
 
 impl IndexMut<LogUsizeId> for ProgressRecord {
     #[inline]
     fn index_mut(&mut self, i: LogUsizeId) -> &mut usize {
-        &mut self.vali[i as usize]
+        unsafe { self.vali.get_unchecked_mut(i as usize) }
     }
 }
 
@@ -940,14 +940,14 @@ impl Index<LogF64Id> for ProgressRecord {
     type Output = f64;
     #[inline]
     fn index(&self, i: LogF64Id) -> &f64 {
-        &self.valf[i as usize]
+        unsafe { self.valf.get_unchecked(i as usize) }
     }
 }
 
 impl IndexMut<LogF64Id> for ProgressRecord {
     #[inline]
     fn index_mut(&mut self, i: LogF64Id) -> &mut f64 {
-        &mut self.valf[i as usize]
+        unsafe { self.valf.get_unchecked_mut(i as usize) }
     }
 }
 

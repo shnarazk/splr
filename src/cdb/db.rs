@@ -54,14 +54,14 @@ impl Index<ClauseId> for ClauseDB {
     type Output = Clause;
     #[inline]
     fn index(&self, cid: ClauseId) -> &Clause {
-        &self.clause[cid.ordinal as usize]
+        unsafe { self.clause.get_unchecked(cid.ordinal as usize) }
     }
 }
 
 impl IndexMut<ClauseId> for ClauseDB {
     #[inline]
     fn index_mut(&mut self, cid: ClauseId) -> &mut Clause {
-        &mut self.clause[cid.ordinal as usize]
+        unsafe { self.clause.get_unchecked_mut(cid.ordinal as usize) }
     }
 }
 
@@ -69,14 +69,14 @@ impl Index<&ClauseId> for ClauseDB {
     type Output = Clause;
     #[inline]
     fn index(&self, cid: &ClauseId) -> &Clause {
-        &self.clause[cid.ordinal as usize]
+        unsafe { self.clause.get_unchecked(cid.ordinal as usize) }
     }
 }
 
 impl IndexMut<&ClauseId> for ClauseDB {
     #[inline]
     fn index_mut(&mut self, cid: &ClauseId) -> &mut Clause {
-        &mut self.clause[cid.ordinal as usize]
+        unsafe { self.clause.get_unchecked_mut(cid.ordinal as usize) }
     }
 }
 
@@ -84,7 +84,7 @@ impl Index<Range<usize>> for ClauseDB {
     type Output = [Clause];
     #[inline]
     fn index(&self, r: Range<usize>) -> &[Clause] {
-        &self.clause[r]
+        unsafe { self.clause.get_unchecked(r) }
     }
 }
 
@@ -92,21 +92,21 @@ impl Index<RangeFrom<usize>> for ClauseDB {
     type Output = [Clause];
     #[inline]
     fn index(&self, r: RangeFrom<usize>) -> &[Clause] {
-        &self.clause[r]
+        unsafe { self.clause.get_unchecked(r) }
     }
 }
 
 impl IndexMut<Range<usize>> for ClauseDB {
     #[inline]
     fn index_mut(&mut self, r: Range<usize>) -> &mut [Clause] {
-        &mut self.clause[r]
+        unsafe { self.clause.get_unchecked_mut(r) }
     }
 }
 
 impl IndexMut<RangeFrom<usize>> for ClauseDB {
     #[inline]
     fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Clause] {
-        &mut self.clause[r]
+        unsafe { self.clause.get_unchecked_mut(r) }
     }
 }
 

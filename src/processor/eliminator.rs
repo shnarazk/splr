@@ -107,7 +107,7 @@ impl Index<Range<usize>> for Eliminator {
     type Output = [LitOccurs];
     #[inline]
     fn index(&self, r: Range<usize>) -> &Self::Output {
-        &self.var[r]
+        unsafe { self.var.get_unchecked(r) }
     }
 }
 
@@ -129,7 +129,7 @@ impl IndexMut<Range<usize>> for Eliminator {
 impl IndexMut<RangeFrom<usize>> for Eliminator {
     #[inline]
     fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut Self::Output {
-        &mut self.var[r]
+        unsafe { self.var.get_unchecked_mut(r) }
     }
 }
 
