@@ -243,35 +243,25 @@ impl AssignStack {
         for l in reason {
             seen[l.vi()] = key;
         }
-        // make sure the decision var is at the top of list
-        if let Some(l) = lits.last().filter(|l| reason.contains(l)) {
-            res.push(*l);
-            seen[l.vi()] = 0;
-        }
-        // sweep
+        // sweep in the reverse order
         for l in self.stack_iter().skip(self.len_upto(0)).rev() {
             if seen[l.vi()] != key {
                 continue;
             }
             if lits.contains(l) {
-                assert!(res.iter().all(|lit| lit.vi() != l.vi()));
+                assert!(!res.contains(l));
                 res.push(!*l);
-            } else if lits.contains(&!*l) {
-                assert!(res.iter().all(|lit| lit.vi() != l.vi()));
-                res.push(*l);
             }
-
-            match self.reason(l.vi()) {
-                AssignReason::Implication(cid, _) => {
-                    for r in cdb[cid].iter() {
-                        seen[r.vi()] = key;
-                    }
-                }
-                AssignReason::None => {
-                    seen[l.vi()] = key;
+            if let AssignReason::Implication(cid, _) = self.reason(l.vi()) {
+                for r in cdb[cid].iter() {
+                    seen[r.vi()] = key;
                 }
             }
         }
+        // make sure the decision var is at the top of list
+        let lst = res.len() - 1;
+        res.swap(0, lst);
+        assert!(matches!(self.reason(res[0].vi()), AssignReason::None));
         res
     }
 }
