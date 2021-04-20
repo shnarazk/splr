@@ -5,7 +5,7 @@ use {
     super::{Stat, State},
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-        cdb::{self, ClauseDB, ClauseDBIF, ClauseIF, NewClauseResult},
+        cdb::{self, ClauseDB, ClauseDBIF, ClauseIF, CID},
         processor::Eliminator,
         state::StateIF,
         types::*,
@@ -118,7 +118,7 @@ pub fn vivify(
                             None
                         }
                         _ => {
-                            if let NewClauseResult::Generated(cid) =
+                            if let CID::Generated(cid) =
                                 cdb.new_clause_sandbox(asg, &mut copied.clone())
                             {
                                 Some(cid)
@@ -193,12 +193,12 @@ pub fn vivify(
             n if n == clits.len() => (),
             n => {
                 match cdb.new_clause(asg, &mut copied, is_learnt, true) {
-                    NewClauseResult::Generated(ci) => {
+                    CID::Generated(ci) => {
                         cdb.set_activity(ci, activity);
                         cdb[ci].turn_on(Flag::VIVIFIED);
                         elim.to_simplify += 1.0 / (n as f64).powf(1.4);
                     }
-                    NewClauseResult::Merged(ci) => {
+                    CID::Merged(ci) => {
                         cdb[ci].turn_on(Flag::VIVIFIED);
                         elim.to_simplify += 0.5;
                     }
