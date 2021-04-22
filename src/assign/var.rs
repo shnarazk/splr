@@ -163,6 +163,7 @@ impl AssignStack {
         self.num_asserted_vars += 1;
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
+        #[cfg(feature = "best_phases_tracking")]
         self.check_best_phase(vi);
     }
     pub fn make_var_eliminated(&mut self, vi: VarId) {
