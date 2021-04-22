@@ -264,19 +264,23 @@ impl PropagateIF for AssignStack {
             //## binary loop
             //
             let bi_clause = cdb.bi_clause_map(*p);
+            let mut conflicting_cid: ClauseId = ClauseId::default();
+            let mut conflicting_act: f64 = 0.0;
             for (&blocker, &cid) in bi_clause.iter() {
                 debug_assert!(!cdb[cid].is_dead());
                 debug_assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
                 #[cfg(feature = "boundary_check")]
-                debug_assert_eq!(cdb[w.c].len(), 2);
+                debug_assert_eq!(cdb[cid].len(), 2);
                 match lit_assign!(self, blocker) {
                     Some(true) => (),
                     Some(false) => {
-                        self.num_conflict += 1;
-                        self.dpc_ema.update(self.num_decision);
-                        self.ppc_ema.update(self.num_propagation);
-                        return cid;
+                        let act = self.var[blocker.vi()].activity();
+                        if conflicting_act < act {
+                            conflicting_act = act;
+                            conflicting_cid = cid;
+                        }
+                        // return cid;
                     }
                     None => {
                         self.assign_by_implication(
@@ -286,6 +290,12 @@ impl PropagateIF for AssignStack {
                         );
                     }
                 }
+            }
+            if conflicting_cid != ClauseId::default() {
+                self.dpc_ema.update(self.num_decision);
+                self.ppc_ema.update(self.num_propagation);
+                self.num_conflict += 1;
+                return conflicting_cid;
             }
             //
             //## normal clause loop

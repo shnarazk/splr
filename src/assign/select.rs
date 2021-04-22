@@ -96,39 +96,46 @@ impl VarSelectIF for AssignStack {
         } else {
             self.phase_age += 1;
             match self.phase_age {
-                0 | 1 => RephasingTarget::Clear,
+                0 | 1 | 6 => RephasingTarget::Clear,
                 2 | 3 | 5 => RephasingTarget::BestPhases,
-                4 => RephasingTarget::Inverted,
-                6 => RephasingTarget::Shift,
+                4 | 7 => RephasingTarget::Inverted,
                 x if x % 8 == 2 => RephasingTarget::BestPhases,
                 x if x % 8 == 6 => RephasingTarget::Inverted,
                 _ => RephasingTarget::Clear,
             }
         };
         let mut s = true;
+        // The iteration order by an iterator on HashMap may change in each execution.
+        // So Shift and XorShift cause non-determinism. Be careful.
+        let mut invalidated = false;
         for (vi, (b, _)) in self.best_phases.iter() {
             let v = &mut self.var[*vi];
             if self.assign[*vi] == Some(!*b) {
-                self.best_phases.clear();
-                self.num_best_assign = self.num_eliminated_vars;
-                return;
+                invalidated = true;
             }
             match target {
                 RephasingTarget::AllTrue => v.set(Flag::PHASE, true),
-                RephasingTarget::BestPhases => v.set(Flag::PHASE, *b),
-                RephasingTarget::Inverted => v.set(Flag::PHASE, !*b),
+                // RephasingTarget::BestPhases => v.set(Flag::PHASE, *b),
+                // RephasingTarget::Inverted => v.set(Flag::PHASE, !*b),
+                RephasingTarget::Inverted => v.set(Flag::PHASE, false),
                 RephasingTarget::Shift => {
                     v.set(Flag::PHASE, s);
-                    s = *b;
+                    // s = *b;
                 }
                 RephasingTarget::XorShift => {
                     v.set(Flag::PHASE, s);
-                    s ^= *b;
+                    // s ^= *b;
                 }
                 RephasingTarget::Clear => (),
+                _ => (),
             }
         }
-        self.num_rephase += 1;
+        if invalidated {
+            self.best_phases.clear();
+            self.num_best_assign = self.num_eliminated_vars;
+        } else {
+            self.num_rephase += 1;
+        }
     }
     fn select_decision_literal(&mut self) -> Lit {
         let vi = self.select_var();
