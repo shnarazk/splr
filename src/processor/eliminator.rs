@@ -586,18 +586,15 @@ impl Eliminator {
         for ci in 1..cdb.len() {
             let cid = ClauseId::from(ci);
             if !cdb[cid].is_dead() && cdb[cid].is_satisfied_under(asg) {
-                cdb.watches(cid, "eliminate_satisfied_clauses");
-                let c = &mut cdb[cid];
                 if self.is_running() {
+                    let c = &mut cdb[cid];
                     if update_occur {
-                        assert!(!c.is_dead());
                         self.remove_cid_occur(asg, cid, c);
                     }
                     for l in c.iter() {
                         self.enqueue_var(asg, l.vi(), true);
                     }
                 }
-                cdb.watches(cid, "eliminator588");
                 cdb.remove_clause(cid);
             }
         }

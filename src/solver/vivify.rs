@@ -4,7 +4,7 @@
 use {
     super::{Stat, State},
     crate::{
-        assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF},
+        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{self, ClauseDB, ClauseDBIF, ClauseIF, CID},
         processor::Eliminator,
         state::StateIF,
@@ -28,16 +28,12 @@ pub fn vivify(
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
     state: &mut State,
+    average_lbd: f64,
 ) -> MaybeInconsistent {
     assert_eq!(asg.root_level, asg.decision_level());
     let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
     {
-        let thr = 10
-            + 26usize.saturating_sub(
-                ((asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).log2()
-                    + (cdb.derefer(cdb::property::Tusize::NumClause) as f64).log10())
-                    as usize,
-            );
+        let thr = (average_lbd + cdb.derefer(cdb::property::Tf64::DpAverageLBD)) as usize;
         for (i, c) in cdb.iter().enumerate().skip(1) {
             if c.is(Flag::LEARNT) {
                 if let Some(act) = c.to_vivify(thr) {
@@ -66,13 +62,13 @@ pub fn vivify(
     // let activity_thr = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
 
     while let Some(cs) = clauses.pop() {
-        assert_eq!(asg.root_level, asg.decision_level());
+        if cdb[cs.to()].is_dead() {
+            continue;
+        }
+        // assert_eq!(asg.root_level, asg.decision_level());
         let activity = cdb.activity(cs.to());
         let is_learnt = cdb[cs.to()].is(Flag::LEARNT);
         let c: &mut Clause = &mut cdb[cs.to()];
-        if c.is_dead() {
-            continue;
-        }
         debug_assert!(!c.is(Flag::ELIMINATED));
         c.vivified();
         let clits = c.iter().map(|l| *l).collect::<Vec<Lit>>();
@@ -189,6 +185,7 @@ pub fn vivify(
                     return Err(SolverError::Inconsistent);
                 }
                 num_purge += 1;
+                clauses.retain(|cs| !cdb[cs.to()].is_dead());
             }
             n if n == clits.len() => (),
             n => {

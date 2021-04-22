@@ -121,7 +121,7 @@ impl Default for Config {
         Config {
             c_cbt_thr: 100,
             c_cls_lim: 0,
-            c_ip_int: 16384,
+            c_ip_int: 10000,
             c_timeout: 5000.0,
 
             splr_interface: false,

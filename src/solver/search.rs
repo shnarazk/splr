@@ -276,12 +276,20 @@ fn search(
                                     &format!("simplify nc:{}", asg.num_conflict),
                                 );
                             }
-                        } else if vivification_turn || true {
+                        } else if vivification_turn {
                             assert_eq!(asg.root_level, asg.decision_level());
                             vivification_turn = false;
                             // check(asg, cdb, false, "before vivification");
                             #[cfg(feature = "clause_vivification")]
-                            if vivify(asg, cdb, elim, state).is_err() {
+                            if vivify(
+                                asg,
+                                cdb,
+                                elim,
+                                state,
+                                rst.refer(restart::property::TEma2::LBD).get(),
+                            )
+                            .is_err()
+                            {
                                 #[cfg(feature = "boundary_check")]
                                 return Err(SolverError::UndescribedError);
 
