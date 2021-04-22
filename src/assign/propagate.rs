@@ -503,10 +503,13 @@ impl AssignStack {
     /// save the current assignments as the best phases
     fn save_best_phases(&mut self) {
         #[cfg(feature = "best_phases_tracking")]
-        for l in self.trail.iter().skip(self.len_upto(self.root_level)) {
-            let vi = l.vi();
-            if let Some(b) = self.assign[vi] {
-                self.best_phases.insert(vi, (b, self.reason[vi]));
+        {
+            self.best_phases.clear();
+            for l in self.trail.iter().skip(self.len_upto(self.root_level)) {
+                let vi = l.vi();
+                if let Some(b) = self.assign[vi] {
+                    self.best_phases.insert(vi, (b, self.reason[vi]));
+                }
             }
         }
         self.build_best_at = self.num_propagation;
