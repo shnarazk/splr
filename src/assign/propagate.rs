@@ -401,7 +401,7 @@ impl PropagateIF for AssignStack {
                 debug_assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
                 #[cfg(feature = "boundary_check")]
-                debug_assert_eq!(cdb[w.c].len(), 2);
+                debug_assert_eq!(cdb[cid].len(), 2);
                 match lit_assign!(self, blocker) {
                     Some(true) => (),
                     Some(false) => {
