@@ -41,27 +41,43 @@ pub trait PropagateIF {
         C: ClauseDBIF;
 }
 
+#[cfg(feature = "unsafe_access")]
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
         unsafe { *$asg.assign.get_unchecked($var) }
     };
 }
+#[cfg(not(feature = "unsafe_access"))]
+macro_rules! var_assign {
+    ($asg: expr, $var: expr) => {
+        $asg.assign[$var]
+    };
+}
 
+#[cfg(feature = "unsafe_access")]
 macro_rules! lit_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
-            l =>
-            {
-                #[allow(unused_unsafe)]
-                match unsafe { *$asg.assign.get_unchecked(l.vi()) } {
-                    Some(x) if !bool::from(l) => Some(!x),
-                    x => x,
-                }
-            }
+            l => match unsafe { *$asg.assign.get_unchecked(l.vi()) } {
+                Some(x) if !bool::from(l) => Some(!x),
+                x => x,
+            },
+        }
+    };
+}
+#[cfg(not(feature = "unsafe_access"))]
+macro_rules! lit_assign {
+    ($asg: expr, $lit: expr) => {
+        match $lit {
+            l => match $asg.assign[l.vi()] {
+                Some(x) if !bool::from(l) => Some(!x),
+                x => x,
+            },
         }
     };
 }
 
+#[cfg(feature = "unsafe_access")]
 macro_rules! set_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
@@ -69,6 +85,17 @@ macro_rules! set_assign {
                 let vi = l.vi();
                 *$asg.assign.get_unchecked_mut(vi) = Some(bool::from(l));
             },
+        }
+    };
+}
+#[cfg(not(feature = "unsafe_access"))]
+macro_rules! set_assign {
+    ($asg: expr, $lit: expr) => {
+        match $lit {
+            l => {
+                let vi = l.vi();
+                $asg.assign[vi] = Some(bool::from(l));
+            }
         }
     };
 }

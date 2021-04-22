@@ -39,6 +39,7 @@ support_user_assumption = []
 trace_analysis = []
 trace_elimination = []
 trace_equivalency = []
+unsafe_access = []
 
 [profile.release]
 lto = "fat"

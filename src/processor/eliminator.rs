@@ -47,14 +47,24 @@ impl Index<VarId> for Eliminator {
     type Output = LitOccurs;
     #[inline]
     fn index(&self, i: VarId) -> &Self::Output {
-        unsafe { self.var.get_unchecked(i) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(i)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.var[i]
     }
 }
 
 impl IndexMut<VarId> for Eliminator {
     #[inline]
     fn index_mut(&mut self, i: VarId) -> &mut Self::Output {
-        unsafe { self.var.get_unchecked_mut(i) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked_mut(i)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.var[i]
     }
 }
 
@@ -62,14 +72,24 @@ impl Index<&VarId> for Eliminator {
     type Output = LitOccurs;
     #[inline]
     fn index(&self, i: &VarId) -> &Self::Output {
-        unsafe { self.var.get_unchecked(*i) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(*i)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.var[*i]
     }
 }
 
 impl IndexMut<&VarId> for Eliminator {
     #[inline]
     fn index_mut(&mut self, i: &VarId) -> &mut Self::Output {
-        unsafe { self.var.get_unchecked_mut(*i) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked_mut(*i)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.var[*i]
     }
 }
 
@@ -77,14 +97,24 @@ impl Index<Lit> for Eliminator {
     type Output = LitOccurs;
     #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
-        unsafe { self.var.get_unchecked(l.vi()) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(l.vi())
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.var[l.vi()]
     }
 }
 
 impl IndexMut<Lit> for Eliminator {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        unsafe { self.var.get_unchecked_mut(l.vi()) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked_mut(l.vi())
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.var[l.vi()]
     }
 }
 
@@ -92,14 +122,24 @@ impl Index<&Lit> for Eliminator {
     type Output = LitOccurs;
     #[inline]
     fn index(&self, l: &Lit) -> &Self::Output {
-        unsafe { self.var.get_unchecked(l.vi()) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(l.vi())
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.var[l.vi()]
     }
 }
 
 impl IndexMut<&Lit> for Eliminator {
     #[inline]
     fn index_mut(&mut self, l: &Lit) -> &mut Self::Output {
-        unsafe { self.var.get_unchecked_mut(l.vi()) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked_mut(l.vi())
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.var[l.vi()]
     }
 }
 
@@ -107,7 +147,12 @@ impl Index<Range<usize>> for Eliminator {
     type Output = [LitOccurs];
     #[inline]
     fn index(&self, r: Range<usize>) -> &Self::Output {
-        unsafe { self.var.get_unchecked(r) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.var[r]
     }
 }
 
@@ -115,21 +160,36 @@ impl Index<RangeFrom<usize>> for Eliminator {
     type Output = [LitOccurs];
     #[inline]
     fn index(&self, r: RangeFrom<usize>) -> &Self::Output {
-        unsafe { self.var.get_unchecked(r) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.var[r]
     }
 }
 
 impl IndexMut<Range<usize>> for Eliminator {
     #[inline]
     fn index_mut(&mut self, r: Range<usize>) -> &mut Self::Output {
-        unsafe { self.var.get_unchecked_mut(r) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked_mut(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.var[r]
     }
 }
 
 impl IndexMut<RangeFrom<usize>> for Eliminator {
     #[inline]
     fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut Self::Output {
-        unsafe { self.var.get_unchecked_mut(r) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked_mut(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.var[r]
     }
 }
 

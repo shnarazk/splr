@@ -11,9 +11,16 @@ use {
 /// ```
 /// let x: Option<bool> = var_assign!(self, lit.vi());
 /// ```
+#[cfg(feature = "unsafe_access")]
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
         unsafe { *$asg.assign.get_unchecked($var) }
+    };
+}
+#[cfg(not(feature = "unsafe_access"))]
+macro_rules! var_assign {
+    ($asg: expr, $var: expr) => {
+        $asg.assign[$var]
     };
 }
 

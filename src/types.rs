@@ -287,14 +287,24 @@ impl Index<Lit> for [bool] {
     type Output = bool;
     #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
-        unsafe { self.get_unchecked(usize::from(l)) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.get_unchecked(usize::from(l))
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self[usize::from(l)]
     }
 }
 
 impl IndexMut<Lit> for [bool] {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        unsafe { self.get_unchecked_mut(usize::from(l)) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.get_unchecked_mut(usize::from(l))
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self[usize::from(l)]
     }
 }
 
@@ -302,14 +312,24 @@ impl Index<Lit> for Vec<bool> {
     type Output = bool;
     #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
-        unsafe { self.get_unchecked(usize::from(l)) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.get_unchecked(usize::from(l))
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self[usize::from(l)]
     }
 }
 
 impl IndexMut<Lit> for Vec<bool> {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        unsafe { self.get_unchecked_mut(usize::from(l)) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.get_unchecked_mut(usize::from(l))
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self[usize::from(l)]
     }
 }
 

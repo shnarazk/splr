@@ -54,14 +54,24 @@ impl Index<ClauseId> for ClauseDB {
     type Output = Clause;
     #[inline]
     fn index(&self, cid: ClauseId) -> &Clause {
-        unsafe { self.clause.get_unchecked(cid.ordinal as usize) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.clause.get_unchecked(cid.ordinal as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.clause[cid.ordinal as usize]
     }
 }
 
 impl IndexMut<ClauseId> for ClauseDB {
     #[inline]
     fn index_mut(&mut self, cid: ClauseId) -> &mut Clause {
-        unsafe { self.clause.get_unchecked_mut(cid.ordinal as usize) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.clause.get_unchecked_mut(cid.ordinal as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.clause[cid.ordinal as usize]
     }
 }
 
@@ -69,14 +79,24 @@ impl Index<&ClauseId> for ClauseDB {
     type Output = Clause;
     #[inline]
     fn index(&self, cid: &ClauseId) -> &Clause {
-        unsafe { self.clause.get_unchecked(cid.ordinal as usize) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.clause.get_unchecked(cid.ordinal as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.clause[cid.ordinal as usize]
     }
 }
 
 impl IndexMut<&ClauseId> for ClauseDB {
     #[inline]
     fn index_mut(&mut self, cid: &ClauseId) -> &mut Clause {
-        unsafe { self.clause.get_unchecked_mut(cid.ordinal as usize) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.clause.get_unchecked_mut(cid.ordinal as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.clause[cid.ordinal as usize]
     }
 }
 
@@ -84,7 +104,12 @@ impl Index<Range<usize>> for ClauseDB {
     type Output = [Clause];
     #[inline]
     fn index(&self, r: Range<usize>) -> &[Clause] {
-        unsafe { self.clause.get_unchecked(r) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.clause.get_unchecked(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.clause[r]
     }
 }
 
@@ -92,21 +117,36 @@ impl Index<RangeFrom<usize>> for ClauseDB {
     type Output = [Clause];
     #[inline]
     fn index(&self, r: RangeFrom<usize>) -> &[Clause] {
-        unsafe { self.clause.get_unchecked(r) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.clause.get_unchecked(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.clause[r]
     }
 }
 
 impl IndexMut<Range<usize>> for ClauseDB {
     #[inline]
     fn index_mut(&mut self, r: Range<usize>) -> &mut [Clause] {
-        unsafe { self.clause.get_unchecked_mut(r) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.clause.get_unchecked_mut(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.clause[r]
     }
 }
 
 impl IndexMut<RangeFrom<usize>> for ClauseDB {
     #[inline]
     fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Clause] {
-        unsafe { self.clause.get_unchecked_mut(r) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.clause.get_unchecked_mut(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.clause[r]
     }
 }
 

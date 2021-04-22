@@ -104,23 +104,48 @@ impl VarManipulateIF for AssignStack {
     }
     #[inline]
     fn assign(&self, vi: VarId) -> Option<bool> {
-        unsafe { *self.assign.get_unchecked(vi) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            *self.assign.get_unchecked(vi)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        self.assign[vi]
     }
     #[inline]
     fn level(&self, vi: VarId) -> DecisionLevel {
-        unsafe { *self.level.get_unchecked(vi) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            *self.level.get_unchecked(vi)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        self.level[vi]
     }
     #[inline]
     fn reason(&self, vi: VarId) -> AssignReason {
-        unsafe { *self.reason.get_unchecked(vi) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            *self.reason.get_unchecked(vi)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        self.reason[vi]
     }
     #[inline]
     fn var(&self, vi: VarId) -> &Var {
-        unsafe { self.var.get_unchecked(vi) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(vi)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.var[vi]
     }
     #[inline]
     fn var_mut(&mut self, vi: VarId) -> &mut Var {
-        unsafe { self.var.get_unchecked_mut(vi) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked_mut(vi)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.var[vi]
     }
     fn var_iter(&self) -> Iter<'_, Var> {
         self.var.iter()
