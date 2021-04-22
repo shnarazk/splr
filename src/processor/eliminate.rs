@@ -127,6 +127,9 @@ where
             cdb.remove_clause(a);
         }
         for cid in neg.iter() {
+            if cdb[*cid].is_dead() {
+                continue;
+            }
             debug_assert!(!asg.locked(&cdb[*cid], *cid));
             #[cfg(feature = "incremental_solver")]
             {
@@ -138,7 +141,6 @@ where
                 dbg!(&cdb[*cid], pos.contains(cid));
                 panic!("eliminate_var found a strange clause");
             }
-            assert!(!cdb[*cid].is_dead(), "{} is dead", *cid);
             elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
             cdb.watches(*cid, "elm141");
             cdb.remove_clause(*cid);

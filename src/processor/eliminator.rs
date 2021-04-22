@@ -342,8 +342,12 @@ impl Eliminator {
             return;
         }
         let evo = self.eliminate_var_occurrence_limit;
+        let mut checked: Vec<VarId> = Vec::new();
         for l in c.iter() {
-            let v = &mut asg.var_mut(l.vi());
+            let vi = l.vi();
+            let v = &mut asg.var_mut(vi);
+            assert!(!checked.contains(&vi));
+            checked.push(vi);
             let w = &mut self[l.vi()];
             let pl = w.pos_occurs.len();
             let nl = w.neg_occurs.len();
