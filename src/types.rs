@@ -806,12 +806,12 @@ impl Logger {
 }
 
 #[derive(Clone, Debug)]
-pub struct OrderedProxy<T: Clone + Default + Sized> {
+pub struct OrderedProxy<T: Clone + Default + Sized + Ord> {
     index: f64,
     body: T,
 }
 
-impl<T: Clone + Default + Sized> Default for OrderedProxy<T> {
+impl<T: Clone + Default + Sized + Ord> Default for OrderedProxy<T> {
     fn default() -> Self {
         OrderedProxy {
             index: 0.0,
@@ -820,18 +820,20 @@ impl<T: Clone + Default + Sized> Default for OrderedProxy<T> {
     }
 }
 
-impl<T: Clone + Default + Sized> PartialEq for OrderedProxy<T> {
+impl<T: Clone + Default + Sized + Ord> PartialEq for OrderedProxy<T> {
     fn eq(&self, other: &OrderedProxy<T>) -> bool {
-        self.index == other.index
+        self.index == other.index && self.body == other.body
     }
 }
 
-impl<T: Clone + Default + Sized> Eq for OrderedProxy<T> {}
+impl<T: Clone + Default + Sized + Ord> Eq for OrderedProxy<T> {}
 
-impl<T: Clone + Default + PartialEq> PartialOrd for OrderedProxy<T> {
+impl<T: Clone + Default + PartialEq + Ord> PartialOrd for OrderedProxy<T> {
     fn partial_cmp(&self, other: &OrderedProxy<T>) -> Option<Ordering> {
-        if (self.index - other.index).abs() < f64::EPSILON {
-            Some(Ordering::Equal)
+        // (self.index - other.index).abs() < f64::EPSILON
+        if self.index == other.index {
+            // Some(Ordering::Equal)
+            self.body.partial_cmp(&other.body)
         } else if self.index < other.index {
             Some(Ordering::Less)
         } else {
@@ -840,10 +842,12 @@ impl<T: Clone + Default + PartialEq> PartialOrd for OrderedProxy<T> {
     }
 }
 
-impl<T: Clone + Default + PartialEq> Ord for OrderedProxy<T> {
+impl<T: Clone + Default + PartialEq + Ord> Ord for OrderedProxy<T> {
     fn cmp(&self, other: &OrderedProxy<T>) -> Ordering {
-        if (self.index - other.index).abs() < f64::EPSILON {
-            Ordering::Equal
+        // (self.index - other.index).abs() < f64::EPSILON
+        if self.index == other.index {
+            // Ordering::Equal
+            self.body.cmp(&other.body)
         } else if self.index < other.index {
             Ordering::Less
         } else {
@@ -852,7 +856,7 @@ impl<T: Clone + Default + PartialEq> Ord for OrderedProxy<T> {
     }
 }
 
-impl<T: Clone + Default + Sized> OrderedProxy<T> {
+impl<T: Clone + Default + Sized + Ord> OrderedProxy<T> {
     pub fn new(body: T, index: f64) -> Self {
         OrderedProxy { index, body }
     }
