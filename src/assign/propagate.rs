@@ -150,9 +150,7 @@ impl PropagateIF for AssignStack {
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
-        #[cfg(feature = "best_phases_tracking")]
         if self.root_level == lv {
-            // self.check_best_phase(vi);
             self.make_var_asserted(vi);
         }
     }
