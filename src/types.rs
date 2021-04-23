@@ -131,7 +131,7 @@ pub type DecisionLevel = u32;
 /// assert_eq!( 2i32, Lit::from( 2i32).into());
 /// assert_eq!(-2i32, Lit::from(-2i32).into());
 /// ```
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Lit {
     /// literal encoded into folded u32
     ordinal: u32,
@@ -141,6 +141,12 @@ pub struct Lit {
 pub const NULL_LIT: Lit = Lit { ordinal: 0 };
 
 impl fmt::Display for Lit {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}L", i32::from(self))
+    }
+}
+
+impl fmt::Debug for Lit {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}L", i32::from(self))
     }

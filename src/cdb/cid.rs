@@ -23,6 +23,12 @@ impl From<usize> for ClauseId {
     }
 }
 
+impl fmt::Debug for ClauseId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}C", self.ordinal)
+    }
+}
+
 impl fmt::Display for ClauseId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if *self == ClauseId::default() {
