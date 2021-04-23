@@ -157,9 +157,9 @@ impl SolveIF for Solver {
                 // As a preparation for incremental solving, we need to backtrack to the
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
-                check(asg, cdb, false, "before");
+                // check(asg, cdb, false, "before");
                 let model = asg.extend_model(cdb, elim.eliminated_lits());
-                check(asg, cdb, true, "after");
+                // check(asg, cdb, true, "after");
 
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
@@ -349,6 +349,7 @@ fn search(
     Ok(true)
 }
 
+#[allow(dead_code)]
 fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
     if let Some(cid) = cdb.validate(asg.assign_ref(), all) {
         println!("{}", message);
