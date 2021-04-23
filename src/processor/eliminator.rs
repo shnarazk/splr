@@ -346,7 +346,7 @@ impl Eliminator {
         for l in c.iter() {
             let vi = l.vi();
             let v = &mut asg.var_mut(vi);
-            assert!(!checked.contains(&vi));
+            assert!(!checked.contains(&vi), "elimitator350: {:?}", c,);
             checked.push(vi);
             let w = &mut self[l.vi()];
             let pl = w.pos_occurs.len();
