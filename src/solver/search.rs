@@ -297,6 +297,7 @@ fn search(
                                 {
                                     analyze_final(asg, state, &cdb[ci]);
                                 }
+                                #[cfg(not(feature = "boundary_check"))]
                                 return Ok(false);
                             }
                             // check(asg, cdb, false, "after vivification");
