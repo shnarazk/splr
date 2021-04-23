@@ -197,6 +197,12 @@ impl PropagateIF for AssignStack {
         let mut shift = lim;
         for i in lim..self.trail.len() {
             let l = self.trail[i];
+            assert!(
+                self.assign[l.vi()].is_some(),
+                "cancel_until found unassigned var in trail {}{:?}",
+                l.vi(),
+                &self.var[l.vi()],
+            );
             let vi = l.vi();
             if self.level[vi] <= lv {
                 self.trail[shift] = l;
