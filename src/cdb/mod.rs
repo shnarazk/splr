@@ -43,6 +43,13 @@ impl CID {
             CID::Merged(cid) => cid,
         }
     }
+    pub fn is_new(self) -> Option<ClauseId> {
+        if let CID::Generated(cid) = self {
+            Some(cid)
+        } else {
+            None
+        }
+    }
 }
 
 /// API for Clause, providing literal accessors.
