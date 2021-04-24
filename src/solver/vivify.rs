@@ -157,9 +157,9 @@ pub fn vivify(
         match copied.len() {
             0 if flipped => {
                 cdb.certificate_add_assertion(clits[0]);
+                panic!("vivif 153");
                 return Err(SolverError::Inconsistent);
             }
-            // 0 if average_timestamp < timestamp => (),
             0 => {
                 cdb.remove_clause(cs.to());
                 num_purge += 1;
@@ -171,6 +171,7 @@ pub fn vivify(
                     None => {
                         cdb.certificate_add_assertion(l0);
                         if asg.assign_at_root_level(l0).is_err() {
+                            panic!("vviy181");
                             return Err(SolverError::Inconsistent);
                         }
                         num_assert += 1;
@@ -182,6 +183,7 @@ pub fn vivify(
                 cdb.remove_clause(cs.to());
                 if !asg.propagate_sandbox(cdb).is_none() {
                     // panic!("Vivification found an inconsistency.");
+                    panic!("vivify193");
                     return Err(SolverError::Inconsistent);
                 }
                 num_purge += 1;
@@ -189,6 +191,11 @@ pub fn vivify(
             }
             n if n == clits.len() => (),
             n => {
+                assert!(
+                    copied.iter().all(|l| !copied.contains(&!*l)),
+                    "vivify learnt clause is broken {:?}",
+                    copied,
+                );
                 match cdb.new_clause(asg, &mut copied, is_learnt, true) {
                     CID::Generated(ci) => {
                         cdb.set_activity(ci, activity);
@@ -228,7 +235,7 @@ fn flip(vec: &mut [Lit]) -> &mut [Lit] {
 impl AssignStack {
     /// inspect the complete implication graph to collect a disjunction of a subset of
     /// negated literals of `lits`
-    fn analyze(
+    fn analyze_sandbox(
         &self,
         cdb: &ClauseDB,
         lits: &[Lit],
@@ -240,6 +247,23 @@ impl AssignStack {
         for l in reason {
             seen[l.vi()] = key;
         }
+        let from = self.len_upto(self.root_level);
+        let all = self.stack_iter().skip(0).map(|l| !*l).collect::<Vec<_>>();
+        let assumes = &all[from..];
+        assert!(
+            all.iter().all(|l| !assumes.contains(&!*l)),
+            "vivify252\n{:?}, {:?}",
+            assumes
+                .iter()
+                .filter(|l| all.contains(&!**l))
+                .collect::<Vec<_>>(),
+            assumes
+                .iter()
+                .filter(|l| all.contains(&!**l))
+                .map(|l| self.reason(l.vi()))
+                .collect::<Vec<_>>(),
+            // am.iter().filter(|l| am.contains(&!**l)).collect::<Vec<_>>(),
+        );
         // sweep in the reverse order
         for l in self.stack_iter().skip(self.len_upto(0)).rev() {
             if seen[l.vi()] != key {
@@ -259,6 +283,13 @@ impl AssignStack {
         let lst = res.len() - 1;
         res.swap(0, lst);
         assert!(matches!(self.reason(res[0].vi()), AssignReason::None));
+        assert!(
+            res.iter().all(|l| !res.contains(&!*l)),
+            "res: {:?} from: {:?} and trail: {:?}",
+            res,
+            lits,
+            assumes,
+        );
         res
     }
 }
