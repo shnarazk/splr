@@ -73,7 +73,6 @@ pub fn vivify(
         c.vivified();
         let clits = c.iter().map(|l| *l).collect::<Vec<Lit>>();
         let mut copied: Vec<Lit> = Vec::new();
-        let mut flipped = true;
         if to_display <= num_check {
             state.flush("");
             if num_target < 2 * num_purge {
@@ -90,9 +89,11 @@ pub fn vivify(
             to_display = num_check + display_step;
         }
         num_check += 1;
+        seen[0] = num_check;
         assert_eq!(asg.root_level, asg.decision_level());
+        assert!(clits.iter().all(|l| !clits.contains(&!*l)));
+        let mut flipped = true;
         'this_clause: for l in clits.iter().map(|ol| *ol) {
-            seen[0] = num_check;
             match asg.assigned(l) {
                 //
                 //## Rule 1
@@ -110,43 +111,36 @@ pub fn vivify(
                     let cid: Option<ClauseId> = match copied.len() {
                         0 => None,
                         1 => {
+                            assert_eq!(asg.assigned(copied[0]), None);
                             asg.assign_by_decision(copied[0]);
                             None
                         }
-                        _ => {
-                            if let CID::Generated(cid) =
-                                cdb.new_clause_sandbox(asg, &mut copied.clone())
-                            {
-                                Some(cid)
-                            } else {
-                                None
-                            }
-                        }
+                        _ => cdb.new_clause_sandbox(asg, &mut copied.clone()).is_new(),
                     };
+                    copied.push(!l);
+                    assert_eq!(asg.assigned(!l), None);
                     asg.assign_by_decision(!l);
                     let cc: ClauseId = asg.propagate_sandbox(cdb);
                     //
                     //## Rule 3
                     //
                     if !cc.is_none() {
-                        copied.push(!l);
-                        copied = asg.analyze(
+                        copied = asg.analyze_sandbox(
                             cdb,
                             &copied,
                             &cdb[cc].iter().map(|l| *l).collect::<Vec<Lit>>(),
                             &mut seen,
                         );
-                        if copied.is_empty() {
-                            break 'this_clause;
-                        }
-                        flipped = false;
                     }
                     asg.backtrack_sandbox();
                     cid.map(|cj| cdb.remove_clause_sandbox(cj));
+                    if !cc.is_none() {
+                        flipped = false;
+                        break 'this_clause;
+                    }
                     //
                     //## Rule 4
                     //
-                    copied.push(!l);
                 }
             }
         }
