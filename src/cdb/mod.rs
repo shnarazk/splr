@@ -121,6 +121,10 @@ pub trait ClauseDBIF:
     fn new_clause_sandbox<A>(&mut self, asg: &mut A, v: &mut Vec<Lit>) -> CID
     where
         A: AssignIF;
+    /// remove a clause temporally
+    fn detach_clause(&mut self, cid: ClauseId) -> (Lit, Lit);
+    /// push back a clause
+    fn reattach_clause(&mut self, cid: ClauseId, watches: (Lit, Lit));
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn remove_clause(&mut self, cid: ClauseId);
     /// un-register a clause `cid` from clause database and make the clause dead.
