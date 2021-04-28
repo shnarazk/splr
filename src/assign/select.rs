@@ -96,12 +96,13 @@ impl VarSelectIF for AssignStack {
         } else {
             self.phase_age += 1;
             match self.phase_age {
-                0 | 1 | 6 => RephasingTarget::Clear,
-                2 | 3 | 5 => RephasingTarget::BestPhases,
-                4 | 7 => RephasingTarget::Inverted,
-                x if x % 8 == 2 => RephasingTarget::BestPhases,
-                x if x % 8 == 6 => RephasingTarget::Inverted,
-                _ => RephasingTarget::Clear,
+                0 | 1 | 5 | 8 => RephasingTarget::Clear,
+                2 | 3 | 9 => RephasingTarget::BestPhases,
+                4 | 6 => RephasingTarget::Inverted,
+                7 => RephasingTarget::Shift,
+                x if x % 4 == 1 => RephasingTarget::Clear,
+                x if x % 4 == 3 => RephasingTarget::Shift,
+                _ => RephasingTarget::BestPhase,
             }
         };
         let mut s = true;
@@ -115,16 +116,16 @@ impl VarSelectIF for AssignStack {
             }
             match target {
                 RephasingTarget::AllTrue => v.set(Flag::PHASE, true),
-                // RephasingTarget::BestPhases => v.set(Flag::PHASE, *b),
-                // RephasingTarget::Inverted => v.set(Flag::PHASE, !*b),
+                RephasingTarget::BestPhases => v.set(Flag::PHASE, *b),
+                RephasingTarget::Inverted => v.set(Flag::PHASE, !*b),
                 RephasingTarget::Inverted => v.set(Flag::PHASE, false),
                 RephasingTarget::Shift => {
                     v.set(Flag::PHASE, s);
-                    // s = *b;
+                    s = *b;
                 }
                 RephasingTarget::XorShift => {
                     v.set(Flag::PHASE, s);
-                    // s ^= *b;
+                    s ^= *b;
                 }
                 RephasingTarget::Clear => (),
                 _ => (),
