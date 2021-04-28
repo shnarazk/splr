@@ -403,7 +403,7 @@ impl PropagateIF for AssignStack {
     // 1. delete codes about search_from
     // 1. delete codes about stats: num_*, ema_*
     // 1. delete comments
-    // 1. allow dead clauses
+    // 1. (allow dead clauses)
     // 1. (allow eliminated vars)
     //
     fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> ClauseId
