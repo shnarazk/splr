@@ -416,6 +416,9 @@ impl PropagateIF for AssignStack {
             let false_lit = !*p;
             let bi_clause = cdb.bi_clause_map(*p);
             for (&blocker, &cid) in bi_clause.iter() {
+                if cdb[cid].is_dead() {
+                    continue;
+                }
                 debug_assert!(!cdb[cid].is_dead());
                 debug_assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
@@ -424,6 +427,7 @@ impl PropagateIF for AssignStack {
                 match lit_assign!(self, blocker) {
                     Some(true) => (),
                     Some(false) => {
+                        assert!(!cdb[cid].is_dead());
                         return cid;
                     }
                     None => {
@@ -438,6 +442,9 @@ impl PropagateIF for AssignStack {
             let source = cdb.detach_watch_cache(sweeping);
             let mut watches = source.iter();
             'next_clause: while let Some((cid, other_watch)) = watches.next().deref_watch() {
+                if cdb[cid].is_dead() {
+                    continue 'next_clause;
+                }
                 let other_watch_value = lit_assign!(self, other_watch);
                 if let Some(true) = other_watch_value {
                     assert!(!self.var[other_watch.vi()].is(Flag::ELIMINATED));
@@ -476,6 +483,7 @@ impl PropagateIF for AssignStack {
                 cdb.reregister_watch_cache(sweeping, Some((cid, other_watch)));
                 if other_watch_value == Some(false) {
                     while cdb.reregister_watch_cache(sweeping, watches.next().deref_watch()) {}
+                    assert!(!cdb[cid].is_dead());
                     return cid;
                 }
                 let lv = cdb[cid]
