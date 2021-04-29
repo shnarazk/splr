@@ -191,6 +191,9 @@ impl ClauseId {
     pub fn is_none(&self) -> bool {
         self.ordinal == 0
     }
+    pub fn to_option(&self) -> Option<ClauseId> {
+        (self.ordinal != 0).then(|| *self)
+    }
 }
 
 /// A representation of 'clause'
