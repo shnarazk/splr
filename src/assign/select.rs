@@ -96,13 +96,15 @@ impl VarSelectIF for AssignStack {
         } else {
             self.phase_age += 1;
             match self.phase_age {
-                0 | 1 | 5 | 8 => RephasingTarget::Clear,
-                2 | 3 | 9 => RephasingTarget::BestPhases,
-                4 | 6 => RephasingTarget::Inverted,
-                7 => RephasingTarget::Shift,
-                x if x % 4 == 1 => RephasingTarget::Clear,
-                x if x % 4 == 3 => RephasingTarget::Shift,
-                _ => RephasingTarget::BestPhase,
+                // 0 | 1 | 5 | 8 => RephasingTarget::Clear,
+                // 2 | 3 | 9 => RephasingTarget::BestPhases,
+                // 4 | 6 => RephasingTarget::Inverted,
+                // 7 => RephasingTarget::Shift,
+                // x if x % 4 == 1 => RephasingTarget::Clear,
+                // x if x % 4 == 3 => RephasingTarget::BestPhase,
+                x if x % 3 == 1 => RephasingTarget::Clear,
+                x if x % 3 == 2 => RephasingTarget::BestPhase,
+                _ => RephasingTarget::Shift,
             }
         };
         let mut s = true;
@@ -120,12 +122,19 @@ impl VarSelectIF for AssignStack {
                 RephasingTarget::Inverted => v.set(Flag::PHASE, !*b),
                 RephasingTarget::Inverted => v.set(Flag::PHASE, false),
                 RephasingTarget::Shift => {
+                    let mut count = 0;
+                    count += b as usize;
+                    count += s as usize;
+                    count += v.is(Flag::PHASE) as usize;
+                    s = 1 < count;
                     v.set(Flag::PHASE, s);
-                    s = *b;
                 }
                 RephasingTarget::XorShift => {
-                    v.set(Flag::PHASE, s);
-                    s ^= *b;
+                    // v.set(Flag::PHASE, s);
+                    // s ^= *b;
+                    if b != v.is(Flag::PHASE) {
+                        v.set(Flag::PHASE, b);
+                    }
                 }
                 RephasingTarget::Clear => (),
                 _ => (),
