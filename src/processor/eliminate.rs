@@ -94,7 +94,6 @@ where
                             asg,
                             vec,
                             cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT),
-                            true,
                         ) {
                             elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
                             #[cfg(feature = "trace_elimination")]

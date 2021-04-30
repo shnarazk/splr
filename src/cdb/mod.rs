@@ -109,13 +109,7 @@ pub trait ClauseDBIF:
     /// removes an eliminated Lit `p` from a clause. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
     /// And this is called only from `Eliminator::strengthen_clause`.
-    fn new_clause<A>(
-        &mut self,
-        asg: &mut A,
-        v: &mut Vec<Lit>,
-        learnt: bool,
-        level_sort: bool,
-    ) -> CID
+    fn new_clause<A>(&mut self, asg: &mut A, v: &mut Vec<Lit>, learnt: bool) -> CID
     where
         A: AssignIF;
     fn new_clause_sandbox<A>(&mut self, asg: &mut A, v: &mut Vec<Lit>) -> CID
@@ -396,7 +390,7 @@ mod tests {
         asg.assign_by_decision(lit(-2));
 
         let c1 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false, false)
+            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
         let c = &cdb[c1];
         assert_eq!(c.rank, 2);
@@ -406,7 +400,7 @@ mod tests {
         assert!(!c.is(Flag::JUST_USED));
 
         let c2 = cdb
-            .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true, true)
+            .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
             .as_cid();
         let c = &cdb[c2];
         assert_eq!(c.rank, 2);
@@ -425,10 +419,10 @@ mod tests {
         let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false, false)
+            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
         let c2 = cdb
-            .new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false, false)
+            .new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false)
             .as_cid();
         cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
@@ -447,7 +441,7 @@ mod tests {
         let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false, false)
+            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
         assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
         let mut iter = cdb[c1][0..].into_iter();

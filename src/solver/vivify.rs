@@ -178,7 +178,7 @@ pub fn vivify(
                 assert!(1 < new_len);
                 if new_len < clits.len() {
                     flip(&mut copied);
-                    if let Some(ci) = cdb.new_clause(asg, &mut copied, is_learnt, true).is_new() {
+                    if let Some(ci) = cdb.new_clause(asg, &mut copied, true).is_new() {
                         cdb.set_activity(ci, activity);
                         cdb[ci].turn_on(Flag::VIVIFIED);
                     }
@@ -214,7 +214,7 @@ pub fn vivify(
                     }
                     clauses.retain(|cs| !cdb[cs.to()].is_dead());
                 } else {
-                    if let Some(ci) = cdb.new_clause(asg, &mut learnt, is_learnt, true).is_new() {
+                    if let Some(ci) = cdb.new_clause(asg, &mut learnt, true).is_new() {
                         cdb.set_activity(ci, activity);
                         cdb[ci].turn_on(Flag::VIVIFIED);
                     }

@@ -313,34 +313,10 @@ impl ClauseDBIF for ClauseDB {
         c.lits.swap(old, new);
         // self.watches(cid, "after update_watch");
     }
-    fn new_clause<A>(
-        &mut self,
-        asg: &mut A,
-        vec: &mut Vec<Lit>,
-        mut learnt: bool,
-        level_sort: bool,
-    ) -> CID
+    fn new_clause<A>(&mut self, asg: &mut A, vec: &mut Vec<Lit>, mut learnt: bool) -> CID
     where
         A: AssignIF,
     {
-        if level_sort {
-            #[cfg(feature = "boundary_check")]
-            debug_assert!(1 < vec.len());
-            // // sort literals
-            // let mut i_max = 1;
-            // let mut lv_max = 0;
-            // // seek a literal with max level
-            // let level = asg.level_ref();
-            // for (i, l) in vec.iter().enumerate() {
-            //     let vi = l.vi();
-            //     let lv = level[vi];
-            //     if asg.assign(vi).is_some() && lv_max < lv {
-            //         i_max = i;
-            //         lv_max = lv;
-            //     }
-            // }
-            // vec.swap(1, i_max);
-        }
         assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{:?}", vec,);
         if vec.len() == 2 {
             if let Some(cid) = self.has_bi_clause(vec[0], vec[1]) {
@@ -933,7 +909,7 @@ impl ClauseDB {
             }
         }
         for pair in vec.iter_mut() {
-            self.new_clause(asg, pair, false, false);
+            self.new_clause(asg, pair, false);
             self.num_bi_clause_compeletion += 1;
         }
     }
@@ -952,8 +928,8 @@ impl ClauseDB {
     /// let l1 = splr::types::Lit::from(1);
     /// let l2 = splr::types::Lit::from(2);
     /// let l3 = splr::types::Lit::from(3);
-    /// cdb.new_clause(&mut asg, &mut vec![l1, l2], false, false);
-    /// cdb.new_clause(&mut asg, &mut vec![!l1, !l2, !l3], false, false);
+    /// cdb.new_clause(&mut asg, &mut vec![l1, l2], false);
+    /// cdb.new_clause(&mut asg, &mut vec![!l1, !l2, !l3], false);
     /// assert!(cdb.has_bi_clause(l1, l2).is_some());
     /// assert!(cdb.has_bi_clause(!l1, l2).is_none());
     /// assert!(cdb.has_bi_clause(l1, !l2).is_none());

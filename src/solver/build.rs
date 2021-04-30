@@ -246,7 +246,7 @@ impl SatSolverIF for Solver {
         let mut tmp = Vec::new();
         std::mem::swap(&mut tmp, &mut cdb.eliminated_permanent);
         while let Some(mut vec) = tmp.pop() {
-            cdb.new_clause(asg, &mut vec, false, false);
+            cdb.new_clause(asg, &mut vec, false);
         }
     }
     #[cfg(not(feature = "no_IO"))]
@@ -325,7 +325,7 @@ impl Solver {
                 asg.assign_at_root_level(lits[0])
                     .map_or(None, |_| Some(ClauseId::default()))
             }
-            _ => match cdb.new_clause(asg, lits, false, false) {
+            _ => match cdb.new_clause(asg, lits, false) {
                 CID::Generated(cid) => {
                     cdb[cid].rank = 1;
                     Some(cid)

@@ -256,7 +256,7 @@ impl AssignIF for AssignStack {
                                 "- pull back clause E {:?}",
                                 phantom_clause.iter().map(i32::from).collect::<Vec<_>>()
                             );
-                            cdb.new_clause(self, &mut phantom_clause, false, false);
+                            cdb.new_clause(self, &mut phantom_clause, false);
                         }
                         break 'next;
                     }
@@ -271,7 +271,7 @@ impl AssignIF for AssignStack {
                             "- pull back clause C {:?}",
                             phantom_clause.iter().map(i32::from).collect::<Vec<_>>()
                         );
-                        cdb.new_clause(self, &mut phantom_clause, false, false);
+                        cdb.new_clause(self, &mut phantom_clause, false);
                     }
                     i -= width;
                     continue 'next;
