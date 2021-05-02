@@ -204,9 +204,8 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
     let mut last_core = 0;
-    let progress_step = 5000;
+    let progress_step = 256;
     let mut next_progress = progress_step;
-    let mut vivification_turn = true;
 
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
@@ -263,23 +262,7 @@ fn search(
                             cdb.check_consistency(asg, "before simplify");
                         }
                         if state.config.c_ip_int <= elim.to_simplify as usize {
-                            // check(asg, cdb, false, "before elimination");
-                            elim.activate();
-                            elim.simplify(asg, cdb, rst, state)?;
-                            vivification_turn = true;
-                            // check(asg, cdb, false, "after elimination");
-                            #[cfg(feature = "trace_equivalency")]
-                            if false {
-                                state.progress(asg, cdb, elim, rst);
-                                cdb.check_consistency(
-                                    asg,
-                                    &format!("simplify nc:{}", asg.num_conflict),
-                                );
-                            }
-                        } else if vivification_turn {
                             assert_eq!(asg.root_level, asg.decision_level());
-                            vivification_turn = false;
-                            // check(asg, cdb, false, "before vivification");
                             #[cfg(feature = "clause_vivification")]
                             if vivify(
                                 asg,
@@ -300,7 +283,18 @@ fn search(
                                 #[cfg(not(feature = "boundary_check"))]
                                 return Ok(false);
                             }
-                            // check(asg, cdb, false, "after vivification");
+                            // check(asg, cdb, false, "before elimination");
+                            elim.activate();
+                            elim.simplify(asg, cdb, rst, state)?;
+                            // check(asg, cdb, false, "after elimination");
+                            #[cfg(feature = "trace_equivalency")]
+                            if false {
+                                state.progress(asg, cdb, elim, rst);
+                                cdb.check_consistency(
+                                    asg,
+                                    &format!("simplify nc:{}", asg.num_conflict),
+                                );
+                            }
                         }
                     }
                     if last_core != num_unreachable || 0 == num_unreachable {
