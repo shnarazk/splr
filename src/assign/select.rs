@@ -103,14 +103,15 @@ impl VarSelectIF for AssignStack {
                 // x if x % 4 == 1 => RephasingTarget::Clear,
                 // x if x % 4 == 3 => RephasingTarget::BestPhase,
                 x if x % 3 == 1 => RephasingTarget::Clear,
-                x if x % 3 == 2 => RephasingTarget::BestPhase,
+                // x if x % 3 == 2 => RephasingTarget::BestPhase,
                 _ => RephasingTarget::Shift,
             }
         };
-        let mut s = true;
         // The iteration order by an iterator on HashMap may change in each execution.
         // So Shift and XorShift cause non-determinism. Be careful.
         let mut invalidated = false;
+        let mut num_flip = 0;
+        let mut act_sum = 0.0;
         for (vi, (b, _)) in self.best_phases.iter() {
             let v = &mut self.var[*vi];
             if self.assign[*vi] == Some(!*b) {
@@ -120,25 +121,41 @@ impl VarSelectIF for AssignStack {
                 RephasingTarget::AllTrue => v.set(Flag::PHASE, true),
                 RephasingTarget::BestPhases => v.set(Flag::PHASE, *b),
                 RephasingTarget::Inverted => v.set(Flag::PHASE, !*b),
-                RephasingTarget::Inverted => v.set(Flag::PHASE, false),
                 RephasingTarget::Shift => {
-                    let mut count = 0;
-                    count += b as usize;
-                    count += s as usize;
-                    count += v.is(Flag::PHASE) as usize;
-                    s = 1 < count;
-                    v.set(Flag::PHASE, s);
+                    // let mut count = 0;
+                    // count += *b as usize;
+                    // count += s as usize;
+                    // count += v.is(Flag::PHASE) as usize;
+                    // s = 1 < count;
+                    // // s ^= v.is(Flag::PHASE);
+                    // // if v.is(Flag::PHASE) != s {
+                    // //     num_match += 1;
+                    // // }
+                    // // v.set(Flag::PHASE, s);
+                    if !v.reward.is_nan() {
+                        act_sum += 0.25 * (1.0 - v.reward);
+                    }
+                    if 1.0 <= act_sum {
+                        v.set(Flag::PHASE, !*b);
+                        act_sum = 0.0;
+                        num_flip += 1;
+                    } else {
+                        v.set(Flag::PHASE, *b);
+                    }
                 }
                 RephasingTarget::XorShift => {
                     // v.set(Flag::PHASE, s);
                     // s ^= *b;
-                    if b != v.is(Flag::PHASE) {
-                        v.set(Flag::PHASE, b);
+                    if *b != v.is(Flag::PHASE) {
+                        v.set(Flag::PHASE, *b);
                     }
                 }
                 RephasingTarget::Clear => (),
-                _ => (),
             }
+        }
+        if target == RephasingTarget::Shift {
+            self.bp_divergence_ema
+                .update(num_flip as f64 / self.best_phases.iter().count() as f64);
         }
         if invalidated {
             self.best_phases.clear();

@@ -130,6 +130,7 @@ pub struct AssignStack {
     build_best_at: usize,
     num_best_assign: usize,
     num_rephase: usize,
+    bp_divergence_ema: Ema,
 
     #[cfg(feature = "best_phases_tracking")]
     best_phases: HashMap<VarId, (bool, AssignReason)>,
@@ -265,12 +266,14 @@ pub mod property {
         DecisionPerConflict,
         PropagationPerConflict,
         ConflictPerRestart,
+        BestPhaseDivergenceRate,
     }
 
-    pub const EMAS: [TEma; 3] = [
+    pub const EMAS: [TEma; 4] = [
         TEma::DecisionPerConflict,
         TEma::PropagationPerConflict,
         TEma::ConflictPerRestart,
+        TEma::BestPhaseDivergenceRate,
     ];
 
     impl PropertyReference<TEma, Ema> for AssignStack {
@@ -280,6 +283,7 @@ pub mod property {
                 TEma::DecisionPerConflict => self.dpc_ema.get_ema(),
                 TEma::PropagationPerConflict => self.ppc_ema.get_ema(),
                 TEma::ConflictPerRestart => self.cpr_ema.get_ema(),
+                TEma::BestPhaseDivergenceRate => &self.bp_divergence_ema,
             }
         }
     }
