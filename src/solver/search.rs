@@ -268,6 +268,7 @@ fn search(
                                 asg,
                                 cdb,
                                 elim,
+                                rst,
                                 state,
                                 rst.refer(restart::property::TEma2::LBD).get(),
                             )
