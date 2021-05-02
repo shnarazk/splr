@@ -317,7 +317,7 @@ impl ClauseDBIF for ClauseDB {
     where
         A: AssignIF,
     {
-        assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{:?}", vec,);
+        debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{:?}", vec,);
         if vec.len() == 2 {
             if let Some(cid) = self.has_bi_clause(vec[0], vec[1]) {
                 return CID::Merged(cid);
