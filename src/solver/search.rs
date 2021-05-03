@@ -66,6 +66,26 @@ impl SolveIF for Solver {
             elim.eliminate_satisfied_clauses(asg, cdb, false);
         }
 
+        state[Stat::NumProcessor] += 1;
+        state.flush("vivifying...");
+        if vivify(asg, cdb, elim, rst, state, 0.0).is_err() {
+            #[cfg(feature = "boundary_check")]
+            return Err(SolverError::UndescribedError);
+
+            #[cfg(feature = "support_user_assumption")]
+            {
+                analyze_final(asg, state, &cdb[ci]);
+            }
+            #[cfg(not(feature = "boundary_check"))]
+            return Ok(Certificate::UNSAT);
+        }
+        if elim.simplify(asg, cdb, rst, state).is_err() {
+            if cdb.check_size().is_err() {
+                return Err(SolverError::OutOfMemory);
+            }
+            return Ok(Certificate::UNSAT);
+        }
+
         #[cfg(feature = "clause_elimination")]
         {
             const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
@@ -77,6 +97,7 @@ impl SolveIF for Solver {
             // To do so, we use eliminator's occur list.
             // Thus we have to call `activate` and `prepare` firstly, to build occur lists.
             // Otherwise all literals are assigned wrongly.
+
             state.flush("phasing...");
             elim.activate();
             elim.prepare(asg, cdb, true);
@@ -261,6 +282,7 @@ fn search(
                             state.progress(asg, cdb, elim, rst);
                             cdb.check_consistency(asg, "before simplify");
                         }
+                        state[Stat::NumProcessor] += 1;
                         if state.config.c_ip_int <= elim.to_simplify as usize {
                             assert_eq!(asg.root_level, asg.decision_level());
                             #[cfg(feature = "clause_vivification")]
@@ -329,7 +351,7 @@ fn search(
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
-                state[Stat::NoDecisionConflict] += 1;
+                state[Stat::NumDecisionConflict] += 1;
             }
             if let Some(na) = asg.best_assigned() {
                 state.flush("");

@@ -63,7 +63,6 @@ impl Default for AssignStack {
             activity_decay_step: 0.1,
 
             during_vivification: false,
-            vivify_sandbox: (0, 0, 0),
         }
     }
 }
@@ -139,19 +138,6 @@ impl Instantiate for AssignStack {
                     self.trail.len()
                 };
                 self.rebuild_order();
-            }
-            #[cfg(feature = "clause_vivification")]
-            SolverEvent::Vivify(start) => {
-                if start {
-                    self.during_vivification = true;
-                    self.vivify_sandbox =
-                        (self.num_conflict, self.num_propagation, self.num_restart);
-                } else {
-                    self.during_vivification = false;
-                    self.num_conflict = self.vivify_sandbox.0;
-                    self.num_propagation = self.vivify_sandbox.1;
-                    self.num_restart = self.vivify_sandbox.2;
-                }
             }
             e => panic!("don't call asg with {:?}", e),
         }

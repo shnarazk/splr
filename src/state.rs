@@ -121,7 +121,9 @@ impl SearchStrategy {
 #[derive(Clone, Eq, PartialEq)]
 pub enum Stat {
     /// the number of 'no decision conflict'
-    NoDecisionConflict,
+    NumDecisionConflict,
+    /// the number of equivalency processor invocation
+    NumProcessor,
     /// the number of vivification
     Vivification,
     /// the number of vivified (shrunk) clauses
@@ -611,8 +613,13 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|elim:{}, #sub:{}, core:{}, /cpr:{}",
-            im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
+            "\x1B[2K        misc|proc:{}, #sub:{}, core:{}, /cpr:{}",
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::NumProcessor,
+                self[Stat::NumProcessor]
+            ),
             im!("{:>9}", self, LogUsizeId::ClauseSubsumption, elim_num_sub),
             im!(
                 "{:>9}",
@@ -627,6 +634,7 @@ impl StateIF for State {
                 asg_cpr_ema.get()
             )
         );
+        self[LogUsizeId::Simplify] = elim_num_full;
         #[cfg(feature = "strategy_adaptation")]
         {
             println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
@@ -683,6 +691,7 @@ impl State {
         self[LogF64Id::PropagationPerConflict] = asg
             .refer(assign::property::TEma::PropagationPerConflict)
             .get();
+        self[LogUsizeId::NumProcessor] = self[Stat::NumProcessor];
         self[LogUsizeId::Simplify] = elim.derefer(processor::property::Tusize::NumFullElimination);
         self[LogUsizeId::ClauseSubsumption] =
             elim.derefer(processor::property::Tusize::NumSubsumedClause);
@@ -916,6 +925,7 @@ pub enum LogUsizeId {
     //
     //## pre(in)-processor
     //
+    NumProcessor,
     Simplify,
     Stabilize,
     ClauseSubsumption,
@@ -1017,7 +1027,9 @@ pub mod property {
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tusize {
         /// the number of 'no decision conflict'
-        NoDecisionConflict,
+        NumDecisionConflict,
+        // the nmuber for processor invocations
+        NumProcessor,
         /// the number of vivification
         Vivification,
         /// the number of vivified (shrunk) clauses
@@ -1026,8 +1038,9 @@ pub mod property {
         VivifiedVar,
     }
 
-    pub const USIZES: [Tusize; 4] = [
-        Tusize::NoDecisionConflict,
+    pub const USIZES: [Tusize; 5] = [
+        Tusize::NumDecisionConflict,
+        Tusize::NumProcessor,
         Tusize::Vivification,
         Tusize::VivifiedClause,
         Tusize::VivifiedVar,
@@ -1037,7 +1050,8 @@ pub mod property {
         #[inline]
         fn derefer(&self, k: Tusize) -> usize {
             match k {
-                Tusize::NoDecisionConflict => self[Stat::NoDecisionConflict],
+                Tusize::NumDecisionConflict => self[Stat::NumDecisionConflict],
+                Tusize::NumProcessor => self[Stat::NumProcessor],
                 Tusize::Vivification => self[Stat::Vivification],
                 Tusize::VivifiedClause => self[Stat::VivifiedClause],
                 Tusize::VivifiedVar => self[Stat::VivifiedVar],
