@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 #![cfg(feature = "clause_vivification")]
 use {
-    super::{Restarter, Stat, State},
+    super::{restart, Restarter, Stat, State},
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{self, ClauseDB, ClauseDBIF, ClauseIF},
@@ -29,21 +29,21 @@ pub fn vivify(
     elim: &mut Eliminator,
     rst: &mut Restarter,
     state: &mut State,
-    average_lbd: f64,
 ) -> MaybeInconsistent {
     assert_eq!(asg.root_level, asg.decision_level());
     if elim.simplify(asg, cdb, rst, state).is_err() {
         panic!("eaeuae");
     }
-    let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
-    {
-        let thr = (average_lbd + cdb.derefer(cdb::property::Tf64::DpAverageLBD)) as usize;
-        for (i, c) in cdb.iter().enumerate().skip(1) {
-            if let Some(act) = c.to_vivify(thr) {
-                clauses.push(OrderedProxy::new(ClauseId::from(i), -act));
-            }
+
+    let average_lbd = {
+        let ema = rst.refer(restart::property::TEma2::LBD).get();
+        if ema.is_nan() {
+            -1.0
+        } else {
+            ema
         }
-    }
+    };
+    let mut clauses: Vec<OrderedProxy<ClauseId>> = gather_clauses(cdb, average_lbd, None);
     if clauses.is_empty() {
         return Ok(());
     }
@@ -55,7 +55,6 @@ pub fn vivify(
     let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
     let display_step: usize = 1000;
     let mut num_check = 0;
-    let mut num_purge = 0;
     let mut num_shrink = 0;
     let mut num_assert = 0;
     let mut to_display = 0;
@@ -66,7 +65,7 @@ pub fn vivify(
         // assert_eq!(asg.root_level, asg.decision_level());
         let activity = cdb.activity(cid);
         let c: &mut Clause = &mut cdb[cid];
-        if c.is_dead() || c.is_satisfied_under(asg) || c.to_vivify(0).is_none() {
+        if c.is_dead() || c.is_satisfied_under(asg) {
             continue;
         }
         let is_learnt = c.is(Flag::LEARNT);
@@ -76,8 +75,8 @@ pub fn vivify(
         if to_display <= num_check {
             state.flush("");
             state.flush(format!(
-                "clause vivifying(assert:{}, purge:{} shorten:{}, check:{}/{})...",
-                num_assert, num_purge, num_shrink, num_check, num_target,
+                "clause vivifying(assert:{} shorten:{}, check:{}/{})...",
+                num_assert, num_shrink, num_check, num_target,
             ));
             to_display = num_check + display_step;
         }
@@ -171,14 +170,6 @@ pub fn vivify(
                     }
                     debug_assert!(clits.contains(&l0));
                     cdb.remove_clause(cid);
-                    num_purge += 1;
-                    if let Some(cc) = asg.propagate(cdb).to_option() {
-                        panic!("vivify193 found an inconsisteny: target:{}, cc:{}", cid, cc);
-                        // return Err(SolverError::Inconsistent);
-                    }
-                    if elim.simplify(asg, cdb, rst, state).is_err() {
-                        panic!("eaeuae");
-                    }
                 } else if new_len < clits.len() {
                     assert!(
                         vec.iter().all(|l| clits.contains(l)),
@@ -210,13 +201,44 @@ pub fn vivify(
     state.log(
         state[Stat::Vivification],
         format!(
-            "vivify, pick:{:>8}, var:{:>6}, purge:{:>6}, shrink:{:>6}",
-            num_check, num_assert, num_purge, num_shrink,
+            "vivify, pick:{:>8}, assert:{:>6}, shrink:{:>6}",
+            num_check, num_assert, num_shrink,
         ),
     );
-    state[Stat::VivifiedClause] += num_shrink + num_purge;
+    state[Stat::VivifiedClause] += num_shrink;
     state[Stat::VivifiedVar] += num_assert;
     Ok(())
+}
+
+fn gather_clauses(
+    cdb: &mut ClauseDB,
+    average_lbd: f64,
+    max_len: Option<usize>,
+) -> Vec<OrderedProxy<ClauseId>> {
+    let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
+    if 0.0 <= average_lbd {
+        let thr = (average_lbd + cdb.derefer(cdb::property::Tf64::DpAverageLBD)) as usize;
+        for (i, c) in cdb.iter().enumerate().skip(1) {
+            if let Some(act) = c.to_vivify(thr) {
+                clauses.push(OrderedProxy::new(ClauseId::from(i), -act));
+                if max_len.map_or(false, |thr| thr <= clauses.len()) {
+                    break;
+                }
+            }
+        }
+    } else {
+        let ml = max_len.map_or(100_000, |thr| thr);
+        for (i, c) in cdb.iter().enumerate().skip(1) {
+            if c.len() <= 4 {
+                clauses.push(OrderedProxy::new(ClauseId::from(i), -1.0 * c.len() as f64));
+                if ml <= clauses.len() {
+                    break;
+                }
+            }
+        }
+    }
+    clauses.sort();
+    clauses
 }
 
 fn flip(vec: &mut [Lit]) -> &mut [Lit] {

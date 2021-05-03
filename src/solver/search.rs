@@ -68,7 +68,7 @@ impl SolveIF for Solver {
 
         state[Stat::NumProcessor] += 1;
         state.flush("vivifying...");
-        if vivify(asg, cdb, elim, rst, state, 0.0).is_err() {
+        if vivify(asg, cdb, elim, rst, state).is_err() {
             #[cfg(feature = "boundary_check")]
             return Err(SolverError::UndescribedError);
 
@@ -286,26 +286,23 @@ fn search(
                         if state.config.c_ip_int <= elim.to_simplify as usize {
                             assert_eq!(asg.root_level, asg.decision_level());
                             #[cfg(feature = "clause_vivification")]
-                            if vivify(
-                                asg,
-                                cdb,
-                                elim,
-                                rst,
-                                state,
-                                rst.refer(restart::property::TEma2::LBD).get(),
-                            )
-                            .is_err()
-                            {
-                                #[cfg(feature = "boundary_check")]
-                                return Err(SolverError::UndescribedError);
-
-                                #[cfg(feature = "support_user_assumption")]
-                                {
-                                    analyze_final(asg, state, &cdb[ci]);
-                                }
-                                #[cfg(not(feature = "boundary_check"))]
-                                return Ok(false);
-                            }
+                            // || \\ if let Err(e) = vivify(asg, cdb, elim, rst, state) {
+                            // || \\     match e {
+                            // || \\         SolverError::ProcessorFoundUnsat => {
+                            // || \\             #[cfg(feature = "support_user_assumption")]
+                            // || \\             {
+                            // || \\                 analyze_final(asg, state, &cdb[ci]);
+                            // || \\             }
+                            // || \\             #[cfg(not(feature = "boundary_check"))]
+                            // || \\             return Ok(false);
+                            // || \\         }
+                            // || \\         _ => {
+                            // || \\             #[cfg(feature = "boundary_check")]
+                            // || \\             return Err(SolverError::UndescribedError);
+                            // || \\             return Err(e);
+                            // || \\         }
+                            // || \\     }
+                            // || \\ }
                             // check(asg, cdb, false, "before elimination");
                             elim.activate();
                             elim.simplify(asg, cdb, rst, state)?;
