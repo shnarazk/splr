@@ -54,20 +54,14 @@ impl From<&Var> for VarTimestamp {
 
 /// Phase saving modes.
 #[cfg(feature = "rephase")]
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum RephasingTarget {
-    ///
-    AllTrue,
     /// use best phases
     BestPhases,
     /// unstage all vars.
     Clear,
-    ///
-    Inverted,
     /// a kind of random shuffle
-    Shift,
-    ///
-    XorShift,
+    Shift(f64),
 }
 
 #[cfg(feature = "rephase")]
@@ -96,14 +90,14 @@ impl VarSelectIF for AssignStack {
         } else {
             self.phase_age += 1;
             match self.phase_age {
-                0 | 1 | 3 | 4 => RephasingTarget::BestPhases,
-                2 => RephasingTarget::Inverted,
-                // 7 => RephasingTarget::Shift,
+                0 | 2 | 4 => RephasingTarget::BestPhases,
+                1 => RephasingTarget::Shift(0.5),
+                3 => RephasingTarget::Shift(0.75),
                 // x if x % 4 == 1 => RephasingTarget::Clear,
                 // x if x % 4 == 3 => RephasingTarget::BestPhase,
                 x if x % 3 == 1 => RephasingTarget::Clear,
                 // x if x % 3 == 2 => RephasingTarget::BestPhase,
-                _ => RephasingTarget::Shift,
+                _ => RephasingTarget::Shift(0.25),
             }
         };
         // The iteration order by an iterator on HashMap may change in each execution.
@@ -117,10 +111,8 @@ impl VarSelectIF for AssignStack {
                 invalidated = true;
             }
             match target {
-                RephasingTarget::AllTrue => v.set(Flag::PHASE, true),
                 RephasingTarget::BestPhases => v.set(Flag::PHASE, *b),
-                RephasingTarget::Inverted => v.set(Flag::PHASE, !*b),
-                RephasingTarget::Shift => {
+                RephasingTarget::Shift(scale) => {
                     // let mut count = 0;
                     // count += *b as usize;
                     // count += s as usize;
@@ -132,7 +124,7 @@ impl VarSelectIF for AssignStack {
                     // // }
                     // // v.set(Flag::PHASE, s);
                     if !v.reward.is_nan() {
-                        act_sum += 0.25 * (1.0 - v.reward);
+                        act_sum += scale * (1.0 - v.reward);
                     }
                     if 1.0 <= act_sum {
                         v.set(Flag::PHASE, !*b);
@@ -142,17 +134,10 @@ impl VarSelectIF for AssignStack {
                         v.set(Flag::PHASE, *b);
                     }
                 }
-                RephasingTarget::XorShift => {
-                    // v.set(Flag::PHASE, s);
-                    // s ^= *b;
-                    if *b != v.is(Flag::PHASE) {
-                        v.set(Flag::PHASE, *b);
-                    }
-                }
                 RephasingTarget::Clear => (),
             }
         }
-        if target == RephasingTarget::Shift {
+        if let RephasingTarget::Shift(_) = target {
             self.bp_divergence_ema
                 .update(num_flip as f64 / self.best_phases.iter().count() as f64);
         }
