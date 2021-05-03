@@ -112,12 +112,12 @@ impl SolveIF for Solver {
                     #[cfg(not(feature = "incremental_solver"))]
                     {
                         if m == 0 {
-                            let l = Lit::from_assign(vi, true);
+                            let l = Lit::from((vi, true));
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
                         } else if p == 0 {
-                            let l = Lit::from_assign(vi, false);
+                            let l = Lit::from((vi, false));
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }

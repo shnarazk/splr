@@ -33,9 +33,6 @@ pub trait PropertyDereference<I, O: Sized> {
 pub trait LitIF {
     /// convert to bool
     fn as_bool(&self) -> bool;
-    /// convert [VarId](../type.VarId.html) to [Lit](../type.Lit.html).
-    /// It returns a positive literal if `p` is `TRUE` or `BOTTOM`.
-    fn from_assign(vi: VarId, p: bool) -> Self;
     /// convert to var index.
     fn vi(self) -> VarId;
     /// return `true` if it is a valid literal, namely non-zero.
@@ -161,7 +158,7 @@ impl From<(VarId, bool)> for Lit {
     #[inline]
     fn from((vi, b): (VarId, bool)) -> Self {
         Lit {
-            ordinal: ((vi as u32) * 2) + (b as u32),
+            ordinal: ((vi as u32) << 1) + (b as u32),
         }
     }
 }
@@ -358,12 +355,6 @@ impl LitIF for Lit {
     #[inline]
     fn as_bool(&self) -> bool {
         self.ordinal & 1 == 1
-    }
-    #[inline]
-    fn from_assign(vi: VarId, p: bool) -> Lit {
-        Lit {
-            ordinal: (vi as u32) << 1 | (p as u32),
-        }
     }
     #[inline]
     fn vi(self) -> VarId {

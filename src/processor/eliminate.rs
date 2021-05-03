@@ -283,13 +283,13 @@ fn make_eliminated_clauses<C>(
             debug_assert!(!cdb[*cid].is_dead());
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
-        make_eliminating_unit_clause(tmp, Lit::from_assign(v, true));
+        make_eliminating_unit_clause(tmp, Lit::from((v, true)));
     } else {
         for cid in pos {
             debug_assert!(!cdb[*cid].is_dead());
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
-        make_eliminating_unit_clause(tmp, Lit::from_assign(v, false));
+        make_eliminating_unit_clause(tmp, Lit::from((v, false)));
     }
 }
 

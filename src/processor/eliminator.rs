@@ -492,58 +492,28 @@ impl Eliminator {
             if best == 0 || asg.var(best).is(Flag::ELIMINATED) {
                 continue;
             }
-            for did in self[best].pos_occurs.clone().iter() {
-                if *did == cid {
-                    continue;
-                }
-                let d = &cdb[*did];
-                if d.len() <= *timedout {
-                    *timedout -= d.len();
-                } else {
-                    *timedout = 0;
-                    return Ok(());
-                }
-                if !d.is_dead() && d.len() <= self.subsume_literal_limit {
-                    self.try_subsume(asg, cdb, cid, *did)?;
-                }
-            }
-            for did in self[best].neg_occurs.clone().iter() {
-                if *did == cid {
-                    continue;
-                }
-                let d = &cdb[*did];
-                if d.len() <= *timedout {
-                    *timedout -= d.len();
-                } else {
-                    *timedout = 0;
-                    return Ok(());
-                }
-                if !d.is_dead() && d.len() <= self.subsume_literal_limit {
-                    self.try_subsume(asg, cdb, cid, *did)?;
+            self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
+            self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
+            for cls in [self[best].pos_occurs.clone(), self[best].neg_occurs.clone()].iter() {
+                for did in cls.iter() {
+                    if *did == cid {
+                        continue;
+                    }
+                    let d = &cdb[*did];
+                    assert!(d.contains(Lit::from((best, false))));
+                    if d.len() <= *timedout {
+                        *timedout -= d.len();
+                    } else {
+                        *timedout = 0;
+                        return Ok(());
+                    }
+                    if !d.is_dead() && d.len() <= self.subsume_literal_limit {
+                        self.try_subsume(asg, cdb, cid, *did)?;
+                    }
                 }
             }
-            // /
-            // /     for cs in &[
-            // /         &mut self[best].pos_occurs, // as *mut Vec<ClauseId>,
-            // /         &mut self[best].neg_occurs, //  as *mut Vec<ClauseId>,
-            // /     ] {
-            // /         for did in &*cs {
-            // /             if *did == cid {
-            // /                 continue;
-            // /             }
-            // /             let d = &cdb[*did];
-            // /             if d.len() <= *timedout {
-            // /                 *timedout -= d.len();
-            // /             } else {
-            // /                 *timedout = 0;
-            // /                 return Ok(());
-            // /             }
-            // /             if !d.is_dead() && d.len() <= self.subsume_literal_limit {
-            // /                 self.try_subsume(asg, cdb, cid, *did)?;
-            // /             }
-            // /         }
-            // /     }
-            // / }
+            self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
+            self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
         }
         Ok(())
     }

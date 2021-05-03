@@ -32,7 +32,6 @@ impl Eliminator {
                 }
                 assert!(!cdb[did].is_dead());
                 self.remove_cid_occur(asg, did, &mut cdb[did]);
-                cdb.watches(did, "sub31");
                 cdb.remove_clause(did);
                 self.num_subsumed += 1;
             }
@@ -40,11 +39,10 @@ impl Eliminator {
             Some(l) if cid.is_lifted_lit() => {
                 #[cfg(feature = "trace_elimination")]
                 println!("BackSubC subsumes {} from {} and {}", l, cid, did);
-                cdb.watches(did, "subsume39");
                 strengthen_clause(asg, cdb, self, did, !l)?;
                 self.enqueue_var(asg, l.vi(), true);
             }
-            _ => {}
+            _ => (),
         }
         Ok(())
     }

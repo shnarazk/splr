@@ -150,7 +150,7 @@ impl VarSelectIF for AssignStack {
     }
     fn select_decision_literal(&mut self) -> Lit {
         let vi = self.select_var();
-        Lit::from_assign(vi, self.var[vi].is(Flag::PHASE))
+        Lit::from((vi, self.var[vi].is(Flag::PHASE)))
     }
     fn update_order(&mut self, v: VarId) {
         self.update_heap(v);
