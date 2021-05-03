@@ -12,13 +12,6 @@ use {
     },
 };
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-enum VivifyResult {
-    Conflict(Vec<Lit>),
-    NoConflict,
-    Satisifed,
-}
-
 /// vivify clauses in `cdb` under `asg`
 #[cfg(not(feature = "clause_vivification"))]
 pub fn vivify(
@@ -54,11 +47,9 @@ pub fn vivify(
     if clauses.is_empty() {
         return Ok(());
     }
-    clauses.sort();
     let num_target = clauses.len();
     state[Stat::Vivification] += 1;
-    let dl = asg.decision_level();
-    debug_assert_eq!(dl, 0);
+    debug_assert_eq!(asg.decision_level(), asg.root_level);
     // This is a reusable vector to reduce memory consumption,
     // the key is the number of invocation
     let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
@@ -72,34 +63,18 @@ pub fn vivify(
 
     while let Some(cs) = clauses.pop() {
         let cid = cs.to();
-        if cdb[cid].is_dead() {
-            continue;
-        }
-        if cdb[cid].is_satisfied_under(asg) {
-            // cdb.remove_clause(cid);
-            continue;
-        }
-        if cdb[cid].to_vivify(0).is_none() {
-            continue;
-        }
-        assert!(cdb[cid].to_vivify(10).is_some());
         // assert_eq!(asg.root_level, asg.decision_level());
         let activity = cdb.activity(cid);
-        let is_learnt = cdb[cid].is(Flag::LEARNT);
         let c: &mut Clause = &mut cdb[cid];
-        debug_assert!(!c.is(Flag::ELIMINATED));
+        if c.is_dead() || c.is_satisfied_under(asg) || c.to_vivify(0).is_none() {
+            continue;
+        }
+        let is_learnt = c.is(Flag::LEARNT);
         c.vivified();
         let clits = c.iter().map(|l| *l).collect::<Vec<Lit>>();
         let mut decisions: Vec<Lit> = Vec::new();
         if to_display <= num_check {
             state.flush("");
-            if num_target < 2 * num_purge {
-                state.flush(format!(
-                    "clause vivifying was canceled due to too high purge rate {:>5.3}. ",
-                    num_purge as f64 / num_check as f64,
-                ));
-                return Ok(());
-            }
             state.flush(format!(
                 "clause vivifying(assert:{}, purge:{} shorten:{}, check:{}/{})...",
                 num_assert, num_purge, num_shrink, num_check, num_target,
@@ -110,7 +85,7 @@ pub fn vivify(
         seen[0] = num_check;
         debug_assert_eq!(asg.root_level, asg.decision_level());
         debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
-        let mut result = VivifyResult::NoConflict;
+        let mut learnt = None;
         'this_clause: for l in clits.iter().map(|ol| *ol) {
             debug_assert!(!asg.var(l.vi()).is(Flag::ELIMINATED));
             match asg.assigned(l) {
@@ -121,11 +96,7 @@ pub fn vivify(
                 //
                 //## Rule 2
                 //
-                Some(true) => {
-                    panic!("why");
-                    result = VivifyResult::Satisifed;
-                    break 'this_clause;
-                }
+                Some(true) => panic!("why here?"),
                 None => {
                     let cid: Option<ClauseId> = match decisions.len() {
                         0 => None,
@@ -141,40 +112,16 @@ pub fn vivify(
                     //## Rule 3
                     //
                     if let Some(cc) = asg.propagate_sandbox(cdb).to_option() {
-                        // / let mut ccl = cdb[cc].iter().map(|l| *l).collect::<Vec<_>>();
-                        // / ccl.sort();
-                        // / let mut sorted = clits.clone();
-                        // / sorted.sort();
-                        // / let ccl1 = ccl.iter().filter(|l| 0 < asg.level(l.vi())).collect::<Vec<_>>();
-                        // / let sorted1 = sorted.iter().filter(|l| 0 < asg.level(l.vi())).collect::<Vec<_>>();
-                        // / assert_eq!(ccl, sorted,
-                        // /            "{:?}({:?}) != {:?}({:?})",
-                        // /            ccl,
-                        // /            ccl1,
-                        // /            sorted,
-                        // /            sorted1,
-                        // / );
-                        // /
-                        // / assert!(!cdb[cc].is_empty());
-                        // / if cid.map_or(false, |ci| ci != cc) {
-                        // /     asg.backtrack_sandbox();
-                        // /     cid.map(|cj| cdb.remove_clause_sandbox(cj));
-                        // /     continue 'next_clause;
-                        // / }
-                        // There's a posibility for a satisfied clause to come here.
-                        // This maybe be the reason of broken UNSAT certificates.
                         debug_assert!(!cdb[cc].is_empty());
-                        debug_assert!(0 < decisions.len());
-                        let learnt = asg.analyze_sandbox(
+                        let vec = asg.analyze_sandbox(
                             cdb,
-                            &decisions, // decision literals
+                            &decisions,
                             &cdb[cc].iter().map(|l| *l).collect::<Vec<Lit>>(),
                             &mut seen,
                         );
                         asg.backtrack_sandbox();
                         cid.map(|cj| cdb.remove_clause_sandbox(cj));
-                        debug_assert!(!learnt.is_empty());
-                        result = VivifyResult::Conflict(learnt);
+                        learnt = Some(vec);
                         break 'this_clause;
                     }
                     //
@@ -185,14 +132,11 @@ pub fn vivify(
                 }
             }
         }
-        match result {
-            VivifyResult::Satisifed => {
-                cdb.remove_clause(cid);
-                num_purge += 1;
-            }
-            VivifyResult::NoConflict => {
+        let mut asserted = false;
+        match learnt {
+            None => {
                 let new_len = decisions.len();
-                debug_assert!(1 < new_len);
+                assert!(1 < new_len);
                 if new_len < clits.len() {
                     flip(&mut decisions);
                     if let Some(ci) = cdb.new_clause(asg, &mut decisions, is_learnt).is_new() {
@@ -202,14 +146,15 @@ pub fn vivify(
                     elim.to_simplify += 1.0 / new_len as f64;
                     num_shrink += 1;
                     cdb.remove_clause(cid);
+                } else {
+                    cdb[cid].vivified();
                 }
             }
-            VivifyResult::Conflict(mut learnt) => {
-                let new_len = learnt.len();
-                debug_assert!(0 < new_len);
+            Some(mut vec) => {
+                let new_len = vec.len();
                 if new_len == 1 {
                     assert_eq!(asg.root_level, asg.decision_level());
-                    let l0 = learnt[0];
+                    let l0 = vec[0];
                     match asg.assigned(l0) {
                         None => {
                             cdb.certificate_add_assertion(l0);
@@ -219,6 +164,7 @@ pub fn vivify(
                             }
                             num_assert += 1;
                             state[Stat::VivifiedVar] += 1;
+                            asserted = true;
                         }
                         Some(false) => panic!("vivify176"),
                         _ => (),
@@ -233,30 +179,31 @@ pub fn vivify(
                     if elim.simplify(asg, cdb, rst, state).is_err() {
                         panic!("eaeuae");
                     }
-                } else {
-                    let related = learnt.iter().all(|l| clits.contains(l));
+                } else if new_len < clits.len() {
                     assert!(
-                        learnt.iter().all(|l| clits.contains(l)),
+                        vec.iter().all(|l| clits.contains(l)),
                         "{:?} < {:?}",
                         clits,
-                        learnt,
+                        vec
                     );
-                    if let Some(ci) = cdb.new_clause(asg, &mut learnt, is_learnt).is_new() {
+                    if let Some(ci) = cdb.new_clause(asg, &mut vec, is_learnt).is_new() {
                         cdb.set_activity(ci, activity);
                         cdb[ci].turn_on(Flag::VIVIFIED);
                     }
                     elim.to_simplify += 1.0 / new_len as f64;
-                    assert!(related);
-                    if related {
-                        cdb.remove_clause(cid);
-                        num_shrink += 1;
-                    }
+                    cdb.remove_clause(cid);
+                    num_shrink += 1;
+                } else {
+                    cdb[cid].vivified();
                 }
-                clauses.retain(|cs| {
-                    !cdb[cs.to()].is_dead()
-                        && !cdb[cid].is_satisfied_under(asg)
-                        && cdb[cid].to_vivify(0).is_some()
-                });
+                // we must update our `clauses` cynchronously.
+                if asserted {
+                    clauses.retain(|cs| {
+                        !cdb[cs.to()].is_dead()
+                            && !cdb[cid].is_satisfied_under(asg)
+                            && cdb[cid].to_vivify(0).is_some()
+                    });
+                }
             }
         }
     }
@@ -325,7 +272,7 @@ impl AssignStack {
                 // 1. [decision1, decision2, !last_decision]
                 // 2. [!decision1, !decision2, !last_decision]
                 // Since `conflict::conflict_analyze` sweeps *reason caluses*,
-                // it collects positive literals in a list. while we collect decision
+                // it collects possitive literals in a list. while we collect decision
                 // literals in *trail* here. Thus we must negate the literals.
                 learnt.push(!*l);
             }

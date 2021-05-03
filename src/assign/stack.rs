@@ -111,9 +111,6 @@ impl Instantiate for AssignStack {
         match e {
             // called only by assertion on chronoBT
             // So execute everything of `assign_by_unitclause` but cancel_until(root_level)
-            SolverEvent::Assert(vi) => {
-                self.make_var_asserted(vi);
-            }
             SolverEvent::Conflict => (),
             SolverEvent::Eliminate(vi) => {
                 self.make_var_eliminated(vi);
@@ -156,7 +153,7 @@ impl Instantiate for AssignStack {
                     self.num_restart = self.vivify_sandbox.2;
                 }
             }
-            _ => (),
+            e => panic!("don't call asg with {:?}", e),
         }
     }
 }
