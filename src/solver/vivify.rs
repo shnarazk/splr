@@ -88,27 +88,32 @@ pub fn vivify(
                     decisions.push(!lit);
                     asg.assign_by_decision(!lit);
                     if let Some(cc) = asg.propagate_sandbox(cdb).to_option() {
-                        if cc != cid {
-                            break;
-                        }
                         let conflits = &cdb[cc].iter().map(|l| *l).collect::<Vec<Lit>>();
                         seen[0] = num_check;
                         let mut vec = asg.analyze_sandbox(cdb, &decisions, &conflits, &mut seen);
-                        let new_len = vec.len();
-                        assert_ne!(0, new_len);
                         asg.backtrack_sandbox();
-                        if new_len == 1 {
-                            assert_lit(asg, cdb, elim, rst, state, vec[0], cid)?;
-                            num_assert += 1;
-                            clauses = select(asg, cdb, ave_lbd, Some(num_target - num_check));
-                        } else {
-                            if let Some(ci) = cdb.new_clause(asg, &mut vec, is_learnt).is_new() {
-                                cdb.set_activity(ci, cp.value());
-                                cdb[ci].turn_on(Flag::VIVIFIED);
+                        match vec.len() {
+                            0 => {
+                                state.flush("");
+                                return Err(SolverError::ProcessorFoundUnsat);
                             }
-                            elim.to_simplify += 1.0 / new_len as f64;
-                            cdb.remove_clause(cid);
-                            num_shrink += 1;
+                            1 => {
+                                assert_lit(asg, cdb, elim, rst, state, vec[0])?;
+                                num_assert += 1;
+                                clauses = select(asg, cdb, ave_lbd, Some(num_target - num_check));
+                            }
+                            n => {
+                                if let Some(ci) = cdb.new_clause(asg, &mut vec, is_learnt).is_new()
+                                {
+                                    cdb.set_activity(ci, cp.value());
+                                    cdb[ci].turn_on(Flag::VIVIFIED);
+                                }
+                                elim.to_simplify += 1.0 / n as f64;
+                                if cc == cid {
+                                    cdb.remove_clause(cid);
+                                    num_shrink += 1;
+                                }
+                            }
                         }
                         continue 'next_clause;
                     }
@@ -116,17 +121,6 @@ pub fn vivify(
             }
         }
         asg.backtrack_sandbox();
-        // |TODO| let new_len = decisions.len();
-        // |TODO| if 1 < new_len && new_len < clits.len() {
-        // |TODO|     flip(&mut decisions);
-        // |TODO|     if let Some(ci) = cdb.new_clause(asg, &mut decisions, is_learnt).is_new() {
-        // |TODO|         cdb.set_activity(ci, activity);
-        // |TODO|         cdb[ci].turn_on(Flag::VIVIFIED);
-        // |TODO|     }
-        // |TODO|     elim.to_simplify += 1.0 / new_len as f64;
-        // |TODO|     num_shrink += 1;
-        // |TODO|     cdb.remove_clause(cid);
-        // |TODO| }
     }
     state.flush("");
     state.flush(format!(
@@ -152,11 +146,11 @@ fn assert_lit(
     rst: &mut Restarter,
     state: &mut State,
     l0: Lit,
-    cid: ClauseId,
 ) -> MaybeInconsistent {
     assert_eq!(asg.assigned(l0), None);
     cdb.certificate_add_assertion(l0);
     if asg.assign_at_root_level(l0).is_err() {
+        state.flush("");
         state.log(
             asg.num_conflict,
             format!("(vivify) root level conflict after asserting {}", l0,),
@@ -164,8 +158,8 @@ fn assert_lit(
         return Err(SolverError::ProcessorFoundUnsat);
     }
     state[Stat::VivifiedVar] += 1;
-    cdb.remove_clause(cid);
     if let Some(cc) = asg.propagate(cdb).to_option() {
+        state.flush("");
         state.log(
             asg.num_conflict,
             format!(
@@ -176,6 +170,7 @@ fn assert_lit(
         return Err(SolverError::ProcessorFoundUnsat);
     }
     if elim.simplify(asg, cdb, rst, state).is_err() {
+        state.flush("");
         state.log(
             asg.num_conflict,
             format!(
@@ -271,9 +266,7 @@ impl AssignStack {
         );
         // sweep in the reverse order
         for l in self.stack_iter().skip(self.len_upto(0)).rev() {
-            if seen[l.vi()] != key
-            /* || l == last_decision */
-            {
+            if seen[l.vi()] != key {
                 continue;
             }
             if decisions.contains(l) {
