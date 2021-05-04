@@ -533,6 +533,7 @@ pub enum SolverError {
     // StateUNSAT = 0,
     // StateSAT,
     IOError,
+    ProcessorFoundUnsat,
     Inconsistent,
     NullLearnt,
     OutOfMemory,

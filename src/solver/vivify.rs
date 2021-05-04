@@ -43,7 +43,7 @@ pub fn vivify(
             ema
         }
     };
-    let mut clauses: Vec<OrderedProxy<ClauseId>> = gather_clauses(cdb, average_lbd, None);
+    let mut clauses: Vec<OrderedProxy<ClauseId>> = gather_clauses(asg, cdb, average_lbd, None);
     if clauses.is_empty() {
         return Ok(());
     }
@@ -58,11 +58,9 @@ pub fn vivify(
     let mut num_shrink = 0;
     let mut num_assert = 0;
     let mut to_display = 0;
-    // let activity_thr = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
-
-    while let Some(cs) = clauses.pop() {
+    'next_clause: while let Some(cs) = clauses.pop() {
+        assert_eq!(asg.root_level, asg.decision_level());
         let cid = cs.to();
-        // assert_eq!(asg.root_level, asg.decision_level());
         let activity = cdb.activity(cid);
         let c: &mut Clause = &mut cdb[cid];
         if c.is_dead() || c.is_satisfied_under(asg) {
@@ -81,127 +79,105 @@ pub fn vivify(
             to_display = num_check + display_step;
         }
         num_check += 1;
-        seen[0] = num_check;
-        debug_assert_eq!(asg.root_level, asg.decision_level());
         debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
-        let mut learnt = None;
-        'this_clause: for l in clits.iter().map(|ol| *ol) {
-            debug_assert!(!asg.var(l.vi()).is(Flag::ELIMINATED));
-            match asg.assigned(l) {
-                //
+        for (i, lit) in clits.clone().iter().map(|p| *p).enumerate() {
+            match asg.assigned(!lit) {
                 //## Rule 1
-                //
-                Some(false) => continue 'this_clause,
-                //
+                Some(false) => (),
                 //## Rule 2
-                //
-                Some(true) => panic!("why here?"),
-                None => {
-                    let cid: Option<ClauseId> = match decisions.len() {
-                        0 => None,
-                        1 => {
-                            asg.assign_by_decision(decisions[0]);
-                            None
-                        }
-                        _ => cdb.new_clause_sandbox(asg, &mut decisions.clone()).is_new(),
-                    };
-                    decisions.push(!l);
-                    asg.assign_by_decision(!l);
-                    //
-                    //## Rule 3
-                    //
-                    if let Some(cc) = asg.propagate_sandbox(cdb).to_option() {
-                        debug_assert!(!cdb[cc].is_empty());
-                        let vec = asg.analyze_sandbox(
-                            cdb,
-                            &decisions,
-                            &cdb[cc].iter().map(|l| *l).collect::<Vec<Lit>>(),
-                            &mut seen,
-                        );
-                        asg.backtrack_sandbox();
-                        cid.map(|cj| cdb.remove_clause_sandbox(cj));
-                        learnt = Some(vec);
-                        break 'this_clause;
-                    }
-                    //
-                    //## Rule 4
-                    //
+                Some(true) => {
                     asg.backtrack_sandbox();
-                    cid.map(|cj| cdb.remove_clause_sandbox(cj));
+                    continue 'next_clause;
                 }
-            }
-        }
-        let mut asserted = false;
-        match learnt {
-            None => {
-                let new_len = decisions.len();
-                assert!(1 < new_len);
-                if new_len < clits.len() {
-                    flip(&mut decisions);
-                    if let Some(ci) = cdb.new_clause(asg, &mut decisions, is_learnt).is_new() {
-                        cdb.set_activity(ci, activity);
-                        cdb[ci].turn_on(Flag::VIVIFIED);
-                    }
-                    elim.to_simplify += 1.0 / new_len as f64;
-                    num_shrink += 1;
-                    cdb.remove_clause(cid);
-                } else {
-                    cdb[cid].vivified();
-                }
-            }
-            Some(mut vec) => {
-                let new_len = vec.len();
-                if new_len == 1 {
-                    assert_eq!(asg.root_level, asg.decision_level());
-                    let l0 = vec[0];
-                    match asg.assigned(l0) {
-                        None => {
+                //## Rule 3 and 4
+                None => {
+                    decisions.push(!lit);
+                    asg.assign_by_decision(!lit);
+                    if let Some(cc) = asg.propagate_sandbox(cdb).to_option() {
+                        if cc != cid || i + 1 == clits.len() {
+                            asg.backtrack_sandbox();
+                            continue 'next_clause;
+                        }
+                        let conflits = &cdb[cc].iter().map(|l| *l).collect::<Vec<Lit>>();
+                        seen[0] = num_check;
+                        let mut vec = asg.analyze_sandbox(cdb, &decisions, &conflits, &mut seen);
+                        asg.backtrack_sandbox();
+                        let new_len = vec.len();
+                        if new_len == 1 {
+                            let l0 = vec[0];
+                            assert_eq!(asg.assigned(l0), None);
                             cdb.certificate_add_assertion(l0);
                             if asg.assign_at_root_level(l0).is_err() {
-                                panic!("vviy181");
-                                // return Err(SolverError::Inconsistent);
+                                state.log(
+                                    asg.num_conflict,
+                                    format!(
+                                        "(vivify) root level conflict by {} after asserting {}",
+                                        cc, l0,
+                                    ),
+                                );
+                                return Err(SolverError::ProcessorFoundUnsat);
                             }
                             num_assert += 1;
                             state[Stat::VivifiedVar] += 1;
-                            asserted = true;
+                            cdb.remove_clause(cid);
+                            if let Some(cc) = asg.propagate(cdb).to_option() {
+                                state.log(
+                                    asg.num_conflict,
+                                    format!("(vivify) root level inconsistency by {} after asserting {}",
+                                            cc,
+                                            l0,
+                                    ),
+                                );
+                                return Err(SolverError::ProcessorFoundUnsat);
+                            }
+                            if elim.simplify(asg, cdb, rst, state).is_err() {
+                                state.log(
+                                    asg.num_conflict,
+                                    format!("(vivify) root level inconsistent simplification after asserting {}",
+                                            l0,
+                                    ),
+                                );
+                                return Err(SolverError::Inconsistent);
+                            }
+                            // we must update our `clauses` cynchronously.
+                            clauses =
+                                gather_clauses(asg, cdb, average_lbd, Some(num_target - num_check));
+                        } else {
+                            if let Some(ci) = cdb.new_clause(asg, &mut vec, is_learnt).is_new() {
+                                cdb.set_activity(ci, activity);
+                                cdb[ci].turn_on(Flag::VIVIFIED);
+                            }
+                            elim.to_simplify += 1.0 / new_len as f64;
+                            cdb.remove_clause(cid);
+                            num_shrink += 1;
                         }
-                        Some(false) => panic!("vivify176"),
-                        _ => (),
+                        continue 'next_clause;
                     }
-                    debug_assert!(clits.contains(&l0));
-                    cdb.remove_clause(cid);
-                } else if new_len < clits.len() {
-                    assert!(
-                        vec.iter().all(|l| clits.contains(l)),
-                        "{:?} < {:?}",
-                        clits,
-                        vec
-                    );
-                    if let Some(ci) = cdb.new_clause(asg, &mut vec, is_learnt).is_new() {
-                        cdb.set_activity(ci, activity);
-                        cdb[ci].turn_on(Flag::VIVIFIED);
-                    }
-                    elim.to_simplify += 1.0 / new_len as f64;
-                    cdb.remove_clause(cid);
-                    num_shrink += 1;
-                } else {
-                    cdb[cid].vivified();
-                }
-                // we must update our `clauses` cynchronously.
-                if asserted {
-                    clauses.retain(|cs| {
-                        !cdb[cs.to()].is_dead()
-                            && !cdb[cid].is_satisfied_under(asg)
-                            && cdb[cid].to_vivify(0).is_some()
-                    });
                 }
             }
         }
+        asg.backtrack_sandbox();
+        // |TODO| let new_len = decisions.len();
+        // |TODO| if 1 < new_len && new_len < clits.len() {
+        // |TODO|     flip(&mut decisions);
+        // |TODO|     if let Some(ci) = cdb.new_clause(asg, &mut decisions, is_learnt).is_new() {
+        // |TODO|         cdb.set_activity(ci, activity);
+        // |TODO|         cdb[ci].turn_on(Flag::VIVIFIED);
+        // |TODO|     }
+        // |TODO|     elim.to_simplify += 1.0 / new_len as f64;
+        // |TODO|     num_shrink += 1;
+        // |TODO|     cdb.remove_clause(cid);
+        // |TODO| }
     }
+    state.flush("");
+    state.flush(format!(
+        "vivified(assert:{} shorten:{}), ",
+        num_assert, num_shrink
+    ));
     state.log(
         state[Stat::Vivification],
         format!(
-            "vivify, pick:{:>8}, assert:{:>6}, shrink:{:>6}",
+            "vivify, pick:{:>8}, assert:{:>6}, shorten:{:>6}",
             num_check, num_assert, num_shrink,
         ),
     );
@@ -211,25 +187,35 @@ pub fn vivify(
 }
 
 fn gather_clauses(
+    asg: &mut AssignStack,
     cdb: &mut ClauseDB,
     average_lbd: f64,
     max_len: Option<usize>,
 ) -> Vec<OrderedProxy<ClauseId>> {
+    let mut seen = vec![false; 2 * (asg.num_vars + 1)];
     let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
-    if 0.0 <= average_lbd {
+    if 0.0 < average_lbd {
         let thr = (average_lbd + cdb.derefer(cdb::property::Tf64::DpAverageLBD)) as usize;
         for (i, c) in cdb.iter().enumerate().skip(1) {
             if let Some(act) = c.to_vivify(thr) {
-                clauses.push(OrderedProxy::new(ClauseId::from(i), -act));
-                if max_len.map_or(false, |thr| thr <= clauses.len()) {
-                    break;
+                if true || c.iter().all(|l| !seen[*l]) {
+                    for l in c.iter() {
+                        seen[*l] = true;
+                    }
+                    clauses.push(OrderedProxy::new(ClauseId::from(i), -act));
+                    if max_len.map_or(false, |thr| thr <= clauses.len()) {
+                        break;
+                    }
                 }
             }
         }
     } else {
         let ml = max_len.map_or(100_000, |thr| thr);
         for (i, c) in cdb.iter().enumerate().skip(1) {
-            if c.len() <= 4 {
+            if true || c.iter().all(|l| !seen[*l]) {
+                for l in c.iter() {
+                    seen[*l] = true;
+                }
                 clauses.push(OrderedProxy::new(ClauseId::from(i), -1.0 * c.len() as f64));
                 if ml <= clauses.len() {
                     break;
@@ -310,6 +296,10 @@ impl AssignStack {
                 _ => (),
             }
         }
+        // cnfs/unsat.cnf can panic at
+        // 'empty learnt, conflict: [-17L, -5L, 25L, -29L, 50L, 51L, -61L, 63L], assumed: [82L]',
+        // src/solver/vivify.rs:312:9
+
         // make sure the decision var is at the top of list
         // if res.is_empty() {
         //     return
