@@ -77,16 +77,16 @@ pub fn vivify(
         debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
         let mut decisions: Vec<Lit> = Vec::new();
         for lit in clits.iter().take(clits.len() - 1).map(|p| *p) {
-            assert!(!asg.var(lit.vi()).is(Flag::ELIMINATED));
+            // assert!(!asg.var(lit.vi()).is(Flag::ELIMINATED));
             match asg.assigned(!lit) {
                 //## Rule 1
                 Some(false) => (),
                 //## Rule 2
                 Some(true) => break,
-                //## Rule 3 and 4
                 None => {
                     decisions.push(!lit);
                     asg.assign_by_decision(!lit);
+                    //## Rule 3
                     if let Some(cc) = asg.propagate_sandbox(cdb).to_option() {
                         let conflits = &cdb[cc].iter().map(|l| *l).collect::<Vec<Lit>>();
                         seen[0] = num_check;
@@ -95,6 +95,8 @@ pub fn vivify(
                         match vec.len() {
                             0 => {
                                 state.flush("");
+                                state[Stat::VivifiedClause] += num_shrink;
+                                state[Stat::VivifiedVar] += num_assert;
                                 return Err(SolverError::ProcessorFoundUnsat);
                             }
                             1 => {
@@ -117,6 +119,7 @@ pub fn vivify(
                         }
                         continue 'next_clause;
                     }
+                    //## Rule 4
                 }
             }
         }
