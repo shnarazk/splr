@@ -30,12 +30,8 @@ pub fn vivify(
     rst: &mut Restarter,
     state: &mut State,
 ) -> MaybeInconsistent {
-    assert_eq!(asg.root_level, asg.decision_level());
-    if elim.simplify(asg, cdb, rst, state).is_err() {
-        panic!("eaeuae");
-    }
-
-    let average_lbd = {
+    elim.simplify(asg, cdb, rst, state)?;
+    let ave_lbd = {
         let ema = rst.refer(restart::property::TEma2::LBD).get();
         if ema.is_nan() {
             -1.0
@@ -43,13 +39,12 @@ pub fn vivify(
             ema
         }
     };
-    let mut clauses: Vec<OrderedProxy<ClauseId>> = gather_clauses(asg, cdb, average_lbd, None);
+    let mut clauses: Vec<OrderedProxy<ClauseId>> = select(asg, cdb, ave_lbd, None);
     if clauses.is_empty() {
         return Ok(());
     }
     let num_target = clauses.len();
     state[Stat::Vivification] += 1;
-    debug_assert_eq!(asg.decision_level(), asg.root_level);
     // This is a reusable vector to reduce memory consumption,
     // the key is the number of invocation
     let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
@@ -58,18 +53,18 @@ pub fn vivify(
     let mut num_shrink = 0;
     let mut num_assert = 0;
     let mut to_display = 0;
-    'next_clause: while let Some(cs) = clauses.pop() {
-        assert_eq!(asg.root_level, asg.decision_level());
-        let cid = cs.to();
-        let activity = cdb.activity(cid);
-        let c: &mut Clause = &mut cdb[cid];
+    'next_clause: while let Some(cp) = clauses.pop() {
+        let cid = cp.to();
+        debug_assert_eq!(asg.root_level, asg.decision_level());
+        let c = &mut cdb[cid];
+        assert!(!c.is_dead());
+        assert!(!c.is_satisfied_under(asg));
         if c.is_dead() || c.is_satisfied_under(asg) {
             continue;
         }
         let is_learnt = c.is(Flag::LEARNT);
         c.vivified();
         let clits = c.iter().map(|l| *l).collect::<Vec<Lit>>();
-        let mut decisions: Vec<Lit> = Vec::new();
         if to_display <= num_check {
             state.flush("");
             state.flush(format!(
@@ -80,71 +75,35 @@ pub fn vivify(
         }
         num_check += 1;
         debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
-        for (i, lit) in clits.clone().iter().map(|p| *p).enumerate() {
+        let mut decisions: Vec<Lit> = Vec::new();
+        for lit in clits.iter().take(clits.len() - 1).map(|p| *p) {
+            assert!(!asg.var(lit.vi()).is(Flag::ELIMINATED));
             match asg.assigned(!lit) {
                 //## Rule 1
                 Some(false) => (),
                 //## Rule 2
-                Some(true) => {
-                    asg.backtrack_sandbox();
-                    continue 'next_clause;
-                }
+                Some(true) => break,
                 //## Rule 3 and 4
                 None => {
                     decisions.push(!lit);
                     asg.assign_by_decision(!lit);
                     if let Some(cc) = asg.propagate_sandbox(cdb).to_option() {
-                        if cc != cid || i + 1 == clits.len() {
-                            asg.backtrack_sandbox();
-                            continue 'next_clause;
+                        if cc != cid {
+                            break;
                         }
                         let conflits = &cdb[cc].iter().map(|l| *l).collect::<Vec<Lit>>();
                         seen[0] = num_check;
                         let mut vec = asg.analyze_sandbox(cdb, &decisions, &conflits, &mut seen);
-                        asg.backtrack_sandbox();
                         let new_len = vec.len();
+                        assert_ne!(0, new_len);
+                        asg.backtrack_sandbox();
                         if new_len == 1 {
-                            let l0 = vec[0];
-                            assert_eq!(asg.assigned(l0), None);
-                            cdb.certificate_add_assertion(l0);
-                            if asg.assign_at_root_level(l0).is_err() {
-                                state.log(
-                                    asg.num_conflict,
-                                    format!(
-                                        "(vivify) root level conflict by {} after asserting {}",
-                                        cc, l0,
-                                    ),
-                                );
-                                return Err(SolverError::ProcessorFoundUnsat);
-                            }
+                            assert_lit(asg, cdb, elim, rst, state, vec[0], cid)?;
                             num_assert += 1;
-                            state[Stat::VivifiedVar] += 1;
-                            cdb.remove_clause(cid);
-                            if let Some(cc) = asg.propagate(cdb).to_option() {
-                                state.log(
-                                    asg.num_conflict,
-                                    format!("(vivify) root level inconsistency by {} after asserting {}",
-                                            cc,
-                                            l0,
-                                    ),
-                                );
-                                return Err(SolverError::ProcessorFoundUnsat);
-                            }
-                            if elim.simplify(asg, cdb, rst, state).is_err() {
-                                state.log(
-                                    asg.num_conflict,
-                                    format!("(vivify) root level inconsistent simplification after asserting {}",
-                                            l0,
-                                    ),
-                                );
-                                return Err(SolverError::Inconsistent);
-                            }
-                            // we must update our `clauses` cynchronously.
-                            clauses =
-                                gather_clauses(asg, cdb, average_lbd, Some(num_target - num_check));
+                            clauses = select(asg, cdb, ave_lbd, Some(num_target - num_check));
                         } else {
                             if let Some(ci) = cdb.new_clause(asg, &mut vec, is_learnt).is_new() {
-                                cdb.set_activity(ci, activity);
+                                cdb.set_activity(ci, cp.value());
                                 cdb[ci].turn_on(Flag::VIVIFIED);
                             }
                             elim.to_simplify += 1.0 / new_len as f64;
@@ -186,33 +145,76 @@ pub fn vivify(
     Ok(())
 }
 
-fn gather_clauses(
+fn assert_lit(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
-    average_lbd: f64,
-    max_len: Option<usize>,
+    elim: &mut Eliminator,
+    rst: &mut Restarter,
+    state: &mut State,
+    l0: Lit,
+    cid: ClauseId,
+) -> MaybeInconsistent {
+    assert_eq!(asg.assigned(l0), None);
+    cdb.certificate_add_assertion(l0);
+    if asg.assign_at_root_level(l0).is_err() {
+        state.log(
+            asg.num_conflict,
+            format!("(vivify) root level conflict after asserting {}", l0,),
+        );
+        return Err(SolverError::ProcessorFoundUnsat);
+    }
+    state[Stat::VivifiedVar] += 1;
+    cdb.remove_clause(cid);
+    if let Some(cc) = asg.propagate(cdb).to_option() {
+        state.log(
+            asg.num_conflict,
+            format!(
+                "(vivify) root level inconsistency by {} after asserting {}",
+                cc, l0,
+            ),
+        );
+        return Err(SolverError::ProcessorFoundUnsat);
+    }
+    if elim.simplify(asg, cdb, rst, state).is_err() {
+        state.log(
+            asg.num_conflict,
+            format!(
+                "(vivify) root level inconsistent simplification after asserting {}",
+                l0,
+            ),
+        );
+        return Err(SolverError::Inconsistent);
+    }
+    Ok(())
+}
+
+fn select(
+    asg: &mut AssignStack,
+    cdb: &mut ClauseDB,
+    thr: f64,
+    len: Option<usize>,
 ) -> Vec<OrderedProxy<ClauseId>> {
     let mut seen = vec![false; 2 * (asg.num_vars + 1)];
     let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
-    if 0.0 < average_lbd {
-        let thr = (average_lbd + cdb.derefer(cdb::property::Tf64::DpAverageLBD)) as usize;
+    if 0.0 < thr {
+        let thr = (thr + cdb.derefer(cdb::property::Tf64::DpAverageLBD)) as usize;
         for (i, c) in cdb.iter().enumerate().skip(1) {
             if let Some(act) = c.to_vivify(thr) {
-                if true || c.iter().all(|l| !seen[*l]) {
+                if !c.is_dead() && c.iter().all(|l| !seen[*l]) {
                     for l in c.iter() {
                         seen[*l] = true;
                     }
                     clauses.push(OrderedProxy::new(ClauseId::from(i), -act));
-                    if max_len.map_or(false, |thr| thr <= clauses.len()) {
+                    if len.map_or(false, |thr| thr <= clauses.len()) {
                         break;
                     }
                 }
             }
         }
     } else {
-        let ml = max_len.map_or(100_000, |thr| thr);
+        let ml = len.map_or(100_000, |thr| thr);
         for (i, c) in cdb.iter().enumerate().skip(1) {
-            if true || c.iter().all(|l| !seen[*l]) {
+            if !c.is_dead() && c.iter().all(|l| !seen[*l]) {
                 for l in c.iter() {
                     seen[*l] = true;
                 }

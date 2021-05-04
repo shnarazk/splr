@@ -863,6 +863,9 @@ impl<T: Clone + Default + Sized + Ord> OrderedProxy<T> {
     pub fn to(&self) -> T {
         self.body.clone()
     }
+    pub fn value(&self) -> f64 {
+        self.index
+    }
 }
 
 #[cfg(test)]
