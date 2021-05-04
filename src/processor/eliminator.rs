@@ -457,7 +457,7 @@ impl Eliminator {
                 self.clear_var_queue(asg);
                 return Ok(());
             }
-            let best = if cid.is_lifted_lit() {
+            let best: VarId = if cid.is_lifted_lit() {
                 let vi = Lit::from(cid).vi();
                 debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
                 vi
@@ -500,7 +500,6 @@ impl Eliminator {
                         continue;
                     }
                     let d = &cdb[*did];
-                    assert!(d.contains(Lit::from((best, false))));
                     if d.len() <= *timedout {
                         *timedout -= d.len();
                     } else {
@@ -508,6 +507,10 @@ impl Eliminator {
                         return Ok(());
                     }
                     if !d.is_dead() && d.len() <= self.subsume_literal_limit {
+                        assert!(
+                            d.contains(Lit::from((best, false)))
+                                || d.contains(Lit::from((best, true)))
+                        );
                         self.try_subsume(asg, cdb, cid, *did)?;
                     }
                 }
