@@ -90,12 +90,10 @@ impl VarSelectIF for AssignStack {
         } else {
             self.phase_age += 1;
             match self.phase_age {
-                0 | 3 => RephasingTarget::BestPhases,
-                1 => RephasingTarget::Shift(0.5),
-                2 => RephasingTarget::Shift(0.75),
-                x if x % 3 == 1 => RephasingTarget::Clear,
-                // x if x % 3 == 2 => RephasingTarget::BestPhase,
-                _ => RephasingTarget::Shift(0.25),
+                1 => RephasingTarget::Shift(0.1),
+                2 => RephasingTarget::Shift(0.2),
+                x if x % 2 == 1 => RephasingTarget::Shift(0.4),
+                _ => RephasingTarget::Clear,
             }
         };
         // The iteration order by an iterator on HashMap may change in each execution.
