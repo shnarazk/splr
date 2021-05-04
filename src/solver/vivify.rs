@@ -299,13 +299,26 @@ impl AssignStack {
             }
         }
         // cnfs/unsat.cnf can panic at
-        // 'empty learnt, conflict: [-17L, -5L, 25L, -29L, 50L, 51L, -61L, 63L], assumed: [82L]',
-        // src/solver/vivify.rs:312:9
-
+        //
+        // clause vivifying(assert:0 shorten:0, check:0/12)...thread 'main' panicked at '
+        // [-17L, -5L, 25L, -29L, 50L, 51L, -61L, 63L]
+        // [Some(false), Some(false), Some(false), Some(false), Some(false), Some(false), Some(false), Some(false)]
+        // [0, 0, 0, 0, 0, 0, 0, 0]',
+        // src/solver/vivify.rs:297:13
+        //
+        // This conflicting clause which consists of implicated literals is found
+        // befere the target clause made a conflict.
+        // So we must skip this conflict.
+        if learnt.is_empty() {
+            assert_eq!(self.num_conflict, 0);
+            // panic!("\n{:?}\n{:?}\n{:?}",
+            //        conflicting,
+            //        conflicting.iter().map(|l| self.assigned(*l)).collect::<Vec<_>>(),
+            //        conflicting.iter().map(|l| self.level(l.vi())).collect::<Vec<_>>(),
+            // );
+            return learnt;
+        }
         // make sure the decision var is at the top of list
-        // if res.is_empty() {
-        //     return
-        // }
         debug_assert!(
             !learnt.is_empty(),
             "empty learnt, conflict: {:?}, assumed: {:?}",

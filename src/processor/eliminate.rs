@@ -378,7 +378,7 @@ mod tests {
         assert!(cdb
             .iter()
             .skip(1)
-            .all(|c| c.iter().all(|l| *l != Lit::from_assign(vi, false))
-                && c.iter().all(|l| *l != Lit::from_assign(vi, false))));
+            .all(|c| c.iter().all(|l| *l != Lit::from((vi, false)))
+                && c.iter().all(|l| *l != Lit::from((vi, false)))));
     }
 }

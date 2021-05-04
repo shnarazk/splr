@@ -29,7 +29,7 @@ pub trait PropertyDereference<I, O: Sized> {
     fn derefer(&self, key: I) -> O;
 }
 
-/// API for Literal like `from_int`, `from_assign`, `to_cid` and so on.
+/// API for Literal like `vi`, `as_bool`, `is_none` and so on.
 pub trait LitIF {
     /// convert to bool
     fn as_bool(&self) -> bool;
@@ -340,12 +340,12 @@ impl IndexMut<Lit> for Vec<bool> {
 ///
 /// ```
 /// use splr::types::*;
-/// assert_eq!(Lit::from(1i32), Lit::from_assign(1 as VarId, true));
-/// assert_eq!(Lit::from(2i32), Lit::from_assign(2 as VarId, true));
-/// assert_eq!(1, Lit::from_assign(1, true).vi());
-/// assert_eq!(1, Lit::from_assign(1, false).vi());
-/// assert_eq!(2, Lit::from_assign(2, true).vi());
-/// assert_eq!(2, Lit::from_assign(2, false).vi());
+/// assert_eq!(Lit::from(1i32), Lit::from((1 as VarId, true)));
+/// assert_eq!(Lit::from(2i32), Lit::from((2 as VarId, true)));
+/// assert_eq!(1, Lit::from((1usize, true)).vi());
+/// assert_eq!(1, Lit::from((1usize, false)).vi());
+/// assert_eq!(2, Lit::from((2usize, true)).vi());
+/// assert_eq!(2, Lit::from((2usize, false)).vi());
 /// assert_eq!(Lit::from( 1i32), !Lit::from(-1i32));
 /// assert_eq!(Lit::from(-1i32), !Lit::from( 1i32));
 /// assert_eq!(Lit::from( 2i32), !Lit::from(-2i32));
