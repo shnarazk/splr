@@ -160,7 +160,6 @@ fn assert_lit(
         );
         return Err(SolverError::ProcessorFoundUnsat);
     }
-    state[Stat::VivifiedVar] += 1;
     if let Some(cc) = asg.propagate(cdb).to_option() {
         state.flush("");
         state.log(
