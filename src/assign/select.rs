@@ -90,11 +90,9 @@ impl VarSelectIF for AssignStack {
         } else {
             self.phase_age += 1;
             match self.phase_age {
-                0 | 2 | 4 => RephasingTarget::BestPhases,
+                0 | 3 => RephasingTarget::BestPhases,
                 1 => RephasingTarget::Shift(0.5),
-                3 => RephasingTarget::Shift(0.75),
-                // x if x % 4 == 1 => RephasingTarget::Clear,
-                // x if x % 4 == 3 => RephasingTarget::BestPhase,
+                2 => RephasingTarget::Shift(0.75),
                 x if x % 3 == 1 => RephasingTarget::Clear,
                 // x if x % 3 == 2 => RephasingTarget::BestPhase,
                 _ => RephasingTarget::Shift(0.25),
