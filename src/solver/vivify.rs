@@ -150,7 +150,7 @@ fn assert_lit(
     state: &mut State,
     l0: Lit,
 ) -> MaybeInconsistent {
-    assert_eq!(asg.assigned(l0), None);
+    // assert_eq!(asg.assigned(l0), None);
     cdb.certificate_add_assertion(l0);
     if asg.assign_at_root_level(l0).is_err() {
         state.flush("");
@@ -191,16 +191,12 @@ fn select(
     thr: f64,
     len: Option<usize>,
 ) -> Vec<OrderedProxy<ClauseId>> {
-    let mut seen = vec![false; 2 * (asg.num_vars + 1)];
     let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
     if 0.0 < thr {
         let thr = (thr + cdb.derefer(cdb::property::Tf64::DpAverageLBD)) as usize;
         for (i, c) in cdb.iter().enumerate().skip(1) {
             if let Some(act) = c.to_vivify(thr) {
-                if !c.is_dead() && c.iter().all(|l| !seen[*l]) {
-                    for l in c.iter() {
-                        seen[*l] = true;
-                    }
+                if !c.is_dead() {
                     clauses.push(OrderedProxy::new(ClauseId::from(i), -act));
                     if len.map_or(false, |thr| thr <= clauses.len()) {
                         break;
@@ -209,6 +205,7 @@ fn select(
             }
         }
     } else {
+        let mut seen = vec![false; 2 * (asg.num_vars + 1)];
         let ml = len.map_or(100_000, |thr| thr);
         for (i, c) in cdb.iter().enumerate().skip(1) {
             if !c.is_dead() && c.iter().all(|l| !seen[*l]) {
