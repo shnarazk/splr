@@ -39,7 +39,7 @@ pub fn vivify(
             ema
         }
     };
-    let mut clauses: Vec<OrderedProxy<ClauseId>> = select(asg, cdb, ave_lbd, None);
+    let mut clauses: Vec<OrderedProxy<ClauseId>> = select(asg, cdb, ave_lbd, Some(100_000));
     if clauses.is_empty() {
         return Ok(());
     }
@@ -193,33 +193,38 @@ fn select(
 ) -> Vec<OrderedProxy<ClauseId>> {
     let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
     if 0.0 < thr {
-        let thr = (thr + cdb.derefer(cdb::property::Tf64::DpAverageLBD)) as usize;
+        let threshold = (thr + cdb.derefer(cdb::property::Tf64::DpAverageLBD)) as usize;
+        let mut seen = vec![false; 2 * (asg.num_vars + 1)];
         for (i, c) in cdb.iter().enumerate().skip(1) {
-            if let Some(act) = c.to_vivify(thr) {
-                if !c.is_dead() {
-                    clauses.push(OrderedProxy::new(ClauseId::from(i), -act));
-                    if len.map_or(false, |thr| thr <= clauses.len()) {
-                        break;
-                    }
-                }
+            if c.is_dead() {
+                continue;
+            }
+            if let Some(act) = c.to_vivify(threshold) {
+                clauses.push(OrderedProxy::new(ClauseId::from(i), act));
+            } else if !seen[c.lit0()] {
+                seen[c.lit0()] = true;
+                clauses.push(OrderedProxy::new(ClauseId::from(i), 0.0));
+            }
+            if len.map_or(false, |thr| thr <= clauses.len()) {
+                break;
             }
         }
     } else {
         let mut seen = vec![false; 2 * (asg.num_vars + 1)];
         let ml = len.map_or(100_000, |thr| thr);
         for (i, c) in cdb.iter().enumerate().skip(1) {
-            if !c.is_dead() && c.iter().all(|l| !seen[*l]) {
-                for l in c.iter() {
-                    seen[*l] = true;
-                }
-                clauses.push(OrderedProxy::new(ClauseId::from(i), -1.0 * c.len() as f64));
+            if c.is_dead() {
+                continue;
+            } else if !seen[c.lit0()] {
+                seen[c.lit0()] = true;
+                clauses.push(OrderedProxy::new(ClauseId::from(i), c.len() as f64));
                 if ml <= clauses.len() {
                     break;
                 }
             }
         }
     }
-    clauses.sort();
+    // clauses.sort();
     clauses
 }
 
