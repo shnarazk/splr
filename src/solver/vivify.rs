@@ -152,35 +152,29 @@ fn assert_lit(
 ) -> MaybeInconsistent {
     // assert_eq!(asg.assigned(l0), None);
     cdb.certificate_add_assertion(l0);
-    if asg.assign_at_root_level(l0).is_err() {
-        state.flush("");
-        state.log(
-            asg.num_conflict,
-            format!("(vivify) root level conflict after asserting {}", l0,),
-        );
-        return Err(SolverError::ProcessorFoundUnsat);
-    }
-    if let Some(cc) = asg.propagate(cdb).to_option() {
+    let mut tag: &str = "assign";
+    if let Err(e) = asg
+        .assign_at_root_level(l0)
+        .and_then(|_| {
+            tag = "propagation";
+            asg.propagate(cdb)
+                .to_option()
+                .ok_or(SolverError::ProcessorFoundUnsat)
+        })
+        .and_then(|_| {
+            tag = "simplification";
+            elim.simplify(asg, cdb, rst, state)
+        })
+    {
         state.flush("");
         state.log(
             asg.num_conflict,
             format!(
                 "(vivify) root level inconsistency by {} after asserting {}",
-                cc, l0,
+                tag, l0,
             ),
         );
-        return Err(SolverError::ProcessorFoundUnsat);
-    }
-    if elim.simplify(asg, cdb, rst, state).is_err() {
-        state.flush("");
-        state.log(
-            asg.num_conflict,
-            format!(
-                "(vivify) root level inconsistent simplification after asserting {}",
-                l0,
-            ),
-        );
-        return Err(SolverError::Inconsistent);
+        return Err(e);
     }
     Ok(())
 }
