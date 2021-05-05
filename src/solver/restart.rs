@@ -512,7 +512,7 @@ impl RestartIF for Restarter {
     }
     #[cfg(feature = "Luby_stabilization")]
     fn stabilize(&mut self) -> Option<bool> {
-        self.stb.update(self.num_restart + self.num_block)
+        self.stb.update(self.num_restart) // don't count num_block
     }
     #[cfg(not(feature = "Luby_stabilization"))]
     fn stabilize(&mut self) -> Option<bool> {
