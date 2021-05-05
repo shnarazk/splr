@@ -273,9 +273,10 @@ impl AssignStack {
                 // Quiz: which is the correct learnt clause here?
                 // 1. [decision1, decision2, !last_decision]
                 // 2. [!decision1, !decision2, !last_decision]
-                // Since `conflict::conflict_analyze` sweeps *reason caluses*,
-                // it collects possitive literals in a list. while we collect decision
-                // literals in *trail* here. Thus we must negate the literals.
+                // Since `conflict::conflict_analyze` sweeps *reason clauses*,
+                // it collects positive literals out of the clauses in the dependency graph,
+                // while we collect decision literals in *trail* here.
+                // Thus we must negate the literals.
                 learnt.push(!*l);
             }
             match self.reason(l.vi()) {
@@ -299,7 +300,7 @@ impl AssignStack {
         // src/solver/vivify.rs:297:13
         //
         // This conflicting clause which consists of implicated literals is found
-        // befere the target clause made a conflict.
+        // before finding a conflict by the target clause.
         // So we must skip this conflict.
         if learnt.is_empty() {
             assert_eq!(self.num_conflict, 0);
