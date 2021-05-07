@@ -135,7 +135,7 @@ impl VarSelectIF for AssignStack {
         }
         if let RephasingTarget::Shift(_) = target {
             self.bp_divergence_ema
-                .update(num_flip as f64 / self.best_phases.iter().count() as f64);
+                .update(num_flip as f64 / self.best_phases.len() as f64);
         }
         if invalidated {
             self.best_phases.clear();

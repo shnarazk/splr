@@ -1,6 +1,6 @@
 /// Var struct and Database management API
 use {
-    super::{AssignStack, Var, VarHeapIF},
+    super::{AssignIF, AssignStack, Var, VarHeapIF},
     crate::types::*,
     std::{
         fmt,
@@ -172,6 +172,8 @@ impl AssignStack {
             self.var[vi].timestamp = self.ordinal;
             self.set_activity(vi, 0.0);
             self.remove_from_heap(vi);
+            assert_eq!(self.decision_level(), self.root_level);
+            self.trail.retain(|l| l.vi() != vi);
             self.num_eliminated_vars += 1;
             #[cfg(feature = "trace_elimination")]
             {

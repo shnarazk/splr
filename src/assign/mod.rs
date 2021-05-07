@@ -119,7 +119,8 @@ pub struct AssignStack {
     /// record of assignment
     trail: Vec<Lit>,
     trail_lim: Vec<usize>,
-    q_head: usize,
+    /// the-number-of-assigned-and-propagated-vars + 1
+    pub q_head: usize,
     pub root_level: DecisionLevel,
     var_order: VarIdHeap, // Variable Order
 

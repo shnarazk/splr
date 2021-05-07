@@ -37,15 +37,15 @@ pub enum CID {
 }
 
 impl CID {
-    pub fn as_cid(self) -> ClauseId {
+    pub fn as_cid(&self) -> ClauseId {
         match self {
-            CID::Generated(cid) => cid,
-            CID::Merged(cid) => cid,
+            CID::Generated(cid) => *cid,
+            CID::Merged(cid) => *cid,
         }
     }
-    pub fn is_new(self) -> Option<ClauseId> {
+    pub fn is_new(&self) -> Option<ClauseId> {
         if let CID::Generated(cid) = self {
-            Some(cid)
+            Some(*cid)
         } else {
             None
         }
@@ -129,6 +129,10 @@ pub trait ClauseDBIF:
     /// None: new_size should be larger than or equal to 2.
     /// return `Some(cid)` if the new clause is equal to a registered binclause.
     fn strengthen_by_vivification(&mut self, cid: ClauseId, length: usize) -> Option<ClauseId>;
+    /// TODO
+    fn update_under<A>(&mut self, asg: &mut A, cid: ClauseId) -> Result<Lit, SolverError>
+    where
+        A: AssignIF;
     /// check the condition to reduce.
     /// * return `true` if reduction is done.
     /// * Otherwise return `false`.

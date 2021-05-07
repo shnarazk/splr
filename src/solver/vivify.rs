@@ -6,7 +6,6 @@ use {
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{self, ClauseDB, ClauseDBIF, ClauseIF},
-        processor::{EliminateIF, Eliminator},
         state::StateIF,
         types::*,
     },
@@ -17,7 +16,6 @@ use {
 pub fn vivify(
     _asg: &mut AssignStack,
     _cdb: &mut ClauseDB,
-    _elim: &mut Eliminator,
     _state: &mut State,
 ) -> MaybeInconsistent {
     Ok(())
@@ -26,11 +24,15 @@ pub fn vivify(
 pub fn vivify(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
-    elim: &mut Eliminator,
     rst: &mut Restarter,
     state: &mut State,
 ) -> MaybeInconsistent {
-    elim.simplify(asg, cdb, rst, state)?;
+    if asg.remains() {
+        if let Some(cc) = asg.propagate(cdb).to_option() {
+            state.log(asg.num_conflict, "By vivifier");
+            return Err(SolverError::RootLevelConflict(cdb[cc].lit0()));
+        }
+    }
     let ave_lbd = {
         let ema = rst.refer(restart::property::TEma2::LBD).get();
         if ema.is_nan() {
@@ -54,6 +56,8 @@ pub fn vivify(
     let mut num_assert = 0;
     let mut to_display = 0;
     'next_clause: while let Some(cp) = clauses.pop() {
+        asg.backtrack_sandbox();
+        assert!(asg.stack_is_empty() || !asg.remains());
         let cid = cp.to();
         debug_assert_eq!(asg.root_level, asg.decision_level());
         let c = &mut cdb[cid];
@@ -64,7 +68,7 @@ pub fn vivify(
         }
         let is_learnt = c.is(Flag::LEARNT);
         c.vivified();
-        let clits = c.iter().map(|l| *l).collect::<Vec<Lit>>();
+        let clits = c.iter().copied().collect::<Vec<Lit>>();
         if to_display <= num_check {
             state.flush("");
             state.flush(format!(
@@ -88,7 +92,7 @@ pub fn vivify(
                     asg.assign_by_decision(!lit);
                     //## Rule 3
                     if let Some(cc) = asg.propagate_sandbox(cdb).to_option() {
-                        let conflits = &cdb[cc].iter().map(|l| *l).collect::<Vec<Lit>>();
+                        let conflits = &cdb[cc].iter().copied().collect::<Vec<Lit>>();
                         seen[0] = num_check;
                         let mut vec = asg.analyze_sandbox(cdb, &decisions, &conflits, &mut seen);
                         asg.backtrack_sandbox();
@@ -97,20 +101,20 @@ pub fn vivify(
                                 state.flush("");
                                 state[Stat::VivifiedClause] += num_shrink;
                                 state[Stat::VivifiedVar] += num_assert;
-                                return Err(SolverError::ProcessorFoundUnsat);
+                                state.log(asg.num_conflict, "By conflict analyzer");
+                                return Err(SolverError::RootLevelConflict(lit));
                             }
                             1 => {
-                                assert_lit(asg, cdb, elim, rst, state, vec[0])?;
+                                assert_lit(asg, cdb, state, vec[0])?;
                                 num_assert += 1;
                                 clauses = select(asg, cdb, ave_lbd, Some(num_target - num_check));
                             }
-                            n => {
+                            _ => {
                                 if let Some(ci) = cdb.new_clause(asg, &mut vec, is_learnt).is_new()
                                 {
                                     cdb.set_activity(ci, cp.value());
                                     cdb[ci].turn_on(Flag::VIVIFIED);
                                 }
-                                elim.to_simplify += 1.0 / n as f64;
                                 if cc == cid {
                                     cdb.remove_clause(cid);
                                     num_shrink += 1;
@@ -123,18 +127,22 @@ pub fn vivify(
                 }
             }
         }
-        asg.backtrack_sandbox();
     }
+    asg.backtrack_sandbox();
+    assert!(asg.stack_is_empty() || !asg.remains());
     state.flush("");
     state.flush(format!(
         "vivified(assert:{} shorten:{}), ",
         num_assert, num_shrink
     ));
     state.log(
-        state[Stat::Vivification],
+        asg.num_conflict,
         format!(
-            "vivify, pick:{:>8}, assert:{:>6}, shorten:{:>6}",
-            num_check, num_assert, num_shrink,
+            "vivify:{:5}, pick:{:>8}, assert:{:>8}, shorten:{:>8}",
+            state[Stat::Vivification],
+            num_check,
+            num_assert,
+            num_shrink,
         ),
     );
     state[Stat::VivifiedClause] += num_shrink;
@@ -145,26 +153,38 @@ pub fn vivify(
 fn assert_lit(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
-    elim: &mut Eliminator,
-    rst: &mut Restarter,
     state: &mut State,
     l0: Lit,
 ) -> MaybeInconsistent {
+    assert_eq!(asg.decision_level(), asg.root_level);
     // assert_eq!(asg.assigned(l0), None);
     cdb.certificate_add_assertion(l0);
     let mut tag: &str = "assign";
-    if let Err(e) = asg
-        .assign_at_root_level(l0)
-        .and_then(|_| {
-            tag = "propagation";
-            asg.propagate(cdb)
-                .to_option()
-                .ok_or(SolverError::ProcessorFoundUnsat)
-        })
-        .and_then(|_| {
-            tag = "simplification";
-            elim.simplify(asg, cdb, rst, state)
-        })
+    if let Err(e) = asg.assign_at_root_level(l0).and_then(|_| {
+        tag = "propagation";
+        assert_eq!(asg.decision_level(), asg.root_level);
+        assert!(asg.remains());
+        asg.propagate(cdb)
+            .to_option()
+            .map_or(Ok(()), |_| Err(SolverError::RootLevelConflict(l0)))
+    })
+    //        while asg.remains() {
+    //            if !asg.propagate(cdb).is_none() {
+    //                return Err(SolverError::ProcessorFoundUnsat);
+    //            }
+    //            if asg.remains() {
+    //                state.log(
+    //                    asg.num_conflict,
+    //                    format!(
+    //                        "(vivify) root level propagation remains unpropagated literals {}/{}",
+    //                        asg.q_head,
+    //                        asg.stack_len(),
+    //                    ),
+    //                );
+    //            }
+    //        }
+    //        Ok(())
+    //    })
     {
         state.flush("");
         state.log(
@@ -176,6 +196,34 @@ fn assert_lit(
         );
         return Err(e);
     }
+    assert_eq!(asg.decision_level(), asg.root_level);
+    if let Some(cc) = asg.propagate(cdb).to_option() {
+        state.log(asg.num_conflict, "By vivifier");
+        return Err(SolverError::RootLevelConflict(cdb[cc].lit0()));
+    }
+    if asg.remains() {
+        state.log(
+            asg.num_conflict,
+            format!(
+                "(vivify) root level propagation remains unpropagated literals {}/{}",
+                asg.q_head,
+                asg.stack_len(),
+            ),
+        );
+    }
+    for (ci, c) in cdb.iter().enumerate() {
+        assert!(
+            c.iter().all(|l| asg.assigned(*l).is_none()),
+            "clause:{}{:?}\n{:?}\n{:?}",
+            ci,
+            c,
+            c.iter().map(|l| asg.assigned(*l)).collect::<Vec<_>>(),
+            c.iter().map(|l| asg.level(l.vi())).collect::<Vec<_>>(),
+        );
+    }
+    assert!(cdb
+        .iter()
+        .all(|c| c.iter().all(|l| asg.assigned(*l).is_none())));
     Ok(())
 }
 
@@ -246,7 +294,7 @@ impl AssignStack {
         }
         let last_decision = decisions.last().unwrap();
         let from = self.len_upto(self.root_level);
-        let all = self.stack_iter().skip(0).map(|l| !*l).collect::<Vec<_>>();
+        let all = self.stack_iter().map(|l| !*l).collect::<Vec<_>>();
         let assumes = &all[from..];
         debug_assert!(
             all.iter().all(|l| !assumes.contains(&!*l)),

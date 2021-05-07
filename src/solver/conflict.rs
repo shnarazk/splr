@@ -10,6 +10,7 @@ use {
         cdb::{ClauseDB, ClauseDBIF, CID},
         processor::Eliminator,
         solver::SolverEvent,
+        state::StateIF,
         types::*,
     },
 };
@@ -180,12 +181,9 @@ pub fn handle_conflict(
         //
         // dump to certified even if it's a literal.
         cdb.certificate_add_assertion(new_learnt[0]);
-        if use_chronobt {
-            asg.cancel_until(bl);
-            debug_assert!(asg.stack_iter().all(|l| l.vi() != l0.vi()));
-            asg.assign_by_implication(l0, AssignReason::default(), asg.root_level);
-        } else {
-            asg.assign_by_unitclause(l0);
+        if asg.assign_at_root_level(l0).is_err() {
+            state.log(asg.num_conflict, "By conflict analyzer");
+            return Err(SolverError::RootLevelConflict(l0));
         }
         elim.to_simplify += (state.config.c_ip_int / 2) as f64;
         rst.handle(SolverEvent::Assert(l0.vi()))

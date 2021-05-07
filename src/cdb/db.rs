@@ -318,6 +318,7 @@ impl ClauseDBIF for ClauseDB {
         A: AssignIF,
     {
         debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{:?}", vec,);
+        assert!(1 < vec.len());
         if vec.len() == 2 {
             if let Some(cid) = self.has_bi_clause(vec[0], vec[1]) {
                 return CID::Merged(cid);
@@ -480,6 +481,7 @@ impl ClauseDBIF for ClauseDB {
     /// remove a clause temporally
     fn detach_clause(&mut self, cid: ClauseId) -> (Lit, Lit) {
         let c = &self.clause[cid.ordinal as usize];
+        assert!(1 < c.lits.len());
         let l0 = c.lit0();
         let l1 = c.lit1();
         if c.len() == 2 {
@@ -552,7 +554,7 @@ impl ClauseDBIF for ClauseDB {
     fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> StrengthenResult {
         // self.watches(cid, "before strengthen_by_elimination");
         debug_assert!(!self[cid].is_dead());
-        debug_assert!(1 < self[cid].len());
+        assert!(1 < self[cid].len());
         let ClauseDB {
             ref mut clause,
             ref mut bi_clause,
@@ -566,7 +568,7 @@ impl ClauseDBIF for ClauseDB {
         // debug_assert!(1 < (*ch).len());
         debug_assert!(1 < usize::from(!p));
         let lits = &mut c.lits;
-        debug_assert!(1 < lits.len());
+        assert!(1 < lits.len());
         if lits.len() == 2 {
             let l0 = lits[(lits[0] == p) as usize];
             return StrengthenResult::BecameUnitClause(l0);
@@ -612,6 +614,7 @@ impl ClauseDBIF for ClauseDB {
             bi_clause[!lits[1]].insert(lits[0], cid);
             *num_bi_clause += 1;
         }
+        assert!(1 < lits.len());
         if certification_store.is_active() {
             certification_store.push_add(&c.lits);
             certification_store.push_delete(&old_lits);
@@ -658,6 +661,101 @@ impl ClauseDBIF for ClauseDB {
         c.lits.resize(length, Lit::default());
         self.watches(cid, "after vivification");
         None
+    }
+    fn update_under<A>(&mut self, asg: &mut A, cid: ClauseId) -> Result<Lit, SolverError>
+    where
+        A: AssignIF,
+    {
+        if self[cid].is_dead() {
+            return Ok(Lit::default());
+        }
+        // firstly sweep without consuming extra memory
+        let mut need_to_shrink = false;
+        for l in self[cid].iter() {
+            match asg.assigned(*l) {
+                Some(true) => {
+                    self.remove_clause(cid);
+                    return Ok(Lit::default());
+                }
+                Some(false) => {
+                    need_to_shrink = true;
+                }
+                None if asg.var(l.vi()).is(Flag::ELIMINATED) => {
+                    need_to_shrink = true;
+                }
+                None => (),
+            }
+        }
+        if !need_to_shrink {
+            return Ok(Lit::default());
+        }
+        let ClauseDB {
+            clause,
+            bi_clause,
+            watch_cache,
+            certification_store,
+            ..
+        } = self;
+        let c = &mut clause[cid.ordinal as usize];
+        let mut valids = c
+            .lits
+            .iter()
+            .filter(|l| asg.assigned(**l).is_none() && !asg.var(l.vi()).is(Flag::ELIMINATED))
+            .copied()
+            .collect::<Vec<_>>();
+        if usize::from(cid) == 160 {
+            dbg!(&valids);
+        }
+        match valids.len() {
+            0 => Err(SolverError::RootLevelConflict(c.lits[0])), // An empty clause means conflict!
+            1 => Ok(valids[0]),
+            2 => {
+                let l0 = valids[0];
+                let l1 = valids[1];
+                assert!(2 < c.lits.len());
+                watch_cache[!c.lits[0]].remove_watch(&cid);
+                watch_cache[!c.lits[1]].remove_watch(&cid);
+                bi_clause[!l0].insert(l1, cid);
+                bi_clause[!l1].insert(l0, cid);
+                if certification_store.is_active() {
+                    certification_store.push_add(&valids);
+                    certification_store.push_delete(&c.lits);
+                }
+                std::mem::swap(&mut c.lits, &mut valids);
+                self.num_bi_clause += 1;
+                c.turn_off(Flag::LEARNT);
+
+                Ok(Lit::default())
+            }
+            _ => {
+                let l0 = valids[0];
+                let l1 = valids[1];
+                if l0 == c.lits[0] && l1 == c.lits[1] {
+                    std::mem::swap(&mut c.lits, &mut valids);
+                    return Ok(Lit::default());
+                }
+                if l0 == c.lits[0] || l0 == c.lits[1] {
+                    watch_cache[!l0].insert_or_update_watch(cid, l1);
+                } else {
+                    watch_cache[!c.lits[0]].remove_watch(&cid);
+                    watch_cache[!l0].insert_or_update_watch(cid, l1);
+                }
+                if l1 == c.lits[1] {
+                    watch_cache[!l1].insert_or_update_watch(cid, l0);
+                } else {
+                    watch_cache[!c.lits[1]].remove_watch(&cid);
+                    watch_cache[!l1].insert_or_update_watch(cid, l0);
+                }
+
+                if certification_store.is_active() {
+                    certification_store.push_add(&valids);
+                    certification_store.push_delete(&c.lits);
+                }
+
+                std::mem::swap(&mut c.lits, &mut valids);
+                Ok(Lit::default())
+            }
+        }
     }
     fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where
@@ -941,7 +1039,7 @@ impl ClauseDB {
     /// bi_clause[!l0].get(&l1).is_some()
     ///```
     fn has_bi_clause(&self, l0: Lit, l1: Lit) -> Option<ClauseId> {
-        self.bi_clause[!l0].get(&l1).map(|c| *c)
+        self.bi_clause[!l0].get(&l1).copied()
     }
     /// halve the number of 'learnt' or *removable* clauses.
     fn reduce_db<A>(&mut self, asg: &mut A, nc: usize)

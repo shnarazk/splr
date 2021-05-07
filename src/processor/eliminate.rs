@@ -82,14 +82,18 @@ where
                         );
                         match asg.assigned(lit) {
                             Some(true) => (),
-                            Some(false) => return Err(SolverError::Inconsistent),
+                            Some(false) => return Err(SolverError::RootLevelConflict(lit)),
                             None => {
-                                asg.assign_at_root_level(lit)?;
+                                if asg.assign_at_root_level(lit).is_err() {
+                                    return Err(SolverError::RootLevelConflict(lit));
+                                }
                                 cdb.certificate_add_assertion(lit);
                             }
                         }
                     }
                     _ => {
+                        assert!(1 < vec.len());
+                        assert!(vec.iter().all(|l| !vec.contains(&!*l)));
                         if let CID::Generated(cid) = cdb.new_clause(
                             asg,
                             vec,
@@ -205,6 +209,9 @@ where
     let mut size = pb.len() + 1;
     'next_literal: for l in qb.iter() {
         if asg.var(l.vi()).is(Flag::ELIMINATED) {
+            continue;
+        }
+        if asg.assigned(*l) == Some(false) {
             continue;
         }
         if l.vi() != v {

@@ -68,21 +68,21 @@ impl SolveIF for Solver {
 
         state[Stat::NumProcessor] += 1;
         state.flush("vivifying...");
-        if vivify(asg, cdb, elim, rst, state).is_err() {
-            #[cfg(feature = "boundary_check")]
-            return Err(SolverError::UndescribedError);
-
+        if vivify(asg, cdb, rst, state).is_err() {
             #[cfg(feature = "support_user_assumption")]
             {
                 analyze_final(asg, state, &cdb[ci]);
             }
-            #[cfg(not(feature = "boundary_check"))]
+            state.log(asg.num_conflict, "By vivifier as a prepossessor");
             return Ok(Certificate::UNSAT);
         }
+        assert!(!asg.remains());
+        assert_eq!(asg.decision_level(), asg.root_level);
         if elim.simplify(asg, cdb, rst, state).is_err() {
             if cdb.check_size().is_err() {
                 return Err(SolverError::OutOfMemory);
             }
+            state.log(asg.num_conflict, "By eliminator");
             return Ok(Certificate::UNSAT);
         }
 
@@ -180,10 +180,12 @@ impl SolveIF for Solver {
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
                 // check(asg, cdb, false, "before");
                 let model = asg.extend_model(cdb, elim.eliminated_lits());
-                // check(asg, cdb, true, "after");
+                check(asg, cdb, true, "after");
 
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
+                    state.log(asg.num_conflict, "failed to validade the extended model");
+                    state.progress(asg, cdb, elim, rst);
                     return Err(SolverError::SolverBug);
                 }
 
@@ -209,6 +211,7 @@ impl SolveIF for Solver {
             }
             Err(e) => {
                 RESTART!(asg, rst);
+                state.progress(asg, cdb, elim, rst);
                 Err(e)
             }
         }
@@ -248,7 +251,12 @@ fn search(
             }
             asg.update_rewards();
             cdb.update_rewards();
-            handle_conflict(asg, cdb, elim, rst, state, ci)?;
+            if let Err(e) = handle_conflict(asg, cdb, elim, rst, state, ci) {
+                match e {
+                    SolverError::RootLevelConflict(_) => return Ok(false),
+                    _ => return Err(e),
+                }
+            }
             rst.update(ProgressUpdate::ASG(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
             ));
@@ -286,26 +294,22 @@ fn search(
                         if state.config.c_ip_int <= elim.to_simplify as usize {
                             assert_eq!(asg.root_level, asg.decision_level());
                             #[cfg(feature = "clause_vivification")]
-                            if let Err(e) = vivify(asg, cdb, elim, rst, state) {
+                            if let Err(e) = vivify(asg, cdb, rst, state).and_then(|_| {
+                                elim.activate();
+                                elim.simplify(asg, cdb, rst, state)
+                            }) {
                                 match e {
-                                    SolverError::ProcessorFoundUnsat => {
+                                    SolverError::RootLevelConflict(_) => {
                                         #[cfg(feature = "support_user_assumption")]
                                         {
                                             analyze_final(asg, state, &cdb[ci]);
                                         }
-                                        #[cfg(not(feature = "boundary_check"))]
+                                        state.log(asg.num_conflict, "at the in-processor");
                                         return Ok(false);
                                     }
-                                    _ => {
-                                        #[cfg(feature = "boundary_check")]
-                                        return Err(SolverError::UndescribedError);
-                                        return Err(e);
-                                    }
+                                    _ => return Err(e),
                                 }
                             }
-                            // check(asg, cdb, false, "before elimination");
-                            elim.activate();
-                            elim.simplify(asg, cdb, rst, state)?;
                             // check(asg, cdb, false, "after elimination");
                             #[cfg(feature = "trace_equivalency")]
                             if false {
@@ -321,7 +325,7 @@ fn search(
                         state.log(
                             asg.num_conflict,
                             format!(
-                                "#cycle:{:>5}, core:{:>9}, level:{:>9},/cpr:{:>9.2}",
+                                "#cycle:{:>5}, core:{:>10}, level:{:>9}, /cpr:{:>9.2}",
                                 num_cycle,
                                 num_unreachable,
                                 block_level,
@@ -360,6 +364,18 @@ fn search(
             }
         }
     }
+    state.log(
+        asg.num_conflict,
+        format!(
+            "search process finished at level {}:: {} = {} - {} - {}\n{:?}",
+            asg.decision_level(),
+            asg.derefer(assign::property::Tusize::NumUnassignedVar),
+            asg.num_vars,
+            asg.num_eliminated_vars,
+            asg.stack_len(),
+            asg.stack_iter().collect::<Vec<_>>(),
+        ),
+    );
     Ok(true)
 }
 
@@ -367,13 +383,29 @@ fn search(
 fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
     if let Some(cid) = cdb.validate(asg.assign_ref(), all) {
         println!("{}", message);
-        println!("| timestamp | level | decision |  literal |  assignment |");
+        println!("| timestamp | level | decision                       |  literal |  assignment |");
+        let l0 = i32::from(cdb[cid].lit0());
+        let l1 = i32::from(cdb[cid].lit1());
         for (t, lv, lit, reason, assign) in asg.dump(&cdb[cid]).iter() {
             println!(
-                "|{:>10} |{:>6} | {} | {:8} | {:?} |",
-                t, lv, reason, lit, assign
+                "|{:>10} |{:>6} | {:30} | {:8}{} | {:16} |",
+                t,
+                lv,
+                format!("{}", reason),
+                lit,
+                if *lit == l0 || *lit == l1 { '*' } else { ' ' },
+                format!(
+                    "{:?}{}",
+                    assign,
+                    if asg.var(lit.abs() as usize).is(Flag::PROPAGATED) {
+                        "x"
+                    } else {
+                        "!"
+                    },
+                ),
             );
         }
+        /*
         let (w1, w2) = cdb.watches(cid, "search354");
         if w1 == Lit::default() && w2 == Lit::default() {
             println!(
@@ -392,6 +424,7 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
                 w2,
             );
         }
+         */
         println!("clause detail: {}", &cdb[cid]);
         panic!(
             "Before extending, NC {}, Level {} generated assignment({:?}) falsifies by {}",

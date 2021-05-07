@@ -132,11 +132,7 @@ impl Instantiate for AssignStack {
                 self.q_head = 0;
                 self.num_eliminated_vars =
                     self.var.iter().filter(|v| v.is(Flag::ELIMINATED)).count();
-                self.num_asserted_vars = if self.trail.is_empty() {
-                    0
-                } else {
-                    self.trail.len()
-                };
+                self.num_asserted_vars = self.assign.iter().filter(|a| a.is_some()).count();
                 self.rebuild_order();
             }
             e => panic!("don't call asg with {:?}", e),
@@ -155,9 +151,7 @@ impl AssignIF for AssignStack {
         self.trail.len()
     }
     fn len_upto(&self, n: DecisionLevel) -> usize {
-        self.trail_lim
-            .get(n as usize)
-            .map_or(self.trail.len(), |n| *n)
+        self.trail_lim.get(n as usize).map_or(0, |n| *n)
     }
     fn stack_is_empty(&self) -> bool {
         self.trail.is_empty()

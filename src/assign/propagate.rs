@@ -130,7 +130,7 @@ impl PropagateIF for AssignStack {
                 // self.make_var_asserted(vi);
                 Ok(())
             }
-            _ => Err(SolverError::Inconsistent),
+            _ => Err(SolverError::RootLevelConflict(l)),
         }
     }
     fn assign_by_implication(&mut self, l: Lit, reason: AssignReason, lv: DecisionLevel) {
@@ -140,9 +140,7 @@ impl PropagateIF for AssignStack {
         // assert!(self.trail_lim.is_empty() || !cid.is_none());
         let vi = l.vi();
         debug_assert!(!self.var[vi].is(Flag::ELIMINATED));
-        debug_assert!(
-            var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
-        );
+        assert!(var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none());
         set_assign!(self, l);
         self.level[vi] = lv;
         self.reason[vi] = reason;
@@ -155,6 +153,9 @@ impl PropagateIF for AssignStack {
         }
     }
     fn assign_by_decision(&mut self, l: Lit) {
+        assert!(
+            var_assign!(self, l.vi()) == Some(bool::from(l)) || var_assign!(self, l.vi()).is_none()
+        );
         debug_assert!(l.vi() < self.var.len());
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(
@@ -170,12 +171,15 @@ impl PropagateIF for AssignStack {
         set_assign!(self, l);
         self.reason[vi] = AssignReason::default();
         self.reward_at_assign(vi);
-        debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
         self.num_decision += 1;
+        assert!(self.q_head < self.trail.len());
     }
     fn assign_by_unitclause(&mut self, l: Lit) {
         self.cancel_until(self.root_level);
+        assert!(
+            var_assign!(self, l.vi()) == Some(bool::from(l)) || var_assign!(self, l.vi()).is_none()
+        );
         debug_assert!(self.trail.iter().all(|k| k.vi() != l.vi()));
         let vi = l.vi();
         self.level[vi] = self.root_level;
@@ -193,8 +197,10 @@ impl PropagateIF for AssignStack {
             self.save_best_phases();
             self.best_assign = false;
         }
+        // We assume that backtrack is never happened in level zero.
         let lim = self.trail_lim[lv as usize];
-        let mut shift = lim;
+        let mut ooo_propagated: Vec<Lit> = Vec::new();
+        let mut ooo_unpropagated: Vec<Lit> = Vec::new();
         for i in lim..self.trail.len() {
             let l = self.trail[i];
             assert!(
@@ -204,19 +210,48 @@ impl PropagateIF for AssignStack {
                 &self.var[l.vi()],
             );
             let vi = l.vi();
+            assert!(self.q_head <= i || self.var[vi].is(Flag::PROPAGATED),
+                    "unpropagated assigned level-{} var {:?},{:?} (loc:{} in trail{:?}) found, staying at level {}",
+                    self.level[vi],
+                    self.var[vi],
+                    self.reason[vi],
+                    i,
+                    self.trail_lim.iter().filter(|n| **n <= i).collect::<Vec<_>>(),
+                    self.decision_level(),
+            );
             if self.level[vi] <= lv {
-                self.trail[shift] = l;
-                shift += 1;
+                if i < self.q_head {
+                    ooo_propagated.push(l);
+                } else {
+                    ooo_unpropagated.push(l);
+                }
                 continue;
             }
             let v = &mut self.var[vi];
+            v.turn_off(Flag::PROPAGATED);
             v.set(Flag::PHASE, var_assign!(self, vi).unwrap());
             unset_assign!(self, vi);
             self.reason[vi] = AssignReason::default();
             self.reward_at_unassign(vi);
             self.insert_heap(vi);
         }
-        self.trail.truncate(shift);
+        self.trail.truncate(lim);
+        self.trail.append(&mut ooo_propagated);
+        for l in self.trail.iter() {
+            assert!(
+                self.var[l.vi()].is(Flag::PROPAGATED),
+                "unpropagated {}: {:?}",
+                *l,
+                &self.var[l.vi()],
+            );
+        }
+
+        assert!(self
+            .trail
+            .iter()
+            .all(|l| self.var[l.vi()].is(Flag::PROPAGATED)));
+        self.q_head = self.trail.len();
+        self.trail.append(&mut ooo_unpropagated);
         debug_assert!(self
             .trail
             .iter()
@@ -224,12 +259,26 @@ impl PropagateIF for AssignStack {
         debug_assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
         self.trail_lim.truncate(lv as usize);
         // assert!(lim < self.q_head) doesn't hold sometimes in chronoBT.
-        self.q_head = self.q_head.min(lim);
+        // ||  self.q_head = self.q_head.min(lim);
         if lv == self.root_level {
+            assert!(self
+                .trail
+                .iter()
+                .take(self.q_head)
+                .all(|l| self.level[l.vi()] == self.root_level
+                    && self.var[l.vi()].is(Flag::PROPAGATED)));
+            // self.trail.clear();
+            // self.trail.append(&mut ooo_unpropagated);
+            // self.q_head = 0;
             self.num_restart += 1;
             self.cpr_ema.update(self.num_conflict);
-            self.num_asserted_vars = self.stack_len();
+            self.num_asserted_vars = self.assign.iter().filter(|a| a.is_some()).count();
         }
+
+        assert!(self.q_head == 0 || self.assign[self.trail[self.q_head - 1].vi()].is_some());
+        assert!(
+            self.q_head == 0 || self.var[self.trail[self.q_head - 1].vi()].is(Flag::PROPAGATED)
+        );
     }
     fn backtrack_sandbox(&mut self) {
         if self.trail_lim.is_empty() {
@@ -239,6 +288,7 @@ impl PropagateIF for AssignStack {
         for i in lim..self.trail.len() {
             let l = self.trail[i];
             let vi = l.vi();
+            assert!(self.root_level < self.level[vi]);
             let v = &mut self.var[vi];
             v.set(Flag::PHASE, var_assign!(self, vi).unwrap());
             unset_assign!(self, vi);
@@ -247,7 +297,10 @@ impl PropagateIF for AssignStack {
         }
         self.trail.truncate(lim);
         self.trail_lim.truncate(self.root_level as usize);
-        self.q_head = self.q_head.min(lim);
+        self.q_head = self.trail.len();
+        // self.trail.clear();
+        // self.trail_lim.clear();
+        // self.q_head = 0;
     }
     /// UNIT PROPAGATION.
     /// Note:
@@ -260,9 +313,16 @@ impl PropagateIF for AssignStack {
     where
         C: ClauseDBIF,
     {
+        if self.decision_level() == self.root_level {
+            if let Some(cc) = self.propagate_at_root_level(cdb) {
+                return ClauseId::from(cc);
+            }
+        }
         while let Some(p) = self.trail.get(self.q_head) {
             self.num_propagation += 1;
             self.q_head += 1;
+            assert!(!self.var[p.vi()].is(Flag::PROPAGATED));
+            self.var[p.vi()].turn_on(Flag::PROPAGATED);
             let sweeping = Lit::from(usize::from(*p));
             let false_lit = !*p;
             // we have to drop `p` here to use self as a mutable reference again later.
@@ -324,7 +384,7 @@ impl PropagateIF for AssignStack {
                     // cdb.watches(cid, "after propagation: satisfying watch");
                     continue 'next_clause;
                 }
-                debug_assert!(!cdb[cid].is_dead());
+                assert!(!cdb[cid].is_dead());
                 let c = &mut cdb[cid];
 
                 #[cfg(not(feature = "maintain_watch_cache"))]
@@ -504,6 +564,37 @@ impl PropagateIF for AssignStack {
 }
 
 impl AssignStack {
+    ///
+    fn propagate_at_root_level<C>(&mut self, cdb: &mut C) -> Option<ClauseId>
+    where
+        C: ClauseDBIF,
+    {
+        let mut num_propagated = 0;
+        while num_propagated < self.trail.len() {
+            num_propagated = self.trail.len();
+            for ci in 1..cdb.len() {
+                let cid = ClauseId::from(ci);
+                match cdb.update_under(self, cid) {
+                    Ok(z) if z == Lit::default() => (),
+                    Ok(lit) => {
+                        cdb.certificate_add_assertion(lit);
+                        if self.assign_at_root_level(lit).is_err() {
+                            return Some(cid);
+                        } else {
+                            cdb.remove_clause(cid);
+                            assert!(cdb[cid].is_dead());
+                        }
+                    }
+                    Err(_) => return Some(cid),
+                }
+            }
+        }
+        // for l in self.trail.iter() {
+        //     self.var[l.vi()].turn_on(Flag::PROPAGATED);
+        // }
+        None
+    }
+
     /// check usability of the saved best phase.
     /// return `true` if the current best phase got invalid.
     #[cfg(not(feature = "best_phases_tracking"))]

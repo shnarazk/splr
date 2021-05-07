@@ -249,6 +249,8 @@ impl EliminateIF for Eliminator {
             if c.is_dead() || c.is(Flag::OCCUR_LINKED) {
                 continue;
             }
+            let vec = c.iter().copied().collect::<Vec<_>>();
+            assert!(vec.iter().all(|l| !vec.contains(&!*l)));
             self.add_cid_occur(asg, ClauseId::from(cid), c, false);
         }
         if force {
@@ -309,7 +311,10 @@ impl EliminateIF for Eliminator {
                 self.stop(asg, cdb);
             }
         } else {
-            self.eliminate_satisfied_clauses(asg, cdb, true);
+            // self.eliminate_satisfied_clauses(asg, cdb, true);
+            if !asg.propagate(cdb).is_none() {
+                return Err(SolverError::RootLevelConflict(Lit::default()));
+            }
         }
         if self.mode != EliminatorMode::Dormant {
             self.stop(asg, cdb);
@@ -518,6 +523,11 @@ impl Eliminator {
             self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
             self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
         }
+        if asg.remains() {
+            if let Some(cc) = asg.propagate(cdb).to_option() {
+                return Err(SolverError::RootLevelConflict(cdb[cc].lit0()));
+            }
+        }
         Ok(())
     }
     /// run clause subsumption and variable elimination.
@@ -595,8 +605,8 @@ impl Eliminator {
             }
             self.backward_subsumption_check(asg, cdb, &mut timedout)?;
             debug_assert!(self.clause_queue.is_empty());
-            if !asg.propagate(cdb).is_none() {
-                return Err(SolverError::Inconsistent);
+            if let Some(cc) = asg.propagate(cdb).to_option() {
+                return Err(SolverError::RootLevelConflict(cdb[cc].lit0()));
             }
             self.eliminate_satisfied_clauses(asg, cdb, true);
             if timedout == 0 {

@@ -103,6 +103,11 @@ where
     debug_assert!(1 < cdb[cid].len());
     debug_assert!(!cid.is_none());
 
+    // | assert!(asg.assigned(cdb[cid].lit0()) != Some(false) && asg.assigned(cdb[cid].lit1()) != Some(false),
+    // |         "{:?} - {:?}",
+    // |         &cdb[cid],
+    // |         cdb[cid].iter().map(|l| asg.assigned(*l)).collect::<Vec<_>>(),
+    // | );
     match cdb.strengthen_by_elimination(cid, l) {
         StrengthenResult::BecameUnitClause(l0) => {
             // Vaporize the binary clause

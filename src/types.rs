@@ -533,11 +533,11 @@ pub enum SolverError {
     // StateUNSAT = 0,
     // StateSAT,
     IOError,
-    ProcessorFoundUnsat,
     Inconsistent,
     NullLearnt,
     OutOfMemory,
     OutOfRange,
+    RootLevelConflict(Lit),
     TimeOut,
     SolverBug,
     UndescribedError,
@@ -762,10 +762,12 @@ bitflags! {
         const CA_SEEN      = 0b0000_0010_0000_0000;
         /// * the previous assigned value of a Var.
         const PHASE        = 0b0000_0100_0000_0000;
+        ///
+        const PROPAGATED   = 0b0000_1000_0000_0000;
 
         #[cfg(feature = "just_used")]
         /// a clause is used recently in conflict analysis.
-        const JUST_USED    = 0b0000_1000_0000_0000;
+        const JUST_USED    = 0b0001_0000_0000_0000;
     }
 }
 
