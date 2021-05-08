@@ -52,6 +52,15 @@ impl CID {
     }
 }
 
+#[derive(Eq, Debug, PartialEq)]
+pub enum ClauseTransform {
+    EmptyClause,
+    UnitClause(Lit),
+    RegisteredBiClause(ClauseId),
+    NewBiClause,
+    Updated,
+}
+
 /// API for Clause, providing literal accessors.
 pub trait ClauseIF {
     /// return true if it contains no literals; a clause after unit propagation.
@@ -126,10 +135,8 @@ pub trait ClauseDBIF:
     fn remove_clause_sandbox(&mut self, cid: ClauseId);
     /// update watches of the clause
     fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> StrengthenResult;
-    /// shorten a clause.
-    /// None: new_size should be larger than or equal to 2.
-    /// return `Some(cid)` if the new clause is equal to a registered binclause.
-    fn strengthen_by_vivification(&mut self, cid: ClauseId, length: usize) -> Option<ClauseId>;
+    /// TODO
+    fn transform(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> ClauseTransform;
     /// TODO
     fn update_under<A>(&mut self, asg: &mut A, cid: ClauseId) -> Result<Lit, SolverError>
     where

@@ -329,10 +329,6 @@ impl PropagateIF for AssignStack {
             let sweeping = Lit::from(usize::from(*p));
             let false_lit = !*p;
 
-            if [162263, 162929, 164933].contains(&false_lit.vi()) {
-                println!("propagate it");
-            }
-
             // we have to drop `p` here to use self as a mutable reference again later.
             //
             //## binary loop
@@ -592,9 +588,10 @@ impl AssignStack {
             num_propagated = self.trail.len();
             for ci in 1..cdb.len() {
                 let cid = ClauseId::from(ci);
-                if !cdb[cid].is_dead() {
-                    cdb.watches(cid, "propagate583");
+                if cdb[cid].is_dead() {
+                    continue;
                 }
+                cdb.watches(cid, "propagate 586");
                 match cdb.update_under(self, cid) {
                     Ok(z) if z == Lit::default() => (),
                     Ok(lit) => {

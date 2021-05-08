@@ -100,7 +100,7 @@ pub fn handle_conflict(
                         for (i, l) in c.iter().enumerate().skip(2) {
                             if *l == decision {
                                 cdb.watches(ci, "conflict102");
-                                cdb.swap_watch(ci);
+                                cdb.update_watch_cache(ci, 0, i, false);
                                 break;
                             }
                         }
