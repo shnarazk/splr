@@ -116,6 +116,7 @@ pub fn vivify(
                                     cdb[ci].turn_on(Flag::VIVIFIED);
                                 }
                                 if cc == cid {
+                                    cdb.watches(cid, "vivify119");
                                     cdb.remove_clause(cid);
                                     num_shrink += 1;
                                 }

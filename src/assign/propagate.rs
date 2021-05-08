@@ -315,8 +315,11 @@ impl PropagateIF for AssignStack {
     {
         if self.decision_level() == self.root_level {
             if let Some(cc) = self.propagate_at_root_level(cdb) {
-                return ClauseId::from(cc);
+                return cc;
             }
+            // for l in self.trail.iter() {
+            //
+            // }
         }
         while let Some(p) = self.trail.get(self.q_head) {
             self.num_propagation += 1;
@@ -325,6 +328,11 @@ impl PropagateIF for AssignStack {
             self.var[p.vi()].turn_on(Flag::PROPAGATED);
             let sweeping = Lit::from(usize::from(*p));
             let false_lit = !*p;
+
+            if [162263, 162929, 164933].contains(&false_lit.vi()) {
+                println!("propagate it");
+            }
+
             // we have to drop `p` here to use self as a mutable reference again later.
             //
             //## binary loop
@@ -381,10 +389,16 @@ impl PropagateIF for AssignStack {
                     // In this path, we use only `AssignStack::assign`.
                     // assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
                     cdb.reregister_watch_cache(sweeping, Some((cid, other_watch)));
-                    // cdb.watches(cid, "after propagation: satisfying watch");
+                    cdb.watches(cid, "after propagation: satisfying watch");
                     continue 'next_clause;
                 }
-                assert!(!cdb[cid].is_dead());
+                assert!(
+                    !cdb[cid].is_dead(),
+                    "dead clause {}{} found during propagating {}",
+                    cid,
+                    &cdb[cid],
+                    false_lit,
+                );
                 let c = &mut cdb[cid];
 
                 #[cfg(not(feature = "maintain_watch_cache"))]
@@ -403,7 +417,7 @@ impl PropagateIF for AssignStack {
                     // In this path, we use only `AssignStack::assign`.
                     // assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
                     cdb.reregister_watch_cache(sweeping, Some((cid, other_watch)));
-                    // cdb.watches(cid, "after propagation: satisfying watch");
+                    cdb.watches(cid, "after propagation: satisfying watch");
                     continue 'next_clause;
                 }
 
@@ -416,12 +430,12 @@ impl PropagateIF for AssignStack {
                 for (k, lk) in c.iter().enumerate().skip(2) {
                     if lit_assign!(self, *lk) != Some(false) {
                         cdb.update_watch_cache(cid, false_watch_pos, k, true);
-                        // cdb.watches(cid, "after propagagtion: found another watch");
+                        cdb.watches(cid, "after propagagtion: found another watch");
                         continue 'next_clause;
                     }
                 }
                 if false_watch_pos == 0 {
-                    cdb.update_watch_cache(cid, 0, 1, false);
+                    cdb.swap_watch(cid);
                 }
                 cdb.reregister_watch_cache(sweeping, Some((cid, other_watch)));
                 // cdb.watches(cid, "after propagation: push back");
@@ -430,7 +444,7 @@ impl PropagateIF for AssignStack {
                     self.dpc_ema.update(self.num_decision);
                     self.ppc_ema.update(self.num_propagation);
                     while cdb.reregister_watch_cache(sweeping, watches.next().deref_watch()) {}
-                    // cdb.watches(cid, "after propagation: conflict");
+                    cdb.watches(cid, "after propagation: conflict");
                     return cid;
                 }
                 let lv = cdb[cid]
@@ -444,7 +458,7 @@ impl PropagateIF for AssignStack {
                     AssignReason::Implication(cid, NULL_LIT),
                     lv,
                 );
-                // cdb.watches(cid, "after propagation: unit clause");
+                cdb.watches(cid, "after propagation: unit clause");
             }
         }
         let na = self.q_head + self.num_eliminated_vars;
@@ -527,6 +541,7 @@ impl PropagateIF for AssignStack {
                 if let Some(true) = other_watch_value {
                     assert!(!self.var[other_watch.vi()].is(Flag::ELIMINATED));
                     cdb.reregister_watch_cache(sweeping, Some((cid, other_watch)));
+                    cdb.watches(cid, &format!("\npropagate {} at L545", false_lit));
                     continue 'next_clause;
                 }
                 debug_assert!(c.lit0() == false_lit || c.lit1() == false_lit);
@@ -534,16 +549,18 @@ impl PropagateIF for AssignStack {
                 for (k, lk) in c.iter().enumerate().skip(2) {
                     if lit_assign!(self, *lk) != Some(false) {
                         cdb.update_watch_cache(cid, false_watch_pos, k, true);
+                        cdb.watches(cid, "propagate553");
                         continue 'next_clause;
                     }
                 }
                 if false_watch_pos == 0 {
-                    cdb.update_watch_cache(cid, 0, 1, false);
+                    cdb.swap_watch(cid);
                 }
                 cdb.reregister_watch_cache(sweeping, Some((cid, other_watch)));
                 if other_watch_value == Some(false) {
                     while cdb.reregister_watch_cache(sweeping, watches.next().deref_watch()) {}
                     assert!(!cdb[cid].is_dead());
+                    cdb.watches(cid, "propagate543");
                     return cid;
                 }
                 let lv = cdb[cid]
@@ -557,6 +574,7 @@ impl PropagateIF for AssignStack {
                     AssignReason::Implication(cid, NULL_LIT),
                     lv,
                 );
+                cdb.watches(cid, "propagate571");
             }
         }
         ClauseId::default()
@@ -574,6 +592,9 @@ impl AssignStack {
             num_propagated = self.trail.len();
             for ci in 1..cdb.len() {
                 let cid = ClauseId::from(ci);
+                if !cdb[cid].is_dead() {
+                    cdb.watches(cid, "propagate583");
+                }
                 match cdb.update_under(self, cid) {
                     Ok(z) if z == Lit::default() => (),
                     Ok(lit) => {
@@ -581,8 +602,8 @@ impl AssignStack {
                         if self.assign_at_root_level(lit).is_err() {
                             return Some(cid);
                         } else {
+                            cdb.watches(cid, "propagate592");
                             cdb.remove_clause(cid);
-                            assert!(cdb[cid].is_dead());
                         }
                     }
                     Err(_) => return Some(cid),

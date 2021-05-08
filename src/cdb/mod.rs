@@ -102,11 +102,12 @@ pub trait ClauseDBIF:
     fn detach_watch_cache(&mut self, l: Lit) -> WatchCache;
     /// register the clase to the previous watch cache
     fn reregister_watch_cache(&mut self, p: Lit, target: Option<(ClauseId, Lit)>) -> bool;
-    /// allocate a new clause and return its id.
-    /// * If `level_sort` is on, register `v` as a learnt after sorting based on assign level.
-    /// * Otherwise, register `v` as a permanent clause, which rank is zero.
+    /// swap the first two literals in a clause.
+    fn swap_watch(&mut self, cid: ClauseId);
+    /// TODO!
     fn update_watch_cache(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool);
-    /// removes an eliminated Lit `p` from a clause. This is an O(n) function!
+    /// allocate a new clause and return its id.
+    /// Note this removes an eliminated Lit `p` from a clause. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
     /// And this is called only from `Eliminator::strengthen_clause`.
     fn new_clause<A>(&mut self, asg: &mut A, v: &mut Vec<Lit>, learnt: bool) -> CID
