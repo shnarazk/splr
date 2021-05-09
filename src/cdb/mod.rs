@@ -118,11 +118,11 @@ pub trait ClauseDBIF:
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn remove_clause_sandbox(&mut self, cid: ClauseId);
     /// update watches of the clause
-    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause;
+    fn transform_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause;
     /// generic clause transformer (not in use)
-    fn transform(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause;
+    fn transform_by_replacement(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause;
     /// check satisfied and nullified literals in a clause
-    fn unasserted<A>(&mut self, asg: &mut A, cid: ClauseId) -> RefClause
+    fn transform_by_simplification<A>(&mut self, asg: &mut A, cid: ClauseId) -> RefClause
     where
         A: AssignIF;
     /// check the condition to reduce.

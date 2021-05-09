@@ -555,7 +555,7 @@ impl ClauseDBIF for ClauseDB {
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
     }
     // return a Lit if the clause becomes a unit clause.
-    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause {
+    fn transform_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause {
         //
         //## Clause transform rules
         //
@@ -646,7 +646,7 @@ impl ClauseDBIF for ClauseDB {
             RefClause::Clause
         }
     }
-    fn transform(&mut self, cid: ClauseId, new_lits: &mut Vec<Lit>) -> RefClause {
+    fn transform_by_replacement(&mut self, cid: ClauseId, new_lits: &mut Vec<Lit>) -> RefClause {
         assert!(1 < new_lits.len());
         //
         //## Clause transform rules
@@ -735,7 +735,7 @@ impl ClauseDBIF for ClauseDB {
             RefClause::Clause
         }
     }
-    fn unasserted<A>(&mut self, asg: &mut A, cid: ClauseId) -> RefClause
+    fn transform_by_simplification<A>(&mut self, asg: &mut A, cid: ClauseId) -> RefClause
     where
         A: AssignIF,
     {

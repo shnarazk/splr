@@ -586,7 +586,7 @@ impl AssignStack {
                 if cdb[cid].is_dead() {
                     continue;
                 }
-                match cdb.unasserted(self, cid) {
+                match cdb.transform_by_simplification(self, cid) {
                     RefClause::BiClause | RefClause::Clause => (),
                     RefClause::Dead => (),
                     RefClause::EmptyClause => return Some(cid),
