@@ -594,16 +594,13 @@ impl ClauseDBIF for ClauseDB {
         }
 
         (*c).search_from = 2;
-        let mut tmp: Vec<Lit> = lits
+        let mut new_lits: Vec<Lit> = lits
             .iter()
             .filter(|&l| *l != p)
             .copied()
             .collect::<Vec<Lit>>();
-        let l0 = lits[0];
-        let l1 = lits[1];
-        std::mem::swap(lits, &mut tmp);
-        if lits.len() == 2 {
-            if let Some(reg) = bi_clause[!lits[0]].get(&lits[1]) {
+        if new_lits.len() == 2 {
+            if let Some(reg) = bi_clause[!new_lits[0]].get(&new_lits[1]) {
                 //
                 //## Case:3-0
                 //
@@ -612,6 +609,9 @@ impl ClauseDBIF for ClauseDB {
                 //
                 //## Case:3-2
                 //
+                let l0 = lits[0];
+                let l1 = lits[1];
+                std::mem::swap(lits, &mut new_lits);
                 watch_cache[!l0].remove_watch(&cid);
                 watch_cache[!l1].remove_watch(&cid);
                 bi_clause[!lits[0]].insert(lits[1], cid);
@@ -619,12 +619,15 @@ impl ClauseDBIF for ClauseDB {
                 *num_bi_clause += 1;
                 if certification_store.is_active() {
                     certification_store.push_add(&c.lits);
-                    certification_store.push_delete(&tmp);
+                    certification_store.push_delete(&new_lits);
                 }
                 // self.watches(cid, "after strengthen_by_elimination case:3-2");
                 RefClause::BiClause
             }
         } else {
+            let l0 = lits[0];
+            let l1 = lits[1];
+            std::mem::swap(lits, &mut new_lits);
             //
             //## Case:3-3
             //
@@ -637,14 +640,14 @@ impl ClauseDBIF for ClauseDB {
             }
             if certification_store.is_active() {
                 certification_store.push_add(&c.lits);
-                certification_store.push_delete(&tmp);
+                certification_store.push_delete(&new_lits);
             }
             // self.watches(cid, "after strengthen_by_elimination case:3-3");
             RefClause::Clause
         }
     }
-    fn transform(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause {
-        assert!(1 < vec.len());
+    fn transform(&mut self, cid: ClauseId, new_lits: &mut Vec<Lit>) -> RefClause {
+        assert!(1 < new_lits.len());
         //
         //## Clause transform rules
         //
@@ -662,33 +665,33 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         let c = &mut clause[cid.ordinal as usize];
-        assert!(vec.len() < c.len());
-        let old_l0 = c.lit0();
-        let old_l1 = c.lit0();
-        std::mem::swap(&mut c.lits, vec);
-        let l0 = c.lit0();
-        let l1 = c.lit0();
-        if c.len() == 2 {
-            if let Some(bc) = bi_clause[c.lit0()].get(&c.lit1()) {
+        assert!(new_lits.len() < c.len());
+        if new_lits.len() == 2 {
+            if let Some(bc) = bi_clause[!new_lits[0]].get(&new_lits[1]) {
                 let did = *bc;
                 //
                 //## Case:0
                 //
                 if certification_store.is_active() {
-                    certification_store.push_delete(&vec);
+                    certification_store.push_delete(&new_lits);
                 }
                 return RefClause::RegisteredBiClause(did);
             }
             //
             //## Case:2
             //
+            let old_l0 = c.lit0();
+            let old_l1 = c.lit0();
+            std::mem::swap(&mut c.lits, new_lits);
+            let l0 = c.lit0();
+            let l1 = c.lit0();
             watch_cache[!old_l0].remove_watch(&cid);
             watch_cache[!old_l1].remove_watch(&cid);
             bi_clause[!l0].insert(l1, cid);
             bi_clause[!l1].insert(l0, cid);
 
             if certification_store.is_active() {
-                certification_store.push_add(&vec);
+                certification_store.push_add(&new_lits);
                 certification_store.push_delete(&c.lits);
             }
             c.turn_off(Flag::LEARNT);
@@ -696,13 +699,19 @@ impl ClauseDBIF for ClauseDB {
 
             if certification_store.is_active() {
                 certification_store.push_add(&c.lits);
-                certification_store.push_delete(&vec);
+                certification_store.push_delete(&new_lits);
             }
             RefClause::BiClause
         } else {
             //
             //## Case:3
             //
+            let old_l0 = c.lit0();
+            let old_l1 = c.lit0();
+            std::mem::swap(&mut c.lits, new_lits);
+            let l0 = c.lit0();
+            let l1 = c.lit0();
+
             if l0 == old_l0 && l1 == old_l1 {
             } else if l0 == old_l0 {
                 watch_cache[!old_l1].remove_watch(&cid);
@@ -720,7 +729,7 @@ impl ClauseDBIF for ClauseDB {
             }
 
             if certification_store.is_active() {
-                certification_store.push_add(&vec);
+                certification_store.push_add(&new_lits);
                 certification_store.push_delete(&c.lits);
             }
             RefClause::Clause
@@ -778,19 +787,19 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         let c = &mut clause[cid.ordinal as usize];
-        let mut valids = c
+        let mut new_lits = c
             .lits
             .iter()
             .filter(|l| asg.assigned(**l).is_none() && !asg.var(l.vi()).is(Flag::ELIMINATED))
             .copied()
             .collect::<Vec<_>>();
-        match valids.len() {
-            0 => RefClause::EmptyClause,           //## Case:0
-            1 => RefClause::UnitClause(valids[0]), //## Case:1
+        match new_lits.len() {
+            0 => RefClause::EmptyClause,             //## Case:0
+            1 => RefClause::UnitClause(new_lits[0]), //## Case:1
             2 => {
                 //## Case:2
-                let l0 = valids[0];
-                let l1 = valids[1];
+                let l0 = new_lits[0];
+                let l1 = new_lits[1];
                 assert!(2 < c.lits.len());
                 if let Some(r) = bi_clause[!l0].get(&l1) {
                     let bid = *r;
@@ -807,13 +816,13 @@ impl ClauseDBIF for ClauseDB {
                 watch_cache[!c.lits[1]].remove_watch(&cid);
                 bi_clause[!l0].insert(l1, cid);
                 bi_clause[!l1].insert(l0, cid);
-                std::mem::swap(&mut c.lits, &mut valids);
+                std::mem::swap(&mut c.lits, &mut new_lits);
                 self.num_bi_clause += 1;
                 c.turn_off(Flag::LEARNT);
 
                 if certification_store.is_active() {
                     certification_store.push_add(&c.lits);
-                    certification_store.push_delete(&valids);
+                    certification_store.push_delete(&new_lits);
                 }
                 // self.watches(cid, "unasserted:708");
                 RefClause::BiClause
@@ -822,34 +831,32 @@ impl ClauseDBIF for ClauseDB {
                 //
                 //## Case:3-3
                 //
-                let l0 = valids[0];
-                let l1 = valids[1];
-                if l0 == c.lits[0] && l1 == c.lits[1] {
-                    std::mem::swap(&mut c.lits, &mut valids);
-                    // self.watches(cid, "unasserted:761");
-                    return RefClause::Clause;
-                } else if l0 == c.lits[0] {
+                let old_l0 = c.lit0();
+                let old_l1 = c.lit1();
+                std::mem::swap(&mut c.lits, &mut new_lits);
+                let l0 = c.lit0();
+                let l1 = c.lit1();
+
+                if old_l0 == l0 && old_l1 == l1 {
+                } else if old_l0 == l0 {
+                    watch_cache[!old_l1].remove_watch(&cid);
                     watch_cache[!l0].insert_or_update_watch(cid, l1);
-                    watch_cache[!c.lits[1]].remove_watch(&cid);
                     watch_cache[!l1].insert_or_update_watch(cid, l0);
-                } else if l0 == c.lits[1] {
-                    watch_cache[!c.lits[0]].remove_watch(&cid);
+                } else if old_l0 == l1 {
+                    watch_cache[!old_l0].remove_watch(&cid);
                     watch_cache[!l0].insert_or_update_watch(cid, l1);
                     watch_cache[!l1].insert_or_update_watch(cid, l0);
                 } else {
-                    watch_cache[!c.lits[0]].remove_watch(&cid);
+                    watch_cache[!old_l0].remove_watch(&cid);
+                    watch_cache[!old_l1].remove_watch(&cid);
                     watch_cache[!l0].insert_or_update_watch(cid, l1);
-                    watch_cache[!c.lits[1]].remove_watch(&cid);
                     watch_cache[!l1].insert_or_update_watch(cid, l0);
                 }
-                std::mem::swap(&mut c.lits, &mut valids);
 
                 if certification_store.is_active() {
                     certification_store.push_add(&c.lits);
-                    certification_store.push_delete(&valids);
+                    certification_store.push_delete(&new_lits);
                 }
-
-                // self.watches(cid, "unasserted:799");
                 RefClause::Clause
             }
         }
