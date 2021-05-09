@@ -160,7 +160,6 @@ impl AssignStack {
     pub fn make_var_asserted(&mut self, vi: VarId) {
         self.reason[vi] = AssignReason::Implication(ClauseId::default(), NULL_LIT);
         self.var[vi].timestamp = self.ordinal;
-        self.num_asserted_vars += 1;
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
         #[cfg(feature = "best_phases_tracking")]

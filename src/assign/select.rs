@@ -139,7 +139,7 @@ impl VarSelectIF for AssignStack {
         }
         if invalidated {
             self.best_phases.clear();
-            self.num_best_assign = self.num_eliminated_vars;
+            self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
         } else {
             self.num_rephase += 1;
         }

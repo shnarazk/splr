@@ -272,7 +272,6 @@ impl PropagateIF for AssignStack {
             // self.q_head = 0;
             self.num_restart += 1;
             self.cpr_ema.update(self.num_conflict);
-            self.num_asserted_vars = self.assign.iter().filter(|a| a.is_some()).count();
         }
 
         assert!(self.q_head == 0 || self.assign[self.trail[self.q_head - 1].vi()].is_some());
@@ -313,13 +312,10 @@ impl PropagateIF for AssignStack {
     where
         C: ClauseDBIF,
     {
-        if self.decision_level() == self.root_level {
+        if self.decision_level() == self.root_level && !self.trail.is_empty() {
             if let Some(cc) = self.propagate_at_root_level(cdb) {
                 return cc;
             }
-            // for l in self.trail.iter() {
-            //
-            // }
         }
         while let Some(p) = self.trail.get(self.q_head) {
             self.num_propagation += 1;
@@ -451,10 +447,13 @@ impl PropagateIF for AssignStack {
                 );
             }
         }
-        if self.decision_level() == self.root_level {
-            // TODO: wipe asserted literals from trail and increment the number of asserted vars.
+        // wipe asserted literals from trail and increment the number of asserted vars.
+        if self.decision_level() == self.root_level && !self.trail.is_empty() {
+            self.num_asserted_vars += self.trail.len();
+            self.trail.clear();
+            self.q_head = 0;
         }
-        let na = self.q_head + self.num_eliminated_vars;
+        let na = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
         if self.num_best_assign <= na && 0 < self.decision_level() {
             self.best_assign = true;
             self.num_best_assign = na;

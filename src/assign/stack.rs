@@ -130,9 +130,9 @@ impl Instantiate for AssignStack {
             SolverEvent::Reinitialize => {
                 debug_assert_eq!(self.decision_level(), self.root_level);
                 self.q_head = 0;
+                self.num_asserted_vars = 0;
                 self.num_eliminated_vars =
                     self.var.iter().filter(|v| v.is(Flag::ELIMINATED)).count();
-                self.num_asserted_vars = self.assign.iter().filter(|a| a.is_some()).count();
                 self.rebuild_order();
             }
             e => panic!("don't call asg with {:?}", e),

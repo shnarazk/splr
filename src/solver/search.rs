@@ -57,7 +57,6 @@ impl SolveIF for Solver {
         if cdb.check_size().is_err() {
             return Err(SolverError::OutOfMemory);
         }
-        asg.num_asserted_vars = asg.stack_len();
         state.progress_header();
         state.progress(asg, cdb, elim, rst);
         state.flush("");
