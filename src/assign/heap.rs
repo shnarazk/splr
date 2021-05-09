@@ -175,8 +175,8 @@ impl VarOrderIF for VarIdHeap {
         let vs = self.heap[s];
         let n = self.idxs[0];
         let vn = self.heap[n];
-        debug_assert!(vn != 0, "Invalid VarId for heap");
-        debug_assert!(vs != 0, "Invalid VarId for heap");
+        debug_assert!(vn != 0, "Invalid VarId for heap: vn {}, n {}", vn, n);
+        debug_assert!(vs != 0, "Invalid VarId for heap: vs {}, n {}", vs, n);
         self.heap.swap(n, s);
         self.idxs.swap(vn, vs);
         self.idxs[0] -= 1;

@@ -81,7 +81,20 @@ fn main() {
             });
         }
     }
-    let mut s = Solver::build(&config).expect("failed to load");
+    let mut s = match Solver::build(&config) {
+        Err(SolverError::RootLevelConflict(_)) => {
+            println!(
+                "\x1B[1G\x1B[K{}: {}",
+                colored(Ok(false), config.no_color),
+                config.cnf_file.file_name().unwrap().to_string_lossy(),
+            );
+            std::process::exit(20);
+        }
+        Err(e) => {
+            panic!("{:?}", e);
+        }
+        Ok(solver) => solver,
+    };
     let res = s.solve();
     save_result(&mut s, &res, &cnf_file, ans_file);
     std::process::exit(match res {

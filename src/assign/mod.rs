@@ -249,10 +249,13 @@ pub mod property {
                 Tusize::NumAssertedVar => self.num_asserted_vars,
                 Tusize::NumEliminatedVar => self.num_eliminated_vars,
                 Tusize::NumUnassertedVar => {
-                    self.num_vars - self.num_eliminated_vars - self.num_asserted_vars
+                    self.num_vars - self.num_asserted_vars - self.num_eliminated_vars
                 }
                 Tusize::NumUnassignedVar => {
-                    self.num_vars - self.num_eliminated_vars - self.trail.len()
+                    self.num_vars
+                        - self.num_asserted_vars
+                        - self.num_eliminated_vars
+                        - self.trail.len()
                 }
                 Tusize::NumUnreachableVar => self.num_vars - self.num_best_assign,
                 Tusize::RootLevel => self.root_level as usize,

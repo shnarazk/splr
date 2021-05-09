@@ -362,7 +362,9 @@ impl Solver {
                             Err(_) => (),
                         }
                     }
-                    if !v.is_empty() && self.add_unchecked_clause(&mut v).is_none() {
+                    if v.is_empty() {
+                        return Err(SolverError::RootLevelConflict(ClauseId::default()));
+                    } else if self.add_unchecked_clause(&mut v).is_none() {
                         return Err(SolverError::RootLevelConflict(ClauseId::from(v[0])));
                     }
                 }
