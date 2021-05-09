@@ -1,11 +1,7 @@
 /// Crate `eliminator` implements clause subsumption and var elimination.
 use {
     super::{EliminateIF, Eliminator},
-    crate::{
-        assign::AssignIF,
-        cdb::{ClauseDBIF, StrengthenResult},
-        types::*,
-    },
+    crate::{assign::AssignIF, cdb::ClauseDBIF, types::*},
 };
 
 impl Eliminator {
@@ -110,7 +106,26 @@ where
     // |         cdb[cid].iter().map(|l| asg.assigned(*l)).collect::<Vec<_>>(),
     // | );
     match cdb.strengthen_by_elimination(cid, l) {
-        StrengthenResult::BecameUnitClause(l0) => {
+        RefClause::BiClause | RefClause::Clause => {
+            #[cfg(feature = "trace_elimination")]
+            println!("cid {} drops literal {}", cid, l);
+
+            #[cfg(feature = "boundary_check")]
+            assert!(1 < cdb[cid].len());
+
+            elim.enqueue_clause(cid, &mut cdb[cid]);
+            elim.remove_lit_occur(asg, l, cid);
+            Ok(())
+        }
+        RefClause::Dead => panic!("impossible"),
+        RefClause::EmptyClause => panic!("imossible"),
+        RefClause::RegisteredBiClause(_) => {
+            elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
+            // cdb.watches(cid, "subsume133");
+            cdb.remove_clause(cid);
+            Ok(())
+        }
+        RefClause::UnitClause(l0) => {
             // Vaporize the binary clause
             // debug_assert!(2 == cdb[cid].len());
             // let c0 = cdb[cid][0];
@@ -127,23 +142,6 @@ where
             // cdb.watches(cid, "subsume127");
             cdb.remove_clause(cid);
             asg.assign_at_root_level(l0)
-        }
-        StrengthenResult::MergedToRegisteredClause(_) => {
-            elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
-            // cdb.watches(cid, "subsume133");
-            cdb.remove_clause(cid);
-            Ok(())
-        }
-        StrengthenResult::Ok => {
-            #[cfg(feature = "trace_elimination")]
-            println!("cid {} drops literal {}", cid, l);
-
-            #[cfg(feature = "boundary_check")]
-            assert!(1 < cdb[cid].len());
-
-            elim.enqueue_clause(cid, &mut cdb[cid]);
-            elim.remove_lit_occur(asg, l, cid);
-            Ok(())
         }
     }
 }

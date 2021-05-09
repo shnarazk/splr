@@ -1,7 +1,7 @@
 use {
     super::{
         property, watch_cache::*, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId,
-        RefClause, StrengthenResult, CID,
+        RefClause, CID,
     },
     crate::{assign::AssignIF, solver::SolverEvent, types::*},
     std::{
@@ -555,7 +555,7 @@ impl ClauseDBIF for ClauseDB {
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
     }
     // return a Lit if the clause becomes a unit clause.
-    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> StrengthenResult {
+    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause {
         //
         //## Clause transform rules
         //
@@ -590,7 +590,7 @@ impl ClauseDBIF for ClauseDB {
             if lits[0] == p {
                 lits.swap(0, 1);
             }
-            return StrengthenResult::BecameUnitClause(lits[0]);
+            return RefClause::UnitClause(lits[0]);
         }
 
         (*c).search_from = 2;
@@ -610,7 +610,7 @@ impl ClauseDBIF for ClauseDB {
             //## Case:3-0
             //
             if let Some(reg) = bi_clause[!tmp[0]].get(&tmp[1]) {
-                return StrengthenResult::MergedToRegisteredClause(*reg);
+                return RefClause::RegisteredBiClause(*reg);
             }
         }
         let l0 = lits[0];
@@ -627,6 +627,7 @@ impl ClauseDBIF for ClauseDB {
             bi_clause[!lits[0]].insert(lits[1], cid);
             bi_clause[!lits[1]].insert(lits[0], cid);
             *num_bi_clause += 1;
+            return RefClause::BiClause;
         }
         //
         //## Case:3-3
@@ -644,7 +645,7 @@ impl ClauseDBIF for ClauseDB {
             certification_store.push_delete(&old_lits);
         }
         // self.watches(cid, "after strengthen_by_elimination case 3-2 and 3-3");
-        StrengthenResult::Ok
+        RefClause::Clause
     }
     fn transform(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause {
         assert!(1 < vec.len());

@@ -20,13 +20,6 @@ use {
     watch_cache::*,
 };
 
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum StrengthenResult {
-    MergedToRegisteredClause(ClauseId),
-    BecameUnitClause(Lit),
-    Ok,
-}
-
 /// ClauseID with the information on generation kind
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum CID {
@@ -125,7 +118,7 @@ pub trait ClauseDBIF:
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn remove_clause_sandbox(&mut self, cid: ClauseId);
     /// update watches of the clause
-    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> StrengthenResult;
+    fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause;
     /// TODO
     fn transform(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause;
     /// TODO
