@@ -537,7 +537,7 @@ pub enum SolverError {
     NullLearnt,
     OutOfMemory,
     OutOfRange,
-    RootLevelConflict(Lit),
+    RootLevelConflict(ClauseId),
     TimeOut,
     SolverBug,
     UndescribedError,

@@ -312,8 +312,8 @@ impl EliminateIF for Eliminator {
             }
         } else {
             // self.eliminate_satisfied_clauses(asg, cdb, true);
-            if !asg.propagate(cdb).is_none() {
-                return Err(SolverError::RootLevelConflict(Lit::default()));
+            if let Some(cc) = asg.propagate(cdb).to_option() {
+                return Err(SolverError::RootLevelConflict(cc));
             }
         }
         if self.mode != EliminatorMode::Dormant {
@@ -525,7 +525,7 @@ impl Eliminator {
         }
         if asg.remains() {
             if let Some(cc) = asg.propagate(cdb).to_option() {
-                return Err(SolverError::RootLevelConflict(cdb[cc].lit0()));
+                return Err(SolverError::RootLevelConflict(cc));
             }
         }
         Ok(())
@@ -606,7 +606,7 @@ impl Eliminator {
             self.backward_subsumption_check(asg, cdb, &mut timedout)?;
             debug_assert!(self.clause_queue.is_empty());
             if let Some(cc) = asg.propagate(cdb).to_option() {
-                return Err(SolverError::RootLevelConflict(cdb[cc].lit0()));
+                return Err(SolverError::RootLevelConflict(cc));
             }
             self.eliminate_satisfied_clauses(asg, cdb, true);
             if timedout == 0 {

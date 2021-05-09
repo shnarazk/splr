@@ -199,7 +199,7 @@ impl SatSolverIF for Solver {
             .map(|i| Lit::from(*i))
             .collect::<Vec<Lit>>();
         if self.add_unchecked_clause(&mut clause).is_none() {
-            return Err(SolverError::RootLevelConflict(clause[0]));
+            return Err(SolverError::RootLevelConflict(ClauseId::from(clause[0])));
         }
         Ok(self)
     }
@@ -360,7 +360,7 @@ impl Solver {
                         }
                     }
                     if !v.is_empty() && self.add_unchecked_clause(&mut v).is_none() {
-                        return Err(SolverError::RootLevelConflict(v[0]));
+                        return Err(SolverError::RootLevelConflict(ClauseId::from(v[0])));
                     }
                 }
                 Err(e) => panic!("{}", e),
@@ -397,7 +397,7 @@ impl Solver {
                 .map(|i| Lit::from(*i))
                 .collect::<Vec<Lit>>();
             if self.add_unchecked_clause(&mut lits).is_none() {
-                return Err(SolverError::RootLevelConflict(lits[0]));
+                return Err(SolverError::RootLevelConflict(ClauseId::from(lits[0])));
             }
         }
         debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);

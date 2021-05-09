@@ -185,7 +185,7 @@ pub fn handle_conflict(
         cdb.certificate_add_assertion(new_learnt[0]);
         if asg.assign_at_root_level(l0).is_err() {
             state.log(asg.num_conflict, "RootLevelConflict by conflict analyzer");
-            return Err(SolverError::RootLevelConflict(l0));
+            return Err(SolverError::RootLevelConflict(ClauseId::default()));
         }
         elim.to_simplify += (state.config.c_ip_int / 2) as f64;
         rst.handle(SolverEvent::Assert(l0.vi()))

@@ -30,7 +30,7 @@ pub fn vivify(
     if asg.remains() {
         if let Some(cc) = asg.propagate(cdb).to_option() {
             state.log(asg.num_conflict, "By vivifier");
-            return Err(SolverError::RootLevelConflict(cdb[cc].lit0()));
+            return Err(SolverError::RootLevelConflict(cc));
         }
     }
     let ave_lbd = {
@@ -100,7 +100,7 @@ pub fn vivify(
                                 state[Stat::VivifiedClause] += num_shrink;
                                 state[Stat::VivifiedVar] += num_assert;
                                 state.log(asg.num_conflict, "RootLevelConflict By vivify");
-                                return Err(SolverError::RootLevelConflict(lit));
+                                return Err(SolverError::RootLevelConflict(cid));
                             }
                             1 => {
                                 assert_lit(asg, cdb, state, vec[0])?;
@@ -165,7 +165,7 @@ fn assert_lit(
         assert!(asg.remains());
         asg.propagate(cdb)
             .to_option()
-            .map_or(Ok(()), |_| Err(SolverError::RootLevelConflict(l0)))
+            .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(cc)))
     })
     //        while asg.remains() {
     //            if !asg.propagate(cdb).is_none() {
@@ -198,7 +198,7 @@ fn assert_lit(
     assert_eq!(asg.decision_level(), asg.root_level);
     if let Some(cc) = asg.propagate(cdb).to_option() {
         state.log(asg.num_conflict, "By vivifier");
-        return Err(SolverError::RootLevelConflict(cdb[cc].lit0()));
+        return Err(SolverError::RootLevelConflict(cc));
     }
     if asg.remains() {
         state.log(

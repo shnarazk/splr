@@ -130,7 +130,7 @@ impl PropagateIF for AssignStack {
                 // self.make_var_asserted(vi);
                 Ok(())
             }
-            _ => Err(SolverError::RootLevelConflict(l)),
+            _ => Err(SolverError::RootLevelConflict(ClauseId::from(l))),
         }
     }
     fn assign_by_implication(&mut self, l: Lit, reason: AssignReason, lv: DecisionLevel) {

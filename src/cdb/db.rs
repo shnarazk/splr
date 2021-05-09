@@ -787,8 +787,8 @@ impl ClauseDBIF for ClauseDB {
             .copied()
             .collect::<Vec<_>>();
         match valids.len() {
-            0 => Err(SolverError::RootLevelConflict(c.lits[0])), //## Case:0
-            1 => Ok(valids[0]),                                  //## Case:1
+            0 => Err(SolverError::RootLevelConflict(cid)), //## Case:0
+            1 => Ok(valids[0]),                            //## Case:1
             2 => {
                 //## Case:2
                 let l0 = valids[0];
