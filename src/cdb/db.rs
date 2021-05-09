@@ -741,7 +741,7 @@ impl ClauseDBIF for ClauseDB {
         // 5. a normal clause becomes a new bi-clause.             [Case:3-2]
         // 5. a normal clause becomes a shorter normal clause.     [Case:3-3]
         //
-        assert!(self[cid].is_dead());
+        assert!(!self[cid].is_dead());
         // self.watches(cid, "unasserted");
         // firstly sweep without consuming extra memory
         let mut need_to_shrink = false;
