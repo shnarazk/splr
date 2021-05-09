@@ -108,10 +108,10 @@ macro_rules! unset_assign {
 
 impl PropagateIF for AssignStack {
     fn assign_at_root_level(&mut self, l: Lit) -> MaybeInconsistent {
+        self.cancel_until(self.root_level);
         let vi = l.vi();
         debug_assert!(vi < self.var.len());
         debug_assert!(!self.var[vi].is(Flag::ELIMINATED));
-        debug_assert_eq!(self.root_level, self.decision_level());
         debug_assert!(self.trail_lim.is_empty());
         self.level[vi] = self.root_level;
         match var_assign!(self, vi) {
