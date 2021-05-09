@@ -561,9 +561,9 @@ impl ClauseDBIF for ClauseDB {
         //
         // There are four cases:
         // 1. a bi-clause becomes a unit clause.                   [Case:2-1]
-        // 1. a normal clause is merged to a registered bi-clause. [Case:3-0]
-        // 1. a normal clause becomes a new bi-clause.             [Case:3-2]
-        // 1. a normal clause becomes a shorter normal clause.     [Case:3-3]
+        // 2. a normal clause is merged to a registered bi-clause. [Case:3-0]
+        // 3. a normal clause becomes a new bi-clause.             [Case:3-2]
+        // 4. a normal clause becomes a shorter normal clause.     [Case:3-3]
         //
 
         // self.watches(cid, "before strengthen_by_elimination");
@@ -594,58 +594,54 @@ impl ClauseDBIF for ClauseDB {
         }
 
         (*c).search_from = 2;
-        let old_lits = if certification_store.is_active() {
-            lits.clone()
-        } else {
-            Vec::new()
-        };
         let mut tmp: Vec<Lit> = lits
             .iter()
             .filter(|&l| *l != p)
             .copied()
             .collect::<Vec<Lit>>();
-        let becomes_binary = tmp.len() == 2;
-        if becomes_binary {
-            //
-            //## Case:3-0
-            //
-            if let Some(reg) = bi_clause[!tmp[0]].get(&tmp[1]) {
-                return RefClause::RegisteredBiClause(*reg);
-            }
-        }
         let l0 = lits[0];
         let l1 = lits[1];
         std::mem::swap(lits, &mut tmp);
-        #[allow(clippy::blocks_in_if_conditions)]
-        if becomes_binary {
-            assert_eq!(lits.len(), 2);
-            //
-            //## Case:3-2
-            //
-            watch_cache[!l0].remove_watch(&cid);
-            watch_cache[!l1].remove_watch(&cid);
-            bi_clause[!lits[0]].insert(lits[1], cid);
-            bi_clause[!lits[1]].insert(lits[0], cid);
-            *num_bi_clause += 1;
-            return RefClause::BiClause;
-        }
-        //
-        //## Case:3-3
-        //
-        else if p == l0 || p == l1 {
-            watch_cache[!p].remove_watch(&cid);
-            watch_cache[!lits[1]].insert_or_update_watch(cid, lits[0]);
+        if lits.len() == 2 {
+            if let Some(reg) = bi_clause[!lits[0]].get(&lits[1]) {
+                //
+                //## Case:3-0
+                //
+                RefClause::RegisteredBiClause(*reg)
+            } else {
+                //
+                //## Case:3-2
+                //
+                watch_cache[!l0].remove_watch(&cid);
+                watch_cache[!l1].remove_watch(&cid);
+                bi_clause[!lits[0]].insert(lits[1], cid);
+                bi_clause[!lits[1]].insert(lits[0], cid);
+                *num_bi_clause += 1;
+                if certification_store.is_active() {
+                    certification_store.push_add(&c.lits);
+                    certification_store.push_delete(&tmp);
+                }
+                // self.watches(cid, "after strengthen_by_elimination case:3-2");
+                RefClause::BiClause
+            }
         } else {
-            assert_eq!(l0, lits[0]);
-            assert_eq!(l1, lits[1]);
+            //
+            //## Case:3-3
+            //
+            if p == l0 || p == l1 {
+                watch_cache[!p].remove_watch(&cid);
+                watch_cache[!lits[1]].insert_or_update_watch(cid, lits[0]);
+            } else {
+                assert_eq!(l0, lits[0]);
+                assert_eq!(l1, lits[1]);
+            }
+            if certification_store.is_active() {
+                certification_store.push_add(&c.lits);
+                certification_store.push_delete(&tmp);
+            }
+            // self.watches(cid, "after strengthen_by_elimination case:3-3");
+            RefClause::Clause
         }
-        assert!(1 < lits.len());
-        if certification_store.is_active() {
-            certification_store.push_add(&c.lits);
-            certification_store.push_delete(&old_lits);
-        }
-        // self.watches(cid, "after strengthen_by_elimination case 3-2 and 3-3");
-        RefClause::Clause
     }
     fn transform(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause {
         assert!(1 < vec.len());
@@ -654,8 +650,8 @@ impl ClauseDBIF for ClauseDB {
         //
         // There are three cases:
         // 1. a normal clause is merged to a registered bi-clause. [Case:0]
-        // 1. a normal clause becomes a new bi-clause.             [Case:2]
-        // 1. a normal clause becomes a shorter normal clause.     [Case:3]
+        // 2. a normal clause becomes a new bi-clause.             [Case:2]
+        // 3. a normal clause becomes a shorter normal clause.     [Case:3]
         //
         assert!(!self[cid].is_dead());
         let ClauseDB {
@@ -681,7 +677,6 @@ impl ClauseDBIF for ClauseDB {
                 if certification_store.is_active() {
                     certification_store.push_delete(&vec);
                 }
-                self.remove_clause(cid);
                 return RefClause::RegisteredBiClause(did);
             }
             //
@@ -696,8 +691,9 @@ impl ClauseDBIF for ClauseDB {
                 certification_store.push_add(&vec);
                 certification_store.push_delete(&c.lits);
             }
-            self.num_bi_clause += 1;
             c.turn_off(Flag::LEARNT);
+            self.num_bi_clause += 1;
+
             if certification_store.is_active() {
                 certification_store.push_add(&c.lits);
                 certification_store.push_delete(&vec);
@@ -730,7 +726,7 @@ impl ClauseDBIF for ClauseDB {
             RefClause::Clause
         }
     }
-    fn update_under<A>(&mut self, asg: &mut A, cid: ClauseId) -> RefClause
+    fn unasserted<A>(&mut self, asg: &mut A, cid: ClauseId) -> RefClause
     where
         A: AssignIF,
     {
@@ -739,14 +735,14 @@ impl ClauseDBIF for ClauseDB {
         //
         // There are six cases:
         // 1. a binary or normal clause becomes an empty clause.   [Case:0]
-        // 1. a binary or normal clause becomes a unit clause.     [Case:1]
-        // 1. a normal or binary clause remains as is.             [Case:2]
-        // 1. a normal clause is merged to a registered bi-clause. [Case:3-0]
-        // 1. a normal clause becomes a new bi-clause.             [Case:3-2]
-        // 1. a normal clause becomes a shorter normal clause.     [Case:3-3]
+        // 2. a binary or normal clause becomes a unit clause.     [Case:1]
+        // 3. a normal or binary clause remains as is.             [Case:2]
+        // 4. a normal clause is merged to a registered bi-clause. [Case:3-0]
+        // 5. a normal clause becomes a new bi-clause.             [Case:3-2]
+        // 5. a normal clause becomes a shorter normal clause.     [Case:3-3]
         //
         assert!(self[cid].is_dead());
-        // self.watches(cid, "update_under");
+        // self.watches(cid, "unasserted");
         // firstly sweep without consuming extra memory
         let mut need_to_shrink = false;
         for l in self[cid].iter() {
@@ -811,15 +807,15 @@ impl ClauseDBIF for ClauseDB {
                 watch_cache[!c.lits[1]].remove_watch(&cid);
                 bi_clause[!l0].insert(l1, cid);
                 bi_clause[!l1].insert(l0, cid);
-                if certification_store.is_active() {
-                    certification_store.push_add(&valids);
-                    certification_store.push_delete(&c.lits);
-                }
                 std::mem::swap(&mut c.lits, &mut valids);
                 self.num_bi_clause += 1;
                 c.turn_off(Flag::LEARNT);
 
-                // self.watches(cid, "update_under:708");
+                if certification_store.is_active() {
+                    certification_store.push_add(&c.lits);
+                    certification_store.push_delete(&valids);
+                }
+                // self.watches(cid, "unasserted:708");
                 RefClause::BiClause
             }
             _ => {
@@ -830,7 +826,7 @@ impl ClauseDBIF for ClauseDB {
                 let l1 = valids[1];
                 if l0 == c.lits[0] && l1 == c.lits[1] {
                     std::mem::swap(&mut c.lits, &mut valids);
-                    // self.watches(cid, "update_under:761");
+                    // self.watches(cid, "unasserted:761");
                     return RefClause::Clause;
                 } else if l0 == c.lits[0] {
                     watch_cache[!l0].insert_or_update_watch(cid, l1);
@@ -846,13 +842,14 @@ impl ClauseDBIF for ClauseDB {
                     watch_cache[!c.lits[1]].remove_watch(&cid);
                     watch_cache[!l1].insert_or_update_watch(cid, l0);
                 }
+                std::mem::swap(&mut c.lits, &mut valids);
+
                 if certification_store.is_active() {
-                    certification_store.push_add(&valids);
-                    certification_store.push_delete(&c.lits);
+                    certification_store.push_add(&c.lits);
+                    certification_store.push_delete(&valids);
                 }
 
-                std::mem::swap(&mut c.lits, &mut valids);
-                // self.watches(cid, "update_under:799");
+                // self.watches(cid, "unasserted:799");
                 RefClause::Clause
             }
         }

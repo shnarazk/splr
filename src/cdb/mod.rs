@@ -122,7 +122,7 @@ pub trait ClauseDBIF:
     /// generic clause transformer (not in use)
     fn transform(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause;
     /// check satisfied and nullified literals in a clause
-    fn update_under<A>(&mut self, asg: &mut A, cid: ClauseId) -> RefClause
+    fn unasserted<A>(&mut self, asg: &mut A, cid: ClauseId) -> RefClause
     where
         A: AssignIF;
     /// check the condition to reduce.

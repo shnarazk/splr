@@ -451,6 +451,9 @@ impl PropagateIF for AssignStack {
                 );
             }
         }
+        if self.decision_level() == self.root_level {
+            // TODO: wipe asserted literals from trail and increment the number of asserted vars.
+        }
         let na = self.q_head + self.num_eliminated_vars;
         if self.num_best_assign <= na && 0 < self.decision_level() {
             self.best_assign = true;
@@ -583,8 +586,7 @@ impl AssignStack {
                 if cdb[cid].is_dead() {
                     continue;
                 }
-                // cdb.watches(cid, "propagate 586");
-                match cdb.update_under(self, cid) {
+                match cdb.unasserted(self, cid) {
                     RefClause::BiClause | RefClause::Clause => (),
                     RefClause::Dead => (),
                     RefClause::EmptyClause => return Some(cid),
@@ -594,7 +596,6 @@ impl AssignStack {
                         if self.assign_at_root_level(lit).is_err() {
                             return Some(cid);
                         } else {
-                            // cdb.watches(cid, "propagate592");
                             cdb.remove_clause(cid);
                         }
                     }
