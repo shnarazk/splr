@@ -309,7 +309,7 @@ impl ClauseDBIF for ClauseDB {
         }
 
         c.lits.swap(old, new);
-        self.watches(cid, "after update_watch328");
+        // self.watches(cid, "after update_watch328");
     }
     fn new_clause<A>(&mut self, asg: &mut A, vec: &mut Vec<Lit>, mut learnt: bool) -> CID
     where
@@ -617,44 +617,24 @@ impl ClauseDBIF for ClauseDB {
         let l1 = lits[1];
         std::mem::swap(lits, &mut tmp);
         #[allow(clippy::blocks_in_if_conditions)]
-        if p == l0 {
-            assert_eq!(l1, lits[1]);
+        if becomes_binary {
+            assert_eq!(lits.len(), 2);
+            //
+            //## Case:3-2
+            //
             watch_cache[!l0].remove_watch(&cid);
-            if becomes_binary {
-                //
-                //## Case:3-2
-                //
-                watch_cache[!l1].remove_watch(&cid);
-                bi_clause[!lits[0]].insert(l1, cid);
-                bi_clause[!l1].insert(lits[0], cid);
-                *num_bi_clause += 1;
-            } else {
-                //
-                //## Case:3-3
-                //
-                watch_cache[!lits[0]].insert_or_update_watch(cid, l1);
-            }
-        } else if p == l1 {
-            assert_eq!(l0, lits[0]);
             watch_cache[!l1].remove_watch(&cid);
-            if becomes_binary {
-                //
-                //## Case:3-2
-                //
-                watch_cache[!l0].remove_watch(&cid);
-                bi_clause[!l0].insert(lits[1], cid);
-                bi_clause[!lits[1]].insert(l0, cid);
-                *num_bi_clause += 1;
-            } else {
-                //
-                //## Case:3-3
-                //
-                watch_cache[!lits[1]].insert_or_update_watch(cid, l0);
-            }
+            bi_clause[!lits[0]].insert(lits[1], cid);
+            bi_clause[!lits[1]].insert(lits[0], cid);
+            *num_bi_clause += 1;
+        }
+        //
+        //## Case:3-3
+        //
+        else if p == l0 || p == l1 {
+            watch_cache[!p].remove_watch(&cid);
+            watch_cache[!lits[1]].insert_or_update_watch(cid, lits[0]);
         } else {
-            //
-            //## Case:3-3
-            //
             assert_eq!(l0, lits[0]);
             assert_eq!(l1, lits[1]);
         }
@@ -663,7 +643,7 @@ impl ClauseDBIF for ClauseDB {
             certification_store.push_add(&c.lits);
             certification_store.push_delete(&old_lits);
         }
-        self.watches(cid, "after strengthen_by_elimination case 3-2 and 3-3");
+        // self.watches(cid, "after strengthen_by_elimination case 3-2 and 3-3");
         StrengthenResult::Ok
     }
     fn transform(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> ClauseTransform {
@@ -768,7 +748,7 @@ impl ClauseDBIF for ClauseDB {
         if self[cid].is_dead() {
             return Ok(Lit::default());
         }
-        self.watches(cid, "update_under");
+        // self.watches(cid, "update_under");
         // firstly sweep without consuming extra memory
         let mut need_to_shrink = false;
         for l in self[cid].iter() {
@@ -836,7 +816,7 @@ impl ClauseDBIF for ClauseDB {
                 self.num_bi_clause += 1;
                 c.turn_off(Flag::LEARNT);
 
-                self.watches(cid, "update_under:708");
+                // self.watches(cid, "update_under:708");
                 Ok(Lit::default())
             }
             _ => {
@@ -847,7 +827,7 @@ impl ClauseDBIF for ClauseDB {
                 let l1 = valids[1];
                 if l0 == c.lits[0] && l1 == c.lits[1] {
                     std::mem::swap(&mut c.lits, &mut valids);
-                    self.watches(cid, "update_under:761");
+                    // self.watches(cid, "update_under:761");
                     return Ok(Lit::default());
                 } else if l0 == c.lits[0] {
                     watch_cache[!l0].insert_or_update_watch(cid, l1);
@@ -869,7 +849,7 @@ impl ClauseDBIF for ClauseDB {
                 }
 
                 std::mem::swap(&mut c.lits, &mut valids);
-                self.watches(cid, "update_under:799");
+                // self.watches(cid, "update_under:799");
                 Ok(Lit::default())
             }
         }

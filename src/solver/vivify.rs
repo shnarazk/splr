@@ -61,9 +61,7 @@ pub fn vivify(
         let cid = cp.to();
         debug_assert_eq!(asg.root_level, asg.decision_level());
         let c = &mut cdb[cid];
-        assert!(!c.is_dead());
-        assert!(!c.is_satisfied_under(asg));
-        if c.is_dead() || c.is_satisfied_under(asg) {
+        if c.is_dead() {
             continue;
         }
         let is_learnt = c.is(Flag::LEARNT);
@@ -107,7 +105,7 @@ pub fn vivify(
                             1 => {
                                 assert_lit(asg, cdb, state, vec[0])?;
                                 num_assert += 1;
-                                clauses = select(asg, cdb, ave_lbd, Some(num_target - num_check));
+                                // clauses = select(asg, cdb, ave_lbd, Some(num_target - num_check));
                             }
                             _ => {
                                 if let Some(ci) = cdb.new_clause(asg, &mut vec, is_learnt).is_new()
