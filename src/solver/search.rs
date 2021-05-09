@@ -67,16 +67,19 @@ impl SolveIF for Solver {
         }
 
         state[Stat::NumProcessor] += 1;
-        state.flush("vivifying...");
-        if vivify(asg, cdb, rst, state).is_err() {
-            #[cfg(feature = "support_user_assumption")]
-            {
-                analyze_final(asg, state, &cdb[ci]);
+        #[cfg(feture = "clause_vivification")]
+        {
+            state.flush("vivifying...");
+            if vivify(asg, cdb, rst, state).is_err() {
+                #[cfg(feature = "support_user_assumption")]
+                {
+                    analyze_final(asg, state, &cdb[ci]);
+                }
+                state.log(asg.num_conflict, "By vivifier as a prepossessor");
+                return Ok(Certificate::UNSAT);
             }
-            state.log(asg.num_conflict, "By vivifier as a prepossessor");
-            return Ok(Certificate::UNSAT);
+            assert!(!asg.remains());
         }
-        assert!(!asg.remains());
         assert_eq!(asg.decision_level(), asg.root_level);
         if elim.simplify(asg, cdb, rst, state).is_err() {
             if cdb.check_size().is_err() {
