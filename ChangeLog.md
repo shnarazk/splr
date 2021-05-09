@@ -1,7 +1,7 @@
 ## 0.8.0, 2021-05-XX
 
 ### Incompatible API changes from 0.7.0
-
+- introduce data `RefClause` for clause transformation
 - define assign::property
 - append AssignIF::dump_cnf
 - define cdb::property
