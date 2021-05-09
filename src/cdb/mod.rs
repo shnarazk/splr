@@ -119,9 +119,9 @@ pub trait ClauseDBIF:
     fn remove_clause_sandbox(&mut self, cid: ClauseId);
     /// update watches of the clause
     fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause;
-    /// TODO
+    /// generic clause transformer (not in use)
     fn transform(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause;
-    /// TODO
+    /// check satisfied and nullified literals in a clause
     fn update_under<A>(&mut self, asg: &mut A, cid: ClauseId) -> RefClause
     where
         A: AssignIF;
