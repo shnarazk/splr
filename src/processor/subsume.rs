@@ -32,7 +32,7 @@ impl Eliminator {
                 }
                 assert!(!cdb[did].is_dead());
                 self.remove_cid_occur(asg, did, &mut cdb[did]);
-                cdb.watches(did, "subsume35");
+                // cdb.watches(did, "subsume35");
                 cdb.remove_clause(did);
                 self.num_subsumed += 1;
             }
@@ -124,13 +124,13 @@ where
 
             cdb.certificate_add_assertion(l0);
             elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
-            cdb.watches(cid, "subsume127");
+            // cdb.watches(cid, "subsume127");
             cdb.remove_clause(cid);
             asg.assign_at_root_level(l0)
         }
         StrengthenResult::MergedToRegisteredClause(_) => {
             elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
-            cdb.watches(cid, "subsume133");
+            // cdb.watches(cid, "subsume133");
             cdb.remove_clause(cid);
             Ok(())
         }

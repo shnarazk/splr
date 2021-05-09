@@ -642,7 +642,7 @@ impl Eliminator {
                         self.enqueue_var(asg, l.vi(), true);
                     }
                 }
-                cdb.watches(cid, "eliminator645");
+                // cdb.watches(cid, "eliminator645");
                 cdb.remove_clause(cid);
             }
         }

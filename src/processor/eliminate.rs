@@ -126,7 +126,7 @@ where
             }
             assert!(!cdb[a].is_dead(), "eaeaeaebr!!!!{}{:?}", cid, cdb[a]);
             elim.remove_cid_occur(asg, a, &mut cdb[a]);
-            cdb.watches(a, "elminate::eliminate_var::129");
+            // cdb.watches(a, "elminate::eliminate_var::129");
             cdb.remove_clause(a);
         }
         for cid in neg.iter() {
@@ -145,7 +145,7 @@ where
                 panic!("eliminate_var found a strange clause");
             }
             elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
-            cdb.watches(*cid, "eliminate::elminate_var::148");
+            // cdb.watches(*cid, "eliminate::elminate_var::148");
             cdb.remove_clause(*cid);
         }
         elim[vi].clear();

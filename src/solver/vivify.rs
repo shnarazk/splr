@@ -99,7 +99,7 @@ pub fn vivify(
                                 state.flush("");
                                 state[Stat::VivifiedClause] += num_shrink;
                                 state[Stat::VivifiedVar] += num_assert;
-                                state.log(asg.num_conflict, "By conflict analyzer");
+                                state.log(asg.num_conflict, "RootLevelConflict By vivify");
                                 return Err(SolverError::RootLevelConflict(lit));
                             }
                             1 => {
@@ -114,7 +114,7 @@ pub fn vivify(
                                     cdb[ci].turn_on(Flag::VIVIFIED);
                                 }
                                 if cc == cid {
-                                    cdb.watches(cid, "vivify119");
+                                    // cdb.watches(cid, "vivify119");
                                     cdb.remove_clause(cid);
                                     num_shrink += 1;
                                 }

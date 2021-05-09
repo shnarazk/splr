@@ -277,7 +277,7 @@ impl ClauseDBIF for ClauseDB {
     fn reregister_watch_cache(&mut self, p: Lit, target: Option<(ClauseId, Lit)>) -> bool {
         if let Some((cid, lit)) = target {
             self.watch_cache[p].insert_watch(cid, lit);
-            self.watches(cid, "after rere");
+            // self.watches(cid, "after rere");
             return true;
         }
         false
@@ -402,7 +402,7 @@ impl ClauseDBIF for ClauseDB {
             *num_clause += 1;
         }
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
-        self.watches(cid, "after new_clause");
+        // self.watches(cid, "after new_clause");
         CID::Generated(cid)
     }
     fn new_clause_sandbox<A>(&mut self, asg: &mut A, vec: &mut Vec<Lit>) -> CID
@@ -475,7 +475,7 @@ impl ClauseDBIF for ClauseDB {
                 watch_cache[!l1].insert_watch(cid, l0);
             }
         }
-        self.watches(cid, "new_clause_sandbox");
+        // self.watches(cid, "new_clause_sandbox");
         CID::Generated(cid)
     }
     /// remove a clause temporally
@@ -534,7 +534,7 @@ impl ClauseDBIF for ClauseDB {
         // if !self.clause[cid.ordinal as usize].is_dead() {
         //     self.watches(cid, "before kill");
         // }
-        self.watches(cid, "before remove_clause_sandbox");
+        // self.watches(cid, "before remove_clause_sandbox");
         let c = &mut self.clause[cid.ordinal as usize];
         debug_assert!(!c.is_dead());
         debug_assert!(1 < c.lits.len());
@@ -1192,7 +1192,7 @@ impl ClauseDB {
         let thr = self.lbd_of_dp_ema.get() as u16;
         for i in &perm[keep..] {
             if thr <= self.clause[i.to()].rank {
-                self.watches(ClauseId::from(i.to()), "db1143");
+                // self.watches(ClauseId::from(i.to()), "db1143");
                 self.remove_clause(ClauseId::from(i.to()));
             }
         }
