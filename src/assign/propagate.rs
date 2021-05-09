@@ -585,8 +585,11 @@ impl AssignStack {
                 }
                 // cdb.watches(cid, "propagate 586");
                 match cdb.update_under(self, cid) {
-                    Ok(z) if z == Lit::default() => (),
-                    Ok(lit) => {
+                    RefClause::BiClause | RefClause::Clause => (),
+                    RefClause::Dead => (),
+                    RefClause::EmptyClause => return Some(cid),
+                    RefClause::RegisteredBiClause(_) => (),
+                    RefClause::UnitClause(lit) => {
                         cdb.certificate_add_assertion(lit);
                         if self.assign_at_root_level(lit).is_err() {
                             return Some(cid);
@@ -595,7 +598,6 @@ impl AssignStack {
                             cdb.remove_clause(cid);
                         }
                     }
-                    Err(_) => return Some(cid),
                 }
             }
         }

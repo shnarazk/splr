@@ -1,7 +1,7 @@
 use {
     super::{
         property, watch_cache::*, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId,
-        ClauseTransform, StrengthenResult, CID,
+        RefClause, StrengthenResult, CID,
     },
     crate::{assign::AssignIF, solver::SolverEvent, types::*},
     std::{
@@ -646,7 +646,7 @@ impl ClauseDBIF for ClauseDB {
         // self.watches(cid, "after strengthen_by_elimination case 3-2 and 3-3");
         StrengthenResult::Ok
     }
-    fn transform(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> ClauseTransform {
+    fn transform(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause {
         assert!(1 < vec.len());
         //
         //## Clause transform rules
@@ -681,7 +681,7 @@ impl ClauseDBIF for ClauseDB {
                     certification_store.push_delete(&vec);
                 }
                 self.remove_clause(cid);
-                return ClauseTransform::RegisteredBiClause(did);
+                return RefClause::RegisteredBiClause(did);
             }
             //
             //## Case:2
@@ -701,7 +701,7 @@ impl ClauseDBIF for ClauseDB {
                 certification_store.push_add(&c.lits);
                 certification_store.push_delete(&vec);
             }
-            ClauseTransform::NewBiClause
+            RefClause::BiClause
         } else {
             //
             //## Case:3
@@ -726,10 +726,10 @@ impl ClauseDBIF for ClauseDB {
                 certification_store.push_add(&vec);
                 certification_store.push_delete(&c.lits);
             }
-            ClauseTransform::Updated
+            RefClause::Clause
         }
     }
-    fn update_under<A>(&mut self, asg: &mut A, cid: ClauseId) -> Result<Lit, SolverError>
+    fn update_under<A>(&mut self, asg: &mut A, cid: ClauseId) -> RefClause
     where
         A: AssignIF,
     {
@@ -744,10 +744,7 @@ impl ClauseDBIF for ClauseDB {
         // 1. a normal clause becomes a new bi-clause.             [Case:3-2]
         // 1. a normal clause becomes a shorter normal clause.     [Case:3-3]
         //
-
-        if self[cid].is_dead() {
-            return Ok(Lit::default());
-        }
+        assert!(self[cid].is_dead());
         // self.watches(cid, "update_under");
         // firstly sweep without consuming extra memory
         let mut need_to_shrink = false;
@@ -755,7 +752,7 @@ impl ClauseDBIF for ClauseDB {
             match asg.assigned(*l) {
                 Some(true) => {
                     self.remove_clause(cid);
-                    return Ok(Lit::default());
+                    return RefClause::Dead;
                 }
                 Some(false) => {
                     need_to_shrink = true;
@@ -770,7 +767,11 @@ impl ClauseDBIF for ClauseDB {
             //
             //## Case:2
             //
-            return Ok(Lit::default());
+            return if self[cid].len() == 2 {
+                RefClause::BiClause
+            } else {
+                RefClause::Clause
+            };
         }
         let ClauseDB {
             clause,
@@ -787,19 +788,20 @@ impl ClauseDBIF for ClauseDB {
             .copied()
             .collect::<Vec<_>>();
         match valids.len() {
-            0 => Err(SolverError::RootLevelConflict(cid)), //## Case:0
-            1 => Ok(valids[0]),                            //## Case:1
+            0 => RefClause::EmptyClause,           //## Case:0
+            1 => RefClause::UnitClause(valids[0]), //## Case:1
             2 => {
                 //## Case:2
                 let l0 = valids[0];
                 let l1 = valids[1];
                 assert!(2 < c.lits.len());
-                if let Some(_reg) = bi_clause[!l0].get(&l1) {
+                if let Some(r) = bi_clause[!l0].get(&l1) {
+                    let bid = *r;
                     //
                     //## Case:3-0
                     //
                     self.remove_clause(cid);
-                    return Ok(Lit::default());
+                    return RefClause::RegisteredBiClause(bid);
                 }
                 //
                 //## Case:3-2
@@ -817,7 +819,7 @@ impl ClauseDBIF for ClauseDB {
                 c.turn_off(Flag::LEARNT);
 
                 // self.watches(cid, "update_under:708");
-                Ok(Lit::default())
+                RefClause::BiClause
             }
             _ => {
                 //
@@ -828,7 +830,7 @@ impl ClauseDBIF for ClauseDB {
                 if l0 == c.lits[0] && l1 == c.lits[1] {
                     std::mem::swap(&mut c.lits, &mut valids);
                     // self.watches(cid, "update_under:761");
-                    return Ok(Lit::default());
+                    return RefClause::Clause;
                 } else if l0 == c.lits[0] {
                     watch_cache[!l0].insert_or_update_watch(cid, l1);
                     watch_cache[!c.lits[1]].remove_watch(&cid);
@@ -850,7 +852,7 @@ impl ClauseDBIF for ClauseDB {
 
                 std::mem::swap(&mut c.lits, &mut valids);
                 // self.watches(cid, "update_under:799");
-                Ok(Lit::default())
+                RefClause::Clause
             }
         }
     }

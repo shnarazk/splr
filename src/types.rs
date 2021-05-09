@@ -526,6 +526,16 @@ impl EmaSU {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub enum RefClause {
+    BiClause,
+    Clause,
+    Dead,
+    EmptyClause,
+    RegisteredBiClause(ClauseId),
+    UnitClause(Lit),
+}
+
 /// Internal errors.
 /// Note: returning `Result<(), a-singleton>` is identical to returning `bool`.
 #[derive(Debug, Eq, PartialEq)]

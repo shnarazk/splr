@@ -52,15 +52,6 @@ impl CID {
     }
 }
 
-#[derive(Eq, Debug, PartialEq)]
-pub enum ClauseTransform {
-    EmptyClause,
-    UnitClause(Lit),
-    RegisteredBiClause(ClauseId),
-    NewBiClause,
-    Updated,
-}
-
 /// API for Clause, providing literal accessors.
 pub trait ClauseIF {
     /// return true if it contains no literals; a clause after unit propagation.
@@ -136,9 +127,9 @@ pub trait ClauseDBIF:
     /// update watches of the clause
     fn strengthen_by_elimination(&mut self, cid: ClauseId, p: Lit) -> StrengthenResult;
     /// TODO
-    fn transform(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> ClauseTransform;
+    fn transform(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause;
     /// TODO
-    fn update_under<A>(&mut self, asg: &mut A, cid: ClauseId) -> Result<Lit, SolverError>
+    fn update_under<A>(&mut self, asg: &mut A, cid: ClauseId) -> RefClause
     where
         A: AssignIF;
     /// check the condition to reduce.
