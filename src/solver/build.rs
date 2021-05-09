@@ -40,7 +40,7 @@ pub trait SatSolverIF: Instantiate {
     /// assert!(s.add_assignment(4).is_ok());
     /// assert!(s.add_assignment(5).is_ok());
     /// assert!(s.add_assignment(8).is_ok());
-    /// assert!(matches!(s.add_assignment(-1), Err(SolverError::Inconsistent)));
+    /// assert!(matches!(s.add_assignment(-1), Err(SolverError::RootLevelConflict(_))));
     /// assert!(matches!(s.add_assignment(10), Err(SolverError::OutOfRange)));
     /// assert!(matches!(s.add_assignment(0), Err(SolverError::OutOfRange)));
     /// assert_eq!(s.solve(), Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8])));
@@ -198,6 +198,9 @@ impl SatSolverIF for Solver {
             .iter()
             .map(|i| Lit::from(*i))
             .collect::<Vec<Lit>>();
+        if clause.is_empty() {
+            return Err(SolverError::RootLevelConflict(ClauseId::default()));
+        }
         if self.add_unchecked_clause(&mut clause).is_none() {
             return Err(SolverError::RootLevelConflict(ClauseId::from(clause[0])));
         }
@@ -397,7 +400,11 @@ impl Solver {
                 .map(|i| Lit::from(*i))
                 .collect::<Vec<Lit>>();
             if self.add_unchecked_clause(&mut lits).is_none() {
-                return Err(SolverError::RootLevelConflict(ClauseId::from(lits[0])));
+                return Err(SolverError::RootLevelConflict(if lits.is_empty() {
+                    ClauseId::default()
+                } else {
+                    ClauseId::from(lits[0])
+                }));
             }
         }
         debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
