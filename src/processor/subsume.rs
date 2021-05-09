@@ -106,7 +106,7 @@ where
     // |         cdb[cid].iter().map(|l| asg.assigned(*l)).collect::<Vec<_>>(),
     // | );
     match cdb.transform_by_elimination(cid, l) {
-        RefClause::BiClause(_) | RefClause::Clause(_) => {
+        RefClause::Clause(_) => {
             #[cfg(feature = "trace_elimination")]
             println!("cid {} drops literal {}", cid, l);
 
@@ -116,7 +116,7 @@ where
         }
         RefClause::Dead => panic!("impossible"),
         RefClause::EmptyClause => panic!("imossible"),
-        RefClause::RegisteredBiClause(_) => {
+        RefClause::RegisteredClause(_) => {
             elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
             // cdb.watches(cid, "subsume133");
             cdb.remove_clause(cid);

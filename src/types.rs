@@ -528,28 +528,25 @@ impl EmaSU {
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum RefClause {
-    BiClause(ClauseId),
     Clause(ClauseId),
     Dead,
     EmptyClause,
-    RegisteredBiClause(ClauseId),
+    RegisteredClause(ClauseId),
     UnitClause(Lit),
 }
 
 impl RefClause {
     pub fn as_cid(&self) -> ClauseId {
         match self {
-            RefClause::BiClause(cid) => *cid,
             RefClause::Clause(cid) => *cid,
-            RefClause::RegisteredBiClause(cid) => *cid,
+            RefClause::RegisteredClause(cid) => *cid,
             _ => panic!("invalid reference to clause"),
         }
     }
     pub fn is_new(&self) -> Option<ClauseId> {
         match self {
-            RefClause::BiClause(cid) => Some(*cid),
             RefClause::Clause(cid) => Some(*cid),
-            RefClause::RegisteredBiClause(_) => None,
+            RefClause::RegisteredClause(_) => None,
             RefClause::EmptyClause => None,
             RefClause::Dead => None,
             RefClause::UnitClause(_) => None,

@@ -332,12 +332,13 @@ impl Solver {
                     .map_or(None, |_| Some(ClauseId::default()))
             }
             _ => match cdb.new_clause(asg, lits, false) {
-                RefClause::BiClause(cid) => Some(cid),
                 RefClause::Clause(cid) => {
-                    cdb[cid].rank = 1;
+                    if 2 < cdb[cid].len() {
+                        cdb[cid].rank = 1;
+                    }
                     Some(cid)
                 }
-                RefClause::RegisteredBiClause(cid) => Some(cid),
+                RefClause::RegisteredClause(cid) => Some(cid),
                 _ => panic!("impossible"),
             },
         }

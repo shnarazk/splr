@@ -319,7 +319,7 @@ impl ClauseDBIF for ClauseDB {
         assert!(1 < vec.len());
         if vec.len() == 2 {
             if let Some(cid) = self.has_bi_clause(vec[0], vec[1]) {
-                return RefClause::RegisteredBiClause(cid);
+                return RefClause::RegisteredClause(cid);
             }
         }
         self.certification_store.push_add(vec);
@@ -395,13 +395,12 @@ impl ClauseDBIF for ClauseDB {
             *num_bi_clause += 1;
             bi_clause[!l0].insert(l1, cid);
             bi_clause[!l1].insert(l0, cid);
-            RefClause::BiClause(cid)
         } else {
             // assert!(2 < c.lits.len());
             watch_cache[!l0].insert_watch(cid, l1);
             watch_cache[!l1].insert_watch(cid, l0);
-            RefClause::Clause(cid)
         }
+        RefClause::Clause(cid)
     }
     fn new_clause_sandbox<A>(&mut self, asg: &mut A, vec: &mut Vec<Lit>) -> RefClause
     where
@@ -411,7 +410,7 @@ impl ClauseDBIF for ClauseDB {
         let mut learnt: bool = true;
         if vec.len() == 2 {
             if let Some(cid) = self.has_bi_clause(vec[0], vec[1]) {
-                return RefClause::RegisteredBiClause(cid);
+                return RefClause::RegisteredClause(cid);
             }
         }
         let cid;
@@ -468,12 +467,11 @@ impl ClauseDBIF for ClauseDB {
         if len2 {
             bi_clause[!l0].insert(l1, cid);
             bi_clause[!l1].insert(l0, cid);
-            RefClause::BiClause(cid)
         } else {
             watch_cache[!l0].insert_watch(cid, l1);
             watch_cache[!l1].insert_watch(cid, l0);
-            RefClause::Clause(cid)
         }
+        RefClause::Clause(cid)
     }
     /// remove a clause temporally
     fn detach_clause(&mut self, cid: ClauseId) -> (Lit, Lit) {
@@ -601,26 +599,24 @@ impl ClauseDBIF for ClauseDB {
                 //
                 //## Case:3-0
                 //
-                RefClause::RegisteredBiClause(*reg)
-            } else {
-                //
-                //## Case:3-2
-                //
-                let l0 = lits[0];
-                let l1 = lits[1];
-                std::mem::swap(lits, &mut new_lits);
-                watch_cache[!l0].remove_watch(&cid);
-                watch_cache[!l1].remove_watch(&cid);
-                bi_clause[!lits[0]].insert(lits[1], cid);
-                bi_clause[!lits[1]].insert(lits[0], cid);
-                *num_bi_clause += 1;
-                if certification_store.is_active() {
-                    certification_store.push_add(&c.lits);
-                    certification_store.push_delete(&new_lits);
-                }
-                // self.watches(cid, "after strengthen_by_elimination case:3-2");
-                RefClause::BiClause(cid)
+                return RefClause::RegisteredClause(*reg);
             }
+            //
+            //## Case:3-2
+            //
+            let l0 = lits[0];
+            let l1 = lits[1];
+            std::mem::swap(lits, &mut new_lits);
+            watch_cache[!l0].remove_watch(&cid);
+            watch_cache[!l1].remove_watch(&cid);
+            bi_clause[!lits[0]].insert(lits[1], cid);
+            bi_clause[!lits[1]].insert(lits[0], cid);
+            *num_bi_clause += 1;
+            if certification_store.is_active() {
+                certification_store.push_add(&c.lits);
+                certification_store.push_delete(&new_lits);
+            }
+            // self.watches(cid, "after strengthen_by_elimination case:3-2");
         } else {
             let l0 = lits[0];
             let l1 = lits[1];
@@ -640,8 +636,8 @@ impl ClauseDBIF for ClauseDB {
                 certification_store.push_delete(&new_lits);
             }
             // self.watches(cid, "after strengthen_by_elimination case:3-3");
-            RefClause::Clause(cid)
         }
+        RefClause::Clause(cid)
     }
     fn transform_by_replacement(&mut self, cid: ClauseId, new_lits: &mut Vec<Lit>) -> RefClause {
         assert!(1 < new_lits.len());
@@ -672,7 +668,7 @@ impl ClauseDBIF for ClauseDB {
                 if certification_store.is_active() {
                     certification_store.push_delete(&new_lits);
                 }
-                return RefClause::RegisteredBiClause(did);
+                return RefClause::RegisteredClause(did);
             }
             //
             //## Case:2
@@ -698,7 +694,6 @@ impl ClauseDBIF for ClauseDB {
                 certification_store.push_add(&c.lits);
                 certification_store.push_delete(&new_lits);
             }
-            RefClause::BiClause(cid)
         } else {
             //
             //## Case:3
@@ -729,8 +724,8 @@ impl ClauseDBIF for ClauseDB {
                 certification_store.push_add(&new_lits);
                 certification_store.push_delete(&c.lits);
             }
-            RefClause::Clause(cid)
         }
+        RefClause::Clause(cid)
     }
     fn transform_by_simplification<A>(&mut self, asg: &mut A, cid: ClauseId) -> RefClause
     where
@@ -770,11 +765,7 @@ impl ClauseDBIF for ClauseDB {
             //
             //## Case:2
             //
-            return if self[cid].len() == 2 {
-                RefClause::BiClause(cid)
-            } else {
-                RefClause::Clause(cid)
-            };
+            return RefClause::Clause(cid);
         }
         let ClauseDB {
             clause,
@@ -804,7 +795,7 @@ impl ClauseDBIF for ClauseDB {
                     //## Case:3-0
                     //
                     self.remove_clause(cid);
-                    return RefClause::RegisteredBiClause(bid);
+                    return RefClause::RegisteredClause(bid);
                 }
                 //
                 //## Case:3-2
@@ -822,7 +813,7 @@ impl ClauseDBIF for ClauseDB {
                     certification_store.push_delete(&new_lits);
                 }
                 // self.watches(cid, "unasserted:708");
-                RefClause::BiClause(cid)
+                RefClause::Clause(cid)
             }
             _ => {
                 //

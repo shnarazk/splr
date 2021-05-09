@@ -586,10 +586,10 @@ impl AssignStack {
                     continue;
                 }
                 match cdb.transform_by_simplification(self, cid) {
-                    RefClause::BiClause(_) | RefClause::Clause(_) => (),
+                    RefClause::Clause(_) => (),
                     RefClause::Dead => (),
                     RefClause::EmptyClause => return Some(cid),
-                    RefClause::RegisteredBiClause(_) => (),
+                    RefClause::RegisteredClause(_) => (),
                     RefClause::UnitClause(lit) => {
                         cdb.certificate_add_assertion(lit);
                         if self.assign_at_root_level(lit).is_err() {
