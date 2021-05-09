@@ -1,7 +1,7 @@
 use {
     super::{
         property, watch_cache::*, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId,
-        RefClause, CID,
+        RefClause,
     },
     crate::{assign::AssignIF, solver::SolverEvent, types::*},
     std::{
@@ -311,7 +311,7 @@ impl ClauseDBIF for ClauseDB {
         c.lits.swap(old, new);
         // self.watches(cid, "after update_watch328");
     }
-    fn new_clause<A>(&mut self, asg: &mut A, vec: &mut Vec<Lit>, mut learnt: bool) -> CID
+    fn new_clause<A>(&mut self, asg: &mut A, vec: &mut Vec<Lit>, mut learnt: bool) -> RefClause
     where
         A: AssignIF,
     {
@@ -319,7 +319,7 @@ impl ClauseDBIF for ClauseDB {
         assert!(1 < vec.len());
         if vec.len() == 2 {
             if let Some(cid) = self.has_bi_clause(vec[0], vec[1]) {
-                return CID::Merged(cid);
+                return RefClause::RegisteredBiClause(cid);
             }
         }
         self.certification_store.push_add(vec);
@@ -351,61 +351,59 @@ impl ClauseDBIF for ClauseDB {
             std::mem::swap(&mut c.lits, vec);
             self.clause.push(c);
         };
-        {
-            let ClauseDB {
-                ref mut clause,
-                ref mut lbd_temp,
-                ref mut num_clause,
-                ref mut num_bi_clause,
-                ref mut num_bi_learnt,
-                ref mut num_lbd2,
-                ref mut num_learnt,
-                ref mut bi_clause,
-                ref ordinal,
-                ref mut watch_cache,
-                ..
-            } = self;
-            let c = &mut clause[cid.ordinal as usize];
-            c.timestamp = *ordinal;
-            let len2 = c.lits.len() == 2;
-            if len2 {
-                c.rank = 1;
-            } else {
-                c.update_lbd(asg, lbd_temp);
-            }
-            if learnt && len2 {
-                *num_bi_learnt += 1;
-            }
-            if c.lits.len() <= 2 || (self.use_chan_seok && c.rank <= self.co_lbd_bound) {
-                learnt = false;
-            }
-            if learnt {
-                c.turn_on(Flag::LEARNT);
 
-                if c.rank <= 2 {
-                    *num_lbd2 += 1;
-                }
-                *num_learnt += 1;
-            }
-            let l0 = c.lits[0];
-            let l1 = c.lits[1];
-            if len2 {
-                // assert_eq!(c.lits.len(), 2);
-                *num_bi_clause += 1;
-                bi_clause[!l0].insert(l1, cid);
-                bi_clause[!l1].insert(l0, cid);
-            } else {
-                // assert!(2 < c.lits.len());
-                watch_cache[!l0].insert_watch(cid, l1);
-                watch_cache[!l1].insert_watch(cid, l0);
-            }
-            *num_clause += 1;
+        let ClauseDB {
+            ref mut clause,
+            ref mut lbd_temp,
+            ref mut num_clause,
+            ref mut num_bi_clause,
+            ref mut num_bi_learnt,
+            ref mut num_lbd2,
+            ref mut num_learnt,
+            ref mut bi_clause,
+            ref ordinal,
+            ref mut watch_cache,
+            ..
+        } = self;
+        let c = &mut clause[cid.ordinal as usize];
+        c.timestamp = *ordinal;
+        let len2 = c.lits.len() == 2;
+        if len2 {
+            c.rank = 1;
+        } else {
+            c.update_lbd(asg, lbd_temp);
         }
-        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
-        // self.watches(cid, "after new_clause");
-        CID::Generated(cid)
+        if learnt && len2 {
+            *num_bi_learnt += 1;
+        }
+        if c.lits.len() <= 2 || (self.use_chan_seok && c.rank <= self.co_lbd_bound) {
+            learnt = false;
+        }
+        if learnt {
+            c.turn_on(Flag::LEARNT);
+
+            if c.rank <= 2 {
+                *num_lbd2 += 1;
+            }
+            *num_learnt += 1;
+        }
+        *num_clause += 1;
+        let l0 = c.lits[0];
+        let l1 = c.lits[1];
+        if len2 {
+            // assert_eq!(c.lits.len(), 2);
+            *num_bi_clause += 1;
+            bi_clause[!l0].insert(l1, cid);
+            bi_clause[!l1].insert(l0, cid);
+            RefClause::BiClause(cid)
+        } else {
+            // assert!(2 < c.lits.len());
+            watch_cache[!l0].insert_watch(cid, l1);
+            watch_cache[!l1].insert_watch(cid, l0);
+            RefClause::Clause(cid)
+        }
     }
-    fn new_clause_sandbox<A>(&mut self, asg: &mut A, vec: &mut Vec<Lit>) -> CID
+    fn new_clause_sandbox<A>(&mut self, asg: &mut A, vec: &mut Vec<Lit>) -> RefClause
     where
         A: AssignIF,
     {
@@ -413,7 +411,7 @@ impl ClauseDBIF for ClauseDB {
         let mut learnt: bool = true;
         if vec.len() == 2 {
             if let Some(cid) = self.has_bi_clause(vec[0], vec[1]) {
-                return CID::Merged(cid);
+                return RefClause::RegisteredBiClause(cid);
             }
         }
         let cid;
@@ -432,51 +430,50 @@ impl ClauseDBIF for ClauseDB {
             std::mem::swap(&mut c.lits, vec);
             self.clause.push(c);
         };
-        {
-            let ClauseDB {
-                ref mut bi_clause_completion_queue,
-                ref mut clause,
-                ref mut lbd_temp,
-                ref mut bi_clause,
-                ref ordinal,
-                ref mut watch_cache,
-                ..
-            } = self;
-            let c = &mut clause[cid.ordinal as usize];
-            c.timestamp = *ordinal;
-            let len2 = c.lits.len() == 2;
-            if len2 {
-                c.rank = 1;
 
-                #[cfg(feature = "bi_clause_completion")]
-                {
-                    for lit in c.iter() {
-                        if !bi_clause_completion_queue.iter().any(|l| *l == *lit) {
-                            bi_clause_completion_queue.push(*lit);
-                        }
+        let ClauseDB {
+            ref mut bi_clause_completion_queue,
+            ref mut clause,
+            ref mut lbd_temp,
+            ref mut bi_clause,
+            ref ordinal,
+            ref mut watch_cache,
+            ..
+        } = self;
+        let c = &mut clause[cid.ordinal as usize];
+        c.timestamp = *ordinal;
+        let len2 = c.lits.len() == 2;
+        if len2 {
+            c.rank = 1;
+
+            #[cfg(feature = "bi_clause_completion")]
+            {
+                for lit in c.iter() {
+                    if !bi_clause_completion_queue.iter().any(|l| *l == *lit) {
+                        bi_clause_completion_queue.push(*lit);
                     }
                 }
-            } else {
-                c.update_lbd(asg, lbd_temp);
             }
-            if c.lits.len() <= 2 || (self.use_chan_seok && c.rank <= self.co_lbd_bound) {
-                learnt = false;
-            }
-            if learnt {
-                c.turn_on(Flag::LEARNT);
-            }
-            let l0 = c.lits[0];
-            let l1 = c.lits[1];
-            if len2 {
-                bi_clause[!l0].insert(l1, cid);
-                bi_clause[!l1].insert(l0, cid);
-            } else {
-                watch_cache[!l0].insert_watch(cid, l1);
-                watch_cache[!l1].insert_watch(cid, l0);
-            }
+        } else {
+            c.update_lbd(asg, lbd_temp);
         }
-        // self.watches(cid, "new_clause_sandbox");
-        CID::Generated(cid)
+        if c.lits.len() <= 2 || (self.use_chan_seok && c.rank <= self.co_lbd_bound) {
+            learnt = false;
+        }
+        if learnt {
+            c.turn_on(Flag::LEARNT);
+        }
+        let l0 = c.lits[0];
+        let l1 = c.lits[1];
+        if len2 {
+            bi_clause[!l0].insert(l1, cid);
+            bi_clause[!l1].insert(l0, cid);
+            RefClause::BiClause(cid)
+        } else {
+            watch_cache[!l0].insert_watch(cid, l1);
+            watch_cache[!l1].insert_watch(cid, l0);
+            RefClause::Clause(cid)
+        }
     }
     /// remove a clause temporally
     fn detach_clause(&mut self, cid: ClauseId) -> (Lit, Lit) {
@@ -622,7 +619,7 @@ impl ClauseDBIF for ClauseDB {
                     certification_store.push_delete(&new_lits);
                 }
                 // self.watches(cid, "after strengthen_by_elimination case:3-2");
-                RefClause::BiClause
+                RefClause::BiClause(cid)
             }
         } else {
             let l0 = lits[0];
@@ -643,7 +640,7 @@ impl ClauseDBIF for ClauseDB {
                 certification_store.push_delete(&new_lits);
             }
             // self.watches(cid, "after strengthen_by_elimination case:3-3");
-            RefClause::Clause
+            RefClause::Clause(cid)
         }
     }
     fn transform_by_replacement(&mut self, cid: ClauseId, new_lits: &mut Vec<Lit>) -> RefClause {
@@ -701,7 +698,7 @@ impl ClauseDBIF for ClauseDB {
                 certification_store.push_add(&c.lits);
                 certification_store.push_delete(&new_lits);
             }
-            RefClause::BiClause
+            RefClause::BiClause(cid)
         } else {
             //
             //## Case:3
@@ -732,7 +729,7 @@ impl ClauseDBIF for ClauseDB {
                 certification_store.push_add(&new_lits);
                 certification_store.push_delete(&c.lits);
             }
-            RefClause::Clause
+            RefClause::Clause(cid)
         }
     }
     fn transform_by_simplification<A>(&mut self, asg: &mut A, cid: ClauseId) -> RefClause
@@ -774,9 +771,9 @@ impl ClauseDBIF for ClauseDB {
             //## Case:2
             //
             return if self[cid].len() == 2 {
-                RefClause::BiClause
+                RefClause::BiClause(cid)
             } else {
-                RefClause::Clause
+                RefClause::Clause(cid)
             };
         }
         let ClauseDB {
@@ -825,7 +822,7 @@ impl ClauseDBIF for ClauseDB {
                     certification_store.push_delete(&new_lits);
                 }
                 // self.watches(cid, "unasserted:708");
-                RefClause::BiClause
+                RefClause::BiClause(cid)
             }
             _ => {
                 //
@@ -857,7 +854,7 @@ impl ClauseDBIF for ClauseDB {
                     certification_store.push_add(&c.lits);
                     certification_store.push_delete(&new_lits);
                 }
-                RefClause::Clause
+                RefClause::Clause(cid)
             }
         }
     }

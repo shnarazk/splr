@@ -3,7 +3,7 @@ use {
     super::{Eliminator, LitOccurs},
     crate::{
         assign::AssignIF,
-        cdb::{ClauseDBIF, CID},
+        cdb::ClauseDBIF,
         solver::{restart::RestartIF, SolverEvent},
         state::State,
         types::*,
@@ -98,11 +98,14 @@ where
                     _ => {
                         assert!(1 < vec.len());
                         assert!(vec.iter().all(|l| !vec.contains(&!*l)));
-                        if let CID::Generated(cid) = cdb.new_clause(
-                            asg,
-                            vec,
-                            cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT),
-                        ) {
+                        if let Some(cid) = cdb
+                            .new_clause(
+                                asg,
+                                vec,
+                                cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT),
+                            )
+                            .is_new()
+                        {
                             elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
                             #[cfg(feature = "trace_elimination")]
                             println!(

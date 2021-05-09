@@ -586,7 +586,7 @@ impl AssignStack {
                     continue;
                 }
                 match cdb.transform_by_simplification(self, cid) {
-                    RefClause::BiClause | RefClause::Clause => (),
+                    RefClause::BiClause(_) | RefClause::Clause(_) => (),
                     RefClause::Dead => (),
                     RefClause::EmptyClause => return Some(cid),
                     RefClause::RegisteredBiClause(_) => (),

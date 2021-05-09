@@ -20,31 +20,6 @@ use {
     watch_cache::*,
 };
 
-/// ClauseID with the information on generation kind
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum CID {
-    /// newly genereted
-    Generated(ClauseId),
-    /// reference to aregistered bi-clause
-    Merged(ClauseId),
-}
-
-impl CID {
-    pub fn as_cid(&self) -> ClauseId {
-        match self {
-            CID::Generated(cid) => *cid,
-            CID::Merged(cid) => *cid,
-        }
-    }
-    pub fn is_new(&self) -> Option<ClauseId> {
-        if let CID::Generated(cid) = self {
-            Some(*cid)
-        } else {
-            None
-        }
-    }
-}
-
 /// API for Clause, providing literal accessors.
 pub trait ClauseIF {
     /// return true if it contains no literals; a clause after unit propagation.
@@ -103,10 +78,10 @@ pub trait ClauseDBIF:
     /// Note this removes an eliminated Lit `p` from a clause. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
     /// And this is called only from `Eliminator::strengthen_clause`.
-    fn new_clause<A>(&mut self, asg: &mut A, v: &mut Vec<Lit>, learnt: bool) -> CID
+    fn new_clause<A>(&mut self, asg: &mut A, v: &mut Vec<Lit>, learnt: bool) -> RefClause
     where
         A: AssignIF;
-    fn new_clause_sandbox<A>(&mut self, asg: &mut A, v: &mut Vec<Lit>) -> CID
+    fn new_clause_sandbox<A>(&mut self, asg: &mut A, v: &mut Vec<Lit>) -> RefClause
     where
         A: AssignIF;
     /// remove a clause temporally

@@ -3,7 +3,7 @@ use {
     super::{restart::Restarter, Certificate, Solver, SolverEvent, SolverResult, State, StateIF},
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-        cdb::{ClauseDB, ClauseDBIF, CID},
+        cdb::{ClauseDB, ClauseDBIF},
         processor::Eliminator,
         types::*,
     },
@@ -332,11 +332,13 @@ impl Solver {
                     .map_or(None, |_| Some(ClauseId::default()))
             }
             _ => match cdb.new_clause(asg, lits, false) {
-                CID::Generated(cid) => {
+                RefClause::BiClause(cid) => Some(cid),
+                RefClause::Clause(cid) => {
                     cdb[cid].rank = 1;
                     Some(cid)
                 }
-                CID::Merged(cid) => Some(cid),
+                RefClause::RegisteredBiClause(cid) => Some(cid),
+                _ => panic!("impossible"),
             },
         }
     }

@@ -7,7 +7,7 @@ use {
     },
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-        cdb::{ClauseDB, ClauseDBIF, CID},
+        cdb::{ClauseDB, ClauseDBIF},
         processor::Eliminator,
         solver::SolverEvent,
         state::StateIF,
@@ -223,7 +223,7 @@ pub fn handle_conflict(
             NULL_LIT
         };
         let new_clause = cdb.new_clause(asg, new_learnt, true);
-        let generated = matches!(new_clause, CID::Generated(_));
+        let generated = new_clause.is_new().is_some();
 
         let cid = new_clause.as_cid();
         // // if generated {

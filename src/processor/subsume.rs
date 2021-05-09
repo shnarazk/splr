@@ -106,7 +106,7 @@ where
     // |         cdb[cid].iter().map(|l| asg.assigned(*l)).collect::<Vec<_>>(),
     // | );
     match cdb.transform_by_elimination(cid, l) {
-        RefClause::BiClause | RefClause::Clause => {
+        RefClause::BiClause(_) | RefClause::Clause(_) => {
             #[cfg(feature = "trace_elimination")]
             println!("cid {} drops literal {}", cid, l);
 
