@@ -369,13 +369,12 @@ fn search(
     state.log(
         asg.num_conflict,
         format!(
-            "search process finished at level {}:: {} = {} - {} - {}\n{:?}",
+            "search process finished at level {}:: {} = {} - {} - {}",
             asg.decision_level(),
             asg.derefer(assign::property::Tusize::NumUnassignedVar),
             asg.num_vars,
             asg.num_eliminated_vars,
             asg.stack_len(),
-            asg.stack_iter().collect::<Vec<_>>(),
         ),
     );
     Ok(true)
@@ -385,12 +384,12 @@ fn search(
 fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
     if let Some(cid) = cdb.validate(asg.assign_ref(), all) {
         println!("{}", message);
-        println!("| timestamp | level | decision                       |  literal |  assignment |");
+        println!("| timestamp | level |                   decision |    literal |   assignment |");
         let l0 = i32::from(cdb[cid].lit0());
         let l1 = i32::from(cdb[cid].lit1());
         for (t, lv, lit, reason, assign) in asg.dump(&cdb[cid]).iter() {
             println!(
-                "|{:>10} |{:>6} | {:30} | {:8}{} | {:16} |",
+                "|{:>10} |{:>6} | {:26} | {:9}{} | {:12} |",
                 t,
                 lv,
                 format!("{}", reason),
