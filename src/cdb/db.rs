@@ -747,6 +747,7 @@ impl ClauseDBIF for ClauseDB {
         // firstly sweep without consuming extra memory
         let mut need_to_shrink = false;
         for l in self[cid].iter() {
+            assert!(!asg.var(l.vi()).is(Flag::ELIMINATED));
             match asg.assigned(*l) {
                 Some(true) => {
                     self.remove_clause(cid);

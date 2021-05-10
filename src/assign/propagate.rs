@@ -334,7 +334,7 @@ impl PropagateIF for AssignStack {
             // // let mut conflicting_act: f64 = 0.0;
             for (&blocker, &cid) in bi_clause.iter() {
                 debug_assert!(!cdb[cid].is_dead());
-                debug_assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
+                assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
                 #[cfg(feature = "boundary_check")]
                 debug_assert_eq!(cdb[cid].len(), 2);
@@ -372,7 +372,7 @@ impl PropagateIF for AssignStack {
             let source = cdb.detach_watch_cache(sweeping);
             let mut watches = source.iter();
             'next_clause: while let Some((cid, other_watch)) = watches.next().deref_watch() {
-                // assert!(!self.var[other_watch.vi()].is(Flag::ELIMINATED));
+                assert!(!self.var[other_watch.vi()].is(Flag::ELIMINATED));
                 // assert_ne!(other_watch.vi(), false_lit.vi());
                 // assert!(other_watch == cdb[cid].lit0() || other_watch == cdb[cid].lit1());
                 let other_watch_value = lit_assign!(self, other_watch);
