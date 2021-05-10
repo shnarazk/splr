@@ -17,14 +17,14 @@ pub type WatchCache = WatchCacheHash;
 pub type WatchCache = WatchCacheList;
 
 pub trait WatchCacheIF {
-    fn get_watch(&mut self, cid: &ClauseId) -> Option<&Lit>;
+    fn get_watch(&self, cid: &ClauseId) -> Option<&Lit>;
     fn remove_watch(&mut self, cid: &ClauseId) -> Option<Lit>;
     fn insert_watch(&mut self, cid: ClauseId, l: Lit);
     fn insert_or_update_watch(&mut self, cid: ClauseId, l: Lit);
 }
 
 impl WatchCacheIF for WatchCacheHash {
-    fn get_watch(&mut self, cid: &ClauseId) -> Option<&Lit> {
+    fn get_watch(&self, cid: &ClauseId) -> Option<&Lit> {
         self.get(cid)
     }
     fn remove_watch(&mut self, cid: &ClauseId) -> Option<Lit> {
@@ -39,7 +39,7 @@ impl WatchCacheIF for WatchCacheHash {
 }
 
 impl WatchCacheIF for WatchCacheList {
-    fn get_watch(&mut self, cid: &ClauseId) -> Option<&Lit> {
+    fn get_watch(&self, cid: &ClauseId) -> Option<&Lit> {
         for e in self.iter() {
             if e.0 == *cid {
                 return Some(&e.1);
