@@ -620,7 +620,7 @@ impl AssignStack {
             if self.assign[vi] != Some(*b) {
                 if self.root_level == self.level[vi] {
                     self.best_phases.clear();
-                    self.num_best_assign = self.num_eliminated_vars;
+                    self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
                 }
                 return true;
             }
