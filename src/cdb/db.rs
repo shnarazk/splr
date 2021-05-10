@@ -618,18 +618,22 @@ impl ClauseDBIF for ClauseDB {
             }
             // self.watches(cid, "after strengthen_by_elimination case:3-2");
         } else {
+            let old_l0 = lits[0];
+            let old_l1 = lits[1];
+            std::mem::swap(lits, &mut new_lits);
             let l0 = lits[0];
             let l1 = lits[1];
-            std::mem::swap(lits, &mut new_lits);
             //
             //## Case:3-3
             //
-            if p == l0 || p == l1 {
+            if p == old_l0 || p == old_l1 {
                 watch_cache[!p].remove_watch(&cid);
-                watch_cache[!lits[1]].insert_or_update_watch(cid, lits[0]);
+                watch_cache[!l1].insert_or_update_watch(cid, l0);
+                // we must make sure there's no eliminated var in clause and *watch cache*.
+                // TODO \\ watch_cache[!l0].insert_or_update_watch(cid, l1);
             } else {
-                assert_eq!(l0, lits[0]);
-                assert_eq!(l1, lits[1]);
+                assert_eq!(old_l0, l0);
+                assert_eq!(old_l1, l1);
             }
             if certification_store.is_active() {
                 certification_store.push_add(&c.lits);
