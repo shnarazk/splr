@@ -64,6 +64,7 @@ where
         // println!("eliminate_var {}: |p|: {} and |n|: {}", vi, (*pos).len(), (*neg).len());
         // Produce clauses in cross product:
         for p in pos.iter() {
+            let learnt_p = cdb[*p].is(Flag::LEARNT);
             for n in neg.iter() {
                 match merge(cdb, *p, *n, vi, vec) {
                     0 => {
@@ -96,14 +97,9 @@ where
                         }
                     }
                     _ => {
-                        assert!(1 < vec.len());
-                        assert!(vec.iter().all(|l| !vec.contains(&!*l)));
+                        debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
                         if let Some(cid) = cdb
-                            .new_clause(
-                                asg,
-                                vec,
-                                cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT),
-                            )
+                            .new_clause(asg, vec, learnt_p && cdb[*n].is(Flag::LEARNT))
                             .is_new()
                         {
                             elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
