@@ -315,7 +315,7 @@ impl AssignStack {
                 continue;
             }
             if decisions.contains(l) {
-                assert!(!learnt.contains(l));
+                // || assert!(!learnt.contains(l));
                 // Quiz: which is the correct learnt clause here?
                 // 1. [decision1, decision2, !last_decision]
                 // 2. [!decision1, !decision2, !last_decision]

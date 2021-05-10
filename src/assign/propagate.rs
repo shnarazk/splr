@@ -237,19 +237,19 @@ impl PropagateIF for AssignStack {
         }
         self.trail.truncate(lim);
         self.trail.append(&mut ooo_propagated);
-        for l in self.trail.iter() {
-            assert!(
-                self.var[l.vi()].is(Flag::PROPAGATED),
-                "unpropagated {}: {:?}",
-                *l,
-                &self.var[l.vi()],
-            );
-        }
+        // || for l in self.trail.iter() {
+        // ||     assert!(
+        // ||         self.var[l.vi()].is(Flag::PROPAGATED),
+        // ||         "unpropagated {}: {:?}",
+        // ||         *l,
+        // ||         &self.var[l.vi()],
+        // ||     );
+        // || }
 
-        assert!(self
-            .trail
-            .iter()
-            .all(|l| self.var[l.vi()].is(Flag::PROPAGATED)));
+        // || assert!(self
+        // ||     .trail
+        // ||     .iter()
+        // ||     .all(|l| self.var[l.vi()].is(Flag::PROPAGATED)));
         self.q_head = self.trail.len();
         self.trail.append(&mut ooo_unpropagated);
         debug_assert!(self
@@ -261,12 +261,12 @@ impl PropagateIF for AssignStack {
         // assert!(lim < self.q_head) doesn't hold sometimes in chronoBT.
         // ||  self.q_head = self.q_head.min(lim);
         if lv == self.root_level {
-            assert!(self
-                .trail
-                .iter()
-                .take(self.q_head)
-                .all(|l| self.level[l.vi()] == self.root_level
-                    && self.var[l.vi()].is(Flag::PROPAGATED)));
+            // || assert!(self
+            // ||     .trail
+            // ||     .iter()
+            // ||     .take(self.q_head)
+            // ||     .all(|l| self.level[l.vi()] == self.root_level
+            // ||         && self.var[l.vi()].is(Flag::PROPAGATED)));
             // self.trail.clear();
             // self.trail.append(&mut ooo_unpropagated);
             // self.q_head = 0;
@@ -585,6 +585,9 @@ impl AssignStack {
                 if cdb[cid].is_dead() {
                     continue;
                 }
+                assert!(cdb[cid]
+                    .iter()
+                    .all(|l| !self.var[l.vi()].is(Flag::ELIMINATED)));
                 match cdb.transform_by_simplification(self, cid) {
                     RefClause::Clause(_) => (),
                     RefClause::Dead => (),
