@@ -201,43 +201,62 @@ where
     false
 }
 
-/// Returns:
+/// Returns (enable-to-merge, the-size-of-clause-being-generated)
 /// - `(false, -)` if one of the clauses is always satisfied.
 /// - `(true, n)` if they are merge-able to a n-literal clause.
-fn check_to_merge<A, C>(asg: &A, cdb: &C, cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize)
+fn check_to_merge<A, C>(asg: &A, cdb: &C, cp: ClauseId, cq: ClauseId, vi: VarId) -> (bool, usize)
 where
     A: AssignIF,
     C: ClauseDBIF,
 {
-    let pqb = &cdb[cp];
-    let qpb = &cdb[cq];
-    let ps_smallest = pqb.len() < qpb.len();
-    let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
-    let mut size = pb.len() + 1;
-    'next_literal: for l in qb.iter() {
-        if asg.var(l.vi()).is(Flag::ELIMINATED) {
+    let c_p = &cdb[cp];
+    let c_q = &cdb[cq];
+    let mut cond_p: Option<Lit> = None;
+    let mut cond_q: Option<Lit> = None;
+    let mut count = 0;
+
+    'next_lit: for lit in c_p.iter() {
+        if lit.vi() == vi {
+            cond_p = Some(*lit);
             continue;
         }
-        if asg.assigned(*l) == Some(false) {
+        if asg.var(lit.vi()).is(Flag::ELIMINATED) {
             continue;
         }
-        if l.vi() != v {
-            for j in pb.iter() {
-                if asg.var(j.vi()).is(Flag::ELIMINATED) {
-                    continue;
-                }
-                if j.vi() == l.vi() {
-                    if !*j == *l {
-                        return (false, size);
-                    } else {
-                        continue 'next_literal;
-                    }
-                }
+        // if this is the last occurrence of this literal, count it.
+        for l in c_q.iter() {
+            if !*lit == *l {
+                return (true, 0);
+            } else if *lit == *l {
+                continue 'next_lit;
             }
-            size += 1;
         }
+        count += 1;
     }
-    (true, size)
+    for lit in c_q.iter() {
+        if lit.vi() == vi {
+            cond_q = Some(*lit);
+            continue;
+        }
+        if asg.var(lit.vi()).is(Flag::ELIMINATED) {
+            continue;
+        }
+        count += 1;
+    }
+    assert!(
+        cond_p.map_or(false, |l0| cond_q.map_or(false, |l1| l0 == !l1)),
+        "{}-mergable? {}:\n{:?}\n{:?}\n{:?}\n{:?}",
+        vi,
+        count,
+        cond_p,
+        c_p,
+        cond_q,
+        c_q
+    );
+    (
+        cond_p.map_or(false, |l0| cond_q.map_or(false, |l1| l0 == !l1)),
+        count,
+    )
 }
 
 /// Return the real length of the generated clause by merging two clauses.
