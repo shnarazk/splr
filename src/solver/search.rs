@@ -406,27 +406,10 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
                 ),
             );
         }
-        /*
-        let (w1, w2) = cdb.watches(cid, "search354");
-        if w1 == Lit::default() && w2 == Lit::default() {
-            println!(
-                "clause {} watching: {} and {} but no registered watches",
-                cid,
-                cdb[cid].lit0(),
-                cdb[cid].lit1(),
-            );
-        } else {
-            println!(
-                "clause {} watching: {} and {}, at {} and {}",
-                cid,
-                cdb[cid].lit0(),
-                cdb[cid].lit1(),
-                w1,
-                w2,
-            );
-        }
-         */
         println!("clause detail: {}", &cdb[cid]);
+        let (w0, w1) = cdb.watches(cid, "search354");
+        println!("watch{} has blocker{}", cdb[cid].lit0(), w0,);
+        println!("watch{} has blocker{}", cdb[cid].lit1(), w1,);
         panic!(
             "Before extending, NC {}, Level {} generated assignment({:?}) falsifies by {}",
             asg.derefer(assign::property::Tusize::NumConflict),

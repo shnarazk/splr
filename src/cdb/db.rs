@@ -1007,6 +1007,8 @@ impl ClauseDBIF for ClauseDB {
         assert!(1 < c.len());
         let l0 = c.lits[0];
         let l1 = c.lits[1];
+        let l0_blocker: Option<Lit>;
+        let l1_blocker: Option<Lit>;
         if 2 == c.lits.len() {
             assert!(
                 self.bi_clause[!l0].contains_key(&l1),
@@ -1036,6 +1038,8 @@ impl ClauseDBIF for ClauseDB {
                 cid,
                 c
             );
+            l0_blocker = Some(l1);
+            l1_blocker = Some(l0);
         } else {
             assert!(
                 self.watch_cache[!l0].iter().any(|wc| wc.0 == cid),
@@ -1065,8 +1069,13 @@ impl ClauseDBIF for ClauseDB {
                 cid,
                 c
             );
+            l0_blocker = self.watch_cache[!l0].get_watch(&cid).copied();
+            l1_blocker = self.watch_cache[!l1].get_watch(&cid).copied();
         }
-        (l0, l1)
+        (
+            l0_blocker.map_or(Lit::default(), |b| b),
+            l1_blocker.map_or(Lit::default(), |b| b),
+        )
     }
     fn complete_bi_clauses<A>(&mut self, asg: &mut A)
     where
