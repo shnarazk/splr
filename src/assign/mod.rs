@@ -119,7 +119,8 @@ pub struct AssignStack {
     /// record of assignment
     trail: Vec<Lit>,
     trail_lim: Vec<usize>,
-    q_head: usize,
+    /// the-number-of-assigned-and-propagated-vars + 1
+    pub q_head: usize,
     pub root_level: DecisionLevel,
     var_order: VarIdHeap, // Variable Order
 
@@ -130,6 +131,7 @@ pub struct AssignStack {
     build_best_at: usize,
     num_best_assign: usize,
     num_rephase: usize,
+    bp_divergence_ema: Ema,
 
     #[cfg(feature = "best_phases_tracking")]
     best_phases: HashMap<VarId, (bool, AssignReason)>,
@@ -179,8 +181,6 @@ pub struct AssignStack {
     //## Vivification
     //
     during_vivification: bool,
-    /// save old num_conflict, num_propagation, num_restart
-    vivify_sandbox: (usize, usize, usize),
 }
 
 /// Heap of VarId, based on var activity.
@@ -249,10 +249,13 @@ pub mod property {
                 Tusize::NumAssertedVar => self.num_asserted_vars,
                 Tusize::NumEliminatedVar => self.num_eliminated_vars,
                 Tusize::NumUnassertedVar => {
-                    self.num_vars - self.num_eliminated_vars - self.num_asserted_vars
+                    self.num_vars - self.num_asserted_vars - self.num_eliminated_vars
                 }
                 Tusize::NumUnassignedVar => {
-                    self.num_vars - self.num_eliminated_vars - self.trail.len()
+                    self.num_vars
+                        - self.num_asserted_vars
+                        - self.num_eliminated_vars
+                        - self.trail.len()
                 }
                 Tusize::NumUnreachableVar => self.num_vars - self.num_best_assign,
                 Tusize::RootLevel => self.root_level as usize,
@@ -265,12 +268,14 @@ pub mod property {
         DecisionPerConflict,
         PropagationPerConflict,
         ConflictPerRestart,
+        BestPhaseDivergenceRate,
     }
 
-    pub const EMAS: [TEma; 3] = [
+    pub const EMAS: [TEma; 4] = [
         TEma::DecisionPerConflict,
         TEma::PropagationPerConflict,
         TEma::ConflictPerRestart,
+        TEma::BestPhaseDivergenceRate,
     ];
 
     impl PropertyReference<TEma, Ema> for AssignStack {
@@ -280,6 +285,7 @@ pub mod property {
                 TEma::DecisionPerConflict => self.dpc_ema.get_ema(),
                 TEma::PropagationPerConflict => self.ppc_ema.get_ema(),
                 TEma::ConflictPerRestart => self.cpr_ema.get_ema(),
+                TEma::BestPhaseDivergenceRate => &self.bp_divergence_ema,
             }
         }
     }

@@ -35,6 +35,7 @@ impl Default for AssignStack {
             build_best_at: 0,
             num_best_assign: 0,
             num_rephase: 0,
+            bp_divergence_ema: Ema::new(10),
 
             #[cfg(feature = "best_phases_tracking")]
             best_phases: HashMap::new(),
@@ -62,7 +63,6 @@ impl Default for AssignStack {
             activity_decay_step: 0.1,
 
             during_vivification: false,
-            vivify_sandbox: (0, 0, 0),
         }
     }
 }
@@ -110,9 +110,6 @@ impl Instantiate for AssignStack {
         match e {
             // called only by assertion on chronoBT
             // So execute everything of `assign_by_unitclause` but cancel_until(root_level)
-            SolverEvent::Assert(vi) => {
-                self.make_var_asserted(vi);
-            }
             SolverEvent::Conflict => (),
             SolverEvent::Eliminate(vi) => {
                 self.make_var_eliminated(vi);
@@ -133,29 +130,12 @@ impl Instantiate for AssignStack {
             SolverEvent::Reinitialize => {
                 debug_assert_eq!(self.decision_level(), self.root_level);
                 self.q_head = 0;
+                self.num_asserted_vars = 0;
                 self.num_eliminated_vars =
                     self.var.iter().filter(|v| v.is(Flag::ELIMINATED)).count();
-                self.num_asserted_vars = if self.trail.is_empty() {
-                    0
-                } else {
-                    self.trail.len()
-                };
                 self.rebuild_order();
             }
-            #[cfg(feature = "clause_vivification")]
-            SolverEvent::Vivify(start) => {
-                if start {
-                    self.during_vivification = true;
-                    self.vivify_sandbox =
-                        (self.num_conflict, self.num_propagation, self.num_restart);
-                } else {
-                    self.during_vivification = false;
-                    self.num_conflict = self.vivify_sandbox.0;
-                    self.num_propagation = self.vivify_sandbox.1;
-                    self.num_restart = self.vivify_sandbox.2;
-                }
-            }
-            _ => (),
+            e => panic!("don't call asg with {:?}", e),
         }
     }
 }
@@ -171,9 +151,7 @@ impl AssignIF for AssignStack {
         self.trail.len()
     }
     fn len_upto(&self, n: DecisionLevel) -> usize {
-        self.trail_lim
-            .get(n as usize)
-            .map_or(self.trail.len(), |n| *n)
+        self.trail_lim.get(n as usize).map_or(0, |n| *n)
     }
     fn stack_is_empty(&self) -> bool {
         self.trail.is_empty()
@@ -256,7 +234,7 @@ impl AssignIF for AssignStack {
                                 "- pull back clause E {:?}",
                                 phantom_clause.iter().map(i32::from).collect::<Vec<_>>()
                             );
-                            cdb.new_clause(self, &mut phantom_clause, false, false);
+                            cdb.new_clause(self, &mut phantom_clause, false);
                         }
                         break 'next;
                     }
@@ -271,7 +249,7 @@ impl AssignIF for AssignStack {
                             "- pull back clause C {:?}",
                             phantom_clause.iter().map(i32::from).collect::<Vec<_>>()
                         );
-                        cdb.new_clause(self, &mut phantom_clause, false, false);
+                        cdb.new_clause(self, &mut phantom_clause, false);
                     }
                     i -= width;
                     continue 'next;
@@ -359,7 +337,10 @@ impl AssignStack {
             .into_iter()
             .map(|l| {
                 (
-                    self.var(l.vi()).timestamp,
+                    self.trail
+                        .iter()
+                        .position(|lit| *lit == *l)
+                        .map_or(0, |p| p),
                     self.level(l.vi()),
                     i32::from(l),
                     self.reason(l.vi()),
@@ -462,6 +443,9 @@ mod tests {
         assert_eq!(asg.len_upto(1), 3);
 
         // [1, 2, 3] => [1, 2]
+        for l in asg.trail.iter() {
+            asg.var[l.vi()].turn_on(Flag::PROPAGATED);
+        } // simulate propagation
         asg.cancel_until(1);
         assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
         assert_eq!(asg.decision_level(), 1);

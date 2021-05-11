@@ -8,8 +8,9 @@ use {
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
-        processor::{EliminateIF, Eliminator},
+        processor::Eliminator,
         solver::SolverEvent,
+        state::StateIF,
         types::*,
     },
 };
@@ -90,16 +91,14 @@ pub fn handle_conflict(
                         );
                     }
                 } else {
-                    if l0 == decision {
-                    } else if l1 == decision {
-                        cdb.update_watch_cache(ci, 0, 1, false);
-                        // cdb.watches(ci, "after conflict analysis");
-                    } else {
-                        for (i, l) in c.iter().enumerate().skip(2) {
-                            if *l == decision {
-                                cdb.update_watch_cache(ci, 0, i, false);
-                                break;
+                    for (i, l) in cdb[ci].iter().enumerate() {
+                        if *l == decision {
+                            match i {
+                                0 => (),
+                                1 => cdb.swap_watch(ci),
+                                _ => cdb.update_watch_cache(ci, 0, i, false),
                             }
+                            break;
                         }
                     }
                     asg.assign_by_implication(
@@ -180,12 +179,9 @@ pub fn handle_conflict(
         //
         // dump to certified even if it's a literal.
         cdb.certificate_add_assertion(new_learnt[0]);
-        if use_chronobt {
-            asg.cancel_until(bl);
-            debug_assert!(asg.stack_iter().all(|l| l.vi() != l0.vi()));
-            asg.assign_by_implication(l0, AssignReason::default(), asg.root_level);
-        } else {
-            asg.assign_by_unitclause(l0);
+        if asg.assign_at_root_level(l0).is_err() {
+            state.log(asg.num_conflict, "RootLevelConflict by conflict analyzer");
+            return Err(SolverError::RootLevelConflict(ClauseId::default()));
         }
         elim.to_simplify += (state.config.c_ip_int / 2) as f64;
         rst.handle(SolverEvent::Assert(l0.vi()))
@@ -222,8 +218,13 @@ pub fn handle_conflict(
         } else {
             NULL_LIT
         };
-        let cid = cdb.new_clause(asg, new_learnt, true, true);
-        elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
+        let new_clause = cdb.new_clause(asg, new_learnt, true);
+        let generated = new_clause.is_new().is_some();
+
+        let cid = new_clause.as_cid();
+        // // if generated {
+        // //     elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
+        // // }
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);
         asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), al);
@@ -236,11 +237,16 @@ pub fn handle_conflict(
                 act = a;
             }
         }
-        elim.to_simplify += 1.0 / (learnt_len as f64).powf(1.4);
+        elim.to_simplify += 1.0 / learnt_len as f64;
         if lbd <= 20 {
             for cid in &state.derive20 {
                 cdb[cid].turn_on(Flag::DERIVE20);
             }
+        }
+
+        #[cfg(feature = "bi_clause_completion")]
+        if !generated {
+            cdb.complete_bi_clauses(asg);
         }
     }
     Ok(())
@@ -414,7 +420,12 @@ fn conflict_analyze(
                     path_cnt,
                     dl,
                     asg.dump(&*learnt),
-                    asg.dump(&cdb[conflicting_clause].lits),
+                    asg.dump(
+                        &cdb[conflicting_clause]
+                            .iter()
+                            .map(|l| *l)
+                            .collect::<Vec<_>>()
+                    ),
                 );
             }
 

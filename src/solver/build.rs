@@ -4,7 +4,7 @@ use {
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
-        processor::{EliminateIF, Eliminator},
+        processor::Eliminator,
         types::*,
     },
     std::convert::TryFrom,
@@ -40,7 +40,7 @@ pub trait SatSolverIF: Instantiate {
     /// assert!(s.add_assignment(4).is_ok());
     /// assert!(s.add_assignment(5).is_ok());
     /// assert!(s.add_assignment(8).is_ok());
-    /// assert!(matches!(s.add_assignment(-1), Err(SolverError::Inconsistent)));
+    /// assert!(matches!(s.add_assignment(-1), Err(SolverError::RootLevelConflict(_))));
     /// assert!(matches!(s.add_assignment(10), Err(SolverError::OutOfRange)));
     /// assert!(matches!(s.add_assignment(0), Err(SolverError::OutOfRange)));
     /// assert_eq!(s.solve(), Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8])));
@@ -150,7 +150,7 @@ where
     fn try_from((config, vec): (Config, &[V])) -> Result<Self, Self::Error> {
         let cnf = CNFDescription::from(vec);
         match Solver::instantiate(&config, &cnf).inject_from_vec(vec) {
-            Err(SolverError::Inconsistent) => Err(Ok(Certificate::UNSAT)),
+            Err(SolverError::RootLevelConflict(_)) => Err(Ok(Certificate::UNSAT)),
             Err(e) => Err(Err(e)),
             Ok(s) => Ok(s),
         }
@@ -180,7 +180,9 @@ impl SatSolverIF for Solver {
         if val == 0 || self.asg.num_vars < val.abs() as usize {
             return Err(SolverError::OutOfRange);
         }
-        self.asg.assign_at_root_level(Lit::from(val)).map(|_| self)
+        let lit = Lit::from(val);
+        self.cdb.certificate_add_assertion(lit);
+        self.asg.assign_at_root_level(lit).map(|_| self)
     }
     fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver, SolverError>
     where
@@ -196,8 +198,11 @@ impl SatSolverIF for Solver {
             .iter()
             .map(|i| Lit::from(*i))
             .collect::<Vec<Lit>>();
+        if clause.is_empty() {
+            return Err(SolverError::RootLevelConflict(ClauseId::default()));
+        }
         if self.add_unchecked_clause(&mut clause).is_none() {
-            return Err(SolverError::Inconsistent);
+            return Err(SolverError::RootLevelConflict(ClauseId::from(clause[0])));
         }
         Ok(self)
     }
@@ -246,7 +251,7 @@ impl SatSolverIF for Solver {
         let mut tmp = Vec::new();
         std::mem::swap(&mut tmp, &mut cdb.eliminated_permanent);
         while let Some(mut vec) = tmp.pop() {
-            cdb.new_clause(asg, &mut vec, false, false);
+            cdb.new_clause(asg, &mut vec, false);
         }
     }
     #[cfg(not(feature = "no_IO"))]
@@ -297,7 +302,6 @@ impl Solver {
         let Solver {
             ref mut asg,
             ref mut cdb,
-            ref mut elim,
             ..
         } = self;
         if lits.is_empty() {
@@ -322,16 +326,21 @@ impl Solver {
         match lits.len() {
             0 => None, // Empty clause is UNSAT.
             1 => {
-                cdb.certificate_add_assertion(lits[0]);
-                asg.assign_at_root_level(lits[0])
+                let l0 = lits[0];
+                cdb.certificate_add_assertion(l0);
+                asg.assign_at_root_level(l0)
                     .map_or(None, |_| Some(ClauseId::default()))
             }
-            _ => {
-                let cid = cdb.new_clause(asg, lits, false, false);
-                elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
-                cdb[cid].rank = 1;
-                Some(cid)
-            }
+            _ => match cdb.new_clause(asg, lits, false) {
+                RefClause::Clause(cid) => {
+                    if 2 < cdb[cid].len() {
+                        cdb[cid].rank = 1;
+                    }
+                    Some(cid)
+                }
+                RefClause::RegisteredClause(cid) => Some(cid),
+                _ => panic!("impossible"),
+            },
         }
     }
     #[cfg(not(feature = "no_IO"))]
@@ -356,8 +365,10 @@ impl Solver {
                             Err(_) => (),
                         }
                     }
-                    if !v.is_empty() && self.add_unchecked_clause(&mut v).is_none() {
-                        return Err(SolverError::Inconsistent);
+                    if v.is_empty() {
+                        return Err(SolverError::RootLevelConflict(ClauseId::default()));
+                    } else if self.add_unchecked_clause(&mut v).is_none() {
+                        return Err(SolverError::RootLevelConflict(ClauseId::from(v[0])));
                     }
                 }
                 Err(e) => panic!("{}", e),
@@ -394,7 +405,11 @@ impl Solver {
                 .map(|i| Lit::from(*i))
                 .collect::<Vec<Lit>>();
             if self.add_unchecked_clause(&mut lits).is_none() {
-                return Err(SolverError::Inconsistent);
+                return Err(SolverError::RootLevelConflict(if lits.is_empty() {
+                    ClauseId::default()
+                } else {
+                    ClauseId::from(lits[0])
+                }));
             }
         }
         debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);

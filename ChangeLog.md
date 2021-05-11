@@ -1,10 +1,13 @@
 ## 0.8.0, 2021-05-XX
 
 ### Incompatible API changes from 0.7.0
-
+- introduce data `RefClause` for clause transformation
 - define assign::property
 - append AssignIF::dump_cnf
 - define cdb::property
+- screen Clause::lits
+- append Clause::lit0
+- append Clause::lit1
 - append ClauseDB::bi_clause_map
 - remove ClauseDB::bin_watcher_lists
 - append ClauseDB::certificate_save
@@ -15,7 +18,7 @@
 - remove ClauseDB::garbage_collect
 - rename ClauseDB::minimize_with_biclauses to minimize_with_bi_clauses
 - remove ClauseDB::new_clause_sandbox
-- rename ClauseDB::registered_biclause to has_bi_clause
+- remove ClauseDB::registered_biclause
 - append ClauseDB::reregister_watch_cache
 - rename ClauseDB::strengthen to ClauseDB::strengthen_by_elimination
 - append ClauseDB::strengthen_by_vivification
@@ -24,6 +27,9 @@
 - remove ClauseDB::watcher_list
 - append ClauseDB::watcher_list_mut
 - remove ClauseDB::watcher_lists_mut
+- remove EliminateIF::add_cid_occur
+- remove EliminateIF::remove_cid_occur
+- remove EliminateIF::stop
 - screen Eliminator's fields
 - define processor::property
 - define restart::property

@@ -7,7 +7,7 @@ use {
     crate::{
         assign::{self, AssignIF},
         cdb::{self, ClauseDBIF},
-        solver::{restart::RestartIF, SolverEvent},
+        solver::{restart, restart::RestartIF, SolverEvent},
         state::{State, StateIF},
         types::*,
     },
@@ -47,14 +47,24 @@ impl Index<VarId> for Eliminator {
     type Output = LitOccurs;
     #[inline]
     fn index(&self, i: VarId) -> &Self::Output {
-        unsafe { self.var.get_unchecked(i) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(i)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.var[i]
     }
 }
 
 impl IndexMut<VarId> for Eliminator {
     #[inline]
     fn index_mut(&mut self, i: VarId) -> &mut Self::Output {
-        unsafe { self.var.get_unchecked_mut(i) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked_mut(i)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.var[i]
     }
 }
 
@@ -62,14 +72,24 @@ impl Index<&VarId> for Eliminator {
     type Output = LitOccurs;
     #[inline]
     fn index(&self, i: &VarId) -> &Self::Output {
-        unsafe { self.var.get_unchecked(*i) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(*i)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.var[*i]
     }
 }
 
 impl IndexMut<&VarId> for Eliminator {
     #[inline]
     fn index_mut(&mut self, i: &VarId) -> &mut Self::Output {
-        unsafe { self.var.get_unchecked_mut(*i) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked_mut(*i)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.var[*i]
     }
 }
 
@@ -77,14 +97,24 @@ impl Index<Lit> for Eliminator {
     type Output = LitOccurs;
     #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
-        unsafe { self.var.get_unchecked(l.vi()) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(l.vi())
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.var[l.vi()]
     }
 }
 
 impl IndexMut<Lit> for Eliminator {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        unsafe { self.var.get_unchecked_mut(l.vi()) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked_mut(l.vi())
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.var[l.vi()]
     }
 }
 
@@ -92,14 +122,24 @@ impl Index<&Lit> for Eliminator {
     type Output = LitOccurs;
     #[inline]
     fn index(&self, l: &Lit) -> &Self::Output {
-        unsafe { self.var.get_unchecked(l.vi()) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(l.vi())
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.var[l.vi()]
     }
 }
 
 impl IndexMut<&Lit> for Eliminator {
     #[inline]
     fn index_mut(&mut self, l: &Lit) -> &mut Self::Output {
-        unsafe { self.var.get_unchecked_mut(l.vi()) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked_mut(l.vi())
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.var[l.vi()]
     }
 }
 
@@ -107,6 +147,11 @@ impl Index<Range<usize>> for Eliminator {
     type Output = [LitOccurs];
     #[inline]
     fn index(&self, r: Range<usize>) -> &Self::Output {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &self.var[r]
     }
 }
@@ -115,20 +160,35 @@ impl Index<RangeFrom<usize>> for Eliminator {
     type Output = [LitOccurs];
     #[inline]
     fn index(&self, r: RangeFrom<usize>) -> &Self::Output {
-        unsafe { self.var.get_unchecked(r) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.var[r]
     }
 }
 
 impl IndexMut<Range<usize>> for Eliminator {
     #[inline]
     fn index_mut(&mut self, r: Range<usize>) -> &mut Self::Output {
-        unsafe { self.var.get_unchecked_mut(r) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked_mut(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.var[r]
     }
 }
 
 impl IndexMut<RangeFrom<usize>> for Eliminator {
     #[inline]
     fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut Self::Output {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked_mut(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &mut self.var[r]
     }
 }
@@ -172,27 +232,6 @@ impl EliminateIF for Eliminator {
     fn is_running(&self) -> bool {
         self.enable && self.mode == EliminatorMode::Running
     }
-    // Due to a potential bug of killing clauses and difficulty about
-    // synchronization between 'garbage_collect' and clearing occur lists,
-    // 'stop' should purge all occur lists to purge any dead clauses for now.
-    fn stop<A, C>(&mut self, asg: &mut A, cdb: &mut C)
-    where
-        A: AssignIF,
-        C: ClauseDBIF,
-    {
-        let force: bool = true;
-        self.clear_clause_queue(cdb);
-        self.clear_var_queue(asg);
-        if force {
-            for c in &mut cdb.iter_mut().skip(1) {
-                c.turn_off(Flag::OCCUR_LINKED);
-            }
-            for w in &mut self[1..] {
-                w.clear();
-            }
-        }
-        self.mode = EliminatorMode::Dormant;
-    }
     fn prepare<A, C>(&mut self, asg: &mut A, cdb: &mut C, force: bool)
     where
         A: AssignIF,
@@ -210,6 +249,8 @@ impl EliminateIF for Eliminator {
             if c.is_dead() || c.is(Flag::OCCUR_LINKED) {
                 continue;
             }
+            let vec = c.iter().copied().collect::<Vec<_>>();
+            assert!(vec.iter().all(|l| !vec.contains(&!*l)));
             self.add_cid_occur(asg, ClauseId::from(cid), c, false);
         }
         if force {
@@ -265,68 +306,22 @@ impl EliminateIF for Eliminator {
             if self.is_waiting() {
                 self.prepare(asg, cdb, true);
             }
+            self.eliminate_combination_limit =
+                rst.refer(restart::property::TEma2::LBD).get() as usize;
             self.eliminate(asg, cdb, rst, state)?;
             if self.is_running() {
                 self.stop(asg, cdb);
             }
         } else {
-            self.eliminate_satisfied_clauses(asg, cdb, true);
+            // self.eliminate_satisfied_clauses(asg, cdb, true);
+            if let Some(cc) = asg.propagate(cdb).to_option() {
+                return Err(SolverError::RootLevelConflict(cc));
+            }
+        }
+        if self.mode != EliminatorMode::Dormant {
+            self.stop(asg, cdb);
         }
         cdb.check_size().map(|_| ())
-    }
-    fn add_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause, enqueue: bool)
-    where
-        A: AssignIF,
-    {
-        if self.mode != EliminatorMode::Running || c.is(Flag::OCCUR_LINKED) {
-            return;
-        }
-        let evo = self.eliminate_var_occurrence_limit;
-        for l in c.iter() {
-            let v = &mut asg.var_mut(l.vi());
-            let w = &mut self[l.vi()];
-            let pl = w.pos_occurs.len();
-            let nl = w.neg_occurs.len();
-            if evo < pl * nl {
-                w.aborted = true;
-                continue;
-            }
-            if !v.is(Flag::ELIMINATED) {
-                if bool::from(*l) {
-                    assert!(
-                        !w.pos_occurs.contains(&cid),
-                        "elim.add_cid_occur found a strange positive clause"
-                    );
-                    w.pos_occurs.push(cid);
-                } else {
-                    assert!(
-                        !w.neg_occurs.contains(&cid),
-                        "elim.add_cid_occur found a strange negative clause"
-                    );
-                    w.neg_occurs.push(cid);
-                }
-                self.enqueue_var(asg, l.vi(), false);
-            }
-        }
-        c.turn_on(Flag::OCCUR_LINKED);
-        if enqueue {
-            self.enqueue_clause(cid, c);
-        }
-    }
-    fn remove_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause)
-    where
-        A: AssignIF,
-    {
-        debug_assert!(self.mode == EliminatorMode::Running);
-        debug_assert!(!cid.is_lifted_lit());
-        assert!(!c.is_dead());
-        c.turn_off(Flag::OCCUR_LINKED);
-        for l in c.iter() {
-            if asg.assign(l.vi()).is_none() {
-                self.remove_lit_occur(asg, *l, cid);
-                self.enqueue_var(asg, l.vi(), true);
-            }
-        }
     }
     fn sorted_iterator(&self) -> Iter<'_, usize> {
         self.var_queue.heap[1..].iter()
@@ -345,11 +340,100 @@ impl EliminateIF for Eliminator {
 }
 
 impl Eliminator {
+    /// register a clause id to all corresponding occur lists.
+    pub fn add_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause, enqueue: bool)
+    where
+        A: AssignIF,
+    {
+        if self.mode != EliminatorMode::Running || c.is(Flag::OCCUR_LINKED) {
+            return;
+        }
+        let evo = self.eliminate_var_occurrence_limit;
+        let mut checked: Vec<VarId> = Vec::new();
+        for l in c.iter() {
+            let vi = l.vi();
+            let v = &mut asg.var_mut(vi);
+            assert!(!checked.contains(&vi), "elimitator350: {:?}", c,);
+            checked.push(vi);
+            let w = &mut self[l.vi()];
+            let pl = w.pos_occurs.len();
+            let nl = w.neg_occurs.len();
+            if evo < pl * nl {
+                w.aborted = true;
+                continue;
+            }
+            if !v.is(Flag::ELIMINATED) {
+                if bool::from(*l) {
+                    assert!(
+                        !w.pos_occurs.contains(&cid),
+                        "elim.add_cid_occur for {:?} found a strange positive clause{}{}, {:?}",
+                        v,
+                        cid,
+                        c,
+                        w.pos_occurs,
+                    );
+                    w.pos_occurs.push(cid);
+                } else {
+                    assert!(
+                        !w.neg_occurs.contains(&cid),
+                        "elim.add_cid_occur for {:?} found a strange negative clause{}{}, {:?}",
+                        v,
+                        cid,
+                        c,
+                        w.pos_occurs,
+                    );
+                    w.neg_occurs.push(cid);
+                }
+                self.enqueue_var(asg, l.vi(), false);
+            }
+        }
+        c.turn_on(Flag::OCCUR_LINKED);
+        if enqueue {
+            self.enqueue_clause(cid, c);
+        }
+    }
+    /// remove a clause id from all corresponding occur lists.
+    pub fn remove_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause)
+    where
+        A: AssignIF,
+    {
+        debug_assert!(self.mode == EliminatorMode::Running);
+        debug_assert!(!cid.is_lifted_lit());
+        assert!(!c.is_dead());
+        c.turn_off(Flag::OCCUR_LINKED);
+        for l in c.iter() {
+            if asg.assign(l.vi()).is_none() {
+                self.remove_lit_occur(asg, *l, cid);
+                self.enqueue_var(asg, l.vi(), true);
+            }
+        }
+    }
     /// check if the eliminator is active and waits for next `eliminate`.
     fn is_waiting(&self) -> bool {
         self.mode == EliminatorMode::Waiting
     }
-
+    /// set eliminator's mode to **dormant**.
+    // Due to a potential bug of killing clauses and difficulty about
+    // synchronization between 'garbage_collect' and clearing occur lists,
+    // 'stop' should purge all occur lists to purge any dead clauses for now.
+    fn stop<A, C>(&mut self, asg: &mut A, cdb: &mut C)
+    where
+        A: AssignIF,
+        C: ClauseDBIF,
+    {
+        let force: bool = true;
+        self.clear_clause_queue(cdb);
+        self.clear_var_queue(asg);
+        if force {
+            for c in &mut cdb.iter_mut().skip(1) {
+                c.turn_off(Flag::OCCUR_LINKED);
+            }
+            for w in &mut self[1..] {
+                w.clear();
+            }
+        }
+        self.mode = EliminatorMode::Dormant;
+    }
     /// returns false if solver is inconsistent
     /// - calls `clause_queue.pop`
     pub fn backward_subsumption_check<A, C>(
@@ -380,7 +464,7 @@ impl Eliminator {
                 self.clear_var_queue(asg);
                 return Ok(());
             }
-            let best = if cid.is_lifted_lit() {
+            let best: VarId = if cid.is_lifted_lit() {
                 let vi = Lit::from(cid).vi();
                 debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
                 vi
@@ -415,58 +499,36 @@ impl Eliminator {
             if best == 0 || asg.var(best).is(Flag::ELIMINATED) {
                 continue;
             }
-            for did in self[best].pos_occurs.clone().iter() {
-                if *did == cid {
-                    continue;
-                }
-                let d = &cdb[*did];
-                if d.len() <= *timedout {
-                    *timedout -= d.len();
-                } else {
-                    *timedout = 0;
-                    return Ok(());
-                }
-                if !d.is_dead() && d.len() <= self.subsume_literal_limit {
-                    self.try_subsume(asg, cdb, cid, *did)?;
-                }
-            }
-            for did in self[best].neg_occurs.clone().iter() {
-                if *did == cid {
-                    continue;
-                }
-                let d = &cdb[*did];
-                if d.len() <= *timedout {
-                    *timedout -= d.len();
-                } else {
-                    *timedout = 0;
-                    return Ok(());
-                }
-                if !d.is_dead() && d.len() <= self.subsume_literal_limit {
-                    self.try_subsume(asg, cdb, cid, *did)?;
+            self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
+            self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
+            for cls in [self[best].pos_occurs.clone(), self[best].neg_occurs.clone()].iter() {
+                for did in cls.iter() {
+                    if *did == cid {
+                        continue;
+                    }
+                    let d = &cdb[*did];
+                    if d.len() <= *timedout {
+                        *timedout -= d.len();
+                    } else {
+                        *timedout = 0;
+                        return Ok(());
+                    }
+                    if !d.is_dead() && d.len() <= self.subsume_literal_limit {
+                        assert!(
+                            d.contains(Lit::from((best, false)))
+                                || d.contains(Lit::from((best, true)))
+                        );
+                        self.try_subsume(asg, cdb, cid, *did)?;
+                    }
                 }
             }
-            // /
-            // /     for cs in &[
-            // /         &mut self[best].pos_occurs, // as *mut Vec<ClauseId>,
-            // /         &mut self[best].neg_occurs, //  as *mut Vec<ClauseId>,
-            // /     ] {
-            // /         for did in &*cs {
-            // /             if *did == cid {
-            // /                 continue;
-            // /             }
-            // /             let d = &cdb[*did];
-            // /             if d.len() <= *timedout {
-            // /                 *timedout -= d.len();
-            // /             } else {
-            // /                 *timedout = 0;
-            // /                 return Ok(());
-            // /             }
-            // /             if !d.is_dead() && d.len() <= self.subsume_literal_limit {
-            // /                 self.try_subsume(asg, cdb, cid, *did)?;
-            // /             }
-            // /         }
-            // /     }
-            // / }
+            self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
+            self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
+        }
+        if asg.remains() {
+            if let Some(cc) = asg.propagate(cdb).to_option() {
+                return Err(SolverError::RootLevelConflict(cc));
+            }
         }
         Ok(())
     }
@@ -545,8 +607,8 @@ impl Eliminator {
             }
             self.backward_subsumption_check(asg, cdb, &mut timedout)?;
             debug_assert!(self.clause_queue.is_empty());
-            if !asg.propagate(cdb).is_none() {
-                return Err(SolverError::Inconsistent);
+            if let Some(cc) = asg.propagate(cdb).to_option() {
+                return Err(SolverError::RootLevelConflict(cc));
             }
             self.eliminate_satisfied_clauses(asg, cdb, true);
             if timedout == 0 {
@@ -573,18 +635,16 @@ impl Eliminator {
         for ci in 1..cdb.len() {
             let cid = ClauseId::from(ci);
             if !cdb[cid].is_dead() && cdb[cid].is_satisfied_under(asg) {
-                cdb.watches(cid, "eliminate_satisfied_clauses");
-                let c = &mut cdb[cid];
                 if self.is_running() {
+                    let c = &mut cdb[cid];
                     if update_occur {
-                        assert!(!c.is_dead());
                         self.remove_cid_occur(asg, cid, c);
                     }
                     for l in c.iter() {
                         self.enqueue_var(asg, l.vi(), true);
                     }
                 }
-                cdb.watches(cid, "eliminator588");
+                // cdb.watches(cid, "eliminator645");
                 cdb.remove_clause(cid);
             }
         }

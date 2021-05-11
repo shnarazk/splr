@@ -89,7 +89,11 @@ pub enum RestartMode {
 }
 
 /// API for [`restart`](`crate::solver::RestartIF::restart`) and [`stabilize`](`crate::solver::RestartIF::stabilize`).
-pub trait RestartIF: Instantiate {
+pub trait RestartIF:
+    Instantiate
+    + PropertyDereference<property::Tusize, usize>
+    + PropertyReference<property::TEma2, Ema2>
+{
     /// check blocking and forcing restart condition.
     fn restart(&mut self) -> Option<RestartDecision>;
     /// check stabilization mode and  return:
@@ -496,7 +500,7 @@ impl RestartIF for Restarter {
             self.num_block += 1;
             self.after_restart = 0;
             self.restart_step = self.initial_restart_step * self.stb.step_max;
-            self.restart_waiting = 0;
+            // self.restart_waiting = 0; // holding restart counter
             return Some(RestartDecision::Block);
         }
         if self.lbd.is_active() {
@@ -512,7 +516,7 @@ impl RestartIF for Restarter {
     }
     #[cfg(feature = "Luby_stabilization")]
     fn stabilize(&mut self) -> Option<bool> {
-        self.stb.update(self.num_restart + self.num_block)
+        self.stb.update(self.num_restart) // don't count num_block
     }
     #[cfg(not(feature = "Luby_stabilization"))]
     fn stabilize(&mut self) -> Option<bool> {

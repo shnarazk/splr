@@ -1,6 +1,6 @@
 /// Var struct and Database management API
 use {
-    super::{AssignStack, Var, VarHeapIF},
+    super::{AssignIF, AssignStack, Var, VarHeapIF},
     crate::types::*,
     std::{
         fmt,
@@ -104,23 +104,48 @@ impl VarManipulateIF for AssignStack {
     }
     #[inline]
     fn assign(&self, vi: VarId) -> Option<bool> {
-        unsafe { *self.assign.get_unchecked(vi) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            *self.assign.get_unchecked(vi)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        self.assign[vi]
     }
     #[inline]
     fn level(&self, vi: VarId) -> DecisionLevel {
-        unsafe { *self.level.get_unchecked(vi) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            *self.level.get_unchecked(vi)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        self.level[vi]
     }
     #[inline]
     fn reason(&self, vi: VarId) -> AssignReason {
-        unsafe { *self.reason.get_unchecked(vi) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            *self.reason.get_unchecked(vi)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        self.reason[vi]
     }
     #[inline]
     fn var(&self, vi: VarId) -> &Var {
-        unsafe { self.var.get_unchecked(vi) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(vi)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.var[vi]
     }
     #[inline]
     fn var_mut(&mut self, vi: VarId) -> &mut Var {
-        unsafe { self.var.get_unchecked_mut(vi) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked_mut(vi)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.var[vi]
     }
     fn var_iter(&self) -> Iter<'_, Var> {
         self.var.iter()
@@ -135,9 +160,9 @@ impl AssignStack {
     pub fn make_var_asserted(&mut self, vi: VarId) {
         self.reason[vi] = AssignReason::Implication(ClauseId::default(), NULL_LIT);
         self.var[vi].timestamp = self.ordinal;
-        self.num_asserted_vars += 1;
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
+        #[cfg(feature = "best_phases_tracking")]
         self.check_best_phase(vi);
     }
     pub fn make_var_eliminated(&mut self, vi: VarId) {
@@ -146,6 +171,8 @@ impl AssignStack {
             self.var[vi].timestamp = self.ordinal;
             self.set_activity(vi, 0.0);
             self.remove_from_heap(vi);
+            assert_eq!(self.decision_level(), self.root_level);
+            self.trail.retain(|l| l.vi() != vi);
             self.num_eliminated_vars += 1;
             #[cfg(feature = "trace_elimination")]
             {

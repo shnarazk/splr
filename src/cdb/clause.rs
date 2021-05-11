@@ -24,6 +24,11 @@ impl Index<usize> for Clause {
     type Output = Lit;
     #[inline]
     fn index(&self, i: usize) -> &Lit {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.lits.get_unchecked(i)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &self.lits[i]
     }
 }
@@ -31,6 +36,11 @@ impl Index<usize> for Clause {
 impl IndexMut<usize> for Clause {
     #[inline]
     fn index_mut(&mut self, i: usize) -> &mut Lit {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.lits.get_unchecked_mut(i)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &mut self.lits[i]
     }
 }
@@ -39,6 +49,11 @@ impl Index<Range<usize>> for Clause {
     type Output = [Lit];
     #[inline]
     fn index(&self, r: Range<usize>) -> &[Lit] {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.lits.get_unchecked(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &self.lits[r]
     }
 }
@@ -47,6 +62,11 @@ impl Index<RangeFrom<usize>> for Clause {
     type Output = [Lit];
     #[inline]
     fn index(&self, r: RangeFrom<usize>) -> &[Lit] {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.lits.get_unchecked(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &self.lits[r]
     }
 }
@@ -54,6 +74,11 @@ impl Index<RangeFrom<usize>> for Clause {
 impl IndexMut<Range<usize>> for Clause {
     #[inline]
     fn index_mut(&mut self, r: Range<usize>) -> &mut [Lit] {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.lits.get_unchecked_mut(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &mut self.lits[r]
     }
 }
@@ -61,6 +86,11 @@ impl IndexMut<Range<usize>> for Clause {
 impl IndexMut<RangeFrom<usize>> for Clause {
     #[inline]
     fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Lit] {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.lits.get_unchecked_mut(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &mut self.lits[r]
     }
 }
@@ -99,10 +129,20 @@ impl ClauseIF for Clause {
     }
     #[inline]
     fn lit0(&self) -> Lit {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            *self.lits.get_unchecked(0)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         self.lits[0]
     }
     #[inline]
     fn lit1(&self) -> Lit {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            *self.lits.get_unchecked(1)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         self.lits[1]
     }
     fn contains(&self, lit: Lit) -> bool {
