@@ -182,7 +182,7 @@ impl SolveIF for Solver {
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
                 // check(asg, cdb, false, "before");
                 let model = asg.extend_model(cdb, elim.eliminated_lits());
-                check(asg, cdb, true, "after");
+                check(asg, cdb, true, "after extending the model");
 
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
@@ -384,15 +384,14 @@ fn search(
 fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
     if let Some(cid) = cdb.validate(asg.assign_ref(), all) {
         println!("{}", message);
-        println!("| timestamp | level |                   decision |    literal |   assignment |");
+        println!("| timestamp | level |   literal  |  assignment  |                  reason  |");
         let l0 = i32::from(cdb[cid].lit0());
         let l1 = i32::from(cdb[cid].lit1());
         for (t, lv, lit, reason, assign) in asg.dump(&cdb[cid]).iter() {
             println!(
-                "|{:>10} |{:>6} | {:26} | {:9}{} | {:12} |",
+                "|{:>10} |{:>6} | {:9}{} | {:12} | {:24} |",
                 t,
                 lv,
-                format!("{}", reason),
                 lit,
                 if *lit == l0 || *lit == l1 { '*' } else { ' ' },
                 format!(
@@ -404,6 +403,7 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
                         "!"
                     },
                 ),
+                format!("{}", reason),
             );
         }
         println!("clause detail: {}", &cdb[cid]);
