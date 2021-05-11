@@ -1,6 +1,6 @@
 /// Crate `eliminator` implements clause subsumption and var elimination.
 use {
-    super::{Eliminator, LitOccurs},
+    super::Eliminator,
     crate::{
         assign::AssignIF,
         cdb::ClauseDBIF,
@@ -31,22 +31,22 @@ where
     }
     debug_assert!(!v.is(Flag::ELIMINATED));
     // count only alive clauses
-    w.pos_occurs.retain(|&c| !cdb[c].is_dead());
-    w.neg_occurs.retain(|&c| !cdb[c].is_dead());
-    let LitOccurs {
-        pos_occurs,
-        neg_occurs,
-        ..
-    } = w;
-    let pos = pos_occurs.clone();
-    let neg = neg_occurs.clone();
+    // Note: it may contain the target literal somehow. So the following may be failed.
+    // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, true)))));
+    w.pos_occurs
+        .retain(|&c| cdb[c].contains(Lit::from((vi, true))));
+    // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, false)))));
+    w.neg_occurs
+        .retain(|&c| cdb[c].contains(Lit::from((vi, false))));
+    let pos = w.pos_occurs.clone();
+    let neg = w.neg_occurs.clone();
     {
         if *timedout < pos.len() * neg.len()
             || skip_var_elimination(
                 asg,
                 cdb,
                 &(*pos),
-                &&(*neg),
+                &(*neg),
                 vi,
                 elim.eliminate_grow_limit,
                 elim.eliminate_combination_limit,
@@ -66,7 +66,7 @@ where
         for p in pos.iter() {
             let learnt_p = cdb[*p].is(Flag::LEARNT);
             for n in neg.iter() {
-                match merge(cdb, *p, *n, vi, vec) {
+                match merge(asg, cdb, *p, *n, vi, vec) {
                     0 => {
                         #[cfg(feature = "trace_elimination")]
                         println!(
@@ -165,8 +165,8 @@ fn skip_var_elimination<A, C>(
     pos: &[ClauseId],
     neg: &[ClauseId],
     v: VarId,
-    eliminate_grow_limit: usize,
-    eliminate_combination_limit: usize,
+    grow_limit: usize,
+    combination_limit: usize,
 ) -> bool
 where
     A: AssignIF,
@@ -174,56 +174,58 @@ where
 {
     // avoid thrashing
     let limit = match cdb.check_size() {
-        Ok(true) => eliminate_grow_limit,
-        Ok(false) => eliminate_grow_limit / 4,
+        Ok(true) => grow_limit,
+        Ok(false) => grow_limit / 4,
         Err(_) => return true,
     };
     let clslen = pos.len() + neg.len();
     let mut cnt = 0;
+    let scale: f64 = 0.1;
+    let mut average_len: f64 = 0.0;
+    let climit = combination_limit as f64;
     for c_pos in pos {
         for c_neg in neg {
-            let (res, clause_size) = check_to_merge(asg, cdb, *c_pos, *c_neg, v);
-            if res {
-                cnt += 1;
-                if clslen + limit < cnt
-                    || (eliminate_combination_limit != 0
-                        && eliminate_combination_limit < clause_size)
-                {
+            if let Some(clause_size) = merge_cost(asg, cdb, *c_pos, *c_neg, v) {
+                cnt += (0 < clause_size) as usize;
+                average_len *= 1.0 - scale;
+                average_len += scale * clause_size as f64;
+                if clslen + limit < cnt || (combination_limit != 0 && climit < average_len) {
                     return true;
                 }
+            } else {
+                debug_assert!(false, "impossible");
             }
         }
     }
     false
 }
 
-/// Returns (enable-to-merge, the-size-of-clause-being-generated)
+/// Returns the the-size-of-clause-being-generated.
 /// - `(false, -)` if one of the clauses is always satisfied.
 /// - `(true, n)` if they are merge-able to a n-literal clause.
-fn check_to_merge<A, C>(asg: &A, cdb: &C, cp: ClauseId, cq: ClauseId, vi: VarId) -> (bool, usize)
+fn merge_cost<A, C>(asg: &A, cdb: &C, cp: ClauseId, cq: ClauseId, vi: VarId) -> Option<usize>
 where
     A: AssignIF,
     C: ClauseDBIF,
 {
     let c_p = &cdb[cp];
     let c_q = &cdb[cq];
-    let mut cond_p: Option<Lit> = None;
-    let mut cond_q: Option<Lit> = None;
+    let mut cond: Option<Lit> = None;
+    let mut cond2: Option<Lit> = None;
     let mut count = 0;
 
     'next_lit: for lit in c_p.iter() {
         if lit.vi() == vi {
-            cond_p = Some(*lit);
+            cond = Some(*lit);
             continue;
         }
-        if asg.var(lit.vi()).is(Flag::ELIMINATED) {
-            continue;
-        }
+        debug_assert_ne!(asg.assigned(*lit), Some(false));
+        assert!(!asg.var(lit.vi()).is(Flag::ELIMINATED));
         // if this is the last occurrence of this literal, count it.
         for l in c_q.iter() {
             if !*lit == *l {
-                return (true, 0);
-            } else if *lit == *l {
+                return Some(0);
+            } else if *lit == *l || asg.var(l.vi()).is(Flag::ELIMINATED) {
                 continue 'next_lit;
             }
         }
@@ -231,34 +233,28 @@ where
     }
     for lit in c_q.iter() {
         if lit.vi() == vi {
-            cond_q = Some(*lit);
+            assert_eq!(cond, Some(!*lit));
+            cond2 = Some(*lit);
             continue;
         }
-        if asg.var(lit.vi()).is(Flag::ELIMINATED) {
-            continue;
-        }
+        assert!(!asg.var(lit.vi()).is(Flag::ELIMINATED));
         count += 1;
     }
-    assert!(
-        cond_p.map_or(false, |l0| cond_q.map_or(false, |l1| l0 == !l1)),
-        "{}-mergable? {}:\n{:?}\n{:?}\n{:?}\n{:?}",
-        vi,
-        count,
-        cond_p,
-        c_p,
-        cond_q,
-        c_q
-    );
-    (
-        cond_p.map_or(false, |l0| cond_q.map_or(false, |l1| l0 == !l1)),
-        count,
-    )
+    cond2.map(|_| count)
 }
 
 /// Return the real length of the generated clause by merging two clauses.
 /// Return **zero** if one of the clauses is always satisfied. (merge_vec should not be used.)
-fn merge<C>(cdb: &mut C, cip: ClauseId, ciq: ClauseId, v: VarId, vec: &mut Vec<Lit>) -> usize
+fn merge<A, C>(
+    asg: &mut A,
+    cdb: &mut C,
+    cip: ClauseId,
+    ciq: ClauseId,
+    vi: VarId,
+    vec: &mut Vec<Lit>,
+) -> usize
 where
+    A: AssignIF,
     C: ClauseDBIF,
 {
     vec.clear();
@@ -268,33 +264,25 @@ where
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
     #[cfg(feature = "trace_elimination")]
     println!("# merge {} & {}", pb, qb);
-    'next_literal: for l in qb.iter() {
-        if l.vi() != v {
-            for j in pb.iter() {
-                if j.vi() == l.vi() {
-                    if !*j == *l {
-                        return 0;
-                    } else {
-                        continue 'next_literal;
-                    }
-                }
-            }
-            vec.push(*l);
-        }
+    if pb.iter().filter(|l| l.vi() != vi).any(|l| qb.contains(!*l)) {
+        return 0;
     }
-    for l in pb.iter() {
-        if l.vi() != v {
-            vec.push(*l);
-        }
-    }
-    #[cfg(feature = "trace_elimination")]
-    println!(
-        " - merge generated {:?} from {} and {} to eliminate {}",
-        vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>(),
-        pb,
-        qb,
-        v
+
+    let mut lits = pb
+        .iter()
+        .filter(|l| l.vi() != vi && !qb.contains(**l))
+        .copied()
+        .collect::<Vec<_>>();
+    lits.append(
+        &mut qb
+            .iter()
+            .filter(|l| l.vi() != vi)
+            .copied()
+            .collect::<Vec<_>>(),
     );
+    std::mem::swap(&mut lits, vec);
+    debug_assert!(vec.iter().all(|l| !asg.var(l.vi()).is(Flag::ELIMINATED)));
+    debug_assert!(vec.iter().all(|l| l.vi() != vi));
     vec.len()
 }
 
