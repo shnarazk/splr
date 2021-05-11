@@ -181,8 +181,9 @@ impl SolveIF for Solver {
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
                 // check(asg, cdb, false, "before");
+                check(asg, cdb, true, "Before extending the model");
                 let model = asg.extend_model(cdb, elim.eliminated_lits());
-                check(asg, cdb, true, "after extending the model");
+                check(asg, cdb, true, "After extending the model");
 
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
@@ -384,7 +385,7 @@ fn search(
 fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
     if let Some(cid) = cdb.validate(asg.assign_ref(), all) {
         println!("{}", message);
-        println!("| timestamp | level |   literal  |  assignment  |                  reason  |");
+        println!("| trail pos | level |   literal  |  assignment  |                  reason  |");
         let l0 = i32::from(cdb[cid].lit0());
         let l1 = i32::from(cdb[cid].lit1());
         for (t, lv, lit, reason, assign) in asg.dump(&cdb[cid]).iter() {
