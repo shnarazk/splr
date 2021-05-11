@@ -41,7 +41,7 @@ pub fn vivify(
             ema
         }
     };
-    let mut clauses: Vec<OrderedProxy<ClauseId>> = select(asg, cdb, ave_lbd, Some(100_000));
+    let mut clauses: Vec<OrderedProxy<ClauseId>> = select(asg, cdb, ave_lbd, Some(80_000));
     if clauses.is_empty() {
         return Ok(());
     }
