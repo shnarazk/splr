@@ -91,18 +91,14 @@ pub fn handle_conflict(
                         );
                     }
                 } else {
-                    if l0 == decision {
-                    } else if l1 == decision {
-                        // cdb.watches(ci, "conflict96");
-                        cdb.swap_watch(ci);
-                        // cdb.watches(ci, "after conflict analysis");
-                    } else {
-                        for (i, l) in c.iter().enumerate().skip(2) {
-                            if *l == decision {
-                                // cdb.watches(ci, "conflict102");
-                                cdb.update_watch_cache(ci, 0, i, false);
-                                break;
+                    for (i, l) in cdb[ci].iter().enumerate() {
+                        if *l == decision {
+                            match i {
+                                0 => (),
+                                1 => cdb.swap_watch(ci),
+                                _ => cdb.update_watch_cache(ci, 0, i, false),
                             }
+                            break;
                         }
                     }
                     asg.assign_by_implication(

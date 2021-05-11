@@ -337,7 +337,10 @@ impl AssignStack {
             .into_iter()
             .map(|l| {
                 (
-                    self.var(l.vi()).timestamp,
+                    self.trail
+                        .iter()
+                        .position(|lit| *lit == *l)
+                        .map_or(0, |p| p),
                     self.level(l.vi()),
                     i32::from(l),
                     self.reason(l.vi()),

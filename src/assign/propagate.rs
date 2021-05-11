@@ -1,7 +1,7 @@
 /// implement boolean constraint propagation, backjump
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{AssignIF, AssignStack, VarHeapIF},
+    super::{AssignIF, AssignStack, VarHeapIF, VarManipulateIF},
     crate::{cdb::ClauseDBIF, types::*},
 };
 
@@ -572,6 +572,10 @@ impl PropagateIF for AssignStack {
 }
 
 impl AssignStack {
+    pub fn check(&self, (b0, b1): (Lit, Lit)) {
+        assert_ne!(self.assigned(b0), Some(false));
+        assert_ne!(self.assigned(b1), Some(false));
+    }
     ///
     fn propagate_at_root_level<C>(&mut self, cdb: &mut C) -> Option<ClauseId>
     where
