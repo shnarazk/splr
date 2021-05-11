@@ -7,7 +7,7 @@ use {
     crate::{
         assign::{self, AssignIF},
         cdb::{self, ClauseDBIF},
-        solver::{restart::RestartIF, SolverEvent},
+        solver::{restart, restart::RestartIF, SolverEvent},
         state::{State, StateIF},
         types::*,
     },
@@ -306,6 +306,8 @@ impl EliminateIF for Eliminator {
             if self.is_waiting() {
                 self.prepare(asg, cdb, true);
             }
+            self.eliminate_combination_limit =
+                rst.refer(restart::property::TEma2::LBD).get() as usize;
             self.eliminate(asg, cdb, rst, state)?;
             if self.is_running() {
                 self.stop(asg, cdb);
