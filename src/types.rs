@@ -2,7 +2,7 @@
 /// some common traits.
 pub use crate::{
     assign::AssignReason,
-    cdb::{Clause, ClauseIF, ClauseId, ClauseIdIF, Watch},
+    cdb::{Clause, ClauseIF, ClauseId, ClauseIdIF},
     config::Config,
 };
 use {
@@ -29,13 +29,10 @@ pub trait PropertyDereference<I, O: Sized> {
     fn derefer(&self, key: I) -> O;
 }
 
-/// API for Literal like `from_int`, `from_assign`, `to_cid` and so on.
+/// API for Literal like `vi`, `as_bool`, `is_none` and so on.
 pub trait LitIF {
     /// convert to bool
     fn as_bool(&self) -> bool;
-    /// convert [VarId](../type.VarId.html) to [Lit](../type.Lit.html).
-    /// It returns a positive literal if `p` is `TRUE` or `BOTTOM`.
-    fn from_assign(vi: VarId, p: bool) -> Self;
     /// convert to var index.
     fn vi(self) -> VarId;
     /// return `true` if it is a valid literal, namely non-zero.
@@ -131,7 +128,7 @@ pub type DecisionLevel = u32;
 /// assert_eq!( 2i32, Lit::from( 2i32).into());
 /// assert_eq!(-2i32, Lit::from(-2i32).into());
 /// ```
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Lit {
     /// literal encoded into folded u32
     ordinal: u32,
@@ -146,6 +143,12 @@ impl fmt::Display for Lit {
     }
 }
 
+impl fmt::Debug for Lit {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}L", i32::from(self))
+    }
+}
+
 /// convert literals to `[i32]` (for debug).
 pub fn i32s(v: &[Lit]) -> Vec<i32> {
     v.iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
@@ -155,7 +158,7 @@ impl From<(VarId, bool)> for Lit {
     #[inline]
     fn from((vi, b): (VarId, bool)) -> Self {
         Lit {
-            ordinal: ((vi as u32) * 2) + (b as u32),
+            ordinal: ((vi as u32) << 1) + (b as u32),
         }
     }
 }
@@ -287,14 +290,24 @@ impl Index<Lit> for [bool] {
     type Output = bool;
     #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
-        unsafe { self.get_unchecked(usize::from(l)) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.get_unchecked(usize::from(l))
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self[usize::from(l)]
     }
 }
 
 impl IndexMut<Lit> for [bool] {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        unsafe { self.get_unchecked_mut(usize::from(l)) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.get_unchecked_mut(usize::from(l))
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self[usize::from(l)]
     }
 }
 
@@ -302,29 +315,24 @@ impl Index<Lit> for Vec<bool> {
     type Output = bool;
     #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
-        unsafe { self.get_unchecked(usize::from(l)) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.get_unchecked(usize::from(l))
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self[usize::from(l)]
     }
 }
 
 impl IndexMut<Lit> for Vec<bool> {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        unsafe { self.get_unchecked_mut(usize::from(l)) }
-    }
-}
-
-impl Index<Lit> for Vec<Vec<Watch>> {
-    type Output = Vec<Watch>;
-    #[inline]
-    fn index(&self, l: Lit) -> &Self::Output {
-        unsafe { self.get_unchecked(usize::from(l)) }
-    }
-}
-
-impl IndexMut<Lit> for Vec<Vec<Watch>> {
-    #[inline]
-    fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        unsafe { self.get_unchecked_mut(usize::from(l)) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.get_unchecked_mut(usize::from(l))
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self[usize::from(l)]
     }
 }
 
@@ -332,12 +340,12 @@ impl IndexMut<Lit> for Vec<Vec<Watch>> {
 ///
 /// ```
 /// use splr::types::*;
-/// assert_eq!(Lit::from(1i32), Lit::from_assign(1 as VarId, true));
-/// assert_eq!(Lit::from(2i32), Lit::from_assign(2 as VarId, true));
-/// assert_eq!(1, Lit::from_assign(1, true).vi());
-/// assert_eq!(1, Lit::from_assign(1, false).vi());
-/// assert_eq!(2, Lit::from_assign(2, true).vi());
-/// assert_eq!(2, Lit::from_assign(2, false).vi());
+/// assert_eq!(Lit::from(1i32), Lit::from((1 as VarId, true)));
+/// assert_eq!(Lit::from(2i32), Lit::from((2 as VarId, true)));
+/// assert_eq!(1, Lit::from((1usize, true)).vi());
+/// assert_eq!(1, Lit::from((1usize, false)).vi());
+/// assert_eq!(2, Lit::from((2usize, true)).vi());
+/// assert_eq!(2, Lit::from((2usize, false)).vi());
 /// assert_eq!(Lit::from( 1i32), !Lit::from(-1i32));
 /// assert_eq!(Lit::from(-1i32), !Lit::from( 1i32));
 /// assert_eq!(Lit::from( 2i32), !Lit::from(-2i32));
@@ -347,12 +355,6 @@ impl LitIF for Lit {
     #[inline]
     fn as_bool(&self) -> bool {
         self.ordinal & 1 == 1
-    }
-    #[inline]
-    fn from_assign(vi: VarId, p: bool) -> Lit {
-        Lit {
-            ordinal: (vi as u32) << 1 | (p as u32),
-        }
     }
     #[inline]
     fn vi(self) -> VarId {
@@ -483,7 +485,7 @@ impl Ema2 {
             se: 1.0 / (f as f64),
         }
     }
-    // set secondary EMA's parameter
+    // set secondary EMA parameter
     pub fn with_slow(mut self, s: usize) -> Ema2 {
         self.se = 1.0 / (s as f64);
         self
@@ -524,6 +526,37 @@ impl EmaSU {
     }
 }
 
+// A generic reference to a clause or something else.
+// we can use DEAD for simply satisfied form, f.e. an empty forms,
+// while EmptyClause can be used for simply UNSAT form.
+#[derive(Debug, Eq, PartialEq)]
+pub enum RefClause {
+    Clause(ClauseId),
+    Dead,
+    EmptyClause,
+    RegisteredClause(ClauseId),
+    UnitClause(Lit),
+}
+
+impl RefClause {
+    pub fn as_cid(&self) -> ClauseId {
+        match self {
+            RefClause::Clause(cid) => *cid,
+            RefClause::RegisteredClause(cid) => *cid,
+            _ => panic!("invalid reference to clause"),
+        }
+    }
+    pub fn is_new(&self) -> Option<ClauseId> {
+        match self {
+            RefClause::Clause(cid) => Some(*cid),
+            RefClause::RegisteredClause(_) => None,
+            RefClause::EmptyClause => None,
+            RefClause::Dead => None,
+            RefClause::UnitClause(_) => None,
+        }
+    }
+}
+
 /// Internal errors.
 /// Note: returning `Result<(), a-singleton>` is identical to returning `bool`.
 #[derive(Debug, Eq, PartialEq)]
@@ -535,6 +568,7 @@ pub enum SolverError {
     NullLearnt,
     OutOfMemory,
     OutOfRange,
+    RootLevelConflict(ClauseId),
     TimeOut,
     SolverBug,
     UndescribedError,
@@ -634,7 +668,7 @@ where
 }
 
 /// A wrapper structure to make a CNFDescription from a file.
-/// To make CNFDescription clonable, a BufReader should be separated from it.
+/// To make CNFDescription clone-able, a BufReader should be separated from it.
 /// If you want to make a CNFDescription which isn't connected to a file,
 /// just call CNFDescription::default() directly.
 #[derive(Debug)]
@@ -737,38 +771,36 @@ bitflags! {
         //
         //## For Clause
         //
-        /// a clause is stored in DB, but is a garbage now.
-        const DEAD         = 0b0000_0000_0000_0001;
         /// a clause is a generated clause by conflict analysis and is removable.
-        const LEARNT       = 0b0000_0000_0000_0010;
+        const LEARNT       = 0b0000_0000_0000_0001;
         /// a clause is registered in vars' occurrence list.
-        const OCCUR_LINKED = 0b0000_0000_0000_0100;
+        const OCCUR_LINKED = 0b0000_0000_0000_0010;
         /// a clause or var is enqueued for eliminator.
-        const ENQUEUED     = 0b0000_0000_0000_1000;
-        /// mark to run garbage collector on the corresponding watcher lists
-        const TOUCHED      = 0b0000_0000_0001_0000;
+        const ENQUEUED     = 0b0000_0000_0000_0100;
         /// for vivified clauses
-        const VIVIFIED     = 0b0000_0000_0010_0000;
+        const VIVIFIED     = 0b0000_0000_0001_0000;
         /// for a clause which decreases LBD twice after vivification
-        const VIVIFIED2    = 0b0000_0000_0100_0000;
+        const VIVIFIED2    = 0b0000_0000_0010_0000;
         /// a given clause derived a learnt which LBD is smaller than 20.
-        const DERIVE20     = 0b0000_0000_1000_0000;
-        /// a temporal clause during vivification
-        const VIV_ASSUMED  = 0b0000_0001_0000_0000;
+        const DERIVE20     = 0b0000_0000_0100_0000;
 
         //
         //## For Var
         //
         /// a var is eliminated and managed by eliminator.
-        const ELIMINATED   = 0b0000_0010_0000_0000;
+        const ELIMINATED   = 0b0000_0001_0000_0000;
         /// a var is checked during in the current conflict analysis.
-        const CA_SEEN      = 0b0000_0100_0000_0000;
+        const CA_SEEN      = 0b0000_0010_0000_0000;
         /// * the previous assigned value of a Var.
-        const PHASE        = 0b0000_1000_0000_0000;
+        const PHASE        = 0b0000_0100_0000_0000;
+
+        #[cfg(feature = "debug_propagation")]
+        /// check propagation
+        const PROPAGATED   = 0b0001_0000_0000_0000;
 
         #[cfg(feature = "just_used")]
         /// a clause is used recently in conflict analysis.
-        const JUST_USED    = 0b0001_0000_0000_0000;
+        const JUST_USED    = 0b0010_0000_0000_0000;
     }
 }
 
@@ -807,12 +839,12 @@ impl Logger {
 }
 
 #[derive(Clone, Debug)]
-pub struct OrderedProxy<T: Clone + Default + Sized> {
+pub struct OrderedProxy<T: Clone + Default + Sized + Ord> {
     index: f64,
     body: T,
 }
 
-impl<T: Clone + Default + Sized> Default for OrderedProxy<T> {
+impl<T: Clone + Default + Sized + Ord> Default for OrderedProxy<T> {
     fn default() -> Self {
         OrderedProxy {
             index: 0.0,
@@ -821,18 +853,18 @@ impl<T: Clone + Default + Sized> Default for OrderedProxy<T> {
     }
 }
 
-impl<T: Clone + Default + Sized> PartialEq for OrderedProxy<T> {
+impl<T: Clone + Default + Sized + Ord> PartialEq for OrderedProxy<T> {
     fn eq(&self, other: &OrderedProxy<T>) -> bool {
-        self.index == other.index
+        self.index == other.index && self.body == other.body
     }
 }
 
-impl<T: Clone + Default + Sized> Eq for OrderedProxy<T> {}
+impl<T: Clone + Default + Sized + Ord> Eq for OrderedProxy<T> {}
 
-impl<T: Clone + Default + PartialEq> PartialOrd for OrderedProxy<T> {
+impl<T: Clone + Default + PartialEq + Ord> PartialOrd for OrderedProxy<T> {
     fn partial_cmp(&self, other: &OrderedProxy<T>) -> Option<Ordering> {
         if (self.index - other.index).abs() < f64::EPSILON {
-            Some(Ordering::Equal)
+            self.body.partial_cmp(&other.body)
         } else if self.index < other.index {
             Some(Ordering::Less)
         } else {
@@ -841,10 +873,10 @@ impl<T: Clone + Default + PartialEq> PartialOrd for OrderedProxy<T> {
     }
 }
 
-impl<T: Clone + Default + PartialEq> Ord for OrderedProxy<T> {
+impl<T: Clone + Default + PartialEq + Ord> Ord for OrderedProxy<T> {
     fn cmp(&self, other: &OrderedProxy<T>) -> Ordering {
         if (self.index - other.index).abs() < f64::EPSILON {
-            Ordering::Equal
+            self.body.cmp(&other.body)
         } else if self.index < other.index {
             Ordering::Less
         } else {
@@ -853,7 +885,7 @@ impl<T: Clone + Default + PartialEq> Ord for OrderedProxy<T> {
     }
 }
 
-impl<T: Clone + Default + Sized> OrderedProxy<T> {
+impl<T: Clone + Default + Sized + Ord> OrderedProxy<T> {
     pub fn new(body: T, index: f64) -> Self {
         OrderedProxy { index, body }
     }
@@ -865,6 +897,9 @@ impl<T: Clone + Default + Sized> OrderedProxy<T> {
     }
     pub fn to(&self) -> T {
         self.body.clone()
+    }
+    pub fn value(&self) -> f64 {
+        self.index
     }
 }
 

@@ -121,7 +121,9 @@ impl SearchStrategy {
 #[derive(Clone, Eq, PartialEq)]
 pub enum Stat {
     /// the number of 'no decision conflict'
-    NoDecisionConflict,
+    NumDecisionConflict,
+    /// the number of equivalency processor invocation
+    NumProcessor,
     /// the number of vivification
     Vivification,
     /// the number of vivified (shrunk) clauses
@@ -136,14 +138,24 @@ impl Index<Stat> for [usize] {
     type Output = usize;
     #[inline]
     fn index(&self, i: Stat) -> &usize {
-        unsafe { self.get_unchecked(i as usize) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.get_unchecked(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self[i as usize]
     }
 }
 
 impl IndexMut<Stat> for [usize] {
     #[inline]
     fn index_mut(&mut self, i: Stat) -> &mut usize {
-        unsafe { self.get_unchecked_mut(i as usize) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.get_unchecked_mut(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self[i as usize]
     }
 }
 
@@ -227,14 +239,24 @@ impl Index<Stat> for State {
     type Output = usize;
     #[inline]
     fn index(&self, i: Stat) -> &usize {
-        unsafe { self.stats.get_unchecked(i as usize) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.stats.get_unchecked(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.stats[i as usize]
     }
 }
 
 impl IndexMut<Stat> for State {
     #[inline]
     fn index_mut(&mut self, i: Stat) -> &mut usize {
-        unsafe { self.stats.get_unchecked_mut(i as usize) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.stats.get_unchecked_mut(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.stats[i as usize]
     }
 }
 
@@ -379,7 +401,7 @@ impl StateIF for State {
     {
         let asg_num_conflict = asg.refer(assign::property::Tusize::NumConflict);
         let asg_num_decision = asg.refer(assign::property::Tusize::NumDecision);
-        let asg_num_propagation = asg.refer(assign::property::Tusize::NumPropegation);
+        let asg_num_propagation = asg.refer(assign::property::Tusize::NumPropagation);
         let asg_num_restart = asg.refer(assign::property::Tusize::NumRestart);
         let cdb_num_bi_learnt = cdb.refer(cdb::property::Tusize::NumBiLearnt);
         let cdb_num_lbd2 = cdb.refer(cdb::property::Tusize::NumLBD2);
@@ -466,7 +488,7 @@ impl StateIF for State {
         let asg_cpr_ema = asg.refer(assign::property::TEma::ConflictPerRestart);
 
         let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
-        let cdb_num_biclause = cdb.derefer(cdb::property::Tusize::NumBiClause);
+        let cdb_num_bi_clause = cdb.derefer(cdb::property::Tusize::NumBiClause);
         let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
         let cdb_lbd_of_dp: f64 = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
@@ -544,8 +566,8 @@ impl StateIF for State {
             im!(
                 "{:>9}",
                 self,
-                LogUsizeId::Binclause,
-                cdb_num_biclause // cdb_num_bi_learnt
+                LogUsizeId::BiClause,
+                cdb_num_bi_clause // cdb_num_bi_learnt
             ),
             im!(
                 "{:>9}",
@@ -591,8 +613,13 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|elim:{}, #sub:{}, core:{}, /cpr:{}",
-            im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
+            "\x1B[2K        misc|proc:{}, #sub:{}, core:{}, /cpr:{}",
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::NumProcessor,
+                self[Stat::NumProcessor]
+            ),
             im!("{:>9}", self, LogUsizeId::ClauseSubsumption, elim_num_sub),
             im!(
                 "{:>9}",
@@ -607,6 +634,7 @@ impl StateIF for State {
                 asg_cpr_ema.get()
             )
         );
+        self[LogUsizeId::Simplify] = elim_num_full;
         #[cfg(feature = "strategy_adaptation")]
         {
             println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
@@ -639,7 +667,7 @@ impl State {
             / asg.derefer(assign::property::Tusize::NumVar) as f64;
         self[LogUsizeId::RemovableClause] = cdb.derefer(cdb::property::Tusize::NumLearnt);
         self[LogUsizeId::LBD2Clause] = cdb.derefer(cdb::property::Tusize::NumLBD2);
-        self[LogUsizeId::Binclause] = cdb.derefer(cdb::property::Tusize::NumBiClause);
+        self[LogUsizeId::BiClause] = cdb.derefer(cdb::property::Tusize::NumBiClause);
         self[LogUsizeId::PermanentClause] =
             cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
         self[LogUsizeId::RestartBlock] = rst.derefer(solver::restart::property::Tusize::NumBlock);
@@ -663,6 +691,7 @@ impl State {
         self[LogF64Id::PropagationPerConflict] = asg
             .refer(assign::property::TEma::PropagationPerConflict)
             .get();
+        self[LogUsizeId::NumProcessor] = self[Stat::NumProcessor];
         self[LogUsizeId::Simplify] = elim.derefer(processor::property::Tusize::NumFullElimination);
         self[LogUsizeId::ClauseSubsumption] =
             elim.derefer(processor::property::Tusize::NumSubsumedClause);
@@ -710,14 +739,24 @@ impl Index<LogUsizeId> for State {
     type Output = usize;
     #[inline]
     fn index(&self, i: LogUsizeId) -> &Self::Output {
-        &self.record[i]
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.record.vali.get_unchecked(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.record.vali[i as usize]
     }
 }
 
 impl IndexMut<LogUsizeId> for State {
     #[inline]
     fn index_mut(&mut self, i: LogUsizeId) -> &mut Self::Output {
-        &mut self.record[i]
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.record.vali.get_unchecked_mut(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.record.vali[i as usize]
     }
 }
 
@@ -725,14 +764,24 @@ impl Index<LogF64Id> for State {
     type Output = f64;
     #[inline]
     fn index(&self, i: LogF64Id) -> &Self::Output {
-        &self.record[i]
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.record.valf.get_unchecked(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.record.valf[i as usize]
     }
 }
 
 impl IndexMut<LogF64Id> for State {
     #[inline]
     fn index_mut(&mut self, i: LogF64Id) -> &mut Self::Output {
-        &mut self.record[i]
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.record.valf.get_unchecked_mut(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.record.valf[i as usize]
     }
 }
 
@@ -860,7 +909,7 @@ pub enum LogUsizeId {
     //
     RemovableClause,
     LBD2Clause,
-    Binclause,
+    BiClause,
     PermanentClause,
 
     //
@@ -876,6 +925,7 @@ pub enum LogUsizeId {
     //
     //## pre(in)-processor
     //
+    NumProcessor,
     Simplify,
     Stabilize,
     ClauseSubsumption,
@@ -925,6 +975,11 @@ impl Index<LogUsizeId> for ProgressRecord {
     type Output = usize;
     #[inline]
     fn index(&self, i: LogUsizeId) -> &usize {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.vali.get_unchecked(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &self.vali[i as usize]
     }
 }
@@ -932,6 +987,11 @@ impl Index<LogUsizeId> for ProgressRecord {
 impl IndexMut<LogUsizeId> for ProgressRecord {
     #[inline]
     fn index_mut(&mut self, i: LogUsizeId) -> &mut usize {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.vali.get_unchecked_mut(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &mut self.vali[i as usize]
     }
 }
@@ -940,6 +1000,11 @@ impl Index<LogF64Id> for ProgressRecord {
     type Output = f64;
     #[inline]
     fn index(&self, i: LogF64Id) -> &f64 {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.valf.get_unchecked(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &self.valf[i as usize]
     }
 }
@@ -947,6 +1012,11 @@ impl Index<LogF64Id> for ProgressRecord {
 impl IndexMut<LogF64Id> for ProgressRecord {
     #[inline]
     fn index_mut(&mut self, i: LogF64Id) -> &mut f64 {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.valf.get_unchecked_mut(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &mut self.valf[i as usize]
     }
 }
@@ -957,7 +1027,9 @@ pub mod property {
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tusize {
         /// the number of 'no decision conflict'
-        NoDecisionConflict,
+        NumDecisionConflict,
+        // the number for processor invocations
+        NumProcessor,
         /// the number of vivification
         Vivification,
         /// the number of vivified (shrunk) clauses
@@ -966,8 +1038,9 @@ pub mod property {
         VivifiedVar,
     }
 
-    pub const USIZES: [Tusize; 4] = [
-        Tusize::NoDecisionConflict,
+    pub const USIZES: [Tusize; 5] = [
+        Tusize::NumDecisionConflict,
+        Tusize::NumProcessor,
         Tusize::Vivification,
         Tusize::VivifiedClause,
         Tusize::VivifiedVar,
@@ -977,7 +1050,8 @@ pub mod property {
         #[inline]
         fn derefer(&self, k: Tusize) -> usize {
             match k {
-                Tusize::NoDecisionConflict => self[Stat::NoDecisionConflict],
+                Tusize::NumDecisionConflict => self[Stat::NumDecisionConflict],
+                Tusize::NumProcessor => self[Stat::NumProcessor],
                 Tusize::Vivification => self[Stat::Vivification],
                 Tusize::VivifiedClause => self[Stat::VivifiedClause],
                 Tusize::VivifiedVar => self[Stat::VivifiedVar],

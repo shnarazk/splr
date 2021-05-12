@@ -23,11 +23,13 @@ impl Eliminator {
                     "BackSubsC    => {} {} subsumed completely by {} {:#}",
                     did, cdb[did], cid, cdb[cid],
                 );
-                cdb.detach(did);
-                self.remove_cid_occur(asg, did, &mut cdb[did]);
                 if !cdb[did].is(Flag::LEARNT) {
                     cdb[cid].turn_off(Flag::LEARNT);
                 }
+                assert!(!cdb[did].is_dead());
+                self.remove_cid_occur(asg, did, &mut cdb[did]);
+                // cdb.watches(did, "subsume35");
+                cdb.remove_clause(did);
                 self.num_subsumed += 1;
             }
             // To avoid making a big clause, we have to add a condition for combining them.
@@ -37,7 +39,7 @@ impl Eliminator {
                 strengthen_clause(asg, cdb, self, did, !l)?;
                 self.enqueue_var(asg, l.vi(), true);
             }
-            _ => {}
+            _ => (),
         }
         Ok(())
     }
@@ -52,7 +54,7 @@ where
     if cid.is_lifted_lit() {
         let l = Lit::from(cid);
         let oh = &cdb[other];
-        for lo in &oh.lits {
+        for lo in oh.iter() {
             if l == !*lo {
                 return Some(l);
             }
@@ -61,11 +63,13 @@ where
     }
     let mut ret: Lit = NULL_LIT;
     let ch = &cdb[cid];
+    debug_assert!(1 < ch.len());
     let ob = &cdb[other];
-    debug_assert!(ob.lits.contains(&ob[0]));
-    debug_assert!(ob.lits.contains(&ob[1]));
-    'next: for l in &ch.lits {
-        for lo in &ob.lits {
+    debug_assert!(1 < ob.len());
+    debug_assert!(ob.contains(ob[0]));
+    debug_assert!(ob.contains(ob[1]));
+    'next: for l in ch.iter() {
+        for lo in ob.iter() {
             if *l == *lo {
                 continue 'next;
             } else if ret == NULL_LIT && *l == !*lo {
@@ -92,39 +96,30 @@ where
     A: AssignIF,
     C: ClauseDBIF,
 {
-    debug_assert!(!cdb[cid].is(Flag::DEAD));
+    debug_assert!(!cdb[cid].is_dead());
     debug_assert!(1 < cdb[cid].len());
-    cdb.touch_var(l.vi());
     debug_assert!(!cid.is_none());
-    if cdb.strengthen_by_elimination(cid, l) {
-        // Vaporize the binary clause
-        debug_assert!(2 == cdb[cid].len());
-        let c0 = cdb[cid][0];
-        debug_assert_ne!(c0, l);
+    match cdb.transform_by_elimination(cid, l) {
+        RefClause::Clause(_) => {
+            #[cfg(feature = "trace_elimination")]
+            println!("cid {} drops literal {}", cid, l);
 
-        #[cfg(feature = "trace_elimination")]
-        println!(
-            "{} {:?} is removed and its first literal {} is enqueued.",
-            cid, cdb[cid], c0,
-        );
-
-        cdb.detach(cid);
-        elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
-        cdb.certificate_add(&[c0]);
-        asg.assign_at_root_level(c0)
-    } else {
-        #[cfg(feature = "trace_elimination")]
-        println!("cid {} drops literal {}", cid, l);
-
-        #[cfg(feature = "boundary_check")]
-        assert!(1 < cdb[cid].len());
-
-        elim.enqueue_clause(cid, &mut cdb[cid]);
-        elim.remove_lit_occur(asg, l, cid);
-        unsafe {
-            let vec = &cdb[cid].lits[..] as *const [Lit];
-            cdb.certificate_add(&*vec);
+            elim.enqueue_clause(cid, &mut cdb[cid]);
+            elim.remove_lit_occur(asg, l, cid);
+            Ok(())
         }
-        Ok(())
+        RefClause::Dead => panic!("impossible"),
+        RefClause::EmptyClause => panic!("impossible"),
+        RefClause::RegisteredClause(_) => {
+            elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
+            cdb.remove_clause(cid);
+            Ok(())
+        }
+        RefClause::UnitClause(l0) => {
+            cdb.certificate_add_assertion(l0);
+            elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
+            cdb.remove_clause(cid);
+            asg.assign_at_root_level(l0)
+        }
     }
 }

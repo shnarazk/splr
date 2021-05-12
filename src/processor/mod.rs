@@ -56,11 +56,6 @@ use {
 pub trait EliminateIF: Instantiate {
     /// set eliminator's mode to **ready**.
     fn activate(&mut self);
-    /// set eliminator's mode to **dormant**.
-    fn stop<A, C>(&mut self, asg: &mut A, cdb: &mut C)
-    where
-        A: AssignIF,
-        C: ClauseDBIF;
     /// check if the eliminator is running.
     fn is_running(&self) -> bool;
     /// rebuild occur lists.
@@ -90,14 +85,6 @@ pub trait EliminateIF: Instantiate {
         A: AssignIF,
         C: ClauseDBIF,
         R: RestartIF;
-    /// register a clause id to all corresponding occur lists.
-    fn add_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause, enqueue: bool)
-    where
-        A: AssignIF;
-    /// remove a clause id from all corresponding occur lists.
-    fn remove_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause)
-    where
-        A: AssignIF;
     /// return the order of vars based on their occurrences
     fn sorted_iterator(&self) -> Iter<'_, usize>;
     /// return vi's stats
@@ -211,8 +198,8 @@ mod tests {
             0,
             cdb.iter()
                 .skip(1)
-                .filter(|c| !c.is(Flag::DEAD))
-                .filter(|c| c.lits.iter().any(|l| elim_vars.contains(&l.vi())))
+                .filter(|c| !c.is_dead())
+                .filter(|c| c.iter().any(|l| elim_vars.contains(&l.vi())))
                 .count()
         );
     }

@@ -7,9 +7,10 @@ use {
     },
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-        cdb::{ClauseDB, ClauseDBIF, WatchDBIF},
-        processor::{EliminateIF, Eliminator},
+        cdb::{ClauseDB, ClauseDBIF},
+        processor::Eliminator,
         solver::SolverEvent,
+        state::StateIF,
         types::*,
     },
 };
@@ -67,15 +68,15 @@ pub fn handle_conflict(
                 asg.cancel_until(snd_l);
                 debug_assert!(
                     asg.stack_iter().all(|l| l.vi() != decision.vi()),
-                    "assign stack contains a strange lito",
+                    "assign stack contains a strange literal",
                 );
                 debug_assert!(asg.assign(decision.vi()).is_none());
                 debug_assert!(c
                     .iter()
                     .all(|l| *l != decision || asg.assigned(*l).is_none()));
-                let l0 = c.lits[0];
-                let l1 = c.lits[1];
-                if c.lits.len() == 2 {
+                let l0 = c.lit0();
+                let l1 = c.lit1();
+                if c.len() == 2 {
                     if decision == l0 {
                         asg.assign_by_implication(
                             decision,
@@ -90,22 +91,14 @@ pub fn handle_conflict(
                         );
                     }
                 } else {
-                    if l0 == decision {
-                    } else if l1 == decision {
-                        c.lits.swap(0, 1);
-                    } else {
-                        for i in 2..c.lits.len() {
-                            let l = c.lits[i];
-                            if l == decision {
-                                c.lits.swap(0, i);
-
-                                let w = cdb.watcher_list_mut(!l0).detach_with(ci).unwrap();
-                                debug_assert_ne!(l0.vi(), decision.vi());
-                                debug_assert!(!asg.var(l0.vi()).is(Flag::ELIMINATED));
-                                debug_assert_ne!(w.blocker, l0);
-                                cdb.watcher_list_mut(!decision).register(w);
-                                break;
+                    for (i, l) in cdb[ci].iter().enumerate() {
+                        if *l == decision {
+                            match i {
+                                0 => (),
+                                1 => cdb.swap_watch(ci),
+                                _ => cdb.update_watch_cache(ci, 0, i, false),
                             }
+                            break;
                         }
                     }
                     asg.assign_by_implication(
@@ -185,14 +178,10 @@ pub fn handle_conflict(
         //## A NEW ASSERTION by UNIT LEARNT CLAUSE GENERATION
         //
         // dump to certified even if it's a literal.
-        cdb.certificate_add(new_learnt);
-        if use_chronobt {
-            asg.cancel_until(bl);
-            debug_assert!(asg.stack_iter().all(|l| l.vi() != l0.vi()));
-            asg.assign_by_implication(l0, AssignReason::default(), 0);
-            asg.handle(SolverEvent::Assert(l0.vi()));
-        } else {
-            asg.assign_by_unitclause(l0);
+        cdb.certificate_add_assertion(new_learnt[0]);
+        if asg.assign_at_root_level(l0).is_err() {
+            state.log(asg.num_conflict, "RootLevelConflict by conflict analyzer");
+            return Err(SolverError::RootLevelConflict(ClauseId::default()));
         }
         elim.to_simplify += (state.config.c_ip_int / 2) as f64;
         rst.handle(SolverEvent::Assert(l0.vi()))
@@ -210,7 +199,7 @@ pub fn handle_conflict(
 
                 #[cfg(feature = "reason_side_rewarding")]
                 if let AssignReason::Implication(r, _) = asg.reason(lit.vi()) {
-                    for l in &cdb[r].lits {
+                    for l in cdb[r].iter() {
                         let vi = l.vi();
                         if !bumped.contains(&vi) {
                             //
@@ -229,8 +218,13 @@ pub fn handle_conflict(
         } else {
             NULL_LIT
         };
-        let cid = cdb.new_clause(asg, new_learnt, true, true);
-        elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
+        let new_clause = cdb.new_clause(asg, new_learnt, true);
+        let generated = new_clause.is_new().is_some();
+
+        let cid = new_clause.as_cid();
+        // // if generated {
+        // //     elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
+        // // }
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);
         asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), al);
@@ -243,11 +237,16 @@ pub fn handle_conflict(
                 act = a;
             }
         }
-        elim.to_simplify += 1.0 / (learnt_len as f64).powf(1.4);
+        elim.to_simplify += 1.0 / learnt_len as f64;
         if lbd <= 20 {
             for cid in &state.derive20 {
                 cdb[cid].turn_on(Flag::DERIVE20);
             }
+        }
+
+        #[cfg(feature = "bi_clause_completion")]
+        if !generated {
+            cdb.complete_bi_clauses(asg);
         }
     }
     Ok(())
@@ -268,7 +267,7 @@ fn conflict_analyze(
     learnt.clear();
     learnt.push(NULL_LIT);
     let dl = asg.decision_level();
-    let mut p = cdb[conflicting_clause].lits[0];
+    let mut p = cdb[conflicting_clause].lit0();
 
     #[cfg(feature = "trace_analysis")]
     println!("- analyze conflicting literal {}", p);
@@ -421,7 +420,12 @@ fn conflict_analyze(
                     path_cnt,
                     dl,
                     asg.dump(&*learnt),
-                    asg.dump(&cdb[conflicting_clause].lits),
+                    asg.dump(
+                        &cdb[conflicting_clause]
+                            .iter()
+                            .map(|l| *l)
+                            .collect::<Vec<_>>()
+                    ),
                 );
             }
 
@@ -473,7 +477,7 @@ impl State {
         new_learnt.retain(|l| *l == l0 || !l.is_redundant(asg, cdb, &mut to_clear, &levels));
         let len = new_learnt.len();
         if 2 < len && len < 30 {
-            cdb.minimize_with_biclauses(asg, new_learnt);
+            cdb.minimize_with_bi_clauses(asg, new_learnt);
         }
         // find correct backtrack level from remaining literals
         let mut level_to_return = 0;
@@ -510,8 +514,7 @@ impl Lit {
         if asg.reason(self.vi()) == AssignReason::default() {
             return false;
         }
-        let mut stack = Vec::new();
-        stack.push(self);
+        let mut stack = vec![self];
         let top = clear.len();
         while let Some(sl) = stack.pop() {
             match asg.reason(sl.vi()) {

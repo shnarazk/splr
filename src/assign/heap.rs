@@ -175,8 +175,8 @@ impl VarOrderIF for VarIdHeap {
         let vs = self.heap[s];
         let n = self.idxs[0];
         let vn = self.heap[n];
-        debug_assert!(vn != 0, "Invalid VarId for heap");
-        debug_assert!(vs != 0, "Invalid VarId for heap");
+        debug_assert!(vn != 0, "Invalid VarId for heap: vn {}, n {}", vn, n);
+        debug_assert!(vs != 0, "Invalid VarId for heap: vs {}, n {}", vs, n);
         self.heap.swap(n, s);
         self.idxs.swap(vn, vs);
         self.idxs[0] -= 1;
@@ -227,8 +227,8 @@ impl VarIdHeap {
     fn check(&self, s: &str) {
         let h = &mut self.heap.clone()[1..];
         let d = &mut self.idxs.clone()[1..];
-        h.sort();
-        d.sort();
+        h.sort_unstable();
+        d.sort_unstable();
         for i in 0..h.len() {
             if h[i] != i + 1 {
                 panic!("heap {} {} {:?}", i, h[i], h);

@@ -144,7 +144,7 @@ unif-k3-r4.25-v360-c1530-S1028159446-096.cnf       360,1530 |time:   124.06
 s UNSATISFIABLE: cnfs/unif-k3-r4.25-v360-c1530-S1028159446-096.cnf
 ```
 
-2. Convert the drat file to a grat file.
+2. Convert the generated DRAT file to a GRAT file.
 
 ```plain
 $ gratgen cnfs/unif-k3-r4.25-v360-c1530-S1028159446-096.cnf proof.out -o proof.grat
@@ -285,10 +285,10 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 | `#ass`       | the number of asserted variables (which has been assigned a value at decision level zero) |
 | `#elm`       | the number of eliminated variables                                                        |
 | `prg%`       | the percentage of `remaining variables / total variables`                                 |
-| `Remv`       | the number of learnt clauses which are not biclauses                                      |
-| `LBD2`       | the number of learnt clauses which LBDs are 2                                             |
-| `Binc`       | the number of binary learnt clauses                                                       |
-| `Perm`       | the number of given clauses and binary learnt clauses                                     |
+| `Remv`       | the current number of learnt clauses which are not bi-clauses                             |
+| `LBD2`       | the accumulated number of learnt clauses which LBDs are 2                                 |
+| `Binc`       | the current number of binary learnt clauses                                               |
+| `Perm`       | the current number of given clauses and binary learnt clauses                             |
 | `#BLK`       | the number of blocking restart                                                            |
 | `#RST`       | the number of restart                                                                     |
 | `trgr`       | the number of the restart trigger before executing restart                                |
