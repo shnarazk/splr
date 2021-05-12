@@ -500,7 +500,7 @@ impl RestartIF for Restarter {
             self.num_block += 1;
             self.after_restart = 0;
             self.restart_step = self.initial_restart_step * self.stb.step_max;
-            // self.restart_waiting = 0; // holding restart counter
+            self.restart_waiting = 0;
             return Some(RestartDecision::Block);
         }
         if self.lbd.is_active() {
