@@ -284,7 +284,7 @@ fn search(
                             );
                         }
                     }
-                    asg.handle(SolverEvent::NewStabilizationStage(block_level));
+                    asg.handle(SolverEvent::Stabilize(block_level));
                     // check(asg, cdb, false, "before reduction");
                     if cdb.reduce(asg, asg.num_conflict) {
                         #[cfg(feature = "trace_equivalency")]

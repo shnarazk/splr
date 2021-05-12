@@ -282,10 +282,9 @@ impl Instantiate for State {
             SolverEvent::Conflict => (),
             SolverEvent::Eliminate(_) => (),
             SolverEvent::Instantiate => (),
-            SolverEvent::NewStabilizationStage(_) => (),
             SolverEvent::Reinitialize => (),
             SolverEvent::Restart => (),
-            SolverEvent::Stabilize((_, _)) => (),
+            SolverEvent::Stabilize(_) => (),
 
             #[cfg(feature = "clause_vivification")]
             SolverEvent::Vivify(_) => (),
