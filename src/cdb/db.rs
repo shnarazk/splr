@@ -475,7 +475,7 @@ impl ClauseDBIF for ClauseDB {
     }
     /// remove a clause temporally
     fn detach_clause(&mut self, cid: ClauseId) -> (Lit, Lit) {
-        self.watches(cid, "detach_clause");
+        // self.watches(cid, "detach_clause");
         let c = &self.clause[cid.ordinal as usize];
         assert!(1 < c.lits.len());
         let l0 = c.lit0();
@@ -499,7 +499,7 @@ impl ClauseDBIF for ClauseDB {
             self.watch_cache[!l0].insert_watch(cid, l1);
             self.watch_cache[!l1].insert_watch(cid, l0);
         }
-        self.watches(cid, "reattach_clause");
+        // self.watches(cid, "reattach_clause");
     }
     /// ## Warning
     /// this function is the only function that makes dead clauses
