@@ -250,7 +250,7 @@ impl EliminateIF for Eliminator {
                 continue;
             }
             let vec = c.iter().copied().collect::<Vec<_>>();
-            assert!(vec.iter().all(|l| !vec.contains(&!*l)));
+            debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
             self.add_cid_occur(asg, ClauseId::from(cid), c, false);
         }
         if force {
@@ -294,7 +294,7 @@ impl EliminateIF for Eliminator {
         {
             for v in asg.var_iter().skip(1) {
                 if asg.reason(v.index) != AssignReason::None {
-                    assert_eq!(asg.level(v.index), 0);
+                    assert_eq!(asg.level(v.index), asg.root_level);
                     // asg.reason(v.index) = AssignReason::None;
                 }
             }
@@ -353,7 +353,7 @@ impl Eliminator {
         for l in c.iter() {
             let vi = l.vi();
             let v = &mut asg.var_mut(vi);
-            assert!(!checked.contains(&vi), "elimitator350: {:?}", c,);
+            debug_assert!(!checked.contains(&vi), "elimitator350: {:?}", c,);
             checked.push(vi);
             let w = &mut self[l.vi()];
             let pl = w.pos_occurs.len();
@@ -364,7 +364,7 @@ impl Eliminator {
             }
             if !v.is(Flag::ELIMINATED) {
                 if bool::from(*l) {
-                    assert!(
+                    debug_assert!(
                         !w.pos_occurs.contains(&cid),
                         "elim.add_cid_occur for {:?} found a strange positive clause{}{}, {:?}",
                         v,
@@ -374,7 +374,7 @@ impl Eliminator {
                     );
                     w.pos_occurs.push(cid);
                 } else {
-                    assert!(
+                    debug_assert!(
                         !w.neg_occurs.contains(&cid),
                         "elim.add_cid_occur for {:?} found a strange negative clause{}{}, {:?}",
                         v,
@@ -399,7 +399,7 @@ impl Eliminator {
     {
         debug_assert!(self.mode == EliminatorMode::Running);
         debug_assert!(!cid.is_lifted_lit());
-        assert!(!c.is_dead());
+        debug_assert!(!c.is_dead());
         c.turn_off(Flag::OCCUR_LINKED);
         for l in c.iter() {
             if asg.assign(l.vi()).is_none() {
@@ -448,7 +448,8 @@ impl Eliminator {
     {
         debug_assert_eq!(asg.decision_level(), 0);
         while !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.stack_len() {
-            // Check top-level assignments by creating a dummy clause and placing it in the queue:
+            // Check top-level assignments by creating a dummy clause
+            // and placing it in the queue:
             if self.clause_queue.is_empty() && self.bwdsub_assigns < asg.stack_len() {
                 let c = ClauseId::from(asg.stack(self.bwdsub_assigns));
                 self.clause_queue.push(c);
@@ -458,7 +459,6 @@ impl Eliminator {
                 Some(x) => x,
                 None => ClauseId::default(),
             };
-            // assert_ne!(cid, 0);
             if *timedout == 0 {
                 self.clear_clause_queue(cdb);
                 self.clear_var_queue(asg);
@@ -475,7 +475,8 @@ impl Eliminator {
                 if c.is_dead() || self.subsume_literal_limit < c.len() {
                     continue;
                 }
-                // if c is subsumed by c', both of c and c' are included in the occurs of all literals of c
+                // if c is subsumed by c', both of c and c' are included in
+                // the occurs of all literals of c
                 // so searching the shortest occurs is most efficient.
                 let mut b = 0;
                 for l in c.iter() {
@@ -514,7 +515,7 @@ impl Eliminator {
                         return Ok(());
                     }
                     if !d.is_dead() && d.len() <= self.subsume_literal_limit {
-                        assert!(
+                        debug_assert!(
                             d.contains(Lit::from((best, false)))
                                 || d.contains(Lit::from((best, true)))
                         );

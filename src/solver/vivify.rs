@@ -57,9 +57,9 @@ pub fn vivify(
     let mut to_display = 0;
     'next_clause: while let Some(cp) = clauses.pop() {
         asg.backtrack_sandbox();
-        assert!(asg.stack_is_empty() || !asg.remains());
-        let cid = cp.to();
+        debug_assert!(asg.stack_is_empty() || !asg.remains());
         debug_assert_eq!(asg.root_level, asg.decision_level());
+        let cid = cp.to();
         let c = &mut cdb[cid];
         if c.is_dead() {
             continue;
@@ -128,7 +128,7 @@ pub fn vivify(
         }
     }
     asg.backtrack_sandbox();
-    assert!(asg.stack_is_empty() || !asg.remains());
+    debug_assert!(asg.stack_is_empty() || !asg.remains());
     state.flush("");
     state.flush(format!(
         "vivified(assert:{} shorten:{}), ",
@@ -161,30 +161,11 @@ fn assert_lit(
     let mut tag: &str = "assign";
     if let Err(e) = asg.assign_at_root_level(l0).and_then(|_| {
         tag = "propagation";
-        assert_eq!(asg.decision_level(), asg.root_level);
-        assert!(asg.remains());
+        debug_assert!(asg.remains());
         asg.propagate(cdb)
             .to_option()
             .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(cc)))
-    })
-    //        while asg.remains() {
-    //            if !asg.propagate(cdb).is_none() {
-    //                return Err(SolverError::ProcessorFoundUnsat);
-    //            }
-    //            if asg.remains() {
-    //                state.log(
-    //                    asg.num_conflict,
-    //                    format!(
-    //                        "(vivify) root level propagation remains unpropagated literals {}/{}",
-    //                        asg.q_head,
-    //                        asg.stack_len(),
-    //                    ),
-    //                );
-    //            }
-    //        }
-    //        Ok(())
-    //    })
-    {
+    }) {
         state.flush("");
         state.log(
             asg.num_conflict,
@@ -210,17 +191,19 @@ fn assert_lit(
             ),
         );
     }
-    for (ci, c) in cdb.iter().enumerate() {
-        assert!(
-            c.iter().all(|l| asg.assigned(*l).is_none()),
-            "clause:{}{:?}\n{:?}\n{:?}",
-            ci,
-            c,
-            c.iter().map(|l| asg.assigned(*l)).collect::<Vec<_>>(),
-            c.iter().map(|l| asg.level(l.vi())).collect::<Vec<_>>(),
-        );
-    }
-    assert!(cdb
+    // {
+    //     for (ci, c) in cdb.iter().enumerate() {
+    //         assert!(
+    //             c.iter().all(|l| asg.assigned(*l).is_none()),
+    //             "clause:{}{:?}\n{:?}\n{:?}",
+    //             ci,
+    //             c,
+    //             c.iter().map(|l| asg.assigned(*l)).collect::<Vec<_>>(),
+    //             c.iter().map(|l| asg.level(l.vi())).collect::<Vec<_>>(),
+    //         );
+    //     }
+    // }
+    debug_assert!(cdb
         .iter()
         .all(|c| c.iter().all(|l| asg.assigned(*l).is_none())));
     Ok(())

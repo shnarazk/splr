@@ -79,7 +79,7 @@ impl SolveIF for Solver {
             }
             assert!(!asg.remains());
         }
-        assert_eq!(asg.decision_level(), asg.root_level);
+        debug_assert_eq!(asg.decision_level(), asg.root_level);
         if elim.simplify(asg, cdb, rst, state).is_err() {
             if cdb.check_size().is_err() {
                 return Err(SolverError::OutOfMemory);
@@ -286,7 +286,6 @@ fn search(
                     }
                     asg.handle(SolverEvent::NewStabilizationStage(block_level));
                     // check(asg, cdb, false, "before reduction");
-                    assert_eq!(asg.root_level, asg.decision_level());
                     if cdb.reduce(asg, asg.num_conflict) {
                         #[cfg(feature = "trace_equivalency")]
                         if false {
@@ -295,7 +294,6 @@ fn search(
                         }
                         state[Stat::NumProcessor] += 1;
                         if state.config.c_ip_int <= elim.to_simplify as usize {
-                            assert_eq!(asg.root_level, asg.decision_level());
                             #[cfg(feature = "clause_vivification")]
                             if let Err(e) = vivify(asg, cdb, rst, state).and_then(|_| {
                                 elim.activate();
@@ -408,9 +406,9 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
             );
         }
         println!("clause detail: {}", &cdb[cid]);
-        let (w0, w1) = cdb.watches(cid, "search354");
-        println!("watch{} has blocker{}", cdb[cid].lit0(), w0,);
-        println!("watch{} has blocker{}", cdb[cid].lit1(), w1,);
+        let (c0, c1) = cdb.watches(cid, "check (search 441)");
+        println!("watch{} has blocker cache {}", cdb[cid].lit0(), c0);
+        println!("watch{} has blocker cache {}", cdb[cid].lit1(), c1);
         panic!(
             "Before extending, NC {}, Level {} generated assignment({:?}) falsifies by {}",
             asg.derefer(assign::property::Tusize::NumConflict),

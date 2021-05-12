@@ -99,12 +99,6 @@ where
     debug_assert!(!cdb[cid].is_dead());
     debug_assert!(1 < cdb[cid].len());
     debug_assert!(!cid.is_none());
-
-    // | assert!(asg.assigned(cdb[cid].lit0()) != Some(false) && asg.assigned(cdb[cid].lit1()) != Some(false),
-    // |         "{:?} - {:?}",
-    // |         &cdb[cid],
-    // |         cdb[cid].iter().map(|l| asg.assigned(*l)).collect::<Vec<_>>(),
-    // | );
     match cdb.transform_by_elimination(cid, l) {
         RefClause::Clause(_) => {
             #[cfg(feature = "trace_elimination")]
@@ -118,25 +112,12 @@ where
         RefClause::EmptyClause => panic!("imossible"),
         RefClause::RegisteredClause(_) => {
             elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
-            // cdb.watches(cid, "subsume133");
             cdb.remove_clause(cid);
             Ok(())
         }
         RefClause::UnitClause(l0) => {
-            // Vaporize the binary clause
-            // debug_assert!(2 == cdb[cid].len());
-            // let c0 = cdb[cid][0];
-            // debug_assert_ne!(c0, l);
-
-            #[cfg(feature = "trace_elimination")]
-            println!(
-                "{} {:?} is removed and its first literal {} is enqueued.",
-                cid, cdb[cid], l0,
-            );
-
             cdb.certificate_add_assertion(l0);
             elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
-            // cdb.watches(cid, "subsume127");
             cdb.remove_clause(cid);
             asg.assign_at_root_level(l0)
         }

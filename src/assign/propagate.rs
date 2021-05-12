@@ -140,7 +140,9 @@ impl PropagateIF for AssignStack {
         // assert!(self.trail_lim.is_empty() || !cid.is_none());
         let vi = l.vi();
         debug_assert!(!self.var[vi].is(Flag::ELIMINATED));
-        assert!(var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none());
+        debug_assert!(
+            var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
+        );
         set_assign!(self, l);
         self.level[vi] = lv;
         self.reason[vi] = reason;
@@ -153,7 +155,7 @@ impl PropagateIF for AssignStack {
         }
     }
     fn assign_by_decision(&mut self, l: Lit) {
-        assert!(
+        debug_assert!(
             var_assign!(self, l.vi()) == Some(bool::from(l)) || var_assign!(self, l.vi()).is_none()
         );
         debug_assert!(l.vi() < self.var.len());
@@ -173,11 +175,11 @@ impl PropagateIF for AssignStack {
         self.reward_at_assign(vi);
         self.trail.push(l);
         self.num_decision += 1;
-        assert!(self.q_head < self.trail.len());
+        debug_assert!(self.q_head < self.trail.len());
     }
     fn assign_by_unitclause(&mut self, l: Lit) {
         self.cancel_until(self.root_level);
-        assert!(
+        debug_assert!(
             var_assign!(self, l.vi()) == Some(bool::from(l)) || var_assign!(self, l.vi()).is_none()
         );
         debug_assert!(self.trail.iter().all(|k| k.vi() != l.vi()));
@@ -203,14 +205,14 @@ impl PropagateIF for AssignStack {
         let mut ooo_unpropagated: Vec<Lit> = Vec::new();
         for i in lim..self.trail.len() {
             let l = self.trail[i];
-            assert!(
+            debug_assert!(
                 self.assign[l.vi()].is_some(),
                 "cancel_until found unassigned var in trail {}{:?}",
                 l.vi(),
                 &self.var[l.vi()],
             );
             let vi = l.vi();
-            assert!(self.q_head <= i || self.var[vi].is(Flag::PROPAGATED),
+            debug_assert!(self.q_head <= i || self.var[vi].is(Flag::PROPAGATED),
                     "unpropagated assigned level-{} var {:?},{:?} (loc:{} in trail{:?}) found, staying at level {}",
                     self.level[vi],
                     self.var[vi],
@@ -237,19 +239,6 @@ impl PropagateIF for AssignStack {
         }
         self.trail.truncate(lim);
         self.trail.append(&mut ooo_propagated);
-        // || for l in self.trail.iter() {
-        // ||     assert!(
-        // ||         self.var[l.vi()].is(Flag::PROPAGATED),
-        // ||         "unpropagated {}: {:?}",
-        // ||         *l,
-        // ||         &self.var[l.vi()],
-        // ||     );
-        // || }
-
-        // || assert!(self
-        // ||     .trail
-        // ||     .iter()
-        // ||     .all(|l| self.var[l.vi()].is(Flag::PROPAGATED)));
         self.q_head = self.trail.len();
         self.trail.append(&mut ooo_unpropagated);
         debug_assert!(self
@@ -259,23 +248,13 @@ impl PropagateIF for AssignStack {
         debug_assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
         self.trail_lim.truncate(lv as usize);
         // assert!(lim < self.q_head) doesn't hold sometimes in chronoBT.
-        // ||  self.q_head = self.q_head.min(lim);
         if lv == self.root_level {
-            // || assert!(self
-            // ||     .trail
-            // ||     .iter()
-            // ||     .take(self.q_head)
-            // ||     .all(|l| self.level[l.vi()] == self.root_level
-            // ||         && self.var[l.vi()].is(Flag::PROPAGATED)));
-            // self.trail.clear();
-            // self.trail.append(&mut ooo_unpropagated);
-            // self.q_head = 0;
             self.num_restart += 1;
             self.cpr_ema.update(self.num_conflict);
         }
 
-        assert!(self.q_head == 0 || self.assign[self.trail[self.q_head - 1].vi()].is_some());
-        assert!(
+        debug_assert!(self.q_head == 0 || self.assign[self.trail[self.q_head - 1].vi()].is_some());
+        debug_assert!(
             self.q_head == 0 || self.var[self.trail[self.q_head - 1].vi()].is(Flag::PROPAGATED)
         );
     }
@@ -297,9 +276,6 @@ impl PropagateIF for AssignStack {
         self.trail.truncate(lim);
         self.trail_lim.truncate(self.root_level as usize);
         self.q_head = self.trail.len();
-        // self.trail.clear();
-        // self.trail_lim.clear();
-        // self.q_head = 0;
     }
     /// UNIT PROPAGATION.
     /// Note:
@@ -320,7 +296,7 @@ impl PropagateIF for AssignStack {
         while let Some(p) = self.trail.get(self.q_head) {
             self.num_propagation += 1;
             self.q_head += 1;
-            assert!(!self.var[p.vi()].is(Flag::PROPAGATED));
+            // assert!(!self.var[p.vi()].is(Flag::PROPAGATED));
             self.var[p.vi()].turn_on(Flag::PROPAGATED);
             let sweeping = Lit::from(usize::from(*p));
             let false_lit = !*p;
@@ -345,11 +321,6 @@ impl PropagateIF for AssignStack {
                         self.ppc_ema.update(self.num_propagation);
                         self.num_conflict += 1;
                         return cid;
-                        // // let act = self.var[blocker.vi()].activity();
-                        // // if conflicting_act < act {
-                        // //     conflicting_act = act;
-                        // //     conflicting_cid = cid;
-                        // // }
                     }
                     None => {
                         self.assign_by_implication(
@@ -360,12 +331,6 @@ impl PropagateIF for AssignStack {
                     }
                 }
             }
-            // // if conflicting_cid != ClauseId::default() {
-            // //     self.dpc_ema.update(self.num_decision);
-            // //     self.ppc_ema.update(self.num_propagation);
-            // //     self.num_conflict += 1;
-            // //     return conflicting_cid;
-            // // }
             //
             //## normal clause loop
             //
@@ -383,15 +348,7 @@ impl PropagateIF for AssignStack {
                     cdb.reregister_watch_cache(sweeping, Some((cid, other_watch)));
                     continue 'next_clause;
                 }
-                assert!(
-                    !cdb[cid].is_dead(),
-                    "dead clause {}{} found during propagating {}",
-                    cid,
-                    &cdb[cid],
-                    false_lit,
-                );
                 let c = &mut cdb[cid];
-
                 #[cfg(not(feature = "maintain_watch_cache"))]
                 let other_watch = if false_lit == c.lit0() && other_watch != c.lit1() {
                     c.lit1()
@@ -513,11 +470,9 @@ impl PropagateIF for AssignStack {
                 }
                 let other_watch_value = lit_assign!(self, other_watch);
                 if let Some(true) = other_watch_value {
-                    assert!(!self.var[other_watch.vi()].is(Flag::ELIMINATED));
                     cdb.reregister_watch_cache(sweeping, Some((cid, other_watch)));
                     continue 'next_clause;
                 }
-                debug_assert!(!cdb[cid].is_dead());
                 let c = &mut cdb[cid];
                 #[cfg(not(feature = "maintain_watch_cache"))]
                 let other_watch = if false_lit == c.lit0() && other_watch != c.lit1() {
@@ -531,9 +486,7 @@ impl PropagateIF for AssignStack {
                 let other_watch_value = lit_assign!(self, other_watch);
                 #[cfg(not(feature = "maintain_watch_cache"))]
                 if let Some(true) = other_watch_value {
-                    assert!(!self.var[other_watch.vi()].is(Flag::ELIMINATED));
                     cdb.reregister_watch_cache(sweeping, Some((cid, other_watch)));
-                    // cdb.watches(cid, &format!("\npropagate {} at L545", false_lit));
                     continue 'next_clause;
                 }
                 debug_assert!(c.lit0() == false_lit || c.lit1() == false_lit);
@@ -550,8 +503,6 @@ impl PropagateIF for AssignStack {
                 cdb.reregister_watch_cache(sweeping, Some((cid, other_watch)));
                 if other_watch_value == Some(false) {
                     while cdb.reregister_watch_cache(sweeping, watches.next().deref_watch()) {}
-                    assert!(!cdb[cid].is_dead());
-                    // cdb.watches(cid, "propagate543");
                     return cid;
                 }
                 let lv = cdb[cid]
@@ -589,7 +540,7 @@ impl AssignStack {
                 if cdb[cid].is_dead() {
                     continue;
                 }
-                assert!(cdb[cid]
+                debug_assert!(cdb[cid]
                     .iter()
                     .all(|l| !self.var[l.vi()].is(Flag::ELIMINATED)));
                 match cdb.transform_by_simplification(self, cid) {
@@ -608,9 +559,6 @@ impl AssignStack {
                 }
             }
         }
-        // for l in self.trail.iter() {
-        //     self.var[l.vi()].turn_on(Flag::PROPAGATED);
-        // }
         None
     }
 

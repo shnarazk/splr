@@ -662,7 +662,7 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         let c = &mut clause[cid.ordinal as usize];
-        assert!(new_lits.len() < c.len());
+        debug_assert!(new_lits.len() < c.len());
         if new_lits.len() == 2 {
             if let Some(bc) = bi_clause[!new_lits[0]].get(&new_lits[1]) {
                 let did = *bc;
@@ -746,12 +746,12 @@ impl ClauseDBIF for ClauseDB {
         // 5. a normal clause becomes a new bi-clause.             [Case:3-2]
         // 5. a normal clause becomes a shorter normal clause.     [Case:3-3]
         //
-        assert!(!self[cid].is_dead());
+        debug_assert!(!self[cid].is_dead());
         // self.watches(cid, "unasserted");
         // firstly sweep without consuming extra memory
         let mut need_to_shrink = false;
         for l in self[cid].iter() {
-            assert!(!asg.var(l.vi()).is(Flag::ELIMINATED));
+            debug_assert!(!asg.var(l.vi()).is(Flag::ELIMINATED));
             match asg.assigned(*l) {
                 Some(true) => {
                     self.remove_clause(cid);
@@ -793,7 +793,7 @@ impl ClauseDBIF for ClauseDB {
                 //## Case:2
                 let l0 = new_lits[0];
                 let l1 = new_lits[1];
-                assert!(2 < c.lits.len());
+                debug_assert!(2 < c.lits.len());
                 if let Some(r) = bi_clause[!l0].get(&l1) {
                     let bid = *r;
                     //
