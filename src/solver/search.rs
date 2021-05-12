@@ -394,13 +394,13 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
                 lit,
                 if *lit == l0 || *lit == l1 { '*' } else { ' ' },
                 format!(
-                    "{:?}{}",
+                    "{:?}",
                     assign,
-                    if asg.var(lit.abs() as usize).is(Flag::PROPAGATED) {
-                        "x"
-                    } else {
-                        "!"
-                    },
+                    // if asg.var(lit.abs() as usize).is(Flag::PROPAGATED) {
+                    //     "x"
+                    // } else {
+                    //     "!"
+                    // },
                 ),
                 format!("{}", reason),
             );

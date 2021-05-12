@@ -212,6 +212,7 @@ impl PropagateIF for AssignStack {
                 &self.var[l.vi()],
             );
             let vi = l.vi();
+            #[cfg(feature = "dabug_propagation")]
             debug_assert!(self.q_head <= i || self.var[vi].is(Flag::PROPAGATED),
                     "unpropagated assigned level-{} var {:?},{:?} (loc:{} in trail{:?}) found, staying at level {}",
                     self.level[vi],
@@ -230,6 +231,7 @@ impl PropagateIF for AssignStack {
                 continue;
             }
             let v = &mut self.var[vi];
+            #[cfg(feature = "debug_propagation")]
             v.turn_off(Flag::PROPAGATED);
             v.set(Flag::PHASE, var_assign!(self, vi).unwrap());
             unset_assign!(self, vi);
@@ -254,6 +256,7 @@ impl PropagateIF for AssignStack {
         }
 
         debug_assert!(self.q_head == 0 || self.assign[self.trail[self.q_head - 1].vi()].is_some());
+        #[cfg(feature = "debug_propagation")]
         debug_assert!(
             self.q_head == 0 || self.var[self.trail[self.q_head - 1].vi()].is(Flag::PROPAGATED)
         );
@@ -296,7 +299,9 @@ impl PropagateIF for AssignStack {
         while let Some(p) = self.trail.get(self.q_head) {
             self.num_propagation += 1;
             self.q_head += 1;
-            // assert!(!self.var[p.vi()].is(Flag::PROPAGATED));
+            #[cfg(feature = "debug_propagation")]
+            assert!(!self.var[p.vi()].is(Flag::PROPAGATED));
+            #[cfg(feature = "debug_propagation")]
             self.var[p.vi()].turn_on(Flag::PROPAGATED);
             let sweeping = Lit::from(usize::from(*p));
             let false_lit = !*p;

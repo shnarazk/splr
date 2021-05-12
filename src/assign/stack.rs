@@ -443,9 +443,12 @@ mod tests {
         assert_eq!(asg.len_upto(1), 3);
 
         // [1, 2, 3] => [1, 2]
-        for l in asg.trail.iter() {
-            asg.var[l.vi()].turn_on(Flag::PROPAGATED);
-        } // simulate propagation
+        #[cfg(feature = "debug_propagation")]
+        {
+            for l in asg.trail.iter() {
+                asg.var[l.vi()].turn_on(Flag::PROPAGATED);
+            } // simulate propagation
+        }
         asg.cancel_until(1);
         assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
         assert_eq!(asg.decision_level(), 1);
