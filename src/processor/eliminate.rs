@@ -179,7 +179,10 @@ where
     for c_pos in pos {
         for c_neg in neg {
             if let Some(clause_size) = merge_cost(asg, cdb, *c_pos, *c_neg, v) {
-                cnt += (0 < clause_size) as usize;
+                if clause_size == 0 {
+                    continue;
+                }
+                cnt += 1;
                 average_len *= 1.0 - scale;
                 average_len += scale * clause_size as f64;
                 if clslen + limit < cnt || (combination_limit != 0 && climit < average_len) {
