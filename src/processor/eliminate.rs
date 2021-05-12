@@ -224,11 +224,15 @@ where
         }
         count += 1;
     }
+    cond?;
     for lit in c_q.iter() {
         if lit.vi() == vi {
-            assert_eq!(cond, Some(!*lit));
-            cond2 = Some(*lit);
-            continue;
+            if cond == Some(!*lit) {
+                cond2 = Some(*lit);
+                continue;
+            } else {
+                return None;
+            }
         }
         assert!(!asg.var(lit.vi()).is(Flag::ELIMINATED));
         count += 1;
