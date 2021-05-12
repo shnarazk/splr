@@ -198,10 +198,11 @@ impl SatSolverIF for Solver {
             .iter()
             .map(|i| Lit::from(*i))
             .collect::<Vec<Lit>>();
+
         if clause.is_empty() {
             return Err(SolverError::RootLevelConflict(ClauseId::default()));
         }
-        if self.add_unchecked_clause(&mut clause).is_none() {
+        if self.add_unchecked_clause(&mut clause) == RefClause::EmptyClause {
             return Err(SolverError::RootLevelConflict(ClauseId::from(clause[0])));
         }
         Ok(self)
@@ -295,17 +296,15 @@ impl SatSolverIF for Solver {
 }
 
 impl Solver {
-    /// FIXME: this should return Result<ClauseId, SolverError>
-    /// fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId>
     // renamed from clause_new
-    fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId> {
+    fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> RefClause {
         let Solver {
             ref mut asg,
             ref mut cdb,
             ..
         } = self;
         if lits.is_empty() {
-            return None;
+            return RefClause::EmptyClause;
         }
         debug_assert!(asg.decision_level() == 0);
         lits.sort();
@@ -315,7 +314,7 @@ impl Solver {
             let li = lits[i];
             let sat = asg.assigned(li);
             if sat == Some(true) || !li == l_ {
-                return Some(ClauseId::default());
+                return RefClause::Dead;
             } else if sat != Some(false) && li != l_ {
                 lits[j] = li;
                 j += 1;
@@ -324,23 +323,14 @@ impl Solver {
         }
         lits.truncate(j);
         match lits.len() {
-            0 => None, // Empty clause is UNSAT.
+            0 => RefClause::EmptyClause, // for UNSAT
             1 => {
                 let l0 = lits[0];
                 cdb.certificate_add_assertion(l0);
                 asg.assign_at_root_level(l0)
-                    .map_or(None, |_| Some(ClauseId::default()))
+                    .map_or(RefClause::EmptyClause, |_| RefClause::UnitClause(l0))
             }
-            _ => match cdb.new_clause(asg, lits, false) {
-                RefClause::Clause(cid) => {
-                    if 2 < cdb[cid].len() {
-                        cdb[cid].rank = 1;
-                    }
-                    Some(cid)
-                }
-                RefClause::RegisteredClause(cid) => Some(cid),
-                _ => panic!("impossible"),
-            },
+            _ => cdb.new_clause(asg, lits, false),
         }
     }
     #[cfg(not(feature = "no_IO"))]
@@ -367,7 +357,7 @@ impl Solver {
                     }
                     if v.is_empty() {
                         return Err(SolverError::RootLevelConflict(ClauseId::default()));
-                    } else if self.add_unchecked_clause(&mut v).is_none() {
+                    } else if self.add_unchecked_clause(&mut v) == RefClause::EmptyClause {
                         return Err(SolverError::RootLevelConflict(ClauseId::from(v[0])));
                     }
                 }
@@ -404,7 +394,10 @@ impl Solver {
                 .iter()
                 .map(|i| Lit::from(*i))
                 .collect::<Vec<Lit>>();
-            if self.add_unchecked_clause(&mut lits).is_none() {
+            if v.is_empty() {
+                return Err(SolverError::RootLevelConflict(ClauseId::default()));
+            }
+            if self.add_unchecked_clause(&mut lits) == RefClause::EmptyClause {
                 return Err(SolverError::RootLevelConflict(if lits.is_empty() {
                     ClauseId::default()
                 } else {

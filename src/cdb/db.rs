@@ -619,8 +619,8 @@ impl ClauseDBIF for ClauseDB {
             if p == old_l0 || p == old_l1 {
                 watch_cache[!p].remove_watch(&cid);
                 watch_cache[!l1].insert_or_update_watch(cid, l0);
-                // we must make sure there's no eliminated var in clause and *watch cache*.
-                // TODO \\ watch_cache[!l0].insert_or_update_watch(cid, l1);
+                // Here we assumed that there's no eliminated var in clause and *watch cache*.
+                // Fortunately the current implementation purges all eliminated vars completely.
             } else {
                 assert_eq!(old_l0, l0);
                 assert_eq!(old_l1, l1);

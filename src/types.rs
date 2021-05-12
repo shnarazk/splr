@@ -526,6 +526,9 @@ impl EmaSU {
     }
 }
 
+// A generic reference to a clause or something else.
+// we can use DEAD for simply satisfied form, f.e. an empty forms,
+// while EmptyClause can be used for simply UNSAT form.
 #[derive(Debug, Eq, PartialEq)]
 pub enum RefClause {
     Clause(ClauseId),

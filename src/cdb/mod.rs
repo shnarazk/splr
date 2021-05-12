@@ -72,7 +72,7 @@ pub trait ClauseDBIF:
     fn reregister_watch_cache(&mut self, p: Lit, target: Option<(ClauseId, Lit)>) -> bool;
     /// swap the first two literals in a clause.
     fn swap_watch(&mut self, cid: ClauseId);
-    /// TODO!
+    /// swap i-th watch with j-th literal then update watch caches correcly
     fn update_watch_cache(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool);
     /// allocate a new clause and return its id.
     /// Note this removes an eliminated Lit `p` from a clause. This is an O(n) function!
