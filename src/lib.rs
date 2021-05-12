@@ -1,4 +1,3 @@
-#![doc(html_root_url = "https://docs.rs/splr/0.7.1")]
 #![allow(clippy::upper_case_acronyms)]
 /*!
 # A modern CDCL SAT solver in Rust
