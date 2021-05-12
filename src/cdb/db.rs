@@ -277,7 +277,6 @@ impl ClauseDBIF for ClauseDB {
     fn reregister_watch_cache(&mut self, p: Lit, target: Option<(ClauseId, Lit)>) -> bool {
         if let Some((cid, lit)) = target {
             self.watch_cache[p].insert_watch(cid, lit);
-            // self.watches(cid, "after rere");
             return true;
         }
         false
@@ -309,7 +308,6 @@ impl ClauseDBIF for ClauseDB {
         }
 
         c.lits.swap(old, new);
-        // self.watches(cid, "after update_watch328");
     }
     fn new_clause<A>(&mut self, asg: &mut A, vec: &mut Vec<Lit>, mut learnt: bool) -> RefClause
     where
@@ -475,7 +473,6 @@ impl ClauseDBIF for ClauseDB {
     }
     /// remove a clause temporally
     fn detach_clause(&mut self, cid: ClauseId) -> (Lit, Lit) {
-        // self.watches(cid, "detach_clause");
         let c = &self.clause[cid.ordinal as usize];
         assert!(1 < c.lits.len());
         let l0 = c.lit0();
@@ -499,15 +496,12 @@ impl ClauseDBIF for ClauseDB {
             self.watch_cache[!l0].insert_watch(cid, l1);
             self.watch_cache[!l1].insert_watch(cid, l0);
         }
-        // self.watches(cid, "reattach_clause");
     }
     /// ## Warning
     /// this function is the only function that makes dead clauses
     fn remove_clause(&mut self, cid: ClauseId) {
-        // self.watches(cid, "before remove_clause");
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
         // if !self.clause[cid.ordinal as usize].is_dead() {
-        //     self.watches(cid, "before kill");
         // }
         let c = &mut self.clause[cid.ordinal as usize];
         debug_assert!(!c.is_dead());
@@ -526,10 +520,6 @@ impl ClauseDBIF for ClauseDB {
     }
     fn remove_clause_sandbox(&mut self, cid: ClauseId) {
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
-        // if !self.clause[cid.ordinal as usize].is_dead() {
-        //     self.watches(cid, "before kill");
-        // }
-        // self.watches(cid, "before remove_clause_sandbox");
         let c = &mut self.clause[cid.ordinal as usize];
         debug_assert!(!c.is_dead());
         debug_assert!(1 < c.lits.len());
@@ -747,7 +737,6 @@ impl ClauseDBIF for ClauseDB {
         // 5. a normal clause becomes a shorter normal clause.     [Case:3-3]
         //
         debug_assert!(!self[cid].is_dead());
-        // self.watches(cid, "unasserted");
         // firstly sweep without consuming extra memory
         let mut need_to_shrink = false;
         for l in self[cid].iter() {
@@ -817,7 +806,6 @@ impl ClauseDBIF for ClauseDB {
                     certification_store.push_add(&c.lits);
                     certification_store.push_delete(&new_lits);
                 }
-                // self.watches(cid, "unasserted:708");
                 RefClause::Clause(cid)
             }
             _ => {
@@ -1201,7 +1189,6 @@ impl ClauseDB {
         let thr = self.lbd_of_dp_ema.get() as u16;
         for i in &perm[keep..] {
             if thr <= self.clause[i.to()].rank {
-                // self.watches(ClauseId::from(i.to()), "db1143");
                 self.remove_clause(ClauseId::from(i.to()));
             }
         }
@@ -1230,7 +1217,6 @@ impl ClauseDB {
                     certicate_store.push_delete(&c.lits);
                     let l0 = c.lits[0];
                     let l1 = c.lits[1];
-                    // self.watches(cid, "before kill");
                     if c.len() == 2 {
                         self.bi_clause[!l0].remove(&l1);
                         self.bi_clause[!l1].remove(&l0);
