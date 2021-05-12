@@ -972,18 +972,18 @@ impl ClauseDBIF for ClauseDB {
             self.lbd_temp[l.vi() as usize] = key;
         }
         let l0 = vec[0];
-        let mut nsat = 0;
+        let mut num_sat = 0;
         for (_, &cid) in self.bi_clause[!l0].iter() {
             let c = &self.clause[cid.ordinal as usize];
             debug_assert!(c[0] == l0 || c[1] == l0);
             let other = c[(c[0] == l0) as usize];
             let vi = other.vi();
             if self.lbd_temp[vi] == key && asg.assigned(other) == Some(true) {
-                nsat += 1;
+                num_sat += 1;
                 self.lbd_temp[vi] = key - 1;
             }
         }
-        if 0 < nsat {
+        if 0 < num_sat {
             self.lbd_temp[l0.vi()] = key;
             vec.retain(|l| self.lbd_temp[l.vi()] == key);
         }
