@@ -68,7 +68,7 @@ pub fn handle_conflict(
                 asg.cancel_until(snd_l);
                 debug_assert!(
                     asg.stack_iter().all(|l| l.vi() != decision.vi()),
-                    "assign stack contains a strange lito",
+                    "assign stack contains a strange literal",
                 );
                 debug_assert!(asg.assign(decision.vi()).is_none());
                 debug_assert!(c

@@ -109,7 +109,7 @@ where
             Ok(())
         }
         RefClause::Dead => panic!("impossible"),
-        RefClause::EmptyClause => panic!("imossible"),
+        RefClause::EmptyClause => panic!("impossible"),
         RefClause::RegisteredClause(_) => {
             elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
             cdb.remove_clause(cid);

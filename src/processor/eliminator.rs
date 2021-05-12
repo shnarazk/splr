@@ -353,7 +353,11 @@ impl Eliminator {
         for l in c.iter() {
             let vi = l.vi();
             let v = &mut asg.var_mut(vi);
-            debug_assert!(!checked.contains(&vi), "elimitator350: {:?}", c,);
+            debug_assert!(
+                !checked.contains(&vi),
+                "eliminator::add_cid_occur356: {:?}",
+                c,
+            );
             checked.push(vi);
             let w = &mut self[l.vi()];
             let pl = w.pos_occurs.len();
@@ -485,14 +489,14 @@ impl Eliminator {
                     if asg.assign(l.vi()).is_some() || w.aborted {
                         continue;
                     }
-                    let nsum = if bool::from(*l) {
+                    let num_sum = if bool::from(*l) {
                         w.neg_occurs.len()
                     } else {
                         w.pos_occurs.len()
                     };
-                    if !v.is(Flag::ELIMINATED) && nsum < tmp {
+                    if !v.is(Flag::ELIMINATED) && num_sum < tmp {
                         b = l.vi();
-                        tmp = nsum;
+                        tmp = num_sum;
                     }
                 }
                 b

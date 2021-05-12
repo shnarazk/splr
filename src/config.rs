@@ -45,7 +45,7 @@ pub struct Config {
     /// Disable any progress message
     pub quiet_mode: bool,
 
-    /// Show submodule logging report
+    /// Show sub-module logging report
     pub show_journal: bool,
 
     /// Writes a DRAT UNSAT certification file
@@ -313,7 +313,7 @@ impl Config {
             }
         }
         if help {
-            let featuers = [
+            let features = [
                 #[cfg(feature = "best_phases_tracking")]
                 "best phase tracking",
                 #[cfg(feature = "bi_clause_completion")]
@@ -348,7 +348,7 @@ impl Config {
             println!(
                 "{}\nActivated features: {}\n{}",
                 env!("CARGO_PKG_DESCRIPTION"),
-                featuers.join(", "),
+                features.join(", "),
                 help_string()
             );
             std::process::exit(0);

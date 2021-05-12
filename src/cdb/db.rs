@@ -23,7 +23,7 @@ impl Default for ClauseDB {
             use_chan_seok: false,
             co_lbd_bound: 4,
             bi_clause_completion_queue: Vec::new(),
-            num_bi_clause_compeletion: 0,
+            num_bi_clause_completion: 0,
             // lbd_frozen_clause: 30,
             ordinal: 0,
             activity_decay: 0.99,
@@ -1026,7 +1026,7 @@ impl ClauseDBIF for ClauseDB {
             );
             assert!(
                 !self.watch_cache[!l1].iter().any(|wc| wc.0 == cid),
-                "(watch_cache health check: binary caluse l1 found in watch cache){}, cid{}{:?}",
+                "(watch_cache health check: binary clause l1 found in watch cache){}, cid{}{:?}",
                 mes,
                 cid,
                 c
@@ -1057,7 +1057,7 @@ impl ClauseDBIF for ClauseDB {
             );
             assert!(
                 self.bi_clause[!l1].iter().all(|(_, c)| *c != cid),
-                "(watch_cache health check: clause l1 found in banary_map){}, cid{}{:?}",
+                "(watch_cache health check: clause l1 found in binary_map){}, cid{}{:?}",
                 mes,
                 cid,
                 c
@@ -1102,7 +1102,7 @@ impl ClauseDB {
         }
         for pair in vec.iter_mut() {
             self.new_clause(asg, pair, false);
-            self.num_bi_clause_compeletion += 1;
+            self.num_bi_clause_completion += 1;
         }
     }
     /// return `true` if a literal pair `(l0, l1)` is registered.
@@ -1202,7 +1202,7 @@ impl ClauseDB {
         // move some clauses with good LBDs (col_lbd_bound) to Permanent
         let ClauseDB {
             ref mut clause,
-            ref mut certicate_store,
+            ref mut certificate_store,
             ..
         } = self;
         for c in &mut clause[1..] {
@@ -1214,7 +1214,7 @@ impl ClauseDB {
                 self.num_learnt -= 1;
             } else if reinit {
                 if !c.is_dead() {
-                    certicate_store.push_delete(&c.lits);
+                    certificate_store.push_delete(&c.lits);
                     let l0 = c.lits[0];
                     let l1 = c.lits[1];
                     if c.len() == 2 {

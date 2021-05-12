@@ -485,7 +485,7 @@ impl Ema2 {
             se: 1.0 / (f as f64),
         }
     }
-    // set secondary EMA's parameter
+    // set secondary EMA parameter
     pub fn with_slow(mut self, s: usize) -> Ema2 {
         self.se = 1.0 / (s as f64);
         self
@@ -668,7 +668,7 @@ where
 }
 
 /// A wrapper structure to make a CNFDescription from a file.
-/// To make CNFDescription clonable, a BufReader should be separated from it.
+/// To make CNFDescription clone-able, a BufReader should be separated from it.
 /// If you want to make a CNFDescription which isn't connected to a file,
 /// just call CNFDescription::default() directly.
 #[derive(Debug)]

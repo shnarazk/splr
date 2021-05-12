@@ -401,7 +401,7 @@ impl StateIF for State {
     {
         let asg_num_conflict = asg.refer(assign::property::Tusize::NumConflict);
         let asg_num_decision = asg.refer(assign::property::Tusize::NumDecision);
-        let asg_num_propagation = asg.refer(assign::property::Tusize::NumPropegation);
+        let asg_num_propagation = asg.refer(assign::property::Tusize::NumPropagation);
         let asg_num_restart = asg.refer(assign::property::Tusize::NumRestart);
         let cdb_num_bi_learnt = cdb.refer(cdb::property::Tusize::NumBiLearnt);
         let cdb_num_lbd2 = cdb.refer(cdb::property::Tusize::NumLBD2);
@@ -1028,7 +1028,7 @@ pub mod property {
     pub enum Tusize {
         /// the number of 'no decision conflict'
         NumDecisionConflict,
-        // the nmuber for processor invocations
+        // the number for processor invocations
         NumProcessor,
         /// the number of vivification
         Vivification,

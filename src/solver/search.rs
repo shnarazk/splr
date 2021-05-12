@@ -66,7 +66,7 @@ impl SolveIF for Solver {
         }
 
         state[Stat::NumProcessor] += 1;
-        #[cfg(feture = "clause_vivification")]
+        #[cfg(feature = "clause_vivification")]
         {
             state.flush("vivifying...");
             if vivify(asg, cdb, rst, state).is_err() {
@@ -74,7 +74,7 @@ impl SolveIF for Solver {
                 {
                     analyze_final(asg, state, &cdb[ci]);
                 }
-                state.log(asg.num_conflict, "By vivifier as a prepossessor");
+                state.log(asg.num_conflict, "By vivifier as a pre-possessor");
                 return Ok(Certificate::UNSAT);
             }
             assert!(!asg.remains());
@@ -175,7 +175,7 @@ impl SolveIF for Solver {
             Ok(true) => {
                 #[cfg(feature = "trace_equivalency")]
                 {
-                    asg.dump_cnf(cdb, "laststep.cnf");
+                    asg.dump_cnf(cdb, "last-step.cnf");
                 }
                 // As a preparation for incremental solving, we need to backtrack to the
                 // root level. So all assignments, including assignments to eliminated vars,
@@ -187,7 +187,7 @@ impl SolveIF for Solver {
 
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
-                    state.log(asg.num_conflict, "failed to validade the extended model");
+                    state.log(asg.num_conflict, "failed to validate the extended model");
                     state.progress(asg, cdb, elim, rst);
                     return Err(SolverError::SolverBug);
                 }

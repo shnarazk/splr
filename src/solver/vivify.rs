@@ -185,7 +185,7 @@ fn assert_lit(
         state.log(
             asg.num_conflict,
             format!(
-                "(vivify) root level propagation remains unpropagated literals {}/{}",
+                "(vivify) root level propagation remains un-propagated literals {}/{}",
                 asg.q_head,
                 asg.stack_len(),
             ),

@@ -68,11 +68,11 @@ pub trait ClauseDBIF:
     fn bi_clause_map(&self, l: Lit) -> &BiClause;
     /// replace the mutable watcher list with an empty one, and return the list
     fn detach_watch_cache(&mut self, l: Lit) -> WatchCache;
-    /// register the clase to the previous watch cache
+    /// register the clause to the previous watch cache
     fn reregister_watch_cache(&mut self, p: Lit, target: Option<(ClauseId, Lit)>) -> bool;
     /// swap the first two literals in a clause.
     fn swap_watch(&mut self, cid: ClauseId);
-    /// swap i-th watch with j-th literal then update watch caches correcly
+    /// swap i-th watch with j-th literal then update watch caches correctly
     fn update_watch_cache(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool);
     /// allocate a new clause and return its id.
     /// Note this removes an eliminated Lit `p` from a clause. This is an O(n) function!
@@ -206,7 +206,7 @@ pub struct ClauseDB {
 
     // bi-clause completion
     bi_clause_completion_queue: Vec<Lit>,
-    num_bi_clause_compeletion: usize,
+    num_bi_clause_completion: usize,
 
     //
     //## clause rewarding
@@ -298,7 +298,7 @@ pub mod property {
             match k {
                 Tusize::NumClause => self.num_clause,
                 Tusize::NumBiClause => self.num_bi_clause,
-                Tusize::NumBiClauseCompletion => self.num_bi_clause_compeletion,
+                Tusize::NumBiClauseCompletion => self.num_bi_clause_completion,
                 Tusize::NumBiLearnt => self.num_bi_learnt,
                 Tusize::NumLBD2 => self.num_lbd2,
                 Tusize::NumLearnt => self.num_learnt,

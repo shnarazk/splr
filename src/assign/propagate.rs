@@ -29,7 +29,7 @@ pub trait PropagateIF {
     fn assign_by_unitclause(&mut self, l: Lit);
     /// execute *backjump*.
     fn cancel_until(&mut self, lv: DecisionLevel);
-    /// execute backjump in vivifiacion sandbox
+    /// execute backjump in vivification sandbox
     fn backtrack_sandbox(&mut self);
     /// execute *boolean constraint propagation* or *unit propagation*.
     fn propagate<C>(&mut self, cdb: &mut C) -> ClauseId
@@ -212,7 +212,7 @@ impl PropagateIF for AssignStack {
                 &self.var[l.vi()],
             );
             let vi = l.vi();
-            #[cfg(feature = "dabug_propagation")]
+            #[cfg(feature = "debug_propagation")]
             debug_assert!(self.q_head <= i || self.var[vi].is(Flag::PROPAGATED),
                     "unpropagated assigned level-{} var {:?},{:?} (loc:{} in trail{:?}) found, staying at level {}",
                     self.level[vi],

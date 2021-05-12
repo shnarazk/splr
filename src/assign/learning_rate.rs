@@ -25,7 +25,7 @@ impl ActivityIF<VarId> for AssignStack {
     fn reward_at_unassign(&mut self, vi: VarId) {
         self.var[vi].update_activity(self.ordinal, self.activity_decay, self.activity_anti_decay);
     }
-    // Note: `update_rewards` should be called befere `cancel_until`
+    // Note: `update_rewards` should be called before `cancel_until`
     fn update_rewards(&mut self) {
         self.ordinal += 1;
     }
