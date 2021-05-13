@@ -27,6 +27,7 @@ pub fn vivify(
     rst: &mut Restarter,
     state: &mut State,
 ) -> MaybeInconsistent {
+    const NUM_TARGETS: Option<usize> = Some(40_000);
     if asg.remains() {
         if let Some(cc) = asg.propagate(cdb).to_option() {
             state.log(asg.num_conflict, "By vivifier");
@@ -41,7 +42,7 @@ pub fn vivify(
             ema
         }
     };
-    let mut clauses: Vec<OrderedProxy<ClauseId>> = select(asg, cdb, ave_lbd, Some(80_000));
+    let mut clauses: Vec<OrderedProxy<ClauseId>> = select(asg, cdb, ave_lbd, NUM_TARGETS);
     if clauses.is_empty() {
         return Ok(());
     }
