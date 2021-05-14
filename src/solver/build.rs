@@ -342,6 +342,7 @@ impl Solver {
         let mut buf = String::new();
         loop {
             buf.clear();
+            let mut ends_zero = false;
             match reader.read_line(&mut buf) {
                 Ok(0) => break,
                 Ok(_) if buf.starts_with('c') => continue,
@@ -350,13 +351,19 @@ impl Solver {
                     let mut v: Vec<Lit> = Vec::new();
                     for s in iter {
                         match s.parse::<i32>() {
-                            Ok(0) => break,
+                            Ok(0) => {
+                                ends_zero = true;
+                                break;
+                            }
                             Ok(val) => v.push(Lit::from(val)),
                             Err(_) => (),
                         }
                     }
                     if v.is_empty() {
-                        return Err(SolverError::RootLevelConflict(ClauseId::default()));
+                        if ends_zero {
+                            return Err(SolverError::RootLevelConflict(ClauseId::default()));
+                        }
+                        continue;
                     } else if self.add_unchecked_clause(&mut v) == RefClause::EmptyClause {
                         return Err(SolverError::RootLevelConflict(ClauseId::from(v[0])));
                     }
