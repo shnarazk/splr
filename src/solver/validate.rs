@@ -41,9 +41,7 @@ impl ValidateIF for Solver {
             return Err(SolverError::Inconsistent);
         }
         for i in vec {
-            let lit = Lit::from(*i);
-            self.cdb.certificate_add_assertion(lit);
-            self.asg.assign_at_root_level(lit)?;
+            self.asg.assign_at_root_level(Lit::from(*i))?;
         }
         Ok(())
     }
