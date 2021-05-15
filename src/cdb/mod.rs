@@ -135,8 +135,8 @@ pub trait ClauseDBIF:
     #[cfg(feature = "incremental_solver")]
     /// save an eliminated permanent clause to an extra space for incremental solving.
     fn make_permanent_immortal(&mut self, cid: ClauseId);
-    /// validate a clause's watches
-    fn watches(&self, cid: ClauseId, message: &str) -> (Lit, Lit);
+    /// return a clause's watches
+    fn watch_caches(&self, cid: ClauseId, message: &str) -> (Lit, Lit);
     /// complete bi-clause network
     fn complete_bi_clauses<A>(&mut self, asg: &mut A)
     where

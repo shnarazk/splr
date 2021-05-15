@@ -994,7 +994,7 @@ impl ClauseDBIF for ClauseDB {
         self.eliminated_permanent
             .push(self.clause[cid.ordinal as usize].lits.clone());
     }
-    fn watches(&self, cid: ClauseId, mes: &str) -> (Lit, Lit) {
+    fn watch_caches(&self, cid: ClauseId, mes: &str) -> (Lit, Lit) {
         // let mut _found = None;
         assert!(!cid.is_lifted_lit());
         let c = &self[cid];

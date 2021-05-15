@@ -406,7 +406,7 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
             );
         }
         println!("clause detail: {}", &cdb[cid]);
-        let (c0, c1) = cdb.watches(cid, "check (search 441)");
+        let (c0, c1) = cdb.watch_caches(cid, "check (search 441)");
         println!("watch{} has blocker cache {}", cdb[cid].lit0(), c0);
         println!("watch{} has blocker cache {}", cdb[cid].lit1(), c1);
         panic!(
