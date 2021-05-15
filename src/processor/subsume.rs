@@ -23,12 +23,11 @@ impl Eliminator {
                     "BackSubsC    => {} {} subsumed completely by {} {:#}",
                     did, cdb[did], cid, cdb[cid],
                 );
+                assert!(!cdb[did].is_dead());
                 if !cdb[did].is(Flag::LEARNT) {
                     cdb[cid].turn_off(Flag::LEARNT);
                 }
-                assert!(!cdb[did].is_dead());
                 self.remove_cid_occur(asg, did, &mut cdb[did]);
-                // cdb.watches(did, "subsume35");
                 cdb.remove_clause(did);
                 self.num_subsumed += 1;
             }
