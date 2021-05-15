@@ -109,16 +109,6 @@ impl VarSelectIF for AssignStack {
             match target {
                 RephasingTarget::BestPhases => v.set(Flag::PHASE, *b),
                 RephasingTarget::Shift(scale) => {
-                    // let mut count = 0;
-                    // count += *b as usize;
-                    // count += s as usize;
-                    // count += v.is(Flag::PHASE) as usize;
-                    // s = 1 < count;
-                    // // s ^= v.is(Flag::PHASE);
-                    // // if v.is(Flag::PHASE) != s {
-                    // //     num_match += 1;
-                    // // }
-                    // // v.set(Flag::PHASE, s);
                     if !v.reward.is_nan() {
                         act_sum += scale * (1.0 - v.reward);
                     }

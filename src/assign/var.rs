@@ -196,9 +196,5 @@ impl AssignStack {
             #[cfg(feature = "boundary_check")]
             panic!("double elimination");
         }
-        // // assert_eq!(
-        // //     self.num_eliminated_vars,
-        // //     self.var.iter().filter(|v| v.is(Flag::ELIMINATED)).count()
-        // // );
     }
 }

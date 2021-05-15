@@ -311,8 +311,6 @@ impl PropagateIF for AssignStack {
             //## binary loop
             //
             let bi_clause = cdb.bi_clause_map(*p);
-            // // let mut conflicting_cid: ClauseId = ClauseId::default();
-            // // let mut conflicting_act: f64 = 0.0;
             for (&blocker, &cid) in bi_clause.iter() {
                 debug_assert!(!cdb[cid].is_dead());
                 assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));

@@ -222,9 +222,6 @@ pub fn handle_conflict(
         let generated = new_clause.is_new().is_some();
 
         let cid = new_clause.as_cid();
-        // // if generated {
-        // //     elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
-        // // }
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);
         asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), al);
