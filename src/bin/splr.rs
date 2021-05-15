@@ -172,8 +172,6 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                 _ => (),
             }
             if s.state.config.use_certification {
-                // let proof_file: PathBuf = s.state.config.io_odir.join(&s.state.config.io_pfile);
-                // save_proof(&s, &input, &proof_file);
                 s.save_certification();
                 println!(
                     " Certificate|file: {}",
