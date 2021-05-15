@@ -220,20 +220,12 @@ pub fn handle_conflict(
         };
         let new_clause = cdb.new_clause(asg, new_learnt, true);
         let generated = new_clause.is_new().is_some();
-
         let cid = new_clause.as_cid();
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);
         asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), al);
         let lbd = cdb[cid].rank;
         rst.update(ProgressUpdate::LBD(lbd));
-        let mut act: f64 = 0.0;
-        for li in cdb[cid].iter() {
-            let a = asg.activity(li.vi());
-            if act < a {
-                act = a;
-            }
-        }
         elim.to_simplify += 1.0 / learnt_len as f64;
         if lbd <= 20 {
             for cid in &state.derive20 {
