@@ -31,7 +31,7 @@ pub fn handle_conflict(
     {
         let level = asg.level_ref();
         if cdb[ci].iter().all(|l| level[l.vi()] == 0) {
-            return Err(SolverError::NullLearnt);
+            return Err(SolverError::RootLevelConflict(ci));
         }
     }
 
@@ -126,12 +126,11 @@ pub fn handle_conflict(
             cl
         }
     };
-    debug_assert!(cdb[ci].iter().any(|l| asg.level(l.vi()) == cl),);
+    debug_assert!(cdb[ci].iter().any(|l| asg.level(l.vi()) == cl));
     asg.handle(SolverEvent::Conflict);
 
     // backtrack level by analyze
     let bl_a = conflict_analyze(asg, cdb, state, ci).max(asg.root_level);
-
     if state.new_learnt.is_empty() {
         #[cfg(debug)]
         {
@@ -143,7 +142,7 @@ pub fn handle_conflict(
             );
         }
 
-        return Err(SolverError::NullLearnt);
+        return Err(SolverError::RootLevelConflict(ClauseId::default()));
     }
     // asg.bump_vars(asg, cdb, ci);
     let chrono_bt_threshold = state.chrono_bt_threshold;
@@ -255,6 +254,7 @@ fn conflict_analyze(
     let learnt = &mut state.new_learnt;
     learnt.clear();
     learnt.push(NULL_LIT);
+    let root_level = asg.root_level;
     let dl = asg.decision_level();
     let mut p = cdb[conflicting_clause].lit0();
 
@@ -263,7 +263,7 @@ fn conflict_analyze(
 
     let mut path_cnt = 0;
     let vi = p.vi();
-    if !asg.var(vi).is(Flag::CA_SEEN) && 0 < asg.level(vi) {
+    if !asg.var(vi).is(Flag::CA_SEEN) && root_level < asg.level(vi) {
         let lvl = asg.level(vi);
         debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
         asg.var_mut(vi).turn_on(Flag::CA_SEEN);
@@ -289,7 +289,7 @@ fn conflict_analyze(
                 let vi = l.vi();
                 if !asg.var(vi).is(Flag::CA_SEEN) {
                     let lvl = asg.level(vi);
-                    if 0 == lvl {
+                    if root_level == lvl {
                         continue;
                     }
                     debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
@@ -337,7 +337,7 @@ fn conflict_analyze(
                     let vi = q.vi();
                     if !asg.var(vi).is(Flag::CA_SEEN) {
                         let lvl = asg.level(vi);
-                        if 0 == lvl {
+                        if root_level == lvl {
                             continue;
                         }
                         debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));

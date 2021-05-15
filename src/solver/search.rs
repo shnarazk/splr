@@ -180,8 +180,7 @@ impl SolveIF for Solver {
                 // As a preparation for incremental solving, we need to backtrack to the
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
-                // check(asg, cdb, false, "before");
-                check(asg, cdb, true, "Before extending the model");
+                // check(asg, cdb, true, "Before extending the model");
                 let model = asg.extend_model(cdb, elim.eliminated_lits());
                 check(asg, cdb, true, "After extending the model");
 
@@ -208,7 +207,15 @@ impl SolveIF for Solver {
                 RESTART!(asg, rst);
                 Ok(Certificate::SAT(vals))
             }
-            Ok(false) | Err(SolverError::NullLearnt) => {
+            Ok(false) => {
+                RESTART!(asg, rst);
+                Ok(Certificate::UNSAT)
+            }
+            Err(SolverError::RootLevelConflict(_)) => {
+                #[cfg(feature = "support_user_assumption")]
+                {
+                    analyze_final(asg, state, &cdb[ci]);
+                }
                 RESTART!(asg, rst);
                 Ok(Certificate::UNSAT)
             }
@@ -243,23 +250,13 @@ fn search(
             asg.assign_by_decision(lit);
             a_decision_was_made = true;
         }
-        let ci = asg.propagate(cdb);
-        if !ci.is_none() {
+        if let Some(ci) = asg.propagate(cdb).to_option() {
             if asg.decision_level() == asg.root_level {
-                #[cfg(feature = "support_user_assumption")]
-                {
-                    analyze_final(asg, state, &cdb[ci]);
-                }
-                return Ok(false);
+                return Err(SolverError::RootLevelConflict(ci));
             }
             asg.update_rewards();
             cdb.update_rewards();
-            if let Err(e) = handle_conflict(asg, cdb, elim, rst, state, ci) {
-                match e {
-                    SolverError::RootLevelConflict(_) => return Ok(false),
-                    _ => return Err(e),
-                }
-            }
+            handle_conflict(asg, cdb, elim, rst, state, ci)?;
             rst.update(ProgressUpdate::ASG(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
             ));
@@ -285,41 +282,16 @@ fn search(
                         }
                     }
                     asg.handle(SolverEvent::Stabilize(block_level));
-                    // check(asg, cdb, false, "before reduction");
                     if cdb.reduce(asg, asg.num_conflict) {
                         #[cfg(feature = "trace_equivalency")]
-                        if false {
-                            state.progress(asg, cdb, elim, rst);
-                            cdb.check_consistency(asg, "before simplify");
-                        }
+                        cdb.check_consistency(asg, "before simplify");
                         state[Stat::NumProcessor] += 1;
                         if state.config.c_ip_int <= elim.to_simplify as usize {
                             #[cfg(feature = "clause_vivification")]
-                            if let Err(e) = vivify(asg, cdb, rst, state).and_then(|_| {
-                                elim.activate();
-                                elim.simplify(asg, cdb, rst, state)
-                            }) {
-                                match e {
-                                    SolverError::RootLevelConflict(_) => {
-                                        #[cfg(feature = "support_user_assumption")]
-                                        {
-                                            analyze_final(asg, state, &cdb[ci]);
-                                        }
-                                        state.log(asg.num_conflict, "at the in-processor");
-                                        return Ok(false);
-                                    }
-                                    _ => return Err(e),
-                                }
-                            }
-                            // check(asg, cdb, false, "after elimination");
-                            #[cfg(feature = "trace_equivalency")]
-                            if false {
-                                state.progress(asg, cdb, elim, rst);
-                                cdb.check_consistency(
-                                    asg,
-                                    &format!("simplify nc:{}", asg.num_conflict),
-                                );
-                            }
+                            vivify(asg, cdb, rst, state)?;
+                            elim.activate();
+                            #[cfg(feature = "clause_elimination")]
+                            elim.simplify(asg, cdb, rst, state)?;
                         }
                     }
                     if last_core != num_unreachable || 0 == num_unreachable {

@@ -565,7 +565,6 @@ pub enum SolverError {
     // StateSAT,
     IOError,
     Inconsistent,
-    NullLearnt,
     OutOfMemory,
     OutOfRange,
     RootLevelConflict(ClauseId),
