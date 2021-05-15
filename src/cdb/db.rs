@@ -317,6 +317,7 @@ impl ClauseDBIF for ClauseDB {
         assert!(1 < vec.len());
         if vec.len() == 2 {
             if let Some(cid) = self.has_bi_clause(vec[0], vec[1]) {
+                self.num_reregistration += 1;
                 return RefClause::RegisteredClause(cid);
             }
         }
