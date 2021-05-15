@@ -106,7 +106,6 @@ pub fn vivify(
                             1 => {
                                 assert_lit(asg, cdb, state, vec[0])?;
                                 num_assert += 1;
-                                // clauses = select(asg, cdb, ave_lbd, Some(num_target - num_check));
                             }
                             _ => {
                                 if let Some(ci) = cdb.new_clause(asg, &mut vec, is_learnt).is_new()
@@ -115,7 +114,6 @@ pub fn vivify(
                                     cdb[ci].turn_on(Flag::VIVIFIED);
                                 }
                                 if cc == cid {
-                                    // cdb.watches(cid, "vivify119");
                                     cdb.remove_clause(cid);
                                     num_shrink += 1;
                                 }
@@ -192,18 +190,6 @@ fn assert_lit(
             ),
         );
     }
-    // {
-    //     for (ci, c) in cdb.iter().enumerate() {
-    //         assert!(
-    //             c.iter().all(|l| asg.assigned(*l).is_none()),
-    //             "clause:{}{:?}\n{:?}\n{:?}",
-    //             ci,
-    //             c,
-    //             c.iter().map(|l| asg.assigned(*l)).collect::<Vec<_>>(),
-    //             c.iter().map(|l| asg.level(l.vi())).collect::<Vec<_>>(),
-    //         );
-    //     }
-    // }
     debug_assert!(cdb
         .iter()
         .all(|c| c.iter().all(|l| asg.assigned(*l).is_none())));
