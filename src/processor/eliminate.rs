@@ -119,7 +119,9 @@ where
     debug_assert!(pos.iter().all(|cid| !cdb[*cid].is_dead()));
     debug_assert!(neg.iter().all(|cid| !cdb[*cid].is_dead()));
     for cid in pos.iter() {
-        let a = *cid;
+        if cdb[*cid].is_dead() {
+            continue;
+        }
         debug_assert!(!asg.locked(&cdb[*cid], *cid));
         #[cfg(feature = "incremental_solver")]
         {
@@ -127,8 +129,8 @@ where
                 cdb.make_permanent_immortal(*cid);
             }
         }
-        elim.remove_cid_occur(asg, a, &mut cdb[a]);
-        cdb.remove_clause(a);
+        elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
+        cdb.remove_clause(*cid);
     }
     for cid in neg.iter() {
         if cdb[*cid].is_dead() {
