@@ -218,6 +218,7 @@ pub fn handle_conflict(
             NULL_LIT
         };
         let new_clause = cdb.new_clause(asg, new_learnt, true);
+        #[cfg(feature = "bi_clause_completion")]
         let generated = new_clause.is_new().is_some();
         let cid = new_clause.as_cid();
         state.c_lvl.update(cl as f64);
