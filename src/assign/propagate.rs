@@ -379,7 +379,7 @@ impl PropagateIF for AssignStack {
                 // Gathering good literals at the beginning of lits.
                 for (k, lk) in c.iter().enumerate().skip(2) {
                     if lit_assign!(self, *lk) != Some(false) {
-                        cdb.update_watch_cache(cid, false_watch_pos, k, true);
+                        cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
                         continue 'next_clause;
                     }
                 }
@@ -496,7 +496,7 @@ impl PropagateIF for AssignStack {
                 let false_watch_pos = (c.lit0() == other_watch) as usize;
                 for (k, lk) in c.iter().enumerate().skip(2) {
                     if lit_assign!(self, *lk) != Some(false) {
-                        cdb.update_watch_cache(cid, false_watch_pos, k, true);
+                        cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
                         continue 'next_clause;
                     }
                 }

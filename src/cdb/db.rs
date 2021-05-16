@@ -284,31 +284,6 @@ impl ClauseDBIF for ClauseDB {
     fn swap_watch(&mut self, cid: ClauseId) {
         self[cid].lits.swap(0, 1);
     }
-    fn update_watch_cache(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool) {
-        assert!(old < 2);
-        assert!(1 < new);
-        let ClauseDB {
-            ref mut clause,
-            ref mut watch_cache,
-            ..
-        } = self;
-        let c = &mut clause[cid.ordinal as usize];
-        assert!(2 < c.len());
-        let other = (old == 0) as usize;
-        if !removed {
-            watch_cache[!c.lits[old]].remove_watch(&cid);
-        } else {
-            debug_assert!(watch_cache[!c.lits[old]].get_watch(&cid).is_none());
-        }
-        watch_cache[!c.lits[new]].insert_watch(cid, c.lits[other]);
-
-        #[cfg(feature = "maintain_watch_cache")]
-        {
-            watcher[!c.lits[other]].insert_or_update_watch(cid, c.lits[new]);
-        }
-
-        c.lits.swap(old, new);
-    }
     fn new_clause<A>(&mut self, asg: &mut A, vec: &mut Vec<Lit>, mut learnt: bool) -> RefClause
     where
         A: AssignIF,
@@ -842,6 +817,53 @@ impl ClauseDBIF for ClauseDB {
                 RefClause::Clause(cid)
             }
         }
+    }
+    fn transform_by_updating_watch(
+        &mut self,
+        cid: ClauseId,
+        old: usize,
+        new: usize,
+        removed: bool,
+    ) {
+        //
+        //## Clause transform rules
+        //
+        // There is one case under non maintain_blocker:
+        // 1. one deletion (if not removed), and one insertion of watch caches
+        //
+        // There is one case under maintain_blocker:
+        // 1. one deletion (if not removed), one insertion, and one update
+        //
+        // So the proceduce is
+        // 1. delete an old one                   [Step:1]
+        // 2. insert a new watch                  [Step:2]
+        // 3. update a blocker cach e             [Step:3]
+
+        debug_assert!(old < 2);
+        debug_assert!(1 < new);
+        let ClauseDB {
+            ref mut clause,
+            ref mut watch_cache,
+            ..
+        } = self;
+        let c = &mut clause[cid.ordinal as usize];
+        let other = (old == 0) as usize;
+        if !removed {
+            //## Step:1
+            watch_cache[!c.lits[old]].remove_watch(&cid);
+        } else {
+            debug_assert!(watch_cache[!c.lits[old]].get_watch(&cid).is_none());
+        }
+        //## Step:2
+        watch_cache[!c.lits[new]].insert_watch(cid, c.lits[other]);
+
+        #[cfg(feature = "maintain_watch_cache")]
+        {
+            //## Step:3
+            watcher[!c.lits[other]].insert_or_update_watch(cid, c.lits[new]);
+        }
+
+        c.lits.swap(old, new);
     }
     fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where

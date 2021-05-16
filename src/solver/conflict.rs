@@ -96,7 +96,7 @@ pub fn handle_conflict(
                             match i {
                                 0 => (),
                                 1 => cdb.swap_watch(ci),
-                                _ => cdb.update_watch_cache(ci, 0, i, false),
+                                _ => cdb.transform_by_updating_watch(ci, 0, i, false),
                             }
                             break;
                         }
