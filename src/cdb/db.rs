@@ -405,6 +405,7 @@ impl ClauseDBIF for ClauseDB {
         };
 
         let ClauseDB {
+            #[cfg(feature = "bi_clause_completion")]
             ref mut bi_clause_completion_queue,
             ref mut clause,
             ref mut lbd_temp,
