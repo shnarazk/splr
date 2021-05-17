@@ -281,6 +281,9 @@ impl ClauseDBIF for ClauseDB {
         }
         false
     }
+    fn merge_watch_cache(&mut self, p: Lit, wc: WatchCache) {
+        self.watch_cache[p].append_watch(wc);
+    }
     fn swap_watch(&mut self, cid: ClauseId) {
         self[cid].lits.swap(0, 1);
     }

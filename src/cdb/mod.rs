@@ -70,6 +70,8 @@ pub trait ClauseDBIF:
     fn detach_watch_cache(&mut self, l: Lit) -> WatchCache;
     /// register the clause to the previous watch cache
     fn reregister_watch_cache(&mut self, p: Lit, target: Option<(ClauseId, Lit)>) -> bool;
+    /// Merge two watch cache
+    fn merge_watch_cache(&mut self, p: Lit, wc: WatchCache);
     /// swap the first two literals in a clause.
     fn swap_watch(&mut self, cid: ClauseId);
     /// swap i-th watch with j-th literal then update watch caches correctly
