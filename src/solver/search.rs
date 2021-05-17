@@ -61,9 +61,6 @@ impl SolveIF for Solver {
         state.progress(asg, cdb, elim, rst);
         state.flush("");
         state.flush("Preprocessing stage: ");
-        if 0 < asg.stack_len() {
-            elim.eliminate_satisfied_clauses(asg, cdb, false);
-        }
 
         state[Stat::NumProcessor] += 1;
         #[cfg(feature = "clause_vivification")]
