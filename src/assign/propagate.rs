@@ -7,7 +7,7 @@ use {
 
 /// API for Boolean Constraint Propagation like [`propagate`](`crate::assign::PropagateIF::propagate`), [`assign_by_decision`](`crate::assign::PropagateIF::assign_by_decision`), [`cancel_until`](`crate::assign::PropagateIF::cancel_until`), and so on.
 pub trait PropagateIF {
-    /// add an assignment at level 0 as a precondition.
+    /// add an assignment at root level as a precondition.
     ///
     /// # Errors
     ///
@@ -22,11 +22,6 @@ pub trait PropagateIF {
     /// ## Caveat
     /// Callers have to assure the consistency after this assignment.
     fn assign_by_decision(&mut self, l: Lit);
-    /// fix a var's assignment by a unit learnt clause.
-    /// ## Caveat
-    /// - Callers have to assure the consistency after this assignment.
-    /// - No need to restart; but execute `propagate` just afterward.
-    fn assign_by_unitclause(&mut self, l: Lit);
     /// execute *backjump*.
     fn cancel_until(&mut self, lv: DecisionLevel);
     /// execute backjump in vivification sandbox
@@ -176,20 +171,6 @@ impl PropagateIF for AssignStack {
         self.trail.push(l);
         self.num_decision += 1;
         debug_assert!(self.q_head < self.trail.len());
-    }
-    fn assign_by_unitclause(&mut self, l: Lit) {
-        self.cancel_until(self.root_level);
-        debug_assert!(
-            var_assign!(self, l.vi()) == Some(bool::from(l)) || var_assign!(self, l.vi()).is_none()
-        );
-        debug_assert!(self.trail.iter().all(|k| k.vi() != l.vi()));
-        let vi = l.vi();
-        self.level[vi] = self.root_level;
-        set_assign!(self, l);
-        debug_assert!(!self.trail.contains(&!l));
-        self.trail.push(l);
-        // NOTE: synchronize the following with handle(SolverEvent::Assert)
-        self.make_var_asserted(vi);
     }
     fn cancel_until(&mut self, lv: DecisionLevel) {
         if self.trail_lim.len() as u32 <= lv {

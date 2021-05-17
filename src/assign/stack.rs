@@ -465,7 +465,8 @@ mod tests {
         assert_eq!(asg.trail_lim, vec![2, 3]);
 
         // [1, 2, 3, 4] => [1, 2, -4]
-        asg.assign_by_unitclause(Lit::from(-4i32));
+        asg.assign_at_root_level(Lit::from(-4i32))
+            .expect("impossible");
         assert_eq!(asg.trail, vec![lit(1), lit(2), lit(-4)]);
         assert_eq!(asg.decision_level(), 0);
         assert_eq!(asg.stack_len(), 3);
