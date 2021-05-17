@@ -116,7 +116,7 @@ pub struct Eliminator {
     /// 0 for no limit
     /// Stop elimination if a generated resolvent is larger than this
     /// 0 means no limit.
-    eliminate_combination_limit: usize,
+    eliminate_combination_limit: f64,
     /// Stop elimination if the increase of clauses is over this
     eliminate_grow_limit: usize,
     /// A criteria by the product's of its positive occurrences and negative ones

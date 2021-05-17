@@ -160,7 +160,7 @@ fn skip_var_elimination<A, C>(
     neg: &[ClauseId],
     v: VarId,
     grow_limit: usize,
-    combination_limit: usize,
+    combination_limit: f64,
 ) -> bool
 where
     A: AssignIF,
@@ -176,7 +176,6 @@ where
     let mut cnt = 0;
     let scale: f64 = 0.5;
     let mut average_len: f64 = 0.0;
-    let climit = combination_limit as f64;
     for c_pos in pos {
         for c_neg in neg {
             if let Some(clause_size) = merge_cost(asg, cdb, *c_pos, *c_neg, v) {
@@ -186,7 +185,9 @@ where
                 cnt += 1;
                 average_len *= 1.0 - scale;
                 average_len += scale * clause_size as f64;
-                if clslen + limit < cnt || (combination_limit != 0 && climit < average_len) {
+                if clslen + limit < cnt
+                    || (combination_limit != 0.0 && combination_limit < average_len)
+                {
                     return true;
                 }
             } else {
