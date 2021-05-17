@@ -559,7 +559,9 @@ impl Eliminator {
         loop {
             let na = asg.stack_len();
             self.eliminate_main(asg, cdb, rst, state)?;
-            self.eliminate_satisfied_clauses(asg, cdb, true);
+            if let Some(cc) = asg.propagate(cdb).to_option() {
+                return Err(SolverError::RootLevelConflict(cc));
+            }
             if na == asg.stack_len()
                 && (!self.is_running()
                     || (0 == self.clause_queue_len() && 0 == self.var_queue_len()))
@@ -616,7 +618,6 @@ impl Eliminator {
             if let Some(cc) = asg.propagate(cdb).to_option() {
                 return Err(SolverError::RootLevelConflict(cc));
             }
-            self.eliminate_satisfied_clauses(asg, cdb, true);
             if timedout == 0 {
                 self.clear_clause_queue(cdb);
                 self.clear_var_queue(asg);
