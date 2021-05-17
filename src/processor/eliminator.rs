@@ -7,7 +7,7 @@ use {
     crate::{
         assign::{self, AssignIF},
         cdb::{self, ClauseDBIF},
-        solver::{restart, restart::RestartIF, SolverEvent},
+        solver::{restart::RestartIF, SolverEvent},
         state::{State, StateIF},
         types::*,
     },
@@ -306,8 +306,9 @@ impl EliminateIF for Eliminator {
             if self.is_waiting() {
                 self.prepare(asg, cdb, true);
             }
+            assert!(!cdb.derefer(cdb::property::Tf64::DpAverageLBD).is_nan());
             self.eliminate_combination_limit =
-                rst.refer(restart::property::TEma2::LBD).get() as usize;
+                (cdb.derefer(cdb::property::Tf64::DpAverageLBD) + 1.0) as usize;
             self.eliminate(asg, cdb, rst, state)?;
             if self.is_running() {
                 self.stop(asg, cdb);

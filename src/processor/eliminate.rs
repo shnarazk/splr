@@ -174,7 +174,7 @@ where
     };
     let clslen = pos.len() + neg.len();
     let mut cnt = 0;
-    let scale: f64 = 0.1;
+    let scale: f64 = 0.5;
     let mut average_len: f64 = 0.0;
     let climit = combination_limit as f64;
     for c_pos in pos {
