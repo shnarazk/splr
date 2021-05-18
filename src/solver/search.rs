@@ -283,12 +283,16 @@ fn search(
                         #[cfg(feature = "trace_equivalency")]
                         cdb.check_consistency(asg, "before simplify");
                         state[Stat::NumProcessor] += 1;
-                        if state.config.c_ip_int <= elim.to_simplify as usize {
+                        /* if state.config.c_ip_int <= elim.to_simplify as usize */
+                        {
                             #[cfg(feature = "clause_vivification")]
                             vivify(asg, cdb, rst, state)?;
-                            elim.activate();
+
                             #[cfg(feature = "clause_elimination")]
-                            elim.simplify(asg, cdb, rst, state)?;
+                            {
+                                elim.activate();
+                                elim.simplify(asg, cdb, rst, state)?;
+                            }
                         }
                         asg.clear_asserted_literals(cdb)?;
                     }

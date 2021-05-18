@@ -312,11 +312,8 @@ impl EliminateIF for Eliminator {
             if self.is_running() {
                 self.stop(asg, cdb);
             }
-        } else {
-            // self.eliminate_satisfied_clauses(asg, cdb, true);
-            if let Some(cc) = asg.propagate(cdb).to_option() {
-                return Err(SolverError::RootLevelConflict(cc));
-            }
+        } else if let Some(cc) = asg.propagate(cdb).to_option() {
+            return Err(SolverError::RootLevelConflict(cc));
         }
         if self.mode != EliminatorMode::Dormant {
             self.stop(asg, cdb);
