@@ -318,9 +318,19 @@ impl PropagateIF for AssignStack {
             //
             //## normal clause loop
             //
-            let source = cdb.detach_watch_cache(sweeping);
+            let mut source = cdb.detach_watch_cache(sweeping);
+            #[cfg(feature = "hashed_watch_cache")]
             let mut watches = source.iter();
-            'next_clause: while let Some((cid, other_watch)) = watches.next().deref_watch() {
+            'next_clause: while let Some((cid, other_watch)) = {
+                #[cfg(feature = "hashed_watch_cache")]
+                {
+                    watches.next().deref_watch()
+                }
+                #[cfg(not(feature = "hashed_watch_cache"))]
+                {
+                    source.pop()
+                }
+            } {
                 assert!(!self.var[other_watch.vi()].is(Flag::ELIMINATED));
                 // assert_ne!(other_watch.vi(), false_lit.vi());
                 // assert!(other_watch == cdb[cid].lit0() || other_watch == cdb[cid].lit1());
@@ -372,7 +382,12 @@ impl PropagateIF for AssignStack {
                     self.num_conflict += 1;
                     self.dpc_ema.update(self.num_decision);
                     self.ppc_ema.update(self.num_propagation);
+
+                    #[cfg(feature = "hashed_watch_cache")]
                     while cdb.reregister_watch_cache(sweeping, watches.next().deref_watch()) {}
+                    #[cfg(not(feature = "hashed_watch_cache"))]
+                    cdb.merge_watch_cache(sweeping, source);
+
                     return cid;
                 }
                 let lv = cdb[cid]
@@ -446,9 +461,21 @@ impl PropagateIF for AssignStack {
                     }
                 }
             }
-            let source = cdb.detach_watch_cache(sweeping);
+            let mut source = cdb.detach_watch_cache(sweeping);
+
+            #[cfg(feature = "hashed_watch_cache")]
             let mut watches = source.iter();
-            'next_clause: while let Some((cid, other_watch)) = watches.next().deref_watch() {
+
+            'next_clause: while let Some((cid, other_watch)) = {
+                #[cfg(feature = "hashed_watch_cache")]
+                {
+                    watches.next().deref_watch()
+                }
+                #[cfg(not(feature = "hashed_watch_cache"))]
+                {
+                    source.pop()
+                }
+            } {
                 if cdb[cid].is_dead() {
                     continue 'next_clause;
                 }
@@ -486,7 +513,11 @@ impl PropagateIF for AssignStack {
                 }
                 cdb.reregister_watch_cache(sweeping, Some((cid, other_watch)));
                 if other_watch_value == Some(false) {
+                    #[cfg(feature = "hashed_watch_cache")]
                     while cdb.reregister_watch_cache(sweeping, watches.next().deref_watch()) {}
+                    #[cfg(not(feature = "hashed_watch_cache"))]
+                    cdb.merge_watch_cache(sweeping, source);
+
                     return cid;
                 }
                 let lv = cdb[cid]
