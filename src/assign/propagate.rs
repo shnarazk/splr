@@ -34,6 +34,10 @@ pub trait PropagateIF {
     fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> ClauseId
     where
         C: ClauseDBIF;
+    /// propagate then clear asserted literals
+    fn clear_asserted_literals<C>(&mut self, cdb: &mut C) -> MaybeInconsistent
+    where
+        C: ClauseDBIF;
 }
 
 #[cfg(feature = "unsafe_access")]
@@ -272,11 +276,6 @@ impl PropagateIF for AssignStack {
     where
         C: ClauseDBIF,
     {
-        if self.decision_level() == self.root_level && !self.trail.is_empty() {
-            if let Some(cc) = self.propagate_at_root_level(cdb) {
-                return cc;
-            }
-        }
         while let Some(p) = self.trail.get(self.q_head) {
             self.num_propagation += 1;
             self.q_head += 1;
@@ -403,12 +402,6 @@ impl PropagateIF for AssignStack {
                 );
             }
         }
-        // wipe asserted literals from trail and increment the number of asserted vars.
-        if self.decision_level() == self.root_level && !self.trail.is_empty() {
-            self.num_asserted_vars += self.trail.len();
-            self.trail.clear();
-            self.q_head = 0;
-        }
         let na = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
         if self.num_best_assign <= na && 0 < self.decision_level() {
             self.best_assign = true;
@@ -534,6 +527,24 @@ impl PropagateIF for AssignStack {
             }
         }
         ClauseId::default()
+    }
+    fn clear_asserted_literals<C>(&mut self, cdb: &mut C) -> MaybeInconsistent
+    where
+        C: ClauseDBIF,
+    {
+        if self.decision_level() == self.root_level && 7 < !self.trail.len() {
+            if let Some(cc) = self.propagate_at_root_level(cdb) {
+                return Err(SolverError::RootLevelConflict(cc));
+            }
+        }
+        if let Some(cc) = self.propagate(cdb).to_option() {
+            return Err(SolverError::RootLevelConflict(cc));
+        }
+        // wipe asserted literals from trail and increment the number of asserted vars.
+        self.num_asserted_vars += self.trail.len();
+        self.trail.clear();
+        self.q_head = 0;
+        Ok(())
     }
 }
 

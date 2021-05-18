@@ -290,6 +290,7 @@ fn search(
                             #[cfg(feature = "clause_elimination")]
                             elim.simplify(asg, cdb, rst, state)?;
                         }
+                        asg.clear_asserted_literals(cdb)?;
                     }
                     if last_core != num_unreachable || 0 == num_unreachable {
                         state.log(
