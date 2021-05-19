@@ -34,7 +34,7 @@ impl Default for ClauseDB {
             inc_step: 300,
             extra_inc: 1000,
             first_reduction: 1000,
-            next_reduction: 10_000,
+            next_reduction: 1000,
             reducible: true,
             reduction_coeff: 1,
             num_clause: 0,
@@ -1213,8 +1213,9 @@ impl ClauseDB {
             };
         }
         perm.sort();
+        let thr = self.lbd_of_dp_ema.get() as u16;
         for i in &perm[keep..] {
-            if 3 <= self.clause[i.to()].rank {
+            if thr <= self.clause[i.to()].rank {
                 self.remove_clause(ClauseId::from(i.to()));
             }
         }
