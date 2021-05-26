@@ -247,7 +247,7 @@ fn search(
             asg.assign_by_decision(lit);
             a_decision_was_made = true;
         }
-        if let Some(ci) = asg.propagate(cdb).to_option() {
+        if let Some(ci) = asg.propagate(cdb) {
             if asg.decision_level() == asg.root_level {
                 return Err(SolverError::RootLevelConflict(ci));
             }

@@ -29,7 +29,7 @@ pub fn vivify(
 ) -> MaybeInconsistent {
     const NUM_TARGETS: Option<usize> = Some(40_000);
     if asg.remains() {
-        if let Some(cc) = asg.propagate(cdb).to_option() {
+        if let Some(cc) = asg.propagate(cdb) {
             state.log(asg.num_conflict, "By vivifier");
             return Err(SolverError::RootLevelConflict(cc));
         }
@@ -162,7 +162,6 @@ fn assert_lit(
         tag = "propagation";
         debug_assert!(asg.remains());
         asg.propagate(cdb)
-            .to_option()
             .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(cc)))
     }) {
         state.flush("");
@@ -176,7 +175,7 @@ fn assert_lit(
         return Err(e);
     }
     assert_eq!(asg.decision_level(), asg.root_level);
-    if let Some(cc) = asg.propagate(cdb).to_option() {
+    if let Some(cc) = asg.propagate(cdb) {
         state.log(asg.num_conflict, "By vivifier");
         return Err(SolverError::RootLevelConflict(cc));
     }

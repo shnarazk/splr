@@ -27,7 +27,7 @@ pub trait PropagateIF {
     /// execute backjump in vivification sandbox
     fn backtrack_sandbox(&mut self);
     /// execute *boolean constraint propagation* or *unit propagation*.
-    fn propagate<C>(&mut self, cdb: &mut C) -> ClauseId
+    fn propagate<C>(&mut self, cdb: &mut C) -> Option<ClauseId>
     where
         C: ClauseDBIF;
     /// `propagate` for vivification, which allows dead clauses.
@@ -272,7 +272,7 @@ impl PropagateIF for AssignStack {
     ///    So Eliminator should call `garbage_collect` before me.
     ///  - The order of literals in binary clauses will be modified to hold
     ///    propagation order.
-    fn propagate<C>(&mut self, cdb: &mut C) -> ClauseId
+    fn propagate<C>(&mut self, cdb: &mut C) -> Option<ClauseId>
     where
         C: ClauseDBIF,
     {
@@ -303,7 +303,7 @@ impl PropagateIF for AssignStack {
                         self.dpc_ema.update(self.num_decision);
                         self.ppc_ema.update(self.num_propagation);
                         self.num_conflict += 1;
-                        return cid;
+                        return Some(cid);
                     }
                     None => {
                         self.assign_by_implication(
@@ -387,7 +387,7 @@ impl PropagateIF for AssignStack {
                     #[cfg(not(feature = "hashed_watch_cache"))]
                     cdb.merge_watch_cache(sweeping, source);
 
-                    return cid;
+                    return Some(cid);
                 }
                 let lv = cdb[cid]
                     .iter()
@@ -407,7 +407,7 @@ impl PropagateIF for AssignStack {
             self.best_assign = true;
             self.num_best_assign = na;
         }
-        ClauseId::default()
+        None
     }
     //
     //## How to generate propagate_sandbox from propagate
@@ -537,7 +537,7 @@ impl PropagateIF for AssignStack {
                 return Err(SolverError::RootLevelConflict(cc));
             }
         }
-        if let Some(cc) = self.propagate(cdb).to_option() {
+        if let Some(cc) = self.propagate(cdb) {
             return Err(SolverError::RootLevelConflict(cc));
         }
         // wipe asserted literals from trail and increment the number of asserted vars.

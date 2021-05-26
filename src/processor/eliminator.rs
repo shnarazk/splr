@@ -312,7 +312,7 @@ impl EliminateIF for Eliminator {
             if self.is_running() {
                 self.stop(asg, cdb);
             }
-        } else if let Some(cc) = asg.propagate(cdb).to_option() {
+        } else if let Some(cc) = asg.propagate(cdb) {
             return Err(SolverError::RootLevelConflict(cc));
         }
         if self.mode != EliminatorMode::Dormant {
@@ -528,7 +528,7 @@ impl Eliminator {
             self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
         }
         if asg.remains() {
-            if let Some(cc) = asg.propagate(cdb).to_option() {
+            if let Some(cc) = asg.propagate(cdb) {
                 return Err(SolverError::RootLevelConflict(cc));
             }
         }
@@ -555,7 +555,7 @@ impl Eliminator {
         loop {
             let na = asg.stack_len();
             self.eliminate_main(asg, cdb, rst, state)?;
-            if let Some(cc) = asg.propagate(cdb).to_option() {
+            if let Some(cc) = asg.propagate(cdb) {
                 return Err(SolverError::RootLevelConflict(cc));
             }
             if na == asg.stack_len()
@@ -611,7 +611,7 @@ impl Eliminator {
             }
             self.backward_subsumption_check(asg, cdb, &mut timedout)?;
             debug_assert!(self.clause_queue.is_empty());
-            if let Some(cc) = asg.propagate(cdb).to_option() {
+            if let Some(cc) = asg.propagate(cdb) {
                 return Err(SolverError::RootLevelConflict(cc));
             }
             if timedout == 0 {
