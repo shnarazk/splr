@@ -97,7 +97,6 @@ where
 {
     debug_assert!(!cdb[cid].is_dead());
     debug_assert!(1 < cdb[cid].len());
-    debug_assert!(!cid.is_none());
     match cdb.transform_by_elimination(cid, l) {
         RefClause::Clause(_) => {
             #[cfg(feature = "trace_elimination")]

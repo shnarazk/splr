@@ -31,7 +31,7 @@ pub fn handle_conflict(
     {
         let level = asg.level_ref();
         if cdb[ci].iter().all(|l| level[l.vi()] == 0) {
-            return Err(SolverError::RootLevelConflict(ci));
+            return Err(SolverError::RootLevelConflict(Some(ci)));
         }
     }
 
@@ -142,7 +142,7 @@ pub fn handle_conflict(
             );
         }
 
-        return Err(SolverError::RootLevelConflict(ClauseId::default()));
+        return Err(SolverError::RootLevelConflict(None));
     }
     // asg.bump_vars(asg, cdb, ci);
     let chrono_bt_threshold = state.chrono_bt_threshold;
@@ -180,7 +180,7 @@ pub fn handle_conflict(
         cdb.certificate_add_assertion(new_learnt[0]);
         if asg.assign_at_root_level(l0).is_err() {
             state.log(asg.num_conflict, "RootLevelConflict by conflict analyzer");
-            return Err(SolverError::RootLevelConflict(ClauseId::default()));
+            return Err(SolverError::RootLevelConflict(None));
         }
         elim.to_simplify += (state.config.c_ip_int / 2) as f64;
         rst.handle(SolverEvent::Assert(l0.vi()))
@@ -309,7 +309,6 @@ fn conflict_analyze(
                 #[cfg(feature = "trace_analysis")]
                 println!("analyze {}", p);
 
-                debug_assert!(!cid.is_none());
                 cdb.mark_clause_as_used(asg, cid);
                 if cdb[cid].is(Flag::LEARNT) {
                     cdb.reward_at_analysis(cid);

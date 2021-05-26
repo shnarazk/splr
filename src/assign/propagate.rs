@@ -31,7 +31,7 @@ pub trait PropagateIF {
     where
         C: ClauseDBIF;
     /// `propagate` for vivification, which allows dead clauses.
-    fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> ClauseId
+    fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> Option<ClauseId>
     where
         C: ClauseDBIF;
     /// propagate then clear asserted literals
@@ -129,7 +129,7 @@ impl PropagateIF for AssignStack {
                 // self.make_var_asserted(vi);
                 Ok(())
             }
-            _ => Err(SolverError::RootLevelConflict(ClauseId::from(l))),
+            _ => Err(SolverError::RootLevelConflict(Some(ClauseId::from(l)))),
         }
     }
     fn assign_by_implication(&mut self, l: Lit, reason: AssignReason, lv: DecisionLevel) {
@@ -421,7 +421,7 @@ impl PropagateIF for AssignStack {
     // 1. (allow dead clauses)
     // 1. (allow eliminated vars)
     //
-    fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> ClauseId
+    fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> Option<ClauseId>
     where
         C: ClauseDBIF,
     {
@@ -443,7 +443,7 @@ impl PropagateIF for AssignStack {
                     Some(true) => (),
                     Some(false) => {
                         assert!(!cdb[cid].is_dead());
-                        return cid;
+                        return Some(cid);
                     }
                     None => {
                         self.assign_by_implication(
@@ -511,7 +511,7 @@ impl PropagateIF for AssignStack {
                     #[cfg(not(feature = "hashed_watch_cache"))]
                     cdb.merge_watch_cache(sweeping, source);
 
-                    return cid;
+                    return Some(cid);
                 }
                 let lv = cdb[cid]
                     .iter()
@@ -526,20 +526,18 @@ impl PropagateIF for AssignStack {
                 );
             }
         }
-        ClauseId::default()
+        None
     }
     fn clear_asserted_literals<C>(&mut self, cdb: &mut C) -> MaybeInconsistent
     where
         C: ClauseDBIF,
     {
         if self.decision_level() == self.root_level && 7 < !self.trail.len() {
-            if let Some(cc) = self.propagate_at_root_level(cdb) {
-                return Err(SolverError::RootLevelConflict(cc));
-            }
+            self.propagate_at_root_level(cdb)
+                .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
         }
-        if let Some(cc) = self.propagate(cdb) {
-            return Err(SolverError::RootLevelConflict(cc));
-        }
+        self.propagate(cdb)
+            .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
         // wipe asserted literals from trail and increment the number of asserted vars.
         self.num_asserted_vars += self.trail.len();
         self.trail.clear();

@@ -56,7 +56,8 @@ impl Index<ClauseId> for ClauseDB {
     fn index(&self, cid: ClauseId) -> &Clause {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            self.clause.get_unchecked(cid.ordinal as usize)
+            self.clause
+                .get_unchecked(std::num::NonZeroU32::get(cid.ordinal) as usize)
         }
         #[cfg(not(feature = "unsafe_access"))]
         &self.clause[cid.ordinal as usize]
@@ -68,7 +69,8 @@ impl IndexMut<ClauseId> for ClauseDB {
     fn index_mut(&mut self, cid: ClauseId) -> &mut Clause {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            self.clause.get_unchecked_mut(cid.ordinal as usize)
+            self.clause
+                .get_unchecked_mut(std::num::NonZeroU32::get(cid.ordinal) as usize)
         }
         #[cfg(not(feature = "unsafe_access"))]
         &mut self.clause[cid.ordinal as usize]
@@ -81,7 +83,8 @@ impl Index<&ClauseId> for ClauseDB {
     fn index(&self, cid: &ClauseId) -> &Clause {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            self.clause.get_unchecked(cid.ordinal as usize)
+            self.clause
+                .get_unchecked(std::num::NonZeroU32::get(cid.ordinal) as usize)
         }
         #[cfg(not(feature = "unsafe_access"))]
         &self.clause[cid.ordinal as usize]
@@ -93,7 +96,8 @@ impl IndexMut<&ClauseId> for ClauseDB {
     fn index_mut(&mut self, cid: &ClauseId) -> &mut Clause {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            self.clause.get_unchecked_mut(cid.ordinal as usize)
+            self.clause
+                .get_unchecked_mut(std::num::NonZeroU32::get(cid.ordinal) as usize)
         }
         #[cfg(not(feature = "unsafe_access"))]
         &mut self.clause[cid.ordinal as usize]
@@ -153,7 +157,7 @@ impl IndexMut<RangeFrom<usize>> for ClauseDB {
 impl ActivityIF<ClauseId> for ClauseDB {
     fn activity(&mut self, cid: ClauseId) -> f64 {
         let t = self.ordinal;
-        self.clause[cid.ordinal as usize].update_activity(
+        self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize].update_activity(
             t,
             self.activity_decay,
             self.activity_anti_decay,
@@ -168,7 +172,7 @@ impl ActivityIF<ClauseId> for ClauseDB {
     fn reward_at_analysis(&mut self, cid: ClauseId) {
         // Note: vivifier has its own conflict analyzer, which never call reward functions.
         let t = self.ordinal;
-        let r = self.clause[cid.ordinal as usize].update_activity(
+        let r = self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize].update_activity(
             t,
             self.activity_decay,
             self.activity_anti_decay,
@@ -342,7 +346,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut watch_cache,
             ..
         } = self;
-        let c = &mut clause[cid.ordinal as usize];
+        let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         c.timestamp = *ordinal;
         let len2 = c.lits.len() == 2;
         if len2 {
@@ -417,7 +421,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut watch_cache,
             ..
         } = self;
-        let c = &mut clause[cid.ordinal as usize];
+        let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         c.timestamp = *ordinal;
         let len2 = c.lits.len() == 2;
         if len2 {
@@ -453,7 +457,7 @@ impl ClauseDBIF for ClauseDB {
     }
     /// remove a clause temporally
     fn detach_clause(&mut self, cid: ClauseId) -> (Lit, Lit) {
-        let c = &self.clause[cid.ordinal as usize];
+        let c = &self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         assert!(1 < c.lits.len());
         let l0 = c.lit0();
         let l1 = c.lit1();
@@ -468,7 +472,7 @@ impl ClauseDBIF for ClauseDB {
     }
     /// push back a clause
     fn reattach_clause(&mut self, cid: ClauseId, (l0, l1): (Lit, Lit)) {
-        let c = &self.clause[cid.ordinal as usize];
+        let c = &self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         if c.len() == 2 {
             self.bi_clause[!l0].insert(l1, cid);
             self.bi_clause[!l1].insert(l0, cid);
@@ -481,9 +485,9 @@ impl ClauseDBIF for ClauseDB {
     /// this function is the only function that makes dead clauses
     fn remove_clause(&mut self, cid: ClauseId) {
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
-        // if !self.clause[cid.ordinal as usize].is_dead() {
+        // if !self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize].is_dead() {
         // }
-        let c = &mut self.clause[cid.ordinal as usize];
+        let c = &mut self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         debug_assert!(!c.is_dead());
         debug_assert!(1 < c.lits.len());
         remove_clause_fn(
@@ -500,7 +504,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn remove_clause_sandbox(&mut self, cid: ClauseId) {
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
-        let c = &mut self.clause[cid.ordinal as usize];
+        let c = &mut self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         debug_assert!(!c.is_dead());
         debug_assert!(1 < c.lits.len());
         let mut store = CertificationStore::default();
@@ -542,7 +546,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut num_bi_clause,
             ..
         } = self;
-        let c = &mut clause[cid.ordinal as usize];
+        let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         // debug_assert!((*ch).lits.contains(&p));
         // debug_assert!(1 < (*ch).len());
         debug_assert!(1 < usize::from(!p));
@@ -631,7 +635,7 @@ impl ClauseDBIF for ClauseDB {
             certification_store,
             ..
         } = self;
-        let c = &mut clause[cid.ordinal as usize];
+        let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         debug_assert!(new_lits.len() < c.len());
         if new_lits.len() == 2 {
             if let Some(bc) = bi_clause[!new_lits[0]].get(&new_lits[1]) {
@@ -748,7 +752,7 @@ impl ClauseDBIF for ClauseDB {
             certification_store,
             ..
         } = self;
-        let c = &mut clause[cid.ordinal as usize];
+        let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         let mut new_lits = c
             .lits
             .iter()
@@ -850,7 +854,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut watch_cache,
             ..
         } = self;
-        let c = &mut clause[cid.ordinal as usize];
+        let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         let other = (old == 0) as usize;
         if !removed {
             //## Step:1
@@ -883,7 +887,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut lbd_temp,
             ..
         } = self;
-        let c = &mut clause[cid.ordinal as usize];
+        let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         let old_rank = c.rank as usize;
         let nlevels = c.update_lbd(asg, lbd_temp);
         debug_assert!(
@@ -1001,7 +1005,7 @@ impl ClauseDBIF for ClauseDB {
         let l0 = vec[0];
         let mut num_sat = 0;
         for (_, &cid) in self.bi_clause[!l0].iter() {
-            let c = &self.clause[cid.ordinal as usize];
+            let c = &self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
             debug_assert!(c[0] == l0 || c[1] == l0);
             let other = c[(c[0] == l0) as usize];
             let vi = other.vi();
@@ -1017,8 +1021,11 @@ impl ClauseDBIF for ClauseDB {
     }
     #[cfg(feature = "incremental_solver")]
     fn make_permanent_immortal(&mut self, cid: ClauseId) {
-        self.eliminated_permanent
-            .push(self.clause[cid.ordinal as usize].lits.clone());
+        self.eliminated_permanent.push(
+            self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize]
+                .lits
+                .clone(),
+        );
     }
     fn watch_caches(&self, cid: ClauseId, mes: &str) -> (Lit, Lit) {
         // let mut _found = None;

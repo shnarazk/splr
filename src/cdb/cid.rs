@@ -6,27 +6,29 @@ pub trait ClauseIdIF {
     fn is_lifted_lit(&self) -> bool;
 }
 
-const NULL_CLAUSE: ClauseId = ClauseId { ordinal: 0 };
-
 impl Default for ClauseId {
     #[inline]
     /// return the default empty clause, used in a reason slot or no conflict path.
     fn default() -> Self {
-        NULL_CLAUSE
+        ClauseId {
+            ordinal: std::num::NonZeroU32::new(0x7FFF_FFFF).unwrap(),
+        }
     }
 }
 
 impl From<usize> for ClauseId {
     #[inline]
     fn from(u: usize) -> ClauseId {
-        ClauseId { ordinal: u as u32 }
+        ClauseId {
+            ordinal: unsafe { std::num::NonZeroU32::new_unchecked(u as u32) },
+        }
     }
 }
 
 impl From<ClauseId> for usize {
     #[inline]
     fn from(cid: ClauseId) -> usize {
-        cid.ordinal as usize
+        std::num::NonZeroU32::get(cid.ordinal) as usize
     }
 }
 
@@ -38,17 +40,13 @@ impl fmt::Debug for ClauseId {
 
 impl fmt::Display for ClauseId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if *self == ClauseId::default() {
-            write!(f, "NullClause")
-        } else {
-            write!(f, "{}C", self.ordinal)
-        }
+        write!(f, "{}C", self.ordinal)
     }
 }
 
 impl ClauseIdIF for ClauseId {
     /// return `true` if the clause is generated from a literal by Eliminator.
     fn is_lifted_lit(&self) -> bool {
-        0 != 0x8000_0000 & self.ordinal
+        0 != 0x8000_0000 & std::num::NonZeroU32::get(self.ordinal)
     }
 }

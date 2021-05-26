@@ -14,6 +14,7 @@ pub use self::{cid::ClauseIdIF, property::*, unsat_certificate::CertificationSto
 use {
     crate::{assign::AssignIF, types::*},
     std::{
+        num::NonZeroU32,
         ops::IndexMut,
         slice::{Iter, IterMut},
     },
@@ -150,17 +151,7 @@ pub trait ClauseDBIF:
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ClauseId {
     /// a sequence number.
-    pub ordinal: u32,
-}
-
-impl ClauseId {
-    #[inline]
-    pub fn is_none(&self) -> bool {
-        self.ordinal == 0
-    }
-    pub fn to_option(&self) -> Option<ClauseId> {
-        (self.ordinal != 0).then(|| *self)
-    }
+    pub ordinal: NonZeroU32,
 }
 
 /// A representation of 'clause'

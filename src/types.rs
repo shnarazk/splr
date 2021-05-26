@@ -193,7 +193,7 @@ impl From<ClauseId> for Lit {
     #[inline]
     fn from(cid: ClauseId) -> Self {
         Lit {
-            ordinal: cid.ordinal & 0x7FFF_FFFF,
+            ordinal: std::num::NonZeroU32::get(cid.ordinal) & 0x7FFF_FFFF,
         }
     }
 }
@@ -242,7 +242,7 @@ impl From<Lit> for ClauseId {
     #[inline]
     fn from(l: Lit) -> ClauseId {
         ClauseId {
-            ordinal: l.ordinal | 0x8000_0000,
+            ordinal: std::num::NonZeroU32::new(l.ordinal | 0x8000_0000).unwrap(),
         }
     }
 }
@@ -567,7 +567,7 @@ pub enum SolverError {
     Inconsistent,
     OutOfMemory,
     OutOfRange,
-    RootLevelConflict(ClauseId),
+    RootLevelConflict(Option<ClauseId>),
     TimeOut,
     SolverBug,
     UndescribedError,

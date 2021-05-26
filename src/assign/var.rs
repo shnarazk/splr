@@ -158,7 +158,7 @@ impl VarManipulateIF for AssignStack {
 impl AssignStack {
     /// make a var asserted.
     pub fn make_var_asserted(&mut self, vi: VarId) {
-        self.reason[vi] = AssignReason::Implication(ClauseId::default(), NULL_LIT);
+        self.reason[vi] = AssignReason::None;
         self.var[vi].timestamp = self.ordinal;
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);

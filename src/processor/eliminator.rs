@@ -312,8 +312,9 @@ impl EliminateIF for Eliminator {
             if self.is_running() {
                 self.stop(asg, cdb);
             }
-        } else if let Some(cc) = asg.propagate(cdb) {
-            return Err(SolverError::RootLevelConflict(cc));
+        } else {
+            asg.propagate(cdb)
+                .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
         }
         if self.mode != EliminatorMode::Dormant {
             self.stop(asg, cdb);
@@ -456,81 +457,78 @@ impl Eliminator {
                 self.clause_queue.push(c);
                 self.bwdsub_assigns += 1;
             }
-            let cid = match self.clause_queue.pop() {
-                Some(x) => x,
-                None => ClauseId::default(),
-            };
-            if *timedout == 0 {
-                self.clear_clause_queue(cdb);
-                self.clear_var_queue(asg);
-                return Ok(());
-            }
-            let best: VarId = if cid.is_lifted_lit() {
-                let vi = Lit::from(cid).vi();
-                debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
-                vi
-            } else {
-                let mut tmp = cdb.derefer(cdb::property::Tusize::NumClause);
-                let c = &mut cdb[cid];
-                c.turn_off(Flag::ENQUEUED);
-                if c.is_dead() || self.subsume_literal_limit < c.len() {
+            if let Some(cid) = self.clause_queue.pop() {
+                if *timedout == 0 {
+                    self.clear_clause_queue(cdb);
+                    self.clear_var_queue(asg);
+                    return Ok(());
+                }
+                let best: VarId = if cid.is_lifted_lit() {
+                    let vi = Lit::from(cid).vi();
+                    debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
+                    vi
+                } else {
+                    let mut tmp = cdb.derefer(cdb::property::Tusize::NumClause);
+                    let c = &mut cdb[cid];
+                    c.turn_off(Flag::ENQUEUED);
+                    if c.is_dead() || self.subsume_literal_limit < c.len() {
+                        continue;
+                    }
+                    // if c is subsumed by c', both of c and c' are included in
+                    // the occurs of all literals of c
+                    // so searching the shortest occurs is most efficient.
+                    let mut b = 0;
+                    for l in c.iter() {
+                        let v = &asg.var(l.vi());
+                        let w = &self[l.vi()];
+                        if asg.assign(l.vi()).is_some() || w.aborted {
+                            continue;
+                        }
+                        let num_sum = if bool::from(*l) {
+                            w.neg_occurs.len()
+                        } else {
+                            w.pos_occurs.len()
+                        };
+                        if !v.is(Flag::ELIMINATED) && num_sum < tmp {
+                            b = l.vi();
+                            tmp = num_sum;
+                        }
+                    }
+                    b
+                };
+                if best == 0 || asg.var(best).is(Flag::ELIMINATED) {
                     continue;
                 }
-                // if c is subsumed by c', both of c and c' are included in
-                // the occurs of all literals of c
-                // so searching the shortest occurs is most efficient.
-                let mut b = 0;
-                for l in c.iter() {
-                    let v = &asg.var(l.vi());
-                    let w = &self[l.vi()];
-                    if asg.assign(l.vi()).is_some() || w.aborted {
-                        continue;
-                    }
-                    let num_sum = if bool::from(*l) {
-                        w.neg_occurs.len()
-                    } else {
-                        w.pos_occurs.len()
-                    };
-                    if !v.is(Flag::ELIMINATED) && num_sum < tmp {
-                        b = l.vi();
-                        tmp = num_sum;
-                    }
-                }
-                b
-            };
-            if best == 0 || asg.var(best).is(Flag::ELIMINATED) {
-                continue;
-            }
-            self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
-            self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
-            for cls in [self[best].pos_occurs.clone(), self[best].neg_occurs.clone()].iter() {
-                for did in cls.iter() {
-                    if *did == cid {
-                        continue;
-                    }
-                    let d = &cdb[*did];
-                    if d.len() <= *timedout {
-                        *timedout -= d.len();
-                    } else {
-                        *timedout = 0;
-                        return Ok(());
-                    }
-                    if !d.is_dead() && d.len() <= self.subsume_literal_limit {
-                        debug_assert!(
-                            d.contains(Lit::from((best, false)))
-                                || d.contains(Lit::from((best, true)))
-                        );
-                        self.try_subsume(asg, cdb, cid, *did)?;
+                self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
+                self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
+                for cls in [self[best].pos_occurs.clone(), self[best].neg_occurs.clone()].iter() {
+                    for did in cls.iter() {
+                        if *did == cid {
+                            continue;
+                        }
+                        let d = &cdb[*did];
+                        if d.len() <= *timedout {
+                            *timedout -= d.len();
+                        } else {
+                            *timedout = 0;
+                            return Ok(());
+                        }
+                        if !d.is_dead() && d.len() <= self.subsume_literal_limit {
+                            debug_assert!(
+                                d.contains(Lit::from((best, false)))
+                                    || d.contains(Lit::from((best, true)))
+                            );
+                            self.try_subsume(asg, cdb, cid, *did)?;
+                        }
                     }
                 }
+                self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
+                self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
             }
-            self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
-            self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
         }
         if asg.remains() {
-            if let Some(cc) = asg.propagate(cdb) {
-                return Err(SolverError::RootLevelConflict(cc));
-            }
+            asg.propagate(cdb)
+                .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
         }
         Ok(())
     }
@@ -555,9 +553,8 @@ impl Eliminator {
         loop {
             let na = asg.stack_len();
             self.eliminate_main(asg, cdb, rst, state)?;
-            if let Some(cc) = asg.propagate(cdb) {
-                return Err(SolverError::RootLevelConflict(cc));
-            }
+            asg.propagate(cdb)
+                .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
             if na == asg.stack_len()
                 && (!self.is_running()
                     || (0 == self.clause_queue_len() && 0 == self.var_queue_len()))
@@ -611,9 +608,8 @@ impl Eliminator {
             }
             self.backward_subsumption_check(asg, cdb, &mut timedout)?;
             debug_assert!(self.clause_queue.is_empty());
-            if let Some(cc) = asg.propagate(cdb) {
-                return Err(SolverError::RootLevelConflict(cc));
-            }
+            asg.propagate(cdb)
+                .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
             if timedout == 0 {
                 self.clear_clause_queue(cdb);
                 self.clear_var_queue(asg);

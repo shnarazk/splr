@@ -29,10 +29,10 @@ pub fn vivify(
 ) -> MaybeInconsistent {
     const NUM_TARGETS: Option<usize> = Some(40_000);
     if asg.remains() {
-        if let Some(cc) = asg.propagate(cdb) {
+        asg.propagate(cdb).map_or(Ok(()), |cc| {
             state.log(asg.num_conflict, "By vivifier");
-            return Err(SolverError::RootLevelConflict(cc));
-        }
+            Err(SolverError::RootLevelConflict(Some(cc)))
+        })?;
     }
     let ave_lbd = {
         let ema = rst.refer(restart::property::TEma2::LBD).get();
@@ -90,7 +90,7 @@ pub fn vivify(
                     decisions.push(!lit);
                     asg.assign_by_decision(!lit);
                     //## Rule 3
-                    if let Some(cc) = asg.propagate_sandbox(cdb).to_option() {
+                    if let Some(cc) = asg.propagate_sandbox(cdb) {
                         let conflits = &cdb[cc].iter().copied().collect::<Vec<Lit>>();
                         seen[0] = num_check;
                         let mut vec = asg.analyze_sandbox(cdb, &decisions, &conflits, &mut seen);
@@ -101,7 +101,7 @@ pub fn vivify(
                                 state[Stat::VivifiedClause] += num_shrink;
                                 state[Stat::VivifiedVar] += num_assert;
                                 state.log(asg.num_conflict, "RootLevelConflict By vivify");
-                                return Err(SolverError::RootLevelConflict(cid));
+                                return Err(SolverError::RootLevelConflict(Some(cid)));
                             }
                             1 => {
                                 assert_lit(asg, cdb, state, vec[0])?;
@@ -162,7 +162,7 @@ fn assert_lit(
         tag = "propagation";
         debug_assert!(asg.remains());
         asg.propagate(cdb)
-            .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(cc)))
+            .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))
     }) {
         state.flush("");
         state.log(
@@ -175,10 +175,10 @@ fn assert_lit(
         return Err(e);
     }
     assert_eq!(asg.decision_level(), asg.root_level);
-    if let Some(cc) = asg.propagate(cdb) {
+    asg.propagate(cdb).map_or(Ok(()), |cc| {
         state.log(asg.num_conflict, "By vivifier");
-        return Err(SolverError::RootLevelConflict(cc));
-    }
+        Err(SolverError::RootLevelConflict(Some(cc)))
+    })?;
     if asg.remains() {
         state.log(
             asg.num_conflict,

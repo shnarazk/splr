@@ -86,11 +86,13 @@ where
                     match asg.assigned(lit) {
                         Some(true) => (),
                         Some(false) => {
-                            return Err(SolverError::RootLevelConflict(ClauseId::from(lit)))
+                            return Err(SolverError::RootLevelConflict(Some(ClauseId::from(lit))))
                         }
                         None => {
                             if asg.assign_at_root_level(lit).is_err() {
-                                return Err(SolverError::RootLevelConflict(ClauseId::from(lit)));
+                                return Err(SolverError::RootLevelConflict(Some(ClauseId::from(
+                                    lit,
+                                ))));
                             }
                             cdb.certificate_add_assertion(lit);
                         }

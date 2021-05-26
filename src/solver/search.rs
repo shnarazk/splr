@@ -249,7 +249,7 @@ fn search(
         }
         if let Some(ci) = asg.propagate(cdb) {
             if asg.decision_level() == asg.root_level {
-                return Err(SolverError::RootLevelConflict(ci));
+                return Err(SolverError::RootLevelConflict(Some(ci)));
             }
             asg.update_rewards();
             cdb.update_rewards();
