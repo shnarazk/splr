@@ -379,6 +379,7 @@ impl fmt::Display for GeometricStabilizer {
 }
 
 impl GeometricStabilizer {
+    #[cfg(feature = "Luby_stabilization")]
     fn update(&mut self, now: usize) -> Option<bool> {
         if self.enable && self.next_trigger <= now {
             self.num_stage += 1;
