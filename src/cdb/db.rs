@@ -1213,7 +1213,8 @@ impl ClauseDB {
             };
         }
         perm.sort();
-        let thr = self.lbd_of_dp_ema.get() as u16;
+        // let thr = self.lbd_of_dp_ema.get() as u16;
+        let thr = (self.lbd_of_dp_ema.get() as u16).max(*co_lbd_bound);
         for i in &perm[keep..] {
             if thr <= self.clause[i.to()].rank {
                 self.remove_clause(ClauseId::from(i.to()));
