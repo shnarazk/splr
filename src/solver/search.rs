@@ -259,7 +259,9 @@ fn search(
             ));
             if rst.restart() == Some(RestartDecision::Force) {
                 #[allow(unused_variables)]
-                if let Some(new_cycle) = rst.stabilize() {
+                if let Some(new_cycle) =
+                    rst.stabilize(asg.refer(assign::TEma::ConflictPerRestart).get())
+                {
                     RESTART!(asg, rst);
                     let block_level = rst.derefer(restart::property::Tusize::TriggerLevel);
                     let num_cycle = rst.derefer(restart::property::Tusize::NumCycle);
@@ -304,8 +306,7 @@ fn search(
                                 num_cycle,
                                 num_unreachable,
                                 block_level,
-                                asg.refer(assign::property::TEma::PropagationPerConflict)
-                                    .get(),
+                                asg.refer(assign::property::TEma::ConflictPerRestart).get(),
                             ),
                         );
                         last_core = num_unreachable;

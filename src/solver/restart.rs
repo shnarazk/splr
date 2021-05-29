@@ -99,7 +99,7 @@ pub trait RestartIF:
     /// check stabilization mode and  return:
     /// - `Some(parity_bit, just_start_a_new_cycle)` if a stabilization phase has just ended.
     /// - `None` otherwise.
-    fn stabilize(&mut self) -> Option<bool>;
+    fn stabilize(&mut self, cpr: f64) -> Option<bool>;
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
 }
@@ -323,29 +323,38 @@ impl ProgressEvaluator for ProgressLuby {
 /// This exists in macro `reset`.
 #[derive(Clone, Debug)]
 struct GeometricStabilizer {
+    base_len: Ema,
+    block_level: usize,
     enable: bool,
     luby: LubySeries,
+    new_cycle: bool,
     num_cycle: usize,
     num_stage: usize,
     next_trigger: usize,
-    // reset_requested: bool,
+    old_level: usize,
     step: usize,
     step_max: usize,
 }
 
 impl Default for GeometricStabilizer {
     fn default() -> Self {
+        let mut base_len = Ema::new(10);
+        base_len.update(50.0);
         GeometricStabilizer {
+            base_len,
+            block_level: 1,
+
             #[cfg(not(feature = "Luby_stabilization"))]
             enable: false,
             #[cfg(feature = "Luby_stabilization")]
             enable: true,
 
             luby: LubySeries::default(),
+            new_cycle: false,
             num_cycle: 0,
             num_stage: 0,
             next_trigger: 1,
-            // reset_requested: false,
+            old_level: 0,
             step: 1,
             step_max: 1,
         }
@@ -380,30 +389,44 @@ impl fmt::Display for GeometricStabilizer {
 
 impl GeometricStabilizer {
     #[cfg(feature = "Luby_stabilization")]
-    fn update(&mut self, now: usize) -> Option<bool> {
-        if self.enable && self.next_trigger <= now {
+    fn update(&mut self, now: usize, len: f64) -> Option<bool> {
+        // if self.enable && self.next_trigger <= now {
+        if !self.enable {
+            return None;
+        }
+        let base_len: f64 = (self.block_level as f64) * 50.0;
+        // if self.next_trigger < now {
+        //     dbg!(old_len, base_len, len);
+        // }
+        // if now % 10 == 0 {
+        //     dbg!(len);
+        // }
+
+        if match self.old_level.cmp(&self.block_level) {
+            std::cmp::Ordering::Equal => self.next_trigger < now,
+            std::cmp::Ordering::Greater => len < base_len,
+            std::cmp::Ordering::Less => base_len < len,
+        } {
             self.num_stage += 1;
-            let mut new_cycle: bool = false;
-            if self.step_max < self.step {
-                new_cycle = true;
+            self.old_level = self.block_level;
+            let new_cycle = self.new_cycle;
+            if self.new_cycle {
+                self.new_cycle = false;
                 self.num_cycle += 1;
-                self.step_max = self.step;
+                self.base_len.update(len);
             }
-            // if self.reset_requested {
-            //     self.num_cycle = 0;
-            //     self.luby.reset();
-            //     self.reset_requested = false;
-            //     self.step_max = 1;
-            // }
             self.step = self.luby.next();
-            self.next_trigger = now + (self.step_max * 2) / self.step;
+            if self.step_max < self.step {
+                self.step_max = self.step;
+                self.new_cycle = true;
+            }
+            self.block_level = self.step_max / self.step;
+            self.next_trigger = now + 32 * self.step;
+            // dbg!(self.old_level, self.block_level);
             return Some(new_cycle);
         }
         None
     }
-    // fn reset_progress(&mut self) {
-    //     self.reset_requested = true;
-    // }
 }
 
 /// `Restarter` provides restart API and holds data about restart conditions.
@@ -497,17 +520,24 @@ impl RestartIF for Restarter {
             return None;
         }
 
-        if self.asg.is_active() {
-            self.num_block += 1;
-            self.after_restart = 0;
-            self.restart_step = self.initial_restart_step * self.stb.step_max;
-            self.restart_waiting = 0;
-            return Some(RestartDecision::Block);
-        }
-        if self.lbd.is_active() {
-            self.restart_step = self.initial_restart_step;
+        // || \\ if self.asg.is_active() {
+        // || \\     self.num_block += 1;
+        // || \\     self.after_restart = 0;
+        // || \\     // self.restart_step = self.initial_restart_step * self.stb.block_level;
+        // || \\     // self.restart_waiting = 0;
+        // || \\     return Some(RestartDecision::Block);
+        // || \\ }
+        // if self.lbd.is_active() {
+        let offset = match self.stb.old_level.cmp(&self.stb.block_level) {
+            std::cmp::Ordering::Equal => 0.0,
+            std::cmp::Ordering::Greater => -1.1,
+            std::cmp::Ordering::Less => 0.1,
+        } * (1.0 + self.after_restart as f64).log(64.0);
+
+        if self.lbd.enable && self.lbd.threshold + offset < self.lbd.trend() {
+            // self.restart_step = self.initial_restart_step;
             self.restart_waiting += 1;
-            if self.stb.step <= self.restart_waiting {
+            if self.stb.block_level <= self.restart_waiting {
                 self.restart_waiting = 0;
                 return Some(RestartDecision::Force);
             }
@@ -516,8 +546,8 @@ impl RestartIF for Restarter {
         None
     }
     #[cfg(feature = "Luby_stabilization")]
-    fn stabilize(&mut self) -> Option<bool> {
-        self.stb.update(self.num_restart) // don't count num_block
+    fn stabilize(&mut self, cpr: f64) -> Option<bool> {
+        self.stb.update(self.num_restart, cpr) // don't count num_block
     }
     #[cfg(not(feature = "Luby_stabilization"))]
     fn stabilize(&mut self) -> Option<bool> {
