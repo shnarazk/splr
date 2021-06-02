@@ -512,6 +512,9 @@ impl EmaIF for EmaSU {
     fn get(&self) -> f64 {
         self.ema.get()
     }
+    fn trend(&self) -> f64 {
+        self.ema.trend()
+    }
 }
 
 impl EmaSU {

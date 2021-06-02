@@ -141,7 +141,7 @@ impl Default for Config {
             elm_grw_lim: 0,
             elm_var_occ: 20000,
 
-            rst_step: 24,
+            rst_step: 16,
             rst_asg_len: 24,
             rst_asg_slw: 8192,
             rst_asg_thr: 0.75,

@@ -237,6 +237,7 @@ fn search(
     let mut last_core = 0;
     let progress_step = 256;
     let mut next_progress = progress_step;
+    let mut num_decision = asg.derefer(assign::property::Tusize::NumDecision);
 
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
@@ -257,14 +258,15 @@ fn search(
             rst.update(ProgressUpdate::ASG(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
             ));
-            if rst.restart() == Some(RestartDecision::Force) {
+            let ndu = asg.derefer(assign::property::Tusize::NumDecision);
+            let dpr = asg.refer(assign::TEma::DecisionPerRestart).get();
+            if rst.restart(ndu - num_decision, dpr) == Some(RestartDecision::Force) {
+                num_decision = ndu;
                 #[allow(unused_variables)]
-                if let Some(new_cycle) =
-                    rst.stabilize(asg.refer(assign::TEma::ConflictPerRestart).get())
-                {
+                if let Some(new_cycle) = rst.stabilize(dpr) {
                     RESTART!(asg, rst);
                     let block_level = rst.derefer(restart::property::Tusize::TriggerLevel);
-                    let num_cycle = rst.derefer(restart::property::Tusize::NumCycle);
+                    let num_stage = rst.derefer(restart::property::Tusize::NumStage);
                     let num_unreachable = asg.derefer(assign::property::Tusize::NumUnreachableVar);
                     #[cfg(feature = "trace_equivalency")]
                     {
@@ -302,8 +304,8 @@ fn search(
                         state.log(
                             asg.num_conflict,
                             format!(
-                                "#cycle:{:>5}, core:{:>10}, level:{:>9}, /cpr:{:>9.2}",
-                                num_cycle,
+                                "#stage:{:>5}, core:{:>10}, level:{:>9}, /cpr:{:>9.2}",
+                                num_stage,
                                 num_unreachable,
                                 block_level,
                                 asg.refer(assign::property::TEma::ConflictPerRestart).get(),
@@ -337,6 +339,18 @@ fn search(
             #[cfg(feature = "strategy_adaptation")]
             if asg.num_conflict % (10 * state.reflection_interval) == 0 {
                 adapt_modules(asg, rst, state);
+            }
+            if asg.num_conflict % 1000 == 0 {
+                if state.config.quiet_mode {
+                    println!(
+                        "{},{:>.2},{:>.2}",
+                        asg.num_conflict,
+                        asg.refer(assign::property::TEma::DecisionPerRestart).get(),
+                        asg.refer(assign::property::TEma::PropagationPerConflict)
+                            .get(),
+                    );
+                }
+                state.progress(asg, cdb, elim, rst);
             }
         }
     }

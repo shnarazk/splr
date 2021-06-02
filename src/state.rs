@@ -576,17 +576,25 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, trgr:{}, peak:{}",
+            "\x1B[2K     Restart|#BLK:{}, #RST:{}, hrzn:{}, /dpr:{}",
+            // "\x1B[2K     Restart|#BLK:{}, #RST:{}, trgr:{}, peak:{}",
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
             im!("{:>9}", self, LogUsizeId::RestartTriggerLevel, rst_trg_lvl),
-            im!(
-                "{:>9}",
+            // || || im!(
+            // || ||     "{:>9}",
+            // || ||     self,
+            // || ||     LogUsizeId::RestartTriggerLevelMax,
+            // || ||     rst_trg_lvl_max
+            // || || ),
+            fm!(
+                "{:>9.2}",
                 self,
-                LogUsizeId::RestartTriggerLevelMax,
-                rst_trg_lvl_max
-            ),
+                LogF64Id::End,
+                asg.refer(assign::property::TEma::DecisionPerRestart).get()
+            )
         );
+        self[LogUsizeId::RestartTriggerLevelMax] = rst_trg_lvl_max;
         println!(
             "\x1B[2K         LBD|avrg:{}, trnd:{}, depG:{}, /dpc:{}",
             fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd.get()),

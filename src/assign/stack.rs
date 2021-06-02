@@ -49,9 +49,10 @@ impl Default for AssignStack {
             num_propagation: 0,
             num_conflict: 0,
             num_restart: 0,
-            dpc_ema: EmaSU::new(100),
-            ppc_ema: EmaSU::new(100),
-            cpr_ema: EmaSU::new(100),
+            dpc_ema: EmaSU::new(1024),
+            ppc_ema: EmaSU::new(1024),
+            cpr_ema: EmaSU::new(256),
+            dpr_ema: EmaSU::new(256),
 
             ordinal: 0,
             var: Vec::new(),
@@ -84,6 +85,7 @@ impl From<&mut AssignStack> for Vec<i32> {
 impl Instantiate for AssignStack {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> AssignStack {
         let nv = cnf.num_of_variables;
+        // dpr_ema.update(1);
         AssignStack {
             assign: vec![None; 1 + nv],
             level: vec![DecisionLevel::default(); nv + 1],
