@@ -20,7 +20,7 @@ pub trait WatchCacheIF {
     fn get_watch(&self, cid: &ClauseId) -> Option<&Lit>;
     fn remove_watch(&mut self, cid: &ClauseId) -> Option<Lit>;
     fn insert_watch(&mut self, cid: ClauseId, l: Lit);
-    fn insert_or_update_watch(&mut self, cid: ClauseId, l: Lit);
+    fn update_or_insert_watch(&mut self, cid: ClauseId, l: Lit);
     fn append_watch(&mut self, appendant: Self);
 }
 
@@ -34,7 +34,7 @@ impl WatchCacheIF for WatchCacheHash {
     fn insert_watch(&mut self, cid: ClauseId, l: Lit) {
         self.insert(cid, l);
     }
-    fn insert_or_update_watch(&mut self, cid: ClauseId, l: Lit) {
+    fn update_or_insert_watch(&mut self, cid: ClauseId, l: Lit) {
         self.insert(cid, l);
     }
     fn append_watch(&mut self, appendant: Self) {
@@ -65,7 +65,7 @@ impl WatchCacheIF for WatchCacheList {
     // Note: this is a (the) slow function.
     // Try to make assure the list doesn't contain it by prooving logically,
     // then you can skip call this function.
-    fn insert_or_update_watch(&mut self, cid: ClauseId, l: Lit) {
+    fn update_or_insert_watch(&mut self, cid: ClauseId, l: Lit) {
         for e in self.iter_mut() {
             if e.0 == cid {
                 e.1 = l;
