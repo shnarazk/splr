@@ -46,12 +46,7 @@ impl WatchCacheIF for WatchCacheHash {
 
 impl WatchCacheIF for WatchCacheList {
     fn get_watch(&self, cid: &ClauseId) -> Option<&Lit> {
-        for e in self.iter() {
-            if e.0 == *cid {
-                return Some(&e.1);
-            }
-        }
-        None
+        self.iter().find_map(|e| (e.0 == *cid).then(|| &e.1))
     }
     fn remove_watch(&mut self, cid: &ClauseId) -> Option<Lit> {
         for (i, e) in self.iter().enumerate() {
@@ -67,6 +62,9 @@ impl WatchCacheIF for WatchCacheList {
         debug_assert!(self.iter().all(|e| e.0 != cid));
         self.push((cid, l));
     }
+    // Note: this is a (the) slow function.
+    // Try to make assure the list doesn't contain it by prooving logically,
+    // then you can skip call this function.
     fn insert_or_update_watch(&mut self, cid: ClauseId, l: Lit) {
         for e in self.iter_mut() {
             if e.0 == cid {
