@@ -20,6 +20,11 @@ pub trait WatchCacheIF {
     fn get_watch(&self, cid: &ClauseId) -> Option<&Lit>;
     fn remove_watch(&mut self, cid: &ClauseId) -> Option<Lit>;
     fn insert_watch(&mut self, cid: ClauseId, l: Lit);
+    // used in
+    // * transform_by_elimination
+    // * transform_by_replacement
+    // * transform_by_simplification
+    // * transform_by_updating_watch under feature "maintain_watch_cache"
     fn update_or_insert_watch(&mut self, cid: ClauseId, l: Lit);
     fn append_watch(&mut self, appendant: Self);
 }

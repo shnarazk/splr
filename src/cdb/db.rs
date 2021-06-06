@@ -617,6 +617,7 @@ impl ClauseDBIF for ClauseDB {
         }
         RefClause::Clause(cid)
     }
+    // Not in use so far
     fn transform_by_replacement(&mut self, cid: ClauseId, new_lits: &mut Vec<Lit>) -> RefClause {
         assert!(1 < new_lits.len());
         //
@@ -705,6 +706,7 @@ impl ClauseDBIF for ClauseDB {
         }
         RefClause::Clause(cid)
     }
+    // only used in `propagate_at_root_level`
     fn transform_by_simplification<A>(&mut self, asg: &mut A, cid: ClauseId) -> RefClause
     where
         A: AssignIF,
@@ -830,6 +832,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
     }
+    // used in `propagate`, `propagate_sandbox`, and `handle_conflict` for chronoBT
     fn transform_by_updating_watch(
         &mut self,
         cid: ClauseId,
