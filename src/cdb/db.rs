@@ -816,8 +816,10 @@ impl ClauseDBIF for ClauseDB {
                 } else {
                     watch_cache[!old_l0].remove_watch(&cid);
                     watch_cache[!old_l1].remove_watch(&cid);
-                    watch_cache[!l0].insert_or_update_watch(cid, l1);
-                    watch_cache[!l1].insert_or_update_watch(cid, l0);
+                    // watch_cache[!l0].insert_or_update_watch(cid, l1);
+                    watch_cache[!l0].insert_watch(cid, l1);
+                    // watch_cache[!l1].insert_or_update_watch(cid, l0);
+                    watch_cache[!l1].insert_watch(cid, l0);
                 }
 
                 if certification_store.is_active() {
