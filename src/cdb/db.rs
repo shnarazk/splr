@@ -296,7 +296,7 @@ impl ClauseDBIF for ClauseDB {
         A: AssignIF,
     {
         debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{:?}", vec,);
-        assert!(1 < vec.len());
+        debug_assert!(1 < vec.len());
         if vec.len() == 2 {
             if let Some(cid) = self.has_bi_clause(vec[0], vec[1]) {
                 self.num_reregistration += 1;
@@ -387,7 +387,7 @@ impl ClauseDBIF for ClauseDB {
     where
         A: AssignIF,
     {
-        assert!(1 < vec.len());
+        debug_assert!(1 < vec.len());
         let mut learnt: bool = true;
         if vec.len() == 2 {
             if let Some(cid) = self.has_bi_clause(vec[0], vec[1]) {
@@ -458,7 +458,7 @@ impl ClauseDBIF for ClauseDB {
     /// remove a clause temporally
     fn detach_clause(&mut self, cid: ClauseId) -> (Lit, Lit) {
         let c = &self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
-        assert!(1 < c.lits.len());
+        debug_assert!(1 < c.lits.len());
         let l0 = c.lit0();
         let l1 = c.lit1();
         if c.len() == 2 {
@@ -537,7 +537,7 @@ impl ClauseDBIF for ClauseDB {
 
         // self.watches(cid, "before strengthen_by_elimination");
         debug_assert!(!self[cid].is_dead());
-        assert!(1 < self[cid].len());
+        debug_assert!(1 < self[cid].len());
         let ClauseDB {
             ref mut clause,
             ref mut bi_clause,
@@ -551,7 +551,7 @@ impl ClauseDBIF for ClauseDB {
         // debug_assert!(1 < (*ch).len());
         debug_assert!(1 < usize::from(!p));
         let lits = &mut c.lits;
-        assert!(1 < lits.len());
+        debug_assert!(1 < lits.len());
         //
         //## Case:2-0
         //
@@ -619,7 +619,7 @@ impl ClauseDBIF for ClauseDB {
     }
     // Not in use so far
     fn transform_by_replacement(&mut self, cid: ClauseId, new_lits: &mut Vec<Lit>) -> RefClause {
-        assert!(1 < new_lits.len());
+        debug_assert!(1 < new_lits.len());
         //
         //## Clause transform rules
         //
@@ -628,7 +628,7 @@ impl ClauseDBIF for ClauseDB {
         // 2. a normal clause becomes a new bi-clause.             [Case:2]
         // 3. a normal clause becomes a shorter normal clause.     [Case:3]
         //
-        assert!(!self[cid].is_dead());
+        debug_assert!(!self[cid].is_dead());
         let ClauseDB {
             clause,
             bi_clause,
@@ -1036,9 +1036,9 @@ impl ClauseDBIF for ClauseDB {
     }
     fn watch_caches(&self, cid: ClauseId, mes: &str) -> (Lit, Lit) {
         // let mut _found = None;
-        assert!(!cid.is_lifted_lit());
+        debug_assert!(!cid.is_lifted_lit());
         let c = &self[cid];
-        assert!(1 < c.len());
+        debug_assert!(1 < c.len());
         let l0 = c.lits[0];
         let l1 = c.lits[1];
         let l0_blocker: Option<Lit>;
