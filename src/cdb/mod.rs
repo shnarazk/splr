@@ -76,11 +76,11 @@ pub trait ClauseDBIF:
     fn fetch_watch_cache_entry(&self, lit: Lit, index: WatchCacheProxy) -> (ClauseId, Lit);
     /// replace the mutable watcher list with an empty one, and return the list
     fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator;
-    /// detach the watch_cache refered by the head of a watch_cache iterator
+    /// detach the watch_cache referred by the head of a watch_cache iterator
     fn detach_watch_cache(&mut self, l: Lit, iter: &mut WatchCacheIterator);
     /// register the clause to the previous watch cache
     fn reregister_watch_cache(&mut self, l: Lit, target: Option<WatchCacheProxy>);
-    /// restorte detached watch cache
+    /// restore detached watch cache
     fn restore_detached_watch_cache(&mut self, l: Lit, wi: WatchCacheIterator);
     /// Merge two watch cache
     fn merge_watch_cache(&mut self, l: Lit, wc: WatchCache);
