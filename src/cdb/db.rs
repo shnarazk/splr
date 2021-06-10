@@ -634,7 +634,7 @@ impl ClauseDBIF for ClauseDB {
             //
             if p == old_l0 || p == old_l1 {
                 watch_cache[!p].remove_watch(&cid);
-                watch_cache[!l1].update_or_insert_watch(cid, l0);
+                watch_cache[!l1].insert_watch(cid, l0);
                 // Here we assumed that there's no eliminated var in clause and *watch cache*.
                 // Fortunately the current implementation purges all eliminated vars completely.
             } else {
@@ -718,17 +718,17 @@ impl ClauseDBIF for ClauseDB {
             if l0 == old_l0 && l1 == old_l1 {
             } else if l0 == old_l0 {
                 watch_cache[!old_l1].remove_watch(&cid);
-                watch_cache[!l0].update_or_insert_watch(cid, l1);
-                watch_cache[!l1].update_or_insert_watch(cid, l0);
+                watch_cache[!l0].insert_watch(cid, l1);
+                watch_cache[!l1].insert_watch(cid, l0);
             } else if l0 == old_l1 {
                 watch_cache[!old_l0].remove_watch(&cid);
-                watch_cache[!l0].update_or_insert_watch(cid, l1);
-                watch_cache[!l1].update_or_insert_watch(cid, l0);
+                watch_cache[!l0].insert_watch(cid, l1);
+                watch_cache[!l1].insert_watch(cid, l0);
             } else {
                 watch_cache[!old_l0].remove_watch(&cid);
                 watch_cache[!old_l1].remove_watch(&cid);
-                watch_cache[!l0].update_or_insert_watch(cid, l1);
-                watch_cache[!l1].update_or_insert_watch(cid, l0);
+                watch_cache[!l0].insert_watch(cid, l1);
+                watch_cache[!l1].insert_watch(cid, l0);
             }
 
             if certification_store.is_active() {
@@ -839,20 +839,20 @@ impl ClauseDBIF for ClauseDB {
                 if old_l0 == l0 && old_l1 == l1 {
                 } else if old_l0 == l0 {
                     watch_cache[!old_l1].remove_watch(&cid);
-                    watch_cache[!l0].update_or_insert_watch(cid, l1);
-                    // watch_cache[!l1].update_or_insert_watch(cid, l0);
+                    watch_cache[!l0].insert_watch(cid, l1);
+                    // watch_cache[!l1].insert_watch(cid, l0);
                     watch_cache[!l1].insert_watch(cid, l0);
                 } else if old_l0 == l1 {
                     // watch_cache[!old_l0].remove_watch(&cid);
-                    // watch_cache[!l0].update_or_insert_watch(cid, l1);
+                    // watch_cache[!l0].insert_watch(cid, l1);
                     watch_cache[!l0].insert_watch(cid, l1);
-                    watch_cache[!l1].update_or_insert_watch(cid, l0);
+                    watch_cache[!l1].insert_watch(cid, l0);
                 } else {
                     watch_cache[!old_l0].remove_watch(&cid);
                     watch_cache[!old_l1].remove_watch(&cid);
-                    // watch_cache[!l0].update_or_insert_watch(cid, l1);
+                    // watch_cache[!l0].insert_watch(cid, l1);
                     watch_cache[!l0].insert_watch(cid, l1);
-                    // watch_cache[!l1].update_or_insert_watch(cid, l0);
+                    // watch_cache[!l1].insert_watch(cid, l0);
                     watch_cache[!l1].insert_watch(cid, l0);
                 }
 
@@ -907,7 +907,7 @@ impl ClauseDBIF for ClauseDB {
         #[cfg(feature = "maintain_watch_cache")]
         {
             //## Step:3
-            watcher[!c.lits[other]].update_or_insert_watch(cid, c.lits[new]);
+            watcher[!c.lits[other]].insert_watch(cid, c.lits[new]);
         }
 
         c.lits.swap(old, new);
