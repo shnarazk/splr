@@ -67,14 +67,37 @@ pub trait ClauseDBIF:
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
     /// return a watcher list for bi-clauses
     fn bi_clause_map(&self, l: Lit) -> &BiClause;
+
+    //
+    //## abstraction to watch_cache
+    //
+
+    // get mutable reference to a watch_cache
+    fn fetch_watch_cache_entry(&self, lit: Lit, index: WatchCacheProxy) -> (ClauseId, Lit);
     /// replace the mutable watcher list with an empty one, and return the list
-    fn detach_watch_cache(&mut self, l: Lit) -> WatchCache;
+    fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator;
+    /// detach the watch_cache refered by the head of a watch_cache iterator
+    fn detach_watch_cache(&mut self, l: Lit, iter: &mut WatchCacheIterator);
     /// register the clause to the previous watch cache
-    fn reregister_watch_cache(&mut self, p: Lit, target: Option<(ClauseId, Lit)>) -> bool;
+    fn reregister_watch_cache(&mut self, l: Lit, target: Option<WatchCacheProxy>);
+    /// restorte detached watch cache
+    fn restore_detached_watch_cache(&mut self, l: Lit, wi: WatchCacheIterator);
     /// Merge two watch cache
-    fn merge_watch_cache(&mut self, p: Lit, wc: WatchCache);
+    fn merge_watch_cache(&mut self, l: Lit, wc: WatchCache);
     /// swap the first two literals in a clause.
     fn swap_watch(&mut self, cid: ClauseId);
+
+    //
+    //## clause transformation
+    //
+
+    /// TODO
+    fn transform_by_restoring_watch_cache(
+        &mut self,
+        l: Lit,
+        iter: &mut WatchCacheIterator,
+        p: Option<Lit>,
+    );
     /// swap i-th watch with j-th literal then update watch caches correctly
     fn transform_by_updating_watch(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool);
     /// allocate a new clause and return its id.

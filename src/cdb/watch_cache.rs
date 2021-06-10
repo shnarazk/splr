@@ -18,14 +18,8 @@ pub type WatchCache = WatchCacheList;
 
 pub trait WatchCacheIF {
     fn get_watch(&self, cid: &ClauseId) -> Option<&Lit>;
-    fn remove_watch(&mut self, cid: &ClauseId) -> Option<Lit>;
+    fn remove_watch(&mut self, cid: &ClauseId);
     fn insert_watch(&mut self, cid: ClauseId, l: Lit);
-    // used in
-    // * transform_by_elimination
-    // * transform_by_replacement
-    // * transform_by_simplification
-    // * transform_by_updating_watch under feature "maintain_watch_cache"
-    fn update_or_insert_watch(&mut self, cid: ClauseId, l: Lit);
     fn append_watch(&mut self, appendant: Self);
 }
 
@@ -33,13 +27,10 @@ impl WatchCacheIF for WatchCacheHash {
     fn get_watch(&self, cid: &ClauseId) -> Option<&Lit> {
         self.get(cid)
     }
-    fn remove_watch(&mut self, cid: &ClauseId) -> Option<Lit> {
-        self.remove(cid)
+    fn remove_watch(&mut self, cid: &ClauseId) {
+        self.remove(cid);
     }
     fn insert_watch(&mut self, cid: ClauseId, l: Lit) {
-        self.insert(cid, l);
-    }
-    fn update_or_insert_watch(&mut self, cid: ClauseId, l: Lit) {
         self.insert(cid, l);
     }
     fn append_watch(&mut self, appendant: Self) {
@@ -53,30 +44,13 @@ impl WatchCacheIF for WatchCacheList {
     fn get_watch(&self, cid: &ClauseId) -> Option<&Lit> {
         self.iter().find_map(|e| (e.0 == *cid).then(|| &e.1))
     }
-    fn remove_watch(&mut self, cid: &ClauseId) -> Option<Lit> {
-        for (i, e) in self.iter().enumerate() {
-            if e.0 == *cid {
-                let tmp = e.1;
-                self.swap_remove(i);
-                return Some(tmp);
-            }
+    fn remove_watch(&mut self, cid: &ClauseId) {
+        if let Some(i) = self.iter().position(|e| e.0 == *cid) {
+            self.swap_remove(i);
         }
-        None
     }
     fn insert_watch(&mut self, cid: ClauseId, l: Lit) {
         debug_assert!(self.iter().all(|e| e.0 != cid));
-        self.push((cid, l));
-    }
-    // Note: this is a (the) slow function.
-    // Try to make assure the list doesn't contain it by prooving logically,
-    // then you can skip call this function.
-    fn update_or_insert_watch(&mut self, cid: ClauseId, l: Lit) {
-        for e in self.iter_mut() {
-            if e.0 == cid {
-                e.1 = l;
-                return;
-            }
-        }
         self.push((cid, l));
     }
     fn append_watch(&mut self, mut appendant: Self) {
@@ -131,5 +105,35 @@ impl IndexMut<Lit> for Vec<WatchCache> {
         }
         #[cfg(not(feature = "unsafe_access"))]
         &mut self[usize::from(l)]
+    }
+}
+
+pub type WatchCacheProxy = usize;
+
+pub struct WatchCacheIterator {
+    pub index: usize,
+    end_at: usize,
+}
+
+impl Iterator for WatchCacheIterator {
+    type Item = WatchCacheProxy;
+    fn next(&mut self) -> Option<Self::Item> {
+        (self.index < self.end_at).then(|| self.index)
+    }
+}
+
+impl WatchCacheIterator {
+    pub fn new(len: usize) -> Self {
+        WatchCacheIterator {
+            index: 0,
+            end_at: len,
+        }
+    }
+    pub fn restore_entry(&mut self) {
+        self.index += 1;
+    }
+    pub fn detach_entry(&mut self) {
+        assert!(self.end_at != 0);
+        self.end_at -= 1;
     }
 }

@@ -272,22 +272,36 @@ impl ClauseDBIF for ClauseDB {
     fn bi_clause_map(&self, l: Lit) -> &HashMap<Lit, ClauseId> {
         &self.bi_clause[l]
     }
-    #[inline]
-    fn detach_watch_cache(&mut self, l: Lit) -> WatchCache {
-        let mut empty = WatchCache::new();
-        std::mem::swap(&mut self.watch_cache[l], &mut empty);
-        empty
-    }
-    fn reregister_watch_cache(&mut self, p: Lit, target: Option<(ClauseId, Lit)>) -> bool {
-        if let Some((cid, lit)) = target {
-            self.watch_cache[p].insert_watch(cid, lit);
-            return true;
+
+    // watch_cache_IF
+    fn fetch_watch_cache_entry(&self, lit: Lit, wix: WatchCacheProxy) -> (ClauseId, Lit) {
+        #[cfg(feature = "hashed_watch_cache")]
+        {
+            todo!()
         }
-        false
+        #[cfg(not(feature = "hashed_watch_cache"))]
+        {
+            self.watch_cache[lit][wix]
+        }
     }
+
+    #[inline]
+    fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator {
+        // let mut empty = WatchCache::new();
+        // std::mem::swap(&mut self.watch_cache[l], &mut empty);
+        // empty
+        WatchCacheIterator::new(self.watch_cache[l].len())
+    }
+    fn detach_watch_cache(&mut self, l: Lit, iter: &mut WatchCacheIterator) {
+        self.watch_cache[l].swap_remove(iter.index);
+        iter.detach_entry();
+    }
+    fn reregister_watch_cache(&mut self, _: Lit, _: Option<WatchCacheProxy>) {}
+    fn restore_detached_watch_cache(&mut self, _: Lit, _: WatchCacheIterator) {}
     fn merge_watch_cache(&mut self, p: Lit, wc: WatchCache) {
         self.watch_cache[p].append_watch(wc);
     }
+
     fn swap_watch(&mut self, cid: ClauseId) {
         self[cid].lits.swap(0, 1);
     }
@@ -522,6 +536,24 @@ impl ClauseDBIF for ClauseDB {
             c,
         );
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
+    }
+    //
+    fn transform_by_restoring_watch_cache(
+        &mut self,
+        l: Lit,
+        iter: &mut WatchCacheIterator,
+        op: Option<Lit>,
+    ) {
+        #[cfg(feature = "hashed_watch_cache")]
+        todo!();
+
+        #[cfg(not(feature = "hashed_watch_cache"))]
+        {
+            if let Some(p) = op {
+                self.watch_cache[l][iter.index].1 = p;
+            }
+            iter.restore_entry();
+        }
     }
     // return a Lit if the clause becomes a unit clause.
     fn transform_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause {
