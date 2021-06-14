@@ -908,7 +908,7 @@ impl ClauseDBIF for ClauseDB {
         #[cfg(feature = "maintain_watch_cache")]
         {
             //## Step:3
-            watcher[!c.lits[other]].insert_watch(cid, c.lits[new]);
+            watch_cache[!c.lits[other]].update_watch(cid, c.lits[new]);
         }
 
         c.lits.swap(old, new);

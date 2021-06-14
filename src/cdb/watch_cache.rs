@@ -21,6 +21,7 @@ pub trait WatchCacheIF {
     fn remove_watch(&mut self, cid: &ClauseId);
     fn insert_watch(&mut self, cid: ClauseId, l: Lit);
     fn append_watch(&mut self, appendant: Self);
+    fn update_watch(&mut self, cid: ClauseId, l: Lit);
 }
 
 impl WatchCacheIF for WatchCacheHash {
@@ -37,6 +38,9 @@ impl WatchCacheIF for WatchCacheHash {
         for (k, v) in appendant.iter() {
             self.insert(*k, *v);
         }
+    }
+    fn update_watch(&mut self, _cid: ClauseId, _l: Lit) {
+        unimplemented!();
     }
 }
 
@@ -55,6 +59,14 @@ impl WatchCacheIF for WatchCacheList {
     }
     fn append_watch(&mut self, mut appendant: Self) {
         self.append(&mut appendant);
+    }
+    fn update_watch(&mut self, cid: ClauseId, l: Lit) {
+        for e in self.iter_mut() {
+            if e.0 == cid {
+                e.1 = l;
+                break;
+            }
+        }
     }
 }
 
