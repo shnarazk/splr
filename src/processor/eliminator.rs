@@ -622,35 +622,6 @@ impl Eliminator {
         }
         Ok(())
     }
-    /// delete satisfied clauses at decision level zero.
-    pub fn eliminate_satisfied_clauses<A, C>(
-        &mut self,
-        asg: &mut A,
-        cdb: &mut C,
-        update_occur: bool,
-    ) where
-        A: AssignIF,
-        C: ClauseDBIF,
-    {
-        debug_assert_eq!(asg.decision_level(), 0);
-        self.num_sat_elimination += 1;
-        for ci in 1..cdb.len() {
-            let cid = ClauseId::from(ci);
-            if !cdb[cid].is_dead() && cdb[cid].is_satisfied_under(asg) {
-                if self.is_running() {
-                    let c = &mut cdb[cid];
-                    if update_occur {
-                        self.remove_cid_occur(asg, cid, c);
-                    }
-                    for l in c.iter() {
-                        self.enqueue_var(asg, l.vi(), true);
-                    }
-                }
-                // cdb.watches(cid, "eliminator645");
-                cdb.remove_clause(cid);
-            }
-        }
-    }
     /// remove a clause id from literal's occur list.
     pub fn remove_lit_occur<A>(&mut self, asg: &mut A, l: Lit, cid: ClauseId)
     where

@@ -416,12 +416,7 @@ fn conflict_analyze(
                     path_cnt,
                     dl,
                     asg.dump(&*learnt),
-                    asg.dump(
-                        &cdb[conflicting_clause]
-                            .iter()
-                            .map(|l| *l)
-                            .collect::<Vec<_>>()
-                    ),
+                    asg.dump(&cdb[conflicting_clause].iter().copied().collect::<Vec<_>>()),
                 );
             }
 
