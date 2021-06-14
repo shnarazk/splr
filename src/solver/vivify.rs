@@ -295,6 +295,8 @@ impl AssignStack {
                 learnt.push(!*l);
             }
             match self.reason(l.vi()) {
+                AssignReason::Asserted(_) => (),
+                AssignReason::Decision(_) => (),
                 AssignReason::Implication(_, bil) if bil != NULL_LIT => {
                     seen[bil.vi()] = key;
                 }
@@ -303,7 +305,7 @@ impl AssignStack {
                         seen[r.vi()] = key;
                     }
                 }
-                _ => (),
+                AssignReason::None => panic!("impossible"),
             }
         }
         // cnfs/unsat.cnf can panic at

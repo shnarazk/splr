@@ -430,7 +430,7 @@ fn analyze_final(asg: &mut AssignStack, state: &mut State, c: &Clause) {
     for l in asg.stack_range(0..asg.len_upto(asg.root_level)) {
         let vi = l.vi();
         if seen[vi] {
-            if asg.reason(vi) == AssignReason::default() {
+            if let AssignReason::Decision(_) = asg.reason(vi) {
                 state.conflicts.push(!*l);
             } else {
                 let level = asg.level_ref();

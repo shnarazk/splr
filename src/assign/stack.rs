@@ -87,7 +87,7 @@ impl Instantiate for AssignStack {
         AssignStack {
             assign: vec![None; 1 + nv],
             level: vec![DecisionLevel::default(); nv + 1],
-            reason: vec![AssignReason::default(); nv + 1],
+            reason: vec![AssignReason::None; nv + 1],
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
 
@@ -122,7 +122,7 @@ impl Instantiate for AssignStack {
             SolverEvent::NewVar => {
                 self.assign.push(None);
                 self.level.push(DecisionLevel::default());
-                self.reason.push(AssignReason::default());
+                self.reason.push(AssignReason::None);
                 self.expand_heap();
                 self.num_vars += 1;
                 self.var.push(Var::from(self.num_vars));

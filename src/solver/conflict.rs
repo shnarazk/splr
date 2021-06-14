@@ -287,6 +287,22 @@ fn conflict_analyze(
     let mut ti = asg.stack_len() - 1; // trail index
     loop {
         match reason {
+            AssignReason::Asserted(_) => {
+                #[cfg(feature = "boundary_check")]
+                panic!(
+                    "conflict_analyze: faced an asserted var. path_cnt {} at level {}",
+                    path_cnt,
+                    asg.level(p.vi()),
+                );
+            }
+            AssignReason::Decision(_) => {
+                #[cfg(feature = "boundary_check")]
+                panic!(
+                    "conflict_analyze: faced a decision var. path_cnt {} at level {}",
+                    path_cnt,
+                    asg.level(p.vi()),
+                );
+            }
             AssignReason::Implication(_, l) if l != NULL_LIT => {
                 // cid = asg.reason(p.vi());
                 let vi = l.vi();
@@ -374,7 +390,7 @@ fn conflict_analyze(
             AssignReason::None => {
                 #[cfg(feature = "boundary_check")]
                 panic!(
-                    "conflict_analyze: faced AssignReason::None. path_cnt {} at level {}",
+                    "conflict_analyze: faced an unassigned var. path_cnt {} at level {}",
                     path_cnt,
                     asg.level(p.vi()),
                 );
@@ -502,19 +518,23 @@ impl Lit {
         clear: &mut Vec<Lit>,
         levels: &[bool],
     ) -> bool {
-        if asg.reason(self.vi()) == AssignReason::default() {
+        if let AssignReason::Decision(_) = asg.reason(self.vi()) {
             return false;
         }
         let mut stack = vec![self];
         let top = clear.len();
         while let Some(sl) = stack.pop() {
             match asg.reason(sl.vi()) {
-                AssignReason::None => panic!("no idea"),
+                AssignReason::Asserted(_) => panic!("no idea"),
+                AssignReason::Decision(_) => panic!("no idea"),
                 AssignReason::Implication(_, l) if l != NULL_LIT => {
                     let vi = l.vi();
                     let lv = asg.level(vi);
                     if 0 < lv && !asg.var(vi).is(Flag::CA_SEEN) {
-                        if asg.reason(vi) != AssignReason::default() && levels[lv as usize] {
+                        // if asg.reason(vi) != AssignReason::Decision(_) && levels[lv as usize] {
+                        if matches!(asg.reason(vi), AssignReason::Implication(_, _))
+                            && levels[lv as usize]
+                        {
                             asg.var_mut(vi).turn_on(Flag::CA_SEEN);
                             stack.push(l);
                             clear.push(l);
@@ -538,7 +558,10 @@ impl Lit {
                         let vi = q.vi();
                         let lv = asg.level(vi);
                         if 0 < lv && !asg.var(vi).is(Flag::CA_SEEN) {
-                            if asg.reason(vi) != AssignReason::default() && levels[lv as usize] {
+                            // if asg.reason(vi) != AssignReason::default() && levels[lv as usize] {
+                            if matches!(asg.reason(vi), AssignReason::Implication(_, _))
+                                && levels[lv as usize]
+                            {
                                 asg.var_mut(vi).turn_on(Flag::CA_SEEN);
                                 stack.push(*q);
                                 clear.push(*q);
@@ -553,6 +576,7 @@ impl Lit {
                         }
                     }
                 }
+                AssignReason::None => panic!("no idea"),
             }
         }
         true

@@ -76,18 +76,24 @@ pub trait AssignIF:
 /// Reasons of assignments, two kinds
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum AssignReason {
-    /// One of not assigned, assigned by decision, or asserted.
-    None,
+    /// asserted
+    Asserted(usize),
+    /// Assigned by decision
+    Decision(DecisionLevel),
     /// Assigned by a clause. If it is binary, the reason literal is stored in the 2nd.
     Implication(ClauseId, Lit),
+    /// One of not assigned, assigned by decision, or asserted.
+    None,
 }
 
 impl fmt::Display for AssignReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            AssignReason::None => write!(f, "Decision|NoAssign"),
+            AssignReason::Asserted(t) => write!(f, "Asserted at {}", t),
+            AssignReason::Decision(lvl) => write!(f, "Decided at level {}", lvl),
             AssignReason::Implication(cid, NULL_LIT) => write!(f, "Implicated by {}", cid),
             AssignReason::Implication(cid, _) => write!(f, "Implicated by B{}", cid),
+            AssignReason::None => write!(f, "Not assigned"),
         }
     }
 }

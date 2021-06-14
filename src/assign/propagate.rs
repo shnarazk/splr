@@ -116,7 +116,7 @@ impl PropagateIF for AssignStack {
         match var_assign!(self, vi) {
             None => {
                 set_assign!(self, l);
-                self.reason[vi] = AssignReason::None;
+                self.reason[vi] = AssignReason::Asserted(self.num_conflict);
                 debug_assert!(!self.trail.contains(&!l));
                 self.trail.push(l);
                 self.make_var_asserted(vi);
@@ -170,7 +170,7 @@ impl PropagateIF for AssignStack {
         let v = &mut self.var[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
         set_assign!(self, l);
-        self.reason[vi] = AssignReason::default();
+        self.reason[vi] = AssignReason::Decision(self.decision_level());
         self.reward_at_assign(vi);
         self.trail.push(l);
         self.num_decision += 1;
@@ -220,7 +220,7 @@ impl PropagateIF for AssignStack {
             v.turn_off(Flag::PROPAGATED);
             v.set(Flag::PHASE, var_assign!(self, vi).unwrap());
             unset_assign!(self, vi);
-            self.reason[vi] = AssignReason::default();
+            self.reason[vi] = AssignReason::None;
             self.reward_at_unassign(vi);
             self.insert_heap(vi);
         }
@@ -258,7 +258,7 @@ impl PropagateIF for AssignStack {
             let v = &mut self.var[vi];
             v.set(Flag::PHASE, var_assign!(self, vi).unwrap());
             unset_assign!(self, vi);
-            self.reason[vi] = AssignReason::default();
+            self.reason[vi] = AssignReason::None;
             self.insert_heap(vi);
         }
         self.trail.truncate(lim);
@@ -613,7 +613,7 @@ impl AssignStack {
                     .all(|l| !self.var[l.vi()].is(Flag::ELIMINATED)));
                 match cdb.transform_by_simplification(self, cid) {
                     RefClause::Clause(_) => (),
-                    RefClause::Dead => (),
+                    RefClause::Dead => (), // was a satisfied clause
                     RefClause::EmptyClause => return Some(cid),
                     RefClause::RegisteredClause(_) => (),
                     RefClause::UnitClause(lit) => {
