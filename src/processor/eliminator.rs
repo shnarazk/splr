@@ -294,7 +294,10 @@ impl EliminateIF for Eliminator {
         {
             for v in asg.var_iter().skip(1) {
                 if asg.reason(v.index) != AssignReason::None {
-                    assert_eq!(asg.level(v.index), asg.root_level);
+                    assert_eq!(
+                        asg.level(v.index),
+                        asg.derefer(assign::property::Tusize::RootLevel) as DecisionLevel
+                    );
                     // asg.reason(v.index) = AssignReason::None;
                 }
             }

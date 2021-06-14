@@ -124,7 +124,7 @@ where
         if cdb[*cid].is_dead() {
             continue;
         }
-        debug_assert!(!asg.locked(&cdb[*cid], *cid));
+        assert!(!asg.locked(cdb[*cid].lit0(), *cid));
         #[cfg(feature = "incremental_solver")]
         {
             if !cdb[*cid].is(Flag::LEARNT) {
@@ -138,7 +138,7 @@ where
         if cdb[*cid].is_dead() {
             continue;
         }
-        debug_assert!(!asg.locked(&cdb[*cid], *cid));
+        assert!(!asg.locked(cdb[*cid].lit0(), *cid));
         #[cfg(feature = "incremental_solver")]
         {
             if !cdb[*cid].is(Flag::LEARNT) {

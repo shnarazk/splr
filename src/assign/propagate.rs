@@ -292,7 +292,7 @@ impl PropagateIF for AssignStack {
             //
             let bi_clause = cdb.bi_clause_map(*p);
             for (&blocker, &cid) in bi_clause.iter() {
-                debug_assert!(!cdb[cid].is_dead());
+                assert!(!cdb[cid].is_dead());
                 assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
                 #[cfg(feature = "boundary_check")]
@@ -306,6 +306,7 @@ impl PropagateIF for AssignStack {
                         return Some(cid);
                     }
                     None => {
+                        assert!(!cdb[cid].is_dead());
                         self.assign_by_implication(
                             blocker,
                             AssignReason::Implication(cid, false_lit),
@@ -332,12 +333,18 @@ impl PropagateIF for AssignStack {
                         .map(|index| cdb.fetch_watch_cache_entry(sweeping, index))
                 }
             } {
+                assert!(
+                    !cdb[cid].is_dead(),
+                    "dead clause in propagation: {:?}",
+                    cdb.is_garbage_collected(cid),
+                );
+                assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));
                 // FIXME: assert!(!self.var[wc.1.vi()].is(Flag::ELIMINATED));
                 // assert_ne!(other_watch.vi(), false_lit.vi());
                 // assert!(other_watch == cdb[cid].lit0() || other_watch == cdb[cid].lit1());
                 let mut other_watch_value = lit_assign!(self, cached);
                 if let Some(true) = other_watch_value {
-                    debug_assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));
+                    assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));
                     // In this path, we use only `AssignStack::assign`.
                     // assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
                     cdb.transform_by_restoring_watch_cache(sweeping, &mut source, None);
@@ -454,7 +461,7 @@ impl PropagateIF for AssignStack {
             //
             let bi_clause = cdb.bi_clause_map(*p);
             for (&blocker, &cid) in bi_clause.iter() {
-                debug_assert!(!cdb[cid].is_dead());
+                assert!(!cdb[cid].is_dead());
                 debug_assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
                 #[cfg(feature = "boundary_check")]
@@ -495,9 +502,10 @@ impl PropagateIF for AssignStack {
                     source.restore_entry();
                     continue;
                 }
+                assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));
                 let mut other_watch_value = lit_assign!(self, cached);
                 if let Some(true) = other_watch_value {
-                    debug_assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));
+                    assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));
                     cdb.transform_by_restoring_watch_cache(sweeping, &mut source, None);
                     continue 'next_clause;
                 }
@@ -558,6 +566,7 @@ impl PropagateIF for AssignStack {
                     .map(|l| self.level[l.vi()])
                     .max()
                     .unwrap_or(self.root_level);
+                assert!(!cdb[cid].is_dead());
                 self.assign_by_implication(cached, AssignReason::Implication(cid, NULL_LIT), lv);
             }
         }
@@ -612,6 +621,7 @@ impl AssignStack {
                         if self.assign_at_root_level(lit).is_err() {
                             return Some(cid);
                         } else {
+                            assert!(!self.locked(lit, cid));
                             cdb.remove_clause(cid);
                         }
                     }

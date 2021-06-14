@@ -48,6 +48,7 @@ pub fn handle_conflict(
     if use_chronobt {
         let level = asg.level_ref();
         let c = &mut cdb[ci];
+        assert!(!c.is_dead());
         let lit_count = c.iter().filter(|l| level[l.vi()] == original_dl).count();
         if 1 == lit_count {
             debug_assert!(c.iter().any(|l| level[l.vi()] == original_dl));
@@ -223,6 +224,7 @@ pub fn handle_conflict(
         let cid = new_clause.as_cid();
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);
+        assert!(!cdb[cid].is_dead());
         asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), al);
         let lbd = cdb[cid].rank;
         rst.update(ProgressUpdate::LBD(lbd));
@@ -317,6 +319,7 @@ fn conflict_analyze(
                 }
                 cdb.lbd_of_dp_ema.update(cdb[cid].rank as f64);
                 let c = &cdb[cid];
+                assert!(!c.is_dead());
 
                 #[cfg(feature = "boundary_check")]
                 if c.len() == 0 {
@@ -370,7 +373,11 @@ fn conflict_analyze(
             }
             AssignReason::None => {
                 #[cfg(feature = "boundary_check")]
-                panic!("conflict_analyze: faced AssignReason::None.");
+                panic!(
+                    "conflict_analyze: faced AssignReason::None. path_cnt {} at level {}",
+                    path_cnt,
+                    asg.level(p.vi()),
+                );
             }
         }
         // The following case was subsumed into `search`.

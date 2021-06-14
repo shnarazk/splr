@@ -568,7 +568,7 @@ impl ClauseDBIF for ClauseDB {
         //
 
         // self.watches(cid, "before strengthen_by_elimination");
-        debug_assert!(!self[cid].is_dead());
+        assert!(!self[cid].is_dead());
         debug_assert!(1 < self[cid].len());
         let ClauseDB {
             ref mut clause,
@@ -660,7 +660,7 @@ impl ClauseDBIF for ClauseDB {
         // 2. a normal clause becomes a new bi-clause.             [Case:2]
         // 3. a normal clause becomes a shorter normal clause.     [Case:3]
         //
-        debug_assert!(!self[cid].is_dead());
+        assert!(!self[cid].is_dead());
         let ClauseDB {
             clause,
             bi_clause,
@@ -754,7 +754,7 @@ impl ClauseDBIF for ClauseDB {
         // 5. a normal clause becomes a new bi-clause.             [Case:3-2]
         // 5. a normal clause becomes a shorter normal clause.     [Case:3-3]
         //
-        debug_assert!(!self[cid].is_dead());
+        assert!(!self[cid].is_dead());
         // firstly sweep without consuming extra memory
         let mut need_to_shrink = false;
         for l in self[cid].iter() {
@@ -886,6 +886,7 @@ impl ClauseDBIF for ClauseDB {
         // 2. insert a new watch                  [Step:2]
         // 3. update a blocker cach e             [Step:3]
 
+        assert!(!self[cid].is_dead());
         debug_assert!(old < 2);
         debug_assert!(1 < new);
         let ClauseDB {
