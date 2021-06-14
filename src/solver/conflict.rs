@@ -359,8 +359,13 @@ fn conflict_analyze(
                         if root_level == lvl {
                             continue;
                         }
-                        debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
-                        debug_assert!(asg.assign(vi).is_some());
+                        assert!(!asg.var(vi).is(Flag::ELIMINATED));
+                        assert!(
+                            asg.assign(vi).is_some(),
+                            "conflict_analysis found {} {}",
+                            asg.var(vi),
+                            asg.reason(vi),
+                        );
                         asg.var_mut(vi).turn_on(Flag::CA_SEEN);
                         if dl <= lvl {
                             // println!("- flag for {} which level is {}", q.int(), lvl);
@@ -427,7 +432,7 @@ fn conflict_analyze(
             #[cfg(feature = "boundary_check")]
             if 0 == ti {
                 panic!(
-                    "p:{}, path_cnt:{}, lv:{}, learnt:{:?}\nconflict:{:?}",
+                    "conflict_analysis broke the bottom:: lit {}, path_cnt {}, lv {}, learnt {:?}\n{:?}",
                     p,
                     path_cnt,
                     dl,

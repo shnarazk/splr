@@ -91,8 +91,8 @@ impl fmt::Display for AssignReason {
         match self {
             AssignReason::Asserted(t) => write!(f, "Asserted at {}", t),
             AssignReason::Decision(lvl) => write!(f, "Decided at level {}", lvl),
-            AssignReason::Implication(cid, NULL_LIT) => write!(f, "Implicated by {}", cid),
-            AssignReason::Implication(cid, _) => write!(f, "Implicated by B{}", cid),
+            AssignReason::Implication(cid, NULL_LIT) => write!(f, "Implied by {}", cid),
+            AssignReason::Implication(cid, _) => write!(f, "Implied by B{}", cid),
             AssignReason::None => write!(f, "Not assigned"),
         }
     }

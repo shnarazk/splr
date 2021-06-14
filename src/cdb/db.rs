@@ -887,8 +887,8 @@ impl ClauseDBIF for ClauseDB {
         // 3. update a blocker cach e             [Step:3]
 
         assert!(!self[cid].is_dead());
-        debug_assert!(old < 2);
-        debug_assert!(1 < new);
+        assert!(old < 2);
+        assert!(1 < new);
         let ClauseDB {
             ref mut clause,
             ref mut watch_cache,
