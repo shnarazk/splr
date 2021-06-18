@@ -77,6 +77,14 @@ pub fn handle_conflict(
                     .all(|l| *l != decision || asg.assigned(*l).is_none()));
                 let l0 = c.lit0();
                 let l1 = c.lit1();
+                assert_ne!(
+                    2,
+                    c.len(),
+                    "biclause:{} has different levels {}-{}",
+                    cdb[ci],
+                    asg.level(cdb[ci].lit0().vi()),
+                    asg.level(cdb[ci].lit1().vi()),
+                );
                 if c.len() == 2 {
                     if decision == l0 {
                         asg.assign_by_implication(

@@ -903,6 +903,7 @@ impl ClauseDBIF for ClauseDB {
             debug_assert!(watch_cache[!c.lits[old]].get_watch(&cid).is_none());
         }
         //## Step:2
+        assert!(watch_cache[!c.lits[new]].iter().all(|e| e.0 != cid));
         watch_cache[!c.lits[new]].insert_watch(cid, c.lits[other]);
 
         #[cfg(feature = "maintain_watch_cache")]

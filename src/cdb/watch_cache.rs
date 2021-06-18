@@ -54,7 +54,7 @@ impl WatchCacheIF for WatchCacheList {
         }
     }
     fn insert_watch(&mut self, cid: ClauseId, l: Lit) {
-        debug_assert!(self.iter().all(|e| e.0 != cid));
+        assert!(self.iter().all(|e| e.0 != cid));
         self.push((cid, l));
     }
     fn append_watch(&mut self, mut appendant: Self) {

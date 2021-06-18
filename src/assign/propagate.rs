@@ -344,7 +344,7 @@ impl PropagateIF for AssignStack {
                 // assert!(other_watch == cdb[cid].lit0() || other_watch == cdb[cid].lit1());
                 let mut other_watch_value = lit_assign!(self, cached);
                 if let Some(true) = other_watch_value {
-                    assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));
+                    debug_assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));
                     // In this path, we use only `AssignStack::assign`.
                     // assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
                     cdb.transform_by_restoring_watch_cache(sweeping, &mut source, None);

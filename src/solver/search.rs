@@ -357,12 +357,13 @@ fn search(
 fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
     if let Some(cid) = cdb.validate(asg.assign_ref(), all) {
         println!("{}", message);
-        println!("| trail pos | level |   literal  |  assignment  |                  reason  |");
+        println!("| on trail |   time | level |   literal  |  assignment |              reason |");
         let l0 = i32::from(cdb[cid].lit0());
         let l1 = i32::from(cdb[cid].lit1());
-        for (t, lv, lit, reason, assign) in asg.dump(&cdb[cid]).iter() {
+        for (p, t, lv, lit, reason, assign) in asg.dump(&cdb[cid]).iter() {
             println!(
-                "|{:>10} |{:>6} | {:9}{} | {:12} | {:24} |",
+                "|{:>9} | {:>6} |{:>6} | {:9}{} | {:11} |{:20} |",
+                p,
                 t,
                 lv,
                 lit,
@@ -381,8 +382,10 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
         }
         println!("clause detail: {}", &cdb[cid]);
         let (c0, c1) = cdb.watch_caches(cid, "check (search 441)");
-        println!("watch{} has blocker cache {}", cdb[cid].lit0(), c0);
-        println!("watch{} has blocker cache {}", cdb[cid].lit1(), c1);
+        println!(" - watch {} has watch cache {:?}", cdb[cid].lit0(), c0);
+        println!(" - watch {} has watch cache {:?}", cdb[cid].lit1(), c1);
+        println!(" which was born at {}", cdb[cid].birth);
+        println!(" which was used at {}", cdb[cid].timestamp());
         panic!(
             "Before extending, NC {}, Level {} generated assignment({:?}) falsifies by {}",
             asg.derefer(assign::property::Tusize::NumConflict),
