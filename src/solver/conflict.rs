@@ -77,14 +77,6 @@ pub fn handle_conflict(
                     .all(|l| *l != decision || asg.assigned(*l).is_none()));
                 let l0 = c.lit0();
                 let l1 = c.lit1();
-                assert_ne!(
-                    2,
-                    c.len(),
-                    "biclause:{} has different levels {}-{}",
-                    cdb[ci],
-                    asg.level(cdb[ci].lit0().vi()),
-                    asg.level(cdb[ci].lit1().vi()),
-                );
                 if c.len() == 2 {
                     if decision == l0 {
                         asg.assign_by_implication(
@@ -186,10 +178,21 @@ pub fn handle_conflict(
         //## A NEW ASSERTION by UNIT LEARNT CLAUSE GENERATION
         //
         // dump to certified even if it's a literal.
-        cdb.certificate_add_assertion(new_learnt[0]);
-        if asg.assign_at_root_level(l0).is_err() {
-            state.log(asg.num_conflict, "RootLevelConflict by conflict analyzer");
-            return Err(SolverError::RootLevelConflict(None));
+        let l0 = new_learnt[0];
+        match asg.assigned(l0) {
+            Some(true) if asg.root_level < asg.level(l0.vi()) => {
+                panic!("eae");
+                // asg.lift_to_asserted(l0.vi());
+            }
+            Some(false) if asg.level(l0.vi()) == asg.root_level => {
+                return Err(SolverError::RootLevelConflict(None))
+            }
+            _ => {
+                cdb.certificate_add_assertion(l0);
+                if asg.assign_at_root_level(l0).is_err() {
+                    panic!("impossible inconsistency");
+                }
+            }
         }
         elim.to_simplify += (state.config.c_ip_int / 2) as f64;
         rst.handle(SolverEvent::Assert(l0.vi()))
