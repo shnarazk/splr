@@ -388,8 +388,8 @@ impl ClauseDBIF for ClauseDB {
         if len2 {
             // assert_eq!(c.lits.len(), 2);
             *num_bi_clause += 1;
-            bi_clause[!l0].insert(l1, cid);
-            bi_clause[!l1].insert(l0, cid);
+            bi_clause[l0].insert(l1, cid);
+            bi_clause[l1].insert(l0, cid);
         } else {
             // assert!(2 < c.lits.len());
             watch_cache[!l0].insert_watch(cid, l1);
@@ -461,8 +461,8 @@ impl ClauseDBIF for ClauseDB {
         let l0 = c.lits[0];
         let l1 = c.lits[1];
         if len2 {
-            bi_clause[!l0].insert(l1, cid);
-            bi_clause[!l1].insert(l0, cid);
+            bi_clause[l0].insert(l1, cid);
+            bi_clause[l1].insert(l0, cid);
         } else {
             watch_cache[!l0].insert_watch(cid, l1);
             watch_cache[!l1].insert_watch(cid, l0);
@@ -476,8 +476,8 @@ impl ClauseDBIF for ClauseDB {
         let l0 = c.lit0();
         let l1 = c.lit1();
         if c.len() == 2 {
-            self.bi_clause[!l0].remove(&l1);
-            self.bi_clause[!l1].remove(&l0);
+            self.bi_clause[l0].remove(&l1);
+            self.bi_clause[l1].remove(&l0);
         } else {
             self.watch_cache[!l0].remove_watch(&cid);
             self.watch_cache[!l1].remove_watch(&cid);
@@ -488,8 +488,8 @@ impl ClauseDBIF for ClauseDB {
     fn reattach_clause(&mut self, cid: ClauseId, (l0, l1): (Lit, Lit)) {
         let c = &self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         if c.len() == 2 {
-            self.bi_clause[!l0].insert(l1, cid);
-            self.bi_clause[!l1].insert(l0, cid);
+            self.bi_clause[l0].insert(l1, cid);
+            self.bi_clause[l1].insert(l0, cid);
         } else {
             self.watch_cache[!l0].insert_watch(cid, l1);
             self.watch_cache[!l1].insert_watch(cid, l0);
@@ -601,7 +601,7 @@ impl ClauseDBIF for ClauseDB {
             .copied()
             .collect::<Vec<Lit>>();
         if new_lits.len() == 2 {
-            if let Some(reg) = bi_clause[!new_lits[0]].get(&new_lits[1]) {
+            if let Some(reg) = bi_clause[new_lits[0]].get(&new_lits[1]) {
                 //
                 //## Case:3-0
                 //
@@ -615,8 +615,8 @@ impl ClauseDBIF for ClauseDB {
             std::mem::swap(lits, &mut new_lits);
             watch_cache[!l0].remove_watch(&cid);
             watch_cache[!l1].remove_watch(&cid);
-            bi_clause[!lits[0]].insert(lits[1], cid);
-            bi_clause[!lits[1]].insert(lits[0], cid);
+            bi_clause[lits[0]].insert(lits[1], cid);
+            bi_clause[lits[1]].insert(lits[0], cid);
             *num_bi_clause += 1;
             if certification_store.is_active() {
                 certification_store.push_add(&c.lits);
@@ -691,8 +691,8 @@ impl ClauseDBIF for ClauseDB {
             let l1 = c.lit0();
             watch_cache[!old_l0].remove_watch(&cid);
             watch_cache[!old_l1].remove_watch(&cid);
-            bi_clause[!l0].insert(l1, cid);
-            bi_clause[!l1].insert(l0, cid);
+            bi_clause[l0].insert(l1, cid);
+            bi_clause[l1].insert(l0, cid);
 
             if certification_store.is_active() {
                 certification_store.push_add(&new_lits);
@@ -801,7 +801,7 @@ impl ClauseDBIF for ClauseDB {
                 let l0 = new_lits[0];
                 let l1 = new_lits[1];
                 debug_assert!(2 < c.lits.len());
-                if let Some(r) = bi_clause[!l0].get(&l1) {
+                if let Some(r) = bi_clause[l0].get(&l1) {
                     let bid = *r;
                     //
                     //## Case:3-0
@@ -814,8 +814,8 @@ impl ClauseDBIF for ClauseDB {
                 //
                 watch_cache[!c.lits[0]].remove_watch(&cid);
                 watch_cache[!c.lits[1]].remove_watch(&cid);
-                bi_clause[!l0].insert(l1, cid);
-                bi_clause[!l1].insert(l0, cid);
+                bi_clause[l0].insert(l1, cid);
+                bi_clause[l1].insert(l0, cid);
                 std::mem::swap(&mut c.lits, &mut new_lits);
                 self.num_bi_clause += 1;
                 c.turn_off(Flag::LEARNT);
@@ -1045,7 +1045,7 @@ impl ClauseDBIF for ClauseDB {
         }
         let l0 = vec[0];
         let mut num_sat = 0;
-        for (_, &cid) in self.bi_clause[!l0].iter() {
+        for (_, &cid) in self.bi_clause[l0].iter() {
             let c = &self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
             debug_assert!(c[0] == l0 || c[1] == l0);
             let other = c[(c[0] == l0) as usize];
@@ -1068,25 +1068,23 @@ impl ClauseDBIF for ClauseDB {
                 .clone(),
         );
     }
-    fn watch_caches(&self, cid: ClauseId, mes: &str) -> (Lit, Lit) {
+    fn watch_caches(&self, cid: ClauseId, mes: &str) -> (Vec<Lit>, Vec<Lit>) {
         // let mut _found = None;
         debug_assert!(!cid.is_lifted_lit());
         let c = &self[cid];
         debug_assert!(1 < c.len());
         let l0 = c.lits[0];
         let l1 = c.lits[1];
-        let l0_blocker: Option<Lit>;
-        let l1_blocker: Option<Lit>;
         if 2 == c.lits.len() {
             assert!(
-                self.bi_clause[!l0].contains_key(&l1),
+                self.bi_clause[l0].contains_key(&l1),
                 "(watch_cache health check: binary clause l0 not found){}, cid{}{:?}",
                 mes,
                 cid,
                 c
             );
             assert!(
-                self.bi_clause[!l1].contains_key(&l0),
+                self.bi_clause[l1].contains_key(&l0),
                 "(watch_cache health check: binary clause l1 not found){}, cid{}{:?}",
                 mes,
                 cid,
@@ -1106,8 +1104,7 @@ impl ClauseDBIF for ClauseDB {
                 cid,
                 c
             );
-            l0_blocker = Some(l1);
-            l1_blocker = Some(l0);
+            (vec![l1], vec![l0])
         } else {
             assert!(
                 self.watch_cache[!l0].iter().any(|wc| wc.0 == cid),
@@ -1124,26 +1121,32 @@ impl ClauseDBIF for ClauseDB {
                 c
             );
             assert!(
-                self.bi_clause[!l0].iter().all(|(_, c)| *c != cid),
+                self.bi_clause[l0].iter().all(|(_, c)| *c != cid),
                 "(watch_cache health check: clause l0 found in binary_map){}, cid{}{:?}",
                 mes,
                 cid,
                 c
             );
             assert!(
-                self.bi_clause[!l1].iter().all(|(_, c)| *c != cid),
+                self.bi_clause[l1].iter().all(|(_, c)| *c != cid),
                 "(watch_cache health check: clause l1 found in binary_map){}, cid{}{:?}",
                 mes,
                 cid,
                 c
             );
-            l0_blocker = self.watch_cache[!l0].get_watch(&cid).copied();
-            l1_blocker = self.watch_cache[!l1].get_watch(&cid).copied();
+            (
+                self.watch_cache[!l0]
+                    .iter()
+                    .filter(|w| w.0 == cid)
+                    .map(|w| w.1)
+                    .collect(),
+                self.watch_cache[!l1]
+                    .iter()
+                    .filter(|w| w.0 == cid)
+                    .map(|w| w.1)
+                    .collect(),
+            )
         }
-        (
-            l0_blocker.map_or(Lit::default(), |b| b),
-            l1_blocker.map_or(Lit::default(), |b| b),
-        )
     }
     fn complete_bi_clauses<A>(&mut self, asg: &mut A)
     where
@@ -1158,18 +1161,18 @@ impl ClauseDBIF for ClauseDB {
 impl ClauseDB {
     /// formula: -a => b and b => c implies -a => c
     /// clause: [a, b] and [-b, c] deduces [a, c]
-    /// map: [!a].get(b), [b].get(c), [!a].get(c)
-    /// rename: [!lit].get(other), [other].get(third), [!a].get(third)
+    /// map: [a].get(b), [!b].get(c), [a].get(c)
+    /// rename: [lit].get(other), [!other].get(third), [a].get(third)
     fn complete_bi_clauses_with<A>(&mut self, asg: &mut A, lit: Lit)
     where
         A: AssignIF,
     {
         let mut vec: Vec<Vec<Lit>> = Vec::new();
         // [lit, other]
-        for other in self.bi_clause[!lit].keys() {
+        for other in self.bi_clause[lit].keys() {
             // [!other, third]
-            for third in self.bi_clause[*other].keys() {
-                if lit.vi() != third.vi() && !self.bi_clause[!lit].contains_key(&third) {
+            for third in self.bi_clause[!*other].keys() {
+                if lit.vi() != third.vi() && !self.bi_clause[lit].contains_key(&third) {
                     // the new [lit, third] should be added.
                     vec.push(vec![lit, *third]);
                 }
@@ -1205,10 +1208,10 @@ impl ClauseDB {
     ///
     /// this is equivalent to the following:
     ///```ignore
-    /// bi_clause[!l0].get(&l1).is_some()
+    /// bi_clause[l0].get(&l1).is_some()
     ///```
     fn has_bi_clause(&self, l0: Lit, l1: Lit) -> Option<ClauseId> {
-        self.bi_clause[!l0].get(&l1).copied()
+        self.bi_clause[l0].get(&l1).copied()
     }
     /// halve the number of 'learnt' or *removable* clauses.
     fn reduce_db<A>(&mut self, asg: &mut A, nc: usize)
@@ -1294,8 +1297,8 @@ impl ClauseDB {
                     let l0 = c.lits[0];
                     let l1 = c.lits[1];
                     if c.len() == 2 {
-                        self.bi_clause[!l0].remove(&l1);
-                        self.bi_clause[!l1].remove(&l0);
+                        self.bi_clause[l0].remove(&l1);
+                        self.bi_clause[l1].remove(&l0);
                         self.num_bi_clause -= 1;
                     } else {
                         self.watcher[!l0].remove(&cid);
@@ -1326,8 +1329,8 @@ fn remove_clause_fn(
     let l0 = c.lits[0];
     let l1 = c.lits[1];
     if c.len() == 2 {
-        bi_clause[usize::from(!l0)].remove(&l1); // .expect("db1072");
-        bi_clause[usize::from(!l1)].remove(&l0); // .expect("db1073");
+        bi_clause[usize::from(l0)].remove(&l1); // .expect("db1072");
+        bi_clause[usize::from(l1)].remove(&l0); // .expect("db1073");
         *num_bi_clause -= 1;
     } else {
         watcher[usize::from(!l0)].remove_watch(&cid); // .expect("db1076");
