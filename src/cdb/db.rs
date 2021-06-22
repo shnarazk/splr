@@ -552,8 +552,9 @@ impl ClauseDBIF for ClauseDB {
             if let Some(p) = op {
                 self.watch_cache[l][iter.index].1 = p;
             }
-            iter.restore_entry();
         }
+
+        iter.restore_entry();
     }
     // return a Lit if the clause becomes a unit clause.
     fn transform_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause {
