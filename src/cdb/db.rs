@@ -672,7 +672,7 @@ impl ClauseDBIF for ClauseDB {
         let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         debug_assert!(new_lits.len() < c.len());
         if new_lits.len() == 2 {
-            if let Some(bc) = bi_clause[!new_lits[0]].get(&new_lits[1]) {
+            if let Some(bc) = bi_clause[new_lits[0]].get(&new_lits[1]) {
                 let did = *bc;
                 //
                 //## Case:0
