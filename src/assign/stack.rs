@@ -13,12 +13,6 @@ use std::{
     io::{BufWriter, Write},
 };
 
-impl Default for AssignReason {
-    fn default() -> AssignReason {
-        AssignReason::None
-    }
-}
-
 impl Default for AssignStack {
     fn default() -> AssignStack {
         AssignStack {
