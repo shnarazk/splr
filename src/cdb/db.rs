@@ -633,14 +633,39 @@ impl ClauseDBIF for ClauseDB {
             //
             //## Case:3-3
             //
-            if p == old_l0 || p == old_l1 {
+
+            // Here we assumed that there's no eliminated var in clause and *watch cache*.
+            // Fortunately the current implementation purges all eliminated vars fully.
+            if p == old_l0 {
                 watch_cache[!p].remove_watch(&cid);
-                watch_cache[!l1].insert_watch(cid, l0);
-                // Here we assumed that there's no eliminated var in clause and *watch cache*.
-                // Fortunately the current implementation purges all eliminated vars completely.
+                if old_l1 == l0 {
+                    // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
+                    watch_cache[!l1].insert_watch(cid, l0);
+                } else if old_l1 == l1 {
+                    // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
+                    watch_cache[!l0].insert_watch(cid, l1);
+                } else {
+                    panic!("impossible");
+                }
+            } else if p == old_l1 {
+                watch_cache[!p].remove_watch(&cid);
+                if old_l0 == l0 {
+                    // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
+                    watch_cache[!l1].insert_watch(cid, l0);
+                } else if old_l0 == l1 {
+                    // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
+                    watch_cache[!l0].insert_watch(cid, l1);
+                } else {
+                    panic!("impossible");
+                }
             } else {
                 assert_eq!(old_l0, l0);
                 assert_eq!(old_l1, l1);
+
+                #[cfg(feature = "maintain_watch_cache")]
+                {
+                    // todo!();
+                }
             }
             if certification_store.is_active() {
                 certification_store.push_add(&c.lits);
@@ -716,19 +741,35 @@ impl ClauseDBIF for ClauseDB {
             let l0 = c.lit0();
             let l1 = c.lit0();
 
-            if l0 == old_l0 && l1 == old_l1 {
+            if (l0 == old_l0 && l1 == old_l1) || (l0 == old_l1 && l1 == old_l0) {
             } else if l0 == old_l0 {
                 watch_cache[!old_l1].remove_watch(&cid);
-                watch_cache[!l0].insert_watch(cid, l1);
+                // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
+                watch_cache[!l0].update_watch(cid, l1); // .insert_watch(cid, l1);
+                                                        // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
                 watch_cache[!l1].insert_watch(cid, l0);
             } else if l0 == old_l1 {
                 watch_cache[!old_l0].remove_watch(&cid);
-                watch_cache[!l0].insert_watch(cid, l1);
+                // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
+                watch_cache[!l0].update_watch(cid, l1); // .insert_watch(cid, l1);
+                                                        // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
                 watch_cache[!l1].insert_watch(cid, l0);
+            } else if l1 == old_l0 {
+                watch_cache[!old_l1].remove_watch(&cid);
+                // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
+                watch_cache[!l0].insert_watch(cid, l1);
+                watch_cache[!l1].update_watch(cid, l0);
+            } else if l1 == old_l1 {
+                watch_cache[!old_l0].remove_watch(&cid);
+                // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
+                watch_cache[!l0].insert_watch(cid, l1);
+                watch_cache[!l1].update_watch(cid, l0);
             } else {
                 watch_cache[!old_l0].remove_watch(&cid);
                 watch_cache[!old_l1].remove_watch(&cid);
+                // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
                 watch_cache[!l0].insert_watch(cid, l1);
+                // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
                 watch_cache[!l1].insert_watch(cid, l0);
             }
 
@@ -838,25 +879,41 @@ impl ClauseDBIF for ClauseDB {
                 let l1 = c.lit1();
 
                 if old_l0 == l0 && old_l1 == l1 {
+                    #[cfg(feature = "maintain_watch_cache")]
+                    {
+                        watch_cache[!l0].update_watch(cid, l1);
+                        watch_cache[!l1].update_watch(cid, l0);
+                    }
                 } else if old_l0 == l0 {
+                    // assert_ne!(old_l1, l1);
                     watch_cache[!old_l1].remove_watch(&cid);
-                    watch_cache[!l0].insert_watch(cid, l1);
-                    // watch_cache[!l1].insert_watch(cid, l0);
+                    watch_cache[!l0].update_watch(cid, l1); // .insert_watch(cid, l1);
+                                                            // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
                     watch_cache[!l1].insert_watch(cid, l0);
                 } else if old_l0 == l1 {
-                    // watch_cache[!old_l0].remove_watch(&cid);
-                    // watch_cache[!l0].insert_watch(cid, l1);
+                    // assert_ne!(old_l1, l0);
+                    watch_cache[!old_l1].remove_watch(&cid);
+                    // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
                     watch_cache[!l0].insert_watch(cid, l1);
+                    watch_cache[!l1].update_watch(cid, l0); // .insert_watch(cid, l0);
+                } else if old_l1 == l0 {
+                    // assert_ne!(old_l0, l1);
+                    watch_cache[!old_l0].remove_watch(&cid);
+                    watch_cache[!l0].update_watch(cid, l1);
                     watch_cache[!l1].insert_watch(cid, l0);
+                } else if old_l1 == l1 {
+                    // assert_ne!(old_l0, l0);
+                    watch_cache[!old_l0].remove_watch(&cid);
+                    watch_cache[!l0].insert_watch(cid, l1);
+                    watch_cache[!l1].update_watch(cid, l0);
                 } else {
                     watch_cache[!old_l0].remove_watch(&cid);
                     watch_cache[!old_l1].remove_watch(&cid);
-                    // watch_cache[!l0].insert_watch(cid, l1);
+                    // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
                     watch_cache[!l0].insert_watch(cid, l1);
-                    // watch_cache[!l1].insert_watch(cid, l0);
+                    // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
                     watch_cache[!l1].insert_watch(cid, l0);
                 }
-
                 if certification_store.is_active() {
                     certification_store.push_add(&c.lits);
                     certification_store.push_delete(&new_lits);
