@@ -59,6 +59,7 @@ pub fn handle_conflict(
                 .max()
                 .unwrap_or(0);
             if 0 < snd_l {
+                assert!(snd_l < original_dl);
                 // If the conflicting clause contains one literal from the maximal
                 // decision level, we let BCP propagating that literal at the second
                 // highest decision level in conflicting cls.

@@ -158,6 +158,7 @@ fn assert_lit(
     // assert_eq!(asg.assigned(l0), None);
     cdb.certificate_add_assertion(l0);
     let mut tag: &str = "assign";
+    assert!(asg.assigned(l0).is_none());
     if let Err(e) = asg.assign_at_root_level(l0).and_then(|_| {
         tag = "propagation";
         debug_assert!(asg.remains());
@@ -189,6 +190,7 @@ fn assert_lit(
             ),
         );
     }
+    assert!(!asg.remains());
     debug_assert!(cdb
         .iter()
         .all(|c| c.iter().all(|l| asg.assigned(*l).is_none())));

@@ -901,10 +901,10 @@ impl ClauseDBIF for ClauseDB {
             //## Step:1
             watch_cache[!c.lits[old]].remove_watch(&cid);
         } else {
-            debug_assert!(watch_cache[!c.lits[old]].get_watch(&cid).is_none());
+            assert!(watch_cache[!c.lits[old]].get_watch(&cid).is_none());
         }
         //## Step:2
-        assert!(watch_cache[!c.lits[new]].iter().all(|e| e.0 != cid));
+        // assert!(watch_cache[!c.lits[new]].iter().all(|e| e.0 != cid));
         watch_cache[!c.lits[new]].insert_watch(cid, c.lits[other]);
 
         #[cfg(feature = "maintain_watch_cache")]
@@ -914,6 +914,8 @@ impl ClauseDBIF for ClauseDB {
         }
 
         c.lits.swap(old, new);
+        assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid));
+        assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid));
     }
     fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where

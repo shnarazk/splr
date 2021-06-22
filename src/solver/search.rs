@@ -112,11 +112,13 @@ impl SolveIF for Solver {
                     {
                         if m == 0 {
                             let l = Lit::from((vi, true));
+                            assert!(asg.assigned(l).is_none());
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
                         } else if p == 0 {
                             let l = Lit::from((vi, false));
+                            assert!(asg.assigned(l).is_none());
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
@@ -178,6 +180,7 @@ impl SolveIF for Solver {
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
                 // check(asg, cdb, true, "Before extending the model");
+                check(asg, cdb, true, "Before extending the model");
                 let model = asg.extend_model(cdb, elim.eliminated_lits());
                 check(asg, cdb, true, "After extending the model");
 

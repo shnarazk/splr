@@ -142,6 +142,7 @@ impl PropagateIF for AssignStack {
         debug_assert!(
             var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
         );
+        assert_eq!(self.assign[vi], None);
         set_assign!(self, l);
         self.level[vi] = lv;
         self.reason[vi] = reason;
@@ -169,6 +170,7 @@ impl PropagateIF for AssignStack {
         self.level[vi] = dl;
         let v = &mut self.var[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
+        assert_eq!(self.assign[vi], None);
         set_assign!(self, l);
         self.reason[vi] = AssignReason::Decision(self.decision_level());
         self.reward_at_assign(vi);
@@ -621,6 +623,7 @@ impl AssignStack {
                     RefClause::EmptyClause => return Some(cid),
                     RefClause::RegisteredClause(_) => (),
                     RefClause::UnitClause(lit) => {
+                        assert!(self.assigned(lit).is_none());
                         cdb.certificate_add_assertion(lit);
                         if self.assign_at_root_level(lit).is_err() {
                             return Some(cid);
