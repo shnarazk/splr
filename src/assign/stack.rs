@@ -326,22 +326,23 @@ impl AssignStack {
     pub fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
         &mut self,
         v: V,
-    ) -> Vec<(usize, DecisionLevel, i32, AssignReason, Option<bool>)> {
+    ) -> Vec<(usize, isize, DecisionLevel, i32, AssignReason, Option<bool>)> {
         let mut res = v
             .into_iter()
             .map(|l| {
                 (
                     self.trail
                         .iter()
-                        .position(|lit| *lit == *l)
+                        .position(|lit| lit.vi() == l.vi())
                         .map_or(0, |p| p),
+                    self.var(l.vi()).propagated_at,
                     self.level(l.vi()),
                     i32::from(l),
                     self.reason(l.vi()),
                     self.assigned(*l),
                 )
             })
-            .collect::<Vec<(usize, DecisionLevel, i32, AssignReason, Option<bool>)>>();
+            .collect::<Vec<(usize, isize, DecisionLevel, i32, AssignReason, Option<bool>)>>();
         res.sort();
         res
     }

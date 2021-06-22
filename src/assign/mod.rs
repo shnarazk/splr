@@ -111,6 +111,7 @@ pub struct Var {
     timestamp: usize,
     /// the `Flag`s
     flags: Flag,
+    pub propagated_at: isize,
 }
 
 /// A record of assignment. It's called 'trail' in Glucose.

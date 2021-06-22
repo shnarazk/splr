@@ -902,6 +902,19 @@ impl<T: Clone + Default + Sized + Ord> OrderedProxy<T> {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub enum Propagate {
+    None,
+    CacheSatisfied(usize),
+    FindNewWatch(usize),
+    BecameUnit(usize),
+    BecameConflict(usize),
+    SandboxCacheSatisfied(usize),
+    SandboxFindNewWatch(usize),
+    SandboxBecameUnit(usize),
+    SandboxBecameConflict(usize),
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

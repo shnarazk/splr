@@ -31,6 +31,7 @@ pub fn handle_conflict(
     {
         let level = asg.level_ref();
         if cdb[ci].iter().all(|l| level[l.vi()] == 0) {
+            panic!();
             return Err(SolverError::RootLevelConflict(Some(ci)));
         }
     }
@@ -144,6 +145,7 @@ pub fn handle_conflict(
             );
         }
 
+        panic!();
         return Err(SolverError::RootLevelConflict(None));
     }
     // asg.bump_vars(asg, cdb, ci);
@@ -234,6 +236,7 @@ pub fn handle_conflict(
         #[cfg(feature = "bi_clause_completion")]
         let generated = new_clause.is_new().is_some();
         let cid = new_clause.as_cid();
+        cdb[cid].set_birth(asg.num_conflict);
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);
         assert!(!cdb[cid].is_dead());

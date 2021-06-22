@@ -16,6 +16,7 @@ impl Default for Var {
             reward: 0.0,
             timestamp: 0,
             flags: Flag::empty(),
+            propagated_at: -123456,
         }
     }
 }

@@ -1159,6 +1159,56 @@ impl ClauseDBIF for ClauseDB {
             self.complete_bi_clauses_with(asg, lit);
         }
     }
+    fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool> {
+        self[cid].is_dead().then(|| self.freelist.contains(&cid))
+    }
+    fn check_consistency<A>(&mut self, asg: &A)
+    where
+        A: AssignIF,
+    {
+        for (key, wc) in self.bi_clause.iter().enumerate() {
+            let lit = Lit::from(key);
+            if let Some(true) = asg.assigned(lit) {
+                continue;
+            }
+            let level = asg.level(lit.vi());
+            for (cached, cid) in wc.iter() {
+                assert!(self[cid].lits.contains(&lit));
+                assert!(self[cid].lits.contains(&cached));
+                if let Some(true) = asg.assigned(*cached) {
+                    continue;
+                }
+                let lvl = asg.level(cached.vi());
+                assert!(
+                    level == lvl || (asg.assigned(lit) == None && asg.assigned(*cached) == None),
+                    "found a strange biclause {}{}\n - {}\n - {}\n{}\n",
+                    cid,
+                    self.clause[usize::from(*cid)],
+                    format!(
+                        "{:>8}:{:>12} at level {:>3} by {:<20}, {:>5}",
+                        format!("{}", lit),
+                        format!("{:?}", asg.assigned(lit)),
+                        format!("{}", level),
+                        format!("{}", asg.reason(lit.vi())),
+                        format!("{}", asg.var(lit.vi()).is(Flag::ELIMINATED)),
+                    ),
+                    format!(
+                        "{:>8}:{:>12} at level {:>3} by {:<20}, {:>5}",
+                        format!("{}", format!("{}", cached)),
+                        format!("{:?}", asg.assigned(*cached)),
+                        format!("{}", lvl),
+                        format!("{}", asg.reason(cached.vi())),
+                        format!("{}", asg.var(cached.vi()).is(Flag::ELIMINATED)),
+                    ),
+                    format!(
+                        "the mirrored({}) image: {:?}",
+                        !*cached,
+                        self.bi_clause[usize::from(!*cached)].get(&!lit),
+                    ),
+                );
+            }
+        }
+    }
 }
 
 impl ClauseDB {

@@ -16,6 +16,8 @@ impl Default for Clause {
             reward: 0.0,
             timestamp: 0,
             flags: Flag::empty(),
+            birth: 0,
+            moved_at: Propagate::None,
         }
     }
 }
@@ -182,6 +184,9 @@ impl ClauseIF for Clause {
             self.turn_off(Flag::DERIVE20);
         }
     }
+    fn set_birth(&mut self, time: usize) {
+        self.birth = time;
+    }
 }
 
 impl FlagIF for Clause {
@@ -204,8 +209,9 @@ impl fmt::Display for Clause {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
-            "{{{:?}{}{}}}",
+            "{{{:?}b{}{}{}}}",
             i32s(&self.lits),
+            self.birth,
             st(Flag::LEARNT, ", learnt"),
             st(Flag::ENQUEUED, ", enqueued"),
         )

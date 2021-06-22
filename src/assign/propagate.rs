@@ -123,11 +123,12 @@ impl PropagateIF for AssignStack {
                 Ok(())
             }
             Some(x) if x == bool::from(l) => {
+                panic!("double assginment(assertion)");
                 // Vivification tries to assign a var by propagation then can assert it.
                 // To make sure the var is asserted, we need to nullify its reason.
-                self.reason[vi] = AssignReason::None;
+                // || self.reason[vi] = AssignReason::None;
                 // self.make_var_asserted(vi);
-                Ok(())
+                // || Ok(())
             }
             _ => Err(SolverError::RootLevelConflict(Some(ClauseId::from(l)))),
         }
@@ -287,6 +288,7 @@ impl PropagateIF for AssignStack {
             self.var[p.vi()].turn_on(Flag::PROPAGATED);
             let propagating = Lit::from(usize::from(*p));
             let false_lit = !*p;
+            self.var[p.vi()].propagated_at = self.num_conflict as isize;
             // we have to drop `p` here to use self as a mutable reference again later.
 
             //
@@ -379,6 +381,7 @@ impl PropagateIF for AssignStack {
                                 &mut source,
                                 Some(other),
                             );
+                            cdb[cid].moved_at = Propagate::CacheSatisfied(self.num_conflict);
                             continue 'next_clause;
                         }
                     }
@@ -400,6 +403,7 @@ impl PropagateIF for AssignStack {
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
                             cdb[cid].search_from = k + 1;
+                            cdb[cid].moved_at = Propagate::FindNewWatch(self.num_conflict);
                             continue 'next_clause;
                         }
                     }
@@ -418,7 +422,7 @@ impl PropagateIF for AssignStack {
                     while cdb.reregister_watch_cache(propagating, watches.next().deref_watch()) {}
                     #[cfg(not(feature = "hashed_watch_cache"))]
                     cdb.restore_detached_watch_cache(propagating, source);
-
+                    cdb[cid].moved_at = Propagate::BecameConflict(self.num_conflict);
                     return Some(cid);
                 }
                 let lv = cdb[cid]
@@ -428,6 +432,7 @@ impl PropagateIF for AssignStack {
                     .max()
                     .unwrap_or(self.root_level);
                 self.assign_by_implication(cached, AssignReason::Implication(cid, NULL_LIT), lv);
+                cdb[cid].moved_at = Propagate::BecameUnit(self.num_conflict);
             }
         }
         let na = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
@@ -459,6 +464,7 @@ impl PropagateIF for AssignStack {
             assert!(!self.var[p.vi()].is(Flag::PROPAGATED));
             #[cfg(feature = "debug_propagation")]
             self.var[p.vi()].turn_on(Flag::PROPAGATED);
+            self.var[p.vi()].propagated_at = -(self.num_conflict as isize);
             let propagating = Lit::from(usize::from(*p));
             let false_lit = !*p;
 
@@ -513,6 +519,7 @@ impl PropagateIF for AssignStack {
                 if let Some(true) = other_watch_value {
                     assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));
                     cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
+                    cdb[cid].moved_at = Propagate::SandboxCacheSatisfied(self.num_conflict);
                     continue 'next_clause;
                 }
                 {
@@ -535,11 +542,12 @@ impl PropagateIF for AssignStack {
                                 &mut source,
                                 Some(other),
                             );
+                            cdb[cid].moved_at = Propagate::SandboxCacheSatisfied(self.num_conflict);
                             continue 'next_clause;
                         }
                     }
                     let c = &cdb[cid];
-                    debug_assert!(lit0 == false_lit || lit1 == false_lit);
+                    assert!(lit0 == false_lit || lit1 == false_lit);
                     let start = c.search_from;
                     for (k, lk) in c
                         .iter()
@@ -551,6 +559,7 @@ impl PropagateIF for AssignStack {
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
                             cdb[cid].search_from = k + 1;
+                            cdb[cid].moved_at = Propagate::SandboxFindNewWatch(self.num_conflict);
                             continue 'next_clause;
                         }
                     }
@@ -564,6 +573,7 @@ impl PropagateIF for AssignStack {
                     while cdb.reregister_watch_cache(propagating, watches.next().deref_watch()) {}
                     #[cfg(not(feature = "hashed_watch_cache"))]
                     cdb.restore_detached_watch_cache(propagating, source);
+                    cdb[cid].moved_at = Propagate::SandboxBecameConflict(self.num_conflict);
                     return Some(cid);
                 }
                 let lv = cdb[cid]
@@ -573,7 +583,9 @@ impl PropagateIF for AssignStack {
                     .max()
                     .unwrap_or(self.root_level);
                 assert!(!cdb[cid].is_dead());
+                assert_eq!(cdb[cid].lit0(), cached);
                 self.assign_by_implication(cached, AssignReason::Implication(cid, NULL_LIT), lv);
+                cdb[cid].moved_at = Propagate::SandboxBecameUnit(self.num_conflict);
             }
         }
         None
@@ -628,7 +640,7 @@ impl AssignStack {
                         if self.assign_at_root_level(lit).is_err() {
                             return Some(cid);
                         } else {
-                            assert!(!self.locked(lit, cid));
+                            assert!(!self.locked(&cdb[cid], cid));
                             cdb.remove_clause(cid);
                         }
                     }

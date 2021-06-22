@@ -360,12 +360,14 @@ fn search(
 fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
     if let Some(cid) = cdb.validate(asg.assign_ref(), all) {
         println!("{}", message);
-        println!("| on trail |   time | level |   literal  |  assignment |              reason |");
+        println!("level {}", asg.decision_level());
+        assert!(asg.stack_iter().all(|l| asg.assigned(*l) == Some(true)));
+        println!("|   pos |   time | level |   literal  |  assignment |               reason |");
         let l0 = i32::from(cdb[cid].lit0());
         let l1 = i32::from(cdb[cid].lit1());
         for (p, t, lv, lit, reason, assign) in asg.dump(&cdb[cid]).iter() {
             println!(
-                "|{:>9} | {:>6} |{:>6} | {:9}{} | {:11} |{:20} |",
+                "|{:>6} | {:>6} |{:>6} | {:9}{} | {:11} | {:20} |",
                 p,
                 t,
                 lv,
@@ -383,12 +385,27 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
                 format!("{}", reason),
             );
         }
-        println!("clause detail: {}", &cdb[cid]);
+        println!("clause {}: {}", cid, &cdb[cid]);
         let (c0, c1) = cdb.watch_caches(cid, "check (search 441)");
-        println!(" - watch {} has watch cache {:?}", cdb[cid].lit0(), c0);
-        println!(" - watch {} has watch cache {:?}", cdb[cid].lit1(), c1);
-        println!(" which was born at {}", cdb[cid].birth);
-        println!(" which was used at {}", cdb[cid].timestamp());
+        println!(
+            " which was born at {}, and used in conflict analysis at {}",
+            cdb[cid].birth,
+            cdb[cid].timestamp(),
+        );
+        println!(
+            " which was moved among watch caches at {:?}",
+            cdb[cid].moved_at
+        );
+        println!(
+            " - L1 {} has complements {:?} in its cache",
+            cdb[cid].lit0(),
+            c0
+        );
+        println!(
+            " - L2 {} has complements {:?} in its cache",
+            cdb[cid].lit1(),
+            c1
+        );
         panic!(
             "Before extending, NC {}, Level {} generated assignment({:?}) falsifies by {}",
             asg.derefer(assign::property::Tusize::NumConflict),
