@@ -58,6 +58,11 @@ pub fn vivify(
     let mut to_display = 0;
     'next_clause: while let Some(cp) = clauses.pop() {
         asg.backtrack_sandbox();
+        assert_eq!(asg.decision_level(), asg.root_level);
+        if asg.remains() {
+            asg.propagate(cdb);
+        }
+
         debug_assert!(asg.stack_is_empty() || !asg.remains());
         debug_assert_eq!(asg.root_level, asg.decision_level());
         let cid = cp.to();
@@ -104,8 +109,6 @@ pub fn vivify(
                                 return Err(SolverError::RootLevelConflict(Some(cid)));
                             }
                             1 => {
-                                // dbg!(vec[0]);
-                                // assert_lit(asg, cdb, state, vec[0])?;
                                 asg.assign_at_root_level(vec[0])?;
                                 num_assert += 1;
                             }
@@ -129,6 +132,10 @@ pub fn vivify(
         }
     }
     asg.backtrack_sandbox();
+    if asg.remains() {
+        asg.propagate(cdb);
+    }
+    asg.clear_asserted_literals(cdb)?;
     debug_assert!(asg.stack_is_empty() || !asg.remains());
     state.flush("");
     state.flush(format!(
@@ -147,55 +154,6 @@ pub fn vivify(
     );
     state[Stat::VivifiedClause] += num_shrink;
     state[Stat::VivifiedVar] += num_assert;
-    Ok(())
-}
-
-fn assert_lit(
-    asg: &mut AssignStack,
-    cdb: &mut ClauseDB,
-    state: &mut State,
-    l0: Lit,
-) -> MaybeInconsistent {
-    assert_eq!(asg.decision_level(), asg.root_level);
-    // assert_eq!(asg.assigned(l0), None);
-    cdb.certificate_add_assertion(l0);
-    let mut tag: &str = "assign";
-    assert!(asg.assigned(l0).is_none());
-    if let Err(e) = asg.assign_at_root_level(l0).and_then(|_| {
-        tag = "propagation";
-        debug_assert!(asg.remains());
-        asg.propagate(cdb)
-            .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))
-    }) {
-        state.flush("");
-        state.log(
-            asg.num_conflict,
-            format!(
-                "(vivify) root level inconsistency by {} after asserting {}",
-                tag, l0,
-            ),
-        );
-        return Err(e);
-    }
-    assert_eq!(asg.decision_level(), asg.root_level);
-    asg.propagate(cdb).map_or(Ok(()), |cc| {
-        state.log(asg.num_conflict, "By vivifier");
-        Err(SolverError::RootLevelConflict(Some(cc)))
-    })?;
-    if asg.remains() {
-        state.log(
-            asg.num_conflict,
-            format!(
-                "(vivify) root level propagation remains un-propagated literals {}/{}",
-                asg.q_head,
-                asg.stack_len(),
-            ),
-        );
-    }
-    assert!(!asg.remains());
-    debug_assert!(cdb
-        .iter()
-        .all(|c| c.iter().all(|l| asg.assigned(*l).is_none())));
     Ok(())
 }
 
