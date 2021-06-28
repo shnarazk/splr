@@ -216,18 +216,18 @@ pub fn handle_conflict(
     } else {
         asg.cancel_until(assign_level);
     }
-    assert_eq!(asg.assigned(l0), None);
-    assert_eq!(
+    debug_assert_eq!(asg.assigned(l0), None);
+    debug_assert_eq!(
         new_learnt.iter().skip(1).map(|l| asg.level(l.vi())).max(),
         Some(assign_level)
     );
     match cdb.new_clause(asg, new_learnt, true) {
         RefClause::Clause(cid) if learnt_len == 2 => {
             cdb[cid].set_birth(asg.num_conflict);
-            assert_eq!(l0, cdb[cid].lit0());
-            assert_eq!(l1, cdb[cid].lit1());
-            assert_eq!(asg.assigned(l1), Some(false));
-            assert_eq!(asg.assigned(l0), None);
+            debug_assert_eq!(l0, cdb[cid].lit0());
+            debug_assert_eq!(l1, cdb[cid].lit1());
+            debug_assert_eq!(asg.assigned(l1), Some(false));
+            debug_assert_eq!(asg.assigned(l0), None);
             asg.assign_by_implication(l0, assign_level, cid, Some(!l1));
             check_graph(asg, cdb, l0, "biclause");
             rst.update(ProgressUpdate::LBD(1));
@@ -239,8 +239,8 @@ pub fn handle_conflict(
         }
         RefClause::Clause(cid) => {
             cdb[cid].set_birth(asg.num_conflict);
-            assert_eq!(cdb[cid].lit0(), l0);
-            assert_eq!(asg.assigned(l0), None);
+            debug_assert_eq!(cdb[cid].lit0(), l0);
+            debug_assert_eq!(asg.assigned(l0), None);
             asg.assign_by_implication(l0, assign_level, cid, None);
             check_graph(asg, cdb, l0, "clause");
             let lbd = cdb[cid].rank;
@@ -255,13 +255,13 @@ pub fn handle_conflict(
         RefClause::Dead => panic!("impossible"),
         RefClause::EmptyClause => panic!("impossible"),
         RefClause::RegisteredClause(cid) => {
-            assert_eq!(learnt_len, 2);
-            assert!(
+            debug_assert_eq!(learnt_len, 2);
+            debug_assert!(
                 (l0 == cdb[cid].lit0() && l1 == cdb[cid].lit1())
                     || (l0 == cdb[cid].lit1() && l1 == cdb[cid].lit0())
             );
-            assert_eq!(asg.assigned(l1), Some(false));
-            assert_eq!(asg.assigned(l0), None);
+            debug_assert_eq!(asg.assigned(l1), Some(false));
+            debug_assert_eq!(asg.assigned(l0), None);
             asg.assign_by_implication(l0, assign_level, cid, Some(!l1));
             check_graph(asg, cdb, l0, "registeredclause");
         }

@@ -17,7 +17,7 @@ pub trait PropagateIF {
     ///
     /// ## Warning
     /// Callers must assure the consistency after this assignment.
-    fn assign_by_implication(&mut self, l: Lit, reason: AssignReason, lv: DecisionLevel);
+    fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, cid: ClauseId, by: Option<Lit>);
     /// unsafe assume (assign by decision); doesn't emit an exception.
     /// ## Caveat
     /// Callers have to assure the consistency after this assignment.
@@ -133,7 +133,7 @@ impl PropagateIF for AssignStack {
             _ => Err(SolverError::RootLevelConflict(Some(ClauseId::from(l)))),
         }
     }
-    fn assign_by_implication(&mut self, l: Lit, reason: AssignReason, lv: DecisionLevel) {
+    fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, cid: ClauseId, by: Option<Lit>) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be enqueued");
         debug_assert!(l.vi() < self.var.len());
         // The following doesn't hold anymore by using chronoBT.
@@ -312,10 +312,12 @@ impl PropagateIF for AssignStack {
                     }
                     None => {
                         assert!(!cdb[cid].is_dead());
+                        assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
                         self.assign_by_implication(
                             blocker,
-                            AssignReason::Implication(cid, propagating),
                             self.level[propagating.vi()],
+                            cid,
+                            Some(propagating),
                         );
                     }
                 }
@@ -427,7 +429,9 @@ impl PropagateIF for AssignStack {
                     .map(|l| self.level[l.vi()])
                     .max()
                     .unwrap_or(self.root_level);
-                self.assign_by_implication(cached, AssignReason::Implication(cid, NULL_LIT), lv);
+                assert_eq!(cdb[cid].lit0(), cached);
+                assert_eq!(self.assigned(cached), None);
+                self.assign_by_implication(cached, lv, cid, None);
                 cdb[cid].moved_at = Propagate::BecameUnit(self.num_conflict);
             }
         }
@@ -476,14 +480,14 @@ impl PropagateIF for AssignStack {
                 debug_assert_eq!(cdb[cid].len(), 2);
                 match lit_assign!(self, blocker) {
                     Some(true) => (),
-                    Some(false) => {
-                        return Some(cid);
-                    }
+                    Some(false) => return Some(cid),
                     None => {
+                        assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
                         self.assign_by_implication(
                             blocker,
-                            AssignReason::Implication(cid, false_lit),
                             self.level[false_lit.vi()],
+                            cid,
+                            Some(propagating),
                         );
                     }
                 }
@@ -578,9 +582,9 @@ impl PropagateIF for AssignStack {
                     .map(|l| self.level[l.vi()])
                     .max()
                     .unwrap_or(self.root_level);
-                assert!(!cdb[cid].is_dead());
                 assert_eq!(cdb[cid].lit0(), cached);
-                self.assign_by_implication(cached, AssignReason::Implication(cid, NULL_LIT), lv);
+                assert_eq!(self.assigned(cached), None);
+                self.assign_by_implication(cached, lv, cid, None);
                 cdb[cid].moved_at = Propagate::SandboxBecameUnit(self.num_conflict);
             }
         }
