@@ -619,10 +619,6 @@ impl ClauseDBIF for ClauseDB {
             bi_clause[lits[0]].insert(lits[1], cid);
             bi_clause[lits[1]].insert(lits[0], cid);
             *num_bi_clause += 1;
-            if certification_store.is_active() {
-                certification_store.push_add(&c.lits);
-                certification_store.push_delete(&new_lits);
-            }
             // self.watches(cid, "after strengthen_by_elimination case:3-2");
         } else {
             let old_l0 = lits[0];
@@ -667,11 +663,11 @@ impl ClauseDBIF for ClauseDB {
                     // todo!();
                 }
             }
-            if certification_store.is_active() {
-                certification_store.push_add(&c.lits);
-                certification_store.push_delete(&new_lits);
-            }
             // self.watches(cid, "after strengthen_by_elimination case:3-3");
+        }
+        if certification_store.is_active() {
+            certification_store.push_add(&c.lits);
+            certification_store.push_delete(&new_lits);
         }
         RefClause::Clause(cid)
     }
@@ -1251,7 +1247,7 @@ impl ClauseDBIF for ClauseDB {
                     ),
                     format!(
                         "{:>8}:{:>12} at level {:>3} by {:<20}, {:>5}",
-                        format!("{}", format!("{}", cached)),
+                        format!("{}", cached),
                         format!("{:?}", asg.assigned(*cached)),
                         format!("{}", lvl),
                         format!("{}", asg.reason(cached.vi())),
