@@ -180,8 +180,10 @@ impl SolveIF for Solver {
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
                 // check(asg, cdb, true, "Before extending the model");
+                #[cfg(fueature = "boundary_check")]
                 check(asg, cdb, true, "Before extending the model");
                 let model = asg.extend_model(cdb, elim.eliminated_lits());
+                #[cfg(fueature = "boundary_check")]
                 check(asg, cdb, true, "After extending the model");
 
                 // Run validator on the extended model.
@@ -356,7 +358,7 @@ fn search(
     Ok(true)
 }
 
-#[allow(dead_code)]
+#[cfg(feature = "boundary_check")]
 fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
     if let Some(cid) = cdb.validate(asg.assign_ref(), all) {
         println!("{}", message);
@@ -365,26 +367,39 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
         println!("|   pos |   time | level |   literal  |  assignment |               reason |");
         let l0 = i32::from(cdb[cid].lit0());
         let l1 = i32::from(cdb[cid].lit1());
-        for (p, t, lv, lit, reason, assign) in asg.dump(&cdb[cid]).iter() {
+        use crate::assign::DebugReportIF;
+
+        for assign::Assign {
+            lit,
+            val,
+            pos,
+            lvl,
+            by: reason,
+            at,
+        } in cdb[cid].report(asg).iter()
+        {
             println!(
                 "|{:>6} | {:>6} |{:>6} | {:9}{} | {:11} | {:20} |",
-                p,
-                t,
-                lv,
+                pos.unwrap_or(0),
+                at,
+                lvl,
                 lit,
                 if *lit == l0 || *lit == l1 { '*' } else { ' ' },
-                format!(
-                    "{:?}",
-                    assign,
-                    // if asg.var(lit.abs() as usize).is(Flag::PROPAGATED) {
-                    //     "x"
-                    // } else {
-                    //     "!"
-                    // },
-                ),
+                format!("{:?}", val,),
                 format!("{}", reason),
             );
         }
+        println!();
+        let last_lit = asg.stack(asg.stack_len() - 1);
+        println!(
+            "|{:>6} | {:>6} |{:>6} | {:9}  | {:11} | {:20} |",
+            asg.stack_len() - 1,
+            asg.var(last_lit.vi()).propagated_at,
+            asg.level(last_lit.vi()),
+            i32::from(last_lit),
+            format!("{:?}", asg.assigned(last_lit),),
+            format!("{}", asg.reason(last_lit.vi())),
+        );
         println!("clause {}: {}", cid, &cdb[cid]);
         let (c0, c1) = cdb.watch_caches(cid, "check (search 441)");
         println!(

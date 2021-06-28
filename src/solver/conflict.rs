@@ -1,5 +1,8 @@
 //! Conflict Analysis
 
+#[cfg(feature = "boundary_check")]
+use crate::assign::DebugReportIF;
+
 use {
     super::{
         restart::{ProgressUpdate, RestartIF, Restarter},
@@ -194,59 +197,79 @@ pub fn handle_conflict(
         //
         asg.reward_at_analysis(lit.vi());
 
+        //
+        //## Reason-Side Rewarding
+        //
         #[cfg(feature = "reason_side_rewarding")]
         if let AssignReason::Implication(r, _) = asg.reason(lit.vi()) {
             for l in cdb[r].iter() {
                 let vi = l.vi();
                 if !bumped.contains(&vi) {
-                    //
-                    //## Reason-Side Rewarding
-                    //
                     asg.reward_at_analysis(vi);
                     bumped.push(vi);
                 }
             }
         }
     }
-    let assign_level: DecisionLevel = backtrack_level;
-    if chronobt.unwrap_or(
-        0 < state.chrono_bt_threshold
-            && state.chrono_bt_threshold + backtrack_level <= conflicting_level,
-    ) {
-        backtrack_level = conflicting_level - 1;
-    }
-
-    asg.cancel_until(backtrack_level);
-    let reason = if learnt_len == 2 {
-        new_learnt[1]
+    if chronobt && assign_level + state.config.c_cbt_thr <= conflicting_level {
+        asg.cancel_until(conflicting_level - 1);
     } else {
-        NULL_LIT
-    };
-    let new_clause = cdb.new_clause(asg, new_learnt, true);
-
-    #[cfg(feature = "bi_clause_completion")]
-    let generated = new_clause.is_new().is_some();
-
-    let cid = new_clause.as_cid();
-    cdb[cid].set_birth(asg.num_conflict);
-    state.c_lvl.update(conflicting_level as f64);
-    state.b_lvl.update(backtrack_level as f64);
-    debug_assert!(!cdb[cid].is_dead());
-    asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), assign_level);
-    let lbd = cdb[cid].rank;
-    rst.update(ProgressUpdate::LBD(lbd));
-    elim.to_simplify += 1.0 / learnt_len as f64;
-    if lbd <= 20 {
-        for cid in &state.derive20 {
-            cdb[cid].turn_on(Flag::DERIVE20);
+        asg.cancel_until(assign_level);
+    }
+    assert_eq!(asg.assigned(l0), None);
+    assert_eq!(
+        new_learnt.iter().skip(1).map(|l| asg.level(l.vi())).max(),
+        Some(assign_level)
+    );
+    match cdb.new_clause(asg, new_learnt, true) {
+        RefClause::Clause(cid) if learnt_len == 2 => {
+            cdb[cid].set_birth(asg.num_conflict);
+            assert_eq!(l0, cdb[cid].lit0());
+            assert_eq!(l1, cdb[cid].lit1());
+            assert_eq!(asg.assigned(l1), Some(false));
+            assert_eq!(asg.assigned(l0), None);
+            asg.assign_by_implication(l0, assign_level, cid, Some(!l1));
+            check_graph(asg, cdb, l0, "biclause");
+            rst.update(ProgressUpdate::LBD(1));
+            elim.to_simplify += 0.5;
+            for cid in &state.derive20 {
+                cdb[cid].turn_on(Flag::DERIVE20);
+            }
+            cdb.complete_bi_clauses(asg);
         }
+        RefClause::Clause(cid) => {
+            cdb[cid].set_birth(asg.num_conflict);
+            assert_eq!(cdb[cid].lit0(), l0);
+            assert_eq!(asg.assigned(l0), None);
+            asg.assign_by_implication(l0, assign_level, cid, None);
+            check_graph(asg, cdb, l0, "clause");
+            let lbd = cdb[cid].rank;
+            rst.update(ProgressUpdate::LBD(lbd));
+            elim.to_simplify += 1.0 / learnt_len as f64;
+            if lbd <= 20 {
+                for cid in &state.derive20 {
+                    cdb[cid].turn_on(Flag::DERIVE20);
+                }
+            }
+        }
+        RefClause::Dead => panic!("impossible"),
+        RefClause::EmptyClause => panic!("impossible"),
+        RefClause::RegisteredClause(cid) => {
+            assert_eq!(learnt_len, 2);
+            assert!(
+                (l0 == cdb[cid].lit0() && l1 == cdb[cid].lit1())
+                    || (l0 == cdb[cid].lit1() && l1 == cdb[cid].lit0())
+            );
+            assert_eq!(asg.assigned(l1), Some(false));
+            assert_eq!(asg.assigned(l0), None);
+            asg.assign_by_implication(l0, assign_level, cid, Some(!l1));
+            check_graph(asg, cdb, l0, "registeredclause");
+        }
+        RefClause::UnitClause(_) => panic!("impossible"),
     }
-
-    #[cfg(feature = "bi_clause_completion")]
-    if !generated {
-        cdb.complete_bi_clauses(asg);
-    }
-
+    state.c_lvl.update(conflicting_level as f64);
+    state.b_lvl.update(assign_level as f64);
+    state.derive20.clear();
     Ok(())
 }
 
@@ -302,13 +325,32 @@ fn conflict_analyze(
                     asg.level(p.vi()),
                 );
             }
-            AssignReason::Decision(_) => {
-                #[cfg(feature = "boundary_check")]
-                panic!(
-                    "conflict_analyze: faced a decision var. path_cnt {} at level {}",
-                    path_cnt,
-                    asg.level(p.vi()),
-                );
+            AssignReason::Decision(_) =>
+            #[cfg(feature = "boundary_check")]
+            {
+                println!(
+                        "conflict_analyze: faced a decision var:: path_cnt {} at level {}\nconflicting literal\n  {:?}\nDecisionMap\n{}\nbuliding learnt\n{}\nconflicting clause\n{}",
+                        path_cnt,
+                        asg.decision_level(),
+                        cdb[conflicting_clause].lit0().report(asg)[0],
+                        asg.stack_iter().skip(ti).filter(|l| matches!(asg.reason(l.vi()), AssignReason::Decision(_)))
+                            .map(|l| format!("{:?}", l.report(asg)))
+                            .collect::<Vec<String>>()
+                            .join("\n"),
+                        learnt.report(asg)
+                            .iter()
+                            .map(|r| format!("  {:?}", r))
+                            .collect::<Vec<String>>()
+                            .join("\n"),
+                        cdb[conflicting_clause]
+                            .report(asg)
+                            .iter()
+                            .map(|r| format!("  {:?}", r))
+                            .collect::<Vec<String>>()
+                            .join("\n"),
+
+                    );
+                tracer(asg, cdb);
             }
             AssignReason::Implication(_, l) if l != NULL_LIT => {
                 // cid = asg.reason(p.vi());
@@ -438,14 +480,25 @@ fn conflict_analyze(
 
             #[cfg(feature = "boundary_check")]
             if 0 == ti {
-                panic!(
-                    "conflict_analysis broke the bottom:: lit {}, path_cnt {}, lv {}, learnt {:?}\n{:?}",
-                    p,
+                println!(
+                    "conflict_analysis broke the bottom:: path_cnt {} scanned len {}, conflict level {}\nconflicting literal\n  {:?}\nbuilding learnt\n{}\nconflicting clause\n{}",
                     path_cnt,
+                    asg.stack_len() - ti, // .report(asg),
                     dl,
-                    asg.dump(&*learnt),
-                    asg.dump(&cdb[conflicting_clause].iter().copied().collect::<Vec<_>>()),
+                    cdb[conflicting_clause].lit0().report(asg)[0],
+                    learnt.report(asg)
+                        .iter()
+                        .map(|r| format!("  {:?}", r))
+                        .collect::<Vec<String>>()
+                        .join("\n"),
+                    cdb[conflicting_clause]
+                        .report(asg)
+                        .iter()
+                        .map(|r| format!("  {:?}", r))
+                        .collect::<Vec<String>>()
+                        .join("\n"),
                 );
+                tracer(asg, cdb);
             }
 
             ti -= 1;
@@ -593,4 +646,142 @@ impl Lit {
         }
         true
     }
+}
+
+fn check_graph(asg: &AssignStack, cdb: &ClauseDB, lit: Lit, mes: &str) {
+    let its_level = asg.level(lit.vi());
+    let mut children = Vec::new();
+    let precedents = lit_level(asg, cdb, lit, &mut children, mes);
+    assert!(precedents <= its_level);
+}
+
+fn lit_level(
+    asg: &AssignStack,
+    cdb: &ClauseDB,
+    lit: Lit,
+    bag: &mut Vec<Lit>,
+    mes: &str,
+) -> DecisionLevel {
+    if bag.contains(&lit) {
+        return 0;
+    }
+    bag.push(lit);
+    match asg.reason(lit.vi()) {
+        AssignReason::Asserted(_) => asg.root_level,
+        AssignReason::Decision(lvl) => lvl,
+        AssignReason::Implication(cid, NULL_LIT) => {
+            assert_eq!(
+                cdb[cid].lit0(),
+                lit,
+                "lit0 {} != lit{}, cid {}, {}",
+                cdb[cid].lit0(),
+                lit,
+                cid,
+                &cdb[cid]
+            );
+            // assert!(
+            //     !bag.contains(&lit),
+            //     "{}; {} is contained in {:?}\n{:?}\n{}",
+            //     mes,
+            //     lit,
+            //     bag,
+            //     asg.reason(lit.vi()),
+            //     dumper(asg, cdb, bag),
+            // );
+            // bag.push(lit);
+            cdb[cid]
+                .iter()
+                .skip(1)
+                .map(|l| lit_level(asg, cdb, !*l, bag, mes))
+                .max()
+                .unwrap()
+        }
+        AssignReason::Implication(cid, b) => {
+            // assert!(
+            //     !bag.contains(&lit),
+            //     "{}; {} is contained in {:?}\n{:?}\n{}",
+            //     mes,
+            //     lit,
+            //     bag,
+            //     asg.reason(lit.vi()),
+            //     dumper(asg, cdb, bag),
+            // );
+            // bag.push(lit);
+            debug_assert!(
+                cdb[cid].lit0() == lit || cdb[cid].lit1() == lit,
+                "Does the {:?} contain {}?\n{} => {:?}",
+                &cdb[cid],
+                lit,
+                lit,
+                AssignReason::Implication(cid, b),
+            );
+           debug_assert!(
+                cdb[cid].lit0() == !b || cdb[cid].lit1() == !b,
+                "Is the {:?} is the reason of {} (it must contain {})?\n{} => {:?}",
+                &cdb[cid],
+                lit,
+                !b,
+                lit,
+                AssignReason::Implication(cid, b),
+            );
+            lit_level(asg, cdb, b, bag, mes)
+        }
+        AssignReason::None => panic!("One of root of {} isn't assigned.", lit),
+    }
+}
+
+#[allow(dead_code)]
+fn dumper(asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
+    let mut s = String::new();
+    for l in bag {
+        s.push_str(&format!(
+            "{:8>} :: level {:4>}, {:?} {:?}\n",
+            *l,
+            asg.level(l.vi()),
+            asg.reason(l.vi()),
+            match asg.reason(l.vi()) {
+                AssignReason::Asserted(_) => vec![NULL_LIT],
+                AssignReason::Decision(_) => vec![NULL_LIT],
+                AssignReason::Implication(cid, _) => cdb[cid].iter().copied().collect::<Vec<Lit>>(),
+                AssignReason::None => vec![],
+            },
+        ));
+    }
+    s
+}
+
+#[cfg(feature = "boundary_check")]
+fn tracer(asg: &AssignStack, cdb: &ClauseDB) {
+    use std::io::{self, Write};
+    loop {
+        let mut input = String::new();
+        print!("cid: ");
+        std::io::stdout().flush().expect("IO error");
+        io::stdin().read_line(&mut input).expect("IO error");
+        if input.is_empty() {
+            break;
+        }
+        if let Ok(cid) = input.trim().parse::<usize>() {
+            if cid == 0 {
+                break;
+            }
+            println!(
+                "{}",
+                cdb[ClauseId::from(cid)]
+                    .report(asg)
+                    .iter()
+                    .map(|r| format!(
+                        " {}{:?}",
+                        asg.var(Lit::from(r.lit).vi())
+                            .is(Flag::CA_SEEN)
+                            .then(|| "S")
+                            .unwrap_or(" "),
+                        r
+                    ))
+                    .collect::<Vec<String>>()
+                    .join("\n"),
+            );
+        }
+    }
+    panic!("done");
 }

@@ -316,38 +316,6 @@ impl AssignIF for AssignStack {
     }
 }
 
-// #[cfg(feature = "boundary_check")]
-impl AssignStack {
-    // return the list of
-    // 1. literal in Clause of cid
-    // 2. its level
-    // 3. it is not assigned,  assigned by decision, or asserted.
-    // 4. value
-    pub fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
-        &mut self,
-        v: V,
-    ) -> Vec<(usize, isize, DecisionLevel, i32, AssignReason, Option<bool>)> {
-        let mut res = v
-            .into_iter()
-            .map(|l| {
-                (
-                    self.trail
-                        .iter()
-                        .position(|lit| lit.vi() == l.vi())
-                        .map_or(0, |p| p),
-                    self.var(l.vi()).propagated_at,
-                    self.level(l.vi()),
-                    i32::from(l),
-                    self.reason(l.vi()),
-                    self.assigned(*l),
-                )
-            })
-            .collect::<Vec<(usize, isize, DecisionLevel, i32, AssignReason, Option<bool>)>>();
-        res.sort();
-        res
-    }
-}
-
 impl fmt::Display for AssignStack {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let v = self.trail.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
