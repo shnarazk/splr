@@ -513,7 +513,7 @@ impl PropagateIF for AssignStack {
                 }
             } {
                 if cdb[cid].is_dead() {
-                    source.restore_entry();
+                    cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
                     continue;
                 }
                 assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));

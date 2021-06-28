@@ -104,7 +104,9 @@ pub fn vivify(
                                 return Err(SolverError::RootLevelConflict(Some(cid)));
                             }
                             1 => {
-                                assert_lit(asg, cdb, state, vec[0])?;
+                                // dbg!(vec[0]);
+                                // assert_lit(asg, cdb, state, vec[0])?;
+                                asg.assign_at_root_level(vec[0])?;
                                 num_assert += 1;
                             }
                             _ => {
