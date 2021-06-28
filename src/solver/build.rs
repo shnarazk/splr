@@ -182,7 +182,11 @@ impl SatSolverIF for Solver {
         }
         let lit = Lit::from(val);
         self.cdb.certificate_add_assertion(lit);
-        self.asg.assign_at_root_level(lit).map(|_| self)
+        match self.asg.assigned(lit) {
+            None => self.asg.assign_at_root_level(lit).map(|_| self),
+            Some(true) => Ok(self),
+            Some(false) => Err(SolverError::RootLevelConflict(Some(ClauseId::from(lit)))),
+        }
     }
     fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver, SolverError>
     where

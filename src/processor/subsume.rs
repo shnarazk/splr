@@ -120,7 +120,7 @@ where
             match asg.assigned(l0) {
                 None => asg.assign_at_root_level(l0),
                 Some(true) => Ok(()),
-                Some(false) => panic!("impossible"),
+                Some(false) => Err(SolverError::RootLevelConflict(Some(cid))),
             }
         }
     }
