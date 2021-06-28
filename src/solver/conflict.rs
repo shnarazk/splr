@@ -13,7 +13,6 @@ use {
         cdb::{ClauseDB, ClauseDBIF},
         processor::Eliminator,
         solver::SolverEvent,
-        state::StateIF,
         types::*,
     },
 };
@@ -34,110 +33,41 @@ pub fn handle_conflict(
     {
         let level = asg.level_ref();
         if cdb[ci].iter().all(|l| level[l.vi()] == 0) {
-            panic!();
             return Err(SolverError::RootLevelConflict(Some(ci)));
         }
     }
 
-    let num_conflict = asg.num_conflict;
     // If we can settle this conflict w/o restart, solver will get a big progress.
-    let chronobt = if num_conflict < 1000 {
-        Some(false) // force normal backtrack
-    } else {
-        /* Some(false) // */
-        None // a closure will determine
-    };
+    let chronobt = 1000 < asg.num_conflict && 0 < state.config.c_cbt_thr;
     rst.update(ProgressUpdate::Counter);
     // rst.block_restart(); // to update asg progress_evaluator
-    if chronobt.unwrap_or(0 < state.config.c_cbt_thr && state.config.c_cbt_thr < conflicting_level)
-    {
+    if chronobt && state.config.c_cbt_thr < conflicting_level {
         let level = asg.level_ref();
         let c = &mut cdb[ci];
-        assert!(!c.is_dead());
+        debug_assert!(!c.is_dead());
         let max_level = c.iter().map(|l| level[l.vi()]).max().unwrap();
         if 1 == c.iter().filter(|l| level[l.vi()] == max_level).count() {
             if let Some(second_level) = c
                 .iter()
                 .map(|l| level[l.vi()])
-                .filter(|l| asg.root_level < *l && *l < max_level)
+                .filter(|l| *l < max_level)
                 .min()
             {
-                dbg!(second_level, max_level);
                 asg.cancel_until(second_level);
                 return Ok(());
             }
-            // CBT20210622 || If the conflicting clause contains one literal from the maximal
-            // CBT20210622 || decision level, we let BCP propagating that literal at the second
-            // CBT20210622 || highest decision level in conflicting cls.
-            // CBT20210622 || PREMISE: 0 < snd_l
-            // CBT20210622 || let decision: Lit = *c
-            // CBT20210622 ||     .iter()
-            // CBT20210622 ||     .find(|l| level[l.vi()] == conflicting_level)
-            // CBT20210622 ||     .unwrap();
-            // CBT20210622 || debug_assert_eq!(asg.assigned(decision), Some(false));
-            // CBT20210622 || debug_assert!(second_level < asg.level(decision.vi()));
-            // CBT20210622 || debug_assert!(
-            // CBT20210622 ||     asg.stack_iter().all(|l| l.vi() != decision.vi()),
-            // CBT20210622 ||     "assign stack contains a strange literal",
-            // CBT20210622 || );
-            // CBT20210622 || debug_assert!(asg.assign(decision.vi()).is_none());
-            // CBT20210622 || debug_assert!(c
-            // CBT20210622 ||     .iter()
-            // CBT20210622 ||     .all(|l| *l != decision || asg.assigned(*l).is_none()));
-            // CBT20210622 || let l0 = c.lit0();
-            // CBT20210622 || let l1 = c.lit1();
-            // CBT20210622 || if c.len() == 2 {
-            // CBT20210622 ||     if decision == l0 {
-            // CBT20210622 ||         asg.assign_by_implication(
-            // CBT20210622 ||             decision,
-            // CBT20210622 ||             AssignReason::Implication(ci, l1),
-            // CBT20210622 ||             snd_l,
-            // CBT20210622 ||         );
-            // CBT20210622 ||     } else {
-            // CBT20210622 ||         asg.assign_by_implication(
-            // CBT20210622 ||             decision,
-            // CBT20210622 ||             AssignReason::Implication(ci, l0),
-            // CBT20210622 ||             snd_l,
-            // CBT20210622 ||         );
-            // CBT20210622 ||     }
-            // CBT20210622 || } else {
-            // CBT20210622 ||     for (i, l) in cdb[ci].iter().enumerate() {
-            // CBT20210622 ||         if *l == decision {
-            // CBT20210622 ||             match i {
-            // CBT20210622 ||                 0 => (),
-            // CBT20210622 ||                 1 => cdb.swap_watch(ci),
-            // CBT20210622 ||                 _ => cdb.transform_by_updating_watch(ci, 0, i, false),
-            // CBT20210622 ||             }
-            // CBT20210622 ||             break;
-            // CBT20210622 ||         }
-            // CBT20210622 ||     }
-            // CBT20210622 ||     asg.assign_by_implication(
-            // CBT20210622 ||         decision,
-            // CBT20210622 ||         AssignReason::Implication(ci, NULL_LIT),
-            // CBT20210622 ||         snd_l,
-            // CBT20210622 ||     );
-            // CBT20210622 || }
-        }
-    }
-    //
-    //## backtrack to conflicting level
-    //
-    // old comment ||  conflicting level
-    // old comment ||  By mixing two restart modes, we must assume a conflicting level is under the current decision level,
-    // old comment ||  even if `use_chronobt` is off, because `use_chronobt` is a flag for future beha9vior.
-    if let Some(lv) = cdb[ci].iter().map(|l| asg.level(l.vi())).max() {
-        if lv < conflicting_level {
-            conflicting_level = lv;
+        } else if max_level < conflicting_level {
+            conflicting_level = max_level;
             asg.cancel_until(conflicting_level);
         }
     }
-    debug_assert!(cdb[ci]
-        .iter()
-        .any(|l| asg.level(l.vi()) == conflicting_level));
     asg.handle(SolverEvent::Conflict);
 
-    let mut backtrack_level = conflict_analyze(asg, cdb, state, ci).max(asg.root_level);
-    if state.new_learnt.is_empty() {
+    state.derive20.clear();
+    let assign_level = conflict_analyze(asg, cdb, state, ci).max(asg.root_level);
+    let new_learnt = &mut state.new_learnt;
+    let learnt_len = new_learnt.len();
+    if learnt_len == 0 {
         #[cfg(debug)]
         {
             println!(
@@ -147,20 +77,13 @@ pub fn handle_conflict(
                 asg.dump(asg, &cdb[ci]),
             );
         }
-
-        panic!();
         return Err(SolverError::RootLevelConflict(None));
     }
-    // asg.bump_vars(asg, cdb, ci);
-    let new_learnt = &mut state.new_learnt;
     let l0 = new_learnt[0];
-    let learnt_len = new_learnt.len();
-
     if learnt_len == 1 {
         //
         //## A NEW ASSERTION by UNIT LEARNT CLAUSE GENERATION
         //
-        // dump to certified even if it's a literal.
         match asg.assigned(l0) {
             Some(true) if asg.root_level < asg.level(l0.vi()) => {
                 panic!("eae");
@@ -170,6 +93,7 @@ pub fn handle_conflict(
                 return Err(SolverError::RootLevelConflict(None))
             }
             _ => {
+                // dump to certified even if it's a literal.
                 cdb.certificate_add_assertion(l0);
                 if asg.assign_at_root_level(l0).is_err() {
                     panic!("impossible inconsistency");
@@ -180,7 +104,7 @@ pub fn handle_conflict(
             }
         }
     }
-
+    let l1 = new_learnt[1];
     // assert: root_level < cl, which was checked already by new_learnt.is_empty().
 
     // NCB places firstUIP on level bl, while CB does it on level cl.
@@ -283,7 +207,6 @@ fn conflict_analyze(
     state: &mut State,
     conflicting_clause: ClauseId,
 ) -> DecisionLevel {
-    state.derive20.clear();
     let learnt = &mut state.new_learnt;
     learnt.clear();
     learnt.push(NULL_LIT);
@@ -416,8 +339,9 @@ fn conflict_analyze(
                             asg.var(vi),
                             asg.reason(vi),
                         );
+                        debug_assert!(lvl <= dl);
                         asg.var_mut(vi).turn_on(Flag::CA_SEEN);
-                        if dl <= lvl {
+                        if dl == lvl {
                             // println!("- flag for {} which level is {}", q.int(), lvl);
                             path_cnt += 1;
                             //
@@ -542,12 +466,12 @@ impl State {
             to_clear.push(*l);
             levels[level[l.vi()] as usize] = true;
         }
-        let _l0 = new_learnt[0];
+        let l0 = new_learnt[0];
 
         #[cfg(feature = "boundary_check")]
-        assert!(!new_learnt.is_empty());
+        debug_assert!(!new_learnt.is_empty());
 
-        // new_learnt.retain(|l| *l == l0 || !l.is_redundant(asg, cdb, &mut to_clear, &levels));
+        new_learnt.retain(|l| *l == l0 || !l.is_redundant(asg, cdb, &mut to_clear, &levels));
         let len = new_learnt.len();
         if 2 < len && len < 30 {
             cdb.minimize_with_bi_clauses(asg, new_learnt);
