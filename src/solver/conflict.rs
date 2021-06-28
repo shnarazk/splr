@@ -248,9 +248,8 @@ fn conflict_analyze(
                     asg.level(p.vi()),
                 );
             }
-            AssignReason::Decision(_) =>
-            #[cfg(feature = "boundary_check")]
-            {
+            AssignReason::Decision(_) => {
+                #[cfg(feature = "boundary_check")]
                 println!(
                         "conflict_analyze: faced a decision var:: path_cnt {} at level {}\nconflicting literal\n  {:?}\nDecisionMap\n{}\nbuliding learnt\n{}\nconflicting clause\n{}",
                         path_cnt,
@@ -273,6 +272,7 @@ fn conflict_analyze(
                             .join("\n"),
 
                     );
+                #[cfg(feature = "boundary_check")]
                 tracer(asg, cdb);
             }
             AssignReason::Implication(_, l) if l != NULL_LIT => {
