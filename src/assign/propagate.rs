@@ -596,12 +596,21 @@ impl PropagateIF for AssignStack {
     where
         C: ClauseDBIF,
     {
-        if self.decision_level() == self.root_level && 7 < !self.trail.len() {
+        assert_eq!(self.decision_level(), self.root_level);
+        loop {
+            if self.remains() {
+                self.propagate(cdb)
+                    .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
+            }
             self.propagate_at_root_level(cdb)
                 .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
+            if self.remains() {
+                self.propagate(cdb)
+                    .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
+            } else {
+                break;
+            }
         }
-        self.propagate(cdb)
-            .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
         // wipe asserted literals from trail and increment the number of asserted vars.
         self.num_asserted_vars += self.trail.len();
         self.trail.clear();
