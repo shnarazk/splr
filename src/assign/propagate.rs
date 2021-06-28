@@ -143,10 +143,12 @@ impl PropagateIF for AssignStack {
         debug_assert!(
             var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
         );
-        assert_eq!(self.assign[vi], None);
+        debug_assert_eq!(self.assign[vi], None);
+        debug_assert_eq!(self.reason[vi], AssignReason::None);
+        debug_assert!(self.trail.iter().all(|rl| *rl != l));
         set_assign!(self, l);
         self.level[vi] = lv;
-        self.reason[vi] = reason;
+        self.reason[vi] = AssignReason::Implication(cid, by.unwrap_or(NULL_LIT));
         self.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
