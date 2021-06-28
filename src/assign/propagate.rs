@@ -211,11 +211,7 @@ impl PropagateIF for AssignStack {
                     self.decision_level(),
             );
             if self.level[vi] <= lv {
-                if i < self.q_head {
-                    ooo_propagated.push(l);
-                } else {
-                    ooo_unpropagated.push(l);
-                }
+                unpropagated.push(l);
                 continue;
             }
             let v = &mut self.var[vi];
