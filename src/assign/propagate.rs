@@ -173,7 +173,8 @@ impl PropagateIF for AssignStack {
         self.level[vi] = dl;
         let v = &mut self.var[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
-        assert_eq!(self.assign[vi], None);
+        debug_assert_eq!(self.assign[vi], None);
+        debug_assert_eq!(self.reason[vi], AssignReason::None);
         set_assign!(self, l);
         self.reason[vi] = AssignReason::Decision(self.decision_level());
         self.reward_at_assign(vi);
@@ -254,7 +255,7 @@ impl PropagateIF for AssignStack {
         for i in lim..self.trail.len() {
             let l = self.trail[i];
             let vi = l.vi();
-            assert!(self.root_level < self.level[vi]);
+            debug_assert!(self.root_level < self.level[vi]);
             let v = &mut self.var[vi];
             v.set(Flag::PHASE, var_assign!(self, vi).unwrap());
             unset_assign!(self, vi);

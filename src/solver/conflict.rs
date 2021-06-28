@@ -363,7 +363,8 @@ fn conflict_analyze(
                     debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
                     debug_assert!(asg.assign(vi).is_some());
                     asg.var_mut(vi).turn_on(Flag::CA_SEEN);
-                    if dl <= lvl {
+                    debug_assert!(lvl <= dl);
+                    if dl == lvl {
                         path_cnt += 1;
                         asg.reward_at_analysis(vi);
                     } else {
@@ -384,7 +385,7 @@ fn conflict_analyze(
                 }
                 cdb.lbd_of_dp_ema.update(cdb[cid].rank as f64);
                 let c = &cdb[cid];
-                assert!(!c.is_dead());
+                debug_assert!(!c.is_dead());
 
                 #[cfg(feature = "boundary_check")]
                 if c.len() == 0 {
@@ -408,8 +409,8 @@ fn conflict_analyze(
                         if root_level == lvl {
                             continue;
                         }
-                        assert!(!asg.var(vi).is(Flag::ELIMINATED));
-                        assert!(
+                        debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
+                        debug_assert!(
                             asg.assign(vi).is_some(),
                             "conflict_analysis found {} {}",
                             asg.var(vi),
@@ -617,7 +618,7 @@ impl Lit {
                     let c = &cdb[cid];
 
                     #[cfg(feature = "boundary_check")]
-                    assert!(0 < c.len());
+                    debug_assert!(0 < c.len());
 
                     for q in &(*c)[1..] {
                         let vi = q.vi();
@@ -715,7 +716,7 @@ fn lit_level(
                 lit,
                 AssignReason::Implication(cid, b),
             );
-           debug_assert!(
+            debug_assert!(
                 cdb[cid].lit0() == !b || cdb[cid].lit1() == !b,
                 "Is the {:?} is the reason of {} (it must contain {})?\n{} => {:?}",
                 &cdb[cid],
