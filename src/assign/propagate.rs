@@ -191,8 +191,7 @@ impl PropagateIF for AssignStack {
         }
         // We assume that backtrack is never happened in level zero.
         let lim = self.trail_lim[lv as usize];
-        let mut ooo_propagated: Vec<Lit> = Vec::new();
-        let mut ooo_unpropagated: Vec<Lit> = Vec::new();
+        let mut unpropagated: Vec<Lit> = Vec::new();
         for i in lim..self.trail.len() {
             let l = self.trail[i];
             debug_assert!(
@@ -226,9 +225,9 @@ impl PropagateIF for AssignStack {
             self.insert_heap(vi);
         }
         self.trail.truncate(lim);
-        self.trail.append(&mut ooo_propagated);
+        // moved below -- self.q_head = self.trail.len();
+        self.trail.append(&mut unpropagated);
         self.q_head = self.trail.len();
-        self.trail.append(&mut ooo_unpropagated);
         debug_assert!(self
             .trail
             .iter()
