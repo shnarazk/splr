@@ -635,34 +635,60 @@ impl ClauseDBIF for ClauseDB {
             if p == old_l0 {
                 watch_cache[!p].remove_watch(&cid);
                 if old_l1 == l0 {
-                    // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
+                    debug_assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
                     watch_cache[!l1].insert_watch(cid, l0);
+
+                    #[cfg(feature = "maintain_watch_cache")]
+                    {
+                        watch_cache[!l0].update_watch(cid, l1);
+                    }
                 } else if old_l1 == l1 {
-                    // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
+                    debug_assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
                     watch_cache[!l0].insert_watch(cid, l1);
+
+                    #[cfg(feature = "maintain_watch_cache")]
+                    {
+                        watch_cache[!l1].update_watch(cid, l0);
+                    }
                 } else {
                     panic!("impossible");
                 }
             } else if p == old_l1 {
                 watch_cache[!p].remove_watch(&cid);
                 if old_l0 == l0 {
-                    // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
+                    debug_assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
                     watch_cache[!l1].insert_watch(cid, l0);
+
+                    #[cfg(feature = "maintain_watch_cache")]
+                    {
+                        watch_cache[!l0].update_watch(cid, l1);
+                    }
                 } else if old_l0 == l1 {
-                    // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
+                    debug_assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
                     watch_cache[!l0].insert_watch(cid, l1);
+
+                    #[cfg(feature = "maintain_watch_cache")]
+                    {
+                        watch_cache[!l1].update_watch(cid, l0);
+                    }
                 } else {
                     panic!("impossible");
                 }
             } else {
                 assert_eq!(old_l0, l0);
                 assert_eq!(old_l1, l1);
-
-                #[cfg(feature = "maintain_watch_cache")]
-                {
-                    // todo!();
-                }
             }
+
+            #[cfg(feature = "maintain_watch_cache")]
+            {
+                assert!(watch_cache[!c.lits[0]]
+                    .iter()
+                    .any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
+                assert!(watch_cache[!c.lits[1]]
+                    .iter()
+                    .any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
+            }
+
             // self.watches(cid, "after strengthen_by_elimination case:3-3");
         }
         if certification_store.is_active() {
