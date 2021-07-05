@@ -229,8 +229,9 @@ impl PropagateIF for AssignStack {
         }
         self.trail.truncate(lim);
         // moved below -- self.q_head = self.trail.len();
+        // see https://github.com/shnarazk/splr/issues/117
+        self.q_head = self.trail.len().min(self.q_head);
         self.trail.append(&mut unpropagated);
-        self.q_head = self.trail.len();
         debug_assert!(self
             .trail
             .iter()
