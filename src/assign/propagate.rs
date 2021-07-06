@@ -442,6 +442,7 @@ impl PropagateIF for AssignStack {
                         .chain(c.iter().enumerate().skip(2).take(start - 2))
                     {
                         if lit_assign!(self, *lk) != Some(false) {
+                            let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
                             cdb[cid].search_from = k + 1;
