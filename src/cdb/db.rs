@@ -1150,6 +1150,10 @@ impl ClauseDBIF for ClauseDB {
                 .clone(),
         );
     }
+    #[cfg(feature = "boundary_check")]
+    fn watch_cache_contains(&self, lit: Lit, cid: ClauseId) -> bool {
+        self.watch_cache[lit].iter().any(|w| w.0 == cid)
+    }
     fn watch_caches(&self, cid: ClauseId, mes: &str) -> (Vec<Lit>, Vec<Lit>) {
         // let mut _found = None;
         debug_assert!(!cid.is_lifted_lit());

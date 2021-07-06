@@ -111,7 +111,11 @@ pub struct Var {
     timestamp: usize,
     /// the `Flag`s
     flags: Flag,
-    pub propagated_at: isize,
+
+    #[cfg(feature = "boundary_check")]
+    pub propagated_at: usize,
+    #[cfg(feature = "boundary_check")]
+    pub state: VarState,
 }
 
 /// A record of assignment. It's called 'trail' in Glucose.
@@ -205,14 +209,15 @@ pub struct VarIdHeap {
 }
 
 #[cfg(feature = "boundary_check")]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Assign {
-    pub lit: i32,
-    pub val: Option<bool>,
+    pub at: usize,
     pub pos: Option<usize>,
     pub lvl: DecisionLevel,
+    pub lit: i32,
+    pub val: Option<bool>,
     pub by: AssignReason,
-    pub at: isize,
+    pub state: VarState,
 }
 
 #[cfg(feature = "boundary_check")]
@@ -237,6 +242,7 @@ fn make_lit_report(asg: &AssignStack, lit: &Lit) -> Assign {
         lvl: asg.level(vi),
         by: asg.reason(vi),
         at: asg.var(vi).propagated_at,
+        state: asg.var[vi].state,
     }
 }
 
@@ -259,9 +265,12 @@ impl DebugReportIF for [Lit] {
 #[cfg(feature = "boundary_check")]
 impl DebugReportIF for Clause {
     fn report(&self, asg: &AssignStack) -> Vec<Assign> {
-        self.iter()
+        let mut l = self
+            .iter()
             .map(|l| make_lit_report(asg, l))
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>();
+        l.sort();
+        l
     }
 }
 

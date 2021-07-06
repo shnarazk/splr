@@ -179,12 +179,21 @@ impl SolveIF for Solver {
                 // As a preparation for incremental solving, we need to backtrack to the
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
-                // check(asg, cdb, true, "Before extending the model");
+                #[cfg(feature = "boundary_check")]
+                check(asg, cdb, true, "Before extending the model");
+
                 #[cfg(fueature = "boundary_check")]
                 check(asg, cdb, true, "Before extending the model");
+
                 let model = asg.extend_model(cdb, elim.eliminated_lits());
+
                 #[cfg(fueature = "boundary_check")]
-                check(asg, cdb, true, "After extending the model");
+                check(
+                    asg,
+                    cdb,
+                    true,
+                    "After extending the model, (passed before extending)",
+                );
 
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
@@ -359,12 +368,29 @@ fn search(
 }
 
 #[cfg(feature = "boundary_check")]
+#[allow(dead_code)]
 fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
     if let Some(cid) = cdb.validate(asg.assign_ref(), all) {
         println!("{}", message);
-        println!("level {}", asg.decision_level());
+        println!(
+            "falsifies by {} at level {}, NumConf {}",
+            cid,
+            asg.decision_level(),
+            asg.derefer(assign::property::Tusize::NumConflict),
+        );
         assert!(asg.stack_iter().all(|l| asg.assigned(*l) == Some(true)));
-        println!("|   pos |   time | level |   literal  |  assignment |               reason |");
+        let (c0, c1) = cdb.watch_caches(cid, "check (search 441)");
+        println!(
+            " which was born at {}, and used in conflict analysis at {}",
+            cdb[cid].birth,
+            cdb[cid].timestamp(),
+        );
+        println!(
+            " which was moved among watch caches at {:?}",
+            cdb[cid].moved_at
+        );
+        println!("Its literals: {}", &cdb[cid]);
+        println!(" |   pos |   time | level |   literal  |  assignment |               reason |");
         let l0 = i32::from(cdb[cid].lit0());
         let l1 = i32::from(cdb[cid].lit1());
         use crate::assign::DebugReportIF;

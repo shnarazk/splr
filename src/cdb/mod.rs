@@ -47,6 +47,8 @@ pub trait ClauseIF {
     fn to_vivify(&self, threshold: usize) -> Option<f64>;
     /// clear flags about vivification
     fn vivified(&mut self);
+
+    #[cfg(feature = "boundary_check")]
     fn set_birth(&mut self, time: usize);
 }
 
@@ -162,6 +164,9 @@ pub trait ClauseDBIF:
     #[cfg(feature = "incremental_solver")]
     /// save an eliminated permanent clause to an extra space for incremental solving.
     fn make_permanent_immortal(&mut self, cid: ClauseId);
+    #[cfg(feature = "boundary_check")]
+    // return true if cid is included in watching literals
+    fn watch_cache_contains(&self, lit: Lit, cid: ClauseId) -> bool;
     /// return a clause's watches
     fn watch_caches(&self, cid: ClauseId, message: &str) -> (Vec<Lit>, Vec<Lit>);
     /// complete bi-clause network
@@ -198,8 +203,10 @@ pub struct Clause {
     timestamp: usize,
     /// Flags
     flags: Flag,
-    /// temp
+
+    #[cfg(feature = "boundary_check")]
     pub birth: usize,
+    #[cfg(feature = "boundary_check")]
     pub moved_at: Propagate,
 }
 

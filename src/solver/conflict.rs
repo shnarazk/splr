@@ -162,11 +162,14 @@ pub fn handle_conflict(
             cdb.complete_bi_clauses(asg);
         }
         RefClause::Clause(cid) => {
+
+            #[cfg(feature = "boundary_check")]
             cdb[cid].set_birth(asg.num_conflict);
+
             debug_assert_eq!(cdb[cid].lit0(), l0);
             debug_assert_eq!(asg.assigned(l0), None);
             asg.assign_by_implication(l0, assign_level, cid, None);
-            check_graph(asg, cdb, l0, "clause");
+            // || check_graph(asg, cdb, l0, "clause");
             let lbd = cdb[cid].rank;
             rst.update(ProgressUpdate::LBD(lbd));
             elim.to_simplify += 1.0 / learnt_len as f64;
@@ -187,7 +190,7 @@ pub fn handle_conflict(
             debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
             asg.assign_by_implication(l0, assign_level, cid, Some(!l1));
-            check_graph(asg, cdb, l0, "registeredclause");
+            // || check_graph(asg, cdb, l0, "registeredclause");
         }
         RefClause::UnitClause(_) => panic!("impossible"),
     }
@@ -386,7 +389,7 @@ fn conflict_analyze(
             learnt.clear();
             return asg.root_level;
         }
-        */
+         */
         // set the index of the next literal to ti
         while {
             let vi = asg.stack(ti).vi();
@@ -573,6 +576,7 @@ impl Lit {
     }
 }
 
+#[allow(dead_code)]
 fn check_graph(asg: &AssignStack, cdb: &ClauseDB, lit: Lit, mes: &str) {
     let its_level = asg.level(lit.vi());
     let mut children = Vec::new();
@@ -580,6 +584,7 @@ fn check_graph(asg: &AssignStack, cdb: &ClauseDB, lit: Lit, mes: &str) {
     assert!(precedents <= its_level);
 }
 
+#[allow(dead_code)]
 fn lit_level(
     asg: &AssignStack,
     cdb: &ClauseDB,
@@ -680,7 +685,7 @@ fn tracer(asg: &AssignStack, cdb: &ClauseDB) {
     use std::io::{self, Write};
     loop {
         let mut input = String::new();
-        print!("cid: ");
+        print!("cid(or 0 for quit): ");
         std::io::stdout().flush().expect("IO error");
         io::stdin().read_line(&mut input).expect("IO error");
         if input.is_empty() {
