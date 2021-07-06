@@ -408,8 +408,8 @@ impl PropagateIF for AssignStack {
                     if cached != other {
                         cached = other;
                         other_watch_value = lit_assign!(self, other);
-                        if let Some(true) = other_watch_value {
-                            debug_assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));
+                        if Some(true) == other_watch_value {
+                            debug_assert!(!self.var[other.vi()].is(Flag::ELIMINATED));
                             // In this path, we use only `AssignStack::assign`.
                             // assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
                             cdb.transform_by_restoring_watch_cache(
@@ -608,7 +608,7 @@ impl PropagateIF for AssignStack {
                     if cached != other {
                         cached = other;
                         other_watch_value = lit_assign!(self, other);
-                        if let Some(true) = other_watch_value {
+                        if Some(true) == other_watch_value {
                             debug_assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));
                             cdb.transform_by_restoring_watch_cache(
                                 propagating,
