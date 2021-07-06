@@ -60,7 +60,8 @@ pub fn vivify(
         asg.backtrack_sandbox();
         assert_eq!(asg.decision_level(), asg.root_level);
         if asg.remains() {
-            asg.propagate(cdb);
+            asg.propagate(cdb)
+                .map_or(Ok(()), |cid| Err(SolverError::RootLevelConflict(Some(cid))))?;
         }
 
         debug_assert!(asg.stack_is_empty() || !asg.remains());
