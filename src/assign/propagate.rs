@@ -318,8 +318,8 @@ impl PropagateIF for AssignStack {
             // Therefore keys to access appropriate targets have the opposite phases.
             //
             for (&blocker, &cid) in cdb.bi_clause_map(false_lit).iter() {
-                assert!(!cdb[cid].is_dead());
-                assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
+                debug_assert!(!cdb[cid].is_dead());
+                debug_assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
 
                 #[cfg(feature = "boundary_check")]
@@ -340,8 +340,8 @@ impl PropagateIF for AssignStack {
                         return Some(cid);
                     }
                     None => {
-                        assert!(!cdb[cid].is_dead());
-                        assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
+                        debug_assert!(!cdb[cid].is_dead());
+                        debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
                         self.assign_by_implication(
                             blocker,
                             self.level[propagating.vi()],
@@ -369,12 +369,21 @@ impl PropagateIF for AssignStack {
                         .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
                 }
             } {
-                assert!(
+                debug_assert!(
                     !cdb[cid].is_dead(),
                     "dead clause in propagation: {:?}",
                     cdb.is_garbage_collected(cid),
                 );
-                assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));
+                debug_assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));
+                #[cfg(feature = "maintain_watch_cache")]
+                debug_assert!(
+                    cached == cdb[cid].lit0() || cached == cdb[cid].lit1(),
+                    "mismatch watch literal and its cache {}: l0 {}  l1 {}, timestamp: {:?}",
+                    cached,
+                    cdb[cid].lit0(),
+                    cdb[cid].lit1(),
+                    cdb[cid].timestamp(),
+                );
                 // FIXME: assert!(!self.var[wc.1.vi()].is(Flag::ELIMINATED));
                 // assert_ne!(other_watch.vi(), false_lit.vi());
                 // assert!(other_watch == cdb[cid].lit0() || other_watch == cdb[cid].lit1());
@@ -436,7 +445,20 @@ impl PropagateIF for AssignStack {
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
                             cdb[cid].search_from = k + 1;
-                            cdb[cid].moved_at = Propagate::FindNewWatch(self.num_conflict);
+                            debug_assert!(
+                                self.assigned(!new_watch) == Some(true)
+                                    || self.assigned(!new_watch) == None
+                            );
+
+                            #[cfg(feature = "boundary_check")]
+                            {
+                                cdb[cid].moved_at = Propagate::FindNewWatch(
+                                    self.num_conflict,
+                                    propagating,
+                                    new_watch,
+                                );
+                            }
+
                             continue 'next_clause;
                         }
                     }
@@ -613,7 +635,6 @@ impl PropagateIF for AssignStack {
                         .chain(c.iter().enumerate().skip(2).take(start - 2))
                     {
                         if lit_assign!(self, *lk) != Some(false) {
-
                             #[cfg(feature = "boundary_check")]
                             let new_watch = !*lk;
 

@@ -402,23 +402,35 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
             lvl,
             by: reason,
             at,
+            state,
         } in cdb[cid].report(asg).iter()
         {
             println!(
-                "|{:>6} | {:>6} |{:>6} | {:9}{} | {:11} | {:20} |",
+                " |{:>6} | {:>6} |{:>6} | {:9}{} | {:11} | {:20} | {:?}",
                 pos.unwrap_or(0),
                 at,
                 lvl,
                 lit,
                 if *lit == l0 || *lit == l1 { '*' } else { ' ' },
-                format!("{:?}", val,),
+                format!("{:?}", val),
                 format!("{}", reason),
+                state,
             );
         }
-        println!();
+        println!(
+            " - L0 {} has complements {:?} in its cache",
+            cdb[cid].lit0(),
+            c0
+        );
+        println!(
+            " - L1 {} has complements {:?} in its cache",
+            cdb[cid].lit1(),
+            c1
+        );
+        println!("The last assigned literal in stack:");
         let last_lit = asg.stack(asg.stack_len() - 1);
         println!(
-            "|{:>6} | {:>6} |{:>6} | {:9}  | {:11} | {:20} |",
+            " |{:>6} | {:>6} |{:>6} | {:9}  | {:11} | {:20} |",
             asg.stack_len() - 1,
             asg.var(last_lit.vi()).propagated_at,
             asg.level(last_lit.vi()),
@@ -426,34 +438,7 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
             format!("{:?}", asg.assigned(last_lit),),
             format!("{}", asg.reason(last_lit.vi())),
         );
-        println!("clause {}: {}", cid, &cdb[cid]);
-        let (c0, c1) = cdb.watch_caches(cid, "check (search 441)");
-        println!(
-            " which was born at {}, and used in conflict analysis at {}",
-            cdb[cid].birth,
-            cdb[cid].timestamp(),
-        );
-        println!(
-            " which was moved among watch caches at {:?}",
-            cdb[cid].moved_at
-        );
-        println!(
-            " - L1 {} has complements {:?} in its cache",
-            cdb[cid].lit0(),
-            c0
-        );
-        println!(
-            " - L2 {} has complements {:?} in its cache",
-            cdb[cid].lit1(),
-            c1
-        );
-        panic!(
-            "Before extending, NC {}, Level {} generated assignment({:?}) falsifies by {}",
-            asg.derefer(assign::property::Tusize::NumConflict),
-            asg.decision_level(),
-            cdb.validate(asg.assign_ref(), false).is_none(),
-            cid,
-        );
+        panic!();
     }
 }
 

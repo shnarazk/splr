@@ -554,6 +554,13 @@ impl ClauseDBIF for ClauseDB {
             }
         }
 
+        // let cid = self.watch_cache[l][iter.index].0;
+        // let c = &self[cid];
+        // let l0 = c.lits[0];
+        // let l1 = c.lits[1];
+        // assert!(self.watch_cache[!l0].iter().any(|wc| wc.0 == cid && wc.1 == l1));
+        // assert!(self.watch_cache[!l1].iter().any(|wc| wc.0 == cid && wc.1 == l0));
+
         iter.restore_entry();
     }
     // return a Lit if the clause becomes a unit clause.
@@ -569,7 +576,7 @@ impl ClauseDBIF for ClauseDB {
         //
 
         // self.watches(cid, "before strengthen_by_elimination");
-        assert!(!self[cid].is_dead());
+        debug_assert!(!self[cid].is_dead());
         debug_assert!(1 < self[cid].len());
         let ClauseDB {
             ref mut clause,
@@ -681,10 +688,10 @@ impl ClauseDBIF for ClauseDB {
 
             #[cfg(feature = "maintain_watch_cache")]
             {
-                assert!(watch_cache[!c.lits[0]]
+                debug_assert!(watch_cache[!c.lits[0]]
                     .iter()
                     .any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
-                assert!(watch_cache[!c.lits[1]]
+                debug_assert!(watch_cache[!c.lits[1]]
                     .iter()
                     .any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
             }
@@ -708,7 +715,7 @@ impl ClauseDBIF for ClauseDB {
         // 2. a normal clause becomes a new bi-clause.             [Case:2]
         // 3. a normal clause becomes a shorter normal clause.     [Case:3]
         //
-        assert!(!self[cid].is_dead());
+        debug_assert!(!self[cid].is_dead());
         let ClauseDB {
             clause,
             bi_clause,
@@ -794,6 +801,9 @@ impl ClauseDBIF for ClauseDB {
                 // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
                 watch_cache[!l1].insert_watch(cid, l0);
             }
+
+            // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
+            // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
 
             if certification_store.is_active() {
                 certification_store.push_add(&new_lits);
@@ -909,15 +919,15 @@ impl ClauseDBIF for ClauseDB {
                 } else if old_l0 == l0 {
                     // assert_ne!(old_l1, l1);
                     watch_cache[!old_l1].remove_watch(&cid);
-                    watch_cache[!l0].update_watch(cid, l1); // .insert_watch(cid, l1);
-                                                            // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
+                    watch_cache[!l0].update_watch(cid, l1);
+                    // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
                     watch_cache[!l1].insert_watch(cid, l0);
                 } else if old_l0 == l1 {
                     // assert_ne!(old_l1, l0);
                     watch_cache[!old_l1].remove_watch(&cid);
                     // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
                     watch_cache[!l0].insert_watch(cid, l1);
-                    watch_cache[!l1].update_watch(cid, l0); // .insert_watch(cid, l0);
+                    watch_cache[!l1].update_watch(cid, l0);
                 } else if old_l1 == l0 {
                     // assert_ne!(old_l0, l1);
                     watch_cache[!old_l0].remove_watch(&cid);
@@ -936,6 +946,10 @@ impl ClauseDBIF for ClauseDB {
                     // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
                     watch_cache[!l1].insert_watch(cid, l0);
                 }
+
+                // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
+                // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
+
                 if certification_store.is_active() {
                     certification_store.push_add(&c.lits);
                     certification_store.push_delete(&new_lits);
@@ -968,7 +982,7 @@ impl ClauseDBIF for ClauseDB {
 
         assert!(!self[cid].is_dead());
         assert!(old < 2);
-        assert!(1 < new);
+        debug_assert!(1 < new);
         let ClauseDB {
             ref mut clause,
             ref mut watch_cache,
@@ -976,11 +990,11 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         let other = (old == 0) as usize;
-        if !removed {
+        if removed {
+            debug_assert!(watch_cache[!c.lits[old]].get_watch(&cid).is_none());
+        } else {
             //## Step:1
             watch_cache[!c.lits[old]].remove_watch(&cid);
-        } else {
-            debug_assert!(watch_cache[!c.lits[old]].get_watch(&cid).is_none());
         }
         //## Step:2
         // assert!(watch_cache[!c.lits[new]].iter().all(|e| e.0 != cid));
@@ -993,8 +1007,9 @@ impl ClauseDBIF for ClauseDB {
         }
 
         c.lits.swap(old, new);
-        debug_assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid));
-        debug_assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid));
+
+        // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
+        // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
     }
     fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where
@@ -1256,8 +1271,8 @@ impl ClauseDBIF for ClauseDB {
             }
             let level = asg.level(lit.vi());
             for (cached, cid) in wc.iter() {
-                assert!(self[cid].lits.contains(&lit));
-                assert!(self[cid].lits.contains(&cached));
+                debug_assert!(self[cid].lits.contains(&lit));
+                debug_assert!(self[cid].lits.contains(&cached));
                 if let Some(true) = asg.assigned(*cached) {
                     continue;
                 }
