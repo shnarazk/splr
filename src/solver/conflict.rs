@@ -147,13 +147,15 @@ pub fn handle_conflict(
     );
     match cdb.new_clause(asg, new_learnt, true) {
         RefClause::Clause(cid) if learnt_len == 2 => {
+            #[cfg(feature = "boundary_check")]
             cdb[cid].set_birth(asg.num_conflict);
+
             debug_assert_eq!(l0, cdb[cid].lit0());
             debug_assert_eq!(l1, cdb[cid].lit1());
             debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
             asg.assign_by_implication(l0, assign_level, cid, Some(!l1));
-            check_graph(asg, cdb, l0, "biclause");
+            // || check_graph(asg, cdb, l0, "biclause");
             rst.update(ProgressUpdate::LBD(1));
             elim.to_simplify += 0.5;
             for cid in &state.derive20 {
@@ -162,7 +164,6 @@ pub fn handle_conflict(
             cdb.complete_bi_clauses(asg);
         }
         RefClause::Clause(cid) => {
-
             #[cfg(feature = "boundary_check")]
             cdb[cid].set_birth(asg.num_conflict);
 
