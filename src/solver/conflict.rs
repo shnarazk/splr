@@ -41,25 +41,27 @@ pub fn handle_conflict(
     let chronobt = 1000 < asg.num_conflict && 0 < state.config.c_cbt_thr;
     rst.update(ProgressUpdate::Counter);
     // rst.block_restart(); // to update asg progress_evaluator
-    if chronobt && state.config.c_cbt_thr < conflicting_level {
-        let level = asg.level_ref();
-        let c = &mut cdb[ci];
-        debug_assert!(!c.is_dead());
-        let max_level = c.iter().map(|l| level[l.vi()]).max().unwrap();
-        if 1 == c.iter().filter(|l| level[l.vi()] == max_level).count() {
-            if let Some(second_level) = c
-                .iter()
-                .map(|l| level[l.vi()])
-                .filter(|l| *l < max_level)
-                .min()
-            {
-                asg.cancel_until(second_level);
-                return Ok(());
-            }
-        } else if max_level < conflicting_level {
-            conflicting_level = max_level;
-            asg.cancel_until(conflicting_level);
+
+    let level = asg.level_ref();
+    let c = &mut cdb[ci];
+    debug_assert!(!c.is_dead());
+    let max_level = c.iter().map(|l| level[l.vi()]).max().unwrap();
+    if chronobt
+        && state.config.c_cbt_thr < conflicting_level
+        && 1 == c.iter().filter(|l| level[l.vi()] == max_level).count()
+    {
+        if let Some(second_level) = c
+            .iter()
+            .map(|l| level[l.vi()])
+            .filter(|l| *l < max_level)
+            .min()
+        {
+            asg.cancel_until(second_level);
+            return Ok(());
         }
+    } else if max_level < conflicting_level {
+        conflicting_level = max_level;
+        asg.cancel_until(conflicting_level);
     }
     asg.handle(SolverEvent::Conflict);
 
