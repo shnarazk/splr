@@ -388,8 +388,11 @@ impl PropagateIF for AssignStack {
                 // assert_ne!(other_watch.vi(), false_lit.vi());
                 // assert!(other_watch == cdb[cid].lit0() || other_watch == cdb[cid].lit1());
                 let mut other_watch_value = lit_assign!(self, cached);
-                if let Some(true) = other_watch_value {
-                    debug_assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));
+                let mut updated_cache: Option<Lit> = None;
+                if Some(true) == other_watch_value {
+                    #[cfg(feature = "maintain_watch_cache")]
+                    debug_assert!(cdb[cid].lit0() == cached || cdb[cid].lit1() == cached);
+
                     // In this path, we use only `AssignStack::assign`.
                     // assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
                     cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
@@ -468,7 +471,7 @@ impl PropagateIF for AssignStack {
                     }
                 }
                 // cdb.reregister_watch_cache(propagating, Some(wc_proxy));
-                cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
+                cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
                 if other_watch_value == Some(false) {
                     self.num_conflict += 1;
                     self.dpc_ema.update(self.num_decision);
@@ -492,10 +495,16 @@ impl PropagateIF for AssignStack {
                     .map(|l| self.level[l.vi()])
                     .max()
                     .unwrap_or(self.root_level);
-                assert_eq!(cdb[cid].lit0(), cached);
-                assert_eq!(self.assigned(cached), None);
-                self.assign_by_implication(cached, lv, cid, None);
-                cdb[cid].moved_at = Propagate::BecameUnit(self.num_conflict);
+                debug_assert_eq!(cdb[cid].lit0(), cached);
+                debug_assert_eq!(self.assigned(cached), None);
+                if other_watch_value.is_none() {
+                    self.assign_by_implication(cached, lv, cid, None);
+                }
+
+                #[cfg(feature = "boundary_check")]
+                {
+                    cdb[cid].moved_at = Propagate::BecameUnit(self.num_conflict, cached);
+                }
             }
         }
         let na = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
