@@ -110,6 +110,7 @@ pub fn vivify(
                                 return Err(SolverError::RootLevelConflict(Some(cid)));
                             }
                             1 => {
+                                cdb.certificate_add_assertion(vec[0]);
                                 asg.assign_at_root_level(vec[0])?;
                                 num_assert += 1;
                             }

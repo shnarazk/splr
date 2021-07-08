@@ -113,12 +113,14 @@ impl SolveIF for Solver {
                         if m == 0 {
                             let l = Lit::from((vi, true));
                             assert!(asg.assigned(l).is_none());
+                            cdb.certificate_add_assertion(l);
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
                         } else if p == 0 {
                             let l = Lit::from((vi, false));
                             assert!(asg.assigned(l).is_none());
+                            cdb.certificate_add_assertion(l);
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }

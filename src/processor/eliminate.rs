@@ -90,12 +90,12 @@ where
                         }
                         None => {
                             assert!(asg.assigned(lit).is_none());
+                            cdb.certificate_add_assertion(lit);
                             if asg.assign_at_root_level(lit).is_err() {
                                 return Err(SolverError::RootLevelConflict(Some(ClauseId::from(
                                     lit,
                                 ))));
                             }
-                            cdb.certificate_add_assertion(lit);
                         }
                     }
                 }
