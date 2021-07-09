@@ -112,11 +112,15 @@ impl SolveIF for Solver {
                     {
                         if m == 0 {
                             let l = Lit::from((vi, true));
+                            assert!(asg.assigned(l).is_none());
+                            cdb.certificate_add_assertion(l);
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
                         } else if p == 0 {
                             let l = Lit::from((vi, false));
+                            assert!(asg.assigned(l).is_none());
+                            cdb.certificate_add_assertion(l);
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
@@ -177,9 +181,21 @@ impl SolveIF for Solver {
                 // As a preparation for incremental solving, we need to backtrack to the
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
-                // check(asg, cdb, true, "Before extending the model");
+                #[cfg(feature = "boundary_check")]
+                check(asg, cdb, true, "Before extending the model");
+
+                #[cfg(fueature = "boundary_check")]
+                check(asg, cdb, true, "Before extending the model");
+
                 let model = asg.extend_model(cdb, elim.eliminated_lits());
-                check(asg, cdb, true, "After extending the model");
+
+                #[cfg(fueature = "boundary_check")]
+                check(
+                    asg,
+                    cdb,
+                    true,
+                    "After extending the model, (passed before extending)",
+                );
 
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
@@ -353,43 +369,78 @@ fn search(
     Ok(true)
 }
 
+#[cfg(feature = "boundary_check")]
 #[allow(dead_code)]
 fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
     if let Some(cid) = cdb.validate(asg.assign_ref(), all) {
         println!("{}", message);
-        println!("| trail pos | level |   literal  |  assignment  |                  reason  |");
+        println!(
+            "falsifies by {} at level {}, NumConf {}",
+            cid,
+            asg.decision_level(),
+            asg.derefer(assign::property::Tusize::NumConflict),
+        );
+        assert!(asg.stack_iter().all(|l| asg.assigned(*l) == Some(true)));
+        let (c0, c1) = cdb.watch_caches(cid, "check (search 441)");
+        println!(
+            " which was born at {}, and used in conflict analysis at {}",
+            cdb[cid].birth,
+            cdb[cid].timestamp(),
+        );
+        println!(
+            " which was moved among watch caches at {:?}",
+            cdb[cid].moved_at
+        );
+        println!("Its literals: {}", &cdb[cid]);
+        println!(" |   pos |   time | level |   literal  |  assignment |               reason |");
         let l0 = i32::from(cdb[cid].lit0());
         let l1 = i32::from(cdb[cid].lit1());
-        for (t, lv, lit, reason, assign) in asg.dump(&cdb[cid]).iter() {
+        use crate::assign::DebugReportIF;
+
+        for assign::Assign {
+            lit,
+            val,
+            pos,
+            lvl,
+            by: reason,
+            at,
+            state,
+        } in cdb[cid].report(asg).iter()
+        {
             println!(
-                "|{:>10} |{:>6} | {:9}{} | {:12} | {:24} |",
-                t,
-                lv,
+                " |{:>6} | {:>6} |{:>6} | {:9}{} | {:11} | {:20} | {:?}",
+                pos.unwrap_or(0),
+                at,
+                lvl,
                 lit,
                 if *lit == l0 || *lit == l1 { '*' } else { ' ' },
-                format!(
-                    "{:?}",
-                    assign,
-                    // if asg.var(lit.abs() as usize).is(Flag::PROPAGATED) {
-                    //     "x"
-                    // } else {
-                    //     "!"
-                    // },
-                ),
+                format!("{:?}", val),
                 format!("{}", reason),
+                state,
             );
         }
-        println!("clause detail: {}", &cdb[cid]);
-        let (c0, c1) = cdb.watch_caches(cid, "check (search 441)");
-        println!("watch{} has blocker cache {}", cdb[cid].lit0(), c0);
-        println!("watch{} has blocker cache {}", cdb[cid].lit1(), c1);
-        panic!(
-            "Before extending, NC {}, Level {} generated assignment({:?}) falsifies by {}",
-            asg.derefer(assign::property::Tusize::NumConflict),
-            asg.decision_level(),
-            cdb.validate(asg.assign_ref(), false).is_none(),
-            cid,
+        println!(
+            " - L0 {} has complements {:?} in its cache",
+            cdb[cid].lit0(),
+            c0
         );
+        println!(
+            " - L1 {} has complements {:?} in its cache",
+            cdb[cid].lit1(),
+            c1
+        );
+        println!("The last assigned literal in stack:");
+        let last_lit = asg.stack(asg.stack_len() - 1);
+        println!(
+            " |{:>6} | {:>6} |{:>6} | {:9}  | {:11} | {:20} |",
+            asg.stack_len() - 1,
+            asg.var(last_lit.vi()).propagated_at,
+            asg.level(last_lit.vi()),
+            i32::from(last_lit),
+            format!("{:?}", asg.assigned(last_lit),),
+            format!("{}", asg.reason(last_lit.vi())),
+        );
+        panic!();
     }
 }
 
@@ -430,7 +481,7 @@ fn analyze_final(asg: &mut AssignStack, state: &mut State, c: &Clause) {
     for l in asg.stack_range(0..asg.len_upto(asg.root_level)) {
         let vi = l.vi();
         if seen[vi] {
-            if asg.reason(vi) == AssignReason::default() {
+            if let AssignReason::Decision(_) = asg.reason(vi) {
                 state.conflicts.push(!*l);
             } else {
                 let level = asg.level_ref();

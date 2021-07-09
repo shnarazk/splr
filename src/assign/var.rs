@@ -16,6 +16,11 @@ impl Default for Var {
             reward: 0.0,
             timestamp: 0,
             flags: Flag::empty(),
+
+            #[cfg(feature = "boundary_check")]
+            propagated_at: 0,
+            #[cfg(feature = "boundary_check")]
+            state: VarState::Unassigned(0),
         }
     }
 }
@@ -158,7 +163,7 @@ impl VarManipulateIF for AssignStack {
 impl AssignStack {
     /// make a var asserted.
     pub fn make_var_asserted(&mut self, vi: VarId) {
-        self.reason[vi] = AssignReason::None;
+        self.reason[vi] = AssignReason::Asserted(self.num_conflict);
         self.var[vi].timestamp = self.ordinal;
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);

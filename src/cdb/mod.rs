@@ -47,6 +47,9 @@ pub trait ClauseIF {
     fn to_vivify(&self, threshold: usize) -> Option<f64>;
     /// clear flags about vivification
     fn vivified(&mut self);
+
+    #[cfg(feature = "boundary_check")]
+    fn set_birth(&mut self, time: usize);
 }
 
 /// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`remove_clause`](`crate::cdb::ClauseDBIF::remove_clause`), and so on.
@@ -67,14 +70,37 @@ pub trait ClauseDBIF:
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
     /// return a watcher list for bi-clauses
     fn bi_clause_map(&self, l: Lit) -> &BiClause;
+
+    //
+    //## abstraction to watch_cache
+    //
+
+    // get mutable reference to a watch_cache
+    fn fetch_watch_cache_entry(&self, lit: Lit, index: WatchCacheProxy) -> (ClauseId, Lit);
     /// replace the mutable watcher list with an empty one, and return the list
-    fn detach_watch_cache(&mut self, l: Lit) -> WatchCache;
+    fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator;
+    /// detach the watch_cache referred by the head of a watch_cache iterator
+    fn detach_watch_cache(&mut self, l: Lit, iter: &mut WatchCacheIterator);
     /// register the clause to the previous watch cache
-    fn reregister_watch_cache(&mut self, p: Lit, target: Option<(ClauseId, Lit)>) -> bool;
+    fn reregister_watch_cache(&mut self, l: Lit, target: Option<WatchCacheProxy>);
+    /// restore detached watch cache
+    fn restore_detached_watch_cache(&mut self, l: Lit, wi: WatchCacheIterator);
     /// Merge two watch cache
-    fn merge_watch_cache(&mut self, p: Lit, wc: WatchCache);
+    fn merge_watch_cache(&mut self, l: Lit, wc: WatchCache);
     /// swap the first two literals in a clause.
     fn swap_watch(&mut self, cid: ClauseId);
+
+    //
+    //## clause transformation
+    //
+
+    /// TODO
+    fn transform_by_restoring_watch_cache(
+        &mut self,
+        l: Lit,
+        iter: &mut WatchCacheIterator,
+        p: Option<Lit>,
+    );
     /// swap i-th watch with j-th literal then update watch caches correctly
     fn transform_by_updating_watch(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool);
     /// allocate a new clause and return its id.
@@ -138,10 +164,18 @@ pub trait ClauseDBIF:
     #[cfg(feature = "incremental_solver")]
     /// save an eliminated permanent clause to an extra space for incremental solving.
     fn make_permanent_immortal(&mut self, cid: ClauseId);
+    #[cfg(feature = "boundary_check")]
+    // return true if cid is included in watching literals
+    fn watch_cache_contains(&self, lit: Lit, cid: ClauseId) -> bool;
     /// return a clause's watches
-    fn watch_caches(&self, cid: ClauseId, message: &str) -> (Lit, Lit);
+    fn watch_caches(&self, cid: ClauseId, message: &str) -> (Vec<Lit>, Vec<Lit>);
     /// complete bi-clause network
     fn complete_bi_clauses<A>(&mut self, asg: &mut A)
+    where
+        A: AssignIF;
+    /// for debug
+    fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool>;
+    fn check_consistency<A>(&mut self, asg: &A)
     where
         A: AssignIF;
 }
@@ -169,6 +203,11 @@ pub struct Clause {
     timestamp: usize,
     /// Flags
     flags: Flag,
+
+    #[cfg(feature = "boundary_check")]
+    pub birth: usize,
+    #[cfg(feature = "boundary_check")]
+    pub moved_at: Propagate,
 }
 
 /// Clause database
@@ -182,7 +221,10 @@ pub struct Clause {
 pub struct ClauseDB {
     /// container of clauses
     clause: Vec<Clause>,
-    /// container of watch literals for binary clauses
+    /// hashed representation of binary clauses.
+    ///## Note
+    /// This means a biclause [l0, l1] is stored at bi_clause[l0] instead of bi_clause[!l0].
+    ///
     pub bi_clause: Vec<BiClause>,
     /// container of watch literals
     pub watch_cache: Vec<WatchCache>,

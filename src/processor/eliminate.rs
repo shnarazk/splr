@@ -89,12 +89,13 @@ where
                             return Err(SolverError::RootLevelConflict(Some(ClauseId::from(lit))))
                         }
                         None => {
+                            assert!(asg.assigned(lit).is_none());
+                            cdb.certificate_add_assertion(lit);
                             if asg.assign_at_root_level(lit).is_err() {
                                 return Err(SolverError::RootLevelConflict(Some(ClauseId::from(
                                     lit,
                                 ))));
                             }
-                            cdb.certificate_add_assertion(lit);
                         }
                     }
                 }
@@ -124,7 +125,7 @@ where
         if cdb[*cid].is_dead() {
             continue;
         }
-        debug_assert!(!asg.locked(&cdb[*cid], *cid));
+        assert!(!asg.locked(&cdb[*cid], *cid));
         #[cfg(feature = "incremental_solver")]
         {
             if !cdb[*cid].is(Flag::LEARNT) {
@@ -138,7 +139,7 @@ where
         if cdb[*cid].is_dead() {
             continue;
         }
-        debug_assert!(!asg.locked(&cdb[*cid], *cid));
+        assert!(!asg.locked(&cdb[*cid], *cid));
         #[cfg(feature = "incremental_solver")]
         {
             if !cdb[*cid].is(Flag::LEARNT) {
