@@ -16,12 +16,14 @@ bitflags = "1.2"
 
 [features]
 default = [
+           # DEBUG "boundary_check",
            "bi_clause_completion",
            "clause_elimination",
            "clause_reduction",
            "clause_vivification",
            "LR_rewarding",
            "Luby_stabilization",
+           # DEBUG "maintain_watch_cache",
            "reason_side_rewarding",
            "rephase",
            "unsafe_access"
