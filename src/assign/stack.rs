@@ -13,12 +13,6 @@ use std::{
     io::{BufWriter, Write},
 };
 
-impl Default for AssignReason {
-    fn default() -> AssignReason {
-        AssignReason::None
-    }
-}
-
 impl Default for AssignStack {
     fn default() -> AssignStack {
         AssignStack {
@@ -202,71 +196,46 @@ impl AssignIF for AssignStack {
         if lits.is_empty() {
             return extended_model;
         }
-        let mut i = lits.len() - 1;
-        let mut width;
-        'next: loop {
-            width = usize::from(lits[i]);
-            if width == 0 && i == 0 {
-                break;
-            }
+        let mut i = lits.len();
+        while 0 < i {
             i -= 1;
+            let width = usize::from(lits[i]);
+            assert!(0 < width);
+            assert!(width <= i);
+            let target_index = i - width;
+            let last_lit_index = i - 1;
+            let reason_literals = target_index + 1..=last_lit_index;
+            i = target_index;
+
             #[cfg(feature = "incremental_solver")]
-            let mut phantom_clause = Vec::new();
-            loop {
-                if width <= 1 {
-                    break;
-                }
-                let l = lits[i];
-                #[cfg(feature = "incremental_solver")]
-                {
-                    phantom_clause.push(l);
-                }
-                if extended_model[l.vi()] != Some(!bool::from(l)) {
-                    if i < width {
-                        #[cfg(feature = "incremental_solver")]
-                        {
-                            for l in &lits[..i] {
-                                phantom_clause.push(*l);
-                            }
-                            debug_assert!(1 < phantom_clause.len());
-                            #[cfg(feature = "trace_elimination")]
-                            println!(
-                                "- pull back clause E {:?}",
-                                phantom_clause.iter().map(i32::from).collect::<Vec<_>>()
-                            );
-                            cdb.new_clause(self, &mut phantom_clause, false);
-                        }
-                        break 'next;
-                    }
-                    #[cfg(feature = "incremental_solver")]
-                    {
-                        for l in &lits[i - width + 1..i] {
-                            phantom_clause.push(*l);
-                        }
-                        debug_assert!(1 < phantom_clause.len());
-                        #[cfg(feature = "trace_elimination")]
-                        println!(
-                            "- pull back clause C {:?}",
-                            phantom_clause.iter().map(i32::from).collect::<Vec<_>>()
-                        );
-                        cdb.new_clause(self, &mut phantom_clause, false);
-                    }
-                    i -= width;
-                    continue 'next;
-                }
-                width -= 1;
-                i -= 1;
+            {
+                cdb.new_clause(
+                    self,
+                    &mut lits[target_index..=last_lit_index]
+                        .iter()
+                        .copied()
+                        .collect::<Vec<Lit>>(),
+                    false,
+                );
             }
-            debug_assert!(width == 1);
-            let l = lits[i];
-            debug_assert_ne!(Some(bool::from(l)), self.assigned(l));
-            #[cfg(feature = "trace_elimination")]
-            println!(" - extend {}", l);
-            extended_model[l.vi()] = Some(bool::from(l));
-            if i < width {
-                break;
+
+            if lits[reason_literals.clone()]
+                .iter()
+                .all(|l| extended_model[l.vi()] == Some(!bool::from(*l)))
+            {
+                let l = lits[target_index];
+                extended_model[l.vi()] = Some(bool::from(l));
+            } else if lits[reason_literals.clone()]
+                .iter()
+                .any(|l| extended_model[l.vi()].is_none())
+            {
+                panic!("impossible: pseudo clause has unassigned literal(s).");
+            } else if lits[reason_literals.clone()]
+                .iter()
+                .any(|l| extended_model[l.vi()] == Some(bool::from(*l)))
+            {
+                continue;
             }
-            i -= width;
         }
         extended_model
     }
@@ -319,37 +288,6 @@ impl AssignIF for AssignStack {
                     .unwrap();
             }
         }
-    }
-}
-
-// #[cfg(feature = "boundary_check")]
-impl AssignStack {
-    // return the list of
-    // 1. literal in Clause of cid
-    // 2. its level
-    // 3. it is not assigned,  assigned by decision, or asserted.
-    // 4. value
-    pub fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
-        &mut self,
-        v: V,
-    ) -> Vec<(usize, DecisionLevel, i32, AssignReason, Option<bool>)> {
-        let mut res = v
-            .into_iter()
-            .map(|l| {
-                (
-                    self.trail
-                        .iter()
-                        .position(|lit| *lit == *l)
-                        .map_or(0, |p| p),
-                    self.level(l.vi()),
-                    i32::from(l),
-                    self.reason(l.vi()),
-                    self.assigned(*l),
-                )
-            })
-            .collect::<Vec<(usize, DecisionLevel, i32, AssignReason, Option<bool>)>>();
-        res.sort();
-        res
     }
 }
 

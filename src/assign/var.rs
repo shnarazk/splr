@@ -16,6 +16,11 @@ impl Default for Var {
             reward: 0.0,
             timestamp: 0,
             flags: Flag::empty(),
+
+            #[cfg(feature = "boundary_check")]
+            propagated_at: 0,
+            #[cfg(feature = "boundary_check")]
+            state: VarState::Unassigned(0),
         }
     }
 }

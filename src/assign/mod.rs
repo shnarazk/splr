@@ -111,6 +111,11 @@ pub struct Var {
     timestamp: usize,
     /// the `Flag`s
     flags: Flag,
+
+    #[cfg(feature = "boundary_check")]
+    pub propagated_at: usize,
+    #[cfg(feature = "boundary_check")]
+    pub state: VarState,
 }
 
 /// A record of assignment. It's called 'trail' in Glucose.
@@ -201,6 +206,72 @@ pub struct VarIdHeap {
     /// VarId : -> order : usize -- How good is the var?
     /// `idxs[0]` holds the number of alive elements
     idxs: Vec<usize>,
+}
+
+#[cfg(feature = "boundary_check")]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct Assign {
+    pub at: usize,
+    pub pos: Option<usize>,
+    pub lvl: DecisionLevel,
+    pub lit: i32,
+    pub val: Option<bool>,
+    pub by: AssignReason,
+    pub state: VarState,
+}
+
+#[cfg(feature = "boundary_check")]
+// return the list of composing literals:
+// 1. literal itself
+// 1. the value
+// 1. the position in trail
+// 1. last time propagated
+// 1. its level
+// 1. its assign reason
+pub trait DebugReportIF {
+    fn report(&self, asg: &AssignStack) -> Vec<Assign>;
+}
+
+#[cfg(feature = "boundary_check")]
+fn make_lit_report(asg: &AssignStack, lit: &Lit) -> Assign {
+    let vi = lit.vi();
+    Assign {
+        lit: i32::from(lit),
+        val: asg.assigned(*lit),
+        pos: asg.trail.iter().position(|l| vi == l.vi()),
+        lvl: asg.level(vi),
+        by: asg.reason(vi),
+        at: asg.var(vi).propagated_at,
+        state: asg.var[vi].state,
+    }
+}
+
+#[cfg(feature = "boundary_check")]
+impl DebugReportIF for Lit {
+    fn report(&self, asg: &AssignStack) -> Vec<Assign> {
+        vec![make_lit_report(asg, self)]
+    }
+}
+
+#[cfg(feature = "boundary_check")]
+impl DebugReportIF for [Lit] {
+    fn report(&self, asg: &AssignStack) -> Vec<Assign> {
+        self.iter()
+            .map(|l| make_lit_report(asg, l))
+            .collect::<Vec<_>>()
+    }
+}
+
+#[cfg(feature = "boundary_check")]
+impl DebugReportIF for Clause {
+    fn report(&self, asg: &AssignStack) -> Vec<Assign> {
+        let mut l = self
+            .iter()
+            .map(|l| make_lit_report(asg, l))
+            .collect::<Vec<_>>();
+        l.sort();
+        l
+    }
 }
 
 pub mod property {

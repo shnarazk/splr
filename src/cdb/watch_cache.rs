@@ -54,7 +54,7 @@ impl WatchCacheIF for WatchCacheList {
         }
     }
     fn insert_watch(&mut self, cid: ClauseId, l: Lit) {
-        assert!(self.iter().all(|e| e.0 != cid));
+        // assert!(self.iter().all(|e| e.0 != cid));
         self.push((cid, l));
     }
     fn append_watch(&mut self, mut appendant: Self) {
@@ -125,12 +125,18 @@ pub type WatchCacheProxy = usize;
 pub struct WatchCacheIterator {
     pub index: usize,
     end_at: usize,
+    checksum: usize,
 }
 
 impl Iterator for WatchCacheIterator {
     type Item = WatchCacheProxy;
     fn next(&mut self) -> Option<Self::Item> {
-        (self.index < self.end_at).then(|| self.index)
+        // assert!(self.checksum == self.end_at - self.index);
+        (self.index < self.end_at).then(|| {
+            // assert!(0 < self.checksum);
+            self.checksum -= 1;
+            self.index
+        })
     }
 }
 
@@ -139,13 +145,14 @@ impl WatchCacheIterator {
         WatchCacheIterator {
             index: 0,
             end_at: len,
+            checksum: len,
         }
     }
     pub fn restore_entry(&mut self) {
         self.index += 1;
     }
     pub fn detach_entry(&mut self) {
-        assert!(self.end_at != 0);
+        // assert!(self.end_at != 0);
         self.end_at -= 1;
     }
 }

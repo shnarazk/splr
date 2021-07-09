@@ -16,6 +16,11 @@ impl Default for Clause {
             reward: 0.0,
             timestamp: 0,
             flags: Flag::empty(),
+
+            #[cfg(feature = "boundary_check")]
+            birth: 0,
+            #[cfg(feature = "boundary_check")]
+            moved_at: Propagate::None,
         }
     }
 }
@@ -182,6 +187,11 @@ impl ClauseIF for Clause {
             self.turn_off(Flag::DERIVE20);
         }
     }
+
+    #[cfg(feature = "boundary_check")]
+    fn set_birth(&mut self, time: usize) {
+        self.birth = time;
+    }
 }
 
 impl FlagIF for Clause {
@@ -200,6 +210,19 @@ impl FlagIF for Clause {
 }
 
 impl fmt::Display for Clause {
+    #[cfg(feature = "boundary_check")]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let st = |flag, mes| if self.is(flag) { mes } else { "" };
+        write!(
+            f,
+            "{{{:?}b{}{}{}}}",
+            i32s(&self.lits),
+            self.birth,
+            st(Flag::LEARNT, ", learnt"),
+            st(Flag::ENQUEUED, ", enqueued"),
+        )
+    }
+    #[cfg(not(feature = "boundary_check"))]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(

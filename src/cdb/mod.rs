@@ -47,6 +47,9 @@ pub trait ClauseIF {
     fn to_vivify(&self, threshold: usize) -> Option<f64>;
     /// clear flags about vivification
     fn vivified(&mut self);
+
+    #[cfg(feature = "boundary_check")]
+    fn set_birth(&mut self, time: usize);
 }
 
 /// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`remove_clause`](`crate::cdb::ClauseDBIF::remove_clause`), and so on.
@@ -161,10 +164,18 @@ pub trait ClauseDBIF:
     #[cfg(feature = "incremental_solver")]
     /// save an eliminated permanent clause to an extra space for incremental solving.
     fn make_permanent_immortal(&mut self, cid: ClauseId);
+    #[cfg(feature = "boundary_check")]
+    // return true if cid is included in watching literals
+    fn watch_cache_contains(&self, lit: Lit, cid: ClauseId) -> bool;
     /// return a clause's watches
-    fn watch_caches(&self, cid: ClauseId, message: &str) -> (Lit, Lit);
+    fn watch_caches(&self, cid: ClauseId, message: &str) -> (Vec<Lit>, Vec<Lit>);
     /// complete bi-clause network
     fn complete_bi_clauses<A>(&mut self, asg: &mut A)
+    where
+        A: AssignIF;
+    /// for debug
+    fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool>;
+    fn check_consistency<A>(&mut self, asg: &A)
     where
         A: AssignIF;
 }
@@ -192,6 +203,11 @@ pub struct Clause {
     timestamp: usize,
     /// Flags
     flags: Flag,
+
+    #[cfg(feature = "boundary_check")]
+    pub birth: usize,
+    #[cfg(feature = "boundary_check")]
+    pub moved_at: Propagate,
 }
 
 /// Clause database
@@ -205,7 +221,10 @@ pub struct Clause {
 pub struct ClauseDB {
     /// container of clauses
     clause: Vec<Clause>,
-    /// container of watch literals for binary clauses
+    /// hashed representation of binary clauses.
+    ///## Note
+    /// This means a biclause [l0, l1] is stored at bi_clause[l0] instead of bi_clause[!l0].
+    ///
     pub bi_clause: Vec<BiClause>,
     /// container of watch literals
     pub watch_cache: Vec<WatchCache>,
