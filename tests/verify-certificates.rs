@@ -44,11 +44,12 @@ fn main() {
                     //     exit 1;
                     // fi
                     if !out.exists() {
-                        panic!(format!(
+                        println!(
                             " FAIL TO CERTIFICATE: {} => {}",
                             cnf.file_name().unwrap().to_string_lossy(),
                             out.to_string_lossy(),
-                        ));
+                        );
+                        panic!("abort");
                     }
                     // egrep -v '^[cs]' < ${target}.out > ${target}.drat
                     Command::new("egrep")
@@ -80,11 +81,12 @@ fn main() {
                     if grat.exists() {
                         print!(" => {}", grat.to_string_lossy());
                     } else {
-                        panic!(format!(
+                        println!(
                             " FAIL TO CONVERT: {} => {}",
                             cnf.file_name().unwrap().to_string_lossy(),
                             grat.to_string_lossy(),
-                        ));
+                        );
+                        panic!("abort");
                     }
                     let mut pass = false;
                     if let Ok(out) = Command::new("gratchk")
@@ -103,11 +105,12 @@ fn main() {
                         }
                     }
                     if !pass {
-                        panic!(format!(
+                        println!(
                             " FAIL TO CERTIFICATE: {} => {}",
                             cnf.file_name().unwrap().to_string_lossy(),
                             grat.to_string_lossy(),
-                        ));
+                        );
+                        panic!("abort");
                     }
                 }
             }

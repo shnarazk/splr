@@ -1,6 +1,8 @@
-#[cfg(feature = "var_staging")]
-use crate::state::StagingTarget;
 /// Decision var selection
+
+#[cfg(feature = "rephase")]
+use super::property;
+
 use {
     super::{AssignStack, Var, VarHeapIF},
     crate::types::*,
@@ -9,25 +11,24 @@ use {
 /// ```
 /// let x: Option<bool> = var_assign!(self, lit.vi());
 /// ```
+#[cfg(feature = "unsafe_access")]
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
         unsafe { *$asg.assign.get_unchecked($var) }
     };
 }
+#[cfg(not(feature = "unsafe_access"))]
+macro_rules! var_assign {
+    ($asg: expr, $var: expr) => {
+        $asg.assign[$var]
+    };
+}
 
 /// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
-    // #[cfg(feature = "var_staging")]
-    // /// decay staging setting
-    // fn dissolve_staged_vars(&mut self, phasing: bool);
-
-    #[cfg(feature = "var_staging")]
-    /// select staged vars
-    fn select_staged_vars(&mut self, request: Option<StagingTarget>, rephasing: bool);
-
-    /// return the number of forgotton vars.
-    fn num_ion(&self) -> (usize, usize);
-
+    #[cfg(feature = "rephase")]
+    /// select rephasing target
+    fn select_rephasing_target(&mut self, request: Option<RephasingTarget>, span: usize);
     /// select a new decision variable.
     fn select_decision_literal(&mut self) -> Lit;
     /// update the internal heap on var order.
@@ -51,76 +52,91 @@ impl From<&Var> for VarTimestamp {
     }
 }
 
-impl VarSelectIF for AssignStack {
-    #[cfg(not(feature = "best_phases_tracking"))]
-    fn num_ion(&self) -> (usize, usize) {
-        (0, 0)
-    }
-    #[cfg(feature = "best_phases_tracking")]
-    fn num_ion(&self) -> (usize, usize) {
-        let thr = self.average_activity();
-        let mut num_negative = 0; // unreachable core side
-        let mut num_positive = 0; // decision var side
+/// Phase saving modes.
+#[cfg(feature = "rephase")]
+#[derive(Debug, PartialEq)]
+pub enum RephasingTarget {
+    /// use best phases
+    BestPhases,
+    /// unstage all vars.
+    Clear,
+    /// a kind of random shuffle
+    Shift(f64),
+}
 
-        for v in self.var.iter().skip(1) {
-            if !v.is(Flag::ELIMINATED)
-                && thr < v.activity(self.stage_activity)
-                && self.root_level < self.level[v.index]
-            {
-                match self.best_phases.get(&v.index) {
-                    Some((_, AssignReason::Implication(_, NULL_LIT))) => {
-                        num_positive += 1;
-                    }
-                    None => {
-                        num_negative += 1;
-                    }
-                    _ => (),
-                }
-            }
-        }
-        (num_negative, num_positive)
+#[cfg(feature = "rephase")]
+impl std::fmt::Display for RephasingTarget {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "{:?}", self)
     }
-    #[cfg(feature = "var_staging")]
-    fn select_staged_vars(&mut self, request: Option<StagingTarget>, rephasing: bool) {
-        self.rephasing = rephasing;
-        self.stage_mode_select += 1;
-        let target = request.unwrap_or(StagingTarget::Clear);
-        for vi in self.staged_vars.keys() {
-            self.var[*vi].turn_off(Flag::STAGED);
+}
+
+impl VarSelectIF for AssignStack {
+    #[cfg(feature = "rephase")]
+    fn select_rephasing_target(&mut self, request: Option<RephasingTarget>, level: usize) {
+        if self.best_phases.is_empty() {
+            return;
         }
-        self.staged_vars.clear();
-        self.stage_activity = self.staging_reward_value;
-        match target {
-            StagingTarget::Backbone => {
-                for (vi, (b, r)) in self.best_phases.iter() {
-                    if matches!(r, AssignReason::None) {
-                        let v = &mut self.var[*vi];
-                        v.turn_on(Flag::STAGED);
+        if self.derefer(property::Tusize::NumUnassertedVar) <= self.best_phases.len() {
+            self.best_phases.clear();
+            return;
+        }
+        let remain = self.derefer(property::Tusize::NumUnassertedVar) - self.best_phases.len() + 1;
+        if (remain as f64).log10() < level as f64 {
+            return;
+        }
+        let target = if let Some(t) = request {
+            t
+        } else {
+            self.phase_age += 1;
+            match self.phase_age {
+                1 => RephasingTarget::Shift(0.1),
+                2 => RephasingTarget::Shift(0.2),
+                x if x % 2 == 1 => RephasingTarget::Shift(0.4),
+                _ => RephasingTarget::Clear,
+            }
+        };
+        // The iteration order by an iterator on HashMap may change in each execution.
+        // So Shift and XorShift cause non-determinism. Be careful.
+        let mut invalidated = false;
+        let mut num_flip = 0;
+        let mut act_sum = 0.0;
+        for (vi, (b, _)) in self.best_phases.iter() {
+            let v = &mut self.var[*vi];
+            if self.assign[*vi] == Some(!*b) {
+                invalidated = true;
+            }
+            match target {
+                RephasingTarget::BestPhases => v.set(Flag::PHASE, *b),
+                RephasingTarget::Shift(scale) => {
+                    if !v.reward.is_nan() {
+                        act_sum += scale * (1.0 - v.reward);
+                    }
+                    if 1.0 <= act_sum {
+                        v.set(Flag::PHASE, !*b);
+                        act_sum = 0.0;
+                        num_flip += 1;
+                    } else {
                         v.set(Flag::PHASE, *b);
-                        self.staged_vars.insert(*vi, *b);
                     }
                 }
+                RephasingTarget::Clear => (),
             }
-            StagingTarget::BestPhases => {
-                for (vi, (b, _)) in self.best_phases.iter() {
-                    let v = &mut self.var[*vi];
-                    v.turn_on(Flag::STAGED);
-                    v.set(Flag::PHASE, *b);
-                    self.staged_vars.insert(*vi, *b);
-                }
-            }
-            StagingTarget::Clear => (),
+        }
+        if let RephasingTarget::Shift(_) = target {
+            self.bp_divergence_ema
+                .update(num_flip as f64 / self.best_phases.len() as f64);
+        }
+        if invalidated {
+            self.best_phases.clear();
+            self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
+        } else {
+            self.num_rephase += 1;
         }
     }
     fn select_decision_literal(&mut self) -> Lit {
         let vi = self.select_var();
-        #[cfg(feature = "best_phases_reuse")]
-        if self.rephasing {
-            if let Some((b, AssignReason::None)) = self.best_phases.get(&vi) {
-                return Lit::from_assign(vi, *b);
-            }
-        }
-        Lit::from_assign(vi, self.var[vi].is(Flag::PHASE))
+        Lit::from((vi, self.var[vi].is(Flag::PHASE)))
     }
     fn update_order(&mut self, v: VarId) {
         self.update_heap(v);

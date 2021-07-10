@@ -16,18 +16,18 @@ fn main() {
 
 #[test]
 fn all_solutions_of_uf8() {
-    drive("tests/uf8.cnf", vec![4, 5, -6, 7, 8]);
+    drive("cnfs/uf8.cnf", vec![4, 5, -6, 7, 8]);
 }
 
 #[test]
 fn all_solutions_of_uf20() {
-    drive("tests/uf20-01.cnf", vec![-4, 5, 6, 7, 8]);
+    drive("cnfs/uf20-01.cnf", vec![-4, 5, 6, 7, 8]);
 }
 
 /// cargo test --test isat2 --features incremental_solver --release
 /// #[cfg_attr(feature = "incremental_solver", test)]
 fn all_solutions_of_uf100() {
-    drive("tests/uf100-010.cnf", vec![]);
+    drive("cnfs/uf100-010.cnf", vec![]);
 }
 
 fn drive(cnf: &str, mother: Vec<i32>) {

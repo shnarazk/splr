@@ -7,24 +7,6 @@ use {
     },
 };
 
-/// API for Clause, providing literal accessors.
-pub trait ClauseIF {
-    /// return true if it contains no literals; a clause after unit propagation.
-    fn is_empty(&self) -> bool;
-    /// return an iterator over its literals.
-    fn iter(&self) -> Iter<'_, Lit>;
-    /// return the number of literals.
-    fn len(&self) -> usize;
-    /// update rank field with the present LBD.
-    fn update_lbd<A>(&mut self, asg: &A, lbd_temp: &mut [usize]) -> usize
-    where
-        A: AssignIF;
-    /// return `true` if the clause should try vivification
-    fn to_vivify(&self, threshold: usize) -> Option<f64>;
-    /// clear flags about vivification
-    fn vivified(&mut self);
-}
-
 impl Default for Clause {
     fn default() -> Clause {
         Clause {
@@ -34,6 +16,11 @@ impl Default for Clause {
             reward: 0.0,
             timestamp: 0,
             flags: Flag::empty(),
+
+            #[cfg(feature = "boundary_check")]
+            birth: 0,
+            #[cfg(feature = "boundary_check")]
+            moved_at: Propagate::None,
         }
     }
 }
@@ -42,14 +29,24 @@ impl Index<usize> for Clause {
     type Output = Lit;
     #[inline]
     fn index(&self, i: usize) -> &Lit {
-        unsafe { self.lits.get_unchecked(i) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.lits.get_unchecked(i)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.lits[i]
     }
 }
 
 impl IndexMut<usize> for Clause {
     #[inline]
     fn index_mut(&mut self, i: usize) -> &mut Lit {
-        unsafe { self.lits.get_unchecked_mut(i) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.lits.get_unchecked_mut(i)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.lits[i]
     }
 }
 
@@ -57,6 +54,11 @@ impl Index<Range<usize>> for Clause {
     type Output = [Lit];
     #[inline]
     fn index(&self, r: Range<usize>) -> &[Lit] {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.lits.get_unchecked(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &self.lits[r]
     }
 }
@@ -65,6 +67,11 @@ impl Index<RangeFrom<usize>> for Clause {
     type Output = [Lit];
     #[inline]
     fn index(&self, r: RangeFrom<usize>) -> &[Lit] {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.lits.get_unchecked(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &self.lits[r]
     }
 }
@@ -72,6 +79,11 @@ impl Index<RangeFrom<usize>> for Clause {
 impl IndexMut<Range<usize>> for Clause {
     #[inline]
     fn index_mut(&mut self, r: Range<usize>) -> &mut [Lit] {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.lits.get_unchecked_mut(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &mut self.lits[r]
     }
 }
@@ -79,6 +91,11 @@ impl IndexMut<Range<usize>> for Clause {
 impl IndexMut<RangeFrom<usize>> for Clause {
     #[inline]
     fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Lit] {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.lits.get_unchecked_mut(r)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &mut self.lits[r]
     }
 }
@@ -109,38 +126,52 @@ impl ClauseIF for Clause {
     fn is_empty(&self) -> bool {
         self.lits.is_empty()
     }
+    fn is_dead(&self) -> bool {
+        self.lits.is_empty()
+    }
     fn iter(&self) -> Iter<'_, Lit> {
         self.lits.iter()
+    }
+    #[inline]
+    fn lit0(&self) -> Lit {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            *self.lits.get_unchecked(0)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        self.lits[0]
+    }
+    #[inline]
+    fn lit1(&self) -> Lit {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            *self.lits.get_unchecked(1)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        self.lits[1]
+    }
+    fn contains(&self, lit: Lit) -> bool {
+        self.lits.contains(&lit)
+    }
+    fn is_satisfied_under<A>(&self, asg: &A) -> bool
+    where
+        A: AssignIF,
+    {
+        for l in self.lits.iter() {
+            if asg.assigned(*l) == Some(true) {
+                return true;
+            }
+        }
+        false
     }
     fn len(&self) -> usize {
         self.lits.len()
     }
-    fn update_lbd<A>(&mut self, asg: &A, lbd_temp: &mut [usize]) -> usize
-    where
-        A: AssignIF,
-    {
-        let level = asg.level_ref();
-        unsafe {
-            let key: usize = lbd_temp.get_unchecked(0) + 1;
-            *lbd_temp.get_unchecked_mut(0) = key;
-            let mut cnt = 0;
-            for l in &self.lits {
-                let lv = level[l.vi()];
-                if lv == 0 {
-                    continue;
-                }
-                let p = lbd_temp.get_unchecked_mut(lv as usize);
-                if *p != key {
-                    *p = key;
-                    cnt += 1;
-                }
-            }
-            self.rank = cnt;
-            cnt as usize
-        }
+    fn timestamp(&self) -> usize {
+        self.timestamp
     }
     fn to_vivify(&self, threshold: usize) -> Option<f64> {
-        if !self.is(Flag::DEAD)
+        if !self.is_dead()
             && self.is(Flag::VIVIFIED) == self.is(Flag::VIVIFIED2)
             && (self.is(Flag::LEARNT) || self.is(Flag::DERIVE20))
             && 3 * (self.rank as usize) + self.len() <= threshold
@@ -155,6 +186,11 @@ impl ClauseIF for Clause {
         if !self.is(Flag::LEARNT) {
             self.turn_off(Flag::DERIVE20);
         }
+    }
+
+    #[cfg(feature = "boundary_check")]
+    fn set_birth(&mut self, time: usize) {
+        self.birth = time;
     }
 }
 
@@ -174,15 +210,53 @@ impl FlagIF for Clause {
 }
 
 impl fmt::Display for Clause {
+    #[cfg(feature = "boundary_check")]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
-            "{{{:?}{}{}{}}}",
+            "{{{:?}b{}{}{}}}",
             i32s(&self.lits),
+            self.birth,
             st(Flag::LEARNT, ", learnt"),
-            st(Flag::DEAD, ", dead"),
             st(Flag::ENQUEUED, ", enqueued"),
         )
+    }
+    #[cfg(not(feature = "boundary_check"))]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let st = |flag, mes| if self.is(flag) { mes } else { "" };
+        write!(
+            f,
+            "{{{:?}{}{}}}",
+            i32s(&self.lits),
+            st(Flag::LEARNT, ", learnt"),
+            st(Flag::ENQUEUED, ", enqueued"),
+        )
+    }
+}
+
+impl Clause {
+    /// update rank field with the present LBD.
+    pub fn update_lbd<A>(&mut self, asg: &A, lbd_temp: &mut [usize]) -> usize
+    where
+        A: AssignIF,
+    {
+        let level = asg.level_ref();
+        let key: usize = lbd_temp[0] + 1;
+        lbd_temp[0] = key;
+        let mut cnt = 0;
+        for l in &self.lits {
+            let lv = level[l.vi()];
+            if lv == 0 {
+                continue;
+            }
+            let p = &mut lbd_temp[lv as usize];
+            if *p != key {
+                *p = key;
+                cnt += 1;
+            }
+        }
+        self.rank = cnt;
+        cnt as usize
     }
 }

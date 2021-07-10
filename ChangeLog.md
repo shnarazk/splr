@@ -1,3 +1,62 @@
+## 0.10.0, 2021-07-10
+
+### Fix critical bugs
+- fix bugs on chronoBT implementation, which have affected Splr from version 0.3.1 to 0.7.0.
+   - `AssignStack::q_head` had a wrong index after backtrack if chronoBT was used.
+   - Non-chronoBT was broken if the number of the highest literal in conflicting clauses is one.
+- fix a bug which has been rarely occurred by eliminator.
+   - `AssignIF::propagate` skipped clause-level satisfiability checking,
+     if its `blocker` held an eliminated var, which was never falsified.
+   - `ClauseDB::strengthen_by_elimination` didn't turn `LEARNT` off
+     when a clause became binary.
+
+### Incompatible API changes from 0.7.0
+By introducing new data types, Splr-0.10 checks the status after calling destructive
+functions more rigidly.
+
+- introduce a new data `RefClause` for clause-level state transition
+- `AssignReason` has 4 states
+- define assign::property
+- append AssignIF::dump_cnf
+- define cdb::property
+- ClauseDB exports reference iterators on watch_caches instead of mutable references to them
+- ClauseDB exports new transform functions that encapsulate internal state transitions
+- ClauseDB and Clause export only immutable references to literals in clauses.
+- ClauseDB exports a new method set on a new certificate saver.
+- append ClauseDB::strengthen_by_vivification
+- remove ClauseDB::count
+- remove ClauseDB::countf
+- rename ClauseDB::detach to ClauseDB::remove_clause
+- remove ClauseDB::garbage_collect
+- rename ClauseDB::minimize_with_biclauses to minimize_with_bi_clauses
+- remove ClauseDB::new_clause_sandbox
+- remove ClauseDB::registered_biclause
+- rename ClauseDB::strengthen to ClauseDB::strengthen_by_elimination
+- remove ClauseDB::touch_var
+- remove EliminateIF::add_cid_occur
+- remove EliminateIF::remove_cid_occur
+- remove EliminateIF::stop
+- screen Eliminator's fields
+- define processor::property
+- define restart::property
+- append SatSolverIF::save_certification
+- append SatSolverIF::dump_cnf
+
+### other changes
+
+- ClauseId uses NonZeroU32 instead of u32.
+- define feature 'trace_equivalency' for debugging
+- define (but incomplete) feature 'support_user_assumption'
+- activate feature 'clause_vivification' by default
+- activate feature 'rephase' by default, which selects the best phases and its variants
+- delete features 'var-boosting' and 'best_phases_reuse'
+- rename feature 'ema_calibration' to 'EMA_calibration'
+- remove comment lines from UNSAT certification files, which default name is changed to 'proof.drat'.
+- var reward decay rate has a static value
+- dump all stats data into answer files
+- slim down */mod.rs
+- all vars have a non-zero initial activity
+
 ## 0.7.0, 2021-03-14
 
 - answer filenames start with "ans_" instead of ".ans_" by default.

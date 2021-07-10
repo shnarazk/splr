@@ -15,12 +15,12 @@ mod stack;
 mod var;
 
 pub use self::{propagate::PropagateIF, property::*, select::VarSelectIF, var::VarManipulateIF};
-#[cfg(any(feature = "best_phases_tracking", feature = "var_staging"))]
+#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
 use std::collections::HashMap;
 use {
     self::heap::VarHeapIF,
     super::{cdb::ClauseDBIF, types::*},
-    std::{ops::Range, slice::Iter},
+    std::{fmt, ops::Range, slice::Iter},
 };
 
 /// API about assignment like [`decision_level`](`crate::assign::AssignIF::decision_level`), [`stack`](`crate::assign::AssignIF::stack`), [`best_assigned`](`crate::assign::AssignIF::best_assigned`), and so on.
@@ -32,6 +32,8 @@ pub trait AssignIF:
     + PropertyDereference<property::Tusize, usize>
     + PropertyReference<property::TEma, Ema>
 {
+    /// return root level.
+    fn root_level(&self) -> DecisionLevel;
     /// return a literal in the stack.
     fn stack(&self, i: usize) -> Lit;
     /// return literals in the range of stack.
@@ -67,15 +69,35 @@ pub trait AssignIF:
     fn satisfies(&self, c: &[Lit]) -> bool;
     /// return `true` is the clause is the reason of the assignment.
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
+    /// dump the status as a CNF
+    fn dump_cnf<C>(&mut self, cdb: &C, fname: &str)
+    where
+        C: ClauseDBIF;
 }
 
 /// Reasons of assignments, two kinds
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum AssignReason {
-    /// One of not assigned, assigned by decision, or asserted.
-    None,
+    /// asserted
+    Asserted(usize),
+    /// Assigned by decision
+    Decision(DecisionLevel),
     /// Assigned by a clause. If it is binary, the reason literal is stored in the 2nd.
     Implication(ClauseId, Lit),
+    /// One of not assigned, assigned by decision, or asserted.
+    None,
+}
+
+impl fmt::Display for AssignReason {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            AssignReason::Asserted(t) => write!(f, "Asserted at {}", t),
+            AssignReason::Decision(lvl) => write!(f, "Decided at level {}", lvl),
+            AssignReason::Implication(cid, NULL_LIT) => write!(f, "Implied by {}", cid),
+            AssignReason::Implication(cid, _) => write!(f, "Implied by B{}", cid),
+            AssignReason::None => write!(f, "Not assigned"),
+        }
+    }
 }
 
 /// Object representing a variable.
@@ -91,6 +113,11 @@ pub struct Var {
     timestamp: usize,
     /// the `Flag`s
     flags: Flag,
+
+    #[cfg(feature = "boundary_check")]
+    pub propagated_at: usize,
+    #[cfg(feature = "boundary_check")]
+    pub state: VarState,
 }
 
 /// A record of assignment. It's called 'trail' in Glucose.
@@ -105,8 +132,9 @@ pub struct AssignStack {
     /// record of assignment
     trail: Vec<Lit>,
     trail_lim: Vec<usize>,
+    /// the-number-of-assigned-and-propagated-vars + 1
     q_head: usize,
-    pub root_level: DecisionLevel,
+    root_level: DecisionLevel,
     var_order: VarIdHeap, // Variable Order
 
     //
@@ -115,26 +143,13 @@ pub struct AssignStack {
     best_assign: bool,
     build_best_at: usize,
     num_best_assign: usize,
-    rephasing: bool,
+    num_rephase: usize,
+    bp_divergence_ema: Ema,
+
     #[cfg(feature = "best_phases_tracking")]
     best_phases: HashMap<VarId, (bool, AssignReason)>,
-
-    //
-    //## Stage handling
-    //
-    #[cfg(feature = "var_staging")]
-    /// Decay rate for staging reward
-    staging_reward_decay: f64,
-    #[cfg(feature = "var_staging")]
-    /// Bonus reward for vars on stage
-    staging_reward_value: f64,
-    #[cfg(feature = "var_staging")]
-    staged_vars: HashMap<VarId, bool>,
-    #[cfg(feature = "var_staging")]
-    stage_mode_select: usize,
-    num_stages: usize,
-    stage_activity: f64,
-    reward_index: usize,
+    #[cfg(feature = "rephase")]
+    phase_age: usize,
 
     //
     //## Statistics
@@ -179,8 +194,6 @@ pub struct AssignStack {
     //## Vivification
     //
     during_vivification: bool,
-    /// save old num_conflict, num_propagation, num_restart
-    vivify_sandbox: (usize, usize, usize),
 }
 
 /// Heap of VarId, based on var activity.
@@ -197,18 +210,69 @@ pub struct VarIdHeap {
     idxs: Vec<usize>,
 }
 
-impl VarIdHeap {
-    pub fn new(n: usize, init: usize) -> Self {
-        let mut heap = Vec::with_capacity(n + 1);
-        let mut idxs = Vec::with_capacity(n + 1);
-        heap.push(0);
-        idxs.push(n);
-        for i in 1..=n {
-            heap.push(i);
-            idxs.push(i);
-        }
-        idxs[0] = init;
-        VarIdHeap { heap, idxs }
+#[cfg(feature = "boundary_check")]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct Assign {
+    pub at: usize,
+    pub pos: Option<usize>,
+    pub lvl: DecisionLevel,
+    pub lit: i32,
+    pub val: Option<bool>,
+    pub by: AssignReason,
+    pub state: VarState,
+}
+
+#[cfg(feature = "boundary_check")]
+// return the list of composing literals:
+// 1. literal itself
+// 1. the value
+// 1. the position in trail
+// 1. last time propagated
+// 1. its level
+// 1. its assign reason
+pub trait DebugReportIF {
+    fn report(&self, asg: &AssignStack) -> Vec<Assign>;
+}
+
+#[cfg(feature = "boundary_check")]
+fn make_lit_report(asg: &AssignStack, lit: &Lit) -> Assign {
+    let vi = lit.vi();
+    Assign {
+        lit: i32::from(lit),
+        val: asg.assigned(*lit),
+        pos: asg.trail.iter().position(|l| vi == l.vi()),
+        lvl: asg.level(vi),
+        by: asg.reason(vi),
+        at: asg.var(vi).propagated_at,
+        state: asg.var[vi].state,
+    }
+}
+
+#[cfg(feature = "boundary_check")]
+impl DebugReportIF for Lit {
+    fn report(&self, asg: &AssignStack) -> Vec<Assign> {
+        vec![make_lit_report(asg, self)]
+    }
+}
+
+#[cfg(feature = "boundary_check")]
+impl DebugReportIF for [Lit] {
+    fn report(&self, asg: &AssignStack) -> Vec<Assign> {
+        self.iter()
+            .map(|l| make_lit_report(asg, l))
+            .collect::<Vec<_>>()
+    }
+}
+
+#[cfg(feature = "boundary_check")]
+impl DebugReportIF for Clause {
+    fn report(&self, asg: &AssignStack) -> Vec<Assign> {
+        let mut l = self
+            .iter()
+            .map(|l| make_lit_report(asg, l))
+            .collect::<Vec<_>>();
+        l.sort();
+        l
     }
 }
 
@@ -216,11 +280,12 @@ pub mod property {
     use super::AssignStack;
     use crate::types::*;
 
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tusize {
         NumConflict,
         NumDecision,
         NumPropagation,
+        NumRephase,
         NumRestart,
         //
         //## var stat
@@ -232,7 +297,23 @@ pub mod property {
         NumUnassertedVar,
         NumUnassignedVar,
         NumUnreachableVar,
+        RootLevel,
     }
+
+    pub const USIZES: [Tusize; 12] = [
+        Tusize::NumConflict,
+        Tusize::NumDecision,
+        Tusize::NumPropagation,
+        Tusize::NumRephase,
+        Tusize::NumRestart,
+        Tusize::NumVar,
+        Tusize::NumAssertedVar,
+        Tusize::NumEliminatedVar,
+        Tusize::NumUnassertedVar,
+        Tusize::NumUnassignedVar,
+        Tusize::NumUnreachableVar,
+        Tusize::RootLevel,
+    ];
 
     impl PropertyDereference<Tusize, usize> for AssignStack {
         #[inline]
@@ -241,35 +322,49 @@ pub mod property {
                 Tusize::NumConflict => self.num_conflict,
                 Tusize::NumDecision => self.num_decision,
                 Tusize::NumPropagation => self.num_propagation,
+                Tusize::NumRephase => self.num_rephase,
                 Tusize::NumRestart => self.num_restart,
                 Tusize::NumVar => self.num_vars,
                 Tusize::NumAssertedVar => self.num_asserted_vars,
                 Tusize::NumEliminatedVar => self.num_eliminated_vars,
                 Tusize::NumUnassertedVar => {
-                    self.num_vars - self.num_eliminated_vars - self.num_asserted_vars
+                    self.num_vars - self.num_asserted_vars - self.num_eliminated_vars
                 }
                 Tusize::NumUnassignedVar => {
-                    self.num_vars - self.num_eliminated_vars - self.trail.len()
+                    self.num_vars
+                        - self.num_asserted_vars
+                        - self.num_eliminated_vars
+                        - self.trail.len()
                 }
                 Tusize::NumUnreachableVar => self.num_vars - self.num_best_assign,
+                Tusize::RootLevel => self.root_level as usize,
             }
         }
     }
 
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum TEma {
-        DPC,
-        PPC,
-        CPR,
+        DecisionPerConflict,
+        PropagationPerConflict,
+        ConflictPerRestart,
+        BestPhaseDivergenceRate,
     }
+
+    pub const EMAS: [TEma; 4] = [
+        TEma::DecisionPerConflict,
+        TEma::PropagationPerConflict,
+        TEma::ConflictPerRestart,
+        TEma::BestPhaseDivergenceRate,
+    ];
 
     impl PropertyReference<TEma, Ema> for AssignStack {
         #[inline]
         fn refer(&self, k: TEma) -> &Ema {
             match k {
-                TEma::DPC => self.dpc_ema.get_ema(),
-                TEma::PPC => self.ppc_ema.get_ema(),
-                TEma::CPR => self.cpr_ema.get_ema(),
+                TEma::DecisionPerConflict => self.dpc_ema.get_ema(),
+                TEma::PropagationPerConflict => self.ppc_ema.get_ema(),
+                TEma::ConflictPerRestart => self.cpr_ema.get_ema(),
+                TEma::BestPhaseDivergenceRate => &self.bp_divergence_ema,
             }
         }
     }

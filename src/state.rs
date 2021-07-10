@@ -52,31 +52,6 @@ pub trait StateIF {
     fn log<S: AsRef<str>>(&mut self, tick: usize, mes: S);
 }
 
-/// Phase saving modes.
-#[derive(Debug, Eq, PartialEq)]
-pub enum StagingTarget {
-    /// use decision vars in best phases
-    Backbone,
-    /// use best phases
-    BestPhases,
-    /// unstage all vars.
-    Clear,
-}
-
-impl fmt::Display for StagingTarget {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            formatter,
-            "{}",
-            match self {
-                StagingTarget::Backbone => "Staging_backbone",
-                StagingTarget::BestPhases => "Staging_bestphase",
-                StagingTarget::Clear => "Staging_none",
-            }
-        )
-    }
-}
-
 #[cfg(feature = "strategy_adaptation")]
 /// A collection of named search heuristics.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -146,9 +121,13 @@ impl SearchStrategy {
 #[derive(Clone, Eq, PartialEq)]
 pub enum Stat {
     /// the number of 'no decision conflict'
-    NoDecisionConflict,
+    NumDecisionConflict,
+    /// the number of equivalency processor invocation
+    NumProcessor,
     /// the number of vivification
     Vivification,
+    /// the number of vivified (shrunk) clauses
+    VivifiedClause,
     /// the number of vivified (asserted) vars
     VivifiedVar,
     /// don't use this dummy (sentinel at the tail).
@@ -159,14 +138,24 @@ impl Index<Stat> for [usize] {
     type Output = usize;
     #[inline]
     fn index(&self, i: Stat) -> &usize {
-        unsafe { self.get_unchecked(i as usize) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.get_unchecked(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self[i as usize]
     }
 }
 
 impl IndexMut<Stat> for [usize] {
     #[inline]
     fn index_mut(&mut self, i: Stat) -> &mut usize {
-        unsafe { self.get_unchecked_mut(i as usize) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.get_unchecked_mut(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self[i as usize]
     }
 }
 
@@ -194,9 +183,10 @@ pub struct State {
     pub b_lvl: Ema,
     /// EMA of conflicting levels
     pub c_lvl: Ema,
-    /// hold conflicting literals for UNSAT problems
+    #[cfg(feature = "support_user_assumption")]
+    /// hold conflicting user-defined *assumed* literals for UNSAT problems
     pub conflicts: Vec<Lit>,
-    /// choroBT threshold
+    /// chronoBT threshold
     pub chrono_bt_threshold: DecisionLevel,
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
@@ -230,6 +220,7 @@ impl Default for State {
 
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
+            #[cfg(feature = "support_user_assumption")]
             conflicts: Vec::new(),
             chrono_bt_threshold: 100,
             last_asg: 0,
@@ -248,14 +239,24 @@ impl Index<Stat> for State {
     type Output = usize;
     #[inline]
     fn index(&self, i: Stat) -> &usize {
-        unsafe { self.stats.get_unchecked(i as usize) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.stats.get_unchecked(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.stats[i as usize]
     }
 }
 
 impl IndexMut<Stat> for State {
     #[inline]
     fn index_mut(&mut self, i: Stat) -> &mut usize {
-        unsafe { self.stats.get_unchecked_mut(i as usize) }
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.stats.get_unchecked_mut(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.stats[i as usize]
     }
 }
 
@@ -283,8 +284,7 @@ impl Instantiate for State {
             SolverEvent::Instantiate => (),
             SolverEvent::Reinitialize => (),
             SolverEvent::Restart => (),
-            SolverEvent::ShrinkCore => (),
-            SolverEvent::Stabilize((_, _)) => (),
+            SolverEvent::Stabilize(_) => (),
 
             #[cfg(feature = "clause_vivification")]
             SolverEvent::Vivify(_) => (),
@@ -398,10 +398,10 @@ impl StateIF for State {
         A: AssignIF,
         C: PropertyDereference<cdb::property::Tusize, usize>,
     {
-        let asg_num_conflict = asg.refer(assign::property::A2usize::NumConflict);
-        let asg_num_decision = asg.refer(assign::property::A2usize::NumDecision);
-        let asg_num_propagation = asg.refer(assign::property::A2usize::NumPropergation);
-        let asg_num_restart = asg.refer(assign::property::A2usize::NumRestart);
+        let asg_num_conflict = asg.refer(assign::property::Tusize::NumConflict);
+        let asg_num_decision = asg.refer(assign::property::Tusize::NumDecision);
+        let asg_num_propagation = asg.refer(assign::property::Tusize::NumPropagation);
+        let asg_num_restart = asg.refer(assign::property::Tusize::NumRestart);
         let cdb_num_bi_learnt = cdb.refer(cdb::property::Tusize::NumBiLearnt);
         let cdb_num_lbd2 = cdb.refer(cdb::property::Tusize::NumLBD2);
 
@@ -464,6 +464,8 @@ impl StateIF for State {
             + PropertyReference<solver::restart::property::TEma2, Ema2>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
+            self.log_messages.clear();
+            self.record_stats(asg, cdb, elim, rst);
             return;
         }
 
@@ -480,18 +482,18 @@ impl StateIF for State {
         let asg_num_decision = asg.derefer(assign::property::Tusize::NumDecision);
         let asg_num_propagation = asg.derefer(assign::property::Tusize::NumPropagation);
 
-        let asg_dpc_ema = asg.refer(assign::property::TEma::DPC);
-        let asg_ppc_ema = asg.refer(assign::property::TEma::PPC);
-        let asg_cpr_ema = asg.refer(assign::property::TEma::CPR);
+        let asg_dpc_ema = asg.refer(assign::property::TEma::DecisionPerConflict);
+        let asg_ppc_ema = asg.refer(assign::property::TEma::PropagationPerConflict);
+        let asg_cpr_ema = asg.refer(assign::property::TEma::ConflictPerRestart);
 
-        let cdb_num_active = cdb.derefer(cdb::property::Tusize::NumActive);
-        let cdb_num_biclause = cdb.derefer(cdb::property::Tusize::NumBiClause);
+        let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
+        let cdb_num_bi_clause = cdb.derefer(cdb::property::Tusize::NumBiClause);
         let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
         let cdb_lbd_of_dp: f64 = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
 
         let elim_num_full = elim.derefer(processor::property::Tusize::NumFullElimination);
-        let elim_num_sub = elim.derefer(processor::property::Tusize::NumClauseSubsumption);
+        let elim_num_sub = elim.derefer(processor::property::Tusize::NumSubsumedClause);
 
         let rst_num_blk: usize = rst.derefer(solver::restart::property::Tusize::NumBlock);
         let rst_num_rst: usize = rst.derefer(solver::restart::property::Tusize::NumRestart);
@@ -563,14 +565,14 @@ impl StateIF for State {
             im!(
                 "{:>9}",
                 self,
-                LogUsizeId::Binclause,
-                cdb_num_biclause // cdb_num_bi_learnt
+                LogUsizeId::BiClause,
+                cdb_num_bi_clause // cdb_num_bi_learnt
             ),
             im!(
                 "{:>9}",
                 self,
                 LogUsizeId::PermanentClause,
-                cdb_num_active - cdb_num_learnt
+                cdb_num_clause - cdb_num_learnt
             ),
         );
         println!(
@@ -610,8 +612,13 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|elim:{}, #sub:{}, core:{}, /cpr:{}",
-            im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
+            "\x1B[2K        misc|proc:{}, #sub:{}, core:{}, /cpr:{}",
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::NumProcessor,
+                self[Stat::NumProcessor]
+            ),
             im!("{:>9}", self, LogUsizeId::ClauseSubsumption, elim_num_sub),
             im!(
                 "{:>9}",
@@ -626,11 +633,71 @@ impl StateIF for State {
                 asg_cpr_ema.get()
             )
         );
+        self[LogUsizeId::Simplify] = elim_num_full;
         #[cfg(feature = "strategy_adaptation")]
         {
             println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
         }
         self.flush("");
+    }
+}
+
+impl State {
+    #[allow(clippy::cognitive_complexity)]
+    fn record_stats<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R)
+    where
+        A: PropertyDereference<assign::property::Tusize, usize>
+            + PropertyReference<assign::property::TEma, Ema>,
+        C: PropertyDereference<cdb::property::Tusize, usize>
+            + PropertyDereference<cdb::property::Tf64, f64>,
+        E: PropertyDereference<processor::property::Tusize, usize>,
+        R: PropertyDereference<solver::restart::property::Tusize, usize>
+            + PropertyReference<solver::restart::property::TEma2, Ema2>,
+    {
+        self[LogUsizeId::NumConflict] = asg.derefer(assign::property::Tusize::NumConflict);
+        self[LogUsizeId::NumDecision] = asg.derefer(assign::property::Tusize::NumDecision);
+        self[LogUsizeId::NumPropagate] = asg.derefer(assign::property::Tusize::NumPropagation);
+        self[LogUsizeId::RemainingVar] = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+        self[LogUsizeId::AssertedVar] = asg.derefer(assign::property::Tusize::NumAssertedVar);
+        self[LogUsizeId::EliminatedVar] = asg.derefer(assign::property::Tusize::NumEliminatedVar);
+        self[LogF64Id::Progress] = 100.0
+            * (self[LogUsizeId::AssertedVar]
+                + asg.derefer(assign::property::Tusize::NumEliminatedVar)) as f64
+            / asg.derefer(assign::property::Tusize::NumVar) as f64;
+        self[LogUsizeId::RemovableClause] = cdb.derefer(cdb::property::Tusize::NumLearnt);
+        self[LogUsizeId::LBD2Clause] = cdb.derefer(cdb::property::Tusize::NumLBD2);
+        self[LogUsizeId::BiClause] = cdb.derefer(cdb::property::Tusize::NumBiClause);
+        self[LogUsizeId::PermanentClause] =
+            cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
+        self[LogUsizeId::RestartBlock] = rst.derefer(solver::restart::property::Tusize::NumBlock);
+        self[LogUsizeId::Restart] = rst.derefer(solver::restart::property::Tusize::NumRestart);
+        self[LogUsizeId::RestartTriggerLevel] =
+            rst.derefer(solver::restart::property::Tusize::TriggerLevel);
+        self[LogUsizeId::RestartTriggerLevelMax] =
+            rst.derefer(solver::restart::property::Tusize::TriggerLevelMax);
+
+        let rst_lbd: &Ema2 = rst.refer(solver::restart::property::TEma2::LBD);
+        self[LogF64Id::EmaLBD] = rst_lbd.get();
+        self[LogF64Id::TrendLBD] = rst_lbd.trend();
+
+        self[LogF64Id::DpAverageLBD] = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
+        self[LogF64Id::DecisionPerConflict] =
+            asg.refer(assign::property::TEma::DecisionPerConflict).get();
+
+        self[LogF64Id::TrendASG] = rst.refer(solver::restart::property::TEma2::ASG).trend();
+        self[LogF64Id::CLevel] = self.c_lvl.get();
+        self[LogF64Id::BLevel] = self.b_lvl.get();
+        self[LogF64Id::PropagationPerConflict] = asg
+            .refer(assign::property::TEma::PropagationPerConflict)
+            .get();
+        self[LogUsizeId::NumProcessor] = self[Stat::NumProcessor];
+        self[LogUsizeId::Simplify] = elim.derefer(processor::property::Tusize::NumFullElimination);
+        self[LogUsizeId::ClauseSubsumption] =
+            elim.derefer(processor::property::Tusize::NumSubsumedClause);
+        self[LogUsizeId::UnreachableCore] =
+            asg.derefer(assign::property::Tusize::NumUnreachableVar);
+        self[LogF64Id::ConflictPerRestart] =
+            asg.refer(assign::property::TEma::ConflictPerRestart).get();
     }
 }
 
@@ -671,14 +738,24 @@ impl Index<LogUsizeId> for State {
     type Output = usize;
     #[inline]
     fn index(&self, i: LogUsizeId) -> &Self::Output {
-        &self.record[i]
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.record.vali.get_unchecked(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.record.vali[i as usize]
     }
 }
 
 impl IndexMut<LogUsizeId> for State {
     #[inline]
     fn index_mut(&mut self, i: LogUsizeId) -> &mut Self::Output {
-        &mut self.record[i]
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.record.vali.get_unchecked_mut(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.record.vali[i as usize]
     }
 }
 
@@ -686,14 +763,24 @@ impl Index<LogF64Id> for State {
     type Output = f64;
     #[inline]
     fn index(&self, i: LogF64Id) -> &Self::Output {
-        &self.record[i]
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.record.valf.get_unchecked(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.record.valf[i as usize]
     }
 }
 
 impl IndexMut<LogF64Id> for State {
     #[inline]
     fn index_mut(&mut self, i: LogF64Id) -> &mut Self::Output {
-        &mut self.record[i]
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.record.valf.get_unchecked_mut(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.record.valf[i as usize]
     }
 }
 
@@ -732,7 +819,7 @@ impl State {
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let asg_num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
         let asg_num_restart = asg.derefer(assign::property::Tusize::NumRestart);
-        let cdb_num_active = cdb.derefer(cdb::property::Tusize::NumActive);
+        let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
         let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
         let cdb_num_reduction = cdb.derefer(cdb::property::Tusize::NumReduction);
@@ -743,7 +830,7 @@ impl State {
             rst_num_block,                             // blocked
             asg_num_conflict / asg_num_restart.max(1), // average cfc (Conflict / Restart)
             asg_num_unasserted_vars,                   // alive vars
-            cdb_num_active - cdb_num_learnt,           // given clauses
+            cdb_num_clause - cdb_num_learnt,           // given clauses
             0,                                         // alive literals
             cdb_num_reduction,                         // clause reduction
             cdb_num_learnt,                            // alive learnts
@@ -767,7 +854,7 @@ impl State {
         let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let asg_num_restart = asg.derefer(assign::property::Tusize::NumRestart);
-        let cdb_num_active = cdb.derefer(cdb::property::Tusize::NumActive);
+        let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
         let rst_num_block = rst.derefer(solver::restart::property::Tusize::NumBlock);
         let rst_asg = rst.refer(solver::restart::property::TEma2::ASG);
@@ -783,7 +870,7 @@ impl State {
             asg_num_eliminated_vars,
             rate * 100.0,
             cdb_num_learnt,
-            cdb_num_active,
+            cdb_num_clause,
             0,
             rst_num_block,
             asg_num_restart,
@@ -821,7 +908,7 @@ pub enum LogUsizeId {
     //
     RemovableClause,
     LBD2Clause,
-    Binclause,
+    BiClause,
     PermanentClause,
 
     //
@@ -837,6 +924,7 @@ pub enum LogUsizeId {
     //
     //## pre(in)-processor
     //
+    NumProcessor,
     Simplify,
     Stabilize,
     ClauseSubsumption,
@@ -886,6 +974,11 @@ impl Index<LogUsizeId> for ProgressRecord {
     type Output = usize;
     #[inline]
     fn index(&self, i: LogUsizeId) -> &usize {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.vali.get_unchecked(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &self.vali[i as usize]
     }
 }
@@ -893,6 +986,11 @@ impl Index<LogUsizeId> for ProgressRecord {
 impl IndexMut<LogUsizeId> for ProgressRecord {
     #[inline]
     fn index_mut(&mut self, i: LogUsizeId) -> &mut usize {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.vali.get_unchecked_mut(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &mut self.vali[i as usize]
     }
 }
@@ -901,6 +999,11 @@ impl Index<LogF64Id> for ProgressRecord {
     type Output = f64;
     #[inline]
     fn index(&self, i: LogF64Id) -> &f64 {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.valf.get_unchecked(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &self.valf[i as usize]
     }
 }
@@ -908,6 +1011,68 @@ impl Index<LogF64Id> for ProgressRecord {
 impl IndexMut<LogF64Id> for ProgressRecord {
     #[inline]
     fn index_mut(&mut self, i: LogF64Id) -> &mut f64 {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.valf.get_unchecked_mut(i as usize)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
         &mut self.valf[i as usize]
+    }
+}
+
+pub mod property {
+    use super::*;
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum Tusize {
+        /// the number of 'no decision conflict'
+        NumDecisionConflict,
+        // the number for processor invocations
+        NumProcessor,
+        /// the number of vivification
+        Vivification,
+        /// the number of vivified (shrunk) clauses
+        VivifiedClause,
+        /// the number of vivified (asserted) vars
+        VivifiedVar,
+    }
+
+    pub const USIZES: [Tusize; 5] = [
+        Tusize::NumDecisionConflict,
+        Tusize::NumProcessor,
+        Tusize::Vivification,
+        Tusize::VivifiedClause,
+        Tusize::VivifiedVar,
+    ];
+
+    impl PropertyDereference<Tusize, usize> for State {
+        #[inline]
+        fn derefer(&self, k: Tusize) -> usize {
+            match k {
+                Tusize::NumDecisionConflict => self[Stat::NumDecisionConflict],
+                Tusize::NumProcessor => self[Stat::NumProcessor],
+                Tusize::Vivification => self[Stat::Vivification],
+                Tusize::VivifiedClause => self[Stat::VivifiedClause],
+                Tusize::VivifiedVar => self[Stat::VivifiedVar],
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum TEma {
+        BackjumpLevel,
+        ConflictLevel,
+    }
+
+    pub const EMAS: [TEma; 2] = [TEma::BackjumpLevel, TEma::ConflictLevel];
+
+    impl PropertyReference<TEma, Ema> for State {
+        #[inline]
+        fn refer(&self, k: TEma) -> &Ema {
+            match k {
+                TEma::BackjumpLevel => &self.b_lvl,
+                TEma::ConflictLevel => &self.c_lvl,
+            }
+        }
     }
 }

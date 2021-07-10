@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.7.0"
+version = "0.10.0"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2018"
@@ -15,26 +15,44 @@ categories = ["mathematics", "science"]
 bitflags = "1.2"
 
 [features]
-default = ["clause_elimination", "clause_reduction", "LR_rewarding", "Luby_stabilization", "reason_side_rewarding"]
+default = [
+           # DEBUG "boundary_check",
+           "bi_clause_completion",
+           "clause_elimination",
+           "clause_reduction",
+           "clause_vivification",
+           "LR_rewarding",
+           "Luby_stabilization",
+           # DEBUG "maintain_watch_cache",
+           "reason_side_rewarding",
+           "rephase",
+           "unsafe_access"
+          ]
 best_phases_tracking = []
-best_phases_reuse = []
+bi_clause_completion = []
 boundary_check = []
 clause_elimination = []
 clause_reduction = []
 clause_vivification = []
-ema_calibration = []
+debug_propagation = []
+EMA_calibration = []
 EVSIDS = []
+hashed_watch_cache = []
 incremental_solver = []
 just_used = []
 LR_rewarding = []
 luby_restart = []
 Luby_stabilization = []
+maintain_watch_cache = []
 no_IO = []
 reason_side_rewarding = []
+rephase = ["best_phases_tracking"]
 strategy_adaptation = []
+support_user_assumption = []
 trace_analysis = []
 trace_elimination = []
-var_staging = []
+trace_equivalency = []
+unsafe_access = []
 
 [profile.release]
 lto = "fat"

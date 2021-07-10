@@ -6,7 +6,7 @@ use {
 
 impl ActivityIF<VarId> for AssignStack {
     fn activity(&mut self, vi: VarId) -> f64 {
-        self.var[vi].activity(self.stage_activity)
+        self.var[vi].activity()
     }
     fn average_activity(&self) -> f64 {
         self.activity_ema.get()
@@ -25,23 +25,9 @@ impl ActivityIF<VarId> for AssignStack {
     fn reward_at_unassign(&mut self, vi: VarId) {
         self.var[vi].update_activity(self.ordinal, self.activity_decay, self.activity_anti_decay);
     }
-    // Note: `update_rewards` should be called befere `cancel_until`
+    // Note: `update_rewards` should be called before `cancel_until`
     fn update_rewards(&mut self) {
         self.ordinal += 1;
-        self.stage_activity *= self.activity_decay;
-    }
-    fn update_activity_decay(&mut self, index: Option<usize>) {
-        // asg.update_activity_decay();
-        if let Some(index) = index {
-            if self.reward_index < index {
-                self.activity_decay += (1.0 - self.activity_decay) * self.activity_decay_step;
-                self.reward_index += 1;
-            }
-        } else {
-            self.activity_decay = self.activity_decay_default;
-            self.reward_index = 1;
-        }
-        self.activity_anti_decay = 1.0 - self.activity_decay;
     }
 }
 

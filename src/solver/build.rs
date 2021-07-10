@@ -4,7 +4,7 @@ use {
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
-        processor::{EliminateIF, Eliminator},
+        processor::Eliminator,
         types::*,
     },
     std::convert::TryFrom,
@@ -13,7 +13,7 @@ use {
 #[cfg(not(feature = "no_IO"))]
 use std::{
     fs::File,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Write},
 };
 
 /// API for SAT solver creation and modification.
@@ -32,7 +32,7 @@ pub trait SatSolverIF: Instantiate {
     /// use std::convert::TryFrom;
     /// use crate::splr::assign::VarManipulateIF;    // for s.asg.assign()
     ///
-    /// let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
+    /// let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
     /// assert!(s.add_assignment(1).is_ok());
     /// assert_eq!(s.asg.assign(1), Some(true));
     /// assert!(s.add_assignment(2).is_ok());
@@ -40,7 +40,7 @@ pub trait SatSolverIF: Instantiate {
     /// assert!(s.add_assignment(4).is_ok());
     /// assert!(s.add_assignment(5).is_ok());
     /// assert!(s.add_assignment(8).is_ok());
-    /// assert!(matches!(s.add_assignment(-1), Err(SolverError::Inconsistent)));
+    /// assert!(matches!(s.add_assignment(-1), Err(SolverError::RootLevelConflict(_))));
     /// assert!(matches!(s.add_assignment(10), Err(SolverError::OutOfRange)));
     /// assert!(matches!(s.add_assignment(0), Err(SolverError::OutOfRange)));
     /// assert_eq!(s.solve(), Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8])));
@@ -58,7 +58,7 @@ pub trait SatSolverIF: Instantiate {
     /// use crate::splr::*;
     /// use std::convert::TryFrom;
     ///
-    /// let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
+    /// let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
     /// assert!(s.add_clause(vec![1, -2]).is_ok());
     /// assert!(s.add_clause(vec![2, -3]).is_ok());
     /// assert!(s.add_clause(vec![3, 4]).is_ok());
@@ -80,7 +80,7 @@ pub trait SatSolverIF: Instantiate {
     /// use crate::splr::*;
     /// use std::convert::TryFrom;
     ///
-    /// let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
+    /// let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
     /// assert_eq!(s.asg.num_vars, 8);
     /// assert!(matches!(s.add_assignment(9), Err(SolverError::OutOfRange)));
     /// s.add_assignment(1).expect("panic");
@@ -94,6 +94,7 @@ pub trait SatSolverIF: Instantiate {
     /// assert_eq!(s.solve(), Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8, -9])));
     /// ```
     fn add_var(&mut self) -> usize;
+    #[cfg(not(feature = "no_IO"))]
     /// make a solver and load a CNF into it.
     ///
     /// # Errors
@@ -101,10 +102,15 @@ pub trait SatSolverIF: Instantiate {
     /// * `SolverError::IOError` if it failed to load a CNF file.
     /// * `SolverError::Inconsistent` if the CNF is conflicting.
     /// * `SolverError::OutOfRange` if any literal used in the CNF is out of range for var index.
-    #[cfg(not(feature = "no_IO"))]
     fn build(config: &Config) -> Result<Solver, SolverError>;
     /// reinitialize a solver for incremental solving. **Requires 'incremental_solver' feature**
     fn reset(&mut self);
+    #[cfg(not(feature = "no_IO"))]
+    /// dump an UNSAT certification file
+    fn save_certification(&mut self);
+    #[cfg(not(feature = "no_IO"))]
+    /// dump the current status as a CNF
+    fn dump_cnf(&self, fname: &str);
 }
 
 impl Default for Solver {
@@ -144,7 +150,7 @@ where
     fn try_from((config, vec): (Config, &[V])) -> Result<Self, Self::Error> {
         let cnf = CNFDescription::from(vec);
         match Solver::instantiate(&config, &cnf).inject_from_vec(vec) {
-            Err(SolverError::Inconsistent) => Err(Ok(Certificate::UNSAT)),
+            Err(SolverError::RootLevelConflict(_)) => Err(Ok(Certificate::UNSAT)),
             Err(e) => Err(Err(e)),
             Ok(s) => Ok(s),
         }
@@ -161,7 +167,7 @@ impl TryFrom<&str> for Solver {
     /// use std::convert::TryFrom;
     /// use crate::splr::solver::{SatSolverIF, Solver};
     ///
-    /// let mut s = Solver::try_from("tests/sample.cnf").expect("fail to load");
+    /// let mut s = Solver::try_from("cnfs/sample.cnf").expect("fail to load");
     ///```
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         let config = Config::from(s);
@@ -174,7 +180,13 @@ impl SatSolverIF for Solver {
         if val == 0 || self.asg.num_vars < val.abs() as usize {
             return Err(SolverError::OutOfRange);
         }
-        self.asg.assign_at_root_level(Lit::from(val)).map(|_| self)
+        let lit = Lit::from(val);
+        self.cdb.certificate_add_assertion(lit);
+        match self.asg.assigned(lit) {
+            None => self.asg.assign_at_root_level(lit).map(|_| self),
+            Some(true) => Ok(self),
+            Some(false) => Err(SolverError::RootLevelConflict(Some(ClauseId::from(lit)))),
+        }
     }
     fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver, SolverError>
     where
@@ -190,8 +202,14 @@ impl SatSolverIF for Solver {
             .iter()
             .map(|i| Lit::from(*i))
             .collect::<Vec<Lit>>();
-        if self.add_unchecked_clause(&mut clause).is_none() {
-            return Err(SolverError::Inconsistent);
+
+        if clause.is_empty() {
+            return Err(SolverError::RootLevelConflict(None));
+        }
+        if self.add_unchecked_clause(&mut clause) == RefClause::EmptyClause {
+            return Err(SolverError::RootLevelConflict(Some(ClauseId::from(
+                clause[0],
+            ))));
         }
         Ok(self)
     }
@@ -215,7 +233,7 @@ impl SatSolverIF for Solver {
     /// use splr::config::Config;
     /// use splr::solver::{SatSolverIF, Solver};
     ///
-    /// let config = Config::from("tests/sample.cnf");
+    /// let config = Config::from("cnfs/sample.cnf");
     /// assert!(Solver::build(&config).is_ok());
     ///```
     #[cfg(not(feature = "no_IO"))]
@@ -240,37 +258,69 @@ impl SatSolverIF for Solver {
         let mut tmp = Vec::new();
         std::mem::swap(&mut tmp, &mut cdb.eliminated_permanent);
         while let Some(mut vec) = tmp.pop() {
-            cdb.new_clause(asg, &mut vec, false, false);
+            cdb.new_clause(asg, &mut vec, false);
+        }
+    }
+    #[cfg(not(feature = "no_IO"))]
+    /// dump an UNSAT certification file
+    fn save_certification(&mut self) {
+        self.cdb.certificate_save();
+    }
+    #[cfg(not(feature = "no_IO"))]
+    fn dump_cnf(&self, fname: &str) {
+        let nv = self.asg.derefer(crate::assign::property::Tusize::NumVar);
+        for vi in 1..nv {
+            if self.asg.var(vi).is(Flag::ELIMINATED) && self.asg.assign(vi).is_some() {
+                panic!("conflicting var {} {:?}", vi, self.asg.assign(vi));
+            }
+        }
+        if let Ok(out) = File::create(&fname) {
+            let mut buf = std::io::BufWriter::new(out);
+            let na = self
+                .asg
+                .derefer(crate::assign::property::Tusize::NumAssertedVar);
+            let nc = self.cdb.iter().skip(1).filter(|c| !c.is_dead()).count();
+            buf.write_all(format!("p cnf {} {}\n", nv, nc + na).as_bytes())
+                .unwrap();
+            for c in self.cdb.iter().skip(1) {
+                if c.is_dead() {
+                    continue;
+                }
+                for l in c.iter() {
+                    buf.write_all(format!("{} ", i32::from(*l)).as_bytes())
+                        .unwrap();
+                }
+                buf.write_all(b"0\n").unwrap();
+            }
+            buf.write_all(b"c from trail\n").unwrap();
+            for x in self.asg.stack_iter().take(self.asg.len_upto(0)) {
+                buf.write_all(format!("{} 0\n", i32::from(*x)).as_bytes())
+                    .unwrap();
+            }
         }
     }
 }
 
 impl Solver {
-    /// FIXME: this should return Result<ClauseId, SolverError>
-    /// fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId>
     // renamed from clause_new
-    fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId> {
+    fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> RefClause {
         let Solver {
             ref mut asg,
             ref mut cdb,
-            ref mut elim,
             ..
         } = self;
         if lits.is_empty() {
-            return None;
+            return RefClause::EmptyClause;
         }
         debug_assert!(asg.decision_level() == 0);
-        if lits.iter().any(|l| asg.assigned(*l).is_some()) {
-            cdb.certificate_add(lits);
-        }
-        lits.sort_unstable();
+        lits.sort();
         let mut j = 0;
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means tautology.
         for i in 0..lits.len() {
             let li = lits[i];
             let sat = asg.assigned(li);
             if sat == Some(true) || !li == l_ {
-                return Some(ClauseId::default());
+                return RefClause::Dead;
             } else if sat != Some(false) && li != l_ {
                 lits[j] = li;
                 j += 1;
@@ -279,16 +329,14 @@ impl Solver {
         }
         lits.truncate(j);
         match lits.len() {
-            0 => None, // Empty clause is UNSAT.
-            1 => asg
-                .assign_at_root_level(lits[0])
-                .map_or(None, |_| Some(ClauseId::default())),
-            _ => {
-                let cid = cdb.new_clause(asg, lits, false, false);
-                elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
-                cdb[cid].rank = 1;
-                Some(cid)
+            0 => RefClause::EmptyClause, // for UNSAT
+            1 => {
+                let l0 = lits[0];
+                cdb.certificate_add_assertion(l0);
+                asg.assign_at_root_level(l0)
+                    .map_or(RefClause::EmptyClause, |_| RefClause::UnitClause(l0))
             }
+            _ => cdb.new_clause(asg, lits, false),
         }
     }
     #[cfg(not(feature = "no_IO"))]
@@ -300,6 +348,7 @@ impl Solver {
         let mut buf = String::new();
         loop {
             buf.clear();
+            let mut ends_zero = false;
             match reader.read_line(&mut buf) {
                 Ok(0) => break,
                 Ok(_) if buf.starts_with('c') => continue,
@@ -308,13 +357,21 @@ impl Solver {
                     let mut v: Vec<Lit> = Vec::new();
                     for s in iter {
                         match s.parse::<i32>() {
-                            Ok(0) => break,
+                            Ok(0) => {
+                                ends_zero = true;
+                                break;
+                            }
                             Ok(val) => v.push(Lit::from(val)),
                             Err(_) => (),
                         }
                     }
-                    if !v.is_empty() && self.add_unchecked_clause(&mut v).is_none() {
-                        return Err(SolverError::Inconsistent);
+                    if v.is_empty() {
+                        if ends_zero {
+                            return Err(SolverError::RootLevelConflict(None));
+                        }
+                        continue;
+                    } else if self.add_unchecked_clause(&mut v) == RefClause::EmptyClause {
+                        return Err(SolverError::RootLevelConflict(Some(ClauseId::from(v[0]))));
                     }
                 }
                 Err(e) => panic!("{}", e),
@@ -350,8 +407,13 @@ impl Solver {
                 .iter()
                 .map(|i| Lit::from(*i))
                 .collect::<Vec<Lit>>();
-            if self.add_unchecked_clause(&mut lits).is_none() {
-                return Err(SolverError::Inconsistent);
+            if v.is_empty() {
+                return Err(SolverError::RootLevelConflict(None));
+            }
+            if self.add_unchecked_clause(&mut lits) == RefClause::EmptyClause {
+                return Err(SolverError::RootLevelConflict(
+                    (!lits.is_empty()).then(|| ClauseId::from(lits[0])),
+                ));
             }
         }
         debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
@@ -376,7 +438,7 @@ mod tests {
     #[cfg(not(feature = "no_IO"))]
     #[test]
     fn test_add_var() {
-        let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
+        let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
         assert_eq!(s.asg.num_vars, 8);
         assert!(matches!(s.add_assignment(9), Err(SolverError::OutOfRange)));
         s.add_assignment(1).expect("panic");

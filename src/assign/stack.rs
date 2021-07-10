@@ -1,5 +1,5 @@
 /// main struct AssignStack
-#[cfg(any(feature = "best_phases_tracking", feature = "var_staging"))]
+#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
 use std::collections::HashMap;
 use {
     super::{AssignIF, AssignStack, Var, VarHeapIF, VarIdHeap, VarManipulateIF, VarSelectIF},
@@ -12,22 +12,6 @@ use std::{
     fs::File,
     io::{BufWriter, Write},
 };
-
-impl Default for AssignReason {
-    fn default() -> AssignReason {
-        AssignReason::None
-    }
-}
-
-impl fmt::Display for AssignReason {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            AssignReason::None => write!(f, "reason:none"),
-            AssignReason::Implication(c, NULL_LIT) => write!(f, "reason:{}", c),
-            AssignReason::Implication(c, _) => write!(f, "reason:biclause{}", c),
-        }
-    }
-}
 
 impl Default for AssignStack {
     fn default() -> AssignStack {
@@ -44,21 +28,13 @@ impl Default for AssignStack {
             best_assign: false,
             build_best_at: 0,
             num_best_assign: 0,
-            rephasing: false,
+            num_rephase: 0,
+            bp_divergence_ema: Ema::new(10),
+
             #[cfg(feature = "best_phases_tracking")]
             best_phases: HashMap::new(),
-
-            #[cfg(feature = "var_staging")]
-            staging_reward_value: 1.0,
-            #[cfg(feature = "var_staging")]
-            staging_reward_decay: 0.9,
-            #[cfg(feature = "var_staging")]
-            staged_vars: HashMap::new(),
-            #[cfg(feature = "var_staging")]
-            stage_mode_select: 0,
-            num_stages: 0,
-            stage_activity: 0.0,
-            reward_index: 1,
+            #[cfg(feature = "rephase")]
+            phase_age: 0,
 
             num_vars: 0,
             num_asserted_vars: 0,
@@ -81,7 +57,6 @@ impl Default for AssignStack {
             activity_decay_step: 0.1,
 
             during_vivification: false,
-            vivify_sandbox: (0, 0, 0),
         }
     }
 }
@@ -106,14 +81,9 @@ impl Instantiate for AssignStack {
         AssignStack {
             assign: vec![None; 1 + nv],
             level: vec![DecisionLevel::default(); nv + 1],
-            reason: vec![AssignReason::default(); nv + 1],
+            reason: vec![AssignReason::None; nv + 1],
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
-
-            #[cfg(feature = "var_staging")]
-            staging_reward_decay: config.stg_rwd_dcy,
-            #[cfg(feature = "var_staging")]
-            staging_reward_value: config.stg_rwd_val,
 
             num_vars: cnf.num_of_variables,
             var: Var::new_vars(nv),
@@ -134,18 +104,19 @@ impl Instantiate for AssignStack {
         match e {
             // called only by assertion on chronoBT
             // So execute everything of `assign_by_unitclause` but cancel_until(root_level)
-            SolverEvent::Assert(vi) => {
-                self.make_var_asserted(vi);
-                self.reward_index = 1;
-            }
             SolverEvent::Conflict => (),
             SolverEvent::Eliminate(vi) => {
                 self.make_var_eliminated(vi);
             }
+            #[allow(unused_variables)]
+            SolverEvent::Stabilize(lvl) => {
+                #[cfg(feature = "rephase")]
+                self.select_rephasing_target(None, lvl);
+            }
             SolverEvent::NewVar => {
                 self.assign.push(None);
                 self.level.push(DecisionLevel::default());
-                self.reason.push(AssignReason::default());
+                self.reason.push(AssignReason::None);
                 self.expand_heap();
                 self.num_vars += 1;
                 self.var.push(Var::from(self.num_vars));
@@ -153,34 +124,20 @@ impl Instantiate for AssignStack {
             SolverEvent::Reinitialize => {
                 debug_assert_eq!(self.decision_level(), self.root_level);
                 self.q_head = 0;
+                self.num_asserted_vars = 0;
                 self.num_eliminated_vars =
                     self.var.iter().filter(|v| v.is(Flag::ELIMINATED)).count();
-                self.num_asserted_vars = if self.trail.is_empty() {
-                    0
-                } else {
-                    self.trail.len()
-                };
                 self.rebuild_order();
             }
-            #[cfg(feature = "clause_vivification")]
-            SolverEvent::Vivify(start) => {
-                if start {
-                    self.during_vivification = true;
-                    self.vivify_sandbox =
-                        (self.num_conflict, self.num_propagation, self.num_restart);
-                } else {
-                    self.during_vivification = false;
-                    self.num_conflict = self.vivify_sandbox.0;
-                    self.num_propagation = self.vivify_sandbox.1;
-                    self.num_restart = self.vivify_sandbox.2;
-                }
-            }
-            _ => (),
+            e => panic!("don't call asg with {:?}", e),
         }
     }
 }
 
 impl AssignIF for AssignStack {
+    fn root_level(&self) -> DecisionLevel {
+        self.root_level
+    }
     fn stack(&self, i: usize) -> Lit {
         self.trail[i]
     }
@@ -191,7 +148,7 @@ impl AssignIF for AssignStack {
         self.trail.len()
     }
     fn len_upto(&self, n: DecisionLevel) -> usize {
-        self.trail_lim[n as usize]
+        self.trail_lim.get(n as usize).map_or(0, |n| *n)
     }
     fn stack_is_empty(&self) -> bool {
         self.trail.is_empty()
@@ -216,10 +173,7 @@ impl AssignIF for AssignStack {
         &self.level
     }
     fn best_assigned(&mut self) -> Option<usize> {
-        if self.build_best_at == self.num_propagation {
-            return Some(self.num_vars - self.num_best_assign);
-        }
-        None
+        (self.build_best_at == self.num_propagation).then(|| self.num_vars - self.num_best_assign)
     }
     #[allow(unused_variables)]
     fn extend_model<C>(&mut self, cdb: &mut C, lits: &[Lit]) -> Vec<Option<bool>>
@@ -245,71 +199,46 @@ impl AssignIF for AssignStack {
         if lits.is_empty() {
             return extended_model;
         }
-        let mut i = lits.len() - 1;
-        let mut width;
-        'next: loop {
-            width = usize::from(lits[i]);
-            if width == 0 && i == 0 {
-                break;
-            }
+        let mut i = lits.len();
+        while 0 < i {
             i -= 1;
+            let width = usize::from(lits[i]);
+            assert!(0 < width);
+            assert!(width <= i);
+            let target_index = i - width;
+            let last_lit_index = i - 1;
+            let reason_literals = target_index + 1..=last_lit_index;
+            i = target_index;
+
             #[cfg(feature = "incremental_solver")]
-            let mut phantom_clause = Vec::new();
-            loop {
-                if width <= 1 {
-                    break;
-                }
-                let l = lits[i];
-                #[cfg(feature = "incremental_solver")]
-                {
-                    phantom_clause.push(l);
-                }
-                if extended_model[l.vi()] != Some(!bool::from(l)) {
-                    if i < width {
-                        #[cfg(feature = "incremental_solver")]
-                        {
-                            for l in &lits[..i] {
-                                phantom_clause.push(*l);
-                            }
-                            debug_assert!(1 < phantom_clause.len());
-                            #[cfg(feature = "trace_elimination")]
-                            println!(
-                                "- pull back clause E {:?}",
-                                phantom_clause.iter().map(i32::from).collect::<Vec<_>>()
-                            );
-                            cdb.new_clause(self, &mut phantom_clause, false, false);
-                        }
-                        break 'next;
-                    }
-                    #[cfg(feature = "incremental_solver")]
-                    {
-                        for l in &lits[i - width + 1..i] {
-                            phantom_clause.push(*l);
-                        }
-                        debug_assert!(1 < phantom_clause.len());
-                        #[cfg(feature = "trace_elimination")]
-                        println!(
-                            "- pull back clause C {:?}",
-                            phantom_clause.iter().map(i32::from).collect::<Vec<_>>()
-                        );
-                        cdb.new_clause(self, &mut phantom_clause, false, false);
-                    }
-                    i -= width;
-                    continue 'next;
-                }
-                width -= 1;
-                i -= 1;
+            {
+                cdb.new_clause(
+                    self,
+                    &mut lits[target_index..=last_lit_index]
+                        .iter()
+                        .copied()
+                        .collect::<Vec<Lit>>(),
+                    false,
+                );
             }
-            debug_assert!(width == 1);
-            let l = lits[i];
-            debug_assert_ne!(Some(bool::from(l)), self.assigned(l));
-            #[cfg(feature = "trace_elimination")]
-            println!(" - extend {}", l);
-            extended_model[l.vi()] = Some(bool::from(l));
-            if i < width {
-                break;
+
+            if lits[reason_literals.clone()]
+                .iter()
+                .all(|l| extended_model[l.vi()] == Some(!bool::from(*l)))
+            {
+                let l = lits[target_index];
+                extended_model[l.vi()] = Some(bool::from(l));
+            } else if lits[reason_literals.clone()]
+                .iter()
+                .any(|l| extended_model[l.vi()].is_none())
+            {
+                panic!("impossible: pseudo clause has unassigned literal(s).");
+            } else if lits[reason_literals.clone()]
+                .iter()
+                .any(|l| extended_model[l.vi()] == Some(bool::from(*l)))
+            {
+                continue;
             }
-            i -= width;
         }
         extended_model
     }
@@ -322,63 +251,42 @@ impl AssignIF for AssignStack {
         false
     }
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
-        let lits = &c.lits;
-        debug_assert!(1 < lits.len());
-        let l0 = lits[0];
+        let l0 = c.lit0();
         self.assigned(l0) == Some(true)
             && matches!(self.reason(l0.vi()), AssignReason::Implication(x, _) if x == cid)
     }
-}
-
-impl AssignStack {
-    #[cfg(feature = "boundary_check")]
-    pub fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
-        &mut self,
-        v: V,
-    ) -> Vec<(i32, DecisionLevel, bool, Option<bool>)> {
-        v.into_iter()
-            .map(|l| {
-                (
-                    i32::from(l),
-                    self.level(l.vi()),
-                    self.reason(l.vi()) == AssignReason::default(),
-                    self.assign(l.vi()),
-                )
-            })
-            .collect::<Vec<(i32, DecisionLevel, bool, Option<bool>)>>()
-    }
-
     /// dump all active clauses and assertions as a CNF file.
     #[cfg(not(feature = "no_IO"))]
-    #[allow(dead_code)]
-    fn dump_cnf<C, V>(&mut self, cdb: &C, fname: &str)
+    fn dump_cnf<C>(&mut self, cdb: &C, fname: &str)
     where
         C: ClauseDBIF,
     {
         for vi in 1..self.var.len() {
-            if self.var(vi).is(Flag::ELIMINATED) {
-                if self.assign.get(vi).is_some() {
-                    panic!("conflicting var {} {:?}", vi, self.assign.get(vi));
-                } else {
-                    println!("eliminate var {}", vi);
-                }
+            if self.var(vi).is(Flag::ELIMINATED) && self.assign[vi].is_some() {
+                panic!("conflicting var {} {:?}", vi, self.assign[vi]);
             }
         }
         if let Ok(out) = File::create(&fname) {
             let mut buf = BufWriter::new(out);
             let nv = self.num_vars;
-            let nc: usize = cdb.len() - 1;
-            buf.write_all(format!("p cnf {} {}\n", self.num_vars, nc + nv).as_bytes())
+            let na = self.len_upto(0);
+            // let nc: usize = cdb.derefer(cdb::property::Tusize::NumClause);
+            let nc = cdb.iter().skip(1).filter(|c| !c.is_dead()).count();
+
+            buf.write_all(format!("p cnf {} {}\n", nv, nc + na).as_bytes())
                 .unwrap();
             for c in cdb.iter().skip(1) {
-                for l in &c.lits {
+                if c.is_dead() {
+                    continue;
+                }
+                for l in c.iter() {
                     buf.write_all(format!("{} ", i32::from(*l)).as_bytes())
                         .unwrap();
                 }
                 buf.write_all(b"0\n").unwrap();
             }
             buf.write_all(b"c from trail\n").unwrap();
-            for x in &self.trail {
+            for x in self.trail.iter().take(self.len_upto(0)) {
                 buf.write_all(format!("{} 0\n", i32::from(*x)).as_bytes())
                     .unwrap();
             }
@@ -476,6 +384,12 @@ mod tests {
         assert_eq!(asg.len_upto(1), 3);
 
         // [1, 2, 3] => [1, 2]
+        #[cfg(feature = "debug_propagation")]
+        {
+            for l in asg.trail.iter() {
+                asg.var[l.vi()].turn_on(Flag::PROPAGATED);
+            } // simulate propagation
+        }
         asg.cancel_until(1);
         assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
         assert_eq!(asg.decision_level(), 1);
@@ -492,7 +406,8 @@ mod tests {
         assert_eq!(asg.trail_lim, vec![2, 3]);
 
         // [1, 2, 3, 4] => [1, 2, -4]
-        asg.assign_by_unitclause(Lit::from(-4i32));
+        asg.assign_at_root_level(Lit::from(-4i32))
+            .expect("impossible");
         assert_eq!(asg.trail, vec![lit(1), lit(2), lit(-4)]);
         assert_eq!(asg.decision_level(), 0);
         assert_eq!(asg.stack_len(), 3);

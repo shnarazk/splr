@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/splr/0.7.0")]
+#![allow(clippy::upper_case_acronyms)]
 /*!
 # A modern CDCL SAT solver in Rust
 
@@ -24,7 +24,7 @@ It adopts various research results on SAT solvers:
 ```
 use splr::*;
 
-let config = Config::from("tests/sample.cnf");
+let config = Config::from("cnfs/sample.cnf");
 if let Ok(mut s) = Solver::build(&config) {
     if let Ok(ans) = s.solve() {
         println!("{:?}", ans);

@@ -1,6 +1,6 @@
 /// Crate `eliminator` implements clause subsumption and var elimination.
 use {
-    super::{EliminateIF, Eliminator},
+    super::Eliminator,
     crate::{
         assign::AssignIF,
         cdb::ClauseDBIF,
@@ -25,74 +25,86 @@ where
     R: RestartIF,
 {
     let v = &mut asg.var(vi);
-    let w = &mut elim[vi];
+    let w = &mut elim.var[vi];
     if asg.assign(vi).is_some() || w.aborted {
         return Ok(());
     }
     debug_assert!(!v.is(Flag::ELIMINATED));
     // count only alive clauses
-    w.pos_occurs.retain(|&c| !cdb[c].is(Flag::DEAD));
-    w.neg_occurs.retain(|&c| !cdb[c].is(Flag::DEAD));
-    let pos = &w.pos_occurs as *const Vec<ClauseId>;
-    let neg = &w.neg_occurs as *const Vec<ClauseId>;
-    unsafe {
-        if *timedout < (*pos).len() * (*neg).len()
-            || skip_var_elimination(asg, cdb, elim, &*pos, &*neg, vi)
-        {
-            return Ok(());
-        } else {
-            *timedout -= (*pos).len() * (*neg).len();
-        }
-        #[cfg(feature = "trace_elimination")]
-        println!("# eliminate_var {}", vi);
-        // OK, eliminate the literal and build constraints on it.
-        make_eliminated_clauses(cdb, elim, vi, &*pos, &*neg);
-        let vec = &mut state.new_learnt as *mut Vec<Lit>;
-        // println!("eliminate_var {}: |p|: {} and |n|: {}", vi, (*pos).len(), (*neg).len());
-        // Produce clauses in cross product:
-        for p in &*pos {
-            for n in &*neg {
-                match merge(cdb, *p, *n, vi, &mut *vec) {
-                    0 => {
-                        #[cfg(feature = "trace_elimination")]
-                        println!(
-                            " - eliminate_var {}: fusion {}{} and {}{}",
-                            vi, p, cdb[*p], n, cdb[*n],
-                        );
-                    }
-                    1 => {
-                        let lit = (*vec)[0];
-                        #[cfg(feature = "trace_elimination")]
-                        println!(
-                            " - eliminate_var {}: found assign {} from {}{} and {}{}",
-                            vi, lit, p, cdb[*p], n, cdb[*n],
-                        );
-                        cdb.certificate_add(&*vec);
-                        asg.assign_at_root_level(lit)?;
-                    }
-                    2 => {
-                        if !cdb.registered_bin_clause((*vec)[0], (*vec)[1]) {
-                            let cid = cdb.new_clause(
-                                asg,
-                                &mut *vec,
-                                cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT),
-                                true,
-                            );
-                            elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
+    // Note: it may contain the target literal somehow. So the following may be failed.
+    // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, true)))));
+    w.pos_occurs
+        .retain(|&c| cdb[c].contains(Lit::from((vi, true))));
+    // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, false)))));
+    w.neg_occurs
+        .retain(|&c| cdb[c].contains(Lit::from((vi, false))));
+
+    let num_combination = w.pos_occurs.len() * w.neg_occurs.len();
+
+    if *timedout < num_combination
+        || skip_var_elimination(
+            asg,
+            cdb,
+            &w.pos_occurs,
+            &w.neg_occurs,
+            vi,
+            elim.eliminate_grow_limit,
+            elim.eliminate_combination_limit,
+        )
+    {
+        return Ok(());
+    } else {
+        *timedout -= num_combination;
+    }
+    let pos = w.pos_occurs.clone();
+    let neg = w.neg_occurs.clone();
+    #[cfg(feature = "trace_elimination")]
+    println!("# eliminate_var {}", vi);
+    // OK, eliminate the literal and build constraints on it.
+    make_eliminated_clauses(cdb, &mut elim.elim_lits, vi, &&(*pos), &&(*neg));
+    let vec = &mut state.new_learnt;
+    // println!("eliminate_var {}: |p|: {} and |n|: {}", vi, (*pos).len(), (*neg).len());
+    // Produce clauses in cross product:
+    for p in pos.iter() {
+        let learnt_p = cdb[*p].is(Flag::LEARNT);
+        for n in neg.iter() {
+            match merge(asg, cdb, *p, *n, vi, vec) {
+                0 => {
+                    #[cfg(feature = "trace_elimination")]
+                    println!(
+                        " - eliminate_var {}: fusion {}{} and {}{}",
+                        vi, p, cdb[*p], n, cdb[*n],
+                    );
+                }
+                1 => {
+                    let lit = vec[0];
+                    #[cfg(feature = "trace_elimination")]
+                    println!(
+                        " - eliminate_var {}: found assign {} from {}{} and {}{}",
+                        vi, lit, p, cdb[*p], n, cdb[*n],
+                    );
+                    match asg.assigned(lit) {
+                        Some(true) => (),
+                        Some(false) => {
+                            return Err(SolverError::RootLevelConflict(Some(ClauseId::from(lit))))
                         }
-                        #[cfg(feature = "trace_elimination")]
-                        println!(
-                            " - eliminate_var {}: X {} from {} and {}",
-                            vi, cdb[cid], cdb[*p], cdb[*n],
-                        );
+                        None => {
+                            debug_assert!(asg.assigned(lit).is_none());
+                            cdb.certificate_add_assertion(lit);
+                            if asg.assign_at_root_level(lit).is_err() {
+                                return Err(SolverError::RootLevelConflict(Some(ClauseId::from(
+                                    lit,
+                                ))));
+                            }
+                        }
                     }
-                    _ => {
-                        let cid = cdb.new_clause(
-                            asg,
-                            &mut *vec,
-                            cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT),
-                            true,
-                        );
+                }
+                _ => {
+                    debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
+                    if let Some(cid) = cdb
+                        .new_clause(asg, vec, learnt_p && cdb[*n].is(Flag::LEARNT))
+                        .is_new()
+                    {
                         elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
                         #[cfg(feature = "trace_elimination")]
                         println!(
@@ -103,46 +115,55 @@ where
                 }
             }
         }
-        //
-        //## VAR ELIMINATION
-        //
-        for cid in &*pos {
-            debug_assert!(!asg.locked(&cdb[*cid], *cid));
-            #[cfg(feature = "incremental_solver")]
-            {
-                if !cdb[*cid].is(Flag::LEARNT) {
-                    cdb.make_permanent_immortal(*cid);
-                }
-            }
-            cdb.detach(*cid);
-            elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
-        }
-        for cid in &*neg {
-            debug_assert!(!asg.locked(&cdb[*cid], *cid));
-            #[cfg(feature = "incremental_solver")]
-            {
-                if !cdb[*cid].is(Flag::LEARNT) {
-                    cdb.make_permanent_immortal(*cid);
-                }
-            }
-            cdb.detach(*cid);
-            elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
-        }
-        elim[vi].clear();
-        asg.handle(SolverEvent::Eliminate(vi));
-        rst.handle(SolverEvent::Eliminate(vi));
-        elim.backward_subsumption_check(asg, cdb, timedout)
     }
+    //
+    //## VAR ELIMINATION
+    //
+    debug_assert!(pos.iter().all(|cid| !cdb[*cid].is_dead()));
+    debug_assert!(neg.iter().all(|cid| !cdb[*cid].is_dead()));
+    for cid in pos.iter() {
+        if cdb[*cid].is_dead() {
+            continue;
+        }
+        debug_assert!(!asg.locked(&cdb[*cid], *cid));
+        #[cfg(feature = "incremental_solver")]
+        {
+            if !cdb[*cid].is(Flag::LEARNT) {
+                cdb.make_permanent_immortal(*cid);
+            }
+        }
+        elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
+        cdb.remove_clause(*cid);
+    }
+    for cid in neg.iter() {
+        if cdb[*cid].is_dead() {
+            continue;
+        }
+        debug_assert!(!asg.locked(&cdb[*cid], *cid));
+        #[cfg(feature = "incremental_solver")]
+        {
+            if !cdb[*cid].is(Flag::LEARNT) {
+                cdb.make_permanent_immortal(*cid);
+            }
+        }
+        elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
+        cdb.remove_clause(*cid);
+    }
+    elim[vi].clear();
+    asg.handle(SolverEvent::Eliminate(vi));
+    rst.handle(SolverEvent::Eliminate(vi));
+    elim.backward_subsumption_check(asg, cdb, timedout)
 }
 
 /// returns `true` if elimination is impossible.
 fn skip_var_elimination<A, C>(
     asg: &A,
     cdb: &C,
-    elim: &Eliminator,
     pos: &[ClauseId],
     neg: &[ClauseId],
     v: VarId,
+    grow_limit: usize,
+    combination_limit: f64,
 ) -> bool
 where
     A: AssignIF,
@@ -150,69 +171,95 @@ where
 {
     // avoid thrashing
     let limit = match cdb.check_size() {
-        Ok(true) => elim.eliminate_grow_limit,
-        Ok(false) => elim.eliminate_grow_limit / 4,
+        Ok(true) => grow_limit,
+        Ok(false) => grow_limit / 4,
         Err(_) => return true,
     };
     let clslen = pos.len() + neg.len();
     let mut cnt = 0;
+    let scale: f64 = 0.5;
+    let mut average_len: f64 = 0.0;
     for c_pos in pos {
         for c_neg in neg {
-            let (res, clause_size) = check_to_merge(asg, cdb, *c_pos, *c_neg, v);
-            if res {
+            if let Some(clause_size) = merge_cost(asg, cdb, *c_pos, *c_neg, v) {
+                if clause_size == 0 {
+                    continue;
+                }
                 cnt += 1;
+                average_len *= 1.0 - scale;
+                average_len += scale * clause_size as f64;
                 if clslen + limit < cnt
-                    || (elim.eliminate_combination_limit != 0
-                        && elim.eliminate_combination_limit < clause_size)
+                    || (combination_limit != 0.0 && combination_limit < average_len)
                 {
                     return true;
                 }
+            } else {
+                debug_assert!(false, "impossible");
             }
         }
     }
     false
 }
 
-/// Returns:
+/// Returns the the-size-of-clause-being-generated.
 /// - `(false, -)` if one of the clauses is always satisfied.
 /// - `(true, n)` if they are merge-able to a n-literal clause.
-fn check_to_merge<A, C>(asg: &A, cdb: &C, cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize)
+fn merge_cost<A, C>(asg: &A, cdb: &C, cp: ClauseId, cq: ClauseId, vi: VarId) -> Option<usize>
 where
     A: AssignIF,
     C: ClauseDBIF,
 {
-    let pqb = &cdb[cp];
-    let qpb = &cdb[cq];
-    let ps_smallest = pqb.len() < qpb.len();
-    let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
-    let mut size = pb.lits.len() + 1;
-    'next_literal: for l in &qb.lits {
-        if asg.var(l.vi()).is(Flag::ELIMINATED) {
+    let c_p = &cdb[cp];
+    let c_q = &cdb[cq];
+    let mut cond: Option<Lit> = None;
+    let mut cond2: Option<Lit> = None;
+    let mut count = 0;
+
+    'next_lit: for lit in c_p.iter() {
+        if lit.vi() == vi {
+            cond = Some(*lit);
             continue;
         }
-        if l.vi() != v {
-            for j in &pb.lits {
-                if asg.var(j.vi()).is(Flag::ELIMINATED) {
-                    continue;
-                }
-                if j.vi() == l.vi() {
-                    if !*j == *l {
-                        return (false, size);
-                    } else {
-                        continue 'next_literal;
-                    }
-                }
+        debug_assert_ne!(asg.assigned(*lit), Some(false));
+        debug_assert!(!asg.var(lit.vi()).is(Flag::ELIMINATED));
+        // if this is the last occurrence of this literal, count it.
+        for l in c_q.iter() {
+            if !*lit == *l {
+                return Some(0);
+            } else if *lit == *l || asg.var(l.vi()).is(Flag::ELIMINATED) {
+                continue 'next_lit;
             }
-            size += 1;
         }
+        count += 1;
     }
-    (true, size)
+    cond?;
+    for lit in c_q.iter() {
+        if lit.vi() == vi {
+            if cond == Some(!*lit) {
+                cond2 = Some(*lit);
+                continue;
+            } else {
+                return None;
+            }
+        }
+        debug_assert!(!asg.var(lit.vi()).is(Flag::ELIMINATED));
+        count += 1;
+    }
+    cond2.map(|_| count)
 }
 
 /// Return the real length of the generated clause by merging two clauses.
 /// Return **zero** if one of the clauses is always satisfied. (merge_vec should not be used.)
-fn merge<C>(cdb: &mut C, cip: ClauseId, ciq: ClauseId, v: VarId, vec: &mut Vec<Lit>) -> usize
+fn merge<A, C>(
+    asg: &mut A,
+    cdb: &mut C,
+    cip: ClauseId,
+    ciq: ClauseId,
+    vi: VarId,
+    vec: &mut Vec<Lit>,
+) -> usize
 where
+    A: AssignIF,
     C: ClauseDBIF,
 {
     vec.clear();
@@ -222,58 +269,49 @@ where
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
     #[cfg(feature = "trace_elimination")]
     println!("# merge {} & {}", pb, qb);
-    'next_literal: for l in &qb.lits {
-        if l.vi() != v {
-            for j in &pb.lits {
-                if j.vi() == l.vi() {
-                    if !*j == *l {
-                        return 0;
-                    } else {
-                        continue 'next_literal;
-                    }
-                }
-            }
-            vec.push(*l);
-        }
+    if pb.iter().filter(|l| l.vi() != vi).any(|l| qb.contains(!*l)) {
+        return 0;
     }
-    for l in &pb.lits {
-        if l.vi() != v {
-            vec.push(*l);
-        }
-    }
-    #[cfg(feature = "trace_elimination")]
-    println!(
-        " - merge generated {:?} from {} and {} to eliminate {}",
-        vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>(),
-        pb,
-        qb,
-        v
+
+    let mut lits = pb
+        .iter()
+        .filter(|l| l.vi() != vi && !qb.contains(**l))
+        .copied()
+        .collect::<Vec<_>>();
+    lits.append(
+        &mut qb
+            .iter()
+            .filter(|l| l.vi() != vi)
+            .copied()
+            .collect::<Vec<_>>(),
     );
+    std::mem::swap(&mut lits, vec);
+    debug_assert!(vec.iter().all(|l| !asg.var(l.vi()).is(Flag::ELIMINATED)));
+    debug_assert!(vec.iter().all(|l| l.vi() != vi));
     vec.len()
 }
 
 fn make_eliminated_clauses<C>(
     cdb: &mut C,
-    elim: &mut Eliminator,
+    tmp: &mut Vec<Lit>,
     v: VarId,
     pos: &[ClauseId],
     neg: &[ClauseId],
 ) where
     C: ClauseDBIF,
 {
-    let tmp = &mut elim.elim_lits;
     if neg.len() < pos.len() {
         for cid in neg {
-            debug_assert!(!cdb[*cid].is(Flag::DEAD));
+            debug_assert!(!cdb[*cid].is_dead());
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
-        make_eliminating_unit_clause(tmp, Lit::from_assign(v, true));
+        make_eliminating_unit_clause(tmp, Lit::from((v, true)));
     } else {
         for cid in pos {
-            debug_assert!(!cdb[*cid].is(Flag::DEAD));
+            debug_assert!(!cdb[*cid].is_dead());
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
-        make_eliminating_unit_clause(tmp, Lit::from_assign(v, false));
+        make_eliminating_unit_clause(tmp, Lit::from((v, false)));
     }
 }
 
@@ -292,7 +330,7 @@ where
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:
     let c = &cdb[cid];
     debug_assert!(!c.is_empty());
-    for l in &c.lits {
+    for l in c.iter() {
         vec.push(*l);
         if l.vi() == vi {
             let index = vec.len() - 1;
@@ -307,7 +345,6 @@ where
     vec.push(Lit::from(c.len()));
     #[cfg(feature = "trace_elimination")]
     println!("# make_eliminated_clause: eliminate({}) clause {}", vi, c);
-    cdb.touch_var(vi);
 }
 
 #[cfg(test)]
@@ -324,7 +361,7 @@ mod tests {
     impl Clause {
         #[allow(dead_code)]
         fn as_vec(&self) -> Vec<i32> {
-            self.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
+            self.iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
         }
     }
     impl ClauseDB {
@@ -332,7 +369,7 @@ mod tests {
         fn as_vec(&self) -> Vec<Vec<i32>> {
             self.iter()
                 .skip(1)
-                .filter(|c| !c.is(Flag::DEAD))
+                .filter(|c| !c.is_dead())
                 .map(|c| c.as_vec())
                 .collect::<Vec<_>>()
         }
@@ -347,24 +384,23 @@ mod tests {
             ref mut rst,
             ref mut state,
             ..
-        } = Solver::try_from("tests/uf8.cnf").expect("failed to load");
+        } = Solver::try_from("cnfs/uf8.cnf").expect("failed to load");
         let mut timedout = 10_000;
         let vi = 4;
 
         elim.activate();
         elim.prepare(asg, cdb, true);
         eliminate_var(asg, cdb, elim, rst, state, vi, &mut timedout).expect("panic");
-        cdb.garbage_collect();
         assert!(asg.var(vi).is(Flag::ELIMINATED));
         assert!(cdb
             .iter()
             .skip(1)
-            .filter(|c| c.is(Flag::DEAD))
+            .filter(|c| c.is_dead())
             .all(|c| c.is_empty()));
         assert!(cdb
             .iter()
             .skip(1)
-            .all(|c| !c.lits.contains(&Lit::from_assign(vi, false))
-                && !c.lits.contains(&Lit::from_assign(vi, false))));
+            .all(|c| c.iter().all(|l| *l != Lit::from((vi, false)))
+                && c.iter().all(|l| *l != Lit::from((vi, false)))));
     }
 }

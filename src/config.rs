@@ -1,6 +1,8 @@
 /// Crate `config` provides solver's configuration and CLI.
 use {crate::types::DecisionLevel, std::path::PathBuf};
 
+pub const CERTIFICATION_DEFAULT_FILENAME: &str = "proof.drat";
+
 /// Configuration built from command line options
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -43,7 +45,7 @@ pub struct Config {
     /// Disable any progress message
     pub quiet_mode: bool,
 
-    /// Show submodule logging report
+    /// Show sub-module logging report
     pub show_journal: bool,
 
     /// Writes a DRAT UNSAT certification file
@@ -119,13 +121,13 @@ impl Default for Config {
         Config {
             c_cbt_thr: 100,
             c_cls_lim: 0,
-            c_ip_int: 16384,
+            c_ip_int: 10000,
             c_timeout: 5000.0,
 
             splr_interface: false,
             cnf_file: PathBuf::new(),
             io_odir: PathBuf::from("."),
-            io_pfile: PathBuf::from("proof.out"),
+            io_pfile: PathBuf::from(CERTIFICATION_DEFAULT_FILENAME),
             io_rfile: PathBuf::new(),
             no_color: false,
             quiet_mode: false,
@@ -311,16 +313,18 @@ impl Config {
             }
         }
         if help {
-            let featuers = [
+            let features = [
                 #[cfg(feature = "best_phases_tracking")]
                 "best phase tracking",
+                #[cfg(feature = "bi_clause_completion")]
+                "binary clause completion",
                 #[cfg(feature = "clause_elimination")]
                 "clause elimination",
                 #[cfg(feature = "clause_reduction")]
                 "clause reduction",
                 #[cfg(feature = "clause_vivification")]
                 "clause vivification",
-                #[cfg(feature = "ema_calibration")]
+                #[cfg(feature = "EMA_calibration")]
                 "EMA calibration",
                 #[cfg(feature = "EVSIDS")]
                 "EVSIDS rewarding",
@@ -336,17 +340,15 @@ impl Config {
                 "Luby stabilization",
                 #[cfg(feature = "reason_side_rewarding")]
                 "reason side rewarding",
+                #[cfg(feature = "rephase")]
+                "stage-based rephase",
                 #[cfg(feature = "strategy_adaptation")]
                 "strategy adaptation",
-                #[cfg(feature = "best_phases_reuse")]
-                "re-phasing",
-                #[cfg(feature = "var_staging")]
-                "stage-based var selection",
             ];
             println!(
                 "{}\nActivated features: {}\n{}",
                 env!("CARGO_PKG_DESCRIPTION"),
-                featuers.join(", "),
+                features.join(", "),
                 help_string()
             );
             std::process::exit(0);
@@ -462,5 +464,43 @@ impl Config {
     #[allow(unused_mut)]
     pub fn override_args(mut self) -> Config {
         self
+    }
+}
+
+pub mod property {
+    use super::Config;
+    use crate::types::*;
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum Tf64 {
+        ChronoBtThreshold,
+        ClauseRewardDecayRate,
+        InprocessorInterval,
+        RestartAsgThreshold,
+        RestartLbdThreshold,
+        VarRewardDecayRate,
+    }
+
+    pub const F64S: [Tf64; 6] = [
+        Tf64::ChronoBtThreshold,
+        Tf64::ClauseRewardDecayRate,
+        Tf64::InprocessorInterval,
+        Tf64::RestartAsgThreshold,
+        Tf64::RestartLbdThreshold,
+        Tf64::VarRewardDecayRate,
+    ];
+
+    impl PropertyDereference<Tf64, f64> for Config {
+        #[inline]
+        fn derefer(&self, k: Tf64) -> f64 {
+            match k {
+                Tf64::ChronoBtThreshold => self.c_cbt_thr as f64,
+                Tf64::ClauseRewardDecayRate => self.crw_dcy_rat,
+                Tf64::InprocessorInterval => self.c_ip_int as f64,
+                Tf64::RestartAsgThreshold => self.rst_asg_thr,
+                Tf64::RestartLbdThreshold => self.rst_lbd_thr,
+                Tf64::VarRewardDecayRate => self.vrw_dcy_rat,
+            }
+        }
     }
 }

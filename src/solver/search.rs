@@ -28,7 +28,7 @@ pub trait SolveIF {
 
 macro_rules! RESTART {
     ($asg: expr, $rst: expr) => {
-        $asg.cancel_until($asg.root_level);
+        $asg.cancel_until($asg.root_level());
         $rst.handle(SolverEvent::Restart);
     };
 }
@@ -39,7 +39,7 @@ impl SolveIF for Solver {
     /// ```
     /// use splr::*;
     ///
-    /// let config = Config::from("tests/sample.cnf");
+    /// let config = Config::from("cnfs/sample.cnf");
     /// if let Ok(mut s) = Solver::build(&config) {
     ///     let res = s.solve();
     ///     assert!(res.is_ok());
@@ -57,15 +57,36 @@ impl SolveIF for Solver {
         if cdb.check_size().is_err() {
             return Err(SolverError::OutOfMemory);
         }
-        asg.num_asserted_vars = asg.stack_len();
         state.progress_header();
         state.progress(asg, cdb, elim, rst);
         state.flush("");
         state.flush("Preprocessing stage: ");
-        if 0 < asg.stack_len() {
-            elim.eliminate_satisfied_clauses(asg, cdb, false);
+
+        state[Stat::NumProcessor] += 1;
+        #[cfg(feature = "clause_vivification")]
+        {
+            state.flush("vivifying...");
+            if vivify(asg, cdb, rst, state).is_err() {
+                #[cfg(feature = "support_user_assumption")]
+                {
+                    analyze_final(asg, state, &cdb[ci]);
+                }
+                state.log(asg.num_conflict, "By vivifier as a pre-possessor");
+                return Ok(Certificate::UNSAT);
+            }
+            assert!(!asg.remains());
         }
-        if elim.enable {
+        debug_assert_eq!(asg.decision_level(), asg.root_level());
+        if elim.simplify(asg, cdb, rst, state).is_err() {
+            if cdb.check_size().is_err() {
+                return Err(SolverError::OutOfMemory);
+            }
+            state.log(asg.num_conflict, "By eliminator");
+            return Ok(Certificate::UNSAT);
+        }
+
+        #[cfg(feature = "clause_elimination")]
+        {
             const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
 
             //
@@ -75,6 +96,7 @@ impl SolveIF for Solver {
             // To do so, we use eliminator's occur list.
             // Thus we have to call `activate` and `prepare` firstly, to build occur lists.
             // Otherwise all literals are assigned wrongly.
+
             state.flush("phasing...");
             elim.activate();
             elim.prepare(asg, cdb, true);
@@ -89,12 +111,16 @@ impl SolveIF for Solver {
                     #[cfg(not(feature = "incremental_solver"))]
                     {
                         if m == 0 {
-                            let l = Lit::from_assign(vi, true);
+                            let l = Lit::from((vi, true));
+                            assert!(asg.assigned(l).is_none());
+                            cdb.certificate_add_assertion(l);
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
                         } else if p == 0 {
-                            let l = Lit::from_assign(vi, false);
+                            let l = Lit::from((vi, false));
+                            assert!(asg.assigned(l).is_none());
+                            cdb.certificate_add_assertion(l);
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
@@ -130,12 +156,14 @@ impl SolveIF for Solver {
                         _ => (),
                     }
                 }
+                let act = 1.0 / (asg.num_vars as f64).powf(0.25);
                 for vi in elim.sorted_iterator() {
-                    asg.set_activity(*vi, 0.0);
+                    if !asg.var(*vi).is(Flag::ELIMINATED) {
+                        asg.set_activity(*vi, act);
+                    }
                 }
                 asg.rebuild_order();
             }
-            elim.stop(asg, cdb);
         }
 
         //
@@ -146,25 +174,33 @@ impl SolveIF for Solver {
         state.progress(asg, cdb, elim, rst);
         match answer {
             Ok(true) => {
+                #[cfg(feature = "trace_equivalency")]
+                {
+                    asg.dump_cnf(cdb, "last-step.cnf");
+                }
                 // As a preparation for incremental solving, we need to backtrack to the
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
+                #[cfg(feature = "boundary_check")]
+                check(asg, cdb, true, "Before extending the model");
+
+                #[cfg(fueature = "boundary_check")]
+                check(asg, cdb, true, "Before extending the model");
+
                 let model = asg.extend_model(cdb, elim.eliminated_lits());
-                #[cfg(debug)]
-                {
-                    if let Some(cid) = cdb.validate(&model, true) {
-                        panic!(
-                            "Level {} generated assignment({:?}) falsifies {}:{:?}",
-                            asg.decision_level(),
-                            cdb.validate(&model, false).is_none(),
-                            cid,
-                            "asg.dump(&cdb[cid])",
-                        );
-                    }
-                }
+
+                #[cfg(fueature = "boundary_check")]
+                check(
+                    asg,
+                    cdb,
+                    true,
+                    "After extending the model, (passed before extending)",
+                );
 
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
+                    state.log(asg.num_conflict, "failed to validate the extended model");
+                    state.progress(asg, cdb, elim, rst);
                     return Err(SolverError::SolverBug);
                 }
 
@@ -184,12 +220,21 @@ impl SolveIF for Solver {
                 RESTART!(asg, rst);
                 Ok(Certificate::SAT(vals))
             }
-            Ok(false) | Err(SolverError::NullLearnt) => {
+            Ok(false) => {
+                RESTART!(asg, rst);
+                Ok(Certificate::UNSAT)
+            }
+            Err(SolverError::RootLevelConflict(_)) => {
+                #[cfg(feature = "support_user_assumption")]
+                {
+                    analyze_final(asg, state, &cdb[ci]);
+                }
                 RESTART!(asg, rst);
                 Ok(Certificate::UNSAT)
             }
             Err(e) => {
                 RESTART!(asg, rst);
+                state.progress(asg, cdb, elim, rst);
                 Err(e)
             }
         }
@@ -206,26 +251,21 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
     let mut last_core = 0;
-    let mut next_progress = 10_000;
-    let mut best_asserted = state.target.num_of_variables;
-
-    #[cfg(feature = "var_staging")]
-    let mut parity = false;
+    let progress_step = 256;
+    let mut next_progress = progress_step;
 
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
 
-    while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) {
+    while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
             let lit = asg.select_decision_literal();
             asg.assign_by_decision(lit);
             a_decision_was_made = true;
         }
-        let ci = asg.propagate(cdb);
-        if !ci.is_none() {
-            if asg.decision_level() == asg.root_level {
-                analyze_final(asg, state, &cdb[ci]);
-                return Ok(false);
+        if let Some(ci) = asg.propagate(cdb) {
+            if asg.decision_level() == asg.root_level() {
+                return Err(SolverError::RootLevelConflict(Some(ci)));
             }
             asg.update_rewards();
             cdb.update_rewards();
@@ -234,89 +274,174 @@ fn search(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
             ));
             if rst.restart() == Some(RestartDecision::Force) {
+                #[allow(unused_variables)]
                 if let Some(new_cycle) = rst.stabilize() {
                     RESTART!(asg, rst);
                     let block_level = rst.derefer(restart::property::Tusize::TriggerLevel);
                     let num_cycle = rst.derefer(restart::property::Tusize::NumCycle);
                     let num_unreachable = asg.derefer(assign::property::Tusize::NumUnreachableVar);
-                    asg.update_activity_decay(if new_cycle { None } else { Some(block_level) });
-
-                    #[cfg(feature = "var_staging")]
+                    #[cfg(feature = "trace_equivalency")]
                     {
-                        parity = !parity;
-                        asg.select_staged_vars(None, parity);
+                        let num_stage = rst.derefer(restart::property::Tusize::NumStage);
+                        if new_cycle {
+                            asg.dump_cnf(
+                                cdb,
+                                &format!(
+                                    "{}-stage{}.cnf",
+                                    state.config.cnf_file.file_stem().unwrap().to_string_lossy(),
+                                    num_stage
+                                ),
+                            );
+                        }
                     }
+                    asg.handle(SolverEvent::Stabilize(block_level));
+                    if cdb.reduce(asg, asg.num_conflict) {
+                        #[cfg(feature = "trace_equivalency")]
+                        cdb.check_consistency(asg, "before simplify");
+                        state[Stat::NumProcessor] += 1;
+                        /* if state.config.c_ip_int <= elim.to_simplify as usize */
+                        {
+                            #[cfg(feature = "clause_vivification")]
+                            vivify(asg, cdb, rst, state)?;
 
+                            #[cfg(feature = "clause_elimination")]
+                            {
+                                elim.activate();
+                                elim.simplify(asg, cdb, rst, state)?;
+                            }
+                        }
+                        asg.clear_asserted_literals(cdb)?;
+                    }
                     if last_core != num_unreachable || 0 == num_unreachable {
                         state.log(
                             asg.num_conflict,
                             format!(
-                                "#cycle:{:>5}, core:{:>9}, level:{:>9},/cpr:{:>9.2}",
+                                "#cycle:{:>5}, core:{:>10}, level:{:>9}, /cpr:{:>9.2}",
                                 num_cycle,
                                 num_unreachable,
                                 block_level,
-                                asg.refer(assign::property::TEma::PPC).get(),
+                                asg.refer(assign::property::TEma::PropagationPerConflict)
+                                    .get(),
                             ),
                         );
                         last_core = num_unreachable;
-                    }
-
-                    if cdb.reduce(asg, asg.num_conflict) {
-                        // Simplification has been postponed because chronoBT was used.
-                        // `elim.to_simplify` is increased much in particular
-                        // when vars are asserted or learnts are small.
-                        // We don't need to count the number of asserted vars.
-                        #[cfg(feature = "clause_vivification")]
-                        if vivify(asg, cdb, elim, state).is_err() {
-                            // return Err(SolverError::UndescribedError);
-                            analyze_final(asg, state, &cdb[ci]);
-                            return Ok(false);
+                    } else if let Some(p) = state.elapsed() {
+                        if 1.0 <= p {
+                            return Err(SolverError::TimeOut);
                         }
-                        if state.config.c_ip_int <= elim.to_simplify as usize {
-                            elim.activate();
-                            elim.simplify(asg, cdb, rst, state)?;
-                        }
+                    } else {
+                        return Err(SolverError::UndescribedError);
                     }
                     if next_progress < asg.num_conflict {
                         state.progress(asg, cdb, elim, rst);
-                        next_progress = asg.num_conflict + 10_000;
+                        next_progress = asg.num_conflict + progress_step;
                     }
                 } else {
                     RESTART!(asg, rst);
                 }
             }
-            // By simplification, we may get further solutions.
-            if asg.decision_level() == asg.root_level && asg.num_asserted_vars < asg.stack_len() {
-                asg.num_asserted_vars = asg.stack_len();
-            }
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
-                state[Stat::NoDecisionConflict] += 1;
+                state[Stat::NumDecisionConflict] += 1;
             }
             if let Some(na) = asg.best_assigned() {
-                if na < best_asserted {
-                    state.flush("");
-                    state.flush(format!("unreachable core: {}", na));
-                    rst.handle(SolverEvent::ShrinkCore);
-                    best_asserted = na;
-                }
+                state.flush("");
+                state.flush(format!("unreachable core: {}", na));
             }
+            #[cfg(feature = "strategy_adaptation")]
             if asg.num_conflict % (10 * state.reflection_interval) == 0 {
-                #[cfg(feature = "strategy_adaptation")]
                 adapt_modules(asg, rst, state);
-
-                if let Some(p) = state.elapsed() {
-                    if 1.0 <= p {
-                        return Err(SolverError::TimeOut);
-                    }
-                } else {
-                    return Err(SolverError::UndescribedError);
-                }
             }
         }
     }
+    state.log(
+        asg.num_conflict,
+        format!(
+            "search process finished at level {}:: {} = {} - {} - {}",
+            asg.decision_level(),
+            asg.derefer(assign::property::Tusize::NumUnassignedVar),
+            asg.num_vars,
+            asg.num_eliminated_vars,
+            asg.stack_len(),
+        ),
+    );
     Ok(true)
+}
+
+#[cfg(feature = "boundary_check")]
+#[allow(dead_code)]
+fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
+    if let Some(cid) = cdb.validate(asg.assign_ref(), all) {
+        println!("{}", message);
+        println!(
+            "falsifies by {} at level {}, NumConf {}",
+            cid,
+            asg.decision_level(),
+            asg.derefer(assign::property::Tusize::NumConflict),
+        );
+        assert!(asg.stack_iter().all(|l| asg.assigned(*l) == Some(true)));
+        let (c0, c1) = cdb.watch_caches(cid, "check (search 441)");
+        println!(
+            " which was born at {}, and used in conflict analysis at {}",
+            cdb[cid].birth,
+            cdb[cid].timestamp(),
+        );
+        println!(
+            " which was moved among watch caches at {:?}",
+            cdb[cid].moved_at
+        );
+        println!("Its literals: {}", &cdb[cid]);
+        println!(" |   pos |   time | level |   literal  |  assignment |               reason |");
+        let l0 = i32::from(cdb[cid].lit0());
+        let l1 = i32::from(cdb[cid].lit1());
+        use crate::assign::DebugReportIF;
+
+        for assign::Assign {
+            lit,
+            val,
+            pos,
+            lvl,
+            by: reason,
+            at,
+            state,
+        } in cdb[cid].report(asg).iter()
+        {
+            println!(
+                " |{:>6} | {:>6} |{:>6} | {:9}{} | {:11} | {:20} | {:?}",
+                pos.unwrap_or(0),
+                at,
+                lvl,
+                lit,
+                if *lit == l0 || *lit == l1 { '*' } else { ' ' },
+                format!("{:?}", val),
+                format!("{}", reason),
+                state,
+            );
+        }
+        println!(
+            " - L0 {} has complements {:?} in its cache",
+            cdb[cid].lit0(),
+            c0
+        );
+        println!(
+            " - L1 {} has complements {:?} in its cache",
+            cdb[cid].lit1(),
+            c1
+        );
+        println!("The last assigned literal in stack:");
+        let last_lit = asg.stack(asg.stack_len() - 1);
+        println!(
+            " |{:>6} | {:>6} |{:>6} | {:9}  | {:11} | {:20} |",
+            asg.stack_len() - 1,
+            asg.var(last_lit.vi()).propagated_at,
+            asg.level(last_lit.vi()),
+            i32::from(last_lit),
+            format!("{:?}", asg.assigned(last_lit),),
+            format!("{}", asg.reason(last_lit.vi())),
+        );
+        panic!();
+    }
 }
 
 #[cfg(feature = "strategy_adaptation")]
@@ -336,27 +461,27 @@ fn adapt_modules(asg: &mut AssignStack, rst: &mut Restarter, state: &mut State) 
     rst.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
 }
 
+#[cfg(feature = "support_user_assumption")]
+// Build a conflict clause caused by *assumed* literals UNDER ROOT_LEVEL.
+// So we use zero instead of root_level sometimes in this function.
 fn analyze_final(asg: &mut AssignStack, state: &mut State, c: &Clause) {
     let mut seen = vec![false; asg.num_vars + 1];
     state.conflicts.clear();
     if asg.decision_level() == 0 {
         return;
     }
-    for l in &c.lits {
-        let vi = l.vi();
-        if 0 < asg.level(vi) {
-            asg.var_mut(vi).turn_on(Flag::CA_SEEN);
-        }
-    }
-    let end = if asg.decision_level() <= asg.root_level {
-        asg.stack_len()
-    } else {
-        asg.len_upto(asg.root_level)
-    };
-    for l in asg.stack_range(asg.len_upto(0)..end) {
+    // ??
+    // for l in &c.lits {
+    //     let vi = l.vi();
+    //     if asg.root_level < asg.level(vi) {
+    //         asg.var_mut(vi).turn_on(Flag::CA_SEEN);
+    //     }
+    // }
+    // FIXME: asg.stack_range().rev() is correct.
+    for l in asg.stack_range(0..asg.len_upto(asg.root_level)) {
         let vi = l.vi();
         if seen[vi] {
-            if asg.reason(vi) == AssignReason::default() {
+            if let AssignReason::Decision(_) = asg.reason(vi) {
                 state.conflicts.push(!*l);
             } else {
                 let level = asg.level_ref();
