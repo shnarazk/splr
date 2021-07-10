@@ -32,6 +32,8 @@ pub trait AssignIF:
     + PropertyDereference<property::Tusize, usize>
     + PropertyReference<property::TEma, Ema>
 {
+    /// return root level.
+    fn root_level(&self) -> DecisionLevel;
     /// return a literal in the stack.
     fn stack(&self, i: usize) -> Lit;
     /// return literals in the range of stack.
@@ -131,8 +133,8 @@ pub struct AssignStack {
     trail: Vec<Lit>,
     trail_lim: Vec<usize>,
     /// the-number-of-assigned-and-propagated-vars + 1
-    pub q_head: usize,
-    pub root_level: DecisionLevel,
+    q_head: usize,
+    root_level: DecisionLevel,
     var_order: VarIdHeap, // Variable Order
 
     //

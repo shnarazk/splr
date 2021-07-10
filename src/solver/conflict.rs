@@ -66,7 +66,7 @@ pub fn handle_conflict(
     asg.handle(SolverEvent::Conflict);
 
     state.derive20.clear();
-    let assign_level = conflict_analyze(asg, cdb, state, ci).max(asg.root_level);
+    let assign_level = conflict_analyze(asg, cdb, state, ci).max(asg.root_level());
     let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
     if learnt_len == 0 {
@@ -87,11 +87,11 @@ pub fn handle_conflict(
         //## A NEW ASSERTION by UNIT LEARNT CLAUSE GENERATION
         //
         match asg.assigned(l0) {
-            Some(true) if asg.root_level < asg.level(l0.vi()) => {
+            Some(true) if asg.root_level() < asg.level(l0.vi()) => {
                 panic!("eae");
                 // asg.lift_to_asserted(l0.vi());
             }
-            Some(false) if asg.level(l0.vi()) == asg.root_level => {
+            Some(false) if asg.level(l0.vi()) == asg.root_level() => {
                 return Err(SolverError::RootLevelConflict(None))
             }
             _ => {
@@ -216,7 +216,7 @@ fn conflict_analyze(
     let learnt = &mut state.new_learnt;
     learnt.clear();
     learnt.push(NULL_LIT);
-    let root_level = asg.root_level;
+    let root_level = asg.root_level();
     let dl = asg.decision_level();
     let mut p = cdb[conflicting_clause].lit0();
 
@@ -600,7 +600,7 @@ fn lit_level(
     }
     bag.push(lit);
     match asg.reason(lit.vi()) {
-        AssignReason::Asserted(_) => asg.root_level,
+        AssignReason::Asserted(_) => asg.root_level(),
         AssignReason::Decision(lvl) => lvl,
         AssignReason::Implication(cid, NULL_LIT) => {
             assert_eq!(

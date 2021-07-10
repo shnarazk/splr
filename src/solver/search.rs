@@ -28,7 +28,7 @@ pub trait SolveIF {
 
 macro_rules! RESTART {
     ($asg: expr, $rst: expr) => {
-        $asg.cancel_until($asg.root_level);
+        $asg.cancel_until($asg.root_level());
         $rst.handle(SolverEvent::Restart);
     };
 }
@@ -76,7 +76,7 @@ impl SolveIF for Solver {
             }
             assert!(!asg.remains());
         }
-        debug_assert_eq!(asg.decision_level(), asg.root_level);
+        debug_assert_eq!(asg.decision_level(), asg.root_level());
         if elim.simplify(asg, cdb, rst, state).is_err() {
             if cdb.check_size().is_err() {
                 return Err(SolverError::OutOfMemory);
@@ -264,7 +264,7 @@ fn search(
             a_decision_was_made = true;
         }
         if let Some(ci) = asg.propagate(cdb) {
-            if asg.decision_level() == asg.root_level {
+            if asg.decision_level() == asg.root_level() {
                 return Err(SolverError::RootLevelConflict(Some(ci)));
             }
             asg.update_rewards();

@@ -58,14 +58,14 @@ pub fn vivify(
     let mut to_display = 0;
     'next_clause: while let Some(cp) = clauses.pop() {
         asg.backtrack_sandbox();
-        debug_assert_eq!(asg.decision_level(), asg.root_level);
+        debug_assert_eq!(asg.decision_level(), asg.root_level());
         if asg.remains() {
             asg.propagate(cdb)
                 .map_or(Ok(()), |cid| Err(SolverError::RootLevelConflict(Some(cid))))?;
         }
 
         debug_assert!(asg.stack_is_empty() || !asg.remains());
-        debug_assert_eq!(asg.root_level, asg.decision_level());
+        debug_assert_eq!(asg.root_level(), asg.decision_level());
         let cid = cp.to();
         let c = &mut cdb[cid];
         if c.is_dead() {
@@ -225,7 +225,7 @@ impl AssignStack {
             seen[l.vi()] = key;
         }
         let last_decision = decisions.last().unwrap();
-        let from = self.len_upto(self.root_level);
+        let from = self.len_upto(self.root_level());
         let all = self.stack_iter().map(|l| !*l).collect::<Vec<_>>();
         let assumes = &all[from..];
         debug_assert!(

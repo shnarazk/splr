@@ -135,6 +135,9 @@ impl Instantiate for AssignStack {
 }
 
 impl AssignIF for AssignStack {
+    fn root_level(&self) -> DecisionLevel {
+        self.root_level
+    }
     fn stack(&self, i: usize) -> Lit {
         self.trail[i]
     }
