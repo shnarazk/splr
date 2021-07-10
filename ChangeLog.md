@@ -1,6 +1,6 @@
 ## 0.10.0, 2021-07-10
 
-### Fix crucial bugs
+### Fix critical bugs
 - fix bugs on chronoBT implementation, which have affected Splr from version 0.3.1 to 0.7.0.
    - `AssignStack::q_head` had a wrong index after backtrack if chronoBT was used.
    - Non-chronoBT was broken if the number of the highest literal in conflicting clauses is one.

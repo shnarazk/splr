@@ -1,6 +1,6 @@
 ## A modern SAT Solver for Propositional Logic in Rust
 
-Splr is a pure [Rust](https://www.rust-lang.org)ic modern SAT solver, based on [Glucose 4.1](https://www.labri.fr/perso/lsimon/glucose/).
+Splr is a modern SAT solver in [Rust](https://www.rust-lang.org), based on [Glucose 4.1](https://www.labri.fr/perso/lsimon/glucose/).
 It adopts various research results on SAT solvers:
 
 - _CDCL_, _watch literals_, _LBD_ and so on from Glucose, [Minisat](http://minisat.se) and the ancestors
@@ -29,9 +29,10 @@ Version 0.10.0 fixes [some critical bugs](ChangeLog.md#0100-2021-07-10).
 - [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.10.0 RC ([5417d8bb](https://github.com/shnarazk/splr/blob/main/ChangeLog.md#070-2021-03-14)) solved with a 200 sec timeout:
   - 30 satisfiable problems: all the solutions were correct.
   - 2 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
-- The UNSAT certifications for aes_equiv_encry_3_rounds.debugged-sc2012.cnf, which was used in SAT Race 2019, were verified three times. Solving this problem by Splr took over 4 hours and the average drat file size was about 20 GB.
 
 ![Benchmark result(2021-07-10)](https://user-images.githubusercontent.com/997855/125105269-41d76800-e119-11eb-84c0-e59e75a06a10.png)
+
+- The UNSAT certifications for aes_equiv_encry_3_rounds.debugged-sc2012.cnf, which was used in SAT Race 2019, were verified three times. Solving this problem by Splr took over 4 hours and the average drat file size was about 20 GB.
 
 ## Install
 
@@ -354,7 +355,7 @@ ARGS:
 
 ## Solver description
 
-Splr-0.7.1 adopts the following feature by default:
+Splr-0.10.0 adopts the following feature by default:
 
   - Learning-rate based var rewarding and clause rewarding
   - Reason-side var rewarding
