@@ -160,21 +160,27 @@ pub trait ClauseDBIF:
     fn minimize_with_bi_clauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
     where
         A: AssignIF;
-
-    #[cfg(feature = "incremental_solver")]
-    /// save an eliminated permanent clause to an extra space for incremental solving.
-    fn make_permanent_immortal(&mut self, cid: ClauseId);
-    #[cfg(feature = "boundary_check")]
-    // return true if cid is included in watching literals
-    fn watch_cache_contains(&self, lit: Lit, cid: ClauseId) -> bool;
-    /// return a clause's watches
-    fn watch_caches(&self, cid: ClauseId, message: &str) -> (Vec<Lit>, Vec<Lit>);
     /// complete bi-clause network
     fn complete_bi_clauses<A>(&mut self, asg: &mut A)
     where
         A: AssignIF;
-    /// for debug
+
+    #[cfg(feature = "incremental_solver")]
+    /// save an eliminated permanent clause to an extra space for incremental solving.
+    fn make_permanent_immortal(&mut self, cid: ClauseId);
+
+    //
+    //## for debug
+    //
+    #[cfg(feature = "boundary_check")]
+    /// return true if cid is included in watching literals
+    fn watch_cache_contains(&self, lit: Lit, cid: ClauseId) -> bool;
+    #[cfg(feature = "boundary_check")]
+    /// return a clause's watches
+    fn watch_caches(&self, cid: ClauseId, message: &str) -> (Vec<Lit>, Vec<Lit>);
+    #[cfg(feature = "boundary_check")]
     fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool>;
+    #[cfg(feature = "boundary_check")]
     fn check_consistency<A>(&mut self, asg: &A)
     where
         A: AssignIF;

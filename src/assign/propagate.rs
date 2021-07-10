@@ -368,6 +368,7 @@ impl PropagateIF for AssignStack {
                         .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
                 }
             } {
+                #[cfg(feature = "boundary_check")]
                 debug_assert!(
                     !cdb[cid].is_dead(),
                     "dead clause in propagation: {:?}",

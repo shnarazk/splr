@@ -1157,6 +1157,14 @@ impl ClauseDBIF for ClauseDB {
             vec.retain(|l| self.lbd_temp[l.vi()] == key);
         }
     }
+    fn complete_bi_clauses<A>(&mut self, asg: &mut A)
+    where
+        A: AssignIF,
+    {
+        while let Some(lit) = self.bi_clause_completion_queue.pop() {
+            self.complete_bi_clauses_with(asg, lit);
+        }
+    }
     #[cfg(feature = "incremental_solver")]
     fn make_permanent_immortal(&mut self, cid: ClauseId) {
         self.eliminated_permanent.push(
@@ -1169,6 +1177,7 @@ impl ClauseDBIF for ClauseDB {
     fn watch_cache_contains(&self, lit: Lit, cid: ClauseId) -> bool {
         self.watch_cache[lit].iter().any(|w| w.0 == cid)
     }
+    #[cfg(feature = "boundary_check")]
     fn watch_caches(&self, cid: ClauseId, mes: &str) -> (Vec<Lit>, Vec<Lit>) {
         // let mut _found = None;
         debug_assert!(!cid.is_lifted_lit());
@@ -1249,17 +1258,11 @@ impl ClauseDBIF for ClauseDB {
             )
         }
     }
-    fn complete_bi_clauses<A>(&mut self, asg: &mut A)
-    where
-        A: AssignIF,
-    {
-        while let Some(lit) = self.bi_clause_completion_queue.pop() {
-            self.complete_bi_clauses_with(asg, lit);
-        }
-    }
+    #[cfg(feature = "boundary_check")]
     fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool> {
         self[cid].is_dead().then(|| self.freelist.contains(&cid))
     }
+    #[cfg(feature = "boundary_check")]
     fn check_consistency<A>(&mut self, asg: &A)
     where
         A: AssignIF,
