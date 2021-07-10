@@ -89,7 +89,7 @@ where
                             return Err(SolverError::RootLevelConflict(Some(ClauseId::from(lit))))
                         }
                         None => {
-                            assert!(asg.assigned(lit).is_none());
+                            debug_assert!(asg.assigned(lit).is_none());
                             cdb.certificate_add_assertion(lit);
                             if asg.assign_at_root_level(lit).is_err() {
                                 return Err(SolverError::RootLevelConflict(Some(ClauseId::from(
@@ -125,7 +125,7 @@ where
         if cdb[*cid].is_dead() {
             continue;
         }
-        assert!(!asg.locked(&cdb[*cid], *cid));
+        debug_assert!(!asg.locked(&cdb[*cid], *cid));
         #[cfg(feature = "incremental_solver")]
         {
             if !cdb[*cid].is(Flag::LEARNT) {
@@ -139,7 +139,7 @@ where
         if cdb[*cid].is_dead() {
             continue;
         }
-        assert!(!asg.locked(&cdb[*cid], *cid));
+        debug_assert!(!asg.locked(&cdb[*cid], *cid));
         #[cfg(feature = "incremental_solver")]
         {
             if !cdb[*cid].is(Flag::LEARNT) {
@@ -221,7 +221,7 @@ where
             continue;
         }
         debug_assert_ne!(asg.assigned(*lit), Some(false));
-        assert!(!asg.var(lit.vi()).is(Flag::ELIMINATED));
+        debug_assert!(!asg.var(lit.vi()).is(Flag::ELIMINATED));
         // if this is the last occurrence of this literal, count it.
         for l in c_q.iter() {
             if !*lit == *l {
@@ -242,7 +242,7 @@ where
                 return None;
             }
         }
-        assert!(!asg.var(lit.vi()).is(Flag::ELIMINATED));
+        debug_assert!(!asg.var(lit.vi()).is(Flag::ELIMINATED));
         count += 1;
     }
     cond2.map(|_| count)

@@ -58,7 +58,7 @@ pub fn vivify(
     let mut to_display = 0;
     'next_clause: while let Some(cp) = clauses.pop() {
         asg.backtrack_sandbox();
-        assert_eq!(asg.decision_level(), asg.root_level);
+        debug_assert_eq!(asg.decision_level(), asg.root_level);
         if asg.remains() {
             asg.propagate(cdb)
                 .map_or(Ok(()), |cid| Err(SolverError::RootLevelConflict(Some(cid))))?;
@@ -284,7 +284,7 @@ impl AssignStack {
         // before finding a conflict by the target clause.
         // So we must skip this conflict.
         if learnt.is_empty() {
-            assert_eq!(self.num_conflict, 0);
+            debug_assert_eq!(self.num_conflict, 0);
             // panic!("\n{:?}\n{:?}\n{:?}",
             //        conflicting,
             //        conflicting.iter().map(|l| self.assigned(*l)).collect::<Vec<_>>(),

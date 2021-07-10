@@ -682,8 +682,8 @@ impl ClauseDBIF for ClauseDB {
                     panic!("impossible");
                 }
             } else {
-                assert_eq!(old_l0, l0);
-                assert_eq!(old_l1, l1);
+                debug_assert_eq!(old_l0, l0);
+                debug_assert_eq!(old_l1, l1);
             }
 
             #[cfg(feature = "maintain_watch_cache")]
@@ -774,14 +774,14 @@ impl ClauseDBIF for ClauseDB {
             } else if l0 == old_l0 {
                 watch_cache[!old_l1].remove_watch(&cid);
                 // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
-                watch_cache[!l0].update_watch(cid, l1); // .insert_watch(cid, l1);
-                                                        // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
+                watch_cache[!l0].update_watch(cid, l1);
+                // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
                 watch_cache[!l1].insert_watch(cid, l0);
             } else if l0 == old_l1 {
                 watch_cache[!old_l0].remove_watch(&cid);
                 // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
-                watch_cache[!l0].update_watch(cid, l1); // .insert_watch(cid, l1);
-                                                        // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
+                watch_cache[!l0].update_watch(cid, l1);
+                // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
                 watch_cache[!l1].insert_watch(cid, l0);
             } else if l1 == old_l0 {
                 watch_cache[!old_l1].remove_watch(&cid);
@@ -828,7 +828,7 @@ impl ClauseDBIF for ClauseDB {
         // 5. a normal clause becomes a new bi-clause.             [Case:3-2]
         // 5. a normal clause becomes a shorter normal clause.     [Case:3-3]
         //
-        assert!(!self[cid].is_dead());
+        debug_assert!(!self[cid].is_dead());
         // firstly sweep without consuming extra memory
         let mut need_to_shrink = false;
         for l in self[cid].iter() {
@@ -980,8 +980,8 @@ impl ClauseDBIF for ClauseDB {
         // 2. insert a new watch                  [Step:2]
         // 3. update a blocker cach e             [Step:3]
 
-        assert!(!self[cid].is_dead());
-        assert!(old < 2);
+        debug_assert!(!self[cid].is_dead());
+        debug_assert!(old < 2);
         debug_assert!(1 < new);
         let ClauseDB {
             ref mut clause,

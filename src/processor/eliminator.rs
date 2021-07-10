@@ -309,7 +309,7 @@ impl EliminateIF for Eliminator {
             if self.is_waiting() {
                 self.prepare(asg, cdb, true);
             }
-            assert!(!cdb.derefer(cdb::property::Tf64::DpAverageLBD).is_nan());
+            debug_assert!(!cdb.derefer(cdb::property::Tf64::DpAverageLBD).is_nan());
             self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
             self.eliminate(asg, cdb, rst, state)?;
             if self.is_running() {
