@@ -133,6 +133,7 @@ v 1 -2 3 4 5 6 -7 -8 9 -10 -11 -12 13 -14 ...  -360 0
 $ dmcr cnfs/unif-k3-r4.25-v360-c1530-S1293537826-039.cnf
 A valid assignment set for cnfs/unif-k3-r4.25-v360-c1530-S1293537826-039.cnf is found in ans_unif-k3-r4.25-v360-c1530-S1293537826-039.cnf
 ```
+
 If you want to certificate unsatisfiability, use `splr --certificate` and recommend to use [Grid](https://www21.in.tum.de/~lammich/grat/).
 
 1. Run splr with certificate option.
@@ -309,7 +310,7 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 | `bLvl`       | the EMA of decision levels to which backjumps go                                          |
 | `/ppc`       | the EMA of propagations per conflict                                                      |
 | `elim`       | the number of invocations of clause/var elimination                                       |
-| `#sub`       | the number of the clauses subsumed by caluse elimination processor                        |
+| `#sub`       | the number of the clauses subsumed by clause elimination processor                        |
 | `core`       | the number of unreachable vars                                                            |
 | `/cpr`       | the EMA of conflicts per restart                                                          |
 | `mode`       | Selected strategy's id                                                                    |
