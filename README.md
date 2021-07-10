@@ -21,16 +21,17 @@ Please check [ChangeLog](ChangeLog.md) about recent updates.
 
 Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results.
 
-#### Version 0.7.1
+#### Version 0.10.0
 
-_Warning: Version 0.7.1 is not the best but a pretty good version._
+Version 0.10.0 fixes [some critical bugs](ChangeLog.md#0100-2021-07-10).
 
 - all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
-- [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.7.1 RC(a73ab46c) solved with a 400 sec timeout:
-  - 47 satisfiable problems: all the solutions were correct.
-  - 12 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+- [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.10.0 RC ([5417d8bb](https://github.com/shnarazk/splr/blob/main/ChangeLog.md#070-2021-03-14)) solved with a 200 sec timeout:
+  - 30 satisfiable problems: all the solutions were correct.
+  - 2 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+- The UNSAT certifications for aes_equiv_encry_3_rounds.debugged-sc2012.cnf, which was used in SAT Race 2019, were verified three times. Solving this problem by Splr took over 4 hours and the average drat file size was about 20 GB.
 
-![Benchmark result(2021-01-16)](https://user-images.githubusercontent.com/997855/104808677-24d97080-582b-11eb-85af-d01fd161bafd.png)
+![Benchmark result(2021-07-10)](https://user-images.githubusercontent.com/997855/125105269-41d76800-e119-11eb-84c0-e59e75a06a10.png)
 
 ## Install
 
