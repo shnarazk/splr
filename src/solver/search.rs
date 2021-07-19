@@ -269,7 +269,7 @@ fn search(
             }
             asg.update_rewards();
             cdb.update_rewards();
-            handle_conflict(asg, cdb, elim, rst, state, ci)?;
+            handle_conflict(asg, cdb, rst, state, ci)?;
             rst.update(ProgressUpdate::ASG(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
             ));
@@ -298,8 +298,6 @@ fn search(
                     if cdb.reduce(asg, asg.num_conflict) {
                         #[cfg(feature = "trace_equivalency")]
                         cdb.check_consistency(asg, "before simplify");
-                        state[Stat::NumProcessor] += 1;
-                        /* if state.config.c_ip_int <= elim.to_simplify as usize */
                         {
                             #[cfg(feature = "clause_vivification")]
                             vivify(asg, cdb, rst, state)?;
@@ -308,6 +306,7 @@ fn search(
                             {
                                 elim.activate();
                                 elim.simplify(asg, cdb, rst, state)?;
+                                state[Stat::NumProcessor] += 1;
                             }
                         }
                         asg.clear_asserted_literals(cdb)?;

@@ -104,7 +104,6 @@ enum EliminatorMode {
 #[derive(Clone, Debug)]
 pub struct Eliminator {
     enable: bool,
-    pub to_simplify: f64,
     mode: EliminatorMode,
     clause_queue: Vec<ClauseId>,
     var_queue: VarOccHeap,
