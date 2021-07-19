@@ -328,7 +328,6 @@ struct GeometricStabilizer {
     num_cycle: usize,
     num_stage: usize,
     next_trigger: usize,
-    // reset_requested: bool,
     step: usize,
     step_max: usize,
 }
@@ -345,7 +344,6 @@ impl Default for GeometricStabilizer {
             num_cycle: 0,
             num_stage: 0,
             next_trigger: 1,
-            // reset_requested: false,
             step: 1,
             step_max: 1,
         }
@@ -389,21 +387,12 @@ impl GeometricStabilizer {
                 self.num_cycle += 1;
                 self.step_max = self.step;
             }
-            // if self.reset_requested {
-            //     self.num_cycle = 0;
-            //     self.luby.reset();
-            //     self.reset_requested = false;
-            //     self.step_max = 1;
-            // }
             self.step = self.luby.next();
-            self.next_trigger = now + (self.step_max * 2) / self.step;
+            self.next_trigger = now + 200;
             return Some(new_cycle);
         }
         None
     }
-    // fn reset_progress(&mut self) {
-    //     self.reset_requested = true;
-    // }
 }
 
 /// `Restarter` provides restart API and holds data about restart conditions.
@@ -417,7 +406,6 @@ pub struct Restarter {
     stb: GeometricStabilizer,
     after_restart: usize,
     restart_step: usize,
-    restart_waiting: usize,
     initial_restart_step: usize,
 
     //
@@ -438,7 +426,6 @@ impl Default for Restarter {
             stb: GeometricStabilizer::default(),
             after_restart: 0,
             restart_step: 0,
-            restart_waiting: 0,
             initial_restart_step: 0,
 
             num_block: 0,
@@ -464,9 +451,7 @@ impl Instantiate for Restarter {
     }
     fn handle(&mut self, e: SolverEvent) {
         match e {
-            SolverEvent::Assert(_) | SolverEvent::Eliminate(_) => {
-                self.restart_waiting = self.stb.step;
-            }
+            SolverEvent::Assert(_) | SolverEvent::Eliminate(_) => (),
             SolverEvent::Restart => {
                 self.after_restart = 0;
                 self.num_restart += 1;
@@ -497,21 +482,17 @@ impl RestartIF for Restarter {
             return None;
         }
 
-        if self.asg.is_active() {
+        if self.stb.step_max * self.num_block < self.stb.step * self.num_restart
+            && self.asg.is_active()
+        {
             self.num_block += 1;
             self.after_restart = 0;
-            self.restart_step = self.initial_restart_step * self.stb.step_max;
-            self.restart_waiting = 0;
+            self.restart_step = self.stb.step * self.initial_restart_step;
             return Some(RestartDecision::Block);
         }
         if self.lbd.is_active() {
-            self.restart_step = self.initial_restart_step;
-            self.restart_waiting += 1;
-            if self.stb.step <= self.restart_waiting {
-                self.restart_waiting = 0;
-                return Some(RestartDecision::Force);
-            }
-            self.after_restart = 0;
+            self.restart_step = self.stb.step * self.initial_restart_step;
+            return Some(RestartDecision::Force);
         }
         None
     }
