@@ -330,7 +330,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             .as_bytes(),
         )?;
     }
-    out.write_all("c\n".as_bytes())?;
+    out.write_all("c \n".as_bytes())?;
     for key in &config::property::F64S {
         out.write_all(
             format!(
