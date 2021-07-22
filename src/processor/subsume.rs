@@ -98,12 +98,14 @@ where
     debug_assert!(!cdb[cid].is_dead());
     debug_assert!(1 < cdb[cid].len());
     match cdb.transform_by_elimination(cid, l) {
-        RefClause::Clause(_) => {
+        RefClause::Clause(ci) => {
             #[cfg(feature = "trace_elimination")]
             println!("cid {} drops literal {}", cid, l);
 
             elim.enqueue_clause(cid, &mut cdb[cid]);
             elim.remove_lit_occur(asg, l, cid);
+            cdb[ci].turn_on(Flag::VIVIFIED);
+            cdb[ci].turn_on(Flag::VIVIFIED2);
             Ok(())
         }
         RefClause::Dead => panic!("impossible"),
