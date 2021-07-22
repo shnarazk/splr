@@ -100,6 +100,8 @@ pub trait RestartIF:
     /// - `Some(parity_bit, just_start_a_new_cycle)` if a stabilization phase has just ended.
     /// - `None` otherwise.
     fn stabilize(&mut self) -> Option<bool>;
+    #[cfg(feature = "Luby_stabilization")]
+    fn switch_stabilization_mode(&mut self);
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
 }
@@ -330,6 +332,7 @@ struct GeometricStabilizer {
     next_trigger: usize,
     step: usize,
     step_max: usize,
+    switch_requsted: bool,
 }
 
 impl Default for GeometricStabilizer {
@@ -346,6 +349,7 @@ impl Default for GeometricStabilizer {
             next_trigger: 1,
             step: 1,
             step_max: 1,
+            switch_requsted: false,
         }
     }
 }
@@ -376,10 +380,10 @@ impl fmt::Display for GeometricStabilizer {
     }
 }
 
+#[cfg(feature = "Luby_stabilization")]
 impl GeometricStabilizer {
-    #[cfg(feature = "Luby_stabilization")]
-    fn update(&mut self, now: usize) -> Option<bool> {
-        if self.enable && self.next_trigger <= now {
+    fn update(&mut self, _now: usize) -> Option<bool> {
+        if self.enable && self.switch_requsted {
             self.num_stage += 1;
             let mut new_cycle: bool = false;
             if self.step_max < self.step {
@@ -388,10 +392,13 @@ impl GeometricStabilizer {
                 self.step_max = self.step;
             }
             self.step = self.luby.next();
-            self.next_trigger = now + 200;
+            self.switch_requsted = false;
             return Some(new_cycle);
         }
         None
+    }
+    fn switch(&mut self) {
+        self.switch_requsted = true;
     }
 }
 
@@ -503,6 +510,10 @@ impl RestartIF for Restarter {
     #[cfg(not(feature = "Luby_stabilization"))]
     fn stabilize(&mut self) -> Option<bool> {
         Some(false)
+    }
+    #[cfg(feature = "Luby_stabilization")]
+    fn switch_stabilization_mode(&mut self) {
+        self.stb.switch();
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {

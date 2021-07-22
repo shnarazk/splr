@@ -295,22 +295,6 @@ fn search(
                         }
                     }
                     asg.handle(SolverEvent::Stabilize(block_level));
-                    if cdb.reduce(asg, asg.num_conflict) {
-                        #[cfg(feature = "trace_equivalency")]
-                        cdb.check_consistency(asg, "before simplify");
-                        {
-                            #[cfg(feature = "clause_vivification")]
-                            vivify(asg, cdb, rst, state)?;
-
-                            #[cfg(feature = "clause_elimination")]
-                            {
-                                elim.activate();
-                                elim.simplify(asg, cdb, rst, state)?;
-                                state[Stat::NumProcessor] += 1;
-                            }
-                        }
-                        asg.clear_asserted_literals(cdb)?;
-                    }
                     if last_core != num_unreachable || 0 == num_unreachable {
                         state.log(
                             asg.num_conflict,
@@ -337,6 +321,23 @@ fn search(
                     }
                 } else {
                     RESTART!(asg, rst);
+                }
+                if cdb.reduce(asg, asg.num_conflict) {
+                    #[cfg(feature = "trace_equivalency")]
+                    cdb.check_consistency(asg, "before simplify");
+                    {
+                        #[cfg(feature = "clause_vivification")]
+                        vivify(asg, cdb, rst, state)?;
+
+                        #[cfg(feature = "clause_elimination")]
+                        {
+                            elim.activate();
+                            elim.simplify(asg, cdb, rst, state)?;
+                            state[Stat::NumProcessor] += 1;
+                        }
+                    }
+                    asg.clear_asserted_literals(cdb)?;
+                    rst.switch_stabilization_mode();
                 }
             }
             if a_decision_was_made {
