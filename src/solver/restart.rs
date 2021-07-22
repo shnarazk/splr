@@ -100,8 +100,6 @@ pub trait RestartIF:
     /// - `Some(parity_bit, just_start_a_new_cycle)` if a stabilization phase has just ended.
     /// - `None` otherwise.
     fn stabilize(&mut self) -> Option<bool>;
-    #[cfg(feature = "Luby_stabilization")]
-    fn switch_stabilization_mode(&mut self);
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
 }
@@ -329,7 +327,6 @@ struct GeometricStabilizer {
     luby: LubySeries,
     num_cycle: usize,
     num_stage: usize,
-    next_trigger: usize,
     step: usize,
     step_max: usize,
     switch_requsted: bool,
@@ -346,7 +343,6 @@ impl Default for GeometricStabilizer {
             luby: LubySeries::default(),
             num_cycle: 0,
             num_stage: 0,
-            next_trigger: 1,
             step: 1,
             step_max: 1,
             switch_requsted: false,
@@ -365,17 +361,9 @@ impl fmt::Display for GeometricStabilizer {
         if !self.enable {
             write!(f, "Stabilizer(dead)")
         } else if self.enable {
-            write!(
-                f,
-                "Stabilizer[step: {}, next:{}, on]",
-                self.step, self.next_trigger
-            )
+            write!(f, "Stabilizer[step: {}, on]", self.step)
         } else {
-            write!(
-                f,
-                "Stabilizer[step: {}, next:{}, off]",
-                self.step, self.next_trigger
-            )
+            write!(f, "Stabilizer[step: {}, off]", self.step)
         }
     }
 }
@@ -458,7 +446,9 @@ impl Instantiate for Restarter {
     }
     fn handle(&mut self, e: SolverEvent) {
         match e {
-            SolverEvent::Assert(_) | SolverEvent::Eliminate(_) => (),
+            SolverEvent::Assert(_) => (),
+            SolverEvent::ClauseReduction => self.stb.switch(),
+            SolverEvent::Eliminate(_) => (),
             SolverEvent::Restart => {
                 self.after_restart = 0;
                 self.num_restart += 1;
@@ -510,10 +500,6 @@ impl RestartIF for Restarter {
     #[cfg(not(feature = "Luby_stabilization"))]
     fn stabilize(&mut self) -> Option<bool> {
         Some(false)
-    }
-    #[cfg(feature = "Luby_stabilization")]
-    fn switch_stabilization_mode(&mut self) {
-        self.stb.switch();
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {

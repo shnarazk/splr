@@ -337,7 +337,7 @@ fn search(
                         }
                     }
                     asg.clear_asserted_literals(cdb)?;
-                    rst.switch_stabilization_mode();
+                    rst.handle(SolverEvent::ClauseReduction);
                 }
             }
             if a_decision_was_made {
