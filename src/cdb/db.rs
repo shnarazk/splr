@@ -1075,11 +1075,10 @@ impl ClauseDBIF for ClauseDB {
             };
             if go {
                 self.reduction_coeff = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
-                let nc = self.num_clause;
-                self.reduce_db(asg, nc);
-                return self.num_clause < nc;
+                self.reduce_db(asg, nc)
+            } else {
+                false
             }
-            false
         }
         #[cfg(not(feature = "clause_reduction"))]
         false
@@ -1368,7 +1367,7 @@ impl ClauseDB {
         self.bi_clause[l0].get(&l1).copied()
     }
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce_db<A>(&mut self, asg: &mut A, nc: usize)
+    fn reduce_db<A>(&mut self, asg: &mut A, nc: usize) -> bool
     where
         A: AssignIF,
     {
@@ -1420,12 +1419,15 @@ impl ClauseDB {
         perm.sort();
         // let thr = self.lbd_of_dp_ema.get() as u16;
         let thr = (self.lbd_of_dp_ema.get() as u16).max(*co_lbd_bound);
+        let mut removed = false;
         for i in &perm[keep..] {
             if thr <= self.clause[i.to()].rank {
                 self.remove_clause(ClauseId::from(i.to()));
+                removed = true;
             }
         }
         debug_assert!(perm[0..keep].iter().all(|c| !self.clause[c.to()].is_dead()));
+        removed
     }
 
     #[cfg(feature = "strategy_adaptation")]
