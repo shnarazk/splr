@@ -370,7 +370,7 @@ impl fmt::Display for GeometricStabilizer {
 
 #[cfg(feature = "Luby_stabilization")]
 impl GeometricStabilizer {
-    fn update(&mut self, _now: usize) -> Option<bool> {
+    fn update(&mut self) -> Option<bool> {
         if self.enable && self.switch_requsted {
             self.num_stage += 1;
             let mut new_cycle: bool = false;
@@ -495,7 +495,7 @@ impl RestartIF for Restarter {
     }
     #[cfg(feature = "Luby_stabilization")]
     fn stabilize(&mut self) -> Option<bool> {
-        self.stb.update(self.num_restart) // don't count num_block
+        self.stb.update()
     }
     #[cfg(not(feature = "Luby_stabilization"))]
     fn stabilize(&mut self) -> Option<bool> {
