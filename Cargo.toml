@@ -19,7 +19,6 @@ default = [
            # DEBUG "boundary_check",
            "bi_clause_completion",
            "clause_elimination",
-           "clause_reduction",
            "clause_vivification",
            "LR_rewarding",
            "Luby_stabilization",
@@ -32,7 +31,6 @@ best_phases_tracking = []
 bi_clause_completion = []
 boundary_check = []
 clause_elimination = []
-clause_reduction = []
 clause_vivification = []
 debug_propagation = []
 EMA_calibration = []
