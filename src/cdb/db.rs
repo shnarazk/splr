@@ -34,9 +34,9 @@ impl Default for ClauseDB {
             inc_step: 300,
             extra_inc: 1000,
             first_reduction: 1000,
+            next_reduction_step: 1000,
             next_reduction: 1000,
             reducible: true,
-            reduction_coeff: 1,
             num_clause: 0,
             num_bi_clause: 0,
             num_bi_learnt: 0,
@@ -1060,28 +1060,15 @@ impl ClauseDBIF for ClauseDB {
         }
         false
     }
-    fn reduce<A>(&mut self, asg: &mut A, nc: usize) -> bool
+    fn reduce<A>(&mut self, asg: &mut A, num_conflicts: usize) -> bool
     where
         A: AssignIF,
     {
-        #[cfg(feature = "clause_reduction")]
-        if 0 == self.num_learnt {
-            false
+        if self.use_chan_seok {
+            self.first_reduction <= self.num_learnt && self.reduce_db(asg, num_conflicts)
         } else {
-            let go = if self.use_chan_seok {
-                self.first_reduction < self.num_learnt
-            } else {
-                self.reduction_coeff * self.next_reduction <= nc
-            };
-            if go {
-                self.reduction_coeff = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
-                self.reduce_db(asg, nc)
-            } else {
-                false
-            }
+            self.next_reduction <= num_conflicts && self.reduce_db(asg, num_conflicts)
         }
-        #[cfg(not(feature = "clause_reduction"))]
-        false
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
@@ -1381,7 +1368,6 @@ impl ClauseDB {
             ..
         } = self;
         self.num_reduction += 1;
-        self.next_reduction += self.inc_step;
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
             if !c.is(Flag::LEARNT) || c.is_dead() || asg.locked(c, ClauseId::from(i)) {
@@ -1408,13 +1394,21 @@ impl ClauseDB {
             perm.push(OrderedProxy::new(i, weight));
         }
         let keep = perm.len().min(nc) / 2;
+
+        let reduction_coeff = ((nc as f64) / (self.next_reduction_step as f64)) as usize + 1;
+        self.next_reduction_step += self.inc_step;
+        if perm.is_empty() {
+            self.next_reduction = reduction_coeff * self.next_reduction_step;
+            return true;
+        }
         if !self.use_chan_seok {
             if clause[perm[keep].to()].rank <= 3 {
-                self.next_reduction += 2 * self.extra_inc;
+                self.next_reduction_step += 2 * self.extra_inc;
             }
             if clause[perm[0].to()].rank <= *co_lbd_bound {
-                self.next_reduction += self.extra_inc;
+                self.next_reduction_step += self.extra_inc;
             };
+            self.next_reduction = reduction_coeff * self.next_reduction_step;
         }
         perm.sort();
         // let thr = self.lbd_of_dp_ema.get() as u16;
