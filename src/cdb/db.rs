@@ -1403,7 +1403,7 @@ impl ClauseDB {
         }
         if !self.use_chan_seok {
             if clause[perm[keep].to()].rank <= *co_lbd_bound {
-                reduction_coeff *= 1.2;
+                reduction_coeff *= 1.1;
             }
             self.next_reduction = (reduction_coeff * self.next_reduction_step as f64) as usize;
         }
