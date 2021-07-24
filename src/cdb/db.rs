@@ -1395,20 +1395,17 @@ impl ClauseDB {
         }
         let keep = perm.len().min(nc) / 2;
 
-        let reduction_coeff = ((nc as f64) / (self.next_reduction_step as f64)) as usize + 1;
+        let mut reduction_coeff: f64 = (nc as f64) / (self.next_reduction_step as f64) + 1.0;
         self.next_reduction_step += self.inc_step;
         if perm.is_empty() {
-            self.next_reduction = reduction_coeff * self.next_reduction_step;
+            self.next_reduction = (reduction_coeff * self.next_reduction_step as f64) as usize;
             return true;
         }
         if !self.use_chan_seok {
-            if clause[perm[keep].to()].rank <= 3 {
-                self.next_reduction_step += 2 * self.extra_inc;
+            if clause[perm[keep].to()].rank <= *co_lbd_bound {
+                reduction_coeff *= 1.2;
             }
-            if clause[perm[0].to()].rank <= *co_lbd_bound {
-                self.next_reduction_step += self.extra_inc;
-            };
-            self.next_reduction = reduction_coeff * self.next_reduction_step;
+            self.next_reduction = (reduction_coeff * self.next_reduction_step as f64) as usize;
         }
         perm.sort();
         // let thr = self.lbd_of_dp_ema.get() as u16;
