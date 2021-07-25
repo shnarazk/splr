@@ -1410,15 +1410,13 @@ impl ClauseDB {
         perm.sort();
         // let thr = self.lbd_of_dp_ema.get() as u16;
         let thr = (self.lbd_of_dp_ema.get() as u16).max(*co_lbd_bound);
-        let mut removed = false;
         for i in &perm[keep..] {
             if thr <= self.clause[i.to()].rank {
                 self.remove_clause(ClauseId::from(i.to()));
-                removed = true;
             }
         }
         debug_assert!(perm[0..keep].iter().all(|c| !self.clause[c.to()].is_dead()));
-        removed
+        true
     }
 
     #[cfg(feature = "strategy_adaptation")]
