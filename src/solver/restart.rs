@@ -327,9 +327,9 @@ struct GeometricStabilizer {
     luby: LubySeries,
     num_cycle: usize,
     num_stage: usize,
-    next_trigger: usize,
     step: usize,
     step_max: usize,
+    switch_requsted: bool,
 }
 
 impl Default for GeometricStabilizer {
@@ -343,9 +343,9 @@ impl Default for GeometricStabilizer {
             luby: LubySeries::default(),
             num_cycle: 0,
             num_stage: 0,
-            next_trigger: 1,
             step: 1,
             step_max: 1,
+            switch_requsted: false,
         }
     }
 }
@@ -361,25 +361,17 @@ impl fmt::Display for GeometricStabilizer {
         if !self.enable {
             write!(f, "Stabilizer(dead)")
         } else if self.enable {
-            write!(
-                f,
-                "Stabilizer[step: {}, next:{}, on]",
-                self.step, self.next_trigger
-            )
+            write!(f, "Stabilizer[step: {}, on]", self.step)
         } else {
-            write!(
-                f,
-                "Stabilizer[step: {}, next:{}, off]",
-                self.step, self.next_trigger
-            )
+            write!(f, "Stabilizer[step: {}, off]", self.step)
         }
     }
 }
 
+#[cfg(feature = "Luby_stabilization")]
 impl GeometricStabilizer {
-    #[cfg(feature = "Luby_stabilization")]
-    fn update(&mut self, now: usize) -> Option<bool> {
-        if self.enable && self.next_trigger <= now {
+    fn update(&mut self) -> Option<bool> {
+        if self.enable && self.switch_requsted {
             self.num_stage += 1;
             let mut new_cycle: bool = false;
             if self.step_max < self.step {
@@ -388,10 +380,13 @@ impl GeometricStabilizer {
                 self.step_max = self.step;
             }
             self.step = self.luby.next();
-            self.next_trigger = now + 200;
+            self.switch_requsted = false;
             return Some(new_cycle);
         }
         None
+    }
+    fn switch(&mut self) {
+        self.switch_requsted = true;
     }
 }
 
@@ -451,7 +446,9 @@ impl Instantiate for Restarter {
     }
     fn handle(&mut self, e: SolverEvent) {
         match e {
-            SolverEvent::Assert(_) | SolverEvent::Eliminate(_) => (),
+            SolverEvent::Assert(_) => (),
+            SolverEvent::ClauseReduction => self.stb.switch(),
+            SolverEvent::Eliminate(_) => (),
             SolverEvent::Restart => {
                 self.after_restart = 0;
                 self.num_restart += 1;
@@ -498,7 +495,7 @@ impl RestartIF for Restarter {
     }
     #[cfg(feature = "Luby_stabilization")]
     fn stabilize(&mut self) -> Option<bool> {
-        self.stb.update(self.num_restart) // don't count num_block
+        self.stb.update()
     }
     #[cfg(not(feature = "Luby_stabilization"))]
     fn stabilize(&mut self) -> Option<bool> {

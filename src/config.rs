@@ -320,8 +320,6 @@ impl Config {
                 "binary clause completion",
                 #[cfg(feature = "clause_elimination")]
                 "clause elimination",
-                #[cfg(feature = "clause_reduction")]
-                "clause reduction",
                 #[cfg(feature = "clause_vivification")]
                 "clause vivification",
                 #[cfg(feature = "EMA_calibration")]

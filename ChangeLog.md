@@ -1,3 +1,7 @@
+## 0.10.1, 2021-08-XX
+
+- Clause reduction and Luby stabilization share the trigger condition.
+
 ## 0.10.0, 2021-07-10
 
 ### Fix critical bugs
