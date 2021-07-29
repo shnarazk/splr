@@ -1,7 +1,7 @@
 ## 0.10.1, 2021-08-XX
 
 - Clause reduction and Luby stabilization share the trigger condition.
-- remove an essential feature "clause_reduction"
+- remove feature "clause_reduction"; this is essential.
 
 ## 0.10.0, 2021-07-10
 
