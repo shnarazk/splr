@@ -251,8 +251,6 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
     let mut last_core = 0;
-    let progress_step = 256;
-    let mut next_progress = progress_step;
 
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
@@ -315,10 +313,6 @@ fn search(
                     } else {
                         return Err(SolverError::UndescribedError);
                     }
-                    if next_progress < asg.num_conflict {
-                        state.progress(asg, cdb, elim, rst);
-                        next_progress = asg.num_conflict + progress_step;
-                    }
                 } else {
                     RESTART!(asg, rst);
                 }
@@ -342,6 +336,7 @@ fn search(
                 }
                 asg.clear_asserted_literals(cdb)?;
                 rst.handle(SolverEvent::ClauseReduction);
+                state.progress(asg, cdb, elim, rst);
             }
             if a_decision_was_made {
                 a_decision_was_made = false;
