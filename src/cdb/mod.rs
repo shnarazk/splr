@@ -229,7 +229,7 @@ pub struct ClauseDB {
     clause: Vec<Clause>,
     /// hashed representation of binary clauses.
     ///## Note
-    /// This means a biclause [l0, l1] is stored at bi_clause[l0] instead of bi_clause[!l0].
+    /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
     ///
     pub bi_clause: Vec<BiClause>,
     /// container of watch literals
