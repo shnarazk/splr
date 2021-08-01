@@ -99,7 +99,7 @@ pub fn vivify(
                     if let Some(cc) = asg.propagate_sandbox(cdb) {
                         let conflits = &cdb[cc].iter().copied().collect::<Vec<Lit>>();
                         seen[0] = num_check;
-                        let mut vec = asg.analyze_sandbox(cdb, &decisions, &conflits, &mut seen);
+                        let mut vec = asg.analyze_sandbox(cdb, &decisions, conflits, &mut seen);
                         asg.backtrack_sandbox();
                         match vec.len() {
                             0 => {

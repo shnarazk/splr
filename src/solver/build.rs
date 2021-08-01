@@ -136,7 +136,7 @@ impl Instantiate for Solver {
             asg: AssignStack::instantiate(config, cnf),
             cdb: ClauseDB::instantiate(config, cnf),
             elim: Eliminator::instantiate(config, cnf),
-            rst: Restarter::instantiate(config, &cnf),
+            rst: Restarter::instantiate(config, cnf),
             state: State::instantiate(config, cnf),
         }
     }

@@ -732,7 +732,7 @@ impl ClauseDBIF for ClauseDB {
                 //## Case:0
                 //
                 if certification_store.is_active() {
-                    certification_store.push_delete(&new_lits);
+                    certification_store.push_delete(new_lits);
                 }
                 return RefClause::RegisteredClause(did);
             }
@@ -750,7 +750,7 @@ impl ClauseDBIF for ClauseDB {
             bi_clause[l1].insert(l0, cid);
 
             if certification_store.is_active() {
-                certification_store.push_add(&new_lits);
+                certification_store.push_add(new_lits);
                 certification_store.push_delete(&c.lits);
             }
             c.turn_off(Flag::LEARNT);
@@ -758,7 +758,7 @@ impl ClauseDBIF for ClauseDB {
 
             if certification_store.is_active() {
                 certification_store.push_add(&c.lits);
-                certification_store.push_delete(&new_lits);
+                certification_store.push_delete(new_lits);
             }
         } else {
             //
@@ -806,7 +806,7 @@ impl ClauseDBIF for ClauseDB {
             // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
 
             if certification_store.is_active() {
-                certification_store.push_add(&new_lits);
+                certification_store.push_add(new_lits);
                 certification_store.push_delete(&c.lits);
             }
         }
@@ -1312,7 +1312,7 @@ impl ClauseDB {
         for other in self.bi_clause[lit].keys() {
             // [!other, third]
             for third in self.bi_clause[!*other].keys() {
-                if lit.vi() != third.vi() && !self.bi_clause[lit].contains_key(&third) {
+                if lit.vi() != third.vi() && !self.bi_clause[lit].contains_key(third) {
                     // the new [lit, third] should be added.
                     vec.push(vec![lit, *third]);
                 }
