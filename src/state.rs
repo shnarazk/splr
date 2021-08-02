@@ -625,7 +625,11 @@ impl StateIF for State {
                 "{:>9}",
                 self,
                 LogUsizeId::UnreachableCore,
-                asg_num_unreachables
+                if asg_num_unreachables == 0 {
+                    self[LogUsizeId::UnreachableCore]
+                } else {
+                    asg_num_unreachables
+                }
             ),
             fm!(
                 "{:>9.2}",
@@ -695,8 +699,12 @@ impl State {
         self[LogUsizeId::Simplify] = elim.derefer(processor::property::Tusize::NumFullElimination);
         self[LogUsizeId::ClauseSubsumption] =
             elim.derefer(processor::property::Tusize::NumSubsumedClause);
-        self[LogUsizeId::UnreachableCore] =
-            asg.derefer(assign::property::Tusize::NumUnreachableVar);
+        {
+            let core = asg.derefer(assign::property::Tusize::NumUnreachableVar);
+            if 0 < core {
+                self[LogUsizeId::UnreachableCore] = core;
+            }
+        }
         self[LogF64Id::ConflictPerRestart] =
             asg.refer(assign::property::TEma::ConflictPerRestart).get();
     }
