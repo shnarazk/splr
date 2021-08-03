@@ -365,7 +365,7 @@ ARGS:
 
 ## Solver description
 
-Splr-0.10.1 adopts the following feature by default:
+Splr-0.10.1 adopts the following features by default:
 
 - Learning-rate based var rewarding and clause rewarding[1]
 - Reason-side var rewarding[1]
@@ -377,21 +377,22 @@ Splr-0.10.1 adopts the following feature by default:
 - clause vivification
 - re-phase the best phases
 
-As shown the blow, Splr calls in-processor very frequently.
-
+As shown in the blow, Splr calls in-processor very frequently.
 
 ![](https://user-images.githubusercontent.com/997855/127977525-a57c11b7-7bf9-4474-8ee8-60b824d90856.png)
 
 
-Luby stabilization is an original mechanism to make long periods without restarts, which are called stabilized modes.
-This method updates the restart interval, which has usually a constant value, as follows:
+Luby stabilization is an original mechanism to make long periods without restarts, which are called stabilized modes. 
+This method updates the restart interval, which usually has a constant value, as follows:
 
 ```
 restart_interval = luby(n) * initial_restart_interval;
 ```
 
 where `n` represents the number of updates, and `luby(n)` is a function returning _n_-th number of Luby series.
-Longer solver searches, larger the average value is. So we can periodically explore the search space more deeply.
+The longer the solver searches, the larger the average value is. So we can periodically explore the search space more deeply.
+
+Note: the mechanism explained here is different from that used in Splr-0.10.0.
 
 ## License
 
