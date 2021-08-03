@@ -346,7 +346,7 @@ OPTIONS (red options depend on features in Cargo.toml):
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.         0
       --evo <elm-var-occ>   Max #cls for var elimination        20000
   -o, --dir <io-outdir>     Output directory                         .
-  -p, --proof <io-pfile>    DRAT Cert. filename                 proof.out
+  -p, --proof <io-pfile>    DRAT Cert. filename                 proof.drat
   -r, --result <io-rfile>   Result filename/stdout                       
       --ral <rst-asg-len>   Length of assign. fast EMA             24
       --ras <rst-asg-slw>   Length of assign. slow EMA           8192
@@ -354,7 +354,7 @@ OPTIONS (red options depend on features in Cargo.toml):
       --rll <rst-lbd-len>   Length of LBD fast EMA                 24
       --rls <rst-lbd-slw>   Length of LBD slow EMA               8192
       --rlt <rst-lbd-thr>   Forcing restart threshold               1.10
-      --rs  <rst-step>      #conflicts between restarts            24
+      --rs  <rst-step>      #conflicts between restarts             8
       --srd <stg-rwd-dcy>   Decay rate for staged var reward        0.50
       --srv <stg-rwd-val>   Extra reward for staged vars            1.00
       --vdr <vrw-dcy-rat>   Var reward decay rate                   0.94
