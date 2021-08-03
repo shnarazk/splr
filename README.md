@@ -21,6 +21,9 @@ Please check [ChangeLog](ChangeLog.md) about recent updates.
 
 Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results.
 
+#### Version 0.10.1
+
+
 #### Version 0.10.0
 
 Version 0.10.0 fixes [some critical bugs](ChangeLog.md#0100-2021-07-10).
@@ -362,57 +365,33 @@ ARGS:
 
 ## Solver description
 
-Splr-0.10.0 adopts the following feature by default:
+Splr-0.10.1 adopts the following feature by default:
 
-  - Learning-rate based var rewarding and clause rewarding
-  - Reason-side var rewarding
-  - dynamic restart blocking based on the number of remaining vars
-  - dynamic restart based on average LBDs of learnt clauses
-  - clause elimination and subsumption as pre-processor and in-processor
-  - stabilization based on Luby series, or LubyStabilization
-  - chronological backtrack and non-chronological backtrack
-  - clause vivification
-  - re-phase the best phases
+- Learning-rate based var rewarding and clause rewarding[1]
+- Reason-side var rewarding[1]
+- dynamic restart blocking based on the number of remaining vars[2]
+- dynamic restart based on average LBDs of learnt clauses[3]
+- clause elimination and subsumption as pre-processor and in-processor[4]
+- stabilization based on Luby series, or LubyStabilization
+- chronological backtrack and non-chronological backtrack
+- clause vivification
+- re-phase the best phases
 
-Among them, the unique feature is LubyStabilization. Let me explain it.
+As shown the blow, Splr calls in-processor very frequently.
 
-To make special periods with very low restart rate, known as 'stabilization mode,' Splr changes
-the number of restart trigger to execute restart.
-Usually SAT solvers execute 'restart' when the average LBD of learnt clauses getting higher.
-Splr requires that the condition holds by *N* times, where N is a value in the Luby series, and is changed during problem-solving. 
-And, to avoid rapid parameters changes, Splr also introduces *stages* that share the same N. The length of stage is also controlled by Luby series.
-Here are the relations of values.
 
-- 'cycle' is a segment of stages, which is separated by highest Luby values.
-- trigger_level *N* of stage *n* = Luby(*n*)
-- length_of_stage *n* = (2 * max(Luby[*1*, *n*]) ) / *n*
+![](https://user-images.githubusercontent.com/997855/127977525-a57c11b7-7bf9-4474-8ee8-60b824d90856.png)
 
-|stage *n*|*N* = Luby(*n*)|cycle|max *N*|stage len|restart cond.| restart |
-|--------:|--------------:|----:|------:|--------:|------------:|:-------:|
-|      1  |             1 |   0 |     1 |       1 |           1 |       1 |
-|      2  |             1 |   1 |     1 |       2 |           2 |       2 |
-|      3  |         **2** |   1 |     1 |       1 |         3-4 |     3-4 |
-|      4  |             1 |   2 |     2 |       4 |         5-6 |     5-8 |
-|      5  |             1 |   2 |     2 |       4 |         7-8 |    9-12 |
-|      6  |             2 |   2 |     2 |       2 |        9-10 |   13-14 |
-|      7  |         **4** |   2 |     2 |       1 |       11-14 |      15 |
-|      8  |             1 |   3 |     4 |       8 |       15-18 |   16-23 |
-|      9  |             1 |   3 |     4 |       8 |       19-22 |   24-31 |
-|      10 |             2 |   3 |     4 |       4 |       23-26 |   32-35 |
-|      11 |             1 |   3 |     4 |       8 |       27-30 |   36-43 |
-|      12 |             1 |   3 |     4 |       8 |       31-34 |   44-51 |
-|      13 |             2 |   3 |     4 |       4 |       35-38 |   52-55 |
-|      14 |             4 |   3 |     4 |       2 |       39-42 |   56-57 |
-|      15 |         **8** |   3 |     4 |       1 |       43-50 |      58 |
-|      16 |             1 |   4 |     8 |      16 |       51-58 |   59-74 |
-|      17 |             1 |   4 |     8 |      16 |       59-66 |   75-90 |
-|      18 |             2 |   4 |     8 |       8 |       67-74 |   91-98 |
-|      19 |             1 |   4 |     8 |      16 |       75-82 |  99-114 |
-|      20 |             1 |   4 |     8 |      16 |       83-90 | 115-130 |
 
-You can see effects of LubyStabilization with the value of `trgr` for *N*, `peak` for max *N* and `/cpr` for 'conflict per restart'. Here's an example.
+Luby stabilization is an original mechanism to make long periods without restarts, which are called stabilized modes.
+This method updates the restart interval, which has usually a constant value, as follows:
 
-![](https://user-images.githubusercontent.com/997855/111037372-0c6e8680-8467-11eb-9512-5deecfa45885.png)
+```
+restart_interval = luby(n) * initial_restart_interval;
+```
+
+where `n` represents the number of updates, and `luby(n)` is a function returning _n_-th number of Luby series.
+Longer solver searches, larger the average value is. So we can periodically explore the search space more deeply.
 
 ## License
 
