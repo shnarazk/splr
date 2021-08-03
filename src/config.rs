@@ -390,7 +390,7 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
       --evo <elm-var-occ>   Max #cls for var elimination   {:>10}
   -o, --dir <io-outdir>     Output directory                {:>10}
-  -p, --proof <io-pfile>    DRAT Cert. filename                {:>10}
+  -p, --proof <io-pfile>    DRAT Cert. filename                 {:>10}
   -r, --result <io-rfile>   Result filename/stdout             {:>10}
       --ral <rst-asg-len>   Length of assign. fast EMA     {:>10}
       --ras <rst-asg-slw>   Length of assign. slow EMA     {:>10}
