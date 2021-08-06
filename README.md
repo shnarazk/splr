@@ -386,7 +386,7 @@ Luby stabilization is an original mechanism to make long periods without restart
 This method updates the restart interval, which usually has a constant value, as follows:
 
 ```
-restart_interval = luby(n) * initial_restart_interval;
+restart_interval = luby(n) * base_interval;
 ```
 
 where `n` represents the number of updates, and `luby(n)` is a function returning _n_-th number of Luby series.
