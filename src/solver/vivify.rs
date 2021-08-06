@@ -27,7 +27,7 @@ pub fn vivify(
     rst: &mut Restarter,
     state: &mut State,
 ) -> MaybeInconsistent {
-    const NUM_TARGETS: Option<usize> = Some(50_000);
+    const NUM_TARGETS: Option<usize> = Some(80_000);
     if asg.remains() {
         asg.propagate(cdb).map_or(Ok(()), |cc| {
             state.log(asg.num_conflict, "By vivifier");
