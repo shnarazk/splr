@@ -367,14 +367,14 @@ ARGS:
 
 Splr-0.10.1 adopts the following features by default:
 
-- Learning-rate based var rewarding and clause rewarding[1]
-- Reason-side var rewarding[1]
+- Learning-rate based var rewarding and clause rewarding[3]
+- Reason-side var rewarding[3]
+- chronological backtrack and non-chronological backtrack[4]
+- clause vivification[5]
 - dynamic restart blocking based on the number of remaining vars[2]
-- dynamic restart based on average LBDs of learnt clauses[3]
-- clause elimination and subsumption as pre-processor and in-processor[4]
-- stabilization based on Luby series, or LubyStabilization
-- chronological backtrack and non-chronological backtrack
-- clause vivification
+- dynamic restart based on average LBDs of learnt clauses[1]
+- clause elimination and subsumption as pre-processor and in-processor
+- stabilization based on Luby series, or _Luby Stabilization_
 - re-phase the best phases
 
 As shown in the blow, Splr calls in-processor very frequently.
@@ -382,7 +382,7 @@ As shown in the blow, Splr calls in-processor very frequently.
 ![](https://user-images.githubusercontent.com/997855/127977525-a57c11b7-7bf9-4474-8ee8-60b824d90856.png)
 
 
-Luby stabilization is an original mechanism to make long periods without restarts, which are called stabilized modes. 
+_Luby stabilization_ is an original mechanism to make long periods without restarts, which are called stabilized modes.
 This method updates the restart interval, which usually has a constant value, as follows:
 
 ```
@@ -396,6 +396,18 @@ Here is an example.
 ![](https://user-images.githubusercontent.com/997855/128656027-a8eaa082-d2f8-4801-860e-46f38fa65c39.png)
 
 Note: the mechanism explained here is different from that used in Splr-0.10.0.
+
+### Bibliography
+
+- [1] G. Audemard and L. Simon, "Predicting learnt clauses quality in modern SAT solvers," in _International Joint Conference on Artificial Intelligence 2009_, pp. 399–404, 2009.
+
+- [2] G. Audemard and L. Simon, "Refining restarts strategies for SAT and UNSAT," in _Lecture Notes in Computer Science_, vol.7513, pp.118–126, 2012.
+
+- [3] J. H. Liang, V. Ganesh, P. Poupart, and K. Czarnecki, "Learning Rate Based Branching Heuristic for SAT Solvers," in _Lecture Notes in Computer Science_, vol.9710, pp.123–140, 2016.
+
+- [4] A. Nadel and V. Ryvchin, "Chronological Backtracking," in _Theory and Applications of Satisfiability Testing - SAT 2018_, June 2018, pp.111–121, 2018.
+
+- [5] C. Piette, Y. Hamadi, and L. Saïs, "Vivifying propositional clausal formulae," _Front. Artif. Intell. Appl._, vol.178, pp.525–529, 2008.
 
 ## License
 
