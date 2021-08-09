@@ -102,6 +102,8 @@ pub trait RestartIF:
     fn stabilize(&mut self) -> Option<bool>;
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
+    /// dynamic adaptation of restart interval
+    fn scale_restart_step(&mut self, scale: f64);
 }
 
 /// An assignment history used for blocking restart.
@@ -514,6 +516,17 @@ impl RestartIF for Restarter {
 
             #[cfg(feature = "Luby_restart")]
             ProgressUpdate::Luby => self.luby.update(0),
+        }
+    }
+    fn scale_restart_step(&mut self, scale: f64) {
+        const LIMIT: f64 = 1.1;
+        let thr = self.lbd.threshold * scale;
+        dbg!(self.lbd.threshold);
+        if 1.1 < thr {
+            self.lbd.threshold = thr;
+        } else {
+            self.lbd.threshold += LIMIT;
+            self.lbd.threshold *= 0.5;
         }
     }
 }

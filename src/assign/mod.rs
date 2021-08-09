@@ -164,9 +164,15 @@ pub struct AssignStack {
     num_propagation: usize,
     pub num_conflict: usize,
     num_restart: usize,
+    /// Decisions Per Conflict
     dpc_ema: EmaSU,
+    /// Propagations Per Conflict
     ppc_ema: EmaSU,
+    /// Conflicts Per Restart
     cpr_ema: EmaSU,
+    /// Conflicts Per Base Interval Restart
+    cpbrema: EmaSU,
+    in_base_interval_restart: bool,
 
     //
     //## Var DB
@@ -347,13 +353,15 @@ pub mod property {
         DecisionPerConflict,
         PropagationPerConflict,
         ConflictPerRestart,
+        ConflictPerBaseRestart,
         BestPhaseDivergenceRate,
     }
 
-    pub const EMAS: [TEma; 4] = [
+    pub const EMAS: [TEma; 5] = [
         TEma::DecisionPerConflict,
         TEma::PropagationPerConflict,
         TEma::ConflictPerRestart,
+        TEma::ConflictPerBaseRestart,
         TEma::BestPhaseDivergenceRate,
     ];
 
@@ -364,6 +372,7 @@ pub mod property {
                 TEma::DecisionPerConflict => self.dpc_ema.get_ema(),
                 TEma::PropagationPerConflict => self.ppc_ema.get_ema(),
                 TEma::ConflictPerRestart => self.cpr_ema.get_ema(),
+                TEma::ConflictPerBaseRestart => self.cpr_ema.get_ema(),
                 TEma::BestPhaseDivergenceRate => &self.bp_divergence_ema,
             }
         }

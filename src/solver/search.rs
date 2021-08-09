@@ -278,6 +278,10 @@ fn search(
                     let block_level = rst.derefer(restart::property::Tusize::TriggerLevel);
                     let num_cycle = rst.derefer(restart::property::Tusize::NumCycle);
                     let num_unreachable = asg.derefer(assign::property::Tusize::NumUnreachableVar);
+                    let cpb = asg
+                        .refer(assign::property::TEma::ConflictPerBaseRestart)
+                        .get();
+
                     #[cfg(feature = "trace_equivalency")]
                     {
                         let num_stage = rst.derefer(restart::property::Tusize::NumStage);
@@ -291,6 +295,10 @@ fn search(
                                 ),
                             );
                         }
+                    }
+
+                    if new_cycle && state.config.rst_step * 100 < (cpb as usize) {
+                        rst.scale_restart_step(0.94);
                     }
                     asg.handle(SolverEvent::Stabilize(block_level));
                     if last_core != num_unreachable || 0 == num_unreachable {
