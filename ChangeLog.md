@@ -1,7 +1,8 @@
-## 0.10.1, 2021-08-XX
+## 0.10.1, 2021-08-10
 
 - Clause reduction and Luby stabilization share the trigger condition.
 - remove feature "clause_reduction"; this is essential.
+- tweak restart parameters
 
 ## 0.10.0, 2021-07-10
 
