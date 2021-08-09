@@ -393,7 +393,7 @@ where `n` represents the number of updates, and `luby(n)` is a function returnin
 The longer the solver searches, the larger the average value is. So we can periodically explore the search space more deeply.
 Here is an example.
 
-![](https://user-images.githubusercontent.com/997855/128653007-2185c7d3-a18d-4fd9-b2e6-dda490dac513.png)
+![](https://user-images.githubusercontent.com/997855/128656027-a8eaa082-d2f8-4801-860e-46f38fa65c39.png)
 
 Note: the mechanism explained here is different from that used in Splr-0.10.0.
 
