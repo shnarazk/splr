@@ -391,6 +391,9 @@ restart_interval = luby(n) * base_interval;
 
 where `n` represents the number of updates, and `luby(n)` is a function returning _n_-th number of Luby series.
 The longer the solver searches, the larger the average value is. So we can periodically explore the search space more deeply.
+Here is an example.
+
+![](https://user-images.githubusercontent.com/997855/128653007-2185c7d3-a18d-4fd9-b2e6-dda490dac513.png)
 
 Note: the mechanism explained here is different from that used in Splr-0.10.0.
 
