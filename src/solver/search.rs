@@ -354,7 +354,7 @@ fn search(
 
                             if last_core != num_unreachable || 0 == num_unreachable {
                                 let block_level =
-                                    rst.derefer(restart::property::Tusize::TriggerLevel);
+                                    rst.derefer(restart::property::Tusize::IntervalScale);
                                 state.log(
                                     asg.num_conflict,
                                     format!(
@@ -376,7 +376,7 @@ fn search(
                         }
                     }
                     asg.handle(SolverEvent::Stabilize(
-                        rst.derefer(restart::property::Tusize::TriggerLevel),
+                        rst.derefer(restart::property::Tusize::IntervalScale),
                     ));
                     #[cfg(feature = "adjust_restart_parameters")]
                     {

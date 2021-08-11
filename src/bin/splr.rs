@@ -281,8 +281,8 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             "c      Restart|#BLK:{}, #RST:{}, trgr:{}, peak:{},\n",
             format!("{:>9}", state[LogUsizeId::RestartBlock]),
             format!("{:>9}", state[LogUsizeId::Restart]),
-            format!("{:>9}", state[LogUsizeId::RestartTriggerLevel]),
-            format!("{:>9}", state[LogUsizeId::RestartTriggerLevelMax]),
+            format!("{:>9}", state[LogUsizeId::RestartIntervalScale]),
+            format!("{:>9}", state[LogUsizeId::RestartIntervalScaleMax]),
         )
         .as_bytes(),
     )?;
@@ -310,7 +310,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
         format!(
             "c         misc|elim:{}, #sub:{}, core:{}, /cpr:{},\n",
             format!("{:>9}", state[LogUsizeId::Simplify]),
-            format!("{:>9}", state[LogUsizeId::ClauseSubsumption]),
+            format!("{:>9}", state[LogUsizeId::SubsumedClause]),
             format!("{:>9}", state[LogUsizeId::UnreachableCore]),
             format!("{:>9.2}", state[LogF64Id::ConflictPerRestart]),
         )

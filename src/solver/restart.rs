@@ -543,8 +543,8 @@ pub mod property {
         NumCycle,
         NumRestart,
         NumStage,
-        TriggerLevel,
-        TriggerLevelMax,
+        IntervalScale,
+        IntervalScaleMax,
     }
 
     pub const USIZES: [Tusize; 6] = [
@@ -552,8 +552,8 @@ pub mod property {
         Tusize::NumCycle,
         Tusize::NumRestart,
         Tusize::NumStage,
-        Tusize::TriggerLevel,
-        Tusize::TriggerLevelMax,
+        Tusize::IntervalScale,
+        Tusize::IntervalScaleMax,
     ];
 
     impl PropertyDereference<Tusize, usize> for Restarter {
@@ -564,8 +564,8 @@ pub mod property {
                 Tusize::NumCycle => self.stb.num_cycle,
                 Tusize::NumRestart => self.num_restart,
                 Tusize::NumStage => self.stb.num_stage,
-                Tusize::TriggerLevel => self.stb.step,
-                Tusize::TriggerLevelMax => self.stb.step_max,
+                Tusize::IntervalScale => self.stb.step,
+                Tusize::IntervalScaleMax => self.stb.step_max,
             }
         }
     }
