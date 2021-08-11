@@ -521,6 +521,9 @@ impl EmaSU {
             ema: Ema::new(s),
         }
     }
+    pub fn update_base(&mut self, x: usize) {
+        self.last = x as f64;
+    }
     pub fn get_ema(&self) -> &Ema {
         &self.ema
     }

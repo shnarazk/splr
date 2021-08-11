@@ -16,17 +16,20 @@ bitflags = "1.2"
 
 [features]
 default = [
-           # DEBUG "boundary_check",
-           "bi_clause_completion",
-           "clause_elimination",
-           "clause_vivification",
-           "LR_rewarding",
-           "Luby_stabilization",
-           # DEBUG "maintain_watch_cache",
-           "reason_side_rewarding",
-           "rephase",
-           "unsafe_access"
-          ]
+        # EXPERIMENTAL "adjust_restart_parameters",
+        # DEBUG "boundary_check",
+        "bi_clause_completion",
+        "clause_elimination",
+        "clause_vivification",
+        # "incremental_solver",
+        "LR_rewarding",
+        "Luby_stabilization",
+        # DEBUG "maintain_watch_cache",
+        "reason_side_rewarding",
+        "rephase",
+        "unsafe_access"
+        ]
+adjust_restart_parameters = []
 best_phases_tracking = []
 bi_clause_completion = []
 boundary_check = []
@@ -39,7 +42,7 @@ hashed_watch_cache = []
 incremental_solver = []
 just_used = []
 LR_rewarding = []
-luby_restart = []
+Luby_restart = []
 Luby_stabilization = []
 maintain_watch_cache = []
 no_IO = []

@@ -96,12 +96,20 @@ pub trait RestartIF:
 {
     /// check blocking and forcing restart condition.
     fn restart(&mut self) -> Option<RestartDecision>;
-    /// check stabilization mode and  return:
-    /// - `Some(parity_bit, just_start_a_new_cycle)` if a stabilization phase has just ended.
-    /// - `None` otherwise.
+    /// toggle stabilization mode and return:
+    /// - `true` if a stabilization _phase_ has just ended (or a new stabilization _phase_ starts).
+    /// - `false` otherwise.
+
+    /// - `Some(true)` if returns to the base restart interval and at the beginning of a new phase.
+    /// - `Some(false)` if returns to the base restart interval
+    /// - `None` if not at the base restart interval
     fn stabilize(&mut self) -> Option<bool>;
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
+
+    #[cfg(feature = "Luby_restart")]
+    /// dynamic adaptation of restart interval
+    fn scale_restart_step(&mut self, scale: f64);
 }
 
 /// An assignment history used for blocking restart.
@@ -371,7 +379,7 @@ impl fmt::Display for GeometricStabilizer {
 #[cfg(feature = "Luby_stabilization")]
 impl GeometricStabilizer {
     fn update(&mut self) -> Option<bool> {
-        if self.enable && self.switch_requsted {
+        if self.enable {
             self.num_stage += 1;
             let mut new_cycle: bool = false;
             if self.step_max < self.step {
@@ -381,12 +389,9 @@ impl GeometricStabilizer {
             }
             self.step = self.luby.next();
             self.switch_requsted = false;
-            return Some(new_cycle);
+            return (self.step == 1).then(|| new_cycle);
         }
-        None
-    }
-    fn switch(&mut self) {
-        self.switch_requsted = true;
+        Some(false)
     }
 }
 
@@ -447,8 +452,6 @@ impl Instantiate for Restarter {
     fn handle(&mut self, e: SolverEvent) {
         match e {
             SolverEvent::Assert(_) => (),
-            SolverEvent::ClauseReduction => self.stb.switch(),
-            SolverEvent::Eliminate(_) => (),
             SolverEvent::Restart => {
                 self.after_restart = 0;
                 self.num_restart += 1;
@@ -499,7 +502,7 @@ impl RestartIF for Restarter {
     }
     #[cfg(not(feature = "Luby_stabilization"))]
     fn stabilize(&mut self) -> Option<bool> {
-        Some(false)
+        None
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
@@ -515,6 +518,18 @@ impl RestartIF for Restarter {
             #[cfg(feature = "Luby_restart")]
             ProgressUpdate::Luby => self.luby.update(0),
         }
+    }
+    #[cfg(feature = "Luby_restart")]
+    fn scale_restart_step(&mut self, scale: f64) {
+        const LIMIT: f64 = 1.2;
+        let thr = self.lbd.threshold * scale;
+        if LIMIT <= thr {
+            self.lbd.threshold = thr;
+        } else {
+            self.lbd.threshold += LIMIT;
+            self.lbd.threshold *= 0.5;
+        }
+        dbg!(self.lbd.threshold);
     }
 }
 

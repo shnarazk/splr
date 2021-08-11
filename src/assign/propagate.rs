@@ -255,6 +255,13 @@ impl PropagateIF for AssignStack {
         if lv == self.root_level {
             self.num_restart += 1;
             self.cpr_ema.update(self.num_conflict);
+
+            #[cfg(feature = "adjust_restart_parameters")]
+            {
+                if self.in_base_interval_restart {
+                    self.cpbrema.update(self.num_conflict);
+                }
+            }
         }
 
         debug_assert!(self.q_head == 0 || self.assign[self.trail[self.q_head - 1].vi()].is_some());
