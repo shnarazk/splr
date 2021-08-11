@@ -279,7 +279,6 @@ impl Instantiate for State {
                 self.target.num_of_variables += 1;
             }
             SolverEvent::Assert(_) => (),
-            SolverEvent::ClauseReduction => (),
             SolverEvent::Conflict => (),
             SolverEvent::Eliminate(_) => (),
             SolverEvent::Instantiate => (),

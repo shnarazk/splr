@@ -51,8 +51,6 @@ pub enum SolverEvent {
 
     /// asserting a var.
     Assert(VarId),
-    /// clause reduction.
-    ClauseReduction,
     /// conflict by unit propagation.
     Conflict,
     /// eliminating a var.

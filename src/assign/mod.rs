@@ -170,8 +170,10 @@ pub struct AssignStack {
     ppc_ema: EmaSU,
     /// Conflicts Per Restart
     cpr_ema: EmaSU,
+    #[cfg(feature = "adjust_restart_parameters")]
     /// Conflicts Per Base Interval Restart
     cpbrema: EmaSU,
+    #[cfg(feature = "adjust_restart_parameters")]
     in_base_interval_restart: bool,
 
     //
