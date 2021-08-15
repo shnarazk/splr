@@ -114,7 +114,7 @@ pub fn vivify(
                                 asg.assign_at_root_level(vec[0])?;
                                 num_assert += 1;
                             }
-                            n => {
+                            _ => {
                                 if let Some(ci) = cdb.new_clause(asg, &mut vec, is_learnt).is_new()
                                 {
                                     cdb.set_activity(ci, cp.value());
