@@ -36,7 +36,6 @@ impl Default for Eliminator {
             subsume_literal_limit: 100,
             var: Vec::new(),
             num_full_elimination: 0,
-            num_sat_elimination: 0,
             num_subsumed: 0,
         }
     }
