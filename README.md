@@ -30,19 +30,6 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 
 ![Benchmark result(2021-08-16)](https://user-images.githubusercontent.com/997855/129486985-4d76d819-98b7-4f4c-b532-c13dc672282d.png)
 
-#### Version 0.10.0
-
-Version 0.10.0 fixes [some critical bugs](ChangeLog.md#0100-2021-07-10).
-
-- all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
-- [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.10.0 RC ([5417d8bb](https://github.com/shnarazk/splr/blob/main/ChangeLog.md#070-2021-03-14)) solved with a 200 sec timeout:
-  - 30 satisfiable problems: all the solutions were correct.
-  - 2 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
-
-![Benchmark result(2021-07-10)](https://user-images.githubusercontent.com/997855/125105269-41d76800-e119-11eb-84c0-e59e75a06a10.png)
-
-- The UNSAT certifications for aes_equiv_encry_3_rounds.debugged-sc2012.cnf, which was used in SAT Race 2019, were verified three times. Solving this problem by Splr took over 4 hours and the average drat file size was about 20 GB.
-
 ## Install
 
 Just run `cargo install splr` after installing the latest [cargo](https://www.rust-lang.org/tools/install).
