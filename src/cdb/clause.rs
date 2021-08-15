@@ -170,15 +170,16 @@ impl ClauseIF for Clause {
     fn timestamp(&self) -> usize {
         self.timestamp
     }
-    fn to_vivify(&self, threshold: usize) -> Option<f64> {
-        if !self.is_dead()
-            && self.is(Flag::VIVIFIED) == self.is(Flag::VIVIFIED2)
-            && (self.is(Flag::LEARNT) || self.is(Flag::DERIVE20))
-            && 3 * (self.rank as usize) + self.len() <= threshold
-        {
-            return Some(self.reward);
+    fn to_vivify(&self, initial_stage: bool) -> Option<f64> {
+        if initial_stage {
+            (!self.is_dead()).then(|| self.len() as f64)
+        } else {
+            (!self.is_dead()
+                && self.is(Flag::VIVIFIED)
+                && self.is(Flag::VIVIFIED2)
+                && (self.is(Flag::LEARNT) || self.is(Flag::DERIVE20)))
+            .then(|| self.reward)
         }
-        None
     }
     fn vivified(&mut self) {
         self.turn_on(Flag::VIVIFIED);

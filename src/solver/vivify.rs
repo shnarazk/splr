@@ -5,7 +5,7 @@ use {
     super::{restart, Restarter, Stat, State},
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-        cdb::{self, ClauseDB, ClauseDBIF, ClauseIF},
+        cdb::{ClauseDB, ClauseDBIF, ClauseIF},
         state::StateIF,
         types::*,
     },
@@ -34,15 +34,12 @@ pub fn vivify(
             Err(SolverError::RootLevelConflict(Some(cc)))
         })?;
     }
-    let ave_lbd = {
-        let ema = rst.refer(restart::property::TEma2::LBD).get();
-        if ema.is_nan() {
-            -1.0
-        } else {
-            ema
-        }
-    };
-    let mut clauses: Vec<OrderedProxy<ClauseId>> = select(asg, cdb, ave_lbd, NUM_TARGETS);
+    let mut clauses: Vec<OrderedProxy<ClauseId>> = select_targets(
+        asg,
+        cdb,
+        rst.derefer(restart::property::Tusize::NumRestart) == 0,
+        NUM_TARGETS,
+    );
     if clauses.is_empty() {
         return Ok(());
     }
@@ -85,7 +82,7 @@ pub fn vivify(
         num_check += 1;
         debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
         let mut decisions: Vec<Lit> = Vec::new();
-        for lit in clits.iter().take(clits.len() - 1).map(|p| *p) {
+        for lit in clits.iter().map(|p| *p) {
             // assert!(!asg.var(lit.vi()).is(Flag::ELIMINATED));
             match asg.assigned(!lit) {
                 //## Rule 1
@@ -97,10 +94,13 @@ pub fn vivify(
                     asg.assign_by_decision(!lit);
                     //## Rule 3
                     if let Some(cc) = asg.propagate_sandbox(cdb) {
-                        let conflits = &cdb[cc].iter().copied().collect::<Vec<Lit>>();
+                        let cnfl_lits = &cdb[cc].iter().copied().collect::<Vec<Lit>>();
                         seen[0] = num_check;
-                        let mut vec = asg.analyze_sandbox(cdb, &decisions, conflits, &mut seen);
+                        let mut vec = asg.analyze_sandbox(cdb, &decisions, cnfl_lits, &mut seen);
                         asg.backtrack_sandbox();
+                        if clits.len() == decisions.len() && cc == cid {
+                            continue 'next_clause;
+                        }
                         match vec.len() {
                             0 => {
                                 state.flush("");
@@ -114,16 +114,14 @@ pub fn vivify(
                                 asg.assign_at_root_level(vec[0])?;
                                 num_assert += 1;
                             }
-                            _ => {
+                            n => {
                                 if let Some(ci) = cdb.new_clause(asg, &mut vec, is_learnt).is_new()
                                 {
                                     cdb.set_activity(ci, cp.value());
                                     cdb[ci].turn_on(Flag::VIVIFIED);
                                 }
-                                if cc == cid {
-                                    cdb.remove_clause(cid);
-                                    num_shrink += 1;
-                                }
+                                cdb.remove_clause(cid);
+                                num_shrink += 1;
                             }
                         }
                         continue 'next_clause;
@@ -159,47 +157,41 @@ pub fn vivify(
     Ok(())
 }
 
-fn select(
+fn select_targets(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
-    thr: f64,
+    initial_stage: bool,
     len: Option<usize>,
 ) -> Vec<OrderedProxy<ClauseId>> {
-    let mut clauses: Vec<OrderedProxy<ClauseId>> = Vec::new();
-    if 0.0 < thr {
-        let threshold = (thr + cdb.derefer(cdb::property::Tf64::DpAverageLBD)) as usize;
-        let mut seen = vec![false; 2 * (asg.num_vars + 1)];
+    if initial_stage {
+        let mut seen: Vec<Option<OrderedProxy<ClauseId>>> = vec![None; 2 * (asg.num_vars + 1)];
         for (i, c) in cdb.iter().enumerate().skip(1) {
-            if c.is_dead() {
-                continue;
-            }
-            if let Some(act) = c.to_vivify(threshold) {
-                clauses.push(OrderedProxy::new(ClauseId::from(i), act));
-            } else if !seen[c.lit0()] {
-                seen[c.lit0()] = true;
-                clauses.push(OrderedProxy::new(ClauseId::from(i), 0.0));
-            }
-            if len.map_or(false, |thr| thr <= clauses.len()) {
-                break;
-            }
-        }
-    } else {
-        let mut seen = vec![false; 2 * (asg.num_vars + 1)];
-        let ml = len.map_or(100_000, |thr| thr);
-        for (i, c) in cdb.iter().enumerate().skip(1) {
-            if c.is_dead() {
-                continue;
-            } else if !seen[c.lit0()] {
-                seen[c.lit0()] = true;
-                clauses.push(OrderedProxy::new(ClauseId::from(i), c.len() as f64));
-                if ml <= clauses.len() {
-                    break;
+            if let Some(rank) = c.to_vivify(true) {
+                let p = &mut seen[usize::from(c.lit0())];
+                if p.as_ref().map_or(0.0, |r| r.value()) < rank {
+                    *p = Some(OrderedProxy::new(ClauseId::from(i), rank));
                 }
             }
         }
+        seen.iter().filter_map(|p| p.clone()).collect::<Vec<_>>()
+    } else {
+        let mut clauses: Vec<OrderedProxy<ClauseId>> = cdb
+            .iter()
+            .enumerate()
+            .skip(1)
+            .filter_map(|(i, c)| {
+                c.to_vivify(false)
+                    .map(|r| OrderedProxy::new_invert(ClauseId::from(i), r))
+            })
+            .collect::<Vec<_>>();
+        if let Some(max_len) = len {
+            if max_len < clauses.len() {
+                clauses.sort();
+                clauses.truncate(max_len);
+            }
+        }
+        clauses
     }
-    // clauses.sort();
-    clauses
 }
 
 fn flip(vec: &mut [Lit]) -> &mut [Lit] {

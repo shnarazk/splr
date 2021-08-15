@@ -44,7 +44,7 @@ pub trait ClauseIF {
     /// return timestamp
     fn timestamp(&self) -> usize;
     /// return `true` if the clause should try vivification
-    fn to_vivify(&self, threshold: usize) -> Option<f64>;
+    fn to_vivify(&self, initial_stage: bool) -> Option<f64>;
     /// clear flags about vivification
     fn vivified(&mut self);
 
