@@ -159,6 +159,7 @@ pub fn handle_conflict(
             for cid in &state.derive20 {
                 cdb[cid].turn_on(Flag::DERIVE20);
             }
+            #[cfg(feature = "bi_clause_completion")]
             cdb.complete_bi_clauses(asg);
         }
         RefClause::Clause(cid) => {

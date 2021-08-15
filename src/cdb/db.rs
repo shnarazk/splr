@@ -348,6 +348,8 @@ impl ClauseDBIF for ClauseDB {
         };
 
         let ClauseDB {
+            #[cfg(feature = "bi_clause_completion")]
+            ref mut bi_clause_completion_queue,
             ref mut clause,
             ref mut lbd_temp,
             ref mut num_clause,
@@ -365,6 +367,17 @@ impl ClauseDBIF for ClauseDB {
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
+
+            #[cfg(feature = "bi_clause_completion")]
+            {
+                if learnt {
+                    for lit in c.iter() {
+                        if !bi_clause_completion_queue.contains(lit) {
+                            bi_clause_completion_queue.push(*lit);
+                        }
+                    }
+                }
+            }
         } else {
             c.update_lbd(asg, lbd_temp);
         }
@@ -426,8 +439,6 @@ impl ClauseDBIF for ClauseDB {
         };
 
         let ClauseDB {
-            #[cfg(feature = "bi_clause_completion")]
-            ref mut bi_clause_completion_queue,
             ref mut clause,
             ref mut lbd_temp,
             ref mut bi_clause,
@@ -440,15 +451,6 @@ impl ClauseDBIF for ClauseDB {
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
-
-            #[cfg(feature = "bi_clause_completion")]
-            {
-                for lit in c.iter() {
-                    if !bi_clause_completion_queue.iter().any(|l| *l == *lit) {
-                        bi_clause_completion_queue.push(*lit);
-                    }
-                }
-            }
         } else {
             c.update_lbd(asg, lbd_temp);
         }
