@@ -639,6 +639,11 @@ impl StateIF for State {
         );
         self[LogUsizeId::NumProcessor] = self[Stat::NumProcessor];
         self[LogUsizeId::Simplify] = elim_num_full;
+        self[LogUsizeId::Stabilize] = rst.derefer(solver::restart::property::Tusize::NumStage);
+        self[LogUsizeId::StabilizationCycle] =
+            rst.derefer(solver::restart::property::Tusize::NumCycle);
+        self[LogUsizeId::Vivify] = self[Stat::Vivification];
+
         #[cfg(feature = "strategy_adaptation")]
         {
             println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
@@ -680,7 +685,9 @@ impl State {
             rst.derefer(solver::restart::property::Tusize::IntervalScale);
         self[LogUsizeId::RestartIntervalScaleMax] =
             rst.derefer(solver::restart::property::Tusize::IntervalScaleMax);
-        // TODO: Stabilize
+        self[LogUsizeId::Stabilize] = rst.derefer(solver::restart::property::Tusize::NumStage);
+        self[LogUsizeId::StabilizationCycle] =
+            rst.derefer(solver::restart::property::Tusize::NumCycle);
 
         self[LogUsizeId::NumProcessor] = self[Stat::NumProcessor];
         self[LogUsizeId::Simplify] = elim.derefer(processor::property::Tusize::NumFullElimination);
@@ -689,7 +696,7 @@ impl State {
             elim.derefer(processor::property::Tusize::NumSubsumedClause);
         self[LogUsizeId::VivifiedClause] = self[Stat::VivifiedClause];
         self[LogUsizeId::VivifiedVar] = self[Stat::VivifiedVar];
-        // TODO: Vivify
+        self[LogUsizeId::Vivify] = self[Stat::Vivification];
         let rst_lbd: &Ema2 = rst.refer(solver::restart::property::TEma2::LBD);
         self[LogF64Id::EmaLBD] = rst_lbd.get();
         self[LogF64Id::TrendLBD] = rst_lbd.trend();
@@ -935,6 +942,7 @@ pub enum LogUsizeId {
     RestartIntervalScale,
     RestartIntervalScaleMax,
     Stabilize,
+    StabilizationCycle,
 
     //
     //## pre(in)-processor
@@ -943,8 +951,8 @@ pub enum LogUsizeId {
     Simplify,
     SubsumedClause,
     VivifiedClause,
-    Vivify,
     VivifiedVar,
+    Vivify,
 
     // the sentinel
     End,
