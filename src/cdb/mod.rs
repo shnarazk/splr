@@ -94,7 +94,7 @@ pub trait ClauseDBIF:
     //## clause transformation
     //
 
-    /// TODO
+    /// push back a watch literal cache by adjusting the iterator for `lit`
     fn transform_by_restoring_watch_cache(
         &mut self,
         l: Lit,
