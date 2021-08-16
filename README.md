@@ -65,11 +65,11 @@ c
 c unif-k3-r4.25-v360-c1530-S1293537826-039.cnf, #var:      360, #cls:     1530
 c  #conflict:     375236, #decision:       683245, #propagate:       20791061,
 c   Assignment|#rem:      351, #fix:        0, #elm:        9, prg%:   2.5000,
-c       Clause|Remv:    41370, LBD2:      184, Binc:        0, Perm:     1521,
-c      Restart|#BLK:        0, #RST:     3936, trgr:        1, peak:       16,
+c       Clause|Remv:    41370, LBD2:      184, BinC:        0, Perm:     1521,
+c      Restart|#BLK:        0, #RST:     3936, *scl:        1, sclM:       16,
 c          LBD|avrg:  10.1331, trnd:   0.8387, depG:   2.8639, /dpc:     1.18,
 c     Conflict|tASG:   0.8740, cLvl:    15.84, bLvl:    14.68, /ppc:    60.03,
-c         misc|elim:       33, #sub:        0, core:      122, /cpr:  2103.33,
+c         misc|vivC:       33, subC:        0, core:      122, /cpr:  2103.33,
 c     Strategy|mode:  generic, time:    20.83,
 c 
 c   config::ChronoBtThreshold                      100
@@ -287,12 +287,12 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 | `prg%`       | the percentage of `remaining variables / total variables`                                 |
 | `Remv`       | the current number of learnt clauses which are not bi-clauses                             |
 | `LBD2`       | the accumulated number of learnt clauses which LBDs are 2                                 |
-| `Binc`       | the current number of binary learnt clauses                                               |
+| `BinC`       | the current number of binary learnt clauses                                               |
 | `Perm`       | the current number of given clauses and binary learnt clauses                             |
 | `#BLK`       | the number of blocking restart                                                            |
 | `#RST`       | the number of restart                                                                     |
 | `*scl`       | the scaling factor for restart interval used in Luby stabilization                        |
-| `peak`       | the largest scaling factor so far                                                         |
+| `sclM`       | the largest scaling factor so far                                                         |
 | `avrg`       | the EMA, Exponential Moving Average, of LBD of learnt clauses                             |
 | `depG`       | the EMA of LBD of the clauses used in conflict analysis                                   |
 | `/dpc`       | the EMA of decisions per conflict                                                         |
