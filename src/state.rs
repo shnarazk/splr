@@ -537,7 +537,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K  Assignment|#rem:{}, #ass:{}, #elm:{}, prg%:{}",
+            "\x1B[2K  Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{}",
             im!(
                 "{:>9}",
                 self,
