@@ -141,13 +141,13 @@ impl Default for Config {
             elm_grw_lim: 0,
             elm_var_occ: 20000,
 
-            rst_step: 24,
+            rst_step: 2,
             rst_asg_len: 24,
             rst_asg_slw: 8192,
-            rst_asg_thr: 0.75,
-            rst_lbd_len: 24,
+            rst_asg_thr: 0.6,
+            rst_lbd_len: 8,
             rst_lbd_slw: 8192,
-            rst_lbd_thr: 1.10,
+            rst_lbd_thr: 1.6,
 
             stg_rwd_dcy: 0.5,
             stg_rwd_val: 1.0,
@@ -320,8 +320,6 @@ impl Config {
                 "binary clause completion",
                 #[cfg(feature = "clause_elimination")]
                 "clause elimination",
-                #[cfg(feature = "clause_reduction")]
-                "clause reduction",
                 #[cfg(feature = "clause_vivification")]
                 "clause vivification",
                 #[cfg(feature = "EMA_calibration")]
@@ -392,7 +390,7 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
       --evo <elm-var-occ>   Max #cls for var elimination   {:>10}
   -o, --dir <io-outdir>     Output directory                {:>10}
-  -p, --proof <io-pfile>    DRAT Cert. filename                {:>10}
+  -p, --proof <io-pfile>    DRAT Cert. filename                 {:>10}
   -r, --result <io-rfile>   Result filename/stdout             {:>10}
       --ral <rst-asg-len>   Length of assign. fast EMA     {:>10}
       --ras <rst-asg-slw>   Length of assign. slow EMA     {:>10}

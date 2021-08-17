@@ -61,7 +61,7 @@ where
     #[cfg(feature = "trace_elimination")]
     println!("# eliminate_var {}", vi);
     // OK, eliminate the literal and build constraints on it.
-    make_eliminated_clauses(cdb, &mut elim.elim_lits, vi, &&(*pos), &&(*neg));
+    make_eliminated_clauses(cdb, &mut elim.elim_lits, vi, &*pos, &*neg);
     let vec = &mut state.new_learnt;
     // println!("eliminate_var {}: |p|: {} and |n|: {}", vi, (*pos).len(), (*neg).len());
     // Produce clauses in cross product:
@@ -101,16 +101,24 @@ where
                 }
                 _ => {
                     debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
-                    if let Some(cid) = cdb
-                        .new_clause(asg, vec, learnt_p && cdb[*n].is(Flag::LEARNT))
-                        .is_new()
-                    {
-                        elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
-                        #[cfg(feature = "trace_elimination")]
-                        println!(
-                            " - eliminate_var {}: X {} from {} and {}",
-                            vi, cdb[cid], cdb[*p], cdb[*n],
-                        );
+                    match cdb.new_clause(asg, vec, learnt_p && cdb[*n].is(Flag::LEARNT)) {
+                        RefClause::Clause(ci) => {
+                            // the merged clause might be a duplicated clause.
+                            cdb[ci].turn_on(Flag::VIVIFIED);
+                            cdb[ci].turn_on(Flag::VIVIFIED2);
+
+                            elim.add_cid_occur(asg, ci, &mut cdb[ci], true);
+
+                            #[cfg(feature = "trace_elimination")]
+                            println!(
+                                " - eliminate_var {}: X {} from {} and {}",
+                                vi, cdb[ci], cdb[*p], cdb[*n],
+                            );
+                        }
+                        RefClause::Dead => (),
+                        RefClause::EmptyClause => (),
+                        RefClause::RegisteredClause(_) => (),
+                        RefClause::UnitClause(_) => (),
                     }
                 }
             }

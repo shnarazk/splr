@@ -251,8 +251,11 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
     let mut last_core = 0;
-    let progress_step = 256;
-    let mut next_progress = progress_step;
+
+    #[cfg(feature = "adjust_restart_parameters")]
+    let mut base_interval_restart = false;
+    #[cfg(feature = "adjust_restart_parameters")]
+    let mut num_conflict_in_base_interval = 0;
 
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
@@ -269,75 +272,124 @@ fn search(
             }
             asg.update_rewards();
             cdb.update_rewards();
-            handle_conflict(asg, cdb, elim, rst, state, ci)?;
+            handle_conflict(asg, cdb, rst, state, ci)?;
             rst.update(ProgressUpdate::ASG(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
             ));
-            if rst.restart() == Some(RestartDecision::Force) {
-                #[allow(unused_variables)]
-                if let Some(new_cycle) = rst.stabilize() {
-                    RESTART!(asg, rst);
-                    let block_level = rst.derefer(restart::property::Tusize::TriggerLevel);
-                    let num_cycle = rst.derefer(restart::property::Tusize::NumCycle);
-                    let num_unreachable = asg.derefer(assign::property::Tusize::NumUnreachableVar);
-                    #[cfg(feature = "trace_equivalency")]
-                    {
-                        let num_stage = rst.derefer(restart::property::Tusize::NumStage);
-                        if new_cycle {
-                            asg.dump_cnf(
-                                cdb,
-                                &format!(
-                                    "{}-stage{}.cnf",
-                                    state.config.cnf_file.file_stem().unwrap().to_string_lossy(),
-                                    num_stage
-                                ),
-                            );
-                        }
-                    }
-                    asg.handle(SolverEvent::Stabilize(block_level));
-                    if cdb.reduce(asg, asg.num_conflict) {
-                        #[cfg(feature = "trace_equivalency")]
-                        cdb.check_consistency(asg, "before simplify");
-                        state[Stat::NumProcessor] += 1;
-                        /* if state.config.c_ip_int <= elim.to_simplify as usize */
-                        {
-                            #[cfg(feature = "clause_vivification")]
-                            vivify(asg, cdb, rst, state)?;
 
-                            #[cfg(feature = "clause_elimination")]
+            #[cfg(feature = "adjust_restart_parameters")]
+            {
+                if base_interval_restart {
+                    num_conflict_in_base_interval += 1;
+                }
+            }
+
+            if rst.restart() == Some(RestartDecision::Force) {
+                RESTART!(asg, rst);
+            }
+            if cdb.reduce(asg, asg.num_conflict) {
+                if asg.decision_level() != asg.root_level() {
+                    RESTART!(asg, rst);
+                }
+
+                #[cfg(feature = "trace_equivalency")]
+                cdb.check_consistency(asg, "before simplify");
+
+                #[cfg(feature = "clause_vivification")]
+                vivify(asg, cdb, rst, state)?;
+
+                #[cfg(feature = "clause_elimination")]
+                {
+                    elim.activate();
+                    elim.simplify(asg, cdb, rst, state)?;
+                    state[Stat::NumProcessor] += 1;
+                }
+                asg.clear_asserted_literals(cdb)?;
+
+                // display the current stats. before updating stabiliation parameters
+                state.progress(asg, cdb, elim, rst);
+
+                #[cfg(feature = "Luby_stabilization")]
+                {
+                    // update stabilization mode
+                    if let Some(new_cycle) = rst.stabilize() {
+                        #[cfg(feature = "adjust_restart_parameters")]
+                        {
+                            base_interval_restart = true;
+                        }
+
+                        if let Some(p) = state.elapsed() {
+                            if 1.0 <= p {
+                                return Err(SolverError::TimeOut);
+                            }
+                        } else {
+                            return Err(SolverError::UndescribedError);
+                        }
+
+                        #[allow(unused_variables)]
+                        if new_cycle {
+                            let num_cycle = rst.derefer(restart::property::Tusize::NumCycle);
+                            let num_unreachable =
+                                asg.derefer(assign::property::Tusize::NumUnreachableVar);
+
+                            #[cfg(feature = "trace_equivalency")]
                             {
-                                elim.activate();
-                                elim.simplify(asg, cdb, rst, state)?;
+                                let num_stage = rst.derefer(restart::property::Tusize::NumStage);
+                                if new_cycle {
+                                    asg.dump_cnf(
+                                        cdb,
+                                        &format!(
+                                            "{}-stage{}.cnf",
+                                            state
+                                                .config
+                                                .cnf_file
+                                                .file_stem()
+                                                .unwrap()
+                                                .to_string_lossy(),
+                                            num_stage
+                                        ),
+                                    );
+                                }
+                            }
+
+                            if last_core != num_unreachable || 0 == num_unreachable {
+                                let block_level =
+                                    rst.derefer(restart::property::Tusize::IntervalScale);
+                                state.log(
+                                    asg.num_conflict,
+                                    format!(
+                                        "#cycle:{:>5}, core:{:>10}, level:{:>9}, /cpr:{:>9.2}",
+                                        num_cycle,
+                                        num_unreachable,
+                                        block_level,
+                                        asg.refer(assign::property::TEma::PropagationPerConflict)
+                                            .get(),
+                                    ),
+                                );
+                                last_core = num_unreachable;
                             }
                         }
-                        asg.clear_asserted_literals(cdb)?;
-                    }
-                    if last_core != num_unreachable || 0 == num_unreachable {
-                        state.log(
-                            asg.num_conflict,
-                            format!(
-                                "#cycle:{:>5}, core:{:>10}, level:{:>9}, /cpr:{:>9.2}",
-                                num_cycle,
-                                num_unreachable,
-                                block_level,
-                                asg.refer(assign::property::TEma::PropagationPerConflict)
-                                    .get(),
-                            ),
-                        );
-                        last_core = num_unreachable;
-                    } else if let Some(p) = state.elapsed() {
-                        if 1.0 <= p {
-                            return Err(SolverError::TimeOut);
-                        }
                     } else {
-                        return Err(SolverError::UndescribedError);
+                        #[cfg(feature = "adjust_restart_parameters")]
+                        {
+                            base_interval_restart = false;
+                        }
                     }
-                    if next_progress < asg.num_conflict {
-                        state.progress(asg, cdb, elim, rst);
-                        next_progress = asg.num_conflict + progress_step;
+                    asg.handle(SolverEvent::Stabilize(
+                        rst.derefer(restart::property::Tusize::IntervalScale),
+                    ));
+                    #[cfg(feature = "adjust_restart_parameters")]
+                    {
+                        if 40_000 < num_conflict_in_base_interval {
+                            num_conflict_in_base_interval = 0;
+                            let cpb = asg
+                                .refer(assign::property::TEma::ConflictPerBaseRestart)
+                                .get();
+                            if 32 * state.config.rst_step < (cpb as usize) {
+                                rst.scale_restart_step(0.98);
+                            }
+                        }
                     }
-                } else {
-                    RESTART!(asg, rst);
                 }
             }
             if a_decision_was_made {

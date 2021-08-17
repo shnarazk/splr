@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.10.0"
+version = "0.11.0"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2018"
@@ -12,27 +12,28 @@ keywords = ["SAT", "SAT-solver", "logic", "satisfiability"]
 categories = ["mathematics", "science"]
 
 [dependencies]
-bitflags = "1.2"
+bitflags = "1.3"
 
 [features]
 default = [
-           # DEBUG "boundary_check",
-           "bi_clause_completion",
-           "clause_elimination",
-           "clause_reduction",
-           "clause_vivification",
-           "LR_rewarding",
-           "Luby_stabilization",
-           # DEBUG "maintain_watch_cache",
-           "reason_side_rewarding",
-           "rephase",
-           "unsafe_access"
-          ]
+        # EXPERIMENTAL "adjust_restart_parameters",
+        # DEBUG "boundary_check",
+        "bi_clause_completion",
+        "clause_elimination",
+        "clause_vivification",
+        # "incremental_solver",
+        "LR_rewarding",
+        "Luby_stabilization",
+        # DEBUG "maintain_watch_cache",
+        "reason_side_rewarding",
+        "rephase",
+        "unsafe_access"
+        ]
+adjust_restart_parameters = []
 best_phases_tracking = []
 bi_clause_completion = []
 boundary_check = []
 clause_elimination = []
-clause_reduction = []
 clause_vivification = []
 debug_propagation = []
 EMA_calibration = []
@@ -41,7 +42,7 @@ hashed_watch_cache = []
 incremental_solver = []
 just_used = []
 LR_rewarding = []
-luby_restart = []
+Luby_restart = []
 Luby_stabilization = []
 maintain_watch_cache = []
 no_IO = []

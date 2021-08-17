@@ -104,7 +104,6 @@ enum EliminatorMode {
 #[derive(Clone, Debug)]
 pub struct Eliminator {
     enable: bool,
-    pub to_simplify: f64,
     mode: EliminatorMode,
     clause_queue: Vec<ClauseId>,
     var_queue: VarOccHeap,
@@ -126,7 +125,6 @@ pub struct Eliminator {
     /// var
     var: Vec<LitOccurs>,
     num_full_elimination: usize,
-    num_sat_elimination: usize,
     num_subsumed: usize,
 }
 
@@ -137,22 +135,16 @@ pub mod property {
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tusize {
         NumFullElimination,
-        NumSatElimination,
         NumSubsumedClause,
     }
 
-    pub const USIZES: [Tusize; 3] = [
-        Tusize::NumFullElimination,
-        Tusize::NumSatElimination,
-        Tusize::NumSubsumedClause,
-    ];
+    pub const USIZES: [Tusize; 2] = [Tusize::NumFullElimination, Tusize::NumSubsumedClause];
 
     impl PropertyDereference<Tusize, usize> for Eliminator {
         #[inline]
         fn derefer(&self, k: Tusize) -> usize {
             match k {
                 Tusize::NumFullElimination => self.num_full_elimination,
-                Tusize::NumSatElimination => self.num_sat_elimination,
                 Tusize::NumSubsumedClause => self.num_subsumed,
             }
         }

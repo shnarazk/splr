@@ -11,7 +11,6 @@ use {
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
-        processor::Eliminator,
         solver::SolverEvent,
         types::*,
     },
@@ -21,7 +20,6 @@ use {
 pub fn handle_conflict(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
-    elim: &mut Eliminator,
     rst: &mut Restarter,
     state: &mut State,
     ci: ClauseId,
@@ -100,7 +98,6 @@ pub fn handle_conflict(
                 if asg.assign_at_root_level(l0).is_err() {
                     panic!("impossible inconsistency");
                 }
-                elim.to_simplify += (state.config.c_ip_int / 2) as f64;
                 rst.handle(SolverEvent::Assert(l0.vi()));
                 return Ok(());
             }
@@ -159,10 +156,10 @@ pub fn handle_conflict(
             asg.assign_by_implication(l0, assign_level, cid, Some(!l1));
             // || check_graph(asg, cdb, l0, "biclause");
             rst.update(ProgressUpdate::LBD(1));
-            elim.to_simplify += 0.5;
             for cid in &state.derive20 {
                 cdb[cid].turn_on(Flag::DERIVE20);
             }
+            #[cfg(feature = "bi_clause_completion")]
             cdb.complete_bi_clauses(asg);
         }
         RefClause::Clause(cid) => {
@@ -175,7 +172,6 @@ pub fn handle_conflict(
             // || check_graph(asg, cdb, l0, "clause");
             let lbd = cdb[cid].rank;
             rst.update(ProgressUpdate::LBD(lbd));
-            elim.to_simplify += 1.0 / learnt_len as f64;
             if lbd <= 20 {
                 for cid in &state.derive20 {
                     cdb[cid].turn_on(Flag::DERIVE20);

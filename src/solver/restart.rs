@@ -96,12 +96,20 @@ pub trait RestartIF:
 {
     /// check blocking and forcing restart condition.
     fn restart(&mut self) -> Option<RestartDecision>;
-    /// check stabilization mode and  return:
-    /// - `Some(parity_bit, just_start_a_new_cycle)` if a stabilization phase has just ended.
-    /// - `None` otherwise.
+    /// toggle stabilization mode and return:
+    /// - `true` if a stabilization _phase_ has just ended (or a new stabilization _phase_ starts).
+    /// - `false` otherwise.
+
+    /// - `Some(true)` if returns to the base restart interval and at the beginning of a new phase.
+    /// - `Some(false)` if returns to the base restart interval
+    /// - `None` if not at the base restart interval
     fn stabilize(&mut self) -> Option<bool>;
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
+
+    #[cfg(feature = "Luby_restart")]
+    /// dynamic adaptation of restart interval
+    fn scale_restart_step(&mut self, scale: f64);
 }
 
 /// An assignment history used for blocking restart.
@@ -327,10 +335,9 @@ struct GeometricStabilizer {
     luby: LubySeries,
     num_cycle: usize,
     num_stage: usize,
-    next_trigger: usize,
-    // reset_requested: bool,
     step: usize,
     step_max: usize,
+    switch_requsted: bool,
 }
 
 impl Default for GeometricStabilizer {
@@ -344,10 +351,9 @@ impl Default for GeometricStabilizer {
             luby: LubySeries::default(),
             num_cycle: 0,
             num_stage: 0,
-            next_trigger: 1,
-            // reset_requested: false,
             step: 1,
             step_max: 1,
+            switch_requsted: false,
         }
     }
 }
@@ -363,25 +369,17 @@ impl fmt::Display for GeometricStabilizer {
         if !self.enable {
             write!(f, "Stabilizer(dead)")
         } else if self.enable {
-            write!(
-                f,
-                "Stabilizer[step: {}, next:{}, on]",
-                self.step, self.next_trigger
-            )
+            write!(f, "Stabilizer[step: {}, on]", self.step)
         } else {
-            write!(
-                f,
-                "Stabilizer[step: {}, next:{}, off]",
-                self.step, self.next_trigger
-            )
+            write!(f, "Stabilizer[step: {}, off]", self.step)
         }
     }
 }
 
+#[cfg(feature = "Luby_stabilization")]
 impl GeometricStabilizer {
-    #[cfg(feature = "Luby_stabilization")]
-    fn update(&mut self, now: usize) -> Option<bool> {
-        if self.enable && self.next_trigger <= now {
+    fn update(&mut self) -> Option<bool> {
+        if self.enable {
             self.num_stage += 1;
             let mut new_cycle: bool = false;
             if self.step_max < self.step {
@@ -389,21 +387,12 @@ impl GeometricStabilizer {
                 self.num_cycle += 1;
                 self.step_max = self.step;
             }
-            // if self.reset_requested {
-            //     self.num_cycle = 0;
-            //     self.luby.reset();
-            //     self.reset_requested = false;
-            //     self.step_max = 1;
-            // }
             self.step = self.luby.next();
-            self.next_trigger = now + (self.step_max * 2) / self.step;
-            return Some(new_cycle);
+            self.switch_requsted = false;
+            return (self.step == 1).then(|| new_cycle);
         }
-        None
+        Some(false)
     }
-    // fn reset_progress(&mut self) {
-    //     self.reset_requested = true;
-    // }
 }
 
 /// `Restarter` provides restart API and holds data about restart conditions.
@@ -417,7 +406,6 @@ pub struct Restarter {
     stb: GeometricStabilizer,
     after_restart: usize,
     restart_step: usize,
-    restart_waiting: usize,
     initial_restart_step: usize,
 
     //
@@ -438,7 +426,6 @@ impl Default for Restarter {
             stb: GeometricStabilizer::default(),
             after_restart: 0,
             restart_step: 0,
-            restart_waiting: 0,
             initial_restart_step: 0,
 
             num_block: 0,
@@ -464,9 +451,7 @@ impl Instantiate for Restarter {
     }
     fn handle(&mut self, e: SolverEvent) {
         match e {
-            SolverEvent::Assert(_) | SolverEvent::Eliminate(_) => {
-                self.restart_waiting = self.stb.step;
-            }
+            SolverEvent::Assert(_) => (),
             SolverEvent::Restart => {
                 self.after_restart = 0;
                 self.num_restart += 1;
@@ -497,31 +482,27 @@ impl RestartIF for Restarter {
             return None;
         }
 
-        if self.asg.is_active() {
+        if self.stb.step_max * self.num_block < self.stb.step * self.num_restart
+            && self.asg.is_active()
+        {
             self.num_block += 1;
             self.after_restart = 0;
-            self.restart_step = self.initial_restart_step * self.stb.step_max;
-            self.restart_waiting = 0;
+            self.restart_step = self.stb.step * self.initial_restart_step;
             return Some(RestartDecision::Block);
         }
         if self.lbd.is_active() {
-            self.restart_step = self.initial_restart_step;
-            self.restart_waiting += 1;
-            if self.stb.step <= self.restart_waiting {
-                self.restart_waiting = 0;
-                return Some(RestartDecision::Force);
-            }
-            self.after_restart = 0;
+            self.restart_step = self.stb.step * self.initial_restart_step;
+            return Some(RestartDecision::Force);
         }
         None
     }
     #[cfg(feature = "Luby_stabilization")]
     fn stabilize(&mut self) -> Option<bool> {
-        self.stb.update(self.num_restart) // don't count num_block
+        self.stb.update()
     }
     #[cfg(not(feature = "Luby_stabilization"))]
     fn stabilize(&mut self) -> Option<bool> {
-        Some(false)
+        None
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
@@ -538,6 +519,18 @@ impl RestartIF for Restarter {
             ProgressUpdate::Luby => self.luby.update(0),
         }
     }
+    #[cfg(feature = "Luby_restart")]
+    fn scale_restart_step(&mut self, scale: f64) {
+        const LIMIT: f64 = 1.2;
+        let thr = self.lbd.threshold * scale;
+        if LIMIT <= thr {
+            self.lbd.threshold = thr;
+        } else {
+            self.lbd.threshold += LIMIT;
+            self.lbd.threshold *= 0.5;
+        }
+        dbg!(self.lbd.threshold);
+    }
 }
 
 pub mod property {
@@ -550,8 +543,8 @@ pub mod property {
         NumCycle,
         NumRestart,
         NumStage,
-        TriggerLevel,
-        TriggerLevelMax,
+        IntervalScale,
+        IntervalScaleMax,
     }
 
     pub const USIZES: [Tusize; 6] = [
@@ -559,8 +552,8 @@ pub mod property {
         Tusize::NumCycle,
         Tusize::NumRestart,
         Tusize::NumStage,
-        Tusize::TriggerLevel,
-        Tusize::TriggerLevelMax,
+        Tusize::IntervalScale,
+        Tusize::IntervalScaleMax,
     ];
 
     impl PropertyDereference<Tusize, usize> for Restarter {
@@ -571,8 +564,8 @@ pub mod property {
                 Tusize::NumCycle => self.stb.num_cycle,
                 Tusize::NumRestart => self.num_restart,
                 Tusize::NumStage => self.stb.num_stage,
-                Tusize::TriggerLevel => self.stb.step,
-                Tusize::TriggerLevelMax => self.stb.step_max,
+                Tusize::IntervalScale => self.stb.step,
+                Tusize::IntervalScaleMax => self.stb.step_max,
             }
         }
     }

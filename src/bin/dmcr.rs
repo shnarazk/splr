@@ -216,7 +216,7 @@ fn read_assignment(rs: &mut dyn BufRead, cnf: &str, assign: &Option<PathBuf>) ->
         match rs.read_line(&mut buf) {
             Ok(0) => return Some(Vec::new()),
             Ok(_) => {
-                if buf.starts_with("c ") {
+                if buf.starts_with('c') {
                     buf.clear();
                     continue;
                 }

@@ -497,9 +497,9 @@ impl StateIF for State {
 
         let rst_num_blk: usize = rst.derefer(solver::restart::property::Tusize::NumBlock);
         let rst_num_rst: usize = rst.derefer(solver::restart::property::Tusize::NumRestart);
-        let rst_trg_lvl: usize = rst.derefer(solver::restart::property::Tusize::TriggerLevel);
-        let rst_trg_lvl_max: usize =
-            rst.derefer(solver::restart::property::Tusize::TriggerLevelMax);
+        let rst_int_scl: usize = rst.derefer(solver::restart::property::Tusize::IntervalScale);
+        let rst_int_scl_max: usize =
+            rst.derefer(solver::restart::property::Tusize::IntervalScaleMax);
         let rst_asg: &Ema2 = rst.refer(solver::restart::property::TEma2::ASG);
         let rst_lbd: &Ema2 = rst.refer(solver::restart::property::TEma2::LBD);
 
@@ -537,7 +537,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K  Assignment|#rem:{}, #ass:{}, #elm:{}, prg%:{}",
+            "\x1B[2K  Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{}",
             im!(
                 "{:>9}",
                 self,
@@ -559,7 +559,7 @@ impl StateIF for State {
             fm!("{:>9.4}", self, LogF64Id::Progress, rate * 100.0),
         );
         println!(
-            "\x1B[2K      Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{}",
+            "\x1B[2K      Clause|Remv:{}, LBD2:{}, BinC:{}, Perm:{}",
             im!("{:>9}", self, LogUsizeId::RemovableClause, cdb_num_learnt),
             im!("{:>9}", self, LogUsizeId::LBD2Clause, cdb_num_lbd2),
             im!(
@@ -576,15 +576,15 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, trgr:{}, peak:{}",
+            "\x1B[2K     Restart|#BLK:{}, #RST:{}, *scl:{}, sclM:{}",
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-            im!("{:>9}", self, LogUsizeId::RestartTriggerLevel, rst_trg_lvl),
+            im!("{:>9}", self, LogUsizeId::RestartIntervalScale, rst_int_scl),
             im!(
                 "{:>9}",
                 self,
-                LogUsizeId::RestartTriggerLevelMax,
-                rst_trg_lvl_max
+                LogUsizeId::RestartIntervalScaleMax,
+                rst_int_scl_max
             ),
         );
         println!(
@@ -612,19 +612,23 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|proc:{}, #sub:{}, core:{}, /cpr:{}",
+            "\x1B[2K        misc|vivC:{}, subC:{}, core:{}, /cpr:{}",
             im!(
                 "{:>9}",
                 self,
-                LogUsizeId::NumProcessor,
-                self[Stat::NumProcessor]
+                LogUsizeId::VivifiedClause,
+                self[Stat::VivifiedClause]
             ),
-            im!("{:>9}", self, LogUsizeId::ClauseSubsumption, elim_num_sub),
+            im!("{:>9}", self, LogUsizeId::SubsumedClause, elim_num_sub),
             im!(
                 "{:>9}",
                 self,
                 LogUsizeId::UnreachableCore,
-                asg_num_unreachables
+                if asg_num_unreachables == 0 {
+                    self[LogUsizeId::UnreachableCore]
+                } else {
+                    asg_num_unreachables
+                }
             ),
             fm!(
                 "{:>9.2}",
@@ -633,7 +637,13 @@ impl StateIF for State {
                 asg_cpr_ema.get()
             )
         );
+        self[LogUsizeId::NumProcessor] = self[Stat::NumProcessor];
         self[LogUsizeId::Simplify] = elim_num_full;
+        self[LogUsizeId::Stabilize] = rst.derefer(solver::restart::property::Tusize::NumStage);
+        self[LogUsizeId::StabilizationCycle] =
+            rst.derefer(solver::restart::property::Tusize::NumCycle);
+        self[LogUsizeId::Vivify] = self[Stat::Vivification];
+
         #[cfg(feature = "strategy_adaptation")]
         {
             println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
@@ -671,11 +681,22 @@ impl State {
             cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
         self[LogUsizeId::RestartBlock] = rst.derefer(solver::restart::property::Tusize::NumBlock);
         self[LogUsizeId::Restart] = rst.derefer(solver::restart::property::Tusize::NumRestart);
-        self[LogUsizeId::RestartTriggerLevel] =
-            rst.derefer(solver::restart::property::Tusize::TriggerLevel);
-        self[LogUsizeId::RestartTriggerLevelMax] =
-            rst.derefer(solver::restart::property::Tusize::TriggerLevelMax);
+        self[LogUsizeId::RestartIntervalScale] =
+            rst.derefer(solver::restart::property::Tusize::IntervalScale);
+        self[LogUsizeId::RestartIntervalScaleMax] =
+            rst.derefer(solver::restart::property::Tusize::IntervalScaleMax);
+        self[LogUsizeId::Stabilize] = rst.derefer(solver::restart::property::Tusize::NumStage);
+        self[LogUsizeId::StabilizationCycle] =
+            rst.derefer(solver::restart::property::Tusize::NumCycle);
 
+        self[LogUsizeId::NumProcessor] = self[Stat::NumProcessor];
+        self[LogUsizeId::Simplify] = elim.derefer(processor::property::Tusize::NumFullElimination);
+
+        self[LogUsizeId::SubsumedClause] =
+            elim.derefer(processor::property::Tusize::NumSubsumedClause);
+        self[LogUsizeId::VivifiedClause] = self[Stat::VivifiedClause];
+        self[LogUsizeId::VivifiedVar] = self[Stat::VivifiedVar];
+        self[LogUsizeId::Vivify] = self[Stat::Vivification];
         let rst_lbd: &Ema2 = rst.refer(solver::restart::property::TEma2::LBD);
         self[LogF64Id::EmaLBD] = rst_lbd.get();
         self[LogF64Id::TrendLBD] = rst_lbd.trend();
@@ -690,12 +711,12 @@ impl State {
         self[LogF64Id::PropagationPerConflict] = asg
             .refer(assign::property::TEma::PropagationPerConflict)
             .get();
-        self[LogUsizeId::NumProcessor] = self[Stat::NumProcessor];
-        self[LogUsizeId::Simplify] = elim.derefer(processor::property::Tusize::NumFullElimination);
-        self[LogUsizeId::ClauseSubsumption] =
-            elim.derefer(processor::property::Tusize::NumSubsumedClause);
-        self[LogUsizeId::UnreachableCore] =
-            asg.derefer(assign::property::Tusize::NumUnreachableVar);
+        {
+            let core = asg.derefer(assign::property::Tusize::NumUnreachableVar);
+            if 0 < core {
+                self[LogUsizeId::UnreachableCore] = core;
+            }
+        }
         self[LogF64Id::ConflictPerRestart] =
             asg.refer(assign::property::TEma::ConflictPerRestart).get();
     }
@@ -918,18 +939,20 @@ pub enum LogUsizeId {
     RestartBlock,
     RestartCancel,
     RestartStabilize,
-    RestartTriggerLevel,
-    RestartTriggerLevelMax,
+    RestartIntervalScale,
+    RestartIntervalScaleMax,
+    Stabilize,
+    StabilizationCycle,
 
     //
     //## pre(in)-processor
     //
     NumProcessor,
     Simplify,
-    Stabilize,
-    ClauseSubsumption,
-    Vivify,
+    SubsumedClause,
+    VivifiedClause,
     VivifiedVar,
+    Vivify,
 
     // the sentinel
     End,

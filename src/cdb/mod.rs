@@ -44,7 +44,7 @@ pub trait ClauseIF {
     /// return timestamp
     fn timestamp(&self) -> usize;
     /// return `true` if the clause should try vivification
-    fn to_vivify(&self, threshold: usize) -> Option<f64>;
+    fn to_vivify(&self, initial_stage: bool) -> Option<f64>;
     /// clear flags about vivification
     fn vivified(&mut self);
 
@@ -94,7 +94,7 @@ pub trait ClauseDBIF:
     //## clause transformation
     //
 
-    /// TODO
+    /// push back a watch literal cache by adjusting the iterator for `lit`
     fn transform_by_restoring_watch_cache(
         &mut self,
         l: Lit,
@@ -229,7 +229,7 @@ pub struct ClauseDB {
     clause: Vec<Clause>,
     /// hashed representation of binary clauses.
     ///## Note
-    /// This means a biclause [l0, l1] is stored at bi_clause[l0] instead of bi_clause[!l0].
+    /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
     ///
     pub bi_clause: Vec<BiClause>,
     /// container of watch literals
@@ -273,10 +273,9 @@ pub struct ClauseDB {
     /// bonus step of reduction threshold used in good progress
     extra_inc: usize,
     first_reduction: usize,
-    next_reduction: usize, // renamed from `nbclausesbeforereduce`
+    next_reduction_step: usize, // renamed from `nbclausesbeforereduce`
+    next_reduction: usize,
     reducible: bool,
-    /// an expansion coefficient for restart
-    reduction_coeff: usize,
 
     //
     //## statistics

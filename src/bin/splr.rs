@@ -268,7 +268,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c       Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{},\n",
+            "c       Clause|Remv:{}, LBD2:{}, BinC:{}, Perm:{},\n",
             format!("{:>9}", state[LogUsizeId::RemovableClause]),
             format!("{:>9}", state[LogUsizeId::LBD2Clause]),
             format!("{:>9}", state[LogUsizeId::BiClause]),
@@ -278,11 +278,11 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c      Restart|#BLK:{}, #RST:{}, trgr:{}, peak:{},\n",
+            "c      Restart|#BLK:{}, #RST:{}, *scl:{}, sclM:{},\n",
             format!("{:>9}", state[LogUsizeId::RestartBlock]),
             format!("{:>9}", state[LogUsizeId::Restart]),
-            format!("{:>9}", state[LogUsizeId::RestartTriggerLevel]),
-            format!("{:>9}", state[LogUsizeId::RestartTriggerLevelMax]),
+            format!("{:>9}", state[LogUsizeId::RestartIntervalScale]),
+            format!("{:>9}", state[LogUsizeId::RestartIntervalScaleMax]),
         )
         .as_bytes(),
     )?;
@@ -308,9 +308,9 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c         misc|elim:{}, #sub:{}, core:{}, /cpr:{},\n",
+            "c         misc|vivC:{}, subC:{}, core:{}, /cpr:{},\n",
             format!("{:>9}", state[LogUsizeId::Simplify]),
-            format!("{:>9}", state[LogUsizeId::ClauseSubsumption]),
+            format!("{:>9}", state[LogUsizeId::SubsumedClause]),
             format!("{:>9}", state[LogUsizeId::UnreachableCore]),
             format!("{:>9.2}", state[LogF64Id::ConflictPerRestart]),
         )
@@ -330,7 +330,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             .as_bytes(),
         )?;
     }
-    out.write_all("c\n".as_bytes())?;
+    out.write_all("c \n".as_bytes())?;
     for key in &config::property::F64S {
         out.write_all(
             format!(

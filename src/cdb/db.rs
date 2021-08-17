@@ -34,9 +34,9 @@ impl Default for ClauseDB {
             inc_step: 300,
             extra_inc: 1000,
             first_reduction: 1000,
+            next_reduction_step: 1000,
             next_reduction: 1000,
             reducible: true,
-            reduction_coeff: 1,
             num_clause: 0,
             num_bi_clause: 0,
             num_bi_learnt: 0,
@@ -348,6 +348,8 @@ impl ClauseDBIF for ClauseDB {
         };
 
         let ClauseDB {
+            #[cfg(feature = "bi_clause_completion")]
+            ref mut bi_clause_completion_queue,
             ref mut clause,
             ref mut lbd_temp,
             ref mut num_clause,
@@ -365,6 +367,17 @@ impl ClauseDBIF for ClauseDB {
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
+
+            #[cfg(feature = "bi_clause_completion")]
+            {
+                if learnt {
+                    for lit in c.iter() {
+                        if !bi_clause_completion_queue.contains(lit) {
+                            bi_clause_completion_queue.push(*lit);
+                        }
+                    }
+                }
+            }
         } else {
             c.update_lbd(asg, lbd_temp);
         }
@@ -426,8 +439,6 @@ impl ClauseDBIF for ClauseDB {
         };
 
         let ClauseDB {
-            #[cfg(feature = "bi_clause_completion")]
-            ref mut bi_clause_completion_queue,
             ref mut clause,
             ref mut lbd_temp,
             ref mut bi_clause,
@@ -440,15 +451,6 @@ impl ClauseDBIF for ClauseDB {
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
-
-            #[cfg(feature = "bi_clause_completion")]
-            {
-                for lit in c.iter() {
-                    if !bi_clause_completion_queue.iter().any(|l| *l == *lit) {
-                        bi_clause_completion_queue.push(*lit);
-                    }
-                }
-            }
         } else {
             c.update_lbd(asg, lbd_temp);
         }
@@ -732,7 +734,7 @@ impl ClauseDBIF for ClauseDB {
                 //## Case:0
                 //
                 if certification_store.is_active() {
-                    certification_store.push_delete(&new_lits);
+                    certification_store.push_delete(new_lits);
                 }
                 return RefClause::RegisteredClause(did);
             }
@@ -750,7 +752,7 @@ impl ClauseDBIF for ClauseDB {
             bi_clause[l1].insert(l0, cid);
 
             if certification_store.is_active() {
-                certification_store.push_add(&new_lits);
+                certification_store.push_add(new_lits);
                 certification_store.push_delete(&c.lits);
             }
             c.turn_off(Flag::LEARNT);
@@ -758,7 +760,7 @@ impl ClauseDBIF for ClauseDB {
 
             if certification_store.is_active() {
                 certification_store.push_add(&c.lits);
-                certification_store.push_delete(&new_lits);
+                certification_store.push_delete(new_lits);
             }
         } else {
             //
@@ -806,7 +808,7 @@ impl ClauseDBIF for ClauseDB {
             // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
 
             if certification_store.is_active() {
-                certification_store.push_add(&new_lits);
+                certification_store.push_add(new_lits);
                 certification_store.push_delete(&c.lits);
             }
         }
@@ -1060,29 +1062,15 @@ impl ClauseDBIF for ClauseDB {
         }
         false
     }
-    fn reduce<A>(&mut self, asg: &mut A, nc: usize) -> bool
+    fn reduce<A>(&mut self, asg: &mut A, num_conflicts: usize) -> bool
     where
         A: AssignIF,
     {
-        #[cfg(feature = "clause_reduction")]
-        if 0 == self.num_learnt {
-            false
+        if self.use_chan_seok {
+            self.first_reduction <= self.num_learnt && self.reduce_db(asg, num_conflicts)
         } else {
-            let go = if self.use_chan_seok {
-                self.first_reduction < self.num_learnt
-            } else {
-                self.reduction_coeff * self.next_reduction <= nc
-            };
-            if go {
-                self.reduction_coeff = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
-                let nc = self.num_clause;
-                self.reduce_db(asg, nc);
-                return self.num_clause < nc;
-            }
-            false
+            self.next_reduction <= num_conflicts && self.reduce_db(asg, num_conflicts)
         }
-        #[cfg(not(feature = "clause_reduction"))]
-        false
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
@@ -1326,7 +1314,7 @@ impl ClauseDB {
         for other in self.bi_clause[lit].keys() {
             // [!other, third]
             for third in self.bi_clause[!*other].keys() {
-                if lit.vi() != third.vi() && !self.bi_clause[lit].contains_key(&third) {
+                if lit.vi() != third.vi() && !self.bi_clause[lit].contains_key(third) {
                     // the new [lit, third] should be added.
                     vec.push(vec![lit, *third]);
                 }
@@ -1368,7 +1356,7 @@ impl ClauseDB {
         self.bi_clause[l0].get(&l1).copied()
     }
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce_db<A>(&mut self, asg: &mut A, nc: usize)
+    fn reduce_db<A>(&mut self, asg: &mut A, nc: usize) -> bool
     where
         A: AssignIF,
     {
@@ -1382,7 +1370,6 @@ impl ClauseDB {
             ..
         } = self;
         self.num_reduction += 1;
-        self.next_reduction += self.inc_step;
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
             if !c.is(Flag::LEARNT) || c.is_dead() || asg.locked(c, ClauseId::from(i)) {
@@ -1409,13 +1396,18 @@ impl ClauseDB {
             perm.push(OrderedProxy::new(i, weight));
         }
         let keep = perm.len().min(nc) / 2;
+
+        let mut reduction_coeff: f64 = (nc as f64) / (self.next_reduction_step as f64) + 1.0;
+        self.next_reduction_step += self.inc_step;
+        if perm.is_empty() {
+            self.next_reduction = (reduction_coeff * self.next_reduction_step as f64) as usize;
+            return true;
+        }
         if !self.use_chan_seok {
-            if clause[perm[keep].to()].rank <= 3 {
-                self.next_reduction += 2 * self.extra_inc;
+            if clause[perm[keep].to()].rank <= *co_lbd_bound {
+                reduction_coeff *= 1.1;
             }
-            if clause[perm[0].to()].rank <= *co_lbd_bound {
-                self.next_reduction += self.extra_inc;
-            };
+            self.next_reduction = (reduction_coeff * self.next_reduction_step as f64) as usize;
         }
         perm.sort();
         // let thr = self.lbd_of_dp_ema.get() as u16;
@@ -1426,6 +1418,7 @@ impl ClauseDB {
             }
         }
         debug_assert!(perm[0..keep].iter().all(|c| !self.clause[c.to()].is_dead()));
+        true
     }
 
     #[cfg(feature = "strategy_adaptation")]

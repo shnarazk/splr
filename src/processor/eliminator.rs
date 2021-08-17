@@ -24,7 +24,6 @@ impl Default for Eliminator {
             enable: false,
             #[cfg(feature = "clause_elimination")]
             enable: true,
-            to_simplify: 0.0,
             mode: EliminatorMode::Dormant,
             var_queue: VarOccHeap::new(0, 0),
             clause_queue: Vec::new(),
@@ -37,7 +36,6 @@ impl Default for Eliminator {
             subsume_literal_limit: 100,
             var: Vec::new(),
             num_full_elimination: 0,
-            num_sat_elimination: 0,
             num_subsumed: 0,
         }
     }
@@ -287,7 +285,6 @@ impl EliminateIF for Eliminator {
         C: ClauseDBIF,
         R: RestartIF,
     {
-        self.to_simplify = 0.0;
         debug_assert_eq!(asg.decision_level(), 0);
         // we can reset all the reasons because decision level is zero.
         #[cfg(feature = "boundary_check")]
