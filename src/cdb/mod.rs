@@ -273,8 +273,8 @@ pub struct ClauseDB {
     /// bonus step of reduction threshold used in good progress
     extra_inc: usize,
     first_reduction: usize,
-    next_reduction_step: usize, // renamed from `nbclausesbeforereduce`
     next_reduction: usize,
+    reduction_step: usize, // renamed from `nbclausesbeforereduce`
     reducible: bool,
 
     //
