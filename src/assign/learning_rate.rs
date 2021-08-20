@@ -6,7 +6,7 @@ use {
 
 impl ActivityIF<VarId> for AssignStack {
     fn activity(&mut self, vi: VarId) -> f64 {
-        self.var[vi].activity()
+        self.var[vi].reward
     }
     fn average_activity(&self) -> f64 {
         self.activity_ema.get()
@@ -16,7 +16,6 @@ impl ActivityIF<VarId> for AssignStack {
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
         self.var[vi].participated += 1;
-        self.activity_ema.update(self.var[vi].reward);
     }
     fn reward_at_assign(&mut self, vi: VarId) {
         self.var[vi].timestamp = self.ordinal;
