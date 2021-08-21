@@ -114,10 +114,10 @@ impl Instantiate for AssignStack {
                 self.make_var_eliminated(vi);
             }
             #[allow(unused_variables)]
-            SolverEvent::Stabilize(lvl) => {
+            SolverEvent::Stabilize(scale) => {
                 #[cfg(feature = "adjust_restart_parameters")]
                 {
-                    if lvl == 1 {
+                    if scale == 1 {
                         self.in_base_interval_restart = true;
                         self.cpbrema.update_base(self.num_conflict);
                     } else {
@@ -126,7 +126,7 @@ impl Instantiate for AssignStack {
                 }
 
                 #[cfg(feature = "rephase")]
-                self.select_rephasing_target(None, lvl);
+                self.select_rephasing_target(None, scale);
             }
             SolverEvent::NewVar => {
                 self.assign.push(None);
