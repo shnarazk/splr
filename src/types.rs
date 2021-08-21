@@ -43,8 +43,6 @@ pub trait LitIF {
 pub trait ActivityIF<Ix> {
     /// return one's activity.
     fn activity(&mut self, ix: Ix) -> f64;
-    /// return average activity
-    fn average_activity(&self) -> f64;
     /// set activity
     fn set_activity(&mut self, ix: Ix, val: f64);
     /// modify one's activity at conflict analysis in `conflict_analyze` in [`solver`](`crate::solver`).

@@ -256,7 +256,6 @@ pub struct ClauseDB {
     ordinal: usize,
     activity_decay: f64,
     activity_anti_decay: f64,
-    activity_ema: Ema,
 
     //
     //## LBD

@@ -193,8 +193,6 @@ pub struct AssignStack {
     activity_decay_default: f64,
     /// its diff
     activity_anti_decay: f64,
-    /// EMA of activity
-    activity_ema: Ema,
     /// ONLY used in feature EVSIDS
     activity_decay_step: f64,
 

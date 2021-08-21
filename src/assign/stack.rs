@@ -58,7 +58,6 @@ impl Default for AssignStack {
             activity_decay: 0.94,
             activity_decay_default: 0.94,
             activity_anti_decay: 0.06,
-            activity_ema: Ema::new(1000),
             activity_decay_step: 0.1,
 
             during_vivification: false,

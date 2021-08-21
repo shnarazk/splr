@@ -28,7 +28,6 @@ impl Default for ClauseDB {
             ordinal: 0,
             activity_decay: 0.99,
             activity_anti_decay: 0.01,
-            activity_ema: Ema::new(1000),
             lbd_temp: Vec::new(),
             num_lbd_update: 0,
             inc_step: 300,
@@ -163,21 +162,16 @@ impl ActivityIF<ClauseId> for ClauseDB {
             self.activity_anti_decay,
         )
     }
-    fn average_activity(&self) -> f64 {
-        self.activity_ema.get()
-    }
     fn set_activity(&mut self, cid: ClauseId, val: f64) {
         self[cid].reward = val;
     }
     fn reward_at_analysis(&mut self, cid: ClauseId) {
         // Note: vivifier has its own conflict analyzer, which never call reward functions.
-        let t = self.ordinal;
-        let r = self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize].update_activity(
-            t,
+        self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize].update_activity(
+            self.ordinal,
             self.activity_decay,
             self.activity_anti_decay,
         );
-        self.activity_ema.update(r);
     }
     fn update_rewards(&mut self) {
         self.ordinal += 1;

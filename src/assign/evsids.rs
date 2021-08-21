@@ -8,9 +8,6 @@ impl ActivityIF<VarId> for AssignStack {
     fn activity(&mut self, vi: VarId) -> f64 {
         self.var[vi].reward
     }
-    fn average_activity(&self) -> f64 {
-        self.activity_ema.get()
-    }
     fn set_activity(&mut self, vi: VarId, val: f64) {
         self.var[vi].reward = val;
     }
