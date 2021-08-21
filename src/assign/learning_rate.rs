@@ -41,10 +41,12 @@ impl Var {
         // 1. cancel_until -> reward_at_unassign -> assertion failed
         //
         if self.timestamp < t {
-            let rate = self.participated as f64 / (t - self.timestamp) as f64;
             self.reward *= decay;
-            self.reward += (1.0 - (rate - 1.0).powf(2.0)).powf(0.5) * reward;
-            self.participated = 0;
+            if 0 < self.participated {
+                let rate = self.participated as f64 / (t - self.timestamp) as f64;
+                self.reward += (1.0 - (1.0 - rate).powi(2)) * reward;
+                self.participated = 0;
+            }
             self.timestamp = t;
         }
         self.reward
