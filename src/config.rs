@@ -159,7 +159,7 @@ impl Default for Config {
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_stp: 0.0001,
             #[cfg(feature = "LR_rewarding")]
-            vrw_dcy_stp: 0.04,
+            vrw_dcy_stp: 0.0,
         }
     }
 }
