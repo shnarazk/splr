@@ -105,7 +105,7 @@ pub trait RestartIF:
     /// - `None` if not at the base restart interval
     fn stabilize(&mut self) -> Option<bool>;
     /// adjust restart threshold
-    fn adjust_restart(&mut self, range: f64, shrink: f64);
+    fn adjust(&mut self, base: f64, range: f64);
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
 
@@ -507,14 +507,11 @@ impl RestartIF for Restarter {
     fn stabilize(&mut self) -> Option<bool> {
         None
     }
-    fn adjust_restart(&mut self, range: f64, shrink: f64) {
+    fn adjust(&mut self, base: f64, range: f64) {
         const DECAY: f64 = 0.9;
-        let span = self.lbd.get();
-        let fill_rate = (span / range).min(1.0);
-        let update = (1.0 + (shrink / fill_rate).max(1.0)).log2().min(1.5);
+        let update = base.min(range / self.lbd.ema.get_slow());
         self.lbd.threshold *= DECAY;
         self.lbd.threshold += (1.0 - DECAY) * update;
-        dbg!(self.lbd.threshold);
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
@@ -578,6 +575,21 @@ pub mod property {
                 Tusize::NumStage => self.stb.num_stage,
                 Tusize::IntervalScale => self.stb.step,
                 Tusize::IntervalScaleMax => self.stb.step_max,
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum Tf64 {
+        RestartThreshold,
+    }
+    pub const F64S: [Tf64; 1] = [Tf64::RestartThreshold];
+
+    impl PropertyDereference<Tf64, f64> for Restarter {
+        #[inline]
+        fn derefer(&self, k: Tf64) -> f64 {
+            match k {
+                Tf64::RestartThreshold => self.lbd.threshold,
             }
         }
     }
