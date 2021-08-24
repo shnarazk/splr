@@ -297,8 +297,7 @@ fn search(
                 state.log(
                     asg.num_conflict,
                     format!(
-                        "#cycle:{:>5}, core:{:>10}, level:{:>9}, /cpr:{:>9.2}, rt:{:>9.2}",
-                        rst.derefer(restart::property::Tusize::NumCycle),
+                        "#core:{:>10}, scale:{:>9}, /cpr:{:>9.2}, rlt:{:>7.4}",
                         asg.derefer(assign::property::Tusize::NumUnreachableVar),
                         rst.derefer(restart::property::Tusize::IntervalScale),
                         asg.refer(assign::property::TEma::PropagationPerConflict)
