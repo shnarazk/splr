@@ -250,12 +250,6 @@ fn search(
     state: &mut State,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
-    let mut last_core = 0;
-
-    #[cfg(feature = "adjust_restart_parameters")]
-    let mut base_interval_restart = false;
-    #[cfg(feature = "adjust_restart_parameters")]
-    let mut num_conflict_in_base_interval = 0;
 
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
@@ -276,13 +270,6 @@ fn search(
             rst.update(ProgressUpdate::ASG(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
             ));
-
-            #[cfg(feature = "adjust_restart_parameters")]
-            {
-                if base_interval_restart {
-                    num_conflict_in_base_interval += 1;
-                }
-            }
 
             if rst.restart() == Some(RestartDecision::Force) {
                 RESTART!(asg, rst);
@@ -307,17 +294,24 @@ fn search(
                 asg.clear_asserted_literals(cdb)?;
 
                 // display the current stats. before updating stabiliation parameters
+                state.log(
+                    asg.num_conflict,
+                    format!(
+                        "#cycle:{:>5}, core:{:>10}, level:{:>9}, /cpr:{:>9.2}, rt:{:>9.2}",
+                        rst.derefer(restart::property::Tusize::NumCycle),
+                        asg.derefer(assign::property::Tusize::NumUnreachableVar),
+                        rst.derefer(restart::property::Tusize::IntervalScale),
+                        asg.refer(assign::property::TEma::PropagationPerConflict)
+                            .get(),
+                        rst.derefer(restart::property::Tf64::RestartThreshold),
+                    ),
+                );
                 state.progress(asg, cdb, elim, rst);
 
                 #[cfg(feature = "Luby_stabilization")]
                 {
                     // update stabilization mode
                     if let Some(new_cycle) = rst.stabilize() {
-                        #[cfg(feature = "adjust_restart_parameters")]
-                        {
-                            base_interval_restart = true;
-                        }
-
                         if let Some(p) = state.elapsed() {
                             if 1.0 <= p {
                                 return Err(SolverError::TimeOut);
@@ -326,16 +320,11 @@ fn search(
                             return Err(SolverError::UndescribedError);
                         }
 
-                        let range = state.c_lvl.get();
-                        let shrink = (state.c_lvl.get() - state.b_lvl.get() - 1.0).max(0.0);
-                        rst.adjust_restart(range, shrink);
+                        #[cfg(feature = "adjust_restart_parameters")]
+                        rst.adjust(state.config.rst_lbd_thr, state.c_lvl.get());
 
                         #[allow(unused_variables)]
                         if new_cycle {
-                            let num_cycle = rst.derefer(restart::property::Tusize::NumCycle);
-                            let num_unreachable =
-                                asg.derefer(assign::property::Tusize::NumUnreachableVar);
-
                             #[cfg(feature = "trace_equivalency")]
                             {
                                 let num_stage = rst.derefer(restart::property::Tusize::NumStage);
@@ -355,45 +344,11 @@ fn search(
                                     );
                                 }
                             }
-
-                            if last_core != num_unreachable || 0 == num_unreachable {
-                                let block_level =
-                                    rst.derefer(restart::property::Tusize::IntervalScale);
-                                state.log(
-                                    asg.num_conflict,
-                                    format!(
-                                        "#cycle:{:>5}, core:{:>10}, level:{:>9}, /cpr:{:>9.2}",
-                                        num_cycle,
-                                        num_unreachable,
-                                        block_level,
-                                        asg.refer(assign::property::TEma::PropagationPerConflict)
-                                            .get(),
-                                    ),
-                                );
-                                last_core = num_unreachable;
-                            }
-                        }
-                    } else {
-                        #[cfg(feature = "adjust_restart_parameters")]
-                        {
-                            base_interval_restart = false;
                         }
                     }
                     asg.handle(SolverEvent::Stabilize(
                         rst.derefer(restart::property::Tusize::IntervalScale),
                     ));
-                    #[cfg(feature = "adjust_restart_parameters")]
-                    {
-                        if 40_000 < num_conflict_in_base_interval {
-                            num_conflict_in_base_interval = 0;
-                            let cpb = asg
-                                .refer(assign::property::TEma::ConflictPerBaseRestart)
-                                .get();
-                            if 32 * state.config.rst_step < (cpb as usize) {
-                                rst.scale_restart_step(0.98);
-                            }
-                        }
-                    }
                 }
             }
             if a_decision_was_made {

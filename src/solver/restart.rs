@@ -104,6 +104,7 @@ pub trait RestartIF:
     /// - `Some(false)` if returns to the base restart interval
     /// - `None` if not at the base restart interval
     fn stabilize(&mut self) -> Option<bool>;
+    #[cfg(feature = "adjust_restart_parameters")]
     /// adjust restart threshold
     fn adjust(&mut self, base: f64, range: f64);
     /// update specific sub-module
@@ -507,6 +508,7 @@ impl RestartIF for Restarter {
     fn stabilize(&mut self) -> Option<bool> {
         None
     }
+    #[cfg(feature = "adjust_restart_parameters")]
     fn adjust(&mut self, base: f64, range: f64) {
         const DECAY: f64 = 0.9;
         let update = base.min(range / self.lbd.ema.get_slow());
