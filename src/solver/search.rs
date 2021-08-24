@@ -326,6 +326,10 @@ fn search(
                             return Err(SolverError::UndescribedError);
                         }
 
+                        let range = state.c_lvl.get();
+                        let shrink = (state.c_lvl.get() - state.b_lvl.get() - 1.0).max(0.0);
+                        rst.adjust_restart(range, shrink);
+
                         #[allow(unused_variables)]
                         if new_cycle {
                             let num_cycle = rst.derefer(restart::property::Tusize::NumCycle);
