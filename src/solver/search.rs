@@ -322,7 +322,7 @@ fn search(
                         #[cfg(feature = "adjust_restart_parameters")]
                         rst.adjust(
                             state.config.rst_lbd_thr,
-                            state.b_lvl.get(),
+                            state.c_lvl.get(),
                             cdb.derefer(cdb::property::Tf64::DpAverageLBD),
                         );
 

@@ -512,11 +512,14 @@ impl RestartIF for Restarter {
     fn adjust(&mut self, base: f64, range: f64, used: f64) {
         const DECAY: f64 = 0.8;
         let lbd = self.lbd.ema.get_slow();
-        let _factor1 = range / lbd;
-        let factor1 = range.log(lbd);
-        let factor2 = (used + 2.0).log(lbd);
+        // map the degree of freedom to [1.0, 2.0]; the larger freedom, the smaller value.
+        let factor1 = 1.0 + 1.0 / range.log(lbd).max(1.0);
+        // map the usability of learnt to [1.0, 2.0]; the smaller gap, the smaller value.
+        let factor2 = 1.0 + 1.0 / range.log(used).max(1.0);
         self.lbd.threshold *= DECAY;
-        self.lbd.threshold += (1.0 - DECAY) * (factor1 * factor2).clamp(1.0, base);
+        self.lbd.threshold += (1.0 - DECAY) * (factor1 * factor2).sqrt().clamp(1.0, base);
+        // remap the product to [1.0, base]
+        // self.lbd.threshold += (1.0 - DECAY) * (factor1 * factor2).sqrt() * 0.5 * base;
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
