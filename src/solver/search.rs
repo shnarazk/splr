@@ -9,7 +9,7 @@ use {
     },
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
-        cdb::{ClauseDB, ClauseDBIF},
+        cdb::{self, ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
         types::*,
@@ -320,7 +320,11 @@ fn search(
                         }
 
                         #[cfg(feature = "adjust_restart_parameters")]
-                        rst.adjust(state.config.rst_lbd_thr, state.c_lvl.get());
+                        rst.adjust(
+                            state.config.rst_lbd_thr,
+                            state.b_lvl.get(),
+                            cdb.derefer(cdb::property::Tf64::DpAverageLBD),
+                        );
 
                         #[allow(unused_variables)]
                         if new_cycle {

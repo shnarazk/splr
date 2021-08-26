@@ -147,7 +147,7 @@ impl Default for Config {
             rst_asg_thr: 0.6,
             rst_lbd_len: 8,
             rst_lbd_slw: 8192,
-            rst_lbd_thr: 1.4,
+            rst_lbd_thr: 2.0,
 
             stg_rwd_dcy: 0.5,
             stg_rwd_val: 1.0,

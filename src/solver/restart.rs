@@ -106,7 +106,7 @@ pub trait RestartIF:
     fn stabilize(&mut self) -> Option<bool>;
     #[cfg(feature = "adjust_restart_parameters")]
     /// adjust restart threshold
-    fn adjust(&mut self, base: f64, range: f64);
+    fn adjust(&mut self, base: f64, range: f64, used: f64);
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
 
@@ -509,11 +509,14 @@ impl RestartIF for Restarter {
         None
     }
     #[cfg(feature = "adjust_restart_parameters")]
-    fn adjust(&mut self, base: f64, range: f64) {
-        const DECAY: f64 = 0.9;
-        let update = base.min(range / self.lbd.ema.get_slow());
+    fn adjust(&mut self, base: f64, range: f64, used: f64) {
+        const DECAY: f64 = 0.8;
+        let lbd = self.lbd.ema.get_slow();
+        let _factor1 = range / lbd;
+        let factor1 = range.log(lbd);
+        let factor2 = (used + 2.0).log(lbd);
         self.lbd.threshold *= DECAY;
-        self.lbd.threshold += (1.0 - DECAY) * update;
+        self.lbd.threshold += (1.0 - DECAY) * (factor1 * factor2).clamp(1.0, base);
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
