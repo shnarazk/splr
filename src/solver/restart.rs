@@ -510,15 +510,15 @@ impl RestartIF for Restarter {
     }
     #[cfg(feature = "dynamic_restart_threshold")]
     fn adjust(&mut self, base: f64, range: f64, used: f64) {
-        const DECAY: f64 = 0.8;
+        const DECAY: f64 = 0.75;
         let lbd = self.lbd.ema.get_slow();
         // map the degree of freedom to [1.0, 2.0]; the larger freedom, the smaller value.
         let factor1 = 1.0 + 1.0 / range.log(lbd).max(1.0);
         // map the usability of learnt to [1.0, 2.0]; the smaller gap, the smaller value.
         let factor2 = 1.0 + 1.0 / lbd.log(used).max(1.0);
         self.lbd.threshold *= DECAY;
-        // finally map the product to [1.0, base]
-        self.lbd.threshold += (1.0 - DECAY) * (factor1 * factor2).sqrt() * 0.5 * base;
+        // finally map the product [1.0, 4.0] to [1.0, base]
+        self.lbd.threshold += (1.0 - DECAY) * (factor1 * factor2).powf(base.log(4.0));
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
