@@ -251,6 +251,10 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
 
+    let mut has_restart = false;
+    let mut restart_ratio = Ema::new(10);
+    restart_ratio.update(5.0);
+
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
 
@@ -273,6 +277,7 @@ fn search(
 
             if rst.restart() == Some(RestartDecision::Force) {
                 RESTART!(asg, rst);
+                has_restart = true;
             }
             if cdb.reduce(asg, asg.num_conflict) {
                 if asg.decision_level() != asg.root_level() {
@@ -297,12 +302,13 @@ fn search(
                 state.log(
                     asg.num_conflict,
                     format!(
-                        "#core:{:>10}, scale:{:>9}, /cpr:{:>9.2}, rlt:{:>7.4}",
+                        "#core:{:>10}, scale:{:>9}, /cpr:{:>9.2}, rlt:{:>7.4}/{:>7.4}",
                         asg.derefer(assign::property::Tusize::NumUnreachableVar),
                         rst.derefer(restart::property::Tusize::IntervalScale),
                         asg.refer(assign::property::TEma::PropagationPerConflict)
                             .get(),
                         rst.derefer(restart::property::Tf64::RestartThreshold),
+                        restart_ratio.get(),
                     ),
                 );
                 state.progress(asg, cdb, elim, rst);
@@ -320,11 +326,17 @@ fn search(
                         }
 
                         #[cfg(feature = "dynamic_restart_threshold")]
-                        rst.adjust(
-                            state.config.rst_lbd_thr,
-                            state.c_lvl.get(),
-                            cdb.derefer(cdb::property::Tf64::DpAverageLBD),
-                        );
+                        {
+                            restart_ratio.update(has_restart as usize as f64);
+                            rst.adjust(
+                                state.config.rst_lbd_thr,
+                                state.c_lvl.get(),
+                                cdb.derefer(cdb::property::Tf64::DpAverageLBD),
+                                restart_ratio.get(),
+                            );
+                        }
+
+                        has_restart = false;
 
                         #[allow(unused_variables)]
                         if new_cycle {
