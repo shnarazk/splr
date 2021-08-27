@@ -104,7 +104,7 @@ pub trait RestartIF:
     /// - `Some(false)` if returns to the base restart interval
     /// - `None` if not at the base restart interval
     fn stabilize(&mut self) -> Option<bool>;
-    #[cfg(feature = "adjust_restart_parameters")]
+    #[cfg(feature = "dynamic_restart_threshold")]
     /// adjust restart threshold
     fn adjust(&mut self, base: f64, range: f64, used: f64);
     /// update specific sub-module
@@ -508,18 +508,17 @@ impl RestartIF for Restarter {
     fn stabilize(&mut self) -> Option<bool> {
         None
     }
-    #[cfg(feature = "adjust_restart_parameters")]
+    #[cfg(feature = "dynamic_restart_threshold")]
     fn adjust(&mut self, base: f64, range: f64, used: f64) {
         const DECAY: f64 = 0.8;
         let lbd = self.lbd.ema.get_slow();
         // map the degree of freedom to [1.0, 2.0]; the larger freedom, the smaller value.
         let factor1 = 1.0 + 1.0 / range.log(lbd).max(1.0);
         // map the usability of learnt to [1.0, 2.0]; the smaller gap, the smaller value.
-        let factor2 = 1.0 + 1.0 / range.log(used).max(1.0);
+        let factor2 = 1.0 + 1.0 / lbd.log(used).max(1.0);
         self.lbd.threshold *= DECAY;
-        self.lbd.threshold += (1.0 - DECAY) * (factor1 * factor2).sqrt().clamp(1.0, base);
-        // remap the product to [1.0, base]
-        // self.lbd.threshold += (1.0 - DECAY) * (factor1 * factor2).sqrt() * 0.5 * base;
+        // finally map the product to [1.0, base]
+        self.lbd.threshold += (1.0 - DECAY) * (factor1 * factor2).sqrt() * 0.5 * base;
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {

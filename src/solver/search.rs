@@ -319,7 +319,7 @@ fn search(
                             return Err(SolverError::UndescribedError);
                         }
 
-                        #[cfg(feature = "adjust_restart_parameters")]
+                        #[cfg(feature = "dynamic_restart_threshold")]
                         rst.adjust(
                             state.config.rst_lbd_thr,
                             state.c_lvl.get(),
