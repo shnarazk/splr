@@ -104,6 +104,9 @@ pub trait RestartIF:
     /// - `Some(false)` if returns to the base restart interval
     /// - `None` if not at the base restart interval
     fn stabilize(&mut self) -> Option<bool>;
+    #[cfg(feature = "dynamic_restart_threshold")]
+    /// adjust restart threshold
+    fn adjust(&mut self, base: f64, range: f64, used: f64, ratio: f64);
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
 
@@ -490,6 +493,7 @@ impl RestartIF for Restarter {
             self.restart_step = self.stb.step * self.initial_restart_step;
             return Some(RestartDecision::Block);
         }
+
         if self.lbd.is_active() {
             self.restart_step = self.stb.step * self.initial_restart_step;
             return Some(RestartDecision::Force);
@@ -503,6 +507,19 @@ impl RestartIF for Restarter {
     #[cfg(not(feature = "Luby_stabilization"))]
     fn stabilize(&mut self) -> Option<bool> {
         None
+    }
+    #[cfg(feature = "dynamic_restart_threshold")]
+    fn adjust(&mut self, base: f64, range: f64, used: f64, ratio: f64) {
+        const DECAY: f64 = 0.75;
+        let lbd = self.lbd.ema.get_slow();
+        // map the degree of freedom to [1.0, 2.0]; the larger freedom, the smaller value.
+        let factor1 = 1.0 + 1.0 / range.log(lbd).max(1.0);
+        // map the usability of learnt to [1.0, 2.0]; the smaller gap, the smaller value.
+        let factor2 = 1.0 + 1.0 / lbd.log(used).max(1.0);
+        self.lbd.threshold *= DECAY;
+        // finally map the product [1.0, 4.0] to [1.0, base]
+        // then rescale based on `ratio`
+        self.lbd.threshold += (1.0 - DECAY) * (factor1 * factor2).powf(base.log(4.0)).powf(ratio);
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
@@ -566,6 +583,21 @@ pub mod property {
                 Tusize::NumStage => self.stb.num_stage,
                 Tusize::IntervalScale => self.stb.step,
                 Tusize::IntervalScaleMax => self.stb.step_max,
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum Tf64 {
+        RestartThreshold,
+    }
+    pub const F64S: [Tf64; 1] = [Tf64::RestartThreshold];
+
+    impl PropertyDereference<Tf64, f64> for Restarter {
+        #[inline]
+        fn derefer(&self, k: Tf64) -> f64 {
+            match k {
+                Tf64::RestartThreshold => self.lbd.threshold,
             }
         }
     }

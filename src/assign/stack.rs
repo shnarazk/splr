@@ -47,11 +47,6 @@ impl Default for AssignStack {
             ppc_ema: EmaSU::new(100),
             cpr_ema: EmaSU::new(100),
 
-            #[cfg(feature = "adjust_restart_parameters")]
-            cpbrema: EmaSU::new(100),
-            #[cfg(feature = "adjust_restart_parameters")]
-            in_base_interval_restart: true,
-
             ordinal: 0,
             var: Vec::new(),
 
@@ -114,16 +109,6 @@ impl Instantiate for AssignStack {
             }
             #[allow(unused_variables)]
             SolverEvent::Stabilize(scale) => {
-                #[cfg(feature = "adjust_restart_parameters")]
-                {
-                    if scale == 1 {
-                        self.in_base_interval_restart = true;
-                        self.cpbrema.update_base(self.num_conflict);
-                    } else {
-                        self.in_base_interval_restart = false;
-                    }
-                }
-
                 #[cfg(feature = "rephase")]
                 self.select_rephasing_target(None, scale);
             }
