@@ -252,8 +252,7 @@ fn search(
     let mut a_decision_was_made = false;
 
     let mut has_restart = false;
-    let mut restart_ratio = Ema::new(10);
-    restart_ratio.update(5.0);
+    state.restart_ratio.update(5.0);
 
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
@@ -308,7 +307,7 @@ fn search(
                         asg.refer(assign::property::TEma::PropagationPerConflict)
                             .get(),
                         rst.derefer(restart::property::Tf64::RestartThreshold),
-                        restart_ratio.get(),
+                        state.restart_ratio.get(),
                     ),
                 );
                 state.progress(asg, cdb, elim, rst);
@@ -327,12 +326,12 @@ fn search(
 
                         #[cfg(feature = "dynamic_restart_threshold")]
                         {
-                            restart_ratio.update(has_restart as usize as f64);
+                            state.restart_ratio.update(has_restart as usize as f64);
                             rst.adjust(
                                 state.config.rst_lbd_thr,
                                 state.c_lvl.get(),
                                 cdb.derefer(cdb::property::Tf64::DpAverageLBD),
-                                restart_ratio.get(),
+                                state.restart_ratio.get().sqrt(),
                             );
                         }
 

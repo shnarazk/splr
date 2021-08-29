@@ -183,9 +183,14 @@ pub struct State {
     pub b_lvl: Ema,
     /// EMA of conflicting levels
     pub c_lvl: Ema,
+
+    /// EMA of restart ratio (the number of stages in which solver restarted to the number of stages)
+    pub restart_ratio: Ema,
+
     #[cfg(feature = "support_user_assumption")]
     /// hold conflicting user-defined *assumed* literals for UNSAT problems
     pub conflicts: Vec<Lit>,
+
     /// chronoBT threshold
     pub chrono_bt_threshold: DecisionLevel,
     /// hold the previous number of non-conflicting assignment
@@ -220,6 +225,8 @@ impl Default for State {
 
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
+            restart_ratio: Ema::new(10),
+
             #[cfg(feature = "support_user_assumption")]
             conflicts: Vec::new(),
             chrono_bt_threshold: 100,
@@ -1085,9 +1092,10 @@ pub mod property {
     pub enum TEma {
         BackjumpLevel,
         ConflictLevel,
+        RestartRatio,
     }
 
-    pub const EMAS: [TEma; 2] = [TEma::BackjumpLevel, TEma::ConflictLevel];
+    pub const EMAS: [TEma; 3] = [TEma::BackjumpLevel, TEma::ConflictLevel, TEma::RestartRatio];
 
     impl PropertyReference<TEma, Ema> for State {
         #[inline]
@@ -1095,6 +1103,7 @@ pub mod property {
             match k {
                 TEma::BackjumpLevel => &self.b_lvl,
                 TEma::ConflictLevel => &self.c_lvl,
+                TEma::RestartRatio => &self.restart_ratio,
             }
         }
     }
