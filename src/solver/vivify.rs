@@ -173,7 +173,14 @@ fn select_targets(
                 }
             }
         }
-        seen.iter().filter_map(|p| p.clone()).collect::<Vec<_>>()
+        let mut clauses = seen.iter().filter_map(|p| p.clone()).collect::<Vec<_>>();
+        if let Some(max_len) = len {
+            if 10 * max_len < clauses.len() {
+                clauses.sort();
+                clauses.truncate(max_len);
+            }
+        }
+        clauses
     } else {
         let mut clauses: Vec<OrderedProxy<ClauseId>> = cdb
             .iter()
