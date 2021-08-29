@@ -272,8 +272,6 @@ impl PropagateIF for AssignStack {
             let l = self.trail[i];
             let vi = l.vi();
             debug_assert!(self.root_level < self.level[vi]);
-            let v = &mut self.var[vi];
-            v.set(Flag::PHASE, var_assign!(self, vi).unwrap());
             unset_assign!(self, vi);
             self.reason[vi] = AssignReason::None;
             self.insert_heap(vi);
