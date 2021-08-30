@@ -202,6 +202,9 @@ impl FlagIF for Clause {
     fn set(&mut self, f: Flag, b: bool) {
         self.flags.set(f, b);
     }
+    fn toggle(&mut self, flag: Flag) {
+        self.flags.toggle(flag);
+    }
     fn turn_off(&mut self, flag: Flag) {
         self.flags.remove(flag);
     }

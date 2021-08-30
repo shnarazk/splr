@@ -758,6 +758,8 @@ pub trait FlagIF {
     fn is(&self, flag: Flag) -> bool;
     /// set the flag.
     fn set(&mut self, f: Flag, b: bool);
+    // toggle the flag.
+    fn toggle(&mut self, flag: Flag);
     /// toggle the flag off.
     fn turn_off(&mut self, flag: Flag);
     /// toggle the flag on.

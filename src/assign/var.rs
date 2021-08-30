@@ -78,6 +78,10 @@ impl FlagIF for Var {
     fn turn_on(&mut self, flag: Flag) {
         self.flags.insert(flag);
     }
+    #[inline]
+    fn toggle(&mut self, flag: Flag) {
+        self.flags.toggle(flag);
+    }
 }
 
 /// Var manipulation
