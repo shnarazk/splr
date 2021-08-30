@@ -251,9 +251,6 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
 
-    let mut has_restart = false;
-    state.restart_ratio.update(5.0);
-
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
 
@@ -276,9 +273,15 @@ fn search(
 
             if rst.restart() == Some(RestartDecision::Force) {
                 RESTART!(asg, rst);
-                has_restart = true;
             }
             if cdb.reduce(asg, asg.num_conflict) {
+                if let Some(p) = state.elapsed() {
+                    if 1.0 <= p {
+                        return Err(SolverError::TimeOut);
+                    }
+                } else {
+                    return Err(SolverError::UndescribedError);
+                }
                 if asg.decision_level() != asg.root_level() {
                     RESTART!(asg, rst);
                 }
@@ -295,49 +298,42 @@ fn search(
                     elim.simplify(asg, cdb, rst, state)?;
                     state[Stat::NumProcessor] += 1;
                 }
+
                 asg.clear_asserted_literals(cdb)?;
 
                 // display the current stats. before updating stabiliation parameters
                 state.log(
                     asg.num_conflict,
                     format!(
-                        "#core:{:>10}, scale:{:>9}, /cpr:{:>9.2}, rlt:{:>7.4}/{:>7.4}",
+                        "core:{:>9}, cpr:{:>9.2}, scale:{:>4}, rlt:{:>7.4}",
                         asg.derefer(assign::property::Tusize::NumUnreachableVar),
-                        rst.derefer(restart::property::Tusize::IntervalScale),
                         asg.refer(assign::property::TEma::PropagationPerConflict)
                             .get(),
+                        rst.derefer(restart::property::Tusize::IntervalScale),
                         rst.derefer(restart::property::Tf64::RestartThreshold),
-                        state.restart_ratio.get(),
                     ),
                 );
+
+                #[cfg(feature = "Luby_stabilization")]
+                #[cfg(feature = "dynamic_restart_threshold")]
+                {
+                    if 1 == rst.derefer(restart::property::Tusize::IntervalScale) {
+                        rst.adjust(
+                            state.config.rst_lbd_thr,
+                            state.c_lvl.get(),
+                            state.b_lvl.get(),
+                            cdb.derefer(cdb::property::Tf64::DpAverageLBD),
+                        );
+                    }
+                }
+
                 state.progress(asg, cdb, elim, rst);
 
                 #[cfg(feature = "Luby_stabilization")]
                 {
                     // update stabilization mode
+                    #[allow(unused_variables)]
                     if let Some(new_cycle) = rst.stabilize() {
-                        if let Some(p) = state.elapsed() {
-                            if 1.0 <= p {
-                                return Err(SolverError::TimeOut);
-                            }
-                        } else {
-                            return Err(SolverError::UndescribedError);
-                        }
-
-                        #[cfg(feature = "dynamic_restart_threshold")]
-                        {
-                            state.restart_ratio.update(has_restart as usize as f64);
-                            rst.adjust(
-                                state.config.rst_lbd_thr,
-                                state.c_lvl.get(),
-                                cdb.derefer(cdb::property::Tf64::DpAverageLBD),
-                                state.restart_ratio.get().sqrt(),
-                            );
-                        }
-
-                        has_restart = false;
-
-                        #[allow(unused_variables)]
                         if new_cycle {
                             #[cfg(feature = "trace_equivalency")]
                             {
@@ -360,6 +356,7 @@ fn search(
                             }
                         }
                     }
+                    // call the enhanced phase saver
                     asg.handle(SolverEvent::Stabilize(
                         rst.derefer(restart::property::Tusize::IntervalScale),
                     ));
