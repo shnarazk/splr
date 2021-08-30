@@ -106,7 +106,7 @@ pub trait RestartIF:
     fn stabilize(&mut self) -> Option<bool>;
     #[cfg(feature = "dynamic_restart_threshold")]
     /// adjust restart threshold
-    fn adjust(&mut self, base: f64, range: f64, used: f64, ratio: f64);
+    fn adjust(&mut self, base: f64, c_lvl: f64, b_lvl: f64, used: f64);
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
 
@@ -509,17 +509,20 @@ impl RestartIF for Restarter {
         None
     }
     #[cfg(feature = "dynamic_restart_threshold")]
-    fn adjust(&mut self, base: f64, range: f64, used: f64, ratio: f64) {
+    fn adjust(&mut self, base: f64, c_lvl: f64, b_lvl: f64, used: f64) {
         const DECAY: f64 = 0.75;
-        let lbd = self.lbd.ema.get_slow();
-        // map the degree of freedom to [1.0, 2.0]; the larger freedom, the smaller value.
-        let factor1 = 1.0 + 1.0 / range.log(lbd).max(1.0);
-        // map the usability of learnt to [1.0, 2.0]; the smaller gap, the smaller value.
-        let factor2 = 1.0 + 1.0 / lbd.log(used).max(1.0);
+        const CONTROL_FACTOR: f64 = 0.4;
         self.lbd.threshold *= DECAY;
-        // finally map the product [1.0, 4.0] to [1.0, base]
-        // then rescale based on `ratio`
-        self.lbd.threshold += (1.0 - DECAY) * (factor1 * factor2).powf(base.log(4.0)).powf(ratio);
+        // * The larger ratio of conflicting level to backjumped level, the smaller threshold we need.
+        //   Probably there are better clauses.
+        // * The larger learnt clauses, compared with useful clauses, we get, the smaller threshold we need.
+        //   Probably there are many bad branches.
+        self.lbd.threshold += (1.0 - DECAY)
+            * (c_lvl * self.lbd.ema.get() / b_lvl)
+                .log(used)
+                .max(1.0)
+                .powf(CONTROL_FACTOR)
+                .clamp(1.0, base);
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
