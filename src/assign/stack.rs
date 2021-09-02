@@ -110,7 +110,7 @@ impl Instantiate for AssignStack {
             #[allow(unused_variables)]
             SolverEvent::Stabilize(scale) => {
                 #[cfg(feature = "rephase")]
-                self.select_rephasing_target(None, scale);
+                self.check_consistency_of_best_phases();
             }
             SolverEvent::NewVar => {
                 self.assign.push(None);

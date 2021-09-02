@@ -29,6 +29,9 @@ pub trait VarSelectIF {
     #[cfg(feature = "rephase")]
     /// select rephasing target
     fn select_rephasing_target(&mut self, request: Option<RephasingTarget>, span: usize);
+    #[cfg(feature = "rephase")]
+    /// check the consistency
+    fn check_consistency_of_best_phases(&mut self);
     /// select a new decision variable.
     fn select_decision_literal(&mut self) -> Lit;
     /// update the internal heap on var order.
@@ -67,7 +70,7 @@ pub enum RephasingTarget {
     /// use the reverse of best phase
     FlipBestPhase,
     /// a kind of random shuffle
-    Shift(f64),
+    Mixin(f64),
 }
 
 #[cfg(feature = "rephase")]
@@ -95,10 +98,9 @@ impl VarSelectIF for AssignStack {
             t
         } else {
             self.phase_age += 1;
-            match self.phase_age {
-                1 => RephasingTarget::BestPhases,
-                x if x % 4 == 0 => RephasingTarget::AntiPhases,
-                x if x % 4 == 2 => RephasingTarget::BestPhases,
+            match scale.trailing_zeros() {
+                0 => RephasingTarget::Clear,
+                _ if self.phase_age % 2 == 0 => RephasingTarget::Mixin(1.0 - 1.0 / scale as f64),
                 _ => RephasingTarget::Clear,
             }
         };
@@ -106,7 +108,11 @@ impl VarSelectIF for AssignStack {
         // So Shift and XorShift cause non-determinism. Be careful.
         let mut num_flip = 0;
         let mut act_sum = 0.0;
-        if self
+        debug_assert!(self
+            .best_phases
+            .iter()
+            .all(|(vi, b)| self.assign[*vi] != Some(!b.0)));
+        /* if self
             .best_phases
             .iter()
             .any(|(vi, b)| self.assign[*vi] == Some(!b.0))
@@ -114,15 +120,19 @@ impl VarSelectIF for AssignStack {
             self.best_phases.clear();
             self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
             return;
-        }
+        } */
         self.num_rephase += 1;
         match target {
             RephasingTarget::AntiPhases => {
-                for vi in 1..self.num_vars {
+                for (vi, (b, _)) in self.best_phases.iter() {
+                    let v = &mut self.var[*vi];
+                    v.set(Flag::PHASE, !*b);
+                }
+                /* for vi in 1..self.num_vars {
                     if !self.best_phases.contains_key(&vi) && !self.var[vi].is(Flag::ELIMINATED) {
                         self.var[vi].toggle(Flag::PHASE);
                     }
-                }
+                } */
             }
             RephasingTarget::BestPhases => {
                 for (vi, (b, _)) in self.best_phases.iter() {
@@ -139,19 +149,19 @@ impl VarSelectIF for AssignStack {
                 }
             }
             RephasingTarget::FlipBestPhase => {
-                for (vi, (b, _)) in self.best_phases.iter() {
+                for (vi, _) in self.best_phases.iter() {
                     let v = &mut self.var[*vi];
-                    v.set(Flag::PHASE, !*b);
+                    v.set(Flag::PHASE, /* !*b */ self.phase_age % 2 == 0);
                 }
             }
-            RephasingTarget::Shift(scl) => {
+            RephasingTarget::Mixin(scl) => {
                 for (vi, (b, _)) in self.best_phases.iter() {
                     let v = &mut self.var[*vi];
                     if !v.reward.is_nan() {
-                        act_sum += scl * (1.0 - v.reward);
+                        act_sum += scl * v.reward;
                     }
                     if 1.0 <= act_sum {
-                        v.set(Flag::PHASE, !*b);
+                        // v.set(Flag::PHASE, !*b); NO: use the current phase!
                         act_sum = 0.0;
                         num_flip += 1;
                     } else {
@@ -161,6 +171,17 @@ impl VarSelectIF for AssignStack {
                 self.bp_divergence_ema
                     .update(num_flip as f64 / self.best_phases.len() as f64);
             }
+        }
+    }
+    #[cfg(feature = "rephase")]
+    fn check_consistency_of_best_phases(&mut self) {
+        if self
+            .best_phases
+            .iter()
+            .any(|(vi, b)| self.assign[*vi] == Some(!b.0))
+        {
+            self.best_phases.clear();
+            self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
         }
     }
     fn select_decision_literal(&mut self) -> Lit {
