@@ -1386,7 +1386,7 @@ impl ClauseDB {
                 .iter()
                 .fold(0.0, |acc, l| acc.max(asg.activity(l.vi())));
             let act_c = c.update_activity(*ordinal, *activity_decay, *activity_anti_decay);
-            let weight = rank / (act_v + act_c);
+            let weight = rank.log2() / (act_c * act_v);
             perm.push(OrderedProxy::new(i, weight));
         }
         let keep = perm.len().min(nc) / 2;
