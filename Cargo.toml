@@ -17,7 +17,7 @@ bitflags = "1.3"
 [features]
 default = [
         # DEBUG "boundary_check",
-        "bi_clause_completion",
+        # increase memory pressure "bi_clause_completion",
         "clause_elimination",
         "clause_vivification",
         "dynamic_restart_threshold",
