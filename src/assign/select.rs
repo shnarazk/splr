@@ -94,16 +94,8 @@ impl VarSelectIF for AssignStack {
         if (remain as f64).log10() < scale as f64 {
             return;
         }
-        let target = if let Some(t) = request {
-            t
-        } else {
-            self.phase_age += 1;
-            match scale.trailing_zeros() {
-                0 => RephasingTarget::Clear,
-                _ if self.phase_age % 2 == 0 => RephasingTarget::Mixin(1.0 - 1.0 / scale as f64),
-                _ => RephasingTarget::Clear,
-            }
-        };
+        self.phase_age += 1;
+        let target = request.unwrap_or_else(|| RephasingTarget::Mixin(1.0 / scale as f64));
         // The iteration order by an iterator on HashMap may change in each execution.
         // So Shift and XorShift cause non-determinism. Be careful.
         let mut num_flip = 0;

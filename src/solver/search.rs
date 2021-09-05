@@ -273,11 +273,6 @@ fn search(
 
             if rst.restart() == Some(RestartDecision::Force) {
                 RESTART!(asg, rst);
-                // call the enhanced phase saver
-                asg.select_rephasing_target(
-                    None,
-                    rst.derefer(restart::property::Tusize::IntervalScale),
-                );
             }
             if cdb.reduce(asg, asg.num_conflict) {
                 if let Some(p) = state.elapsed() {
@@ -361,10 +356,10 @@ fn search(
                             }
                         }
                     }
-                    /* // call the enhanced phase saver
+                    // call the enhanced phase saver
                     asg.handle(SolverEvent::Stabilize(
                         rst.derefer(restart::property::Tusize::IntervalScale),
-                    )); */
+                    ));
                 }
             }
             if a_decision_was_made {
