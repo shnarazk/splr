@@ -104,15 +104,6 @@ impl VarSelectIF for AssignStack {
             .best_phases
             .iter()
             .all(|(vi, b)| self.assign[*vi] != Some(!b.0)));
-        /* if self
-            .best_phases
-            .iter()
-            .any(|(vi, b)| self.assign[*vi] == Some(!b.0))
-        {
-            self.best_phases.clear();
-            self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
-            return;
-        } */
         self.num_rephase += 1;
         match target {
             RephasingTarget::AntiPhases => {
