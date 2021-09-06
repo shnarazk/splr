@@ -173,7 +173,7 @@ impl ActivityIF<ClauseId> for ClauseDB {
             self.activity_anti_decay,
         );
     }
-    fn update_rewards(&mut self) {
+    fn update_activity_tick(&mut self) {
         self.ordinal += 1;
     }
 }

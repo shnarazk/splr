@@ -264,8 +264,8 @@ fn search(
             if asg.decision_level() == asg.root_level() {
                 return Err(SolverError::RootLevelConflict(Some(ci)));
             }
-            asg.update_rewards();
-            cdb.update_rewards();
+            asg.update_activity_tick();
+            cdb.update_activity_tick();
             handle_conflict(asg, cdb, rst, state, ci)?;
             rst.update(ProgressUpdate::ASG(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
