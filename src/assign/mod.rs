@@ -5,7 +5,7 @@ mod heap;
 mod propagate;
 /// Var rewarding
 #[cfg_attr(feature = "EVSIDS", path = "evsids.rs")]
-#[cfg_attr(feature = "LR_rewarding", path = "learning_rate.rs")]
+#[cfg_attr(feature = "LRB_rewarding", path = "learning_rate.rs")]
 mod reward;
 /// Decision var selection
 mod select;
