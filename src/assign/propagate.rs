@@ -124,7 +124,7 @@ impl PropagateIF for AssignStack {
             }
             Some(x) if x == bool::from(l) => {
                 #[cfg(feature = "boundary_check")]
-                panic!("double assginment(assertion)");
+                panic!("double assignment(assertion)");
                 #[cfg(not(feature = "boundary_check"))]
                 // Vivification tries to assign a var by propagation then can assert it.
                 // To make sure the var is asserted, we need to nullify its reason.
