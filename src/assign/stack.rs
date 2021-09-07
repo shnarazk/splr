@@ -89,7 +89,7 @@ impl Instantiate for AssignStack {
 
             #[cfg(feature = "EVSIDS")]
             activity_decay: config.vrw_dcy_rat * 0.6,
-            #[cfg(feature = "LR_rewarding")]
+            #[cfg(feature = "LRB_rewarding")]
             activity_decay_default: config.vrw_dcy_rat,
 
             activity_anti_decay: 1.0 - config.vrw_dcy_rat,
