@@ -314,8 +314,9 @@ impl EliminateIF for Eliminator {
                 self.stop(asg, cdb);
             }
         } else {
-            asg.propagate(cdb)
-                .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
+            asg.propagate(cdb).map_or(Ok(()), |cc| {
+                Err(SolverError::RootLevelConflict(Some(cc.cid)))
+            })?;
         }
         if self.mode != EliminatorMode::Dormant {
             self.stop(asg, cdb);
@@ -528,8 +529,9 @@ impl Eliminator {
             }
         }
         if asg.remains() {
-            asg.propagate(cdb)
-                .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
+            asg.propagate(cdb).map_or(Ok(()), |cc| {
+                Err(SolverError::RootLevelConflict(Some(cc.cid)))
+            })?;
         }
         Ok(())
     }
@@ -554,8 +556,9 @@ impl Eliminator {
         loop {
             let na = asg.stack_len();
             self.eliminate_main(asg, cdb, rst, state)?;
-            asg.propagate(cdb)
-                .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
+            asg.propagate(cdb).map_or(Ok(()), |cc| {
+                Err(SolverError::RootLevelConflict(Some(cc.cid)))
+            })?;
             if na == asg.stack_len()
                 && (!self.is_running()
                     || (0 == self.clause_queue_len() && 0 == self.var_queue_len()))
@@ -609,8 +612,9 @@ impl Eliminator {
             }
             self.backward_subsumption_check(asg, cdb, &mut timedout)?;
             debug_assert!(self.clause_queue.is_empty());
-            asg.propagate(cdb)
-                .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
+            asg.propagate(cdb).map_or(Ok(()), |cc| {
+                Err(SolverError::RootLevelConflict(Some(cc.cid)))
+            })?;
             if timedout == 0 {
                 self.clear_clause_queue(cdb);
                 self.clear_var_queue(asg);

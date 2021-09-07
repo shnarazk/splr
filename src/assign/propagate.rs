@@ -335,7 +335,7 @@ impl PropagateIF for AssignStack {
                             cdb[cid].moved_at = Propagate::EmitConflict(self.num_conflict, blocker);
                         }
 
-                        return Some(cid);
+                        return Some(ConflictContext { cid, link: blocker });
                     }
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
@@ -490,7 +490,10 @@ impl PropagateIF for AssignStack {
                         cdb[cid].moved_at = Propagate::EmitConflict(self.num_conflict, cached);
                     }
 
-                    return Some(cid);
+                    return Some(ConflictContext {
+                        cid,
+                        link: NULL_LIT,
+                    });
                 }
                 let lv = cdb[cid]
                     .iter()
@@ -715,14 +718,16 @@ impl PropagateIF for AssignStack {
         assert_eq!(self.decision_level(), self.root_level);
         loop {
             if self.remains() {
-                self.propagate(cdb)
-                    .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
+                self.propagate(cdb).map_or(Ok(()), |cc| {
+                    Err(SolverError::RootLevelConflict(Some(cc.cid)))
+                })?;
             }
             self.propagate_at_root_level(cdb)
                 .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
             if self.remains() {
-                self.propagate(cdb)
-                    .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
+                self.propagate(cdb).map_or(Ok(()), |cc| {
+                    Err(SolverError::RootLevelConflict(Some(cc.cid)))
+                })?;
             } else {
                 break;
             }

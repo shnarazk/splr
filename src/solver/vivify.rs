@@ -31,7 +31,7 @@ pub fn vivify(
     if asg.remains() {
         asg.propagate(cdb).map_or(Ok(()), |cc| {
             state.log(asg.num_conflict, "By vivifier");
-            Err(SolverError::RootLevelConflict(Some(cc)))
+            Err(SolverError::RootLevelConflict(Some(cc.cid)))
         })?;
     }
     let mut clauses: Vec<OrderedProxy<ClauseId>> = select_targets(
@@ -57,8 +57,9 @@ pub fn vivify(
         asg.backtrack_sandbox();
         debug_assert_eq!(asg.decision_level(), asg.root_level());
         if asg.remains() {
-            asg.propagate(cdb)
-                .map_or(Ok(()), |cid| Err(SolverError::RootLevelConflict(Some(cid))))?;
+            asg.propagate(cdb).map_or(Ok(()), |cc| {
+                Err(SolverError::RootLevelConflict(Some(cc.cid)))
+            })?;
         }
 
         debug_assert!(asg.stack_is_empty() || !asg.remains());
