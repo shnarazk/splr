@@ -37,7 +37,7 @@ impl Var {
         // 1. restart
         // 1. cancel_until -> reward_at_unassign -> assertion failed
         //
-        const UPDATE_SPAN: u32 = 8;
+        const UPDATE_SPAN: u32 = 4;
 
         if self.timestamp < t {
             self.activated += (t - self.timestamp) as u32;

@@ -27,7 +27,7 @@ pub trait PropagateIF {
     /// execute backjump in vivification sandbox
     fn backtrack_sandbox(&mut self);
     /// execute *boolean constraint propagation* or *unit propagation*.
-    fn propagate<C>(&mut self, cdb: &mut C) -> Option<ClauseId>
+    fn propagate<C>(&mut self, cdb: &mut C) -> Option<ConflictContext>
     where
         C: ClauseDBIF;
     /// `propagate` for vivification, which allows dead clauses.
@@ -287,7 +287,7 @@ impl PropagateIF for AssignStack {
     ///    So Eliminator should call `garbage_collect` before me.
     ///  - The order of literals in binary clauses will be modified to hold
     ///    propagation order.
-    fn propagate<C>(&mut self, cdb: &mut C) -> Option<ClauseId>
+    fn propagate<C>(&mut self, cdb: &mut C) -> Option<ConflictContext>
     where
         C: ClauseDBIF,
     {
