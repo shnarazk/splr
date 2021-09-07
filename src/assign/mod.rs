@@ -111,6 +111,8 @@ pub struct Var {
     reward: f64,
     /// the number of conflicts at which this var was assigned an rewarded lastly.
     timestamp: usize,
+    /// the accumulated length of assigned period
+    activated: u32,
     /// the `Flag`s
     flags: Flag,
 
