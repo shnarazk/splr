@@ -154,11 +154,11 @@ impl Default for Config {
 
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_rat: 0.98,
-            #[cfg(feature = "LR_rewarding")]
+            #[cfg(feature = "LRB_rewarding")]
             vrw_dcy_rat: 0.96,
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_stp: 0.0001,
-            #[cfg(feature = "LR_rewarding")]
+            #[cfg(feature = "LRB_rewarding")]
             vrw_dcy_stp: 0.0,
         }
     }
@@ -330,7 +330,7 @@ impl Config {
                 "incremental solver",
                 #[cfg(feature = "just_used")]
                 "use_just_used_flag",
-                #[cfg(feature = "LR_rewarding")]
+                #[cfg(feature = "LRB_rewarding")]
                 "Learning-Rate based rewarding",
                 #[cfg(feature = "Luby_restart")]
                 "Luby restart",

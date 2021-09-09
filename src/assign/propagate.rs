@@ -27,7 +27,7 @@ pub trait PropagateIF {
     /// execute backjump in vivification sandbox
     fn backtrack_sandbox(&mut self);
     /// execute *boolean constraint propagation* or *unit propagation*.
-    fn propagate<C>(&mut self, cdb: &mut C) -> Option<ClauseId>
+    fn propagate<C>(&mut self, cdb: &mut C) -> Option<ConflictContext>
     where
         C: ClauseDBIF;
     /// `propagate` for vivification, which allows dead clauses.
@@ -124,7 +124,7 @@ impl PropagateIF for AssignStack {
             }
             Some(x) if x == bool::from(l) => {
                 #[cfg(feature = "boundary_check")]
-                panic!("double assginment(assertion)");
+                panic!("double assignment(assertion)");
                 #[cfg(not(feature = "boundary_check"))]
                 // Vivification tries to assign a var by propagation then can assert it.
                 // To make sure the var is asserted, we need to nullify its reason.
@@ -287,7 +287,7 @@ impl PropagateIF for AssignStack {
     ///    So Eliminator should call `garbage_collect` before me.
     ///  - The order of literals in binary clauses will be modified to hold
     ///    propagation order.
-    fn propagate<C>(&mut self, cdb: &mut C) -> Option<ClauseId>
+    fn propagate<C>(&mut self, cdb: &mut C) -> Option<ConflictContext>
     where
         C: ClauseDBIF,
     {
@@ -335,7 +335,7 @@ impl PropagateIF for AssignStack {
                             cdb[cid].moved_at = Propagate::EmitConflict(self.num_conflict, blocker);
                         }
 
-                        return Some(cid);
+                        return Some(ConflictContext { cid, link: blocker });
                     }
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
@@ -490,7 +490,10 @@ impl PropagateIF for AssignStack {
                         cdb[cid].moved_at = Propagate::EmitConflict(self.num_conflict, cached);
                     }
 
-                    return Some(cid);
+                    return Some(ConflictContext {
+                        cid,
+                        link: NULL_LIT,
+                    });
                 }
                 let lv = cdb[cid]
                     .iter()
@@ -715,14 +718,16 @@ impl PropagateIF for AssignStack {
         assert_eq!(self.decision_level(), self.root_level);
         loop {
             if self.remains() {
-                self.propagate(cdb)
-                    .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
+                self.propagate(cdb).map_or(Ok(()), |cc| {
+                    Err(SolverError::RootLevelConflict(Some(cc.cid)))
+                })?;
             }
             self.propagate_at_root_level(cdb)
                 .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
             if self.remains() {
-                self.propagate(cdb)
-                    .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
+                self.propagate(cdb).map_or(Ok(()), |cc| {
+                    Err(SolverError::RootLevelConflict(Some(cc.cid)))
+                })?;
             } else {
                 break;
             }

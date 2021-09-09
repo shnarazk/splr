@@ -22,7 +22,7 @@ pub fn handle_conflict(
     cdb: &mut ClauseDB,
     rst: &mut Restarter,
     state: &mut State,
-    ci: ClauseId,
+    cc: &ConflictContext,
 ) -> MaybeInconsistent {
     let mut conflicting_level = asg.decision_level();
     // we need a catch here for handling the possibility of level zero conflict
@@ -30,8 +30,8 @@ pub fn handle_conflict(
     // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
     {
         let level = asg.level_ref();
-        if cdb[ci].iter().all(|l| level[l.vi()] == 0) {
-            return Err(SolverError::RootLevelConflict(Some(ci)));
+        if cdb[cc.cid].iter().all(|l| level[l.vi()] == 0) {
+            return Err(SolverError::RootLevelConflict(Some(cc.cid)));
         }
     }
 
@@ -41,7 +41,8 @@ pub fn handle_conflict(
     // rst.block_restart(); // to update asg progress_evaluator
 
     let level = asg.level_ref();
-    let c = &mut cdb[ci];
+    let c = &mut cdb[cc.cid];
+
     debug_assert!(!c.is_dead());
     let max_level = c.iter().map(|l| level[l.vi()]).max().unwrap();
     if chronobt
@@ -64,7 +65,7 @@ pub fn handle_conflict(
     asg.handle(SolverEvent::Conflict);
 
     state.derive20.clear();
-    let assign_level = conflict_analyze(asg, cdb, state, ci).max(asg.root_level());
+    let assign_level = conflict_analyze(asg, cdb, state, cc).max(asg.root_level());
     let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
     if learnt_len == 0 {
@@ -207,14 +208,14 @@ fn conflict_analyze(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
     state: &mut State,
-    conflicting_clause: ClauseId,
+    cc: &ConflictContext,
 ) -> DecisionLevel {
     let learnt = &mut state.new_learnt;
     learnt.clear();
     learnt.push(NULL_LIT);
     let root_level = asg.root_level();
     let dl = asg.decision_level();
-    let mut p = cdb[conflicting_clause].lit0();
+    let mut p = cc.conflicting_literal(cdb);
 
     #[cfg(feature = "trace_analysis")]
     println!("- analyze conflicting literal {}", p);
@@ -238,7 +239,27 @@ fn conflict_analyze(
             learnt.push(p);
         }
     }
-    let mut reason = AssignReason::Implication(conflicting_clause, NULL_LIT);
+    let mut reason = AssignReason::Implication(cc.cid, cc.link);
+    if cc.link != NULL_LIT {
+        let vi = cc.conflicting_literal(cdb).vi();
+        if !asg.var(vi).is(Flag::CA_SEEN) {
+            let lvl = asg.level(vi);
+            if root_level == lvl {
+                panic!();
+            }
+            debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
+            debug_assert!(asg.assign(vi).is_some());
+            asg.var_mut(vi).turn_on(Flag::CA_SEEN);
+            debug_assert!(lvl <= dl);
+            if dl == lvl {
+                path_cnt += 1;
+                asg.reward_at_analysis(vi);
+            } else {
+                #[cfg(feature = "boundary_check")]
+                panic!("strange level binary clause");
+            }
+        }
+    }
     let mut ti = asg.stack_len() - 1; // trail index
     loop {
         match reason {

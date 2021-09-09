@@ -37,15 +37,36 @@ impl Var {
         // 1. restart
         // 1. cancel_until -> reward_at_unassign -> assertion failed
         //
+        const UPDATE_SPAN: u32 = 6;
+
         if self.timestamp < t {
+            self.activated += (t - self.timestamp) as u32;
+            self.timestamp = t;
+        }
+        if UPDATE_SPAN <= self.activated {
             self.reward *= decay;
             if 0 < self.participated {
-                let rate = self.participated as f64 / (t - self.timestamp) as f64;
-                self.reward += (1.0 - (1.0 - rate).powi(2)) * reward;
+                let rate = self.participated as f64 / self.activated as f64;
+                // self.reward += (1.0 - (1.0 - rate).powi(2)) * reward;
+                self.reward += rate * reward;
+                self.participated = 0;
+            }
+            self.activated = 0;
+            self.timestamp = t;
+        }
+
+        /* if self.timestamp < t {
+            self.reward *= decay;
+            if 0 < self.participated {
+                let band: f64 = (t - self.timestamp) as f64;
+                let rate = self.participated as f64 / band;
+                let certainty = 1.0 - 0.6 / band;
+                // self.reward += (1.0 - (1.0 - rate).powi(2)) * reward;
+                self.reward += rate * certainty * reward;
                 self.participated = 0;
             }
             self.timestamp = t;
-        }
+        } */
         self.reward
     }
 }

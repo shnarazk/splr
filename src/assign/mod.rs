@@ -5,7 +5,7 @@ mod heap;
 mod propagate;
 /// Var rewarding
 #[cfg_attr(feature = "EVSIDS", path = "evsids.rs")]
-#[cfg_attr(feature = "LR_rewarding", path = "learning_rate.rs")]
+#[cfg_attr(feature = "LRB_rewarding", path = "learning_rate.rs")]
 mod reward;
 /// Decision var selection
 mod select;
@@ -105,6 +105,8 @@ impl fmt::Display for AssignReason {
 pub struct Var {
     /// reverse conversion to index. Note `VarId` must be `usize`.
     pub index: VarId,
+    /// the accumulated length of assigned period
+    activated: u32,
     /// the number of participation in conflict analysis
     participated: u32,
     /// a dynamic evaluation criterion like EVSIDS or ACID.

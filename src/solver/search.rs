@@ -260,13 +260,13 @@ fn search(
             asg.assign_by_decision(lit);
             a_decision_was_made = true;
         }
-        if let Some(ci) = asg.propagate(cdb) {
+        if let Some(cc) = asg.propagate(cdb) {
             if asg.decision_level() == asg.root_level() {
-                return Err(SolverError::RootLevelConflict(Some(ci)));
+                return Err(SolverError::RootLevelConflict(Some(cc.cid)));
             }
             asg.update_activity_tick();
             cdb.update_activity_tick();
-            handle_conflict(asg, cdb, rst, state, ci)?;
+            handle_conflict(asg, cdb, rst, state, &cc)?;
             rst.update(ProgressUpdate::ASG(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
             ));

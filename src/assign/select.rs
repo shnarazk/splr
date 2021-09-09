@@ -95,7 +95,8 @@ impl VarSelectIF for AssignStack {
             return;
         }
         self.phase_age += 1;
-        let target = request.unwrap_or_else(|| RephasingTarget::Mixin(1.0 / scale as f64));
+        // let target = request.unwrap_or_else(|| RephasingTarget::Mixin(1.0 / scale as f64));
+        let target = request.unwrap_or(RephasingTarget::BestPhases);
         // The iteration order by an iterator on HashMap may change in each execution.
         // So Shift and XorShift cause non-determinism. Be careful.
         let mut num_flip = 0;

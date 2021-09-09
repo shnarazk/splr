@@ -2,7 +2,7 @@
 /// some common traits.
 pub use crate::{
     assign::AssignReason,
-    cdb::{Clause, ClauseIF, ClauseId, ClauseIdIF},
+    cdb::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
     config::Config,
 };
 use {
@@ -361,6 +361,23 @@ impl LitIF for Lit {
     #[inline]
     fn is_none(&self) -> bool {
         self.ordinal == 0
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub struct ConflictContext {
+    pub cid: ClauseId,
+    pub link: Lit,
+}
+
+impl ConflictContext {
+    pub fn conflicting_literal(&self, cdb: &ClauseDB) -> Lit {
+        let lit0 = cdb[self.cid].lit0();
+        if lit0 == self.link {
+            cdb[self.cid].lit1()
+        } else {
+            lit0
+        }
     }
 }
 

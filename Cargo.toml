@@ -22,7 +22,7 @@ default = [
         "clause_vivification",
         "dynamic_restart_threshold",
         # "incremental_solver",
-        "LR_rewarding",
+        "LRB_rewarding",
         "Luby_stabilization",
         # DEBUG "maintain_watch_cache",
         "reason_side_rewarding",
@@ -41,7 +41,7 @@ EVSIDS = []
 hashed_watch_cache = []
 incremental_solver = []
 just_used = []
-LR_rewarding = []
+LRB_rewarding = []
 Luby_restart = []
 Luby_stabilization = []
 maintain_watch_cache = []
