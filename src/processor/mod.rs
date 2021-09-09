@@ -184,7 +184,7 @@ mod tests {
         let elim_vars = asg
             .var_iter()
             .filter(|v| v.is(Flag::ELIMINATED))
-            .map(|v| v.index)
+            .map(|v| v.index as usize)
             .collect::<Vec<_>>();
         assert_eq!(
             0,
