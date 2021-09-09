@@ -444,14 +444,14 @@ impl PropagateIF for AssignStack {
                     for (k, lk) in c
                         .iter()
                         .enumerate()
-                        .skip(start)
-                        .chain(c.iter().enumerate().skip(2).take(start - 2))
+                        .skip(start as usize)
+                        .chain(c.iter().enumerate().skip(2).take(start as usize - 2))
                     {
                         if lit_assign!(self, *lk) != Some(false) {
                             let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
-                            cdb[cid].search_from = k + 1;
+                            cdb[cid].search_from = k as u32 + 1;
                             debug_assert!(
                                 self.assigned(!new_watch) == Some(true)
                                     || self.assigned(!new_watch) == None
@@ -648,14 +648,14 @@ impl PropagateIF for AssignStack {
                     for (k, lk) in c
                         .iter()
                         .enumerate()
-                        .skip(start)
-                        .chain(c.iter().enumerate().skip(2).take(start - 2))
+                        .skip(start as usize)
+                        .chain(c.iter().enumerate().skip(2).take(start as usize - 2))
                     {
                         if lit_assign!(self, *lk) != Some(false) {
                             let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
-                            cdb[cid].search_from = k + 1;
+                            cdb[cid].search_from = k as u32 + 1;
                             debug_assert!(
                                 self.assigned(!new_watch) == Some(true)
                                     || self.assigned(!new_watch) == None

@@ -208,7 +208,7 @@ impl SolveIF for Solver {
                 let vals = asg
                     .var_iter()
                     .skip(1)
-                    .map(|v| i32::from(Lit::from((v.index, model[v.index]))))
+                    .map(|v| i32::from(Lit::from((v.index as usize, model[v.index as usize]))))
                     .collect::<Vec<i32>>();
 
                 // As a preparation for incremental solving, turn flags off.

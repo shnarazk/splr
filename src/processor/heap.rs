@@ -149,7 +149,7 @@ impl VarOrderIF for VarOccHeap {
         self.reset();
         for (vi, v) in asg.var_iter().enumerate().skip(1) {
             if asg.assign(vi).is_none() && !v.is(Flag::ELIMINATED) {
-                self.insert(occur, v.index, true);
+                self.insert(occur, v.index as usize, true);
             }
         }
     }

@@ -199,16 +199,16 @@ pub struct ClauseId {
 pub struct Clause {
     /// The literals in a clause.
     lits: Vec<Lit>,
+    /// Flags (16 bits)
+    flags: Flag,
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: u16,
     /// the index from which `propagate` starts searching an un-falsified literal.
-    pub search_from: usize,
+    pub search_from: u32,
     /// A dynamic clause evaluation criterion based on the number of references.
     reward: f64,
     /// the number of conflicts at which this clause was used in `conflict_analyze`
     timestamp: usize,
-    /// Flags
-    flags: Flag,
 
     #[cfg(feature = "boundary_check")]
     pub birth: usize,

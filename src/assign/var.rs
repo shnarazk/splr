@@ -42,7 +42,7 @@ impl From<usize> for Var {
     #[inline]
     fn from(i: usize) -> Self {
         Var {
-            index: i,
+            index: i as u32,
             ..Var::default()
         }
     }

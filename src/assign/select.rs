@@ -50,7 +50,7 @@ impl From<&Var> for VarTimestamp {
     fn from(v: &Var) -> Self {
         VarTimestamp {
             timestamp: v.timestamp,
-            vi: v.index,
+            vi: v.index as usize,
         }
     }
 }
