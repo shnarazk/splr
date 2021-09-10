@@ -73,8 +73,8 @@ impl LitOccurs {
 ///   `indx` is positions. So the unused field 0 can hold the last position as a special case.
 #[derive(Clone, Debug)]
 pub struct VarOccHeap {
-    pub heap: Vec<VarId>, // order : usize -> VarId
-    pub idxs: Vec<usize>, // VarId : -> order : usize
+    pub heap: Vec<u32>, // order : usize -> VarId::from
+    pub idxs: Vec<u32>, // VarId : -> order : usize::from
 }
 
 impl VarOccHeap {
@@ -82,12 +82,12 @@ impl VarOccHeap {
         let mut heap = Vec::with_capacity(n + 1);
         let mut idxs = Vec::with_capacity(n + 1);
         heap.push(0);
-        idxs.push(n);
+        idxs.push(n as u32);
         for i in 1..=n {
-            heap.push(i);
-            idxs.push(i);
+            heap.push(i as u32);
+            idxs.push(i as u32);
         }
-        idxs[0] = init;
+        idxs[0] = init as u32;
         VarOccHeap { heap, idxs }
     }
 }
@@ -106,10 +106,10 @@ impl VarOrderIF for VarOccHeap {
         }
         let i = self.idxs[vi];
         let n = self.idxs[0] + 1;
-        let vn = self.heap[n];
-        self.heap.swap(i, n);
-        self.idxs.swap(vi, vn);
-        debug_assert!(n < self.heap.len());
+        let vn = self.heap[n as usize];
+        self.heap.swap(i as usize, n as usize);
+        self.idxs.swap(vi, vn as usize);
+        debug_assert!((n as usize) < self.heap.len());
         self.idxs[0] = n;
         self.percolate_up(occur, n);
     }
@@ -117,13 +117,13 @@ impl VarOrderIF for VarOccHeap {
     where
         A: AssignIF,
     {
-        for v in &mut self.heap[0..self.idxs[0]] {
-            asg.var_mut(*v).turn_off(Flag::ENQUEUED);
+        for v in &mut self.heap[0..self.idxs[0] as usize] {
+            asg.var_mut(*v as usize).turn_off(Flag::ENQUEUED);
         }
         self.reset()
     }
     fn len(&self) -> usize {
-        self.idxs[0]
+        self.idxs[0] as usize
     }
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0
@@ -161,90 +161,91 @@ impl VarOccHeap {
     }
     fn reset(&mut self) {
         for i in 0..self.idxs.len() {
-            self.idxs[i] = i;
-            self.heap[i] = i;
+            self.idxs[i] = i as u32;
+            self.heap[i] = i as u32;
         }
     }
     fn get_root(&mut self, occur: &[LitOccurs]) -> VarId {
         let s = 1;
         let vs = self.heap[s];
         let n = self.idxs[0];
-        debug_assert!(n < self.heap.len());
+        debug_assert!((n as usize) < self.heap.len());
         if n == 0 {
             return 0;
         }
-        let vn = self.heap[n];
+        let vn = self.heap[n as usize];
         debug_assert!(vn != 0, "Invalid VarId for heap");
         debug_assert!(vs != 0, "Invalid VarId for heap");
-        self.heap.swap(n, s);
-        self.idxs.swap(vn, vs);
+        self.heap.swap(n as usize, s);
+        self.idxs.swap(vn as usize, vs as usize);
         self.idxs[0] -= 1;
         if 1 < self.idxs[0] {
             self.percolate_down(occur, 1);
         }
-        vs
+        vs as usize
     }
-    fn percolate_up(&mut self, occur: &[LitOccurs], start: usize) {
+    fn percolate_up(&mut self, occur: &[LitOccurs], start: u32) {
         let mut q = start;
-        let vq = self.heap[q];
+        let vq = self.heap[q as usize];
         debug_assert!(0 < vq, "size of heap is too small");
-        let aq = occur[vq].activity();
+        let aq = occur[vq as usize].activity();
         loop {
             let p = q / 2;
             if p == 0 {
-                self.heap[q] = vq;
+                self.heap[q as usize] = vq;
                 debug_assert!(vq != 0, "Invalid index in percolate_up");
-                self.idxs[vq] = q;
+                self.idxs[vq as usize] = q;
                 return;
             } else {
-                let vp = self.heap[p];
-                let ap = occur[vp].activity();
+                let vp = self.heap[p as usize];
+                let ap = occur[vp as usize].activity();
                 if ap > aq {
                     // move down the current parent, and make it empty
-                    self.heap[q] = vp;
+                    self.heap[q as usize] = vp;
                     debug_assert!(vq != 0, "Invalid index in percolate_up");
-                    self.idxs[vp] = q;
+                    self.idxs[vp as usize] = q;
                     q = p;
                 } else {
-                    self.heap[q] = vq;
+                    self.heap[q as usize] = vq;
                     debug_assert!(vq != 0, "Invalid index in percolate_up");
-                    self.idxs[vq] = q;
+                    self.idxs[vq as usize] = q;
                     return;
                 }
             }
         }
     }
-    fn percolate_down(&mut self, occur: &[LitOccurs], start: usize) {
+    fn percolate_down(&mut self, occur: &[LitOccurs], start: u32) {
         let n = self.len();
         let mut i = start;
-        let vi = self.heap[i];
-        let ai = occur[vi].activity();
+        let vi = self.heap[i as usize];
+        let ai = occur[vi as usize].activity();
         loop {
             let l = 2 * i; // left
-            if l < n {
-                let vl = self.heap[l];
-                let al = occur[vl].activity();
+            if l < (n as u32) {
+                let vl = self.heap[l as usize];
+                let al = occur[vl as usize].activity();
                 let r = l + 1; // right
-                let (target, vc, ac) = if r < n && al > occur[self.heap[r]].activity() {
-                    let vr = self.heap[r];
-                    (r, vr, occur[vr].activity())
-                } else {
-                    (l, vl, al)
-                };
+                let (target, vc, ac) =
+                    if r < (n as u32) && al > occur[self.heap[r as usize] as usize].activity() {
+                        let vr = self.heap[r as usize];
+                        (r, vr, occur[vr as usize].activity())
+                    } else {
+                        (l, vl, al)
+                    };
                 if ai > ac {
-                    self.heap[i] = vc;
-                    self.idxs[vc] = i;
+                    self.heap[i as usize] = vc;
+                    self.idxs[vc as usize] = i;
                     i = target;
                 } else {
-                    self.heap[i] = vi;
+                    self.heap[i as usize] = vi;
                     debug_assert!(vi != 0, "invalid index");
-                    self.idxs[vi] = i;
+                    self.idxs[vi as usize] = i;
                     return;
                 }
             } else {
-                self.heap[i] = vi;
+                self.heap[i as usize] = vi;
                 debug_assert!(vi != 0, "invalid index");
-                self.idxs[vi] = i;
+                self.idxs[vi as usize] = i;
                 return;
             }
         }

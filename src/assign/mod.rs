@@ -18,7 +18,7 @@ pub use self::{propagate::PropagateIF, property::*, select::VarSelectIF, var::Va
 #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
 use std::collections::HashMap;
 use {
-    self::heap::VarHeapIF,
+    self::heap::{VarHeapIF, VarIdHeap},
     super::{cdb::ClauseDBIF, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
@@ -197,20 +197,6 @@ pub struct AssignStack {
     //## Vivification
     //
     during_vivification: bool,
-}
-
-/// Heap of VarId, based on var activity.
-// # Note
-// - both fields has a fixed length. Don't use push and pop.
-// - `idxs[0]` contains the number of alive elements
-//   `indx` is positions. So the unused field 0 can hold the last position as a special case.
-#[derive(Clone, Debug)]
-pub struct VarIdHeap {
-    /// order : usize -> VarId, -- Which var is the n-th best?
-    heap: Vec<VarId>,
-    /// VarId : -> order : usize -- How good is the var?
-    /// `idxs[0]` holds the number of alive elements
-    idxs: Vec<usize>,
 }
 
 #[cfg(feature = "boundary_check")]

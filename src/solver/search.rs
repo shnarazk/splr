@@ -157,9 +157,9 @@ impl SolveIF for Solver {
                     }
                 }
                 let act = 1.0 / (asg.num_vars as f64).powf(0.25);
-                for vi in elim.sorted_iterator() {
-                    if !asg.var(*vi).is(Flag::ELIMINATED) {
-                        asg.set_activity(*vi, act);
+                for vi in 1..asg.num_vars {
+                    if !asg.var(vi).is(Flag::ELIMINATED) {
+                        asg.set_activity(vi, act);
                     }
                 }
                 asg.rebuild_order();

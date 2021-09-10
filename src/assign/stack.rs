@@ -82,7 +82,7 @@ impl Instantiate for AssignStack {
             level: vec![DecisionLevel::default(); nv + 1],
             reason: vec![AssignReason::None; nv + 1],
             trail: Vec::with_capacity(nv),
-            var_order: VarIdHeap::new(nv, nv),
+            var_order: VarIdHeap::new(nv),
 
             num_vars: cnf.num_of_variables,
             var: Var::new_vars(nv),

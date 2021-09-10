@@ -208,9 +208,9 @@ impl Instantiate for Eliminator {
             SolverEvent::NewVar => {
                 let len = self.var_queue.heap.len();
                 self.var.push(LitOccurs::default());
-                self.var_queue.heap.push(len);
-                self.var_queue.idxs.push(len);
-                self.var_queue.idxs[0] = len;
+                self.var_queue.heap.push(len as u32);
+                self.var_queue.idxs.push(len as u32);
+                self.var_queue.idxs[0] = len as u32;
             }
             SolverEvent::Reinitialize => {
                 self.elim_lits.clear();
@@ -323,7 +323,7 @@ impl EliminateIF for Eliminator {
         }
         cdb.check_size().map(|_| ())
     }
-    fn sorted_iterator(&self) -> Iter<'_, usize> {
+    fn sorted_iterator(&self) -> Iter<'_, u32> {
         self.var_queue.heap[1..].iter()
     }
     fn stats(&self, vi: VarId) -> Option<(usize, usize)> {
