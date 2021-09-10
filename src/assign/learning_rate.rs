@@ -37,13 +37,13 @@ impl Var {
         // 1. restart
         // 1. cancel_until -> reward_at_unassign -> assertion failed
         //
-        const UPDATE_SPAN: u32 = 6;
+        const UPDATE_INTERVAL: u32 = 16;
 
         if self.timestamp < t {
             self.activated += (t - self.timestamp) as u32;
             self.timestamp = t;
         }
-        if UPDATE_SPAN <= self.activated {
+        if UPDATE_INTERVAL <= self.activated {
             self.reward *= decay;
             if 0 < self.participated {
                 let rate = self.participated as f64 / self.activated as f64;
