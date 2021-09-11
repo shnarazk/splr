@@ -358,6 +358,7 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         c.timestamp = *ordinal;
+        c.reward = 0.5;
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
