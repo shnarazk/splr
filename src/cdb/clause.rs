@@ -11,11 +11,11 @@ impl Default for Clause {
     fn default() -> Clause {
         Clause {
             lits: vec![],
+            flags: Flag::empty(),
             rank: 0,
             search_from: 2,
             reward: 0.0,
             timestamp: 0,
-            flags: Flag::empty(),
 
             #[cfg(feature = "boundary_check")]
             birth: 0,
