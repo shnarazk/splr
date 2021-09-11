@@ -1358,15 +1358,22 @@ impl ClauseDB {
             ref mut clause,
             ref co_lbd_bound,
             ref mut lbd_temp,
+            ref mut num_reduction,
             ref ordinal,
             ref activity_decay,
             ref activity_anti_decay,
             ..
         } = self;
-        self.num_reduction += 1;
+        *num_reduction += 1;
+
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
-            if !c.is(Flag::LEARNT) || c.is_dead() || asg.locked(c, ClauseId::from(i)) {
+            if c.is_dead() {
+                continue;
+            }
+            let rank = c.update_lbd(asg, lbd_temp) as f64;
+            let act_c = c.update_activity(*ordinal, *activity_decay, *activity_anti_decay);
+            if !c.is(Flag::LEARNT) || asg.locked(c, ClauseId::from(i)) {
                 continue;
             }
 
@@ -1380,12 +1387,11 @@ impl ClauseDB {
             }
 
             // This is the best at least for 3SAT360.
-            let rank = c.update_lbd(asg, lbd_temp) as f64;
+
             let act_v: f64 = c
                 .lits
                 .iter()
                 .fold(0.0, |acc, l| acc.max(asg.activity(l.vi())));
-            let act_c = c.update_activity(*ordinal, *activity_decay, *activity_anti_decay);
             let weight = rank.log2() / (act_c * act_v);
             perm.push(OrderedProxy::new(i, weight));
         }
