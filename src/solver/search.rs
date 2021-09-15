@@ -357,9 +357,7 @@ fn search(
                         }
                     }
                     // call the enhanced phase saver
-                    asg.handle(SolverEvent::Stabilize(
-                        rst.derefer(restart::property::Tusize::IntervalScale),
-                    ));
+                    asg.handle(SolverEvent::Stabilize);
                 }
             }
             if a_decision_was_made {

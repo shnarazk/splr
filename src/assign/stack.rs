@@ -108,10 +108,10 @@ impl Instantiate for AssignStack {
                 self.make_var_eliminated(vi);
             }
             #[allow(unused_variables)]
-            SolverEvent::Stabilize(scale) => {
+            SolverEvent::Stabilize => {
                 #[cfg(feature = "rephase")]
                 self.check_consistency_of_best_phases();
-                self.select_rephasing_target(None, scale);
+                self.select_rephasing_target(None);
             }
             SolverEvent::NewVar => {
                 self.assign.push(None);

@@ -28,7 +28,7 @@ macro_rules! var_assign {
 pub trait VarSelectIF {
     #[cfg(feature = "rephase")]
     /// select rephasing target
-    fn select_rephasing_target(&mut self, request: Option<RephasingTarget>, span: usize);
+    fn select_rephasing_target(&mut self, request: Option<RephasingTarget>);
     #[cfg(feature = "rephase")]
     /// check the consistency
     fn check_consistency_of_best_phases(&mut self);
@@ -82,16 +82,12 @@ impl std::fmt::Display for RephasingTarget {
 
 impl VarSelectIF for AssignStack {
     #[cfg(feature = "rephase")]
-    fn select_rephasing_target(&mut self, request: Option<RephasingTarget>, scale: usize) {
+    fn select_rephasing_target(&mut self, request: Option<RephasingTarget>) {
         if self.best_phases.is_empty() {
             return;
         }
         if self.derefer(property::Tusize::NumUnassertedVar) <= self.best_phases.len() {
             self.best_phases.clear();
-            return;
-        }
-        let remain = self.derefer(property::Tusize::NumUnassertedVar) - self.best_phases.len() + 1;
-        if (remain as f64).log10() < scale as f64 {
             return;
         }
         self.phase_age += 1;
