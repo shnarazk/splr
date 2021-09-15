@@ -13,7 +13,6 @@ impl Default for Var {
         Var {
             index: 0,
             reward: 0.0,
-            activated: 0,
             participated: 0,
             timestamp: 0,
             flags: Flag::empty(),
