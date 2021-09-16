@@ -12,15 +12,15 @@ impl ActivityIF<VarId> for AssignStack {
         self.var[vi].reward = val;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
-        self.var[vi].participated += 1;
+        self.var[vi].update_activity(self.ordinal, self.activity_decay, self.activity_anti_decay);
     }
     fn reward_at_assign(&mut self, vi: VarId) {
         self.var[vi].timestamp = self.ordinal;
     }
+    #[inline]
     fn reward_at_propagation(&mut self, _vi: VarId) {}
-    fn reward_at_unassign(&mut self, vi: VarId) {
-        self.var[vi].update_activity(self.ordinal, self.activity_decay, self.activity_anti_decay);
-    }
+    #[inline]
+    fn reward_at_unassign(&mut self, _vi: VarId) {}
     // Note: `update_rewards` should be called before `cancel_until`
     fn update_activity_tick(&mut self) {
         self.ordinal += 1;
@@ -37,18 +37,13 @@ impl Var {
         // 1. restart
         // 1. cancel_until -> reward_at_unassign -> assertion failed
         //
-
-        let span = t - self.timestamp;
-        if 0 < span {
+        if self.timestamp < t {
+            self.reward *= decay.powi((t - self.timestamp) as i32);
             self.timestamp = t;
-            let certainty = 1.0 - 0.9 / span as f64;
-            self.reward *= 1.0 - certainty * (1.0 - decay);
-            if 0 < self.participated {
-                let rate = self.participated as f64 / span as f64;
-                self.participated = 0;
-                self.reward += rate * certainty * reward;
-            }
+        } else if 0.0 < reward {
+            self.reward *= decay;
         }
+        self.reward += reward;
         self.reward
     }
 }

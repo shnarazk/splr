@@ -12,10 +12,9 @@ impl Default for Var {
     fn default() -> Var {
         Var {
             index: 0,
-            reward: 0.0,
-            participated: 0,
-            timestamp: 0,
             flags: Flag::empty(),
+            timestamp: 0,
+            reward: 0.0,
 
             #[cfg(feature = "boundary_check")]
             propagated_at: 0,
