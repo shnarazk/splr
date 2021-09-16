@@ -126,6 +126,7 @@ pub fn handle_conflict(
         //
         #[cfg(feature = "reason_side_rewarding")]
         if let AssignReason::Implication(r, _) = asg.reason(lit.vi()) {
+            cdb.reward_at_analysis(r);
             for l in cdb[r].iter() {
                 let vi = l.vi();
                 if !bumped.contains(&vi) {
