@@ -6,7 +6,7 @@ impl ActivityIF<ClauseId> for ClauseDB {
         self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize].update_activity(
             self.ordinal,
             self.activity_decay,
-            self.activity_anti_decay,
+            0.0,
         )
     }
     fn set_activity(&mut self, cid: ClauseId, val: f64) {

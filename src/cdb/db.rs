@@ -333,7 +333,7 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         c.timestamp = *ordinal;
-        c.reward = 0.5;
+        c.reward = 0.0;
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
@@ -1337,7 +1337,6 @@ impl ClauseDB {
             ref mut num_reduction,
             ref ordinal,
             ref activity_decay,
-            ref activity_anti_decay,
             ..
         } = self;
         *num_reduction += 1;
@@ -1348,7 +1347,7 @@ impl ClauseDB {
                 continue;
             }
             let rank = c.update_lbd(asg, lbd_temp) as f64;
-            let act_c = c.update_activity(*ordinal, *activity_decay, *activity_anti_decay);
+            let act_c = c.update_activity(*ordinal, *activity_decay, 0.0);
             if !c.is(Flag::LEARNT) || asg.locked(c, ClauseId::from(i)) {
                 continue;
             }
