@@ -13,13 +13,12 @@ impl Default for Var {
         Var {
             index: 0,
             reward: 0.0,
-            activated: 0,
-            participated: 0,
-            timestamp: 0,
             flags: Flag::empty(),
 
             #[cfg(feature = "boundary_check")]
             propagated_at: 0,
+            #[cfg(feature = "boundary_check")]
+            timestamp: 0,
             #[cfg(feature = "boundary_check")]
             state: VarState::Unassigned(0),
         }
@@ -169,21 +168,31 @@ impl AssignStack {
     /// make a var asserted.
     pub fn make_var_asserted(&mut self, vi: VarId) {
         self.reason[vi] = AssignReason::Asserted(self.num_conflict);
-        self.var[vi].timestamp = self.ordinal;
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
+
+        #[cfg(feature = "boundary_check")]
+        {
+            self.var[vi].timestamp = self.ordinal;
+        }
+
         #[cfg(feature = "best_phases_tracking")]
         self.check_best_phase(vi);
     }
     pub fn make_var_eliminated(&mut self, vi: VarId) {
         if !self.var[vi].is(Flag::ELIMINATED) {
             self.var[vi].turn_on(Flag::ELIMINATED);
-            self.var[vi].timestamp = self.ordinal;
             self.set_activity(vi, 0.0);
             self.remove_from_heap(vi);
             debug_assert_eq!(self.decision_level(), self.root_level);
             self.trail.retain(|l| l.vi() != vi);
             self.num_eliminated_vars += 1;
+
+            #[cfg(feature = "boundary_check")]
+            {
+                self.var[vi].timestamp = self.ordinal;
+            }
+
             #[cfg(feature = "trace_elimination")]
             {
                 let lv = self.level[vi];
