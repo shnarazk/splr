@@ -207,10 +207,12 @@ pub struct Clause {
     pub rank: u16,
     /// the index from which `propagate` starts searching an un-falsified literal.
     pub search_from: u32,
-    /// A dynamic clause evaluation criterion based on the number of references.
-    reward: f64,
     /// the number of conflicts at which this clause was used in `conflict_analyze`
     timestamp: usize,
+
+    #[cfg(feature = "clause_rewarding")]
+    /// A dynamic clause evaluation criterion based on the number of references.
+    reward: f64,
 
     #[cfg(feature = "boundary_check")]
     pub birth: usize,

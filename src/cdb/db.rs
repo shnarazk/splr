@@ -303,7 +303,12 @@ impl ClauseDBIF for ClauseDB {
             // }
             // assert!(c.is_dead());
             c.flags = Flag::empty();
-            c.reward = 0.0;
+
+            #[cfg(feature = "clause_rewarding")]
+            {
+                c.reward = 0.0;
+            }
+
             debug_assert!(c.lits.is_empty()); // c.lits.clear();
             std::mem::swap(&mut c.lits, vec);
             c.search_from = 2;
@@ -1347,7 +1352,7 @@ impl ClauseDB {
                 continue;
             }
             let rank = c.update_lbd(asg, lbd_temp) as f64;
-            let act_c = c.update_activity(*ordinal, *activity_decay, 0.0);
+            c.update_activity(*ordinal, *activity_decay, 0.0);
             if !c.is(Flag::LEARNT) || asg.locked(c, ClauseId::from(i)) {
                 continue;
             }
@@ -1367,7 +1372,13 @@ impl ClauseDB {
                 .lits
                 .iter()
                 .fold(0.0, |acc, l| acc.max(asg.activity(l.vi())));
-            let weight = rank.log2() / (act_c * act_v);
+
+            #[cfg(feature = "clause_rewarding")]
+            let act_c = c.reward;
+            #[cfg(not(feature = "clause_rewarding"))]
+            let act_c = 0.25;
+
+            let weight = rank / (act_c + act_v);
             perm.push(OrderedProxy::new(i, weight));
         }
         let keep = perm.len().min(nc) / 2;

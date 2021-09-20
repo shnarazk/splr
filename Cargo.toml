@@ -19,6 +19,7 @@ default = [
         # DEBUG "boundary_check",
         # increase memory pressure "bi_clause_completion",
         "clause_elimination",
+        # "clause_rewarding",
         "clause_vivification",
         "dynamic_restart_threshold",
         # "incremental_solver",
@@ -33,6 +34,7 @@ best_phases_tracking = []
 bi_clause_completion = []
 boundary_check = []
 clause_elimination = []
+clause_rewarding = []
 clause_vivification = []
 debug_propagation = []
 dynamic_restart_threshold = []
