@@ -1,3 +1,9 @@
+## 0.12.0, 2021-09
+
+- reduce memory footprint
+  - clause activity is calculated from its LBD and var activities
+  - LRB tick is the length from assignment to unassignment
+
 ## 0.11.0, 2021-08-17
 
 - clause reduction and Luby stabilization share the trigger condition.
