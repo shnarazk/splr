@@ -438,11 +438,11 @@ mod tests {
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false)
             .as_cid();
-        cdb[c2].reward = 2.4;
+        // cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_eq!(c1 == c1, true);
         assert_ne!(c1, c2);
-        assert_eq!(cdb.activity(c2), 2.4);
+        // assert_eq!(cdb.activity(c2), 2.4);
     }
 
     #[test]
