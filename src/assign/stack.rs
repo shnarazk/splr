@@ -119,7 +119,7 @@ impl Instantiate for AssignStack {
                 self.reason.push(AssignReason::None);
                 self.expand_heap();
                 self.num_vars += 1;
-                self.var.push(Var::from(self.num_vars));
+                self.var.push(Var::default());
             }
             SolverEvent::Reinitialize => {
                 debug_assert_eq!(self.decision_level(), self.root_level);

@@ -11,7 +11,6 @@ use {
 impl Default for Var {
     fn default() -> Var {
         Var {
-            index: 0,
             reward: 0.0,
             flags: Flag::empty(),
 
@@ -28,33 +27,14 @@ impl Default for Var {
 impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
-        write!(
-            f,
-            "V{{{} {}}}",
-            self.index,
-            st(Flag::ELIMINATED, ", eliminated"),
-        )
-    }
-}
-
-impl From<usize> for Var {
-    #[inline]
-    fn from(i: usize) -> Self {
-        Var {
-            index: i as u32,
-            ..Var::default()
-        }
+        write!(f, "V{{{}}}", st(Flag::ELIMINATED, ", eliminated"),)
     }
 }
 
 impl Var {
     /// return a new vector of $n$ `Var`s.
     pub fn new_vars(n: usize) -> Vec<Var> {
-        let mut vec = Vec::with_capacity(n + 1);
-        for i in 0..=n {
-            vec.push(Var::from(i));
-        }
-        vec
+        vec![Var::default(); n + 1]
     }
     pub fn activity(&self) -> f64 {
         self.reward

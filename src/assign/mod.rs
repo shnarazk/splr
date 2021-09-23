@@ -103,8 +103,6 @@ impl fmt::Display for AssignReason {
 /// Object representing a variable.
 #[derive(Clone, Debug)]
 pub struct Var {
-    /// reverse conversion to index. Note `VarId` must be `usize`.
-    pub index: u32,
     /// the `Flag`s (16 bits)
     flags: Flag,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
