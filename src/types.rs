@@ -364,6 +364,9 @@ impl LitIF for Lit {
     }
 }
 
+/// Capture which literal and clause emits the present conflict.
+/// * conflict by a biclause if `link == NULL_LIT`.
+/// * conflict by a normal clause otherwise.
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct ConflictContext {
     pub cid: ClauseId,

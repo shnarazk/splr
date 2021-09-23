@@ -3,6 +3,7 @@
 - reduce memory footprint
   - clause activity is calculated from its LBD and var activities
   - LRB tick is the length from assignment to unassignment
+- disable chrono-BT by default
 
 ## 0.11.0, 2021-08-17
 
