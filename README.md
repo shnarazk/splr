@@ -364,14 +364,14 @@ ARGS:
 
 ## Solver description
 
-Splr-0.11.0 adopts the following features by default:
+Splr-0.12.0 adopts the following features by default:
 
-- Learning-rate based var rewarding and clause rewarding[3]
+- Learning-rate based (LRB) var rewarding and clause rewarding[3]
 - Reason-side var rewarding[3]
-- chronological backtrack and non-chronological backtrack[4]
+- ~~chronological backtrack[4]~~ disabled in 0.12 due to incorrect UNSAT certificates.
 - clause vivification[5]
-- dynamic restart blocking based on the number of remaining vars[2]
 - dynamic restart based on average LBDs of learnt clauses[1]
+- dynamic restart blocking based on the number of remaining vars[2]
 - clause elimination and subsumption as pre-processor and in-processor
 - stabilization based on Luby series, or _Luby Stabilization_
 - re-phase the best phases
@@ -380,15 +380,15 @@ As shown in the blow, Splr calls in-processor very frequently.
 
 ![search algorithm in Splr 0.11](https://user-images.githubusercontent.com/997855/129641237-f33ca231-711c-4f3c-9fdd-31dfd92aaa8a.png)
 
-
 _Luby stabilization_ is an original mechanism to make long periods without restarts, which are called stabilized modes.
-This method updates the restart interval, which usually has a constant value, as follows:
+In this method, _every clause reduction_ updates the restart interval, which usually has a constant value, as follows:
 
 ```
 restart_interval = luby(n) * base_interval;
 ```
-where `n` represents the number of updates, and `luby(n)` is a function returning _n_-th number of Luby series.
+where `n` represents the number of updates, and `luby(n)` is a function returning _n_-th value of Luby series.
 The longer the solver searches, the larger the average value is. So we can periodically explore the search space more deeply.
+
 Here is an example.
 
 ![](https://user-images.githubusercontent.com/997855/128656027-a8eaa082-d2f8-4801-860e-46f38fa65c39.png)
