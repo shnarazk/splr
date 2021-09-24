@@ -22,9 +22,9 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 
 #### Version 0.12.0
 
-- [SAT Competition 2021](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks main truck](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.12.0 RC (487618f2) solved with a 500 sec timeout:
-  - 39 satisfiable problems: all the solutions were correct.
-  - 47 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+- [SAT Competition 2021](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks main truck](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.12.0 RC (ed953b78) solved with a 500 sec timeout:
+  - 42 satisfiable problems: all the solutions were correct.
+  - 42 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
 
 #### Version 0.11.0
 
