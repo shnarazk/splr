@@ -183,8 +183,10 @@ mod tests {
         );
         let elim_vars = asg
             .var_iter()
-            .filter(|v| v.is(Flag::ELIMINATED))
-            .map(|v| v.index as usize)
+            .enumerate()
+            .skip(1)
+            .filter(|(_, v)| v.is(Flag::ELIMINATED))
+            .map(|(vi, _)| vi)
             .collect::<Vec<_>>();
         assert_eq!(
             0,
