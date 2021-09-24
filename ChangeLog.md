@@ -1,9 +1,12 @@
 ## 0.12.0, 2021-09-25
 
 - reduce memory footprint
-  - clause activity is calculated from its LBD and var activities
-  - LRB tick is the length from assignment to unassignment
 - disable chrono-BT by default: it still generates wrong UNSAT certificates.
+- revise LRB var rewarding
+  - LRB tick is changed to the length from assignment to unassignment
+- revise clause rewarding
+  - clause activity is calculated based on its LBD and var activities
+- dynamic control of restart interval
 
 ## 0.11.0, 2021-08-17
 
