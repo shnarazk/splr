@@ -4,7 +4,7 @@
 use super::property;
 
 use {
-    super::{AssignStack, Var, VarHeapIF},
+    super::{AssignStack, VarHeapIF},
     crate::types::*,
 };
 
@@ -38,21 +38,6 @@ pub trait VarSelectIF {
     fn update_order(&mut self, v: VarId);
     /// rebuild the internal var_order
     fn rebuild_order(&mut self);
-}
-
-#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
-struct VarTimestamp {
-    timestamp: usize,
-    vi: VarId,
-}
-
-impl From<&Var> for VarTimestamp {
-    fn from(v: &Var) -> Self {
-        VarTimestamp {
-            timestamp: v.timestamp,
-            vi: v.index as usize,
-        }
-    }
 }
 
 /// Phase saving modes.

@@ -103,21 +103,15 @@ impl fmt::Display for AssignReason {
 /// Object representing a variable.
 #[derive(Clone, Debug)]
 pub struct Var {
-    /// reverse conversion to index. Note `VarId` must be `usize`.
-    pub index: u32,
-    /// the `Flag`s
+    /// the `Flag`s (16 bits)
     flags: Flag,
-    /// the accumulated length of assigned period
-    activated: u32,
-    /// the number of participation in conflict analysis
-    participated: u32,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
     reward: f64,
-    /// the number of conflicts at which this var was assigned an rewarded lastly.
-    timestamp: usize,
 
     #[cfg(feature = "boundary_check")]
     pub propagated_at: usize,
+    #[cfg(feature = "boundary_check")]
+    pub timestamp: usize,
     #[cfg(feature = "boundary_check")]
     pub state: VarState,
 }

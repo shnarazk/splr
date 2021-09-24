@@ -200,7 +200,10 @@ impl PropagateIF for AssignStack {
         }
         // We assume that backtrack is never happened in level zero.
         let lim = self.trail_lim[lv as usize];
+
+        #[cfg(feature = "chrono_BT")]
         let mut unpropagated: Vec<Lit> = Vec::new();
+
         for i in lim..self.trail.len() {
             let l = self.trail[i];
             debug_assert!(
@@ -220,10 +223,13 @@ impl PropagateIF for AssignStack {
                     self.trail_lim.iter().filter(|n| **n <= i).collect::<Vec<_>>(),
                     self.decision_level(),
             );
+
+            #[cfg(feature = "chrono_BT")]
             if self.level[vi] <= lv {
                 unpropagated.push(l);
                 continue;
             }
+
             let v = &mut self.var[vi];
             #[cfg(feature = "debug_propagation")]
             v.turn_off(Flag::PROPAGATED);
@@ -244,7 +250,10 @@ impl PropagateIF for AssignStack {
         // moved below -- self.q_head = self.trail.len();
         // see https://github.com/shnarazk/splr/issues/117
         self.q_head = self.trail.len().min(self.q_head);
+
+        #[cfg(feature = "chrono_BT")]
         self.trail.append(&mut unpropagated);
+
         debug_assert!(self
             .trail
             .iter()
@@ -291,6 +300,7 @@ impl PropagateIF for AssignStack {
     where
         C: ClauseDBIF,
     {
+        let dl = self.decision_level();
         while let Some(p) = self.trail.get(self.q_head) {
             self.num_propagation += 1;
             self.q_head += 1;
@@ -495,7 +505,8 @@ impl PropagateIF for AssignStack {
                         link: NULL_LIT,
                     });
                 }
-                let lv = cdb[cid]
+                #[cfg(feature = "chrono_BT")]
+                let dl = cdb[cid]
                     .iter()
                     .skip(1)
                     .map(|l| self.level[l.vi()])
@@ -504,7 +515,7 @@ impl PropagateIF for AssignStack {
                 debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
                 assert!(other_watch_value.is_none());
-                self.assign_by_implication(cached, lv, cid, None);
+                self.assign_by_implication(cached, dl, cid, None);
 
                 #[cfg(feature = "boundary_check")]
                 {
@@ -513,7 +524,7 @@ impl PropagateIF for AssignStack {
             }
         }
         let na = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
-        if self.num_best_assign <= na && 0 < self.decision_level() {
+        if self.num_best_assign <= na && 0 < dl {
             self.best_assign = true;
             self.num_best_assign = na;
         }
@@ -535,6 +546,7 @@ impl PropagateIF for AssignStack {
     where
         C: ClauseDBIF,
     {
+        let dl = self.decision_level();
         while let Some(p) = self.trail.get(self.q_head) {
             self.q_head += 1;
             #[cfg(feature = "debug_propagation")]
@@ -692,7 +704,9 @@ impl PropagateIF for AssignStack {
 
                     return Some(cid);
                 }
-                let lv = cdb[cid]
+
+                #[cfg(feature = "chrono_BT")]
+                let dl = cdb[cid]
                     .iter()
                     .skip(1)
                     .map(|l| self.level[l.vi()])
@@ -701,7 +715,7 @@ impl PropagateIF for AssignStack {
                 debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
                 assert!(other_watch_value.is_none());
-                self.assign_by_implication(cached, lv, cid, None);
+                self.assign_by_implication(cached, dl, cid, None);
 
                 #[cfg(feature = "boundary_check")]
                 {

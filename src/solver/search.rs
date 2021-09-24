@@ -207,8 +207,9 @@ impl SolveIF for Solver {
                 // map `Option<bool>` to `i32`, and remove the dummy var at the head.
                 let vals = asg
                     .var_iter()
+                    .enumerate()
                     .skip(1)
-                    .map(|v| i32::from(Lit::from((v.index as usize, model[v.index as usize]))))
+                    .map(|(vi, _)| i32::from(Lit::from((vi, model[vi]))))
                     .collect::<Vec<i32>>();
 
                 // As a preparation for incremental solving, turn flags off.

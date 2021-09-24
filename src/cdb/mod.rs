@@ -1,3 +1,5 @@
+/// methods on clause activity
+mod activity;
 /// methods on `ClauseId`
 mod cid;
 /// methods on `Clause`
@@ -205,10 +207,12 @@ pub struct Clause {
     pub rank: u16,
     /// the index from which `propagate` starts searching an un-falsified literal.
     pub search_from: u32,
-    /// A dynamic clause evaluation criterion based on the number of references.
-    reward: f64,
     /// the number of conflicts at which this clause was used in `conflict_analyze`
     timestamp: usize,
+
+    #[cfg(feature = "clause_rewarding")]
+    /// A dynamic clause evaluation criterion based on the number of references.
+    reward: f64,
 
     #[cfg(feature = "boundary_check")]
     pub birth: usize,
@@ -434,11 +438,11 @@ mod tests {
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false)
             .as_cid();
-        cdb[c2].reward = 2.4;
+        // cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_eq!(c1 == c1, true);
         assert_ne!(c1, c2);
-        assert_eq!(cdb.activity(c2), 2.4);
+        // assert_eq!(cdb.activity(c2), 2.4);
     }
 
     #[test]

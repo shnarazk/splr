@@ -153,31 +153,6 @@ impl IndexMut<RangeFrom<usize>> for ClauseDB {
     }
 }
 
-impl ActivityIF<ClauseId> for ClauseDB {
-    fn activity(&mut self, cid: ClauseId) -> f64 {
-        let t = self.ordinal;
-        self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize].update_activity(
-            t,
-            self.activity_decay,
-            self.activity_anti_decay,
-        )
-    }
-    fn set_activity(&mut self, cid: ClauseId, val: f64) {
-        self[cid].reward = val;
-    }
-    fn reward_at_analysis(&mut self, cid: ClauseId) {
-        // Note: vivifier has its own conflict analyzer, which never call reward functions.
-        self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize].update_activity(
-            self.ordinal,
-            self.activity_decay,
-            self.activity_anti_decay,
-        );
-    }
-    fn update_activity_tick(&mut self) {
-        self.ordinal += 1;
-    }
-}
-
 impl Instantiate for ClauseDB {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> ClauseDB {
         let nv = cnf.num_of_variables;
@@ -328,6 +303,12 @@ impl ClauseDBIF for ClauseDB {
             // }
             // assert!(c.is_dead());
             c.flags = Flag::empty();
+
+            #[cfg(feature = "clause_rewarding")]
+            {
+                c.reward = 0.0;
+            }
+
             debug_assert!(c.lits.is_empty()); // c.lits.clear();
             std::mem::swap(&mut c.lits, vec);
             c.search_from = 2;
@@ -358,7 +339,6 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         c.timestamp = *ordinal;
-        c.reward = 0.5;
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
@@ -1362,7 +1342,6 @@ impl ClauseDB {
             ref mut num_reduction,
             ref ordinal,
             ref activity_decay,
-            ref activity_anti_decay,
             ..
         } = self;
         *num_reduction += 1;
@@ -1373,7 +1352,7 @@ impl ClauseDB {
                 continue;
             }
             let rank = c.update_lbd(asg, lbd_temp) as f64;
-            let act_c = c.update_activity(*ordinal, *activity_decay, *activity_anti_decay);
+            c.update_activity(*ordinal, *activity_decay, 0.0);
             if !c.is(Flag::LEARNT) || asg.locked(c, ClauseId::from(i)) {
                 continue;
             }
@@ -1393,7 +1372,13 @@ impl ClauseDB {
                 .lits
                 .iter()
                 .fold(0.0, |acc, l| acc.max(asg.activity(l.vi())));
-            let weight = rank.log2() / (act_c * act_v);
+
+            #[cfg(feature = "clause_rewarding")]
+            let act_c = c.reward;
+            #[cfg(not(feature = "clause_rewarding"))]
+            let act_c = 0.25;
+
+            let weight = rank / (act_c + act_v);
             perm.push(OrderedProxy::new(i, weight));
         }
         let keep = perm.len().min(nc) / 2;
@@ -1493,15 +1478,6 @@ fn remove_clause_fn(
 }
 
 impl Clause {
-    fn update_activity(&mut self, t: usize, decay: f64, anti_decay: f64) -> f64 {
-        if self.timestamp < t {
-            let duration = (t - self.timestamp) as f64;
-            self.reward *= decay.powf(duration);
-            self.reward += anti_decay;
-            self.timestamp = t;
-        }
-        self.reward
-    }
     /// evaluate a clause and return Option<bool>.
     /// - `Some(true)` -- the literals is satisfied by a literal
     /// - `Some(false)` -- the literals is unsatisfied; no unassigned literal

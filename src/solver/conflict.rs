@@ -24,7 +24,11 @@ pub fn handle_conflict(
     state: &mut State,
     cc: &ConflictContext,
 ) -> MaybeInconsistent {
+    #[cfg(feature = "chrono_BT")]
     let mut conflicting_level = asg.decision_level();
+    #[cfg(not(feature = "chrono_BT"))]
+    let conflicting_level = asg.decision_level();
+
     // we need a catch here for handling the possibility of level zero conflict
     // at higher level due to the incoherence between the current level and conflicting
     // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
@@ -36,32 +40,44 @@ pub fn handle_conflict(
     }
 
     // If we can settle this conflict w/o restart, solver will get a big progress.
+    #[cfg(feature = "chrono_BT")]
     let chronobt = 1000 < asg.num_conflict && 0 < state.config.c_cbt_thr;
+    #[cfg(not(feature = "chrono_BT"))]
+    let chronobt: bool = false;
+
     rst.update(ProgressUpdate::Counter);
     // rst.block_restart(); // to update asg progress_evaluator
 
-    let level = asg.level_ref();
     let c = &mut cdb[cc.cid];
 
     debug_assert!(!c.is_dead());
-    let max_level = c.iter().map(|l| level[l.vi()]).max().unwrap();
-    if chronobt
-        && state.config.c_cbt_thr < conflicting_level
-        && 1 == c.iter().filter(|l| level[l.vi()] == max_level).count()
+
+    #[cfg(feature = "chrono_BT")]
     {
-        if let Some(second_level) = c
-            .iter()
-            .map(|l| level[l.vi()])
-            .filter(|l| *l < max_level)
-            .min()
+        let level = asg.level_ref();
+        let max_level = c.iter().map(|l| level[l.vi()]).max().unwrap();
+
+        if chronobt
+            && state.config.c_cbt_thr < conflicting_level
+            && 1 == c.iter().filter(|l| level[l.vi()] == max_level).count()
         {
-            asg.cancel_until(second_level);
-            return Ok(());
+            if let Some(second_level) = c
+                .iter()
+                .map(|l| level[l.vi()])
+                .filter(|l| *l < max_level)
+                .max()
+            {
+                assert!(0 < second_level);
+                asg.cancel_until(second_level);
+                return Ok(());
+            }
         }
-    } else if max_level < conflicting_level {
-        conflicting_level = max_level;
-        asg.cancel_until(conflicting_level);
+        if max_level < conflicting_level {
+            conflicting_level = max_level;
+            asg.cancel_until(conflicting_level);
+        }
     }
+
     asg.handle(SolverEvent::Conflict);
 
     state.derive20.clear();
@@ -87,7 +103,7 @@ pub fn handle_conflict(
         //
         match asg.assigned(l0) {
             Some(true) if asg.root_level() < asg.level(l0.vi()) => {
-                panic!("eae");
+                panic!("double assignment occured");
                 // asg.lift_to_asserted(l0.vi());
             }
             Some(false) if asg.level(l0.vi()) == asg.root_level() => {
