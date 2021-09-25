@@ -378,7 +378,7 @@ Splr-0.12.0 adopts the following features by default:
 
 As shown in the blow, Splr calls in-processor very frequently.
 
-![search algorithm in Splr 0.12](https://user-images.githubusercontent.com/997855/134661416-f3a614d2-7cd7-4c82-970d-f1bb7f0d66a9.png)
+![search algorithm in Splr 0.12](https://user-images.githubusercontent.com/997855/134761834-793bab61-b0f8-44f7-8ab2-62e848db50d7.png)
 
 _Luby stabilization_ is an original mechanism to make long periods without restarts, which are called stabilized modes.
 In this method, _every clause reduction_ updates the restart interval, which usually has a constant value, as follows:
