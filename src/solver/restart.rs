@@ -104,6 +104,9 @@ pub trait RestartIF:
     /// - `Some(false)` if returns to the base restart interval
     /// - `None` if not at the base restart interval
     fn stabilize(&mut self) -> Option<bool>;
+    #[cfg(feature = "dynamic_restart_threshold")]
+    /// adjust restart threshold
+    fn adjust(&mut self, base: f64, c_lvl: f64, b_lvl: f64, used: f64);
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
 
@@ -490,6 +493,7 @@ impl RestartIF for Restarter {
             self.restart_step = self.stb.step * self.initial_restart_step;
             return Some(RestartDecision::Block);
         }
+
         if self.lbd.is_active() {
             self.restart_step = self.stb.step * self.initial_restart_step;
             return Some(RestartDecision::Force);
@@ -503,6 +507,22 @@ impl RestartIF for Restarter {
     #[cfg(not(feature = "Luby_stabilization"))]
     fn stabilize(&mut self) -> Option<bool> {
         None
+    }
+    #[cfg(feature = "dynamic_restart_threshold")]
+    fn adjust(&mut self, base: f64, c_lvl: f64, b_lvl: f64, used: f64) {
+        const DECAY: f64 = 0.75;
+        const CONTROL_FACTOR: f64 = 0.4;
+        self.lbd.threshold *= DECAY;
+        // * The larger ratio of conflicting level to backjumped level, the smaller threshold we need.
+        //   Probably there are better clauses.
+        // * The larger learnt clauses, compared with useful clauses, we get, the smaller threshold we need.
+        //   Probably there are many bad branches.
+        self.lbd.threshold += (1.0 - DECAY)
+            * (c_lvl * self.lbd.ema.get() / b_lvl)
+                .log(used)
+                .max(1.0)
+                .powf(CONTROL_FACTOR)
+                .clamp(1.0, base);
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
@@ -566,6 +586,21 @@ pub mod property {
                 Tusize::NumStage => self.stb.num_stage,
                 Tusize::IntervalScale => self.stb.step,
                 Tusize::IntervalScaleMax => self.stb.step_max,
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum Tf64 {
+        RestartThreshold,
+    }
+    pub const F64S: [Tf64; 1] = [Tf64::RestartThreshold];
+
+    impl PropertyDereference<Tf64, f64> for Restarter {
+        #[inline]
+        fn derefer(&self, k: Tf64) -> f64 {
+            match k {
+                Tf64::RestartThreshold => self.lbd.threshold,
             }
         }
     }

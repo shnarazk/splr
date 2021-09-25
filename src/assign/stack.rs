@@ -47,18 +47,12 @@ impl Default for AssignStack {
             ppc_ema: EmaSU::new(100),
             cpr_ema: EmaSU::new(100),
 
-            #[cfg(feature = "adjust_restart_parameters")]
-            cpbrema: EmaSU::new(100),
-            #[cfg(feature = "adjust_restart_parameters")]
-            in_base_interval_restart: true,
-
             ordinal: 0,
             var: Vec::new(),
 
             activity_decay: 0.94,
             activity_decay_default: 0.94,
             activity_anti_decay: 0.06,
-            activity_ema: Ema::new(1000),
             activity_decay_step: 0.1,
 
             during_vivification: false,
@@ -88,14 +82,14 @@ impl Instantiate for AssignStack {
             level: vec![DecisionLevel::default(); nv + 1],
             reason: vec![AssignReason::None; nv + 1],
             trail: Vec::with_capacity(nv),
-            var_order: VarIdHeap::new(nv, nv),
+            var_order: VarIdHeap::new(nv),
 
             num_vars: cnf.num_of_variables,
             var: Var::new_vars(nv),
 
             #[cfg(feature = "EVSIDS")]
             activity_decay: config.vrw_dcy_rat * 0.6,
-            #[cfg(feature = "LR_rewarding")]
+            #[cfg(feature = "LRB_rewarding")]
             activity_decay_default: config.vrw_dcy_rat,
 
             activity_anti_decay: 1.0 - config.vrw_dcy_rat,
@@ -114,19 +108,10 @@ impl Instantiate for AssignStack {
                 self.make_var_eliminated(vi);
             }
             #[allow(unused_variables)]
-            SolverEvent::Stabilize(lvl) => {
-                #[cfg(feature = "adjust_restart_parameters")]
-                {
-                    if lvl == 1 {
-                        self.in_base_interval_restart = true;
-                        self.cpbrema.update_base(self.num_conflict);
-                    } else {
-                        self.in_base_interval_restart = false;
-                    }
-                }
-
+            SolverEvent::Stabilize(scale) => {
                 #[cfg(feature = "rephase")]
-                self.select_rephasing_target(None, lvl);
+                self.check_consistency_of_best_phases();
+                self.select_rephasing_target(None, scale);
             }
             SolverEvent::NewVar => {
                 self.assign.push(None);
@@ -134,7 +119,7 @@ impl Instantiate for AssignStack {
                 self.reason.push(AssignReason::None);
                 self.expand_heap();
                 self.num_vars += 1;
-                self.var.push(Var::from(self.num_vars));
+                self.var.push(Var::default());
             }
             SolverEvent::Reinitialize => {
                 debug_assert_eq!(self.decision_level(), self.root_level);

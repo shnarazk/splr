@@ -183,9 +183,11 @@ pub struct State {
     pub b_lvl: Ema,
     /// EMA of conflicting levels
     pub c_lvl: Ema,
+
     #[cfg(feature = "support_user_assumption")]
     /// hold conflicting user-defined *assumed* literals for UNSAT problems
     pub conflicts: Vec<Lit>,
+
     /// chronoBT threshold
     pub chrono_bt_threshold: DecisionLevel,
     /// hold the previous number of non-conflicting assignment
@@ -220,6 +222,7 @@ impl Default for State {
 
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
+
             #[cfg(feature = "support_user_assumption")]
             conflicts: Vec::new(),
             chrono_bt_threshold: 100,
@@ -588,9 +591,9 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K         LBD|avrg:{}, trnd:{}, depG:{}, /dpc:{}",
-            fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd.get()),
+            "\x1B[2K         LBD|trnd:{}, avrg:{}, depG:{}, /dpc:{}",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
+            fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd.get()),
             fm!("{:>9.4}", self, LogF64Id::DpAverageLBD, cdb_lbd_of_dp),
             fm!(
                 "{:>9.2}",

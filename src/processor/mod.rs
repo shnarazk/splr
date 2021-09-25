@@ -86,7 +86,7 @@ pub trait EliminateIF: Instantiate {
         C: ClauseDBIF,
         R: RestartIF;
     /// return the order of vars based on their occurrences
-    fn sorted_iterator(&self) -> Iter<'_, usize>;
+    fn sorted_iterator(&self) -> Iter<'_, u32>;
     /// return vi's stats
     fn stats(&self, vi: VarId) -> Option<(usize, usize)>;
     /// return the constraints on eliminated literals.
@@ -183,8 +183,10 @@ mod tests {
         );
         let elim_vars = asg
             .var_iter()
-            .filter(|v| v.is(Flag::ELIMINATED))
-            .map(|v| v.index)
+            .enumerate()
+            .skip(1)
+            .filter(|(_, v)| v.is(Flag::ELIMINATED))
+            .map(|(vi, _)| vi)
             .collect::<Vec<_>>();
         assert_eq!(
             0,

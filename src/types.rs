@@ -2,7 +2,7 @@
 /// some common traits.
 pub use crate::{
     assign::AssignReason,
-    cdb::{Clause, ClauseIF, ClauseId, ClauseIdIF},
+    cdb::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
     config::Config,
 };
 use {
@@ -43,8 +43,6 @@ pub trait LitIF {
 pub trait ActivityIF<Ix> {
     /// return one's activity.
     fn activity(&mut self, ix: Ix) -> f64;
-    /// return average activity
-    fn average_activity(&self) -> f64;
     /// set activity
     fn set_activity(&mut self, ix: Ix, val: f64);
     /// modify one's activity at conflict analysis in `conflict_analyze` in [`solver`](`crate::solver`).
@@ -68,7 +66,7 @@ pub trait ActivityIF<Ix> {
         todo!()
     }
     /// update internal counter.
-    fn update_rewards(&mut self);
+    fn update_activity_tick(&mut self);
     /// update reward decay.
     fn update_activity_decay(&mut self, _index: Option<usize>) {
         #[cfg(debug)]
@@ -363,6 +361,26 @@ impl LitIF for Lit {
     #[inline]
     fn is_none(&self) -> bool {
         self.ordinal == 0
+    }
+}
+
+/// Capture which literal and clause emits the present conflict.
+/// * conflict by a biclause if `link == NULL_LIT`.
+/// * conflict by a normal clause otherwise.
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub struct ConflictContext {
+    pub cid: ClauseId,
+    pub link: Lit,
+}
+
+impl ConflictContext {
+    pub fn conflicting_literal(&self, cdb: &ClauseDB) -> Lit {
+        let lit0 = cdb[self.cid].lit0();
+        if lit0 == self.link {
+            cdb[self.cid].lit1()
+        } else {
+            lit0
+        }
     }
 }
 
@@ -760,6 +778,8 @@ pub trait FlagIF {
     fn is(&self, flag: Flag) -> bool;
     /// set the flag.
     fn set(&mut self, f: Flag, b: bool);
+    // toggle the flag.
+    fn toggle(&mut self, flag: Flag);
     /// toggle the flag off.
     fn turn_off(&mut self, flag: Flag);
     /// toggle the flag on.
@@ -785,7 +805,8 @@ bitflags! {
         const VIVIFIED2    = 0b0000_0000_0010_0000;
         /// a given clause derived a learnt which LBD is smaller than 20.
         const DERIVE20     = 0b0000_0000_0100_0000;
-
+        /// used in conflict analyze
+        const USED         = 0b0000_0000_1000_0000;
         //
         //## For Var
         //

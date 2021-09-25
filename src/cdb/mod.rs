@@ -1,3 +1,5 @@
+/// methods on clause activity
+mod activity;
 /// methods on `ClauseId`
 mod cid;
 /// methods on `Clause`
@@ -199,16 +201,18 @@ pub struct ClauseId {
 pub struct Clause {
     /// The literals in a clause.
     lits: Vec<Lit>,
+    /// Flags (16 bits)
+    flags: Flag,
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: u16,
     /// the index from which `propagate` starts searching an un-falsified literal.
-    pub search_from: usize,
-    /// A dynamic clause evaluation criterion based on the number of references.
-    reward: f64,
+    pub search_from: u32,
     /// the number of conflicts at which this clause was used in `conflict_analyze`
     timestamp: usize,
-    /// Flags
-    flags: Flag,
+
+    #[cfg(feature = "clause_rewarding")]
+    /// A dynamic clause evaluation criterion based on the number of references.
+    reward: f64,
 
     #[cfg(feature = "boundary_check")]
     pub birth: usize,
@@ -256,7 +260,6 @@ pub struct ClauseDB {
     ordinal: usize,
     activity_decay: f64,
     activity_anti_decay: f64,
-    activity_ema: Ema,
 
     //
     //## LBD
@@ -273,8 +276,8 @@ pub struct ClauseDB {
     /// bonus step of reduction threshold used in good progress
     extra_inc: usize,
     first_reduction: usize,
-    next_reduction_step: usize, // renamed from `nbclausesbeforereduce`
     next_reduction: usize,
+    reduction_step: usize, // renamed from `nbclausesbeforereduce`
     reducible: bool,
 
     //
@@ -435,11 +438,11 @@ mod tests {
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false)
             .as_cid();
-        cdb[c2].reward = 2.4;
+        // cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_eq!(c1 == c1, true);
         assert_ne!(c1, c2);
-        assert_eq!(cdb.activity(c2), 2.4);
+        // assert_eq!(cdb.activity(c2), 2.4);
     }
 
     #[test]

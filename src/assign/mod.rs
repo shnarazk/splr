@@ -5,7 +5,7 @@ mod heap;
 mod propagate;
 /// Var rewarding
 #[cfg_attr(feature = "EVSIDS", path = "evsids.rs")]
-#[cfg_attr(feature = "LR_rewarding", path = "learning_rate.rs")]
+#[cfg_attr(feature = "LRB_rewarding", path = "learning_rate.rs")]
 mod reward;
 /// Decision var selection
 mod select;
@@ -18,7 +18,7 @@ pub use self::{propagate::PropagateIF, property::*, select::VarSelectIF, var::Va
 #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
 use std::collections::HashMap;
 use {
-    self::heap::VarHeapIF,
+    self::heap::{VarHeapIF, VarIdHeap},
     super::{cdb::ClauseDBIF, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
@@ -103,19 +103,15 @@ impl fmt::Display for AssignReason {
 /// Object representing a variable.
 #[derive(Clone, Debug)]
 pub struct Var {
-    /// reverse conversion to index. Note `VarId` must be `usize`.
-    pub index: VarId,
-    /// the number of participation in conflict analysis
-    participated: u32,
+    /// the `Flag`s (16 bits)
+    flags: Flag,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
     reward: f64,
-    /// the number of conflicts at which this var was assigned an rewarded lastly.
-    timestamp: usize,
-    /// the `Flag`s
-    flags: Flag,
 
     #[cfg(feature = "boundary_check")]
     pub propagated_at: usize,
+    #[cfg(feature = "boundary_check")]
+    pub timestamp: usize,
     #[cfg(feature = "boundary_check")]
     pub state: VarState,
 }
@@ -170,11 +166,6 @@ pub struct AssignStack {
     ppc_ema: EmaSU,
     /// Conflicts Per Restart
     cpr_ema: EmaSU,
-    #[cfg(feature = "adjust_restart_parameters")]
-    /// Conflicts Per Base Interval Restart
-    cpbrema: EmaSU,
-    #[cfg(feature = "adjust_restart_parameters")]
-    in_base_interval_restart: bool,
 
     //
     //## Var DB
@@ -193,8 +184,6 @@ pub struct AssignStack {
     activity_decay_default: f64,
     /// its diff
     activity_anti_decay: f64,
-    /// EMA of activity
-    activity_ema: Ema,
     /// ONLY used in feature EVSIDS
     activity_decay_step: f64,
 
@@ -202,20 +191,6 @@ pub struct AssignStack {
     //## Vivification
     //
     during_vivification: bool,
-}
-
-/// Heap of VarId, based on var activity.
-// # Note
-// - both fields has a fixed length. Don't use push and pop.
-// - `idxs[0]` contains the number of alive elements
-//   `indx` is positions. So the unused field 0 can hold the last position as a special case.
-#[derive(Clone, Debug)]
-pub struct VarIdHeap {
-    /// order : usize -> VarId, -- Which var is the n-th best?
-    heap: Vec<VarId>,
-    /// VarId : -> order : usize -- How good is the var?
-    /// `idxs[0]` holds the number of alive elements
-    idxs: Vec<usize>,
 }
 
 #[cfg(feature = "boundary_check")]

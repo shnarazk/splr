@@ -11,11 +11,13 @@ impl Default for Clause {
     fn default() -> Clause {
         Clause {
             lits: vec![],
+            flags: Flag::empty(),
             rank: 0,
             search_from: 2,
-            reward: 0.0,
             timestamp: 0,
-            flags: Flag::empty(),
+
+            #[cfg(feature = "clause_rewarding")]
+            reward: 0.0,
 
             #[cfg(feature = "boundary_check")]
             birth: 0,
@@ -170,6 +172,7 @@ impl ClauseIF for Clause {
     fn timestamp(&self) -> usize {
         self.timestamp
     }
+    #[cfg(feature = "clause_rewarding")]
     fn to_vivify(&self, initial_stage: bool) -> Option<f64> {
         if initial_stage {
             (!self.is_dead()).then(|| self.len() as f64)
@@ -179,6 +182,18 @@ impl ClauseIF for Clause {
                 && self.is(Flag::VIVIFIED2)
                 && (self.is(Flag::LEARNT) || self.is(Flag::DERIVE20)))
             .then(|| self.reward)
+        }
+    }
+    #[cfg(not(feature = "clause_rewarding"))]
+    fn to_vivify(&self, initial_stage: bool) -> Option<f64> {
+        if initial_stage {
+            (!self.is_dead()).then(|| self.len() as f64)
+        } else {
+            (!self.is_dead()
+                && self.is(Flag::VIVIFIED)
+                && self.is(Flag::VIVIFIED2)
+                && (self.is(Flag::LEARNT) || self.is(Flag::DERIVE20)))
+            .then(|| -(self.rank as f64))
         }
     }
     fn vivified(&mut self) {
@@ -201,6 +216,9 @@ impl FlagIF for Clause {
     }
     fn set(&mut self, f: Flag, b: bool) {
         self.flags.set(f, b);
+    }
+    fn toggle(&mut self, flag: Flag) {
+        self.flags.toggle(flag);
     }
     fn turn_off(&mut self, flag: Flag) {
         self.flags.remove(flag);

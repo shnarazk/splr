@@ -28,14 +28,13 @@ impl Default for ClauseDB {
             ordinal: 0,
             activity_decay: 0.99,
             activity_anti_decay: 0.01,
-            activity_ema: Ema::new(1000),
             lbd_temp: Vec::new(),
             num_lbd_update: 0,
             inc_step: 300,
             extra_inc: 1000,
             first_reduction: 1000,
-            next_reduction_step: 1000,
             next_reduction: 1000,
+            reduction_step: 1000,
             reducible: true,
             num_clause: 0,
             num_bi_clause: 0,
@@ -151,36 +150,6 @@ impl IndexMut<RangeFrom<usize>> for ClauseDB {
         }
         #[cfg(not(feature = "unsafe_access"))]
         &mut self.clause[r]
-    }
-}
-
-impl ActivityIF<ClauseId> for ClauseDB {
-    fn activity(&mut self, cid: ClauseId) -> f64 {
-        let t = self.ordinal;
-        self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize].update_activity(
-            t,
-            self.activity_decay,
-            self.activity_anti_decay,
-        )
-    }
-    fn average_activity(&self) -> f64 {
-        self.activity_ema.get()
-    }
-    fn set_activity(&mut self, cid: ClauseId, val: f64) {
-        self[cid].reward = val;
-    }
-    fn reward_at_analysis(&mut self, cid: ClauseId) {
-        // Note: vivifier has its own conflict analyzer, which never call reward functions.
-        let t = self.ordinal;
-        let r = self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize].update_activity(
-            t,
-            self.activity_decay,
-            self.activity_anti_decay,
-        );
-        self.activity_ema.update(r);
-    }
-    fn update_rewards(&mut self) {
-        self.ordinal += 1;
     }
 }
 
@@ -334,6 +303,12 @@ impl ClauseDBIF for ClauseDB {
             // }
             // assert!(c.is_dead());
             c.flags = Flag::empty();
+
+            #[cfg(feature = "clause_rewarding")]
+            {
+                c.reward = 0.0;
+            }
+
             debug_assert!(c.lits.is_empty()); // c.lits.clear();
             std::mem::swap(&mut c.lits, vec);
             c.search_from = 2;
@@ -1364,15 +1339,21 @@ impl ClauseDB {
             ref mut clause,
             ref co_lbd_bound,
             ref mut lbd_temp,
+            ref mut num_reduction,
             ref ordinal,
             ref activity_decay,
-            ref activity_anti_decay,
             ..
         } = self;
-        self.num_reduction += 1;
+        *num_reduction += 1;
+
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
-            if !c.is(Flag::LEARNT) || c.is_dead() || asg.locked(c, ClauseId::from(i)) {
+            if c.is_dead() {
+                continue;
+            }
+            let rank = c.update_lbd(asg, lbd_temp) as f64;
+            c.update_activity(*ordinal, *activity_decay, 0.0);
+            if !c.is(Flag::LEARNT) || asg.locked(c, ClauseId::from(i)) {
                 continue;
             }
 
@@ -1386,28 +1367,33 @@ impl ClauseDB {
             }
 
             // This is the best at least for 3SAT360.
-            let rank = c.update_lbd(asg, lbd_temp) as f64;
+
             let act_v: f64 = c
                 .lits
                 .iter()
                 .fold(0.0, |acc, l| acc.max(asg.activity(l.vi())));
-            let act_c = c.update_activity(*ordinal, *activity_decay, *activity_anti_decay);
-            let weight = rank / (act_v + act_c);
+
+            #[cfg(feature = "clause_rewarding")]
+            let act_c = c.reward;
+            #[cfg(not(feature = "clause_rewarding"))]
+            let act_c = 0.25;
+
+            let weight = rank / (act_c + act_v);
             perm.push(OrderedProxy::new(i, weight));
         }
         let keep = perm.len().min(nc) / 2;
 
-        let mut reduction_coeff: f64 = (nc as f64) / (self.next_reduction_step as f64) + 1.0;
-        self.next_reduction_step += self.inc_step;
+        let mut reduction_coeff: f64 = (nc as f64) / (self.reduction_step as f64) + 1.0;
+        self.reduction_step += self.inc_step;
         if perm.is_empty() {
-            self.next_reduction = (reduction_coeff * self.next_reduction_step as f64) as usize;
+            self.next_reduction = (reduction_coeff * self.reduction_step as f64) as usize;
             return true;
         }
         if !self.use_chan_seok {
             if clause[perm[keep].to()].rank <= *co_lbd_bound {
                 reduction_coeff *= 1.1;
             }
-            self.next_reduction = (reduction_coeff * self.next_reduction_step as f64) as usize;
+            self.next_reduction = (reduction_coeff * self.reduction_step as f64) as usize;
         }
         perm.sort();
         // let thr = self.lbd_of_dp_ema.get() as u16;
@@ -1492,15 +1478,6 @@ fn remove_clause_fn(
 }
 
 impl Clause {
-    fn update_activity(&mut self, t: usize, decay: f64, anti_decay: f64) -> f64 {
-        if self.timestamp < t {
-            let duration = (t - self.timestamp) as f64;
-            self.reward *= decay.powf(duration);
-            self.reward += anti_decay;
-            self.timestamp = t;
-        }
-        self.reward
-    }
     /// evaluate a clause and return Option<bool>.
     /// - `Some(true)` -- the literals is satisfied by a literal
     /// - `Some(false)` -- the literals is unsatisfied; no unassigned literal

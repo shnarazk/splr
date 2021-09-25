@@ -7,7 +7,7 @@ use {
     crate::{
         assign::{self, AssignIF},
         cdb::{self, ClauseDBIF},
-        solver::{restart::RestartIF, SolverEvent},
+        solver::{restart, restart::RestartIF, SolverEvent},
         state::{State, StateIF},
         types::*,
     },
@@ -208,9 +208,9 @@ impl Instantiate for Eliminator {
             SolverEvent::NewVar => {
                 let len = self.var_queue.heap.len();
                 self.var.push(LitOccurs::default());
-                self.var_queue.heap.push(len);
-                self.var_queue.idxs.push(len);
-                self.var_queue.idxs[0] = len;
+                self.var_queue.heap.push(len as u32);
+                self.var_queue.idxs.push(len as u32);
+                self.var_queue.idxs[0] = len as u32;
             }
             SolverEvent::Reinitialize => {
                 self.elim_lits.clear();
@@ -300,6 +300,7 @@ impl EliminateIF for Eliminator {
             }
         }
         if self.enable {
+            self.eliminate_grow_limit = rst.derefer(restart::property::Tusize::IntervalScale) / 2;
             self.subsume_literal_limit = (state.config.elm_cls_lim
                 + cdb.derefer(cdb::property::Tf64::DpAverageLBD) as usize)
                 / 2;
@@ -313,15 +314,16 @@ impl EliminateIF for Eliminator {
                 self.stop(asg, cdb);
             }
         } else {
-            asg.propagate(cdb)
-                .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
+            asg.propagate(cdb).map_or(Ok(()), |cc| {
+                Err(SolverError::RootLevelConflict(Some(cc.cid)))
+            })?;
         }
         if self.mode != EliminatorMode::Dormant {
             self.stop(asg, cdb);
         }
         cdb.check_size().map(|_| ())
     }
-    fn sorted_iterator(&self) -> Iter<'_, usize> {
+    fn sorted_iterator(&self) -> Iter<'_, u32> {
         self.var_queue.heap[1..].iter()
     }
     fn stats(&self, vi: VarId) -> Option<(usize, usize)> {
@@ -527,8 +529,9 @@ impl Eliminator {
             }
         }
         if asg.remains() {
-            asg.propagate(cdb)
-                .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
+            asg.propagate(cdb).map_or(Ok(()), |cc| {
+                Err(SolverError::RootLevelConflict(Some(cc.cid)))
+            })?;
         }
         Ok(())
     }
@@ -553,8 +556,9 @@ impl Eliminator {
         loop {
             let na = asg.stack_len();
             self.eliminate_main(asg, cdb, rst, state)?;
-            asg.propagate(cdb)
-                .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
+            asg.propagate(cdb).map_or(Ok(()), |cc| {
+                Err(SolverError::RootLevelConflict(Some(cc.cid)))
+            })?;
             if na == asg.stack_len()
                 && (!self.is_running()
                     || (0 == self.clause_queue_len() && 0 == self.var_queue_len()))
@@ -608,8 +612,9 @@ impl Eliminator {
             }
             self.backward_subsumption_check(asg, cdb, &mut timedout)?;
             debug_assert!(self.clause_queue.is_empty());
-            asg.propagate(cdb)
-                .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
+            asg.propagate(cdb).map_or(Ok(()), |cc| {
+                Err(SolverError::RootLevelConflict(Some(cc.cid)))
+            })?;
             if timedout == 0 {
                 self.clear_clause_queue(cdb);
                 self.clear_var_queue(asg);

@@ -2,3 +2,4 @@
 **/*.rs.bk
 *.cnf
 .ans_*
+.vscode

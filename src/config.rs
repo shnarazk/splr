@@ -137,12 +137,12 @@ impl Default for Config {
 
             crw_dcy_rat: 0.95,
 
-            elm_cls_lim: 18,
+            elm_cls_lim: 64,
             elm_grw_lim: 0,
             elm_var_occ: 20000,
 
             rst_step: 2,
-            rst_asg_len: 24,
+            rst_asg_len: 16,
             rst_asg_slw: 8192,
             rst_asg_thr: 0.6,
             rst_lbd_len: 8,
@@ -154,12 +154,12 @@ impl Default for Config {
 
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_rat: 0.98,
-            #[cfg(feature = "LR_rewarding")]
-            vrw_dcy_rat: 0.94,
+            #[cfg(feature = "LRB_rewarding")]
+            vrw_dcy_rat: 0.96,
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_stp: 0.0001,
-            #[cfg(feature = "LR_rewarding")]
-            vrw_dcy_stp: 0.1,
+            #[cfg(feature = "LRB_rewarding")]
+            vrw_dcy_stp: 0.0,
         }
     }
 }
@@ -330,7 +330,7 @@ impl Config {
                 "incremental solver",
                 #[cfg(feature = "just_used")]
                 "use_just_used_flag",
-                #[cfg(feature = "LR_rewarding")]
+                #[cfg(feature = "LRB_rewarding")]
                 "Learning-Rate based rewarding",
                 #[cfg(feature = "Luby_restart")]
                 "Luby restart",

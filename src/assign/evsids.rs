@@ -8,9 +8,6 @@ impl ActivityIF<VarId> for AssignStack {
     fn activity(&mut self, vi: VarId) -> f64 {
         self.var[vi].reward
     }
-    fn average_activity(&self) -> f64 {
-        self.activity_ema.get()
-    }
     fn set_activity(&mut self, vi: VarId, val: f64) {
         self.var[vi].reward = val;
     }
@@ -32,7 +29,7 @@ impl ActivityIF<VarId> for AssignStack {
             self.activity_decay_step *= SCALE;
         }
     }
-    fn update_rewards(&mut self) {
+    fn update_activity_tick(&mut self) {
         const INC_SCALE: f64 = 1.01;
         if self.ordinal == 0 {
             self.activity_decay *= 0.5;

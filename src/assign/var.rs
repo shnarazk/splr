@@ -11,14 +11,13 @@ use {
 impl Default for Var {
     fn default() -> Var {
         Var {
-            index: 0,
-            participated: 0,
             reward: 0.0,
-            timestamp: 0,
             flags: Flag::empty(),
 
             #[cfg(feature = "boundary_check")]
             propagated_at: 0,
+            #[cfg(feature = "boundary_check")]
+            timestamp: 0,
             #[cfg(feature = "boundary_check")]
             state: VarState::Unassigned(0),
         }
@@ -28,33 +27,14 @@ impl Default for Var {
 impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
-        write!(
-            f,
-            "V{{{} {}}}",
-            self.index,
-            st(Flag::ELIMINATED, ", eliminated"),
-        )
-    }
-}
-
-impl From<usize> for Var {
-    #[inline]
-    fn from(i: usize) -> Self {
-        Var {
-            index: i,
-            ..Var::default()
-        }
+        write!(f, "V{{{}}}", st(Flag::ELIMINATED, ", eliminated"),)
     }
 }
 
 impl Var {
     /// return a new vector of $n$ `Var`s.
     pub fn new_vars(n: usize) -> Vec<Var> {
-        let mut vec = Vec::with_capacity(n + 1);
-        for i in 0..=n {
-            vec.push(Var::from(i));
-        }
-        vec
+        vec![Var::default(); n + 1]
     }
     pub fn activity(&self) -> f64 {
         self.reward
@@ -77,6 +57,10 @@ impl FlagIF for Var {
     #[inline]
     fn turn_on(&mut self, flag: Flag) {
         self.flags.insert(flag);
+    }
+    #[inline]
+    fn toggle(&mut self, flag: Flag) {
+        self.flags.toggle(flag);
     }
 }
 
@@ -164,21 +148,31 @@ impl AssignStack {
     /// make a var asserted.
     pub fn make_var_asserted(&mut self, vi: VarId) {
         self.reason[vi] = AssignReason::Asserted(self.num_conflict);
-        self.var[vi].timestamp = self.ordinal;
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
+
+        #[cfg(feature = "boundary_check")]
+        {
+            self.var[vi].timestamp = self.ordinal;
+        }
+
         #[cfg(feature = "best_phases_tracking")]
         self.check_best_phase(vi);
     }
     pub fn make_var_eliminated(&mut self, vi: VarId) {
         if !self.var[vi].is(Flag::ELIMINATED) {
             self.var[vi].turn_on(Flag::ELIMINATED);
-            self.var[vi].timestamp = self.ordinal;
             self.set_activity(vi, 0.0);
             self.remove_from_heap(vi);
             debug_assert_eq!(self.decision_level(), self.root_level);
             self.trail.retain(|l| l.vi() != vi);
             self.num_eliminated_vars += 1;
+
+            #[cfg(feature = "boundary_check")]
+            {
+                self.var[vi].timestamp = self.ordinal;
+            }
+
             #[cfg(feature = "trace_elimination")]
             {
                 let lv = self.level[vi];

@@ -5,34 +5,33 @@ use {
 };
 
 impl ActivityIF<VarId> for AssignStack {
+    #[inline]
     fn activity(&mut self, vi: VarId) -> f64 {
-        self.var[vi].activity()
-    }
-    fn average_activity(&self) -> f64 {
-        self.activity_ema.get()
+        self.var[vi].reward
     }
     fn set_activity(&mut self, vi: VarId, val: f64) {
         self.var[vi].reward = val;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
-        self.var[vi].participated += 1;
-        self.activity_ema.update(self.var[vi].reward);
+        self.var[vi].turn_on(Flag::USED);
     }
-    fn reward_at_assign(&mut self, vi: VarId) {
-        self.var[vi].timestamp = self.ordinal;
-    }
+    #[inline]
+    fn reward_at_assign(&mut self, _vi: VarId) {}
+    #[inline]
     fn reward_at_propagation(&mut self, _vi: VarId) {}
+    #[inline]
     fn reward_at_unassign(&mut self, vi: VarId) {
-        self.var[vi].update_activity(self.ordinal, self.activity_decay, self.activity_anti_decay);
+        self.var[vi].update_activity(self.activity_decay, self.activity_anti_decay);
     }
     // Note: `update_rewards` should be called before `cancel_until`
-    fn update_rewards(&mut self) {
+    #[inline]
+    fn update_activity_tick(&mut self) {
         self.ordinal += 1;
     }
 }
 
 impl Var {
-    fn update_activity(&mut self, t: usize, decay: f64, reward: f64) -> f64 {
+    fn update_activity(&mut self, decay: f64, reward: f64) -> f64 {
         // Note: why the condition can be broken.
         //
         // 1. asg.ordinal += 1;
@@ -41,12 +40,10 @@ impl Var {
         // 1. restart
         // 1. cancel_until -> reward_at_unassign -> assertion failed
         //
-        if self.timestamp < t {
-            let rate = self.participated as f64 / (t - self.timestamp) as f64;
-            self.reward *= decay;
-            self.reward += (1.0 - (rate - 1.0).powf(2.0)).powf(0.5) * reward;
-            self.participated = 0;
-            self.timestamp = t;
+        self.reward *= decay;
+        if self.is(Flag::USED) {
+            self.reward += reward;
+            self.turn_off(Flag::USED);
         }
         self.reward
     }
