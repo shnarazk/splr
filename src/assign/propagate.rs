@@ -846,7 +846,7 @@ impl AssignStack {
 impl AssignStack {
     fn append_saved_literals(&mut self) -> Result<(), ConflictContext> {
         let dl = self.decision_level();
-        for i in (0..=self.trail_saved.len()).rev() {
+        for i in (0..self.trail_saved.len()).rev() {
             let lit = self.trail_saved[i];
             let vi = lit.vi();
             match self.reason_saved[vi] {
