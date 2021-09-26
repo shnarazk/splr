@@ -301,6 +301,7 @@ impl PropagateIF for AssignStack {
         C: ClauseDBIF,
     {
         let dl = self.decision_level();
+        self.append_saved_literals().unwrap();
         while let Some(p) = self.trail.get(self.q_head) {
             self.num_propagation += 1;
             self.q_head += 1;
@@ -522,6 +523,7 @@ impl PropagateIF for AssignStack {
                     cdb[cid].moved_at = Propagate::BecameUnit(self.num_conflict, cached);
                 }
             }
+            self.append_saved_literals().unwrap();
         }
         let na = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
         if self.num_best_assign <= na && 0 < dl {
@@ -836,6 +838,14 @@ impl AssignStack {
         {
             self.phase_age = 0;
         }
+    }
+}
+
+//
+//## Trail Saving
+impl AssignStack {
+    fn append_saved_literals(&mut self) -> Result<(), ConflictContext> {
+        Ok(())
     }
 }
 

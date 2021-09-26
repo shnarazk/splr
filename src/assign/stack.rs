@@ -20,6 +20,7 @@ impl Default for AssignStack {
             level: Vec::new(),
             reason: Vec::new(),
             trail: Vec::new(),
+            trail_saved: Vec::new(),
             trail_lim: Vec::new(),
             q_head: 0,
             root_level: 0,
