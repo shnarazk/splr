@@ -127,12 +127,17 @@ pub struct AssignStack {
     reason: Vec<AssignReason>,
     /// record of assignment
     trail: Vec<Lit>,
-    trail_saved: Vec<Lit>,
     trail_lim: Vec<usize>,
     /// the-number-of-assigned-and-propagated-vars + 1
     q_head: usize,
     root_level: DecisionLevel,
     var_order: VarIdHeap, // Variable Order
+
+    //
+    //## Trail Saving
+    //
+    reason_saved: Vec<AssignReason>,
+    trail_saved: Vec<Lit>,
 
     //
     //## Phase handling

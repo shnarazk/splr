@@ -20,11 +20,13 @@ impl Default for AssignStack {
             level: Vec::new(),
             reason: Vec::new(),
             trail: Vec::new(),
-            trail_saved: Vec::new(),
             trail_lim: Vec::new(),
             q_head: 0,
             root_level: 0,
             var_order: VarIdHeap::default(),
+
+            trail_saved: Vec::new(),
+            reason_saved: Vec::new(),
 
             best_assign: false,
             build_best_at: 0,
@@ -84,6 +86,9 @@ impl Instantiate for AssignStack {
             reason: vec![AssignReason::None; nv + 1],
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv),
+
+            trail_saved: Vec::with_capacity(nv),
+            reason_saved: vec![AssignReason::None; nv + 1],
 
             num_vars: cnf.num_of_variables,
             var: Var::new_vars(nv),

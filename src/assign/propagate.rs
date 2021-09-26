@@ -845,6 +845,34 @@ impl AssignStack {
 //## Trail Saving
 impl AssignStack {
     fn append_saved_literals(&mut self) -> Result<(), ConflictContext> {
+        let dl = self.decision_level();
+        for i in (0..=self.trail_saved.len()).rev() {
+            let lit = self.trail_saved[i];
+            let vi = lit.vi();
+            match self.reason_saved[vi] {
+                AssignReason::Decision(_lv) => {
+                    if self.assigned(lit) == Some(true) {
+                        continue;
+                    }
+                    self.trail_saved.truncate(self.trail_saved.len() - i);
+                    return Ok(());
+                }
+                AssignReason::Implication(c, l) => match self.assigned(lit) {
+                    Some(true) => continue,
+                    Some(false) => return Err(ConflictContext { cid: c, link: l }),
+                    None => {
+                        self.assign_by_implication(
+                            lit,
+                            dl,
+                            c,
+                            if l == NULL_LIT { None } else { Some(l) },
+                        );
+                    }
+                },
+                AssignReason::Asserted(_timestamp) => panic!("impossible path"),
+                AssignReason::None => panic!("impossible path"),
+            }
+        }
         Ok(())
     }
 }
