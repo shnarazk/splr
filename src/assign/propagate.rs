@@ -823,12 +823,12 @@ impl AssignStack {
                     RefClause::EmptyClause => return Some(cid),
                     RefClause::RegisteredClause(_) => (),
                     RefClause::UnitClause(lit) => {
-                        assert!(self.assigned(lit).is_none());
+                        debug_assert!(self.assigned(lit).is_none());
                         cdb.certificate_add_assertion(lit);
                         if self.assign_at_root_level(lit).is_err() {
                             return Some(cid);
                         } else {
-                            assert!(!self.locked(&cdb[cid], cid));
+                            debug_assert!(!self.locked(&cdb[cid], cid));
                             cdb.remove_clause(cid);
                         }
                     }
