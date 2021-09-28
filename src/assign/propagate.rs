@@ -321,12 +321,15 @@ impl PropagateIF for AssignStack {
 
         #[cfg(feature = "trail_saving")]
         {
-            if let Err(cc) = self.append_saved_literals(cdb) {
-                self.num_propagation += 1;
-                self.num_conflict += 1;
-                self.dpc_ema.update(self.num_decision);
-                self.ppc_ema.update(self.num_propagation);
-                return Some(cc);
+            if let Err(cc) = self.append_saved_literals() {
+                let c = &cdb[cc.cid];
+                if self.locked(c, cc.cid) {
+                    self.num_propagation += 1;
+                    self.num_conflict += 1;
+                    self.dpc_ema.update(self.num_decision);
+                    self.ppc_ema.update(self.num_propagation);
+                    return Some(cc);
+                }
             }
         }
 
@@ -553,12 +556,15 @@ impl PropagateIF for AssignStack {
             }
             #[cfg(feature = "trail_saving")]
             {
-                if let Err(cc) = self.append_saved_literals(cdb) {
-                    self.num_propagation += 1;
-                    self.num_conflict += 1;
-                    self.dpc_ema.update(self.num_decision);
-                    self.ppc_ema.update(self.num_propagation);
-                    return Some(cc);
+                if let Err(cc) = self.append_saved_literals() {
+                    let c = &cdb[cc.cid];
+                    if self.locked(c, cc.cid) {
+                        self.num_propagation += 1;
+                        self.num_conflict += 1;
+                        self.dpc_ema.update(self.num_decision);
+                        self.ppc_ema.update(self.num_propagation);
+                        return Some(cc);
+                    }
                 }
             }
         }
@@ -883,13 +889,10 @@ impl AssignStack {
 
 #[cfg(feature = "trail_saving")]
 impl AssignStack {
-    fn append_saved_literals<C>(&mut self, cdb: &C) -> Result<(), ConflictContext>
-    where
-        C: ClauseDBIF,
-    {
+    fn append_saved_literals(&mut self) -> Result<(), ConflictContext> {
         let dl = self.decision_level();
         if let Some(last) = self.trail_saved.last() {
-            assert!(matches!(
+            debug_assert!(matches!(
                 self.reason_saved[last.vi()],
                 AssignReason::Decision(_)
             ));
@@ -909,14 +912,7 @@ impl AssignStack {
                         return Ok(());
                     }
                     None => {
-                        // THIS IS THE PROBREM.
                         self.trail_saved.truncate(i + 1);
-                        // for j in i + 1..self.trail_saved.len() {
-                        //     let vi = self.trail_saved[j].vi();
-                        //     self.reason_saved[vi] = AssignReason::None;
-                        // }
-                        // assert_eq!(self.trail_saved.last(), Some(&lit));
-                        // self.trail_saved.clear();
                         return Ok(());
                     }
                 },
@@ -932,45 +928,10 @@ impl AssignStack {
                         //         || self.reason[l.vi()] != AssignReason::None
                         // );
                         self.trail_saved.clear();
-                        // return Ok(());
-                        assert!(cdb[c].iter().all(|k| self.assigned(*k) == Some(false)));
-                        if cdb[c].lit0() == lit {
-                            return Err(ConflictContext { cid: c, link: l });
-                        } else if let AssignReason::Implication(d, _) =
-                            self.reason[cdb[c].lit0().vi()]
-                        {
-                            if d == c {
-                                return Err(ConflictContext { cid: c, link: l });
-                                // return Ok(());
-                            } else {
-                                return Ok(());
-                            }
-                        }
-                        // return Err(ConflictContext { cid: c, link: l });
-                        return Ok(());
+                        return Err(ConflictContext { cid: c, link: l });
                     }
                     None => {
-                        // assert!(self.reason[lit.vi()] == AssignReason::None);
-                        // assert!(
-                        //     l != NULL_LIT
-                        //         || cdb[c]
-                        //             .iter()
-                        //             .skip(1)
-                        //             .all(|k| self.assigned(*k) == Some(false))
-                        // );
-                        // assert!(
-                        //     l == NULL_LIT
-                        //         || self.assigned(l) == Some(false)
-                        //         || self.reason[l.vi()] != AssignReason::None
-                        // );
-                        // assert!(!self.trail.contains(&lit));
-                        assert!(l != NULL_LIT || cdb[c].lit0() == lit);
-                        self.assign_by_implication(
-                            lit,
-                            dl,
-                            c,
-                            if l == NULL_LIT { None } else { Some(l) },
-                        );
+                        self.assign_by_implication(lit, dl, c, l);
                     }
                 },
                 AssignReason::Asserted(_timestamp) => panic!("impossible path"),
