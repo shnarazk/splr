@@ -144,6 +144,10 @@ impl Instantiate for AssignStack {
                     self.var.iter().filter(|v| v.is(Flag::ELIMINATED)).count();
                 self.rebuild_order();
             }
+            SolverEvent::Restart => {
+                #[cfg(feature = "trail_saving")]
+                self.clear_saved_literals();
+            }
             e => panic!("don't call asg with {:?}", e),
         }
     }

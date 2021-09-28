@@ -201,6 +201,22 @@ impl PropagateIF for AssignStack {
         // We assume that backtrack is never happened in level zero.
         let lim = self.trail_lim[lv as usize];
 
+        #[cfg(feature = "trail_saving")]
+        {
+            let dl = self.decision_level();
+            self.clear_saved_literals();
+            for i in (lim..self.trail.len()).rev() {
+                let l = self.trail[i];
+                let vi = l.vi();
+                if self.level[vi] < dl && lv < self.level[vi] {
+                    self.trail_saved.push(l);
+                    self.reason_saved[vi] = self.reason[vi];
+                } else {
+                    self.reason_saved[vi] = AssignReason::None;
+                }
+            }
+        }
+
         #[cfg(feature = "chrono_BT")]
         let mut unpropagated: Vec<Lit> = Vec::new();
 
@@ -242,31 +258,11 @@ impl PropagateIF for AssignStack {
             }
 
             unset_assign!(self, vi);
-
-            #[cfg(feature = "trail_saving")]
-            {
-                self.reason_saved[vi] = self.reason[vi];
-            }
-
             self.reason[vi] = AssignReason::None;
             self.reward_at_unassign(vi);
-            // Trail saving serves unassigned literals from `trail_saved` not from `heap`
+            // TODO: heap operation opimization under trail saving
             self.insert_heap(vi);
         }
-
-        #[cfg(feature = "trail_saving")]
-        if 1 < self.decision_level() {
-            self.trail_saved.clear();
-            for i in (lim..=self.trail_lim[self.trail_lim.len() - 2]).rev() {
-                let lit = self.trail[i];
-                self.trail_saved.push(lit);
-            }
-            /* for i in self.trail_lim.len() - 1..self.trail.len() {
-                let vi = self.trail[i].vi();
-                self.insert_heap(vi);
-            } */
-        }
-
         self.trail.truncate(lim);
         // moved below -- self.q_head = self.trail.len();
         // see https://github.com/shnarazk/splr/issues/117
@@ -324,8 +320,14 @@ impl PropagateIF for AssignStack {
         let dl = self.decision_level();
 
         #[cfg(feature = "trail_saving")]
-        if let Err(cc) = self.append_saved_literals() {
-            return Some(cc);
+        {
+            if let Err(cc) = self.append_saved_literals(cdb) {
+                self.num_propagation += 1;
+                self.num_conflict += 1;
+                self.dpc_ema.update(self.num_decision);
+                self.ppc_ema.update(self.num_propagation);
+                return Some(cc);
+            }
         }
 
         while let Some(p) = self.trail.get(self.q_head) {
@@ -550,8 +552,14 @@ impl PropagateIF for AssignStack {
                 }
             }
             #[cfg(feature = "trail_saving")]
-            if let Err(cc) = self.append_saved_literals() {
-                return Some(cc);
+            {
+                if let Err(cc) = self.append_saved_literals(cdb) {
+                    self.num_propagation += 1;
+                    self.num_conflict += 1;
+                    self.dpc_ema.update(self.num_decision);
+                    self.ppc_ema.update(self.num_propagation);
+                    return Some(cc);
+                }
             }
         }
         let na = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
@@ -875,23 +883,88 @@ impl AssignStack {
 
 #[cfg(feature = "trail_saving")]
 impl AssignStack {
-    fn append_saved_literals(&mut self) -> Result<(), ConflictContext> {
+    fn append_saved_literals<C>(&mut self, cdb: &C) -> Result<(), ConflictContext>
+    where
+        C: ClauseDBIF,
+    {
         let dl = self.decision_level();
+        if let Some(last) = self.trail_saved.last() {
+            assert!(matches!(
+                self.reason_saved[last.vi()],
+                AssignReason::Decision(_)
+            ));
+            if self.level[last.vi()] < dl {
+                self.trail_saved.clear();
+                return Ok(());
+            }
+        }
         for i in (0..self.trail_saved.len()).rev() {
             let lit = self.trail_saved[i];
             let vi = lit.vi();
             match self.reason_saved[vi] {
-                AssignReason::Decision(_) => {
-                    if self.assigned(lit) == Some(true) {
+                AssignReason::Decision(_) => match self.assigned(lit) {
+                    Some(true) => continue,
+                    Some(false) => {
+                        self.trail_saved.clear();
+                        return Ok(());
+                    }
+                    None => {
+                        // THIS IS THE PROBREM.
+                        self.trail_saved.truncate(i + 1);
+                        // for j in i + 1..self.trail_saved.len() {
+                        //     let vi = self.trail_saved[j].vi();
+                        //     self.reason_saved[vi] = AssignReason::None;
+                        // }
+                        // assert_eq!(self.trail_saved.last(), Some(&lit));
+                        // self.trail_saved.clear();
+                        return Ok(());
+                    }
+                },
+                AssignReason::Implication(c, l) => match self.assigned(lit) {
+                    Some(true) => {
                         continue;
                     }
-                    self.trail_saved.truncate(i + 1);
-                    return Ok(());
-                }
-                AssignReason::Implication(c, l) => match self.assigned(lit) {
-                    Some(true) => continue,
-                    Some(false) => return Err(ConflictContext { cid: c, link: l }),
+                    Some(false) => {
+                        // assert!(self.reason[lit.vi()] != AssignReason::None);
+                        // assert!(
+                        //     l == NULL_LIT
+                        //         || self.assigned(l) == Some(false)
+                        //         || self.reason[l.vi()] != AssignReason::None
+                        // );
+                        self.trail_saved.clear();
+                        // return Ok(());
+                        assert!(cdb[c].iter().all(|k| self.assigned(*k) == Some(false)));
+                        if cdb[c].lit0() == lit {
+                            return Err(ConflictContext { cid: c, link: l });
+                        } else if let AssignReason::Implication(d, _) =
+                            self.reason[cdb[c].lit0().vi()]
+                        {
+                            if d == c {
+                                return Err(ConflictContext { cid: c, link: l });
+                                // return Ok(());
+                            } else {
+                                return Ok(());
+                            }
+                        }
+                        // return Err(ConflictContext { cid: c, link: l });
+                        return Ok(());
+                    }
                     None => {
+                        // assert!(self.reason[lit.vi()] == AssignReason::None);
+                        // assert!(
+                        //     l != NULL_LIT
+                        //         || cdb[c]
+                        //             .iter()
+                        //             .skip(1)
+                        //             .all(|k| self.assigned(*k) == Some(false))
+                        // );
+                        // assert!(
+                        //     l == NULL_LIT
+                        //         || self.assigned(l) == Some(false)
+                        //         || self.reason[l.vi()] != AssignReason::None
+                        // );
+                        // assert!(!self.trail.contains(&lit));
+                        assert!(l != NULL_LIT || cdb[c].lit0() == lit);
                         self.assign_by_implication(
                             lit,
                             dl,
@@ -908,11 +981,13 @@ impl AssignStack {
         Ok(())
     }
     pub fn clear_saved_literals(&mut self) {
-        while let Some(lit) = self.trail_saved.pop() {
-            let vi = lit.vi();
-            self.reason_saved[vi] = AssignReason::None;
-            self.insert_heap(vi);
-        }
+        // while let Some(lit) = self.trail_saved.pop() {
+        //     let vi = lit.vi();
+        //     self.reason_saved[vi] = AssignReason::None;
+        //     self.insert_heap(vi);
+        // }
+        // assert!(self.reason_saved.iter().all(|r| *r == AssignReason::None));
+        self.trail_saved.clear();
     }
 }
 
