@@ -203,16 +203,15 @@ impl PropagateIF for AssignStack {
 
         #[cfg(feature = "trail_saving")]
         {
-            let dl = self.decision_level();
+            let dl = self.trail_lim.len();
             self.clear_saved_literals();
-            for i in (lim..self.trail.len()).rev() {
-                let l = self.trail[i];
-                let vi = l.vi();
-                if self.level[vi] < dl && lv < self.level[vi] {
+            if 2 <= dl {
+                let lim2 = self.trail_lim[dl - 2];
+                for i in (lim..lim2).rev() {
+                    let l = self.trail[i];
+                    let vi = l.vi();
                     self.trail_saved.push(l);
                     self.reason_saved[vi] = self.reason[vi];
-                } else {
-                    self.reason_saved[vi] = AssignReason::None;
                 }
             }
         }
@@ -891,22 +890,12 @@ impl AssignStack {
 impl AssignStack {
     fn append_saved_literals(&mut self) -> Result<(), ConflictContext> {
         let dl = self.decision_level();
-        if let Some(last) = self.trail_saved.last() {
-            debug_assert!(matches!(
-                self.reason_saved[last.vi()],
-                AssignReason::Decision(_)
-            ));
-            if self.level[last.vi()] < dl {
-                self.trail_saved.clear();
-                return Ok(());
-            }
-        }
         for i in (0..self.trail_saved.len()).rev() {
             let lit = self.trail_saved[i];
             let vi = lit.vi();
             match self.reason_saved[vi] {
                 AssignReason::Decision(_) => match self.assigned(lit) {
-                    Some(true) => continue,
+                    Some(true) => (),
                     Some(false) => {
                         self.trail_saved.clear();
                         return Ok(());
@@ -917,25 +906,14 @@ impl AssignStack {
                     }
                 },
                 AssignReason::Implication(c, l) => match self.assigned(lit) {
-                    Some(true) => {
-                        continue;
-                    }
+                    Some(true) => (),
                     Some(false) => {
-                        // assert!(self.reason[lit.vi()] != AssignReason::None);
-                        // assert!(
-                        //     l == NULL_LIT
-                        //         || self.assigned(l) == Some(false)
-                        //         || self.reason[l.vi()] != AssignReason::None
-                        // );
                         self.trail_saved.clear();
                         return Err(ConflictContext { cid: c, link: l });
                     }
-                    None => {
-                        self.assign_by_implication(lit, dl, c, l);
-                    }
+                    None => self.assign_by_implication(lit, dl, c, l),
                 },
-                AssignReason::Asserted(_timestamp) => panic!("impossible path"),
-                AssignReason::None => panic!("impossible path"),
+                r => panic!("impossible path {:?}", r),
             }
         }
         self.trail_saved.clear();
