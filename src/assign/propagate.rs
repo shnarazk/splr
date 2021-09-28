@@ -31,7 +31,7 @@ pub trait PropagateIF {
     where
         C: ClauseDBIF;
     /// `propagate` for vivification, which allows dead clauses.
-    fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> Option<ClauseId>
+    fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> Option<ConflictContext>
     where
         C: ClauseDBIF;
     /// propagate then clear asserted literals
@@ -242,10 +242,31 @@ impl PropagateIF for AssignStack {
             }
 
             unset_assign!(self, vi);
+
+            #[cfg(feature = "trail_saving")]
+            {
+                self.reason_saved[vi] = self.reason[vi];
+            }
+
             self.reason[vi] = AssignReason::None;
             self.reward_at_unassign(vi);
+            // Trail saving serves unassigned literals from `trail_saved` not from `heap`
             self.insert_heap(vi);
         }
+
+        #[cfg(feature = "trail_saving")]
+        if 1 < self.decision_level() {
+            self.trail_saved.clear();
+            for i in (lim..=self.trail_lim[self.trail_lim.len() - 2]).rev() {
+                let lit = self.trail[i];
+                self.trail_saved.push(lit);
+            }
+            /* for i in self.trail_lim.len() - 1..self.trail.len() {
+                let vi = self.trail[i].vi();
+                self.insert_heap(vi);
+            } */
+        }
+
         self.trail.truncate(lim);
         // moved below -- self.q_head = self.trail.len();
         // see https://github.com/shnarazk/splr/issues/117
@@ -301,7 +322,12 @@ impl PropagateIF for AssignStack {
         C: ClauseDBIF,
     {
         let dl = self.decision_level();
-        self.append_saved_literals().unwrap();
+
+        #[cfg(feature = "trail_saving")]
+        if let Err(cc) = self.append_saved_literals() {
+            return Some(cc);
+        }
+
         while let Some(p) = self.trail.get(self.q_head) {
             self.num_propagation += 1;
             self.q_head += 1;
@@ -523,7 +549,10 @@ impl PropagateIF for AssignStack {
                     cdb[cid].moved_at = Propagate::BecameUnit(self.num_conflict, cached);
                 }
             }
-            self.append_saved_literals().unwrap();
+            #[cfg(feature = "trail_saving")]
+            if let Err(cc) = self.append_saved_literals() {
+                return Some(cc);
+            }
         }
         let na = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
         if self.num_best_assign <= na && 0 < dl {
@@ -544,7 +573,7 @@ impl PropagateIF for AssignStack {
     // 1. (allow dead clauses)
     // 1. (allow eliminated vars)
     //
-    fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> Option<ClauseId>
+    fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> Option<ConflictContext>
     where
         C: ClauseDBIF,
     {
@@ -578,7 +607,7 @@ impl PropagateIF for AssignStack {
 
                 match lit_assign!(self, blocker) {
                     Some(true) => (),
-                    Some(false) => return Some(cid),
+                    Some(false) => return Some(ConflictContext { cid, link: blocker }),
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
                         self.assign_by_implication(
@@ -704,7 +733,10 @@ impl PropagateIF for AssignStack {
                             Propagate::SandboxEmitConflict(self.num_conflict, propagating);
                     }
 
-                    return Some(cid);
+                    return Some(ConflictContext {
+                        cid,
+                        link: NULL_LIT,
+                    });
                 }
 
                 #[cfg(feature = "chrono_BT")]
@@ -734,14 +766,14 @@ impl PropagateIF for AssignStack {
         assert_eq!(self.decision_level(), self.root_level);
         loop {
             if self.remains() {
-                self.propagate(cdb).map_or(Ok(()), |cc| {
+                self.propagate_sandbox(cdb).map_or(Ok(()), |cc| {
                     Err(SolverError::RootLevelConflict(Some(cc.cid)))
                 })?;
             }
             self.propagate_at_root_level(cdb)
                 .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
             if self.remains() {
-                self.propagate(cdb).map_or(Ok(()), |cc| {
+                self.propagate_sandbox(cdb).map_or(Ok(()), |cc| {
                     Err(SolverError::RootLevelConflict(Some(cc.cid)))
                 })?;
             } else {
@@ -841,8 +873,7 @@ impl AssignStack {
     }
 }
 
-//
-//## Trail Saving
+#[cfg(feature = "trail_saving")]
 impl AssignStack {
     fn append_saved_literals(&mut self) -> Result<(), ConflictContext> {
         let dl = self.decision_level();
@@ -850,11 +881,11 @@ impl AssignStack {
             let lit = self.trail_saved[i];
             let vi = lit.vi();
             match self.reason_saved[vi] {
-                AssignReason::Decision(_lv) => {
+                AssignReason::Decision(_) => {
                     if self.assigned(lit) == Some(true) {
                         continue;
                     }
-                    self.trail_saved.truncate(self.trail_saved.len() - i);
+                    self.trail_saved.truncate(i + 1);
                     return Ok(());
                 }
                 AssignReason::Implication(c, l) => match self.assigned(lit) {
@@ -873,7 +904,15 @@ impl AssignStack {
                 AssignReason::None => panic!("impossible path"),
             }
         }
+        self.trail_saved.clear();
         Ok(())
+    }
+    pub fn clear_saved_literals(&mut self) {
+        while let Some(lit) = self.trail_saved.pop() {
+            let vi = lit.vi();
+            self.reason_saved[vi] = AssignReason::None;
+            self.insert_heap(vi);
+        }
     }
 }
 

@@ -133,10 +133,9 @@ pub struct AssignStack {
     root_level: DecisionLevel,
     var_order: VarIdHeap, // Variable Order
 
-    //
-    //## Trail Saving
-    //
+    #[cfg(feature = "trail_saving")]
     reason_saved: Vec<AssignReason>,
+    #[cfg(feature = "trail_saving")]
     trail_saved: Vec<Lit>,
 
     //

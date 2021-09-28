@@ -25,7 +25,9 @@ impl Default for AssignStack {
             root_level: 0,
             var_order: VarIdHeap::default(),
 
+            #[cfg(feature = "trail_saving")]
             trail_saved: Vec::new(),
+            #[cfg(feature = "trail_saving")]
             reason_saved: Vec::new(),
 
             best_assign: false,
@@ -87,7 +89,9 @@ impl Instantiate for AssignStack {
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv),
 
+            #[cfg(feature = "trail_saving")]
             trail_saved: Vec::with_capacity(nv),
+            #[cfg(feature = "trail_saving")]
             reason_saved: vec![AssignReason::None; nv + 1],
 
             num_vars: cnf.num_of_variables,
@@ -116,8 +120,13 @@ impl Instantiate for AssignStack {
             #[allow(unused_variables)]
             SolverEvent::Stabilize(scale) => {
                 #[cfg(feature = "rephase")]
-                self.check_consistency_of_best_phases();
-                self.select_rephasing_target(None, scale);
+                {
+                    self.check_consistency_of_best_phases();
+                    self.select_rephasing_target(None, scale);
+                }
+
+                #[cfg(feature = "trail_saving")]
+                self.clear_saved_literals();
             }
             SolverEvent::NewVar => {
                 self.assign.push(None);

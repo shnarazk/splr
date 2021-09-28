@@ -374,8 +374,8 @@ fn conflict_analyze(
                         debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
                         debug_assert!(
                             asg.assign(vi).is_some(),
-                            "conflict_analysis found {} {}",
-                            asg.var(vi),
+                            "conflict_analysis found V{} {}",
+                            vi,
                             asg.reason(vi),
                         );
                         debug_assert!(lvl <= dl);
