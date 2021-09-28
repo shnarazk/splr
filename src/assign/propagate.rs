@@ -17,7 +17,7 @@ pub trait PropagateIF {
     ///
     /// ## Warning
     /// Callers must assure the consistency after this assignment.
-    fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, cid: ClauseId, by: Option<Lit>);
+    fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, cid: ClauseId, by: Lit);
     /// unsafe assume (assign by decision); doesn't emit an exception.
     /// ## Caveat
     /// Callers have to assure the consistency after this assignment.
@@ -135,7 +135,7 @@ impl PropagateIF for AssignStack {
             _ => Err(SolverError::RootLevelConflict(Some(ClauseId::from(l)))),
         }
     }
-    fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, cid: ClauseId, by: Option<Lit>) {
+    fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, cid: ClauseId, by: Lit) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be enqueued");
         debug_assert!(l.vi() < self.var.len());
         // The following doesn't hold anymore by using chronoBT.
@@ -150,7 +150,7 @@ impl PropagateIF for AssignStack {
         debug_assert!(self.trail.iter().all(|rl| *rl != l));
         set_assign!(self, l);
         self.level[vi] = lv;
-        self.reason[vi] = AssignReason::Implication(cid, by.unwrap_or(NULL_LIT));
+        self.reason[vi] = AssignReason::Implication(cid, by);
         self.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
@@ -382,7 +382,7 @@ impl PropagateIF for AssignStack {
                             blocker,
                             self.level[propagating.vi()],
                             cid,
-                            Some(propagating),
+                            propagating,
                         );
                     }
                 }
@@ -543,8 +543,8 @@ impl PropagateIF for AssignStack {
                     .unwrap_or(self.root_level);
                 debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
-                assert!(other_watch_value.is_none());
-                self.assign_by_implication(cached, dl, cid, None);
+                debug_assert!(other_watch_value.is_none());
+                self.assign_by_implication(cached, dl, cid, NULL_LIT);
 
                 #[cfg(feature = "boundary_check")]
                 {
@@ -622,7 +622,7 @@ impl PropagateIF for AssignStack {
                             blocker,
                             self.level[false_lit.vi()],
                             cid,
-                            Some(propagating),
+                            propagating,
                         );
                     }
                 }
@@ -756,8 +756,8 @@ impl PropagateIF for AssignStack {
                     .unwrap_or(self.root_level);
                 debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
-                assert!(other_watch_value.is_none());
-                self.assign_by_implication(cached, dl, cid, None);
+                debug_assert!(other_watch_value.is_none());
+                self.assign_by_implication(cached, dl, cid, NULL_LIT);
 
                 #[cfg(feature = "boundary_check")]
                 {

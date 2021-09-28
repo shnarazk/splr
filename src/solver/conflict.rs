@@ -170,7 +170,7 @@ pub fn handle_conflict(
             debug_assert_eq!(l1, cdb[cid].lit1());
             debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
-            asg.assign_by_implication(l0, assign_level, cid, Some(!l1));
+            asg.assign_by_implication(l0, assign_level, cid, !l1);
             // || check_graph(asg, cdb, l0, "biclause");
             rst.update(ProgressUpdate::LBD(1));
             for cid in &state.derive20 {
@@ -185,7 +185,7 @@ pub fn handle_conflict(
 
             debug_assert_eq!(cdb[cid].lit0(), l0);
             debug_assert_eq!(asg.assigned(l0), None);
-            asg.assign_by_implication(l0, assign_level, cid, None);
+            asg.assign_by_implication(l0, assign_level, cid, NULL_LIT);
             // || check_graph(asg, cdb, l0, "clause");
             let lbd = cdb[cid].rank;
             rst.update(ProgressUpdate::LBD(lbd));
@@ -205,7 +205,7 @@ pub fn handle_conflict(
             );
             debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
-            asg.assign_by_implication(l0, assign_level, cid, Some(!l1));
+            asg.assign_by_implication(l0, assign_level, cid, !l1);
             // || check_graph(asg, cdb, l0, "registeredclause");
         }
         RefClause::UnitClause(_) => panic!("impossible"),
