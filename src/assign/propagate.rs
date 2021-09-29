@@ -322,7 +322,7 @@ impl PropagateIF for AssignStack {
         {
             if let Err(cc) = self.append_saved_literals() {
                 let c = &cdb[cc.cid];
-                if self.locked(c, cc.cid) {
+                if c.len() < 10 && self.locked(c, cc.cid) {
                     self.num_propagation += 1;
                     self.num_conflict += 1;
                     self.dpc_ema.update(self.num_decision);
@@ -557,7 +557,7 @@ impl PropagateIF for AssignStack {
             {
                 if let Err(cc) = self.append_saved_literals() {
                     let c = &cdb[cc.cid];
-                    if self.locked(c, cc.cid) {
+                    if c.len() < 10 && self.locked(c, cc.cid) {
                         self.num_propagation += 1;
                         self.num_conflict += 1;
                         self.dpc_ema.update(self.num_decision);
