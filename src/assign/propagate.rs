@@ -893,26 +893,19 @@ impl AssignStack {
         for i in (0..self.trail_saved.len()).rev() {
             let lit = self.trail_saved[i];
             let vi = lit.vi();
-            match self.reason_saved[vi] {
-                AssignReason::Decision(_) => match self.assigned(lit) {
-                    Some(true) => (),
-                    Some(false) => {
-                        self.trail_saved.clear();
-                        return Ok(());
-                    }
-                    None => {
-                        self.trail_saved.truncate(i + 1);
-                        return Ok(());
-                    }
-                },
-                AssignReason::Implication(c, l) => match self.assigned(lit) {
-                    Some(true) => (),
-                    Some(false) => {
-                        self.trail_saved.clear();
-                        return Err(ConflictContext { cid: c, link: l });
-                    }
-                    None => self.assign_by_implication(lit, dl, c, l),
-                },
+            match (self.reason_saved[vi], self.assigned(lit)) {
+                (_, Some(true)) => (),
+                (AssignReason::Implication(c, l), None) => {
+                    self.assign_by_implication(lit, dl, c, l)
+                }
+                (AssignReason::Implication(c, l), Some(false)) => {
+                    self.trail_saved.clear();
+                    return Err(ConflictContext { cid: c, link: l });
+                }
+                (AssignReason::Decision(_), _) => {
+                    self.trail_saved.truncate(i + 1);
+                    return Ok(());
+                }
                 r => panic!("impossible path {:?}", r),
             }
         }
