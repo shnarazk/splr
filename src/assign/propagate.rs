@@ -360,7 +360,8 @@ impl PropagateIF for AssignStack {
                     // }
                     //
                     // panic!();
-                    None
+                    // None
+                    Some(cc)
                 };
                 if ret.is_some() {
                     self.num_propagation += 1;
@@ -603,7 +604,7 @@ impl PropagateIF for AssignStack {
                         cc.link = cdb[cc.cid].lit0();
                         Some(cc)
                     } else {
-                        None
+                        Some(cc) // None
                     };
                     if ret.is_some() {
                         self.num_propagation += 1;
