@@ -259,7 +259,7 @@ impl PropagateIF for AssignStack {
             unset_assign!(self, vi);
             self.reason[vi] = AssignReason::None;
             self.reward_at_unassign(vi);
-            // TODO: heap operation opimization under trail saving
+            // TODO: heap operation optimization under trail saving
             self.insert_heap(vi);
         }
         self.trail.truncate(lim);
@@ -320,14 +320,54 @@ impl PropagateIF for AssignStack {
 
         #[cfg(feature = "trail_saving")]
         {
-            if let Err(cc) = self.append_saved_literals() {
+            if let Err(mut cc) = self.append_saved_literals() {
                 let c = &cdb[cc.cid];
-                if c.len() < 10 && self.locked(c, cc.cid) {
+                let ret = if self.locked(c, cc.cid) {
+                    Some(cc)
+                } else if cc.link != NULL_LIT {
+                    cc.link = cdb[cc.cid].lit0();
+                    Some(cc)
+                } else {
+                    // dbg!(i32::from(cdb[cc.cid].lit0()));
+                    // dbg!(self.locked(c, cc.cid));
+                    // dbg!(self.reason[cdb[cc.cid].lit0().vi()]);
+                    // if let AssignReason::Implication(_, _) =
+                    //     self.reason[cdb[cc.cid].lit0().vi()]
+                    // {
+                    //     return Some(cc);
+                    // }
+                    // if let AssignReason::Implication(r, _) =
+                    //     self.reason[cdb[cc.cid].lit0().vi()]
+                    // {
+                    //     dbg!(r);
+                    //     dbg!(i32::from(cdb[r].lit0()));
+                    //     dbg!(self.reason[cdb[r].lit0().vi()]);
+                    //     dbg!(i32::from(cc.link));
+                    //     panic!();
+                    // }
+                    // for l in c.iter() {
+                    //     println!(
+                    //         "{} {:?} by {:?} <= {}",
+                    //         i32::from(l),
+                    //         self.assigned(*l),
+                    //         self.reason[l.vi()],
+                    //         if let AssignReason::Implication(c1, _) = self.reason[l.vi()] {
+                    //             i32::from(cdb[c1].lit0())
+                    //         } else {
+                    //             i32::from(NULL_LIT)
+                    //         },
+                    //     );
+                    // }
+                    //
+                    // panic!();
+                    None
+                };
+                if ret.is_some() {
                     self.num_propagation += 1;
                     self.num_conflict += 1;
                     self.dpc_ema.update(self.num_decision);
                     self.ppc_ema.update(self.num_propagation);
-                    return Some(cc);
+                    return ret;
                 }
             }
         }
@@ -555,14 +595,22 @@ impl PropagateIF for AssignStack {
             }
             #[cfg(feature = "trail_saving")]
             {
-                if let Err(cc) = self.append_saved_literals() {
+                if let Err(mut cc) = self.append_saved_literals() {
                     let c = &cdb[cc.cid];
-                    if c.len() < 10 && self.locked(c, cc.cid) {
+                    let ret = if self.locked(c, cc.cid) {
+                        Some(cc)
+                    } else if cc.link != NULL_LIT {
+                        cc.link = cdb[cc.cid].lit0();
+                        Some(cc)
+                    } else {
+                        None
+                    };
+                    if ret.is_some() {
                         self.num_propagation += 1;
                         self.num_conflict += 1;
                         self.dpc_ema.update(self.num_decision);
                         self.ppc_ema.update(self.num_propagation);
-                        return Some(cc);
+                        return ret;
                     }
                 }
             }
