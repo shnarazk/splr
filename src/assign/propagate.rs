@@ -320,7 +320,7 @@ impl PropagateIF for AssignStack {
 
         #[cfg(feature = "trail_saving")]
         {
-            if let Err(mut cc) = self.append_saved_literals() {
+            if let Err(mut cc) = self.repropagate_from_saved_trail() {
                 let c = &cdb[cc.cid];
                 if cc.link != NULL_LIT && !self.locked(c, cc.cid) {
                     cc.link = cdb[cc.cid].lit0();
@@ -557,7 +557,7 @@ impl PropagateIF for AssignStack {
             }
             #[cfg(feature = "trail_saving")]
             {
-                if let Err(mut cc) = self.append_saved_literals() {
+                if let Err(mut cc) = self.repropagate_from_saved_trail() {
                     let c = &cdb[cc.cid];
                     if cc.link != NULL_LIT && !self.locked(c, cc.cid) {
                         cc.link = cdb[cc.cid].lit0();
@@ -892,7 +892,7 @@ impl AssignStack {
 
 #[cfg(feature = "trail_saving")]
 impl AssignStack {
-    fn append_saved_literals(&mut self) -> Result<(), ConflictContext> {
+    fn repropagate_from_saved_trail(&mut self) -> Result<(), ConflictContext> {
         let dl = self.decision_level();
         for i in (0..self.trail_saved.len()).rev() {
             let lit = self.trail_saved[i];
