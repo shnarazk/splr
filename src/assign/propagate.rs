@@ -327,6 +327,7 @@ impl PropagateIF for AssignStack {
                 }
                 self.num_propagation += 1;
                 self.num_conflict += 1;
+                self.num_reconflict += 1;
                 self.dpc_ema.update(self.num_decision);
                 self.ppc_ema.update(self.num_propagation);
                 return Some(cc);
@@ -563,6 +564,7 @@ impl PropagateIF for AssignStack {
                     }
                     self.num_propagation += 1;
                     self.num_conflict += 1;
+                    self.num_reconflict += 1;
                     self.dpc_ema.update(self.num_decision);
                     self.ppc_ema.update(self.num_propagation);
                     return Some(cc);
@@ -898,7 +900,8 @@ impl AssignStack {
             match (self.reason_saved[vi], self.assigned(lit)) {
                 (_, Some(true)) => (),
                 (AssignReason::Implication(c, l), None) => {
-                    self.assign_by_implication(lit, dl, c, l)
+                    self.num_repropagation += 1;
+                    self.assign_by_implication(lit, dl, c, l);
                 }
                 (AssignReason::Implication(c, l), Some(false)) => {
                     self.trail_saved.clear();

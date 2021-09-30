@@ -137,6 +137,8 @@ pub struct AssignStack {
     reason_saved: Vec<AssignReason>,
     #[cfg(feature = "trail_saving")]
     trail_saved: Vec<Lit>,
+    num_reconflict: usize,
+    num_repropagation: usize,
 
     //
     //## Phase handling
@@ -281,6 +283,8 @@ pub mod property {
         NumVar,
         NumAssertedVar,
         NumEliminatedVar,
+        NumReconflict,
+        NumRepropagation,
         /// the number of vars in `the unreachable core'
         NumUnassertedVar,
         NumUnassignedVar,
@@ -288,7 +292,7 @@ pub mod property {
         RootLevel,
     }
 
-    pub const USIZES: [Tusize; 12] = [
+    pub const USIZES: [Tusize; 14] = [
         Tusize::NumConflict,
         Tusize::NumDecision,
         Tusize::NumPropagation,
@@ -297,6 +301,8 @@ pub mod property {
         Tusize::NumVar,
         Tusize::NumAssertedVar,
         Tusize::NumEliminatedVar,
+        Tusize::NumReconflict,
+        Tusize::NumRepropagation,
         Tusize::NumUnassertedVar,
         Tusize::NumUnassignedVar,
         Tusize::NumUnreachableVar,
@@ -315,6 +321,8 @@ pub mod property {
                 Tusize::NumVar => self.num_vars,
                 Tusize::NumAssertedVar => self.num_asserted_vars,
                 Tusize::NumEliminatedVar => self.num_eliminated_vars,
+                Tusize::NumReconflict => self.num_reconflict,
+                Tusize::NumRepropagation => self.num_repropagation,
                 Tusize::NumUnassertedVar => {
                     self.num_vars - self.num_asserted_vars - self.num_eliminated_vars
                 }

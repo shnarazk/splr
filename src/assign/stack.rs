@@ -29,6 +29,8 @@ impl Default for AssignStack {
             trail_saved: Vec::new(),
             #[cfg(feature = "trail_saving")]
             reason_saved: Vec::new(),
+            num_reconflict: 0,
+            num_repropagation: 0,
 
             best_assign: false,
             build_best_at: 0,
