@@ -29,7 +29,6 @@ pub trait SolveIF {
 macro_rules! RESTART {
     ($asg: expr, $rst: expr) => {
         $asg.cancel_until($asg.root_level());
-        $asg.handle(SolverEvent::Restart);
         $rst.handle(SolverEvent::Restart);
     };
 }
