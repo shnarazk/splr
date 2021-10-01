@@ -128,7 +128,7 @@ impl Instantiate for AssignStack {
                 }
 
                 #[cfg(feature = "trail_saving")]
-                self.clear_saved_literals();
+                self.clear_saved_trail();
             }
             SolverEvent::NewVar => {
                 self.assign.push(None);

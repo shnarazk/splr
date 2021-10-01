@@ -207,7 +207,7 @@ impl PropagateIF for AssignStack {
         #[cfg(feature = "trail_saving")]
         {
             let dl = self.trail_lim.len();
-            self.clear_saved_literals();
+            self.clear_saved_trail();
             if 2 <= dl {
                 let lim2 = self.trail_lim[dl - 2];
                 for i in (lim..lim2).rev() {
@@ -919,13 +919,7 @@ impl AssignStack {
         self.trail_saved.clear();
         None
     }
-    pub fn clear_saved_literals(&mut self) {
-        // while let Some(lit) = self.trail_saved.pop() {
-        //     let vi = lit.vi();
-        //     self.reason_saved[vi] = AssignReason::None;
-        //     self.insert_heap(vi);
-        // }
-        // assert!(self.reason_saved.iter().all(|r| *r == AssignReason::None));
+    pub fn clear_saved_trail(&mut self) {
         self.trail_saved.clear();
     }
 }
