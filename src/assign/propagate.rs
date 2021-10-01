@@ -2,7 +2,10 @@
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
     super::{AssignIF, AssignStack, VarHeapIF, VarManipulateIF},
-    crate::{cdb::ClauseDBIF, types::*},
+    crate::{
+        cdb::{self, ClauseDBIF},
+        types::*,
+    },
 };
 
 /// API for Boolean Constraint Propagation like [`propagate`](`crate::assign::PropagateIF::propagate`), [`assign_by_decision`](`crate::assign::PropagateIF::assign_by_decision`), [`cancel_until`](`crate::assign::PropagateIF::cancel_until`), and so on.
@@ -317,23 +320,6 @@ impl PropagateIF for AssignStack {
         C: ClauseDBIF,
     {
         let dl = self.decision_level();
-
-        #[cfg(feature = "trail_saving")]
-        {
-            if let Err(mut cc) = self.repropagate_from_saved_trail() {
-                let c = &cdb[cc.cid];
-                if cc.link != NULL_LIT && !self.locked(c, cc.cid) {
-                    cc.link = cdb[cc.cid].lit0();
-                }
-                self.num_propagation += 1;
-                self.num_conflict += 1;
-                self.num_reconflict += 1;
-                self.dpc_ema.update(self.num_decision);
-                self.ppc_ema.update(self.num_propagation);
-                return Some(cc);
-            }
-        }
-
         while let Some(p) = self.trail.get(self.q_head) {
             self.num_propagation += 1;
             self.q_head += 1;
@@ -538,6 +524,7 @@ impl PropagateIF for AssignStack {
                         link: NULL_LIT,
                     });
                 }
+
                 #[cfg(feature = "chrono_BT")]
                 let dl = cdb[cid]
                     .iter()
@@ -545,6 +532,7 @@ impl PropagateIF for AssignStack {
                     .map(|l| self.level[l.vi()])
                     .max()
                     .unwrap_or(self.root_level);
+
                 debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
@@ -556,19 +544,13 @@ impl PropagateIF for AssignStack {
                 }
             }
             #[cfg(feature = "trail_saving")]
-            {
-                if let Err(mut cc) = self.repropagate_from_saved_trail() {
-                    let c = &cdb[cc.cid];
-                    if cc.link != NULL_LIT && !self.locked(c, cc.cid) {
-                        cc.link = cdb[cc.cid].lit0();
-                    }
-                    self.num_propagation += 1;
-                    self.num_conflict += 1;
-                    self.num_reconflict += 1;
-                    self.dpc_ema.update(self.num_decision);
-                    self.ppc_ema.update(self.num_propagation);
-                    return Some(cc);
-                }
+            if let cc @ Some(_) = self.from_saved_trail(cdb) {
+                self.num_propagation += 1;
+                self.num_conflict += 1;
+                self.num_reconflict += 1;
+                self.dpc_ema.update(self.num_decision);
+                self.ppc_ema.update(self.num_propagation);
+                return cc;
             }
         }
         let na = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
@@ -892,30 +874,50 @@ impl AssignStack {
 
 #[cfg(feature = "trail_saving")]
 impl AssignStack {
-    fn repropagate_from_saved_trail(&mut self) -> Result<(), ConflictContext> {
+    fn from_saved_trail<C>(&mut self, cdb: &C) -> Option<ConflictContext>
+    where
+        C: ClauseDBIF,
+    {
+        let q = (0.75 * cdb.derefer(cdb::property::Tf64::DpAverageLBD)).max(4.0) as u16;
         let dl = self.decision_level();
         for i in (0..self.trail_saved.len()).rev() {
             let lit = self.trail_saved[i];
             let vi = lit.vi();
-            match (self.reason_saved[vi], self.assigned(lit)) {
+            let old_reason = self.reason_saved[vi];
+            match (old_reason, self.assigned(lit)) {
                 (_, Some(true)) => (),
-                (AssignReason::Implication(c, l), None) => {
-                    self.num_repropagation += 1;
-                    self.assign_by_implication(lit, dl, c, l);
+                // reason refinement by ignoring this dependecy like decision var
+                (AssignReason::Implication(c, l), None) if l == NULL_LIT && q < cdb[c].rank => {
+                    self.trail_saved.truncate(i + 1);
+                    return None;
                 }
-                (AssignReason::Implication(c, l), Some(false)) => {
+                (AssignReason::Implication(cid, l), None) => {
+                    self.num_repropagation += 1;
+                    self.assign_by_implication(lit, dl, cid, l);
+                }
+                (AssignReason::Implication(cid, link), Some(false)) => {
                     self.trail_saved.clear();
-                    return Err(ConflictContext { cid: c, link: l });
+                    if link == NULL_LIT {
+                        return Some(ConflictContext { cid, link });
+                    }
+                    if self.reason[vi] == old_reason {
+                        return Some(ConflictContext { cid, link });
+                    } else {
+                        return Some(ConflictContext {
+                            cid,
+                            link: cdb[cid].lit0(),
+                        });
+                    }
                 }
                 (AssignReason::Decision(_), _) => {
                     self.trail_saved.truncate(i + 1);
-                    return Ok(());
+                    return None;
                 }
                 r => panic!("impossible path {:?}", r),
             }
         }
         self.trail_saved.clear();
-        Ok(())
+        None
     }
     pub fn clear_saved_literals(&mut self) {
         // while let Some(lit) = self.trail_saved.pop() {
