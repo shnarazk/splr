@@ -11,6 +11,8 @@ mod reward;
 mod select;
 /// assignment management
 mod stack;
+/// trail saving
+mod trail_saving;
 /// var struct and its methods
 mod var;
 
