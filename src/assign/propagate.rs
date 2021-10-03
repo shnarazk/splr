@@ -247,9 +247,12 @@ impl PropagateIF for AssignStack {
 
             unset_assign!(self, vi);
             self.reason[vi] = AssignReason::None;
-            self.reward_at_unassign(vi);
-            // TODO: heap operation optimization under trail saving
-            self.insert_heap(vi);
+
+            #[cfg(not(feature = "trail_saving"))]
+            {
+                self.reward_at_unassign(vi);
+                self.insert_heap(vi);
+            }
         }
         self.trail.truncate(lim);
         // moved below -- self.q_head = self.trail.len();
