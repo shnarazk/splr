@@ -64,7 +64,7 @@ impl AssignStack {
     where
         C: ClauseDBIF,
     {
-        let q = (0.75 * cdb.derefer(cdb::property::Tf64::DpAverageLBD)).max(4.0) as u16;
+        let q = (1.2 * cdb.derefer(cdb::property::Tf64::DpAverageLBD)).max(5.0) as u16;
         let dl = self.decision_level();
         for i in (0..self.trail_saved.len()).rev() {
             let lit = self.trail_saved[i];
@@ -73,28 +73,56 @@ impl AssignStack {
             match (old_reason, self.assigned(lit)) {
                 (_, Some(true)) => (),
                 // reason refinement by ignoring this dependecy like decision var
-                (AssignReason::Implication(c, l), None) if l == NULL_LIT && q < cdb[c].rank => {
+                (AssignReason::Implication(c, NULL_LIT), None) if q < cdb[c].rank => {
                     self.insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
+                (AssignReason::Implication(cid, NULL_LIT), None) => {
+                    debug_assert_eq!(cdb[cid].lit0(), lit);
+                    debug_assert!(
+                        cdb[cid]
+                            .iter()
+                            .skip(1)
+                            .all(|l| self.assigned(*l) == Some(false)),
+                        "{:?}",
+                        self.dump(cdb, cid),
+                    );
+                    self.num_repropagation += 1;
+                    self.assign_by_implication(lit, dl, cid, NULL_LIT);
+                }
                 (AssignReason::Implication(cid, l), None) => {
+                    debug_assert!(
+                        cdb[cid].lit0() != l || self.assigned(cdb[cid].lit0()) == Some(true),
+                        "{:?}",
+                        self.dump(cdb, cid)
+                    );
+                    debug_assert!(
+                        cdb[cid].lit1() != l || self.assigned(cdb[cid].lit1()) == Some(true),
+                        "{:?}",
+                        self.dump(cdb, cid),
+                    );
                     self.num_repropagation += 1;
                     self.assign_by_implication(lit, dl, cid, l);
                 }
                 (AssignReason::Implication(cid, link), Some(false)) => {
                     self.truncate_trail_saved(i + 1);
                     self.clear_trail_saved();
+                    debug_assert!(
+                        cdb[cid].iter().all(|l| self.assigned(*l) == Some(false)),
+                        "## {} ##\n{}\n{:?}",
+                        i32::from(lit),
+                        self.dump(cdb, cid),
+                        old_reason,
+                    );
                     if link == NULL_LIT {
                         return Some(ConflictContext { cid, link });
                     }
-                    if self.reason[vi] == old_reason {
-                        return Some(ConflictContext { cid, link });
-                    } else {
-                        return Some(ConflictContext {
-                            cid,
-                            link: cdb[cid].lit0(),
-                        });
-                    }
+                    let c = &cdb[cid];
+                    let lit0 = c.lit0();
+                    return Some(ConflictContext {
+                        cid,
+                        link: if lit != lit0 { lit0 } else { c.lit1() },
+                    });
                 }
                 (AssignReason::Decision(_), _) => {
                     self.insert_heap(vi);
@@ -105,6 +133,16 @@ impl AssignStack {
         }
         self.trail_saved.clear();
         None
+    }
+    fn dump<C>(&self, cdb: &C, cid: ClauseId) -> String
+    where
+        C: ClauseDBIF,
+    {
+        cdb[cid]
+            .iter()
+            .map(|l| format!("{}:{:?}", l, self.assigned(*l)))
+            .collect::<Vec<String>>()
+            .join("\n")
     }
     pub fn clear_trail_saved(&mut self) {
         for j in 0..self.trail_saved.len() {

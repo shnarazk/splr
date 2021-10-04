@@ -361,6 +361,7 @@ fn search(
                     asg.handle(SolverEvent::Stabilize(
                         rst.derefer(restart::property::Tusize::IntervalScale),
                     ));
+                    // assert!(asg.trail_saved.is_empty());
                 }
             }
             if a_decision_was_made {
