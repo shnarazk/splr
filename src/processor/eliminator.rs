@@ -314,7 +314,7 @@ impl EliminateIF for Eliminator {
                 self.stop(asg, cdb);
             }
         } else {
-            asg.propagate(cdb).map_or(Ok(()), |cc| {
+            asg.propagate_sandbox(cdb).map_or(Ok(()), |cc| {
                 Err(SolverError::RootLevelConflict(Some(cc.cid)))
             })?;
         }
@@ -529,7 +529,7 @@ impl Eliminator {
             }
         }
         if asg.remains() {
-            asg.propagate(cdb).map_or(Ok(()), |cc| {
+            asg.propagate_sandbox(cdb).map_or(Ok(()), |cc| {
                 Err(SolverError::RootLevelConflict(Some(cc.cid)))
             })?;
         }
@@ -556,7 +556,7 @@ impl Eliminator {
         loop {
             let na = asg.stack_len();
             self.eliminate_main(asg, cdb, rst, state)?;
-            asg.propagate(cdb).map_or(Ok(()), |cc| {
+            asg.propagate_sandbox(cdb).map_or(Ok(()), |cc| {
                 Err(SolverError::RootLevelConflict(Some(cc.cid)))
             })?;
             if na == asg.stack_len()
@@ -612,7 +612,7 @@ impl Eliminator {
             }
             self.backward_subsumption_check(asg, cdb, &mut timedout)?;
             debug_assert!(self.clause_queue.is_empty());
-            asg.propagate(cdb).map_or(Ok(()), |cc| {
+            asg.propagate_sandbox(cdb).map_or(Ok(()), |cc| {
                 Err(SolverError::RootLevelConflict(Some(cc.cid)))
             })?;
             if timedout == 0 {

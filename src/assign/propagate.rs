@@ -17,7 +17,7 @@ pub trait PropagateIF {
     ///
     /// ## Warning
     /// Callers must assure the consistency after this assignment.
-    fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, cid: ClauseId, by: Option<Lit>);
+    fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, cid: ClauseId, by: Lit);
     /// unsafe assume (assign by decision); doesn't emit an exception.
     /// ## Caveat
     /// Callers have to assure the consistency after this assignment.
@@ -31,7 +31,7 @@ pub trait PropagateIF {
     where
         C: ClauseDBIF;
     /// `propagate` for vivification, which allows dead clauses.
-    fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> Option<ClauseId>
+    fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> Option<ConflictContext>
     where
         C: ClauseDBIF;
     /// propagate then clear asserted literals
@@ -135,7 +135,7 @@ impl PropagateIF for AssignStack {
             _ => Err(SolverError::RootLevelConflict(Some(ClauseId::from(l)))),
         }
     }
-    fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, cid: ClauseId, by: Option<Lit>) {
+    fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, cid: ClauseId, by: Lit) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be enqueued");
         debug_assert!(l.vi() < self.var.len());
         // The following doesn't hold anymore by using chronoBT.
@@ -150,7 +150,7 @@ impl PropagateIF for AssignStack {
         debug_assert!(self.trail.iter().all(|rl| *rl != l));
         set_assign!(self, l);
         self.level[vi] = lv;
-        self.reason[vi] = AssignReason::Implication(cid, by.unwrap_or(NULL_LIT));
+        self.reason[vi] = AssignReason::Implication(cid, by);
         self.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
@@ -198,11 +198,15 @@ impl PropagateIF for AssignStack {
             self.save_best_phases();
             self.best_assign = false;
         }
-        // We assume that backtrack is never happened in level zero.
-        let lim = self.trail_lim[lv as usize];
 
         #[cfg(feature = "chrono_BT")]
         let mut unpropagated: Vec<Lit> = Vec::new();
+
+        // We assume that backtrack is never happened in level zero.
+        let lim = self.trail_lim[lv as usize];
+
+        #[cfg(feature = "trail_saving")]
+        self.save_trail(lim, lv);
 
         for i in lim..self.trail.len() {
             let l = self.trail[i];
@@ -243,8 +247,12 @@ impl PropagateIF for AssignStack {
 
             unset_assign!(self, vi);
             self.reason[vi] = AssignReason::None;
-            self.reward_at_unassign(vi);
-            self.insert_heap(vi);
+
+            #[cfg(not(feature = "trail_saving"))]
+            {
+                self.reward_at_unassign(vi);
+                self.insert_heap(vi);
+            }
         }
         self.trail.truncate(lim);
         // moved below -- self.q_head = self.trail.len();
@@ -301,6 +309,17 @@ impl PropagateIF for AssignStack {
         C: ClauseDBIF,
     {
         let dl = self.decision_level();
+
+        #[cfg(feature = "trail_saving")]
+        if let cc @ Some(_) = self.from_saved_trail(cdb) {
+            self.num_propagation += 1;
+            self.num_conflict += 1;
+            self.num_reconflict += 1;
+            self.dpc_ema.update(self.num_decision);
+            self.ppc_ema.update(self.num_propagation);
+            return cc;
+        }
+
         while let Some(p) = self.trail.get(self.q_head) {
             self.num_propagation += 1;
             self.q_head += 1;
@@ -353,7 +372,7 @@ impl PropagateIF for AssignStack {
                             blocker,
                             self.level[propagating.vi()],
                             cid,
-                            Some(propagating),
+                            propagating,
                         );
                     }
                 }
@@ -505,6 +524,7 @@ impl PropagateIF for AssignStack {
                         link: NULL_LIT,
                     });
                 }
+
                 #[cfg(feature = "chrono_BT")]
                 let dl = cdb[cid]
                     .iter()
@@ -512,15 +532,25 @@ impl PropagateIF for AssignStack {
                     .map(|l| self.level[l.vi()])
                     .max()
                     .unwrap_or(self.root_level);
+
                 debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
-                assert!(other_watch_value.is_none());
-                self.assign_by_implication(cached, dl, cid, None);
+                debug_assert!(other_watch_value.is_none());
+                self.assign_by_implication(cached, dl, cid, NULL_LIT);
 
                 #[cfg(feature = "boundary_check")]
                 {
                     cdb[cid].moved_at = Propagate::BecameUnit(self.num_conflict, cached);
                 }
+            }
+            #[cfg(feature = "trail_saving")]
+            if let cc @ Some(_) = self.from_saved_trail(cdb) {
+                self.num_propagation += 1;
+                self.num_conflict += 1;
+                self.num_reconflict += 1;
+                self.dpc_ema.update(self.num_decision);
+                self.ppc_ema.update(self.num_propagation);
+                return cc;
             }
         }
         let na = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
@@ -542,7 +572,7 @@ impl PropagateIF for AssignStack {
     // 1. (allow dead clauses)
     // 1. (allow eliminated vars)
     //
-    fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> Option<ClauseId>
+    fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> Option<ConflictContext>
     where
         C: ClauseDBIF,
     {
@@ -576,14 +606,14 @@ impl PropagateIF for AssignStack {
 
                 match lit_assign!(self, blocker) {
                     Some(true) => (),
-                    Some(false) => return Some(cid),
+                    Some(false) => return Some(ConflictContext { cid, link: blocker }),
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
                         self.assign_by_implication(
                             blocker,
                             self.level[false_lit.vi()],
                             cid,
-                            Some(propagating),
+                            propagating,
                         );
                     }
                 }
@@ -702,7 +732,10 @@ impl PropagateIF for AssignStack {
                             Propagate::SandboxEmitConflict(self.num_conflict, propagating);
                     }
 
-                    return Some(cid);
+                    return Some(ConflictContext {
+                        cid,
+                        link: NULL_LIT,
+                    });
                 }
 
                 #[cfg(feature = "chrono_BT")]
@@ -714,8 +747,8 @@ impl PropagateIF for AssignStack {
                     .unwrap_or(self.root_level);
                 debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
-                assert!(other_watch_value.is_none());
-                self.assign_by_implication(cached, dl, cid, None);
+                debug_assert!(other_watch_value.is_none());
+                self.assign_by_implication(cached, dl, cid, NULL_LIT);
 
                 #[cfg(feature = "boundary_check")]
                 {
@@ -732,14 +765,14 @@ impl PropagateIF for AssignStack {
         assert_eq!(self.decision_level(), self.root_level);
         loop {
             if self.remains() {
-                self.propagate(cdb).map_or(Ok(()), |cc| {
+                self.propagate_sandbox(cdb).map_or(Ok(()), |cc| {
                     Err(SolverError::RootLevelConflict(Some(cc.cid)))
                 })?;
             }
             self.propagate_at_root_level(cdb)
                 .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
             if self.remains() {
-                self.propagate(cdb).map_or(Ok(()), |cc| {
+                self.propagate_sandbox(cdb).map_or(Ok(()), |cc| {
                     Err(SolverError::RootLevelConflict(Some(cc.cid)))
                 })?;
             } else {
@@ -781,12 +814,12 @@ impl AssignStack {
                     RefClause::EmptyClause => return Some(cid),
                     RefClause::RegisteredClause(_) => (),
                     RefClause::UnitClause(lit) => {
-                        assert!(self.assigned(lit).is_none());
+                        debug_assert!(self.assigned(lit).is_none());
                         cdb.certificate_add_assertion(lit);
                         if self.assign_at_root_level(lit).is_err() {
                             return Some(cid);
                         } else {
-                            assert!(!self.locked(&cdb[cid], cid));
+                            debug_assert!(!self.locked(&cdb[cid], cid));
                             cdb.remove_clause(cid);
                         }
                     }

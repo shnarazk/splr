@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.13.0-alpha"
+version = "0.13.0-alpha1"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2018"
@@ -28,6 +28,7 @@ default = [
         # DEBUG "maintain_watch_cache",
         "reason_side_rewarding",
         "rephase",
+        "trail_saving",
         "unsafe_access"
         ]
 best_phases_tracking = []
@@ -56,6 +57,7 @@ support_user_assumption = []
 trace_analysis = []
 trace_elimination = []
 trace_equivalency = []
+trail_saving = []
 unsafe_access = []
 
 [profile.release]
