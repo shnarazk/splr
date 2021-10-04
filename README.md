@@ -400,7 +400,7 @@ Note: the mechanism explained here is different from that used in Splr-0.10.0.
 
 - [1] G. Audemard and L. Simon, "Predicting learnt clauses quality in modern SAT solvers," in _International Joint Conference on Artificial Intelligence 2009_, pp. 399–404, 2009.
 
-- [2] G. Audemard and L. Simon, "Refining restarts strategies for SAT and UNSAT," in _Lecture Notes in Computer Science_, vol.7513, pp.118–126, 2012.
+- [2] G. Audemard and L. Simon, "Refining restarts strategies for SAT and UNSAT," in _LNCS_, vol.7513, pp.118–126, 2012.
 
 - [3] R. Hickey and F. Bacchus, "Trail Saving on Backtrack", _SAT 2020_, _LNCS_, vol. 12178, pp.46-61, 2020.
 
