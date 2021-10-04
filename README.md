@@ -375,7 +375,7 @@ Splr-0.13.0 adopts the following features by default:
 - clause elimination and subsumption as pre-processor and in-processor
 - stabilization based on Luby series, or _Luby Stabilization_
 - re-phase the best phases
-- trail saving extended with multiple conflicts  and reason refinement based on clause quality[3]
+- trail saving extended with saving over multiple backtracks and reason refinement based on clause quality[3]
 
 As shown in the blow, Splr calls in-processor very frequently.
 
