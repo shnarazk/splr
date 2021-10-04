@@ -1,3 +1,7 @@
+## 0.12.0, 2021-  -  
+
+- implement trail saving as an alternative of chrono-BT
+
 ## 0.12.0, 2021-09-25
 
 - reduce memory footprint

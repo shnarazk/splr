@@ -364,17 +364,18 @@ ARGS:
 
 ## Solver description
 
-Splr-0.12.0 adopts the following features by default:
+Splr-0.13.0 adopts the following features by default:
 
-- Learning-rate based (LRB) var rewarding and clause rewarding[3]
-- Reason-side var rewarding[3]
-- ~~chronological backtrack[4]~~ disabled in 0.12 due to incorrect UNSAT certificates.
-- clause vivification[5]
+- Learning-rate based (LRB) var rewarding and clause rewarding[4]
+- Reason-side var rewarding[4]
+- ~~chronological backtrack[5]~~ disabled since 0.12 due to incorrect UNSAT certificates.
+- clause vivification[6]
 - dynamic restart based on average LBDs of learnt clauses[1]
 - dynamic restart blocking based on the number of remaining vars[2]
 - clause elimination and subsumption as pre-processor and in-processor
 - stabilization based on Luby series, or _Luby Stabilization_
 - re-phase the best phases
+- trail saving extended with multiple conflicts  and reason refinement based on clause quality[3]
 
 As shown in the blow, Splr calls in-processor very frequently.
 
@@ -401,11 +402,13 @@ Note: the mechanism explained here is different from that used in Splr-0.10.0.
 
 - [2] G. Audemard and L. Simon, "Refining restarts strategies for SAT and UNSAT," in _Lecture Notes in Computer Science_, vol.7513, pp.118–126, 2012.
 
-- [3] J. H. Liang, V. Ganesh, P. Poupart, and K. Czarnecki, "Learning Rate Based Branching Heuristic for SAT Solvers," in _Lecture Notes in Computer Science_, vol.9710, pp.123–140, 2016.
+- [3] R. Hickey and F. Bacchus, "Trail Saving on Backtrack", _SAT 2020_, _LNCS_, vol. 12178, pp.46-61, 2020.
 
-- [4] A. Nadel and V. Ryvchin, "Chronological Backtracking," in _Theory and Applications of Satisfiability Testing - SAT 2018_, June 2018, pp.111–121, 2018.
+- [4] J. H. Liang, V. Ganesh, P. Poupart, and K. Czarnecki, "Learning Rate Based Branching Heuristic for SAT Solvers," in _LNCS_, vol.9710, pp.123–140, 2016.
 
-- [5] C. Piette, Y. Hamadi, and L. Saïs, "Vivifying propositional clausal formulae," _Front. Artif. Intell. Appl._, vol.178, pp.525–529, 2008.
+- [5] A. Nadel and V. Ryvchin, "Chronological Backtracking," in _Theory and Applications of Satisfiability Testing - SAT 2018_, June 2018, pp.111–121, 2018.
+
+- [6] C. Piette, Y. Hamadi, and L. Saïs, "Vivifying propositional clausal formulae," _Front. Artif. Intell. Appl._, vol.178, pp.525–529, 2008.
 
 ## License
 
