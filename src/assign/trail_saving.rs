@@ -8,6 +8,8 @@ use {
     },
 };
 
+const REASON_THRESHOLD: f64 = 1.5;
+
 #[cfg(feature = "trail_saving")]
 impl AssignStack {
     pub fn save_trail(&mut self, lim: usize, _to_lvl: DecisionLevel) {
@@ -64,7 +66,7 @@ impl AssignStack {
     where
         C: ClauseDBIF,
     {
-        let q = (1.2 * cdb.derefer(cdb::property::Tf64::DpAverageLBD)).max(5.0) as u16;
+        let q = (REASON_THRESHOLD * cdb.derefer(cdb::property::Tf64::DpAverageLBD)).max(6.0) as u16;
         let dl = self.decision_level();
         for i in (0..self.trail_saved.len()).rev() {
             let lit = self.trail_saved[i];
