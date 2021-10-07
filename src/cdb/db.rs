@@ -286,7 +286,7 @@ impl ClauseDBIF for ClauseDB {
                 return RefClause::RegisteredClause(cid);
             }
         }
-        self.certification_store.push_add(vec);
+        self.certification_store.add_clause(vec);
         let cid;
         if let Some(cid_used) = self.freelist.pop() {
             cid = cid_used;
@@ -676,8 +676,8 @@ impl ClauseDBIF for ClauseDB {
             // self.watches(cid, "after strengthen_by_elimination case:3-3");
         }
         if certification_store.is_active() {
-            certification_store.push_add(&c.lits);
-            certification_store.push_delete(&new_lits);
+            certification_store.add_clause(&c.lits);
+            certification_store.delete_clause(&new_lits);
         }
         RefClause::Clause(cid)
     }
@@ -709,7 +709,7 @@ impl ClauseDBIF for ClauseDB {
                 //## Case:0
                 //
                 if certification_store.is_active() {
-                    certification_store.push_delete(new_lits);
+                    certification_store.delete_clause(new_lits);
                 }
                 return RefClause::RegisteredClause(did);
             }
@@ -727,15 +727,15 @@ impl ClauseDBIF for ClauseDB {
             bi_clause[l1].insert(l0, cid);
 
             if certification_store.is_active() {
-                certification_store.push_add(new_lits);
-                certification_store.push_delete(&c.lits);
+                certification_store.add_clause(new_lits);
+                certification_store.delete_clause(&c.lits);
             }
             c.turn_off(Flag::LEARNT);
             self.num_bi_clause += 1;
 
             if certification_store.is_active() {
-                certification_store.push_add(&c.lits);
-                certification_store.push_delete(new_lits);
+                certification_store.add_clause(&c.lits);
+                certification_store.delete_clause(new_lits);
             }
         } else {
             //
@@ -783,8 +783,8 @@ impl ClauseDBIF for ClauseDB {
             // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
 
             if certification_store.is_active() {
-                certification_store.push_add(new_lits);
-                certification_store.push_delete(&c.lits);
+                certification_store.add_clause(new_lits);
+                certification_store.delete_clause(&c.lits);
             }
         }
         RefClause::Clause(cid)
@@ -872,8 +872,8 @@ impl ClauseDBIF for ClauseDB {
                 c.turn_off(Flag::LEARNT);
 
                 if certification_store.is_active() {
-                    certification_store.push_add(&c.lits);
-                    certification_store.push_delete(&new_lits);
+                    certification_store.add_clause(&c.lits);
+                    certification_store.delete_clause(&new_lits);
                 }
                 RefClause::Clause(cid)
             }
@@ -928,8 +928,8 @@ impl ClauseDBIF for ClauseDB {
                 // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
 
                 if certification_store.is_active() {
-                    certification_store.push_add(&c.lits);
-                    certification_store.push_delete(&new_lits);
+                    certification_store.add_clause(&c.lits);
+                    certification_store.delete_clause(&new_lits);
                 }
                 RefClause::Clause(cid)
             }
@@ -1065,7 +1065,7 @@ impl ClauseDBIF for ClauseDB {
         }
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
-        self.certification_store.push_add(&[lit]);
+        self.certification_store.add_clause(&[lit]);
     }
     fn certificate_save(&mut self) {
         self.certification_store.close();
@@ -1473,7 +1473,7 @@ fn remove_clause_fn(
         *num_learnt -= 1;
     }
     *num_clause -= 1;
-    certificate_store.push_delete(&c.lits);
+    certificate_store.delete_clause(&c.lits);
     c.lits.clear();
 }
 
