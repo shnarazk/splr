@@ -20,20 +20,11 @@ Please check [ChangeLog](ChangeLog.md) about recent updates.
 
 Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results.
 
-#### Version 0.12.0
+#### Version 0.13.0
 
-- [SAT Competition 2021](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks main truck](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.12.0 RC (ed953b78) solved with a 500 sec timeout:
-  - 42 satisfiable problems: all the solutions were correct.
-  - 42 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
-
-#### Version 0.11.0
-
-- all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
-- [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.11.0 RC (84895b21) solved with a 300 sec timeout:
-  - 43 satisfiable problems: all the solutions were correct.
-  - 7 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
-
-![Benchmark result(2021-08-16)](https://user-images.githubusercontent.com/997855/129486985-4d76d819-98b7-4f4c-b532-c13dc672282d.png)
+- [SAT Competition 2021](https://satcompetition.github.io/2021/), [Benchmarks main truck](https://satcompetition.github.io/2021/benchmarks.html) -- splr-0.13.0 RC (8d45af74) solved with a 500 sec timeout:
+  - 41 satisfiable problems: all the solutions were correct.
+  - 44 unsatisfiable problems: ?? the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
 
 ## Install
 
