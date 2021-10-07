@@ -334,7 +334,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     for key in &config::property::F64S {
         out.write_all(
             format!(
-                "c   config::{:<27}{:>15}\n",
+                "c   config::{:<27}{:>19.3}\n",
                 format!("{:?}", key),
                 s.state.config.derefer(*key),
             )
