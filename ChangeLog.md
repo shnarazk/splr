@@ -1,4 +1,4 @@
-## 0.13.0, 2021-10-09
+## 0.13.0, 2021-10-10
 
 - implement trail saving as an alternative of chrono-BT with following extensions:
   - saving over multiple backtracks
