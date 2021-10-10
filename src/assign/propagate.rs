@@ -206,7 +206,7 @@ impl PropagateIF for AssignStack {
         let lim = self.trail_lim[lv as usize];
 
         #[cfg(feature = "trail_saving")]
-        self.save_trail(lim, lv);
+        self.save_trail(lv);
 
         for i in lim..self.trail.len() {
             let l = self.trail[i];

@@ -1,7 +1,6 @@
 ## 0.13.0, 2021-10-10
 
 - implement trail saving as an alternative of chrono-BT with following extensions:
-  - saving over multiple backtracks
   - reason refinement based on LBD values
   - heap operation optimization
 - dump UNSAT certificate less frequently
