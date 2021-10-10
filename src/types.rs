@@ -373,6 +373,8 @@ pub struct ConflictContext {
     pub link: Lit,
 }
 
+pub type PropagationResult = Result<(), ConflictContext>;
+
 impl ConflictContext {
     pub fn conflicting_literal(&self, cdb: &ClauseDB) -> Lit {
         let lit0 = cdb[self.cid].lit0();

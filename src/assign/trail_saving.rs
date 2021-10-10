@@ -48,7 +48,7 @@ impl AssignStack {
             self.insert_heap(vi);
         }
     }
-    pub fn from_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> Option<ConflictContext> {
+    pub fn from_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult {
         let q = (REASON_THRESHOLD * cdb.derefer(cdb::property::Tf64::DpAverageLBD)).max(6.0) as u16;
         let dl = self.decision_level();
         for i in (0..self.trail_saved.len()).rev() {
@@ -72,14 +72,14 @@ impl AssignStack {
                     self.assign_by_implication(lit, dl, cid, l);
                 }
                 (AssignReason::Implication(cid, link), Some(false)) => {
-                    self.truncate_trail_saved(i + 1);
+                    let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_trail_saved();
                     if link == NULL_LIT {
-                        return Some(ConflictContext { cid, link });
+                        return Err(ConflictContext { cid, link });
                     }
                     let c = &cdb[cid];
                     let lit0 = c.lit0();
-                    return Some(ConflictContext {
+                    return Err(ConflictContext {
                         cid,
                         link: if lit != lit0 { lit0 } else { c.lit1() },
                     });
@@ -92,7 +92,7 @@ impl AssignStack {
             }
         }
         self.trail_saved.clear();
-        None
+        Ok(())
     }
     pub fn clear_trail_saved(&mut self) {
         for j in 0..self.trail_saved.len() {
@@ -101,8 +101,8 @@ impl AssignStack {
         }
         self.trail_saved.clear();
     }
-    fn truncate_trail_saved(&mut self, len: usize) -> Option<ConflictContext> {
+    fn truncate_trail_saved(&mut self, len: usize) -> PropagationResult {
         self.trail_saved.truncate(len);
-        None
+        Ok(())
     }
 }

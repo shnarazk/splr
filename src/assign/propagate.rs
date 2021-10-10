@@ -27,13 +27,9 @@ pub trait PropagateIF {
     /// execute backjump in vivification sandbox
     fn backtrack_sandbox(&mut self);
     /// execute *boolean constraint propagation* or *unit propagation*.
-    fn propagate<C>(&mut self, cdb: &mut C) -> Option<ConflictContext>
-    where
-        C: ClauseDBIF;
+    fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
     /// `propagate` for vivification, which allows dead clauses.
-    fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> Option<ConflictContext>
-    where
-        C: ClauseDBIF;
+    fn propagate_sandbox(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
     /// propagate then clear asserted literals
     fn clear_asserted_literals<C>(&mut self, cdb: &mut C) -> MaybeInconsistent
     where
@@ -304,14 +300,11 @@ impl PropagateIF for AssignStack {
     ///    So Eliminator should call `garbage_collect` before me.
     ///  - The order of literals in binary clauses will be modified to hold
     ///    propagation order.
-    fn propagate<C>(&mut self, cdb: &mut C) -> Option<ConflictContext>
-    where
-        C: ClauseDBIF,
-    {
+    fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
         let dl = self.decision_level();
 
         #[cfg(feature = "trail_saving")]
-        if let cc @ Some(_) = self.from_saved_trail(cdb) {
+        if let cc @ Err(_) = self.from_saved_trail(cdb) {
             self.num_propagation += 1;
             self.num_conflict += 1;
             self.num_reconflict += 1;
@@ -364,7 +357,7 @@ impl PropagateIF for AssignStack {
                             cdb[cid].moved_at = Propagate::EmitConflict(self.num_conflict, blocker);
                         }
 
-                        return Some(ConflictContext { cid, link: blocker });
+                        return Err(ConflictContext { cid, link: blocker });
                     }
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
@@ -519,7 +512,7 @@ impl PropagateIF for AssignStack {
                         cdb[cid].moved_at = Propagate::EmitConflict(self.num_conflict, cached);
                     }
 
-                    return Some(ConflictContext {
+                    return Err(ConflictContext {
                         cid,
                         link: NULL_LIT,
                     });
@@ -544,7 +537,7 @@ impl PropagateIF for AssignStack {
                 }
             }
             #[cfg(feature = "trail_saving")]
-            if let cc @ Some(_) = self.from_saved_trail(cdb) {
+            if let cc @ Err(_) = self.from_saved_trail(cdb) {
                 self.num_propagation += 1;
                 self.num_conflict += 1;
                 self.num_reconflict += 1;
@@ -558,7 +551,7 @@ impl PropagateIF for AssignStack {
             self.best_assign = true;
             self.num_best_assign = na;
         }
-        None
+        Ok(())
     }
     //
     //## How to generate propagate_sandbox from propagate
@@ -572,10 +565,7 @@ impl PropagateIF for AssignStack {
     // 1. (allow dead clauses)
     // 1. (allow eliminated vars)
     //
-    fn propagate_sandbox<C>(&mut self, cdb: &mut C) -> Option<ConflictContext>
-    where
-        C: ClauseDBIF,
-    {
+    fn propagate_sandbox(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
         let dl = self.decision_level();
         while let Some(p) = self.trail.get(self.q_head) {
             self.q_head += 1;
@@ -606,7 +596,7 @@ impl PropagateIF for AssignStack {
 
                 match lit_assign!(self, blocker) {
                     Some(true) => (),
-                    Some(false) => return Some(ConflictContext { cid, link: blocker }),
+                    Some(false) => return Err(ConflictContext { cid, link: blocker }),
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
                         self.assign_by_implication(
@@ -732,7 +722,7 @@ impl PropagateIF for AssignStack {
                             Propagate::SandboxEmitConflict(self.num_conflict, propagating);
                     }
 
-                    return Some(ConflictContext {
+                    return Err(ConflictContext {
                         cid,
                         link: NULL_LIT,
                     });
@@ -756,7 +746,7 @@ impl PropagateIF for AssignStack {
                 }
             }
         }
-        None
+        Ok(())
     }
     fn clear_asserted_literals<C>(&mut self, cdb: &mut C) -> MaybeInconsistent
     where
@@ -765,16 +755,14 @@ impl PropagateIF for AssignStack {
         assert_eq!(self.decision_level(), self.root_level);
         loop {
             if self.remains() {
-                self.propagate_sandbox(cdb).map_or(Ok(()), |cc| {
-                    Err(SolverError::RootLevelConflict(Some(cc.cid)))
-                })?;
+                self.propagate_sandbox(cdb)
+                    .map_err(|cc| SolverError::RootLevelConflict(Some(cc.cid)))?;
             }
             self.propagate_at_root_level(cdb)
                 .map_or(Ok(()), |cc| Err(SolverError::RootLevelConflict(Some(cc))))?;
             if self.remains() {
-                self.propagate_sandbox(cdb).map_or(Ok(()), |cc| {
-                    Err(SolverError::RootLevelConflict(Some(cc.cid)))
-                })?;
+                self.propagate_sandbox(cdb)
+                    .map_err(|cc| SolverError::RootLevelConflict(Some(cc.cid)))?;
             } else {
                 break;
             }
