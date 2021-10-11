@@ -29,9 +29,9 @@ pub fn vivify(
 ) -> MaybeInconsistent {
     const NUM_TARGETS: Option<usize> = Some(80_000);
     if asg.remains() {
-        asg.propagate(cdb).map_or(Ok(()), |cc| {
+        asg.propagate_sandbox(cdb).map_err(|cc| {
             state.log(asg.num_conflict, "By vivifier");
-            Err(SolverError::RootLevelConflict(Some(cc.cid)))
+            SolverError::RootLevelConflict(Some(cc.cid))
         })?;
     }
     let mut clauses: Vec<OrderedProxy<ClauseId>> = select_targets(
@@ -57,9 +57,8 @@ pub fn vivify(
         asg.backtrack_sandbox();
         debug_assert_eq!(asg.decision_level(), asg.root_level());
         if asg.remains() {
-            asg.propagate(cdb).map_or(Ok(()), |cc| {
-                Err(SolverError::RootLevelConflict(Some(cc.cid)))
-            })?;
+            asg.propagate_sandbox(cdb)
+                .map_err(|cc| SolverError::RootLevelConflict(Some(cc.cid)))?;
         }
 
         debug_assert!(asg.stack_is_empty() || !asg.remains());
@@ -94,12 +93,12 @@ pub fn vivify(
                     decisions.push(!lit);
                     asg.assign_by_decision(!lit);
                     //## Rule 3
-                    if let Some(cc) = asg.propagate_sandbox(cdb) {
-                        let cnfl_lits = &cdb[cc].iter().copied().collect::<Vec<Lit>>();
+                    if let Err(cc) = asg.propagate_sandbox(cdb) {
+                        let cnfl_lits = &cdb[cc.cid].iter().copied().collect::<Vec<Lit>>();
                         seen[0] = num_check;
                         let mut vec = asg.analyze_sandbox(cdb, &decisions, cnfl_lits, &mut seen);
                         asg.backtrack_sandbox();
-                        if clits.len() == decisions.len() && cc == cid {
+                        if clits.len() == decisions.len() && cc.cid == cid {
                             continue 'next_clause;
                         }
                         match vec.len() {
@@ -134,7 +133,7 @@ pub fn vivify(
     }
     asg.backtrack_sandbox();
     if asg.remains() {
-        asg.propagate(cdb);
+        assert!(asg.propagate_sandbox(cdb).is_ok());
     }
     asg.clear_asserted_literals(cdb)?;
     debug_assert!(asg.stack_is_empty() || !asg.remains());

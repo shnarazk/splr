@@ -1,3 +1,10 @@
+## 0.13.0, 2021-10-11
+
+- implement trail saving as an alternative of chrono-BT with following extensions:
+  - reason refinement based on LBD values
+  - heap operation optimization
+- dump UNSAT certificate less frequently
+
 ## 0.12.0, 2021-09-25
 
 - reduce memory footprint

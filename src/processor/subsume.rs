@@ -5,17 +5,13 @@ use {
 };
 
 impl Eliminator {
-    pub fn try_subsume<A, C>(
+    pub fn try_subsume(
         &mut self,
-        asg: &mut A,
-        cdb: &mut C,
+        asg: &mut impl AssignIF,
+        cdb: &mut impl ClauseDBIF,
         cid: ClauseId,
         did: ClauseId,
-    ) -> MaybeInconsistent
-    where
-        A: AssignIF,
-        C: ClauseDBIF,
-    {
+    ) -> MaybeInconsistent {
         match have_subsuming_lit(cdb, cid, did) {
             Some(NULL_LIT) => {
                 #[cfg(feature = "trace_elimination")]
@@ -45,10 +41,7 @@ impl Eliminator {
 }
 
 /// returns a literal if these clauses can be merged by the literal.
-fn have_subsuming_lit<C>(cdb: &mut C, cid: ClauseId, other: ClauseId) -> Option<Lit>
-where
-    C: ClauseDBIF,
-{
+fn have_subsuming_lit(cdb: &mut impl ClauseDBIF, cid: ClauseId, other: ClauseId) -> Option<Lit> {
     debug_assert!(!other.is_lifted_lit());
     if cid.is_lifted_lit() {
         let l = Lit::from(cid);
@@ -84,17 +77,13 @@ where
 /// removes `l` from clause `cid`
 /// - calls `enqueue_clause`
 /// - calls `enqueue_var`
-fn strengthen_clause<A, C>(
-    asg: &mut A,
-    cdb: &mut C,
+fn strengthen_clause(
+    asg: &mut impl AssignIF,
+    cdb: &mut impl ClauseDBIF,
     elim: &mut Eliminator,
     cid: ClauseId,
     l: Lit,
-) -> MaybeInconsistent
-where
-    A: AssignIF,
-    C: ClauseDBIF,
-{
+) -> MaybeInconsistent {
     debug_assert!(!cdb[cid].is_dead());
     debug_assert!(1 < cdb[cid].len());
     match cdb.transform_by_elimination(cid, l) {

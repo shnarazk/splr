@@ -11,6 +11,8 @@ mod reward;
 mod select;
 /// assignment management
 mod stack;
+/// trail saving
+mod trail_saving;
 /// var struct and its methods
 mod var;
 
@@ -62,17 +64,13 @@ pub trait AssignIF:
     fn level_ref(&self) -> &[DecisionLevel];
     fn best_assigned(&mut self) -> Option<usize>;
     /// inject assignments for eliminated vars.
-    fn extend_model<C>(&mut self, c: &mut C, lits: &[Lit]) -> Vec<Option<bool>>
-    where
-        C: ClauseDBIF;
+    fn extend_model(&mut self, c: &mut impl ClauseDBIF, lits: &[Lit]) -> Vec<Option<bool>>;
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
     /// return `true` is the clause is the reason of the assignment.
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
     /// dump the status as a CNF
-    fn dump_cnf<C>(&mut self, cdb: &C, fname: &str)
-    where
-        C: ClauseDBIF;
+    fn dump_cnf(&mut self, cdb: &impl ClauseDBIF, fname: &str);
 }
 
 /// Reasons of assignments, two kinds
@@ -132,6 +130,13 @@ pub struct AssignStack {
     q_head: usize,
     root_level: DecisionLevel,
     var_order: VarIdHeap, // Variable Order
+
+    #[cfg(feature = "trail_saving")]
+    reason_saved: Vec<AssignReason>,
+    #[cfg(feature = "trail_saving")]
+    trail_saved: Vec<Lit>,
+    num_reconflict: usize,
+    num_repropagation: usize,
 
     //
     //## Phase handling
@@ -276,6 +281,8 @@ pub mod property {
         NumVar,
         NumAssertedVar,
         NumEliminatedVar,
+        NumReconflict,
+        NumRepropagation,
         /// the number of vars in `the unreachable core'
         NumUnassertedVar,
         NumUnassignedVar,
@@ -283,7 +290,7 @@ pub mod property {
         RootLevel,
     }
 
-    pub const USIZES: [Tusize; 12] = [
+    pub const USIZES: [Tusize; 14] = [
         Tusize::NumConflict,
         Tusize::NumDecision,
         Tusize::NumPropagation,
@@ -292,6 +299,8 @@ pub mod property {
         Tusize::NumVar,
         Tusize::NumAssertedVar,
         Tusize::NumEliminatedVar,
+        Tusize::NumReconflict,
+        Tusize::NumRepropagation,
         Tusize::NumUnassertedVar,
         Tusize::NumUnassignedVar,
         Tusize::NumUnreachableVar,
@@ -310,6 +319,8 @@ pub mod property {
                 Tusize::NumVar => self.num_vars,
                 Tusize::NumAssertedVar => self.num_asserted_vars,
                 Tusize::NumEliminatedVar => self.num_eliminated_vars,
+                Tusize::NumReconflict => self.num_reconflict,
+                Tusize::NumRepropagation => self.num_repropagation,
                 Tusize::NumUnassertedVar => {
                     self.num_vars - self.num_asserted_vars - self.num_eliminated_vars
                 }

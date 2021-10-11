@@ -10,20 +10,15 @@ use {
     },
 };
 
-pub fn eliminate_var<A, C, R>(
-    asg: &mut A,
-    cdb: &mut C,
+pub fn eliminate_var(
+    asg: &mut impl AssignIF,
+    cdb: &mut impl ClauseDBIF,
     elim: &mut Eliminator,
-    rst: &mut R,
+    rst: &mut impl RestartIF,
     state: &mut State,
     vi: VarId,
     timedout: &mut usize,
-) -> MaybeInconsistent
-where
-    A: AssignIF,
-    C: ClauseDBIF,
-    R: RestartIF,
-{
+) -> MaybeInconsistent {
     let v = &mut asg.var(vi);
     let w = &mut elim.var[vi];
     if asg.assign(vi).is_some() || w.aborted {
@@ -164,19 +159,15 @@ where
 }
 
 /// returns `true` if elimination is impossible.
-fn skip_var_elimination<A, C>(
-    asg: &A,
-    cdb: &C,
+fn skip_var_elimination(
+    asg: &impl AssignIF,
+    cdb: &impl ClauseDBIF,
     pos: &[ClauseId],
     neg: &[ClauseId],
     v: VarId,
     grow_limit: usize,
     combination_limit: f64,
-) -> bool
-where
-    A: AssignIF,
-    C: ClauseDBIF,
-{
+) -> bool {
     // avoid thrashing
     let limit = match cdb.check_size() {
         Ok(true) => grow_limit,
@@ -212,11 +203,13 @@ where
 /// Returns the the-size-of-clause-being-generated.
 /// - `(false, -)` if one of the clauses is always satisfied.
 /// - `(true, n)` if they are merge-able to a n-literal clause.
-fn merge_cost<A, C>(asg: &A, cdb: &C, cp: ClauseId, cq: ClauseId, vi: VarId) -> Option<usize>
-where
-    A: AssignIF,
-    C: ClauseDBIF,
-{
+fn merge_cost(
+    asg: &impl AssignIF,
+    cdb: &impl ClauseDBIF,
+    cp: ClauseId,
+    cq: ClauseId,
+    vi: VarId,
+) -> Option<usize> {
     let c_p = &cdb[cp];
     let c_q = &cdb[cq];
     let mut cond: Option<Lit> = None;
@@ -258,18 +251,14 @@ where
 
 /// Return the real length of the generated clause by merging two clauses.
 /// Return **zero** if one of the clauses is always satisfied. (merge_vec should not be used.)
-fn merge<A, C>(
-    asg: &mut A,
-    cdb: &mut C,
+fn merge(
+    asg: &mut impl AssignIF,
+    cdb: &mut impl ClauseDBIF,
     cip: ClauseId,
     ciq: ClauseId,
     vi: VarId,
     vec: &mut Vec<Lit>,
-) -> usize
-where
-    A: AssignIF,
-    C: ClauseDBIF,
-{
+) -> usize {
     vec.clear();
     let pqb = &cdb[cip];
     let qpb = &cdb[ciq];
@@ -299,15 +288,13 @@ where
     vec.len()
 }
 
-fn make_eliminated_clauses<C>(
-    cdb: &mut C,
+fn make_eliminated_clauses(
+    cdb: &mut impl ClauseDBIF,
     tmp: &mut Vec<Lit>,
     v: VarId,
     pos: &[ClauseId],
     neg: &[ClauseId],
-) where
-    C: ClauseDBIF,
-{
+) {
     if neg.len() < pos.len() {
         for cid in neg {
             debug_assert!(!cdb[*cid].is_dead());
@@ -330,10 +317,7 @@ fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {
     vec.push(Lit::from(1usize));
 }
 
-fn make_eliminated_clause<C>(cdb: &mut C, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId)
-where
-    C: ClauseDBIF,
-{
+fn make_eliminated_clause(cdb: &mut impl ClauseDBIF, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId) {
     let first = vec.len();
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:
     let c = &cdb[cid];

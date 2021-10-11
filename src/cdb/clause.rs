@@ -155,10 +155,7 @@ impl ClauseIF for Clause {
     fn contains(&self, lit: Lit) -> bool {
         self.lits.contains(&lit)
     }
-    fn is_satisfied_under<A>(&self, asg: &A) -> bool
-    where
-        A: AssignIF,
-    {
+    fn is_satisfied_under(&self, asg: &impl AssignIF) -> bool {
         for l in self.lits.iter() {
             if asg.assigned(*l) == Some(true) {
                 return true;
@@ -256,10 +253,7 @@ impl fmt::Display for Clause {
 
 impl Clause {
     /// update rank field with the present LBD.
-    pub fn update_lbd<A>(&mut self, asg: &A, lbd_temp: &mut [usize]) -> usize
-    where
-        A: AssignIF,
-    {
+    pub fn update_lbd(&mut self, asg: &impl AssignIF, lbd_temp: &mut [usize]) -> usize {
         let level = asg.level_ref();
         let key: usize = lbd_temp[0] + 1;
         lbd_temp[0] = key;

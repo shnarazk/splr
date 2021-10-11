@@ -230,11 +230,7 @@ impl EliminateIF for Eliminator {
     fn is_running(&self) -> bool {
         self.enable && self.mode == EliminatorMode::Running
     }
-    fn prepare<A, C>(&mut self, asg: &mut A, cdb: &mut C, force: bool)
-    where
-        A: AssignIF,
-        C: ClauseDBIF,
-    {
+    fn prepare(&mut self, asg: &mut impl AssignIF, cdb: &mut impl ClauseDBIF, force: bool) {
         debug_assert!(self.enable);
         if self.mode != EliminatorMode::Waiting {
             return;
@@ -260,10 +256,7 @@ impl EliminateIF for Eliminator {
             }
         }
     }
-    fn enqueue_var<A>(&mut self, asg: &mut A, vi: VarId, upward: bool)
-    where
-        A: AssignIF,
-    {
+    fn enqueue_var(&mut self, asg: &mut impl AssignIF, vi: VarId, upward: bool) {
         if self.mode != EliminatorMode::Running {
             return;
         }
@@ -273,18 +266,13 @@ impl EliminateIF for Eliminator {
             self.var_queue.insert(&self.var, vi, upward);
         }
     }
-    fn simplify<A, C, R>(
+    fn simplify(
         &mut self,
-        asg: &mut A,
-        cdb: &mut C,
-        rst: &mut R,
+        asg: &mut impl AssignIF,
+        cdb: &mut impl ClauseDBIF,
+        rst: &mut impl RestartIF,
         state: &mut State,
-    ) -> MaybeInconsistent
-    where
-        A: AssignIF,
-        C: ClauseDBIF,
-        R: RestartIF,
-    {
+    ) -> MaybeInconsistent {
         debug_assert_eq!(asg.decision_level(), 0);
         // we can reset all the reasons because decision level is zero.
         #[cfg(feature = "boundary_check")]
@@ -314,9 +302,8 @@ impl EliminateIF for Eliminator {
                 self.stop(asg, cdb);
             }
         } else {
-            asg.propagate(cdb).map_or(Ok(()), |cc| {
-                Err(SolverError::RootLevelConflict(Some(cc.cid)))
-            })?;
+            asg.propagate_sandbox(cdb)
+                .map_err(|cc| SolverError::RootLevelConflict(Some(cc.cid)))?;
         }
         if self.mode != EliminatorMode::Dormant {
             self.stop(asg, cdb);
@@ -341,10 +328,13 @@ impl EliminateIF for Eliminator {
 
 impl Eliminator {
     /// register a clause id to all corresponding occur lists.
-    pub fn add_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause, enqueue: bool)
-    where
-        A: AssignIF,
-    {
+    pub fn add_cid_occur(
+        &mut self,
+        asg: &mut impl AssignIF,
+        cid: ClauseId,
+        c: &mut Clause,
+        enqueue: bool,
+    ) {
         if self.mode != EliminatorMode::Running || c.is(Flag::OCCUR_LINKED) {
             return;
         }
@@ -397,10 +387,7 @@ impl Eliminator {
         }
     }
     /// remove a clause id from all corresponding occur lists.
-    pub fn remove_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause)
-    where
-        A: AssignIF,
-    {
+    pub fn remove_cid_occur(&mut self, asg: &mut impl AssignIF, cid: ClauseId, c: &mut Clause) {
         debug_assert!(self.mode == EliminatorMode::Running);
         debug_assert!(!cid.is_lifted_lit());
         debug_assert!(!c.is_dead());
@@ -420,11 +407,7 @@ impl Eliminator {
     // Due to a potential bug of killing clauses and difficulty about
     // synchronization between 'garbage_collect' and clearing occur lists,
     // 'stop' should purge all occur lists to purge any dead clauses for now.
-    fn stop<A, C>(&mut self, asg: &mut A, cdb: &mut C)
-    where
-        A: AssignIF,
-        C: ClauseDBIF,
-    {
+    fn stop(&mut self, asg: &mut impl AssignIF, cdb: &mut impl ClauseDBIF) {
         let force: bool = true;
         self.clear_clause_queue(cdb);
         self.clear_var_queue(asg);
@@ -440,16 +423,12 @@ impl Eliminator {
     }
     /// returns false if solver is inconsistent
     /// - calls `clause_queue.pop`
-    pub fn backward_subsumption_check<A, C>(
+    pub fn backward_subsumption_check(
         &mut self,
-        asg: &mut A,
-        cdb: &mut C,
+        asg: &mut impl AssignIF,
+        cdb: &mut impl ClauseDBIF,
         timedout: &mut usize,
-    ) -> MaybeInconsistent
-    where
-        A: AssignIF,
-        C: ClauseDBIF,
-    {
+    ) -> MaybeInconsistent {
         debug_assert_eq!(asg.decision_level(), 0);
         while !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.stack_len() {
             // Check top-level assignments by creating a dummy clause
@@ -529,9 +508,8 @@ impl Eliminator {
             }
         }
         if asg.remains() {
-            asg.propagate(cdb).map_or(Ok(()), |cc| {
-                Err(SolverError::RootLevelConflict(Some(cc.cid)))
-            })?;
+            asg.propagate_sandbox(cdb)
+                .map_err(|cc| SolverError::RootLevelConflict(Some(cc.cid)))?;
         }
         Ok(())
     }
@@ -540,25 +518,19 @@ impl Eliminator {
     /// # Errors
     ///
     /// if solver becomes inconsistent.
-    fn eliminate<A, C, R>(
+    fn eliminate(
         &mut self,
-        asg: &mut A,
-        cdb: &mut C,
-        rst: &mut R,
+        asg: &mut impl AssignIF,
+        cdb: &mut impl ClauseDBIF,
+        rst: &mut impl RestartIF,
         state: &mut State,
-    ) -> MaybeInconsistent
-    where
-        A: AssignIF,
-        C: ClauseDBIF,
-        R: RestartIF,
-    {
+    ) -> MaybeInconsistent {
         let start = state.elapsed().unwrap_or(0.0);
         loop {
             let na = asg.stack_len();
             self.eliminate_main(asg, cdb, rst, state)?;
-            asg.propagate(cdb).map_or(Ok(()), |cc| {
-                Err(SolverError::RootLevelConflict(Some(cc.cid)))
-            })?;
+            asg.propagate_sandbox(cdb)
+                .map_err(|cc| SolverError::RootLevelConflict(Some(cc.cid)))?;
             if na == asg.stack_len()
                 && (!self.is_running()
                     || (0 == self.clause_queue_len() && 0 == self.var_queue_len()))
@@ -575,18 +547,13 @@ impl Eliminator {
         Ok(())
     }
     /// do the elimination task
-    fn eliminate_main<A, C, R>(
+    fn eliminate_main(
         &mut self,
-        asg: &mut A,
-        cdb: &mut C,
-        rst: &mut R,
+        asg: &mut impl AssignIF,
+        cdb: &mut impl ClauseDBIF,
+        rst: &mut impl RestartIF,
         state: &mut State,
-    ) -> MaybeInconsistent
-    where
-        A: AssignIF,
-        C: ClauseDBIF,
-        R: RestartIF,
-    {
+    ) -> MaybeInconsistent {
         debug_assert!(asg.decision_level() == 0);
         if self.mode == EliminatorMode::Dormant {
             return Ok(());
@@ -612,9 +579,8 @@ impl Eliminator {
             }
             self.backward_subsumption_check(asg, cdb, &mut timedout)?;
             debug_assert!(self.clause_queue.is_empty());
-            asg.propagate(cdb).map_or(Ok(()), |cc| {
-                Err(SolverError::RootLevelConflict(Some(cc.cid)))
-            })?;
+            asg.propagate_sandbox(cdb)
+                .map_err(|cc| SolverError::RootLevelConflict(Some(cc.cid)))?;
             if timedout == 0 {
                 self.clear_clause_queue(cdb);
                 self.clear_var_queue(asg);
@@ -625,10 +591,7 @@ impl Eliminator {
         Ok(())
     }
     /// remove a clause id from literal's occur list.
-    pub fn remove_lit_occur<A>(&mut self, asg: &mut A, l: Lit, cid: ClauseId)
-    where
-        A: AssignIF,
-    {
+    pub fn remove_lit_occur(&mut self, asg: &mut impl AssignIF, l: Lit, cid: ClauseId) {
         let w = &mut self[l.vi()];
         if w.aborted {
             return;
@@ -661,10 +624,7 @@ impl Eliminator {
         c.turn_on(Flag::ENQUEUED);
     }
     /// clear eliminator's clause queue.
-    fn clear_clause_queue<C>(&mut self, cdb: &mut C)
-    where
-        C: ClauseDBIF,
-    {
+    fn clear_clause_queue(&mut self, cdb: &mut impl ClauseDBIF) {
         for cid in &self.clause_queue {
             cdb[*cid].turn_off(Flag::ENQUEUED);
         }
@@ -680,10 +640,7 @@ impl Eliminator {
     ///
 
     /// clear eliminator's var queue
-    fn clear_var_queue<A>(&mut self, asg: &mut A)
-    where
-        A: AssignIF,
-    {
+    fn clear_var_queue(&mut self, asg: &mut impl AssignIF) {
         self.var_queue.clear(asg);
     }
     /// return the length of eliminator's var queue.
@@ -693,10 +650,7 @@ impl Eliminator {
 }
 
 #[allow(dead_code)]
-fn check_eliminator<C>(cdb: &C, elim: &Eliminator) -> bool
-where
-    C: ClauseDBIF,
-{
+fn check_eliminator(cdb: &impl ClauseDBIF, elim: &Eliminator) -> bool {
     // clause_queue should be clear.
     // all elements in occur_lists exist.
     // for v in asg {

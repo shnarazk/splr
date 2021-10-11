@@ -331,7 +331,7 @@ impl Config {
                 #[cfg(feature = "just_used")]
                 "use_just_used_flag",
                 #[cfg(feature = "LRB_rewarding")]
-                "Learning-Rate based rewarding",
+                "Learning-Rate Based rewarding",
                 #[cfg(feature = "Luby_restart")]
                 "Luby restart",
                 #[cfg(feature = "Luby_stabilization")]
@@ -342,6 +342,8 @@ impl Config {
                 "stage-based rephase",
                 #[cfg(feature = "strategy_adaptation")]
                 "strategy adaptation",
+                #[cfg(feature = "trail_saving")]
+                "trail saving",
             ];
             println!(
                 "{}\nActivated features: {}\n{}",

@@ -103,10 +103,7 @@ pub struct Solver {
     pub state: State,
 }
 
-impl<V> TryFrom<Vec<V>> for Certificate
-where
-    V: AsRef<[i32]>,
-{
+impl<V: AsRef<[i32]>> TryFrom<Vec<V>> for Certificate {
     type Error = SolverError;
     fn try_from(vec: Vec<V>) -> SolverResult {
         let s = Solver::try_from((Config::default(), vec.as_ref()));

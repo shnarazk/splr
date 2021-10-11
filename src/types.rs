@@ -373,6 +373,8 @@ pub struct ConflictContext {
     pub link: Lit,
 }
 
+pub type PropagationResult = Result<(), ConflictContext>;
+
 impl ConflictContext {
     pub fn conflicting_literal(&self, cdb: &ClauseDB) -> Lit {
         let lit0 = cdb[self.cid].lit0();
@@ -669,10 +671,7 @@ impl fmt::Display for CNFDescription {
     }
 }
 
-impl<V> From<&[V]> for CNFDescription
-where
-    V: AsRef<[i32]>,
-{
+impl<V: AsRef<[i32]>> From<&[V]> for CNFDescription {
     fn from(vec: &[V]) -> Self {
         let num_of_variables = vec
             .iter()

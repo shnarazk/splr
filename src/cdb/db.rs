@@ -274,10 +274,12 @@ impl ClauseDBIF for ClauseDB {
     fn swap_watch(&mut self, cid: ClauseId) {
         self[cid].lits.swap(0, 1);
     }
-    fn new_clause<A>(&mut self, asg: &mut A, vec: &mut Vec<Lit>, mut learnt: bool) -> RefClause
-    where
-        A: AssignIF,
-    {
+    fn new_clause(
+        &mut self,
+        asg: &mut impl AssignIF,
+        vec: &mut Vec<Lit>,
+        mut learnt: bool,
+    ) -> RefClause {
         debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{:?}", vec,);
         debug_assert!(1 < vec.len());
         if vec.len() == 2 {
@@ -286,7 +288,7 @@ impl ClauseDBIF for ClauseDB {
                 return RefClause::RegisteredClause(cid);
             }
         }
-        self.certification_store.push_add(vec);
+        self.certification_store.add_clause(vec);
         let cid;
         if let Some(cid_used) = self.freelist.pop() {
             cid = cid_used;
@@ -385,10 +387,7 @@ impl ClauseDBIF for ClauseDB {
         }
         RefClause::Clause(cid)
     }
-    fn new_clause_sandbox<A>(&mut self, asg: &mut A, vec: &mut Vec<Lit>) -> RefClause
-    where
-        A: AssignIF,
-    {
+    fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, vec: &mut Vec<Lit>) -> RefClause {
         debug_assert!(1 < vec.len());
         let mut learnt: bool = true;
         if vec.len() == 2 {
@@ -676,8 +675,8 @@ impl ClauseDBIF for ClauseDB {
             // self.watches(cid, "after strengthen_by_elimination case:3-3");
         }
         if certification_store.is_active() {
-            certification_store.push_add(&c.lits);
-            certification_store.push_delete(&new_lits);
+            certification_store.add_clause(&c.lits);
+            certification_store.delete_clause(&new_lits);
         }
         RefClause::Clause(cid)
     }
@@ -709,7 +708,7 @@ impl ClauseDBIF for ClauseDB {
                 //## Case:0
                 //
                 if certification_store.is_active() {
-                    certification_store.push_delete(new_lits);
+                    certification_store.delete_clause(new_lits);
                 }
                 return RefClause::RegisteredClause(did);
             }
@@ -727,15 +726,15 @@ impl ClauseDBIF for ClauseDB {
             bi_clause[l1].insert(l0, cid);
 
             if certification_store.is_active() {
-                certification_store.push_add(new_lits);
-                certification_store.push_delete(&c.lits);
+                certification_store.add_clause(new_lits);
+                certification_store.delete_clause(&c.lits);
             }
             c.turn_off(Flag::LEARNT);
             self.num_bi_clause += 1;
 
             if certification_store.is_active() {
-                certification_store.push_add(&c.lits);
-                certification_store.push_delete(new_lits);
+                certification_store.add_clause(&c.lits);
+                certification_store.delete_clause(new_lits);
             }
         } else {
             //
@@ -783,17 +782,14 @@ impl ClauseDBIF for ClauseDB {
             // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
 
             if certification_store.is_active() {
-                certification_store.push_add(new_lits);
-                certification_store.push_delete(&c.lits);
+                certification_store.add_clause(new_lits);
+                certification_store.delete_clause(&c.lits);
             }
         }
         RefClause::Clause(cid)
     }
     // only used in `propagate_at_root_level`
-    fn transform_by_simplification<A>(&mut self, asg: &mut A, cid: ClauseId) -> RefClause
-    where
-        A: AssignIF,
-    {
+    fn transform_by_simplification(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> RefClause {
         //
         //## Clause transform rules
         //
@@ -872,8 +868,8 @@ impl ClauseDBIF for ClauseDB {
                 c.turn_off(Flag::LEARNT);
 
                 if certification_store.is_active() {
-                    certification_store.push_add(&c.lits);
-                    certification_store.push_delete(&new_lits);
+                    certification_store.add_clause(&c.lits);
+                    certification_store.delete_clause(&new_lits);
                 }
                 RefClause::Clause(cid)
             }
@@ -928,8 +924,8 @@ impl ClauseDBIF for ClauseDB {
                 // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
 
                 if certification_store.is_active() {
-                    certification_store.push_add(&c.lits);
-                    certification_store.push_delete(&new_lits);
+                    certification_store.add_clause(&c.lits);
+                    certification_store.delete_clause(&new_lits);
                 }
                 RefClause::Clause(cid)
             }
@@ -988,10 +984,7 @@ impl ClauseDBIF for ClauseDB {
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
     }
-    fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
-    where
-        A: AssignIF,
-    {
+    fn mark_clause_as_used(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> bool {
         let chan_seok_condition = if self.use_chan_seok {
             self.co_lbd_bound as usize
         } else {
@@ -1037,10 +1030,7 @@ impl ClauseDBIF for ClauseDB {
         }
         false
     }
-    fn reduce<A>(&mut self, asg: &mut A, num_conflicts: usize) -> bool
-    where
-        A: AssignIF,
-    {
+    fn reduce(&mut self, asg: &mut impl AssignIF, num_conflicts: usize) -> bool {
         if self.use_chan_seok {
             self.first_reduction <= self.num_learnt && self.reduce_db(asg, num_conflicts)
         } else {
@@ -1065,7 +1055,7 @@ impl ClauseDBIF for ClauseDB {
         }
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
-        self.certification_store.push_add(&[lit]);
+        self.certification_store.add_clause(&[lit]);
     }
     fn certificate_save(&mut self) {
         self.certification_store.close();
@@ -1091,10 +1081,7 @@ impl ClauseDBIF for ClauseDB {
         }
         None
     }
-    fn minimize_with_bi_clauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
-    where
-        A: AssignIF,
-    {
+    fn minimize_with_bi_clauses(&mut self, asg: &impl AssignIF, vec: &mut Vec<Lit>) {
         if vec.len() <= 1 {
             return;
         }
@@ -1120,10 +1107,7 @@ impl ClauseDBIF for ClauseDB {
             vec.retain(|l| self.lbd_temp[l.vi()] == key);
         }
     }
-    fn complete_bi_clauses<A>(&mut self, asg: &mut A)
-    where
-        A: AssignIF,
-    {
+    fn complete_bi_clauses(&mut self, asg: &mut impl AssignIF) {
         while let Some(lit) = self.bi_clause_completion_queue.pop() {
             self.complete_bi_clauses_with(asg, lit);
         }
@@ -1226,10 +1210,7 @@ impl ClauseDBIF for ClauseDB {
         self[cid].is_dead().then(|| self.freelist.contains(&cid))
     }
     #[cfg(feature = "boundary_check")]
-    fn check_consistency<A>(&mut self, asg: &A)
-    where
-        A: AssignIF,
-    {
+    fn check_consistency(&mut self, asg: &impl AssignIF) {
         for (key, wc) in self.bi_clause.iter().enumerate() {
             let lit = Lit::from(key);
             if let Some(true) = asg.assigned(lit) {
@@ -1280,10 +1261,7 @@ impl ClauseDB {
     /// clause: [a, b] and [-b, c] deduces [a, c]
     /// map: [a].get(b), [!b].get(c), [a].get(c)
     /// rename: [lit].get(other), [!other].get(third), [a].get(third)
-    fn complete_bi_clauses_with<A>(&mut self, asg: &mut A, lit: Lit)
-    where
-        A: AssignIF,
-    {
+    fn complete_bi_clauses_with(&mut self, asg: &mut impl AssignIF, lit: Lit) {
         let mut vec: Vec<Vec<Lit>> = Vec::new();
         // [lit, other]
         for other in self.bi_clause[lit].keys() {
@@ -1331,10 +1309,7 @@ impl ClauseDB {
         self.bi_clause[l0].get(&l1).copied()
     }
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce_db<A>(&mut self, asg: &mut A, nc: usize) -> bool
-    where
-        A: AssignIF,
-    {
+    fn reduce_db(&mut self, asg: &mut impl AssignIF, nc: usize) -> bool {
         let ClauseDB {
             ref mut clause,
             ref co_lbd_bound,
@@ -1473,7 +1448,7 @@ fn remove_clause_fn(
         *num_learnt -= 1;
     }
     *num_clause -= 1;
-    certificate_store.push_delete(&c.lits);
+    certificate_store.delete_clause(&c.lits);
     c.lits.clear();
 }
 

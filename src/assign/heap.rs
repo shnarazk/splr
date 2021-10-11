@@ -82,6 +82,9 @@ impl VarHeapIF for AssignStack {
         self.percolate_up(i as u32);
     }
     fn get_heap_root(&mut self) -> VarId {
+        if self.var_order.is_empty() {
+            self.clear_trail_saved();
+        }
         let vs = self.var_order.get_root();
         if 1 < self.var_order.len() {
             self.percolate_down(1);
