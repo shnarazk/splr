@@ -1,4 +1,4 @@
-## 0.13.0, 2021-10-10
+## 0.13.0, 2021-10-11
 
 - implement trail saving as an alternative of chrono-BT with following extensions:
   - reason refinement based on LBD values
