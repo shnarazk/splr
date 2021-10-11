@@ -17,7 +17,10 @@ pub trait PropagateIF {
     ///
     /// ## Warning
     /// Callers must assure the consistency after this assignment.
+    #[cfg(feature = "chrono_BT")]
     fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, cid: ClauseId, by: Lit);
+    #[cfg(not(feature = "chrono_BT"))]
+    fn assign_by_implication(&mut self, l: Lit, cid: ClauseId, by: Lit);
     /// unsafe assume (assign by decision); doesn't emit an exception.
     /// ## Caveat
     /// Callers have to assure the consistency after this assignment.
@@ -129,6 +132,7 @@ impl PropagateIF for AssignStack {
             _ => Err(SolverError::RootLevelConflict(Some(ClauseId::from(l)))),
         }
     }
+    #[cfg(feature = "chrono_BT")]
     fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, cid: ClauseId, by: Lit) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be enqueued");
         debug_assert!(l.vi() < self.var.len());
@@ -143,6 +147,38 @@ impl PropagateIF for AssignStack {
         debug_assert_eq!(self.reason[vi], AssignReason::None);
         debug_assert!(self.trail.iter().all(|rl| *rl != l));
         set_assign!(self, l);
+        self.level[vi] = lv;
+        self.reason[vi] = AssignReason::Implication(cid, by);
+        self.reward_at_assign(vi);
+        debug_assert!(!self.trail.contains(&l));
+        debug_assert!(!self.trail.contains(&!l));
+        self.trail.push(l);
+        if self.root_level == lv {
+            self.make_var_asserted(vi);
+        }
+
+        #[cfg(feature = "boundary_check")]
+        {
+            self.var[vi].propagated_at = self.num_conflict;
+            self.var[vi].state = VarState::Assigned(self.num_conflict);
+        }
+    }
+    #[cfg(not(feature = "chrono_BT"))]
+    fn assign_by_implication(&mut self, l: Lit, cid: ClauseId, by: Lit) {
+        debug_assert!(usize::from(l) != 0, "Null literal is about to be enqueued");
+        debug_assert!(l.vi() < self.var.len());
+        // The following doesn't hold anymore by using chronoBT.
+        // assert!(self.trail_lim.is_empty() || !cid.is_none());
+        let vi = l.vi();
+        debug_assert!(!self.var[vi].is(Flag::ELIMINATED));
+        debug_assert!(
+            var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
+        );
+        debug_assert_eq!(self.assign[vi], None);
+        debug_assert_eq!(self.reason[vi], AssignReason::None);
+        debug_assert!(self.trail.iter().all(|rl| *rl != l));
+        set_assign!(self, l);
+        let lv = self.decision_level();
         self.level[vi] = lv;
         self.reason[vi] = AssignReason::Implication(cid, by);
         self.reward_at_assign(vi);
@@ -359,12 +395,15 @@ impl PropagateIF for AssignStack {
                     }
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
+                        #[cfg(feature = "chrono_BT")]
                         self.assign_by_implication(
                             blocker,
                             self.level[propagating.vi()],
                             cid,
                             propagating,
                         );
+                        #[cfg(not(feature = "chrono_BT"))]
+                        self.assign_by_implication(blocker, cid, propagating);
                     }
                 }
             }
@@ -527,7 +566,11 @@ impl PropagateIF for AssignStack {
                 debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
+
+                #[cfg(feature = "chrono_BT")]
                 self.assign_by_implication(cached, dl, cid, NULL_LIT);
+                #[cfg(not(feature = "chrono_BT"))]
+                self.assign_by_implication(cached, cid, NULL_LIT);
 
                 #[cfg(feature = "boundary_check")]
                 {
@@ -564,7 +607,6 @@ impl PropagateIF for AssignStack {
     // 1. (allow eliminated vars)
     //
     fn propagate_sandbox(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
-        let dl = self.decision_level();
         while let Some(p) = self.trail.get(self.q_head) {
             self.q_head += 1;
             #[cfg(feature = "debug_propagation")]
@@ -597,12 +639,16 @@ impl PropagateIF for AssignStack {
                     Some(false) => return Err(ConflictContext { cid, link: blocker }),
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
+
+                        #[cfg(feature = "chrono_BT")]
                         self.assign_by_implication(
                             blocker,
                             self.level[false_lit.vi()],
                             cid,
                             propagating,
                         );
+                        #[cfg(not(feature = "chrono_BT"))]
+                        self.assign_by_implication(blocker, cid, propagating);
                     }
                 }
             }
@@ -736,7 +782,11 @@ impl PropagateIF for AssignStack {
                 debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
+
+                #[cfg(feature = "chrono_BT")]
                 self.assign_by_implication(cached, dl, cid, NULL_LIT);
+                #[cfg(not(feature = "chrono_BT"))]
+                self.assign_by_implication(cached, cid, NULL_LIT);
 
                 #[cfg(feature = "boundary_check")]
                 {

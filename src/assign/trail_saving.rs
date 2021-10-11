@@ -1,12 +1,15 @@
 /// implement boolean constraint propagation, backjump
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{AssignIF, AssignStack, PropagateIF, VarHeapIF, VarManipulateIF},
+    super::{AssignStack, PropagateIF, VarHeapIF, VarManipulateIF},
     crate::{
         cdb::{self, ClauseDBIF},
         types::*,
     },
 };
+
+#[cfg(feature = "chrono_BT")]
+use super::AssignIF;
 
 const REASON_THRESHOLD: f64 = 1.5;
 
@@ -50,7 +53,10 @@ impl AssignStack {
     }
     pub fn from_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult {
         let q = (REASON_THRESHOLD * cdb.derefer(cdb::property::Tf64::DpAverageLBD)).max(6.0) as u16;
+
+        #[cfg(feature = "chrono_BT")]
         let dl = self.decision_level();
+
         for i in (0..self.trail_saved.len()).rev() {
             let lit = self.trail_saved[i];
             let vi = lit.vi();
@@ -65,11 +71,19 @@ impl AssignStack {
                 (AssignReason::Implication(cid, NULL_LIT), None) => {
                     debug_assert_eq!(cdb[cid].lit0(), lit);
                     self.num_repropagation += 1;
+
+                    #[cfg(feature = "chrono_BT")]
                     self.assign_by_implication(lit, dl, cid, NULL_LIT);
+                    #[cfg(not(feature = "chrono_BT"))]
+                    self.assign_by_implication(lit, cid, NULL_LIT);
                 }
                 (AssignReason::Implication(cid, l), None) => {
                     self.num_repropagation += 1;
+
+                    #[cfg(feature = "chrono_BT")]
                     self.assign_by_implication(lit, dl, cid, l);
+                    #[cfg(not(feature = "chrono_BT"))]
+                    self.assign_by_implication(lit, cid, l);
                 }
                 (AssignReason::Implication(cid, link), Some(false)) => {
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
