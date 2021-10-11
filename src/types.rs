@@ -671,10 +671,7 @@ impl fmt::Display for CNFDescription {
     }
 }
 
-impl<V> From<&[V]> for CNFDescription
-where
-    V: AsRef<[i32]>,
-{
+impl<V: AsRef<[i32]>> From<&[V]> for CNFDescription {
     fn from(vec: &[V]) -> Self {
         let num_of_variables = vec
             .iter()

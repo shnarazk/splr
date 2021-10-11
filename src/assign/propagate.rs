@@ -31,9 +31,7 @@ pub trait PropagateIF {
     /// `propagate` for vivification, which allows dead clauses.
     fn propagate_sandbox(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
     /// propagate then clear asserted literals
-    fn clear_asserted_literals<C>(&mut self, cdb: &mut C) -> MaybeInconsistent
-    where
-        C: ClauseDBIF;
+    fn clear_asserted_literals(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent;
 }
 
 #[cfg(feature = "unsafe_access")]
@@ -748,10 +746,7 @@ impl PropagateIF for AssignStack {
         }
         Ok(())
     }
-    fn clear_asserted_literals<C>(&mut self, cdb: &mut C) -> MaybeInconsistent
-    where
-        C: ClauseDBIF,
-    {
+    fn clear_asserted_literals(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
         assert_eq!(self.decision_level(), self.root_level);
         loop {
             if self.remains() {
@@ -781,10 +776,7 @@ impl AssignStack {
         assert_ne!(self.assigned(b1), Some(false));
     }
     ///
-    fn propagate_at_root_level<C>(&mut self, cdb: &mut C) -> Option<ClauseId>
-    where
-        C: ClauseDBIF,
-    {
+    fn propagate_at_root_level(&mut self, cdb: &mut impl ClauseDBIF) -> Option<ClauseId> {
         let mut num_propagated = 0;
         while num_propagated < self.trail.len() {
             num_propagated = self.trail.len();

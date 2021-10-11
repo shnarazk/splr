@@ -64,17 +64,13 @@ pub trait AssignIF:
     fn level_ref(&self) -> &[DecisionLevel];
     fn best_assigned(&mut self) -> Option<usize>;
     /// inject assignments for eliminated vars.
-    fn extend_model<C>(&mut self, c: &mut C, lits: &[Lit]) -> Vec<Option<bool>>
-    where
-        C: ClauseDBIF;
+    fn extend_model(&mut self, c: &mut impl ClauseDBIF, lits: &[Lit]) -> Vec<Option<bool>>;
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
     /// return `true` is the clause is the reason of the assignment.
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
     /// dump the status as a CNF
-    fn dump_cnf<C>(&mut self, cdb: &C, fname: &str)
-    where
-        C: ClauseDBIF;
+    fn dump_cnf(&mut self, cdb: &impl ClauseDBIF, fname: &str);
 }
 
 /// Reasons of assignments, two kinds

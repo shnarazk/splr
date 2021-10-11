@@ -36,9 +36,7 @@ pub trait ClauseIF {
     /// return `true` if the clause contains the literal
     fn contains(&self, lit: Lit) -> bool;
     /// check clause satisfiability
-    fn is_satisfied_under<A>(&self, asg: &A) -> bool
-    where
-        A: AssignIF;
+    fn is_satisfied_under(&self, asg: &impl AssignIF) -> bool;
     /// return an iterator over its literals.
     fn iter(&self) -> Iter<'_, Lit>;
     /// return the number of literals.
@@ -109,12 +107,8 @@ pub trait ClauseDBIF:
     /// Note this removes an eliminated Lit `p` from a clause. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
     /// And this is called only from `Eliminator::strengthen_clause`.
-    fn new_clause<A>(&mut self, asg: &mut A, v: &mut Vec<Lit>, learnt: bool) -> RefClause
-    where
-        A: AssignIF;
-    fn new_clause_sandbox<A>(&mut self, asg: &mut A, v: &mut Vec<Lit>) -> RefClause
-    where
-        A: AssignIF;
+    fn new_clause(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
+    fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>) -> RefClause;
     /// remove a clause temporally
     fn detach_clause(&mut self, cid: ClauseId) -> (Lit, Lit);
     /// push back a clause
@@ -128,23 +122,17 @@ pub trait ClauseDBIF:
     /// generic clause transformer (not in use)
     fn transform_by_replacement(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause;
     /// check satisfied and nullified literals in a clause
-    fn transform_by_simplification<A>(&mut self, asg: &mut A, cid: ClauseId) -> RefClause
-    where
-        A: AssignIF;
+    fn transform_by_simplification(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> RefClause;
     /// check the condition to reduce.
     /// * return `true` if reduction is done.
     /// * Otherwise return `false`.
     ///
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce<A>(&mut self, asg: &mut A, nc: usize) -> bool
-    where
-        A: AssignIF;
+    fn reduce(&mut self, asg: &mut impl AssignIF, nc: usize) -> bool;
     fn reset(&mut self);
     /// update LBD then convert a learnt clause to permanent if needed.
-    fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
-    where
-        A: AssignIF;
+    fn mark_clause_as_used(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> bool;
     /// record an asserted literal to unsat certification.
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.
@@ -159,13 +147,9 @@ pub trait ClauseDBIF:
     /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
     fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId>;
     /// minimize a clause.
-    fn minimize_with_bi_clauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
-    where
-        A: AssignIF;
+    fn minimize_with_bi_clauses(&mut self, asg: &impl AssignIF, vec: &mut Vec<Lit>);
     /// complete bi-clause network
-    fn complete_bi_clauses<A>(&mut self, asg: &mut A)
-    where
-        A: AssignIF;
+    fn complete_bi_clauses(&mut self, asg: &mut impl AssignIF);
 
     #[cfg(feature = "incremental_solver")]
     /// save an eliminated permanent clause to an extra space for incremental solving.
@@ -183,9 +167,7 @@ pub trait ClauseDBIF:
     #[cfg(feature = "boundary_check")]
     fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool>;
     #[cfg(feature = "boundary_check")]
-    fn check_consistency<A>(&mut self, asg: &A)
-    where
-        A: AssignIF;
+    fn check_consistency(&mut self, asg: &impl AssignIF);
 }
 
 /// Clause identifier, or clause index, starting with one.

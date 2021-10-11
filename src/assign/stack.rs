@@ -193,10 +193,7 @@ impl AssignIF for AssignStack {
         (self.build_best_at == self.num_propagation).then(|| self.num_vars - self.num_best_assign)
     }
     #[allow(unused_variables)]
-    fn extend_model<C>(&mut self, cdb: &mut C, lits: &[Lit]) -> Vec<Option<bool>>
-    where
-        C: ClauseDBIF,
-    {
+    fn extend_model(&mut self, cdb: &mut impl ClauseDBIF, lits: &[Lit]) -> Vec<Option<bool>> {
         #[cfg(feature = "trace_elimination")]
         println!(
             "# extend_model\n - as i32: {:?}\n - as raw: {:?}",
@@ -274,10 +271,7 @@ impl AssignIF for AssignStack {
     }
     /// dump all active clauses and assertions as a CNF file.
     #[cfg(not(feature = "no_IO"))]
-    fn dump_cnf<C>(&mut self, cdb: &C, fname: &str)
-    where
-        C: ClauseDBIF,
-    {
+    fn dump_cnf(&mut self, cdb: &impl ClauseDBIF, fname: &str) {
         for vi in 1..self.var.len() {
             if self.var(vi).is(Flag::ELIMINATED) && self.assign[vi].is_some() {
                 panic!("conflicting var {} {:?}", vi, self.assign[vi]);

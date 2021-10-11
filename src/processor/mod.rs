@@ -59,14 +59,9 @@ pub trait EliminateIF: Instantiate {
     /// check if the eliminator is running.
     fn is_running(&self) -> bool;
     /// rebuild occur lists.
-    fn prepare<A, C>(&mut self, asg: &mut A, cdb: &mut C, force: bool)
-    where
-        A: AssignIF,
-        C: ClauseDBIF;
+    fn prepare(&mut self, asg: &mut impl AssignIF, cdb: &mut impl ClauseDBIF, force: bool);
     /// enqueue a var into eliminator's var queue.
-    fn enqueue_var<A>(&mut self, asg: &mut A, vi: VarId, upward: bool)
-    where
-        A: AssignIF;
+    fn enqueue_var(&mut self, asg: &mut impl AssignIF, vi: VarId, upward: bool);
     /// simplify database by:
     /// * removing satisfiable clauses
     /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.
@@ -74,17 +69,13 @@ pub trait EliminateIF: Instantiate {
     /// # Errors
     ///
     /// if solver becomes inconsistent.
-    fn simplify<A, C, R>(
+    fn simplify(
         &mut self,
-        asg: &mut A,
-        cdb: &mut C,
-        rst: &mut R,
+        asg: &mut impl AssignIF,
+        cdb: &mut impl ClauseDBIF,
+        rst: &mut impl RestartIF,
         state: &mut State,
-    ) -> MaybeInconsistent
-    where
-        A: AssignIF,
-        C: ClauseDBIF,
-        R: RestartIF;
+    ) -> MaybeInconsistent;
     /// return the order of vars based on their occurrences
     fn sorted_iterator(&self) -> Iter<'_, u32>;
     /// return vi's stats
