@@ -1,3 +1,4 @@
+#![cfg(feature = "trail_saving")]
 /// implement boolean constraint propagation, backjump
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
@@ -13,7 +14,6 @@ use super::AssignIF;
 
 const REASON_THRESHOLD: f64 = 1.5;
 
-#[cfg(feature = "trail_saving")]
 impl AssignStack {
     pub fn save_trail(&mut self, to_lvl: DecisionLevel) {
         let lim = self.trail_lim[to_lvl as usize];

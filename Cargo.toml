@@ -10,6 +10,7 @@ repository = "https://github.com/shnarazk/splr"
 homepage = "https://github.com/shnarazk/splr"
 keywords = ["SAT", "SAT-solver", "logic", "satisfiability"]
 categories = ["mathematics", "science"]
+default-run = "splr"
 
 [dependencies]
 bitflags = "1.3"
