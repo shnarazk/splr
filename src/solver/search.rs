@@ -263,7 +263,7 @@ fn search(
         }
         if let Err(cc) = asg.propagate(cdb) {
             if asg.decision_level() == asg.root_level() {
-                return Err(SolverError::RootLevelConflict(Some(cc.cid)));
+                return Err(SolverError::RootLevelConflict(cc));
             }
             asg.update_activity_tick();
             cdb.update_activity_tick();
