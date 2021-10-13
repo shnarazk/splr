@@ -35,8 +35,6 @@ pub trait LitIF {
     fn as_bool(&self) -> bool;
     /// convert to var index.
     fn vi(self) -> VarId;
-    /// return `true` if it is a valid literal, namely non-zero.
-    fn is_none(&self) -> bool;
 }
 
 /// API for reward based activity management.
@@ -358,33 +356,13 @@ impl LitIF for Lit {
     fn vi(self) -> VarId {
         (self.ordinal >> 1) as VarId
     }
-    #[inline]
-    fn is_none(&self) -> bool {
-        self.ordinal == 0
-    }
 }
 
-/// Capture which literal and clause emits the present conflict.
-/// * conflict by a biclause if `link == NULL_LIT`.
-/// * conflict by a normal clause otherwise.
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub struct ConflictContext {
-    pub cid: ClauseId,
-    pub link: Lit,
-}
+/// Capture a conflict
+pub type ConflictContext = (Lit, AssignReason);
 
+/// Return type of unit propagation
 pub type PropagationResult = Result<(), ConflictContext>;
-
-impl ConflictContext {
-    pub fn conflicting_literal(&self, cdb: &ClauseDB) -> Lit {
-        let lit0 = cdb[self.cid].lit0();
-        if lit0 == self.link {
-            cdb[self.cid].lit1()
-        } else {
-            lit0
-        }
-    }
-}
 
 /// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
 pub trait EmaIF {
@@ -590,7 +568,8 @@ pub enum SolverError {
     Inconsistent,
     OutOfMemory,
     OutOfRange,
-    RootLevelConflict(Option<ClauseId>),
+    RootLevelConflict(ConflictContext),
+    EmptyClause,
     TimeOut,
     SolverBug,
     UndescribedError,

@@ -31,7 +31,7 @@ pub fn vivify(
     if asg.remains() {
         asg.propagate_sandbox(cdb).map_err(|cc| {
             state.log(asg.num_conflict, "By vivifier");
-            SolverError::RootLevelConflict(Some(cc.cid))
+            SolverError::RootLevelConflict(cc)
         })?;
     }
     let mut clauses: Vec<OrderedProxy<ClauseId>> = select_targets(
@@ -58,7 +58,7 @@ pub fn vivify(
         debug_assert_eq!(asg.decision_level(), asg.root_level());
         if asg.remains() {
             asg.propagate_sandbox(cdb)
-                .map_err(|cc| SolverError::RootLevelConflict(Some(cc.cid)))?;
+                .map_err(SolverError::RootLevelConflict)?;
         }
 
         debug_assert!(asg.stack_is_empty() || !asg.remains());
@@ -94,6 +94,41 @@ pub fn vivify(
                     asg.assign_by_decision(!lit);
                     //## Rule 3
                     if let Err(cc) = asg.propagate_sandbox(cdb) {
+                        let mut vec: Vec<Lit>;
+                        match cc.1 {
+                            AssignReason::BinaryLink(l) => {
+                                let cnfl_lits = vec![cc.0, !l];
+                                // vec = asg.analyze_sandbox(cdb, &decisions, &cnfl_lits, &mut seen);
+                                // asg.backtrack_sandbox();
+                                if clits.len() == 2
+                                    && cnfl_lits.contains(&clits[0])
+                                    && cnfl_lits.contains(&clits[1])
+                                {
+                                    asg.backtrack_sandbox();
+                                    continue 'next_clause;
+                                } else {
+                                    assert!(clits.len() != 2 || decisions.len() != 2);
+                                    seen[0] = num_check;
+                                    vec =
+                                        asg.analyze_sandbox(cdb, &decisions, &cnfl_lits, &mut seen);
+                                    asg.backtrack_sandbox();
+                                }
+                            }
+                            AssignReason::Implication(ci) => {
+                                let cnfl_lits = &cdb[ci].iter().copied().collect::<Vec<Lit>>();
+                                if clits.len() == decisions.len() && ci == cid {
+                                    asg.backtrack_sandbox();
+                                    continue 'next_clause;
+                                } else {
+                                    seen[0] = num_check;
+                                    vec =
+                                        asg.analyze_sandbox(cdb, &decisions, cnfl_lits, &mut seen);
+                                    asg.backtrack_sandbox();
+                                }
+                            }
+                            _ => panic!(),
+                        }
+                        /*
                         let cnfl_lits = &cdb[cc.cid].iter().copied().collect::<Vec<Lit>>();
                         seen[0] = num_check;
                         let mut vec = asg.analyze_sandbox(cdb, &decisions, cnfl_lits, &mut seen);
@@ -101,13 +136,14 @@ pub fn vivify(
                         if clits.len() == decisions.len() && cc.cid == cid {
                             continue 'next_clause;
                         }
+                        */
                         match vec.len() {
                             0 => {
                                 state.flush("");
                                 state[Stat::VivifiedClause] += num_shrink;
                                 state[Stat::VivifiedVar] += num_assert;
                                 state.log(asg.num_conflict, "RootLevelConflict By vivify");
-                                return Err(SolverError::RootLevelConflict(Some(cid)));
+                                return Err(SolverError::EmptyClause);
                             }
                             1 => {
                                 cdb.certificate_add_assertion(vec[0]);
@@ -258,12 +294,11 @@ impl AssignStack {
                 learnt.push(!*l);
             }
             match self.reason(l.vi()) {
-                AssignReason::Asserted(_) => (),
                 AssignReason::Decision(_) => (),
-                AssignReason::Implication(_, bil) if bil != NULL_LIT => {
+                AssignReason::BinaryLink(bil) => {
                     seen[bil.vi()] = key;
                 }
-                AssignReason::Implication(cid, _) => {
+                AssignReason::Implication(cid) => {
                     for r in cdb[cid].iter().skip(1) {
                         seen[r.vi()] = key;
                     }

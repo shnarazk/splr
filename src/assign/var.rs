@@ -147,7 +147,7 @@ impl VarManipulateIF for AssignStack {
 impl AssignStack {
     /// make a var asserted.
     pub fn make_var_asserted(&mut self, vi: VarId) {
-        self.reason[vi] = AssignReason::Asserted(self.num_conflict);
+        self.reason[vi] = AssignReason::Decision(0);
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
 

@@ -34,8 +34,10 @@ pub fn handle_conflict(
     // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
     {
         let level = asg.level_ref();
-        if cdb[cc.cid].iter().all(|l| level[l.vi()] == 0) {
-            return Err(SolverError::RootLevelConflict(Some(cc.cid)));
+        if let AssignReason::Implication(cid) = cc.1 {
+            if cdb[cid].iter().all(|l| level[l.vi()] == 0) {
+                return Err(SolverError::RootLevelConflict(*cc));
+            }
         }
     }
 
@@ -47,10 +49,6 @@ pub fn handle_conflict(
 
     rst.update(ProgressUpdate::Counter);
     // rst.block_restart(); // to update asg progress_evaluator
-
-    let c = &mut cdb[cc.cid];
-
-    debug_assert!(!c.is_dead());
 
     #[cfg(feature = "chrono_BT")]
     {
@@ -94,7 +92,7 @@ pub fn handle_conflict(
                 asg.dump(asg, &cdb[ci]),
             );
         }
-        return Err(SolverError::RootLevelConflict(None));
+        return Err(SolverError::EmptyClause);
     }
     let l0 = new_learnt[0];
     if learnt_len == 1 {
@@ -107,7 +105,7 @@ pub fn handle_conflict(
                 // asg.lift_to_asserted(l0.vi());
             }
             Some(false) if asg.level(l0.vi()) == asg.root_level() => {
-                return Err(SolverError::RootLevelConflict(None))
+                return Err(SolverError::RootLevelConflict((l0, asg.reason(l0.vi()))));
             }
             _ => {
                 // dump to certified even if it's a literal.
@@ -141,14 +139,24 @@ pub fn handle_conflict(
         //## Reason-Side Rewarding
         //
         #[cfg(feature = "reason_side_rewarding")]
-        if let AssignReason::Implication(r, _) = asg.reason(lit.vi()) {
-            for l in cdb[r].iter() {
-                let vi = l.vi();
+        match asg.reason(lit.vi()) {
+            AssignReason::BinaryLink(from) => {
+                let vi = from.vi();
                 if !bumped.contains(&vi) {
                     asg.reward_at_analysis(vi);
                     bumped.push(vi);
                 }
             }
+            AssignReason::Implication(r) => {
+                for l in cdb[r].iter() {
+                    let vi = l.vi();
+                    if !bumped.contains(&vi) {
+                        asg.reward_at_analysis(vi);
+                        bumped.push(vi);
+                    }
+                }
+            }
+            _ => (),
         }
     }
     if chronobt && assign_level + state.config.c_cbt_thr <= conflicting_level {
@@ -174,7 +182,7 @@ pub fn handle_conflict(
             #[cfg(feature = "chrono_BT")]
             asg.assign_by_implication(l0, assign_level, cid, !l1);
             #[cfg(not(feature = "chrono_BT"))]
-            asg.assign_by_implication(l0, cid, !l1);
+            asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1));
 
             // || check_graph(asg, cdb, l0, "biclause");
             rst.update(ProgressUpdate::LBD(1));
@@ -194,7 +202,7 @@ pub fn handle_conflict(
             #[cfg(feature = "chrono_BT")]
             asg.assign_by_implication(l0, assign_level, cid, NULL_LIT);
             #[cfg(not(feature = "chrono_BT"))]
-            asg.assign_by_implication(l0, cid, NULL_LIT);
+            asg.assign_by_implication(l0, AssignReason::Implication(cid));
 
             // || check_graph(asg, cdb, l0, "clause");
             let lbd = cdb[cid].rank;
@@ -219,7 +227,7 @@ pub fn handle_conflict(
             #[cfg(feature = "chrono_BT")]
             asg.assign_by_implication(l0, assign_level, cid, !l1);
             #[cfg(not(feature = "chrono_BT"))]
-            asg.assign_by_implication(l0, cid, !l1);
+            asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1));
 
             // || check_graph(asg, cdb, l0, "registeredclause");
         }
@@ -246,111 +254,46 @@ fn conflict_analyze(
     learnt.push(NULL_LIT);
     let root_level = asg.root_level();
     let dl = asg.decision_level();
-    let mut p = cc.conflicting_literal(cdb);
-
-    #[cfg(feature = "trace_analysis")]
-    println!("- analyze conflicting literal {}", p);
-
+    let mut p = cc.0;
     let mut path_cnt = 0;
-    let vi = p.vi();
-    if !asg.var(vi).is(Flag::CA_SEEN) && root_level < asg.level(vi) {
-        let lvl = asg.level(vi);
-        debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
+    let mut reason = cc.1;
+    // handle the conflicting literal itself here.
+    {
+        #[cfg(feature = "trace_analysis")]
+        println!("- analyze conflicting literal {}", p);
+
+        let vi = p.vi();
+        debug_assert!(!asg.var(vi).is(Flag::CA_SEEN) && !asg.var(vi).is(Flag::ELIMINATED));
         asg.var_mut(vi).turn_on(Flag::CA_SEEN);
-        if dl <= lvl {
-            path_cnt = 1;
-            //
-            //## Conflict-Side Rewarding
-            //
+        let lvl = asg.level(vi);
+        debug_assert_ne!(root_level, lvl);
+        if dl == lvl {
+            path_cnt += 1;
+            #[cfg(feature = "conflict_side_rewarding")]
             asg.reward_at_analysis(vi);
         } else {
-            #[cfg(feature = "trace_analysis")]
-            println!("- push {} to learnt, which level is {}", p, lvl);
-
+            debug_assert!(lvl < dl);
             learnt.push(p);
-        }
-    }
-    let mut reason = AssignReason::Implication(cc.cid, cc.link);
-    if cc.link != NULL_LIT {
-        let vi = cc.conflicting_literal(cdb).vi();
-        if !asg.var(vi).is(Flag::CA_SEEN) {
-            let lvl = asg.level(vi);
-            if root_level == lvl {
-                panic!();
-            }
-            debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
-            debug_assert!(asg.assign(vi).is_some());
-            asg.var_mut(vi).turn_on(Flag::CA_SEEN);
-            debug_assert!(lvl <= dl);
-            if dl == lvl {
-                path_cnt += 1;
-                asg.reward_at_analysis(vi);
-            } else {
-                #[cfg(feature = "boundary_check")]
-                panic!("strange level binary clause");
-            }
         }
     }
     let mut ti = asg.stack_len() - 1; // trail index
     loop {
         match reason {
-            AssignReason::Asserted(_) => {
-                #[cfg(feature = "boundary_check")]
-                panic!(
-                    "conflict_analyze: faced an asserted var. path_cnt {} at level {}",
-                    path_cnt,
-                    asg.level(p.vi()),
-                );
-            }
-            AssignReason::Decision(_) => {
-                #[cfg(feature = "boundary_check")]
-                println!(
-                        "conflict_analyze: faced a decision var:: path_cnt {} at level {}\nconflicting literal\n  {:?}\nDecisionMap\n{}\nbuliding learnt\n{}\nconflicting clause\n{}",
-                        path_cnt,
-                        asg.decision_level(),
-                        cdb[conflicting_clause].lit0().report(asg)[0],
-                        asg.stack_iter().skip(ti).filter(|l| matches!(asg.reason(l.vi()), AssignReason::Decision(_)))
-                            .map(|l| format!("{:?}", l.report(asg)))
-                            .collect::<Vec<String>>()
-                            .join("\n"),
-                        learnt.report(asg)
-                            .iter()
-                            .map(|r| format!("  {:?}", r))
-                            .collect::<Vec<String>>()
-                            .join("\n"),
-                        cdb[conflicting_clause]
-                            .report(asg)
-                            .iter()
-                            .map(|r| format!("  {:?}", r))
-                            .collect::<Vec<String>>()
-                            .join("\n"),
-
-                    );
-                #[cfg(feature = "boundary_check")]
-                tracer(asg, cdb);
-            }
-            AssignReason::Implication(_, l) if l != NULL_LIT => {
+            AssignReason::BinaryLink(l) => {
                 // cid = asg.reason(p.vi());
                 let vi = l.vi();
                 if !asg.var(vi).is(Flag::CA_SEEN) {
-                    let lvl = asg.level(vi);
-                    if root_level == lvl {
-                        continue;
-                    }
+                    debug_assert_eq!(asg.level(vi), dl, "strange level binary clause");
+                    // if root_level == asg.level(vi) { continue; }
                     debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
                     debug_assert!(asg.assign(vi).is_some());
                     asg.var_mut(vi).turn_on(Flag::CA_SEEN);
-                    debug_assert!(lvl <= dl);
-                    if dl == lvl {
-                        path_cnt += 1;
-                        asg.reward_at_analysis(vi);
-                    } else {
-                        #[cfg(feature = "boundary_check")]
-                        panic!("strange level binary clause");
-                    }
+                    path_cnt += 1;
+                    #[cfg(feature = "conflict_side_rewarding")]
+                    asg.reward_at_analysis(vi);
                 }
             }
-            AssignReason::Implication(cid, _) => {
+            AssignReason::Implication(cid) => {
                 #[cfg(feature = "trace_analysis")]
                 println!("analyze {}", p);
 
@@ -395,13 +338,11 @@ fn conflict_analyze(
                         );
                         debug_assert!(lvl <= dl);
                         asg.var_mut(vi).turn_on(Flag::CA_SEEN);
+                        #[cfg(feature = "conflict_side_rewarding")]
+                        asg.reward_at_analysis(vi);
                         if dl == lvl {
                             // println!("- flag for {} which level is {}", q.int(), lvl);
                             path_cnt += 1;
-                            //
-                            //## Conflict-Side Rewarding
-                            //
-                            asg.reward_at_analysis(vi);
                         } else {
                             #[cfg(feature = "trace_analysis")]
                             println!("- push {} to learnt, which level is {}", q, lvl);
@@ -419,6 +360,34 @@ fn conflict_analyze(
                         }
                     }
                 }
+            }
+            AssignReason::Decision(0) => {
+                #[cfg(feature = "boundary_check")]
+                panic!(
+                    "conflict_analyze: faced an asserted var. path_cnt {} at level {}",
+                    path_cnt,
+                    asg.level(p.vi()),
+                );
+            }
+            AssignReason::Decision(_) => {
+                #[cfg(feature = "boundary_check")]
+                println!(
+                        "conflict_analyze: faced a decision var:: path_cnt {} at level {}\nconflict\n  {:?}\nDecisionMap\n{}\nbuliding learnt\n{}\n",
+                        path_cnt,
+                        asg.decision_level(),
+                        cc,
+                        asg.stack_iter().skip(ti).filter(|l| matches!(asg.reason(l.vi()), AssignReason::Decision(_)))
+                            .map(|l| format!("{:?}", l.report(asg)))
+                            .collect::<Vec<String>>()
+                            .join("\n"),
+                        learnt.report(asg)
+                            .iter()
+                            .map(|r| format!("  {:?}", r))
+                            .collect::<Vec<String>>()
+                            .join("\n",),
+                    );
+                #[cfg(feature = "boundary_check")]
+                tracer(asg, cdb);
             }
             AssignReason::None => {
                 #[cfg(feature = "boundary_check")]
@@ -460,18 +429,12 @@ fn conflict_analyze(
             #[cfg(feature = "boundary_check")]
             if 0 == ti {
                 println!(
-                    "conflict_analysis broke the bottom:: path_cnt {} scanned len {}, conflict level {}\nconflicting literal\n  {:?}\nbuilding learnt\n{}\nconflicting clause\n{}",
+                    "conflict_analysis broke the bottom:: path_cnt {} scanned len {}, conflict level {}\nconflict {:?}\nbuilding learnt\n{}",
                     path_cnt,
                     asg.stack_len() - ti, // .report(asg),
                     dl,
-                    cdb[conflicting_clause].lit0().report(asg)[0],
+                    cc,
                     learnt.report(asg)
-                        .iter()
-                        .map(|r| format!("  {:?}", r))
-                        .collect::<Vec<String>>()
-                        .join("\n"),
-                    cdb[conflicting_clause]
-                        .report(asg)
                         .iter()
                         .map(|r| format!("  {:?}", r))
                         .collect::<Vec<String>>()
@@ -569,15 +532,16 @@ impl Lit {
         let top = clear.len();
         while let Some(sl) = stack.pop() {
             match asg.reason(sl.vi()) {
-                AssignReason::Asserted(_) => panic!("no idea"),
                 AssignReason::Decision(_) => panic!("no idea"),
-                AssignReason::Implication(_, l) if l != NULL_LIT => {
+                AssignReason::BinaryLink(l) => {
                     let vi = l.vi();
                     let lv = asg.level(vi);
                     if 0 < lv && !asg.var(vi).is(Flag::CA_SEEN) {
                         // if asg.reason(vi) != AssignReason::Decision(_) && levels[lv as usize] {
-                        if matches!(asg.reason(vi), AssignReason::Implication(_, _))
-                            && levels[lv as usize]
+                        if matches!(
+                            asg.reason(vi),
+                            AssignReason::Implication(_) | AssignReason::BinaryLink(_)
+                        ) && levels[lv as usize]
                         {
                             asg.var_mut(vi).turn_on(Flag::CA_SEEN);
                             stack.push(l);
@@ -592,7 +556,7 @@ impl Lit {
                         }
                     }
                 }
-                AssignReason::Implication(cid, _) => {
+                AssignReason::Implication(cid) => {
                     let c = &cdb[cid];
 
                     #[cfg(feature = "boundary_check")]
@@ -603,8 +567,10 @@ impl Lit {
                         let lv = asg.level(vi);
                         if 0 < lv && !asg.var(vi).is(Flag::CA_SEEN) {
                             // if asg.reason(vi) != AssignReason::default() && levels[lv as usize] {
-                            if matches!(asg.reason(vi), AssignReason::Implication(_, _))
-                                && levels[lv as usize]
+                            if matches!(
+                                asg.reason(vi),
+                                AssignReason::BinaryLink(_) | AssignReason::Implication(_)
+                            ) && levels[lv as usize]
                             {
                                 asg.var_mut(vi).turn_on(Flag::CA_SEEN);
                                 stack.push(*q);
@@ -648,9 +614,9 @@ fn lit_level(
     }
     bag.push(lit);
     match asg.reason(lit.vi()) {
-        AssignReason::Asserted(_) => asg.root_level(),
+        AssignReason::Decision(0) => asg.root_level(),
         AssignReason::Decision(lvl) => lvl,
-        AssignReason::Implication(cid, NULL_LIT) => {
+        AssignReason::Implication(cid) => {
             assert_eq!(
                 cdb[cid].lit0(),
                 lit,
@@ -677,36 +643,7 @@ fn lit_level(
                 .max()
                 .unwrap()
         }
-        AssignReason::Implication(cid, b) => {
-            // assert!(
-            //     !bag.contains(&lit),
-            //     "{}; {} is contained in {:?}\n{:?}\n{}",
-            //     mes,
-            //     lit,
-            //     bag,
-            //     asg.reason(lit.vi()),
-            //     dumper(asg, cdb, bag),
-            // );
-            // bag.push(lit);
-            debug_assert!(
-                cdb[cid].lit0() == lit || cdb[cid].lit1() == lit,
-                "Does the {:?} contain {}?\n{} => {:?}",
-                &cdb[cid],
-                lit,
-                lit,
-                AssignReason::Implication(cid, b),
-            );
-            debug_assert!(
-                cdb[cid].lit0() == !b || cdb[cid].lit1() == !b,
-                "Is the {:?} is the reason of {} (it must contain {})?\n{} => {:?}",
-                &cdb[cid],
-                lit,
-                !b,
-                lit,
-                AssignReason::Implication(cid, b),
-            );
-            lit_level(asg, cdb, b, bag, mes)
-        }
+        AssignReason::BinaryLink(b) => lit_level(asg, cdb, b, bag, mes),
         AssignReason::None => panic!("One of root of {} isn't assigned.", lit),
     }
 }
@@ -721,9 +658,9 @@ fn dumper(asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
             asg.level(l.vi()),
             asg.reason(l.vi()),
             match asg.reason(l.vi()) {
-                AssignReason::Asserted(_) => vec![NULL_LIT],
                 AssignReason::Decision(_) => vec![NULL_LIT],
-                AssignReason::Implication(cid, _) => cdb[cid].iter().copied().collect::<Vec<Lit>>(),
+                AssignReason::BinaryLink(lit) => vec![*l, !lit],
+                AssignReason::Implication(cid) => cdb[cid].iter().copied().collect::<Vec<Lit>>(),
                 AssignReason::None => vec![],
             },
         ));

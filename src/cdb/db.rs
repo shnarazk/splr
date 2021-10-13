@@ -1219,7 +1219,7 @@ impl ClauseDBIF for ClauseDB {
             let level = asg.level(lit.vi());
             for (cached, cid) in wc.iter() {
                 debug_assert!(self[cid].lits.contains(&lit));
-                debug_assert!(self[cid].lits.contains(&cached));
+                debug_assert!(self[cid].lits.contains(cached));
                 if let Some(true) = asg.assigned(*cached) {
                     continue;
                 }

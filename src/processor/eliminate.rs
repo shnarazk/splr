@@ -81,16 +81,15 @@ pub fn eliminate_var(
                     match asg.assigned(lit) {
                         Some(true) => (),
                         Some(false) => {
-                            return Err(SolverError::RootLevelConflict(Some(ClauseId::from(lit))))
+                            return Err(SolverError::RootLevelConflict((
+                                lit,
+                                asg.reason(lit.vi()),
+                            )));
                         }
                         None => {
                             debug_assert!(asg.assigned(lit).is_none());
                             cdb.certificate_add_assertion(lit);
-                            if asg.assign_at_root_level(lit).is_err() {
-                                return Err(SolverError::RootLevelConflict(Some(ClauseId::from(
-                                    lit,
-                                ))));
-                            }
+                            asg.assign_at_root_level(lit)?;
                         }
                     }
                 }

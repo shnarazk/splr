@@ -185,7 +185,10 @@ impl SatSolverIF for Solver {
         match self.asg.assigned(lit) {
             None => self.asg.assign_at_root_level(lit).map(|_| self),
             Some(true) => Ok(self),
-            Some(false) => Err(SolverError::RootLevelConflict(Some(ClauseId::from(lit)))),
+            Some(false) => Err(SolverError::RootLevelConflict((
+                lit,
+                self.asg.reason(lit.vi()),
+            ))),
         }
     }
     fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver, SolverError>
@@ -204,12 +207,10 @@ impl SatSolverIF for Solver {
             .collect::<Vec<Lit>>();
 
         if clause.is_empty() {
-            return Err(SolverError::RootLevelConflict(None));
+            return Err(SolverError::EmptyClause);
         }
         if self.add_unchecked_clause(&mut clause) == RefClause::EmptyClause {
-            return Err(SolverError::RootLevelConflict(Some(ClauseId::from(
-                clause[0],
-            ))));
+            return Err(SolverError::EmptyClause);
         }
         Ok(self)
     }
@@ -367,11 +368,11 @@ impl Solver {
                     }
                     if v.is_empty() {
                         if ends_zero {
-                            return Err(SolverError::RootLevelConflict(None));
+                            return Err(SolverError::EmptyClause);
                         }
                         continue;
                     } else if self.add_unchecked_clause(&mut v) == RefClause::EmptyClause {
-                        return Err(SolverError::RootLevelConflict(Some(ClauseId::from(v[0]))));
+                        return Err(SolverError::EmptyClause);
                     }
                 }
                 Err(e) => panic!("{}", e),
@@ -408,12 +409,10 @@ impl Solver {
                 .map(|i| Lit::from(*i))
                 .collect::<Vec<Lit>>();
             if v.is_empty() {
-                return Err(SolverError::RootLevelConflict(None));
+                return Err(SolverError::EmptyClause);
             }
             if self.add_unchecked_clause(&mut lits) == RefClause::EmptyClause {
-                return Err(SolverError::RootLevelConflict(
-                    (!lits.is_empty()).then(|| ClauseId::from(lits[0])),
-                ));
+                return Err(SolverError::EmptyClause);
             }
         }
         debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
