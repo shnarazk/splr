@@ -833,19 +833,15 @@ impl AssignStack {
                 match cdb.transform_by_simplification(self, cid) {
                     RefClause::Clause(_) => (),
                     RefClause::Dead => (), // was a satisfied clause
-                    RefClause::EmptyClause => {
-                        return Err((NULL_LIT, AssignReason::Implication(cid)))
-                    }
+                    RefClause::EmptyClause => panic!(), // return Err((NULL_LIT, AssignReason::Implication(cid)))
                     RefClause::RegisteredClause(_) => (),
                     RefClause::UnitClause(lit) => {
                         debug_assert!(self.assigned(lit).is_none());
                         cdb.certificate_add_assertion(lit);
-                        if self.assign_at_root_level(lit).is_err() {
-                            return Err((lit, AssignReason::Implication(cid)));
-                        } else {
-                            debug_assert!(!self.locked(&cdb[cid], cid));
-                            cdb.remove_clause(cid);
-                        }
+                        self.assign_at_root_level(lit)
+                            .map_err(|_| (lit, AssignReason::Implication(cid)))?;
+                        debug_assert!(!self.locked(&cdb[cid], cid));
+                        cdb.remove_clause(cid);
                     }
                 }
             }
