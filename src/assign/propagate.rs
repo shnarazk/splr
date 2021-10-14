@@ -539,7 +539,6 @@ impl PropagateIF for AssignStack {
 
                     #[cfg(feature = "hashed_watch_cache")]
                     while cdb.reregister_watch_cache(propagating, watches.next().deref_watch()) {}
-
                     #[cfg(not(feature = "hashed_watch_cache"))]
                     cdb.restore_detached_watch_cache(propagating, source);
 
