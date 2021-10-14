@@ -389,7 +389,7 @@ impl PropagateIF for AssignStack {
                         {
                             cdb[cid].moved_at = Propagate::EmitConflict(self.num_conflict, blocker);
                         }
-                        return Err((propagating, AssignReason::BinaryLink(blocker)));
+                        return Err((blocker, AssignReason::BinaryLink(propagating)));
                     }
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
@@ -633,7 +633,7 @@ impl PropagateIF for AssignStack {
 
                 match lit_assign!(self, blocker) {
                     Some(true) => (),
-                    Some(false) => return Err((propagating, AssignReason::BinaryLink(blocker))),
+                    Some(false) => return Err((blocker, AssignReason::BinaryLink(propagating))),
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
 
