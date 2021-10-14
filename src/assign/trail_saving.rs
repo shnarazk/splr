@@ -63,35 +63,21 @@ impl AssignStack {
             let old_reason = self.reason_saved[vi];
             match (old_reason, self.assigned(lit)) {
                 (_, Some(true)) => (),
-                (AssignReason::BinaryLink(_), None) => {
-                    self.num_repropagation += 1;
-
-                    #[cfg(feature = "chrono_BT")]
-                    self.assign_by_implication(lit, dl, cid, NULL_LIT);
-                    #[cfg(not(feature = "chrono_BT"))]
-                    self.assign_by_implication(lit, old_reason);
-                }
                 // reason refinement by ignoring this dependecy
                 (AssignReason::Implication(c), None) if q < cdb[c].rank => {
                     self.insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
-                (AssignReason::Implication(cid), None) => {
-                    debug_assert_eq!(cdb[cid].lit0(), lit);
+                (AssignReason::BinaryLink(_) | AssignReason::Implication(_), None) => {
                     self.num_repropagation += 1;
 
                     #[cfg(feature = "chrono_BT")]
-                    self.assign_by_implication(lit, dl, cid, NULL_LIT);
+                    panic!("self.assign_by_implication(lit, dl, cid, NULL_LIT);");
+
                     #[cfg(not(feature = "chrono_BT"))]
                     self.assign_by_implication(lit, old_reason);
                 }
-                (AssignReason::BinaryLink(_link), Some(false)) => {
-                    let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
-                    self.clear_trail_saved();
-                    return Err((lit, old_reason));
-                }
-
-                (AssignReason::Implication(_cid), Some(false)) => {
+                (AssignReason::BinaryLink(_) | AssignReason::Implication(_), Some(false)) => {
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_trail_saved();
                     return Err((lit, old_reason));
