@@ -221,11 +221,7 @@ impl SolveIF for Solver {
                 RESTART!(asg, rst);
                 Ok(Certificate::SAT(vals))
             }
-            Ok(false) => {
-                RESTART!(asg, rst);
-                Ok(Certificate::UNSAT)
-            }
-            Err(SolverError::RootLevelConflict(_)) => {
+            Ok(false) | Err(SolverError::EmptyClause | SolverError::RootLevelConflict(_)) => {
                 #[cfg(feature = "support_user_assumption")]
                 {
                     analyze_final(asg, state, &cdb[ci]);
