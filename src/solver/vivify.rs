@@ -169,7 +169,8 @@ pub fn vivify(
     }
     asg.backtrack_sandbox();
     if asg.remains() {
-        assert!(asg.propagate_sandbox(cdb).is_ok());
+        asg.propagate_sandbox(cdb)
+            .map_err(SolverError::RootLevelConflict)?;
     }
     asg.clear_asserted_literals(cdb)?;
     debug_assert!(asg.stack_is_empty() || !asg.remains());
