@@ -265,14 +265,18 @@ impl AssignIF for AssignStack {
         false
     }
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
-        let l0 = c.lit0();
-        if self.assigned(l0) == Some(true) {
-            self.reason[l0.vi()]
-                == if c.len() == 2 {
-                    AssignReason::BinaryLink(!c.lit1())
-                } else {
-                    AssignReason::Implication(cid)
-                }
+        if c.len() == 2 {
+            let l0 = c.lit0();
+            let l1 = c.lit1();
+            if let AssignReason::BinaryLink(link) = self.reason[l0.vi()] {
+                link == !l1
+            } else if let AssignReason::BinaryLink(link) = self.reason[l1.vi()] {
+                link == !l0
+            } else {
+                false
+            }
+        } else if let AssignReason::Implication(ci) = self.reason[c.lit0().vi()] {
+            cid == ci
         } else {
             false
         }
