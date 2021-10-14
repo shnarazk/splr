@@ -115,11 +115,11 @@ pub fn vivify(
                                 }
                             }
                             AssignReason::Implication(ci) => {
-                                let cnfl_lits = &cdb[ci].iter().copied().collect::<Vec<Lit>>();
-                                if clits.len() == decisions.len() && ci == cid {
+                                if ci == cid && clits.len() == decisions.len() {
                                     asg.backtrack_sandbox();
                                     continue 'next_clause;
                                 } else {
+                                    let cnfl_lits = &cdb[ci].iter().copied().collect::<Vec<Lit>>();
                                     seen[0] = num_check;
                                     vec =
                                         asg.analyze_sandbox(cdb, &decisions, cnfl_lits, &mut seen);

@@ -254,13 +254,11 @@ fn conflict_analyze(
     learnt.push(NULL_LIT);
     let root_level = asg.root_level();
     let dl = asg.decision_level();
-    let mut p = cc.0;
     let mut path_cnt = 0;
-    let mut reason = cc.1;
-    // handle the conflicting literal itself here.
+    let (mut p, mut reason) = cc;
     {
         #[cfg(feature = "trace_analysis")]
-        println!("- analyze conflicting literal {}", p);
+        println!("- handle conflicting literal {}", p);
 
         let vi = p.vi();
         debug_assert!(!asg.var(vi).is(Flag::CA_SEEN) && !asg.var(vi).is(Flag::ELIMINATED));
@@ -280,10 +278,9 @@ fn conflict_analyze(
     loop {
         match reason {
             AssignReason::BinaryLink(l) => {
-                // cid = asg.reason(p.vi());
                 let vi = l.vi();
                 if !asg.var(vi).is(Flag::CA_SEEN) {
-                    debug_assert_eq!(asg.level(vi), dl, "strange level binary clause");
+                    assert_eq!(asg.level(vi), dl, "strange level binary clause");
                     // if root_level == asg.level(vi) { continue; }
                     debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
                     debug_assert!(asg.assign(vi).is_some());
@@ -295,7 +292,7 @@ fn conflict_analyze(
             }
             AssignReason::Implication(cid) => {
                 #[cfg(feature = "trace_analysis")]
-                println!("analyze {}", p);
+                println!("analyze clause {} for {}", cid, p);
 
                 cdb.mark_clause_as_used(asg, cid);
                 if cdb[cid].is(Flag::LEARNT) {
@@ -308,19 +305,7 @@ fn conflict_analyze(
                 debug_assert!(!c.is_dead());
 
                 #[cfg(feature = "boundary_check")]
-                if c.len() == 0 {
-                    panic!(
-                        "Level {} I-graph reaches {}:{} for {}:{}",
-                        asg.decision_level(),
-                        cid,
-                        c,
-                        p,
-                        asg.var(p.vi())
-                    )
-                }
-
-                #[cfg(feature = "trace_analysis")]
-                println!("- handle {}", cid);
+                assert!(2 < c.len());
 
                 for q in &c[1..] {
                     let vi = q.vi();
@@ -338,11 +323,12 @@ fn conflict_analyze(
                         );
                         debug_assert!(lvl <= dl);
                         asg.var_mut(vi).turn_on(Flag::CA_SEEN);
-                        #[cfg(feature = "conflict_side_rewarding")]
-                        asg.reward_at_analysis(vi);
                         if dl == lvl {
                             // println!("- flag for {} which level is {}", q.int(), lvl);
                             path_cnt += 1;
+
+                            #[cfg(feature = "conflict_side_rewarding")]
+                            asg.reward_at_analysis(vi);
                         } else {
                             #[cfg(feature = "trace_analysis")]
                             println!("- push {} to learnt, which level is {}", q, lvl);
@@ -351,51 +337,34 @@ fn conflict_analyze(
                         }
                     } else {
                         #[cfg(feature = "trace_analysis")]
-                        {
-                            if !asg.var(vi).is(Flag::CA_SEEN) {
-                                println!("- ignore {} because it was flagged", q);
-                            } else {
-                                println!("- ignore {} because its level is {}", q, asg.level(vi));
-                            }
+                        if !asg.var(vi).is(Flag::CA_SEEN) {
+                            println!("- ignore {} because it was flagged", q);
+                        } else {
+                            println!("- ignore {} because its level is {}", q, asg.level(vi));
                         }
                     }
                 }
             }
-            AssignReason::Decision(0) => {
-                #[cfg(feature = "boundary_check")]
-                panic!(
-                    "conflict_analyze: faced an asserted var. path_cnt {} at level {}",
-                    path_cnt,
-                    asg.level(p.vi()),
-                );
-            }
-            AssignReason::Decision(_) => {
+            AssignReason::Decision(_) | AssignReason::None => {
                 #[cfg(feature = "boundary_check")]
                 println!(
-                        "conflict_analyze: faced a decision var:: path_cnt {} at level {}\nconflict\n  {:?}\nDecisionMap\n{}\nbuliding learnt\n{}\n",
-                        path_cnt,
-                        asg.decision_level(),
-                        cc,
-                        asg.stack_iter().skip(ti).filter(|l| matches!(asg.reason(l.vi()), AssignReason::Decision(_)))
-                            .map(|l| format!("{:?}", l.report(asg)))
-                            .collect::<Vec<String>>()
-                            .join("\n"),
-                        learnt.report(asg)
-                            .iter()
-                            .map(|r| format!("  {:?}", r))
-                            .collect::<Vec<String>>()
-                            .join("\n",),
-                    );
+                    "conflict_analyze: faced a strange var {:?}:: path_cnt {} at level {}\nconflict\n  {:?}\nDecisionMap\n{}\nbuliding learnt\n{}\n",
+                    reason,
+                    path_cnt,
+                    asg.decision_level(),
+                    cc,
+                    asg.stack_iter().skip(ti).filter(|l| matches!(asg.reason(l.vi()), AssignReason::Decision(_)))
+                        .map(|l| format!("{:?}", l.report(asg)))
+                        .collect::<Vec<String>>()
+                        .join("\n"),
+                    learnt.report(asg)
+                        .iter()
+                        .map(|r| format!("  {:?}", r))
+                        .collect::<Vec<String>>()
+                        .join("\n",),
+                );
                 #[cfg(feature = "boundary_check")]
                 tracer(asg, cdb);
-            }
-            AssignReason::None => {
-                #[cfg(feature = "boundary_check")]
-                panic!(
-                    "conflict_analyze: faced an unassigned var. path_cnt {} at level {}",
-                    path_cnt,
-                    asg.level(p.vi()),
-                );
             }
         }
         // The following case was subsumed into `search`.
