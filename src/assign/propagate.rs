@@ -389,6 +389,7 @@ impl PropagateIF for AssignStack {
                         {
                             cdb[cid].moved_at = Propagate::EmitConflict(self.num_conflict, blocker);
                         }
+
                         return Err((blocker, AssignReason::BinaryLink(propagating)));
                     }
                     None => {
