@@ -529,49 +529,47 @@ impl PropagateIF for AssignStack {
                     if false_watch_pos == 0 {
                         cdb.swap_watch(cid);
                     }
-                    // cdb.reregister_watch_cache(propagating, Some(wc_proxy));
-                    cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
-                    if other_watch_value == Some(false) {
-                        self.num_conflict += 1;
-                        self.dpc_ema.update(self.num_decision);
-                        self.ppc_ema.update(self.num_propagation);
+                }
+                // cdb.reregister_watch_cache(propagating, Some(wc_proxy));
+                cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
+                if other_watch_value == Some(false) {
+                    self.num_conflict += 1;
+                    self.dpc_ema.update(self.num_decision);
+                    self.ppc_ema.update(self.num_propagation);
 
-                        #[cfg(feature = "hashed_watch_cache")]
-                        while cdb.reregister_watch_cache(propagating, watches.next().deref_watch())
-                        {
-                        }
+                    #[cfg(feature = "hashed_watch_cache")]
+                    while cdb.reregister_watch_cache(propagating, watches.next().deref_watch()) {}
 
-                        #[cfg(not(feature = "hashed_watch_cache"))]
-                        cdb.restore_detached_watch_cache(propagating, source);
-
-                        #[cfg(feature = "boundary_check")]
-                        {
-                            cdb[cid].moved_at = Propagate::EmitConflict(self.num_conflict, cached);
-                        }
-                        return Err((other, AssignReason::Implication(cid)));
-                    }
-
-                    #[cfg(feature = "chrono_BT")]
-                    let dl = cdb[cid]
-                        .iter()
-                        .skip(1)
-                        .map(|l| self.level[l.vi()])
-                        .max()
-                        .unwrap_or(self.root_level);
-
-                    debug_assert_eq!(cdb[cid].lit0(), cached);
-                    debug_assert_eq!(self.assigned(cached), None);
-                    debug_assert!(other_watch_value.is_none());
-
-                    #[cfg(feature = "chrono_BT")]
-                    self.assign_by_implication(cached, dl, cid, NULL_LIT);
-                    #[cfg(not(feature = "chrono_BT"))]
-                    self.assign_by_implication(cached, AssignReason::Implication(cid));
+                    #[cfg(not(feature = "hashed_watch_cache"))]
+                    cdb.restore_detached_watch_cache(propagating, source);
 
                     #[cfg(feature = "boundary_check")]
                     {
-                        cdb[cid].moved_at = Propagate::BecameUnit(self.num_conflict, cached);
+                        cdb[cid].moved_at = Propagate::EmitConflict(self.num_conflict, cached);
                     }
+                    return Err((cached, AssignReason::Implication(cid)));
+                }
+
+                #[cfg(feature = "chrono_BT")]
+                let dl = cdb[cid]
+                    .iter()
+                    .skip(1)
+                    .map(|l| self.level[l.vi()])
+                    .max()
+                    .unwrap_or(self.root_level);
+
+                debug_assert_eq!(cdb[cid].lit0(), cached);
+                debug_assert_eq!(self.assigned(cached), None);
+                debug_assert!(other_watch_value.is_none());
+
+                #[cfg(feature = "chrono_BT")]
+                self.assign_by_implication(cached, dl, cid, NULL_LIT);
+                #[cfg(not(feature = "chrono_BT"))]
+                self.assign_by_implication(cached, AssignReason::Implication(cid));
+
+                #[cfg(feature = "boundary_check")]
+                {
+                    cdb[cid].moved_at = Propagate::BecameUnit(self.num_conflict, cached);
                 }
             }
             #[cfg(feature = "trail_saving")]
@@ -749,45 +747,42 @@ impl PropagateIF for AssignStack {
                     if false_watch_pos == 0 {
                         cdb.swap_watch(cid);
                     }
-
-                    cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
-                    if other_watch_value == Some(false) {
-                        #[cfg(feature = "hashed_watch_cache")]
-                        while cdb.reregister_watch_cache(propagating, watches.next().deref_watch())
-                        {
-                        }
-                        #[cfg(not(feature = "hashed_watch_cache"))]
-                        cdb.restore_detached_watch_cache(propagating, source);
-
-                        #[cfg(feature = "boundary_check")]
-                        {
-                            cdb[cid].moved_at =
-                                Propagate::SandboxEmitConflict(self.num_conflict, propagating);
-                        }
-
-                        return Err((other, AssignReason::Implication(cid)));
-                    }
-
-                    #[cfg(feature = "chrono_BT")]
-                    let dl = cdb[cid]
-                        .iter()
-                        .skip(1)
-                        .map(|l| self.level[l.vi()])
-                        .max()
-                        .unwrap_or(self.root_level);
-                    debug_assert_eq!(cdb[cid].lit0(), cached);
-                    debug_assert_eq!(self.assigned(cached), None);
-                    debug_assert!(other_watch_value.is_none());
-
-                    #[cfg(feature = "chrono_BT")]
-                    self.assign_by_implication(cached, dl, cid, NULL_LIT);
-                    #[cfg(not(feature = "chrono_BT"))]
-                    self.assign_by_implication(cached, AssignReason::Implication(cid));
+                }
+                cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
+                if other_watch_value == Some(false) {
+                    #[cfg(feature = "hashed_watch_cache")]
+                    while cdb.reregister_watch_cache(propagating, watches.next().deref_watch()) {}
+                    #[cfg(not(feature = "hashed_watch_cache"))]
+                    cdb.restore_detached_watch_cache(propagating, source);
 
                     #[cfg(feature = "boundary_check")]
                     {
-                        cdb[cid].moved_at = Propagate::SandboxBecameUnit(self.num_conflict);
+                        cdb[cid].moved_at =
+                            Propagate::SandboxEmitConflict(self.num_conflict, propagating);
                     }
+
+                    return Err((cached, AssignReason::Implication(cid)));
+                }
+
+                #[cfg(feature = "chrono_BT")]
+                let dl = cdb[cid]
+                    .iter()
+                    .skip(1)
+                    .map(|l| self.level[l.vi()])
+                    .max()
+                    .unwrap_or(self.root_level);
+                debug_assert_eq!(cdb[cid].lit0(), cached);
+                debug_assert_eq!(self.assigned(cached), None);
+                debug_assert!(other_watch_value.is_none());
+
+                #[cfg(feature = "chrono_BT")]
+                self.assign_by_implication(cached, dl, cid, NULL_LIT);
+                #[cfg(not(feature = "chrono_BT"))]
+                self.assign_by_implication(cached, AssignReason::Implication(cid));
+
+                #[cfg(feature = "boundary_check")]
+                {
+                    cdb[cid].moved_at = Propagate::SandboxBecameUnit(self.num_conflict);
                 }
             }
         }
