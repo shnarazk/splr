@@ -61,14 +61,9 @@ impl AssignStack {
             let lit = self.trail_saved[i];
             let vi = lit.vi();
             let old_reason = self.reason_saved[vi];
-            match (old_reason, self.assigned(lit)) {
-                (_, Some(true)) => (),
-                // reason refinement by ignoring this dependecy
-                (AssignReason::Implication(c), None) if q < cdb[c].rank => {
-                    self.insert_heap(vi);
-                    return self.truncate_trail_saved(i + 1);
-                }
-                (AssignReason::BinaryLink(link), None) => {
+            match (self.assigned(lit), old_reason) {
+                (Some(true), _) => (),
+                (None, AssignReason::BinaryLink(link)) => {
                     debug_assert_ne!(link.vi(), lit.vi());
                     debug_assert_eq!(self.assigned(link), Some(true));
                     self.num_repropagation += 1;
@@ -79,7 +74,12 @@ impl AssignStack {
                     #[cfg(not(feature = "chrono_BT"))]
                     self.assign_by_implication(lit, old_reason);
                 }
-                (AssignReason::Implication(cid), None) => {
+                // reason refinement by ignoring this dependecy
+                (None, AssignReason::Implication(c)) if q < cdb[c].rank => {
+                    self.insert_heap(vi);
+                    return self.truncate_trail_saved(i + 1);
+                }
+                (None, AssignReason::Implication(cid)) => {
                     debug_assert_eq!(cdb[cid].lit0(), lit);
                     debug_assert!(cdb[cid]
                         .iter()
@@ -93,20 +93,20 @@ impl AssignStack {
                     #[cfg(not(feature = "chrono_BT"))]
                     self.assign_by_implication(lit, old_reason);
                 }
-                (AssignReason::BinaryLink(link), Some(false)) => {
+                (Some(false), AssignReason::BinaryLink(link)) => {
                     debug_assert_ne!(link.vi(), lit.vi());
                     debug_assert_eq!(self.assigned(link), Some(true));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_trail_saved();
                     return Err((lit, old_reason));
                 }
-                (AssignReason::Implication(cid), Some(false)) => {
+                (Some(false), AssignReason::Implication(cid)) => {
                     debug_assert!(cdb[cid].iter().all(|l| self.assigned(*l) == Some(false)));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_trail_saved();
                     return Err((cdb[cid].lit0(), AssignReason::Implication(cid)));
                 }
-                (AssignReason::Decision(lvl), _) => {
+                (_, AssignReason::Decision(lvl)) => {
                     debug_assert_ne!(0, lvl);
                     self.insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
