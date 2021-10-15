@@ -72,7 +72,7 @@ impl AssignStack {
                     self.num_repropagation += 1;
 
                     #[cfg(feature = "chrono_BT")]
-                    panic!("self.assign_by_implication(lit, dl, cid, NULL_LIT);");
+                    self.assign_by_implication(lit, dl, old_reason);
 
                     #[cfg(not(feature = "chrono_BT"))]
                     self.assign_by_implication(lit, old_reason);

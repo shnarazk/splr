@@ -132,7 +132,7 @@ impl PropagateIF for AssignStack {
         }
     }
     #[cfg(feature = "chrono_BT")]
-    fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, cid: ClauseId, by: Lit) {
+    fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, reason: AssignReason) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be enqueued");
         debug_assert!(l.vi() < self.var.len());
         // The following doesn't hold anymore by using chronoBT.
@@ -147,7 +147,7 @@ impl PropagateIF for AssignStack {
         debug_assert!(self.trail.iter().all(|rl| *rl != l));
         set_assign!(self, l);
         self.level[vi] = lv;
-        self.reason[vi] = AssignReason::Implication(cid, by);
+        self.reason[vi] = reason;
         self.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
