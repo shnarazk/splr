@@ -68,7 +68,9 @@ impl AssignStack {
                     self.insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
-                (AssignReason::BinaryLink(_) | AssignReason::Implication(_), None) => {
+                (AssignReason::BinaryLink(link), None) => {
+                    debug_assert_ne!(link.vi(), lit.vi());
+                    debug_assert_eq!(self.assigned(link), Some(true));
                     self.num_repropagation += 1;
 
                     #[cfg(feature = "chrono_BT")]
@@ -77,7 +79,23 @@ impl AssignStack {
                     #[cfg(not(feature = "chrono_BT"))]
                     self.assign_by_implication(lit, old_reason);
                 }
-                (AssignReason::BinaryLink(_) | AssignReason::Implication(_), Some(false)) => {
+                (AssignReason::Implication(cid), None) => {
+                    debug_assert_eq!(cdb[cid].lit0(), lit);
+                    debug_assert!(cdb[cid]
+                        .iter()
+                        .skip(1)
+                        .all(|l| self.assigned(*l) == Some(false)));
+                    self.num_repropagation += 1;
+
+                    #[cfg(feature = "chrono_BT")]
+                    self.assign_by_implication(lit, dl, old_reason);
+
+                    #[cfg(not(feature = "chrono_BT"))]
+                    self.assign_by_implication(lit, old_reason);
+                }
+                (AssignReason::BinaryLink(link), Some(false)) => {
+                    debug_assert_ne!(link.vi(), lit.vi());
+                    debug_assert_eq!(self.assigned(link), Some(true));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_trail_saved();
                     return Err((lit, old_reason));
