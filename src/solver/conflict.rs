@@ -52,6 +52,10 @@ pub fn handle_conflict(
 
     #[cfg(feature = "chrono_BT")]
     {
+        let c = match cc.1 {
+            AssignReason::Implication(cid) => &cdb[cid],
+            _ => panic!(), // TODO
+        };
         let level = asg.level_ref();
         let max_level = c.iter().map(|l| level[l.vi()]).max().unwrap();
 
@@ -180,7 +184,7 @@ pub fn handle_conflict(
             debug_assert_eq!(asg.assigned(l0), None);
 
             #[cfg(feature = "chrono_BT")]
-            asg.assign_by_implication(l0, assign_level, cid, !l1);
+            asg.assign_by_implication(l0, assign_level, AssignReason::BinaryLink(!l1));
             #[cfg(not(feature = "chrono_BT"))]
             asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1));
 
@@ -200,7 +204,7 @@ pub fn handle_conflict(
             debug_assert_eq!(asg.assigned(l0), None);
 
             #[cfg(feature = "chrono_BT")]
-            asg.assign_by_implication(l0, assign_level, cid, NULL_LIT);
+            asg.assign_by_implication(l0, assign_level, AssignReason::Implication(cid));
             #[cfg(not(feature = "chrono_BT"))]
             asg.assign_by_implication(l0, AssignReason::Implication(cid));
 
@@ -225,7 +229,7 @@ pub fn handle_conflict(
             debug_assert_eq!(asg.assigned(l0), None);
 
             #[cfg(feature = "chrono_BT")]
-            asg.assign_by_implication(l0, assign_level, cid, !l1);
+            asg.assign_by_implication(l0, assign_level, AssignReason::BinaryLink(!l1));
             #[cfg(not(feature = "chrono_BT"))]
             asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1));
 

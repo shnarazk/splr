@@ -18,7 +18,7 @@ pub trait PropagateIF {
     /// ## Warning
     /// Callers must assure the consistency after this assignment.
     #[cfg(feature = "chrono_BT")]
-    fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, cid: ClauseId, by: Lit);
+    fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, reason: AssignReason);
     #[cfg(not(feature = "chrono_BT"))]
     fn assign_by_implication(&mut self, l: Lit, reason: AssignReason);
     /// unsafe assume (assign by decision); doesn't emit an exception.
@@ -398,8 +398,7 @@ impl PropagateIF for AssignStack {
                         self.assign_by_implication(
                             blocker,
                             self.level[propagating.vi()],
-                            cid,
-                            propagating,
+                            AssignReason::BinaryLink(propagating),
                         );
                         #[cfg(not(feature = "chrono_BT"))]
                         self.assign_by_implication(blocker, AssignReason::BinaryLink(propagating));
@@ -563,7 +562,7 @@ impl PropagateIF for AssignStack {
                 debug_assert!(other_watch_value.is_none());
 
                 #[cfg(feature = "chrono_BT")]
-                self.assign_by_implication(cached, dl, cid, NULL_LIT);
+                self.assign_by_implication(cached, dl, AssignReason::Implication(cid));
                 #[cfg(not(feature = "chrono_BT"))]
                 self.assign_by_implication(cached, AssignReason::Implication(cid));
 
@@ -639,8 +638,7 @@ impl PropagateIF for AssignStack {
                         self.assign_by_implication(
                             blocker,
                             self.level[false_lit.vi()],
-                            cid,
-                            propagating,
+                            AssignReason::BinaryLink(propagating),
                         );
                         #[cfg(not(feature = "chrono_BT"))]
                         self.assign_by_implication(blocker, AssignReason::BinaryLink(propagating));
@@ -776,7 +774,7 @@ impl PropagateIF for AssignStack {
                 debug_assert!(other_watch_value.is_none());
 
                 #[cfg(feature = "chrono_BT")]
-                self.assign_by_implication(cached, dl, cid, NULL_LIT);
+                self.assign_by_implication(cached, dl, AssignReason::Implication(cid));
                 #[cfg(not(feature = "chrono_BT"))]
                 self.assign_by_implication(cached, AssignReason::Implication(cid));
 
