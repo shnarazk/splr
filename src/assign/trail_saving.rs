@@ -82,7 +82,14 @@ impl AssignStack {
                     self.clear_trail_saved();
                     return Err((lit, old_reason));
                 }
-                (AssignReason::Decision(_), _) => {
+                (AssignReason::Implication(cid), Some(false)) => {
+                    debug_assert!(cdb[cid].iter().all(|l| self.assigned(*l) == Some(false)));
+                    let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
+                    self.clear_trail_saved();
+                    return Err((cdb[cid].lit0(), AssignReason::Implication(cid)));
+                }
+                (AssignReason::Decision(lvl), _) => {
+                    debug_assert_ne!(0, lvl);
                     self.insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
