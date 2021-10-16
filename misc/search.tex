@@ -1,0 +1,38 @@
+\NeedsTeXFormat{LaTeX2e}
+\documentclass{article}
+\usepackage[boxed,ruled,vlined]{algorithm2e}
+\usepackage{xcolor}
+\begin{document}
+\begin{algorithm}
+\KwOut{satisfiability of the given CNF}
+\SetKwComment{Comment}{}{}
+\BlankLine
+\Begin{
+\While{there is an unassigned or unpropagated var}{
+  \If{there is no unpropagated var}{
+    select a decision var and its phase\;
+  }
+  \If{BCP() returns an conflict}{
+    \If{decision level is root level}{
+      \Return{UNSAT}\;
+    }
+    CONFLICT-ANALYSIS()\;
+    BACKTRACK()\;
+    \uIf{there are too many learnt clauses}{
+      RESTART()\;
+      REDUCE()\;
+      ELIMINATE()\;
+      VIVIFY()\;
+      update restart threshold and interval\Comment*{\sl\small\color[gray]{0.5}// Luby Stabilization}
+      select var phases;
+    }
+    \ElseIf{LBD-based dynamic restart condition holds}{
+      RESTART();
+    }
+  }
+}
+\Return{SAT}\;
+}
+\caption{Main search loop in Splr-0.14 (src/solver/search.rs)}
+\end{algorithm}
+\end{document}
