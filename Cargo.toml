@@ -23,6 +23,7 @@ default = [
         # "clause_rewarding",
         "clause_vivification",
         "conflict_side_rewarding",
+        "deterministic_iterator",
         "dynamic_restart_threshold",
         # "incremental_solver",
         "LRB_rewarding",
@@ -42,6 +43,7 @@ clause_vivification = []
 chrono_BT = []
 conflict_side_rewarding = []
 debug_propagation = []
+deterministic_iterator = []
 dynamic_restart_threshold = []
 EMA_calibration = []
 EVSIDS = []
