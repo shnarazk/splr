@@ -771,8 +771,7 @@ impl PropagateIF for AssignStack {
                 self.propagate_sandbox(cdb)
                     .map_err(SolverError::RootLevelConflict)?;
             }
-            self.propagate_at_root_level(cdb)
-                .map_err(SolverError::RootLevelConflict)?;
+            self.propagate_at_root_level(cdb)?;
             if self.remains() {
                 self.propagate_sandbox(cdb)
                     .map_err(SolverError::RootLevelConflict)?;
@@ -794,7 +793,7 @@ impl AssignStack {
         assert_ne!(self.assigned(b1), Some(false));
     }
     ///
-    fn propagate_at_root_level(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
+    fn propagate_at_root_level(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
         let mut num_propagated = 0;
         while num_propagated < self.trail.len() {
             num_propagated = self.trail.len();
@@ -809,13 +808,12 @@ impl AssignStack {
                 match cdb.transform_by_simplification(self, cid) {
                     RefClause::Clause(_) => (),
                     RefClause::Dead => (), // was a satisfied clause
-                    RefClause::EmptyClause => panic!(), // return Err((NULL_LIT, AssignReason::Implication(cid)))
+                    RefClause::EmptyClause => return Err(SolverError::EmptyClause),
                     RefClause::RegisteredClause(_) => (),
                     RefClause::UnitClause(lit) => {
                         debug_assert!(self.assigned(lit).is_none());
                         cdb.certificate_add_assertion(lit);
-                        self.assign_at_root_level(lit)
-                            .map_err(|_| (lit, AssignReason::Implication(cid)))?;
+                        self.assign_at_root_level(lit)?;
                         cdb.remove_clause(cid);
                     }
                 }
