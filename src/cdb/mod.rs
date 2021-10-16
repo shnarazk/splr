@@ -124,12 +124,12 @@ pub trait ClauseDBIF:
     /// check satisfied and nullified literals in a clause
     fn transform_by_simplification(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> RefClause;
     /// check the condition to reduce.
-    /// * return `true` if reduction is done.
-    /// * Otherwise return `false`.
-    ///
+    fn should_reduce(&mut self, nc: usize) -> bool;
+    /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, nc: usize) -> bool;
+    fn reduce(&mut self, asg: &mut impl AssignIF, nc: usize);
+    /// FIXME
     fn reset(&mut self);
     /// update LBD then convert a learnt clause to permanent if needed.
     fn mark_clause_as_used(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> bool;

@@ -82,7 +82,7 @@ fn main() {
         }
     }
     let mut s = match Solver::build(&config) {
-        Err(SolverError::RootLevelConflict(_)) => {
+        Err(SolverError::EmptyClause | SolverError::RootLevelConflict(_)) => {
             println!(
                 "\x1B[1G\x1B[K{}: {}",
                 colored(Ok(false), config.no_color),

@@ -264,11 +264,6 @@ impl AssignIF for AssignStack {
         }
         false
     }
-    fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
-        let l0 = c.lit0();
-        self.assigned(l0) == Some(true)
-            && matches!(self.reason(l0.vi()), AssignReason::Implication(x, _) if x == cid)
-    }
     /// dump all active clauses and assertions as a CNF file.
     #[cfg(not(feature = "no_IO"))]
     fn dump_cnf(&mut self, cdb: &impl ClauseDBIF, fname: &str) {

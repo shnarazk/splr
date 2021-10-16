@@ -82,6 +82,7 @@ impl VarHeapIF for AssignStack {
         self.percolate_up(i as u32);
     }
     fn get_heap_root(&mut self) -> VarId {
+        #[cfg(feature = "trail_saving")]
         if self.var_order.is_empty() {
             self.clear_trail_saved();
         }

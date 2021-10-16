@@ -1,3 +1,7 @@
+## 0.14.0, 2021-1 -  
+
+- `ConflictContext` uses `AssignReason`
+
 ## 0.13.0, 2021-10-11
 
 - implement trail saving as an alternative of chrono-BT with following extensions:

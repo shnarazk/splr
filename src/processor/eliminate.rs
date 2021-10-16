@@ -81,16 +81,15 @@ pub fn eliminate_var(
                     match asg.assigned(lit) {
                         Some(true) => (),
                         Some(false) => {
-                            return Err(SolverError::RootLevelConflict(Some(ClauseId::from(lit))))
+                            return Err(SolverError::RootLevelConflict((
+                                lit,
+                                asg.reason(lit.vi()),
+                            )));
                         }
                         None => {
                             debug_assert!(asg.assigned(lit).is_none());
                             cdb.certificate_add_assertion(lit);
-                            if asg.assign_at_root_level(lit).is_err() {
-                                return Err(SolverError::RootLevelConflict(Some(ClauseId::from(
-                                    lit,
-                                ))));
-                            }
+                            asg.assign_at_root_level(lit)?;
                         }
                     }
                 }
@@ -128,7 +127,6 @@ pub fn eliminate_var(
         if cdb[*cid].is_dead() {
             continue;
         }
-        debug_assert!(!asg.locked(&cdb[*cid], *cid));
         #[cfg(feature = "incremental_solver")]
         {
             if !cdb[*cid].is(Flag::LEARNT) {
@@ -142,7 +140,6 @@ pub fn eliminate_var(
         if cdb[*cid].is_dead() {
             continue;
         }
-        debug_assert!(!asg.locked(&cdb[*cid], *cid));
         #[cfg(feature = "incremental_solver")]
         {
             if !cdb[*cid].is(Flag::LEARNT) {
