@@ -264,23 +264,6 @@ impl AssignIF for AssignStack {
         }
         false
     }
-    fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
-        if c.len() == 2 {
-            let l0 = c.lit0();
-            let l1 = c.lit1();
-            if let AssignReason::BinaryLink(link) = self.reason[l0.vi()] {
-                link == !l1
-            } else if let AssignReason::BinaryLink(link) = self.reason[l1.vi()] {
-                link == !l0
-            } else {
-                false
-            }
-        } else if let AssignReason::Implication(ci) = self.reason[c.lit0().vi()] {
-            cid == ci
-        } else {
-            false
-        }
-    }
     /// dump all active clauses and assertions as a CNF file.
     #[cfg(not(feature = "no_IO"))]
     fn dump_cnf(&mut self, cdb: &impl ClauseDBIF, fname: &str) {

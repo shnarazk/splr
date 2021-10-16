@@ -816,7 +816,6 @@ impl AssignStack {
                         cdb.certificate_add_assertion(lit);
                         self.assign_at_root_level(lit)
                             .map_err(|_| (lit, AssignReason::Implication(cid)))?;
-                        debug_assert!(!self.locked(&cdb[cid], cid));
                         cdb.remove_clause(cid);
                     }
                 }

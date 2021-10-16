@@ -127,7 +127,6 @@ pub fn eliminate_var(
         if cdb[*cid].is_dead() {
             continue;
         }
-        debug_assert!(!asg.locked(&cdb[*cid], *cid));
         #[cfg(feature = "incremental_solver")]
         {
             if !cdb[*cid].is(Flag::LEARNT) {
@@ -141,7 +140,6 @@ pub fn eliminate_var(
         if cdb[*cid].is_dead() {
             continue;
         }
-        debug_assert!(!asg.locked(&cdb[*cid], *cid));
         #[cfg(feature = "incremental_solver")]
         {
             if !cdb[*cid].is(Flag::LEARNT) {

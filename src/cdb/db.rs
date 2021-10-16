@@ -1030,12 +1030,94 @@ impl ClauseDBIF for ClauseDB {
         }
         false
     }
-    fn reduce(&mut self, asg: &mut impl AssignIF, num_conflicts: usize) -> bool {
+    fn should_reduce(&mut self, num_conflicts: usize) -> bool {
         if self.use_chan_seok {
-            self.first_reduction <= self.num_learnt && self.reduce_db(asg, num_conflicts)
+            self.first_reduction <= self.num_learnt
         } else {
-            self.next_reduction <= num_conflicts && self.reduce_db(asg, num_conflicts)
+            self.next_reduction <= num_conflicts
         }
+    }
+    /// halve the number of 'learnt' or *removable* clauses.
+    fn reduce(&mut self, asg: &mut impl AssignIF, nc: usize) {
+        let ClauseDB {
+            ref mut clause,
+            ref co_lbd_bound,
+            ref mut lbd_temp,
+            ref mut num_reduction,
+            ref ordinal,
+            ref activity_decay,
+            ..
+        } = self;
+        *num_reduction += 1;
+
+        let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
+        for (i, c) in clause.iter_mut().enumerate().skip(1) {
+            if c.is_dead() {
+                continue;
+            }
+            let rank = c.update_lbd(asg, lbd_temp) as f64;
+            c.update_activity(*ordinal, *activity_decay, 0.0);
+            // There's no clause stored in `reason` because the decision level is 'zero.'
+            debug_assert_ne!(
+                asg.reason(c.lit0().vi()),
+                AssignReason::Implication(ClauseId::from(i)),
+                "Lit {} {:?} level {}, dl: {}",
+                i32::from(c.lit0()),
+                asg.assigned(c.lit0()),
+                asg.level(c.lit0().vi()),
+                asg.decision_level(),
+            );
+            if !c.is(Flag::LEARNT) {
+                continue;
+            }
+
+            #[cfg(feature = "just_used")]
+            {
+                let used = c.is(Flag::JUST_USED);
+                if used {
+                    c.turn_off(Flag::JUST_USED);
+                    continue;
+                }
+            }
+
+            // This is the best at least for 3SAT360.
+
+            let act_v: f64 = c
+                .lits
+                .iter()
+                .fold(0.0, |acc, l| acc.max(asg.activity(l.vi())));
+
+            #[cfg(feature = "clause_rewarding")]
+            let act_c = c.reward;
+            #[cfg(not(feature = "clause_rewarding"))]
+            let act_c = 0.25;
+
+            let weight = rank / (act_c + act_v);
+            perm.push(OrderedProxy::new(i, weight));
+        }
+        let keep = perm.len().min(nc) / 2;
+
+        let mut reduction_coeff: f64 = (nc as f64) / (self.reduction_step as f64) + 1.0;
+        self.reduction_step += self.inc_step;
+        if perm.is_empty() {
+            self.next_reduction = (reduction_coeff * self.reduction_step as f64) as usize;
+            return;
+        }
+        if !self.use_chan_seok {
+            if clause[perm[keep].to()].rank <= *co_lbd_bound {
+                reduction_coeff *= 1.1;
+            }
+            self.next_reduction = (reduction_coeff * self.reduction_step as f64) as usize;
+        }
+        perm.sort();
+        // let thr = self.lbd_of_dp_ema.get() as u16;
+        let thr = (self.lbd_of_dp_ema.get() as u16).max(*co_lbd_bound);
+        for i in &perm[keep..] {
+            if thr <= self.clause[i.to()].rank {
+                self.remove_clause(ClauseId::from(i.to()));
+            }
+        }
+        debug_assert!(perm[0..keep].iter().all(|c| !self.clause[c.to()].is_dead()));
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
@@ -1308,80 +1390,6 @@ impl ClauseDB {
     fn has_bi_clause(&self, l0: Lit, l1: Lit) -> Option<ClauseId> {
         self.bi_clause[l0].get(&l1).copied()
     }
-    /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce_db(&mut self, asg: &mut impl AssignIF, nc: usize) -> bool {
-        let ClauseDB {
-            ref mut clause,
-            ref co_lbd_bound,
-            ref mut lbd_temp,
-            ref mut num_reduction,
-            ref ordinal,
-            ref activity_decay,
-            ..
-        } = self;
-        *num_reduction += 1;
-
-        let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
-        for (i, c) in clause.iter_mut().enumerate().skip(1) {
-            if c.is_dead() {
-                continue;
-            }
-            let rank = c.update_lbd(asg, lbd_temp) as f64;
-            c.update_activity(*ordinal, *activity_decay, 0.0);
-            if !c.is(Flag::LEARNT) || asg.locked(c, ClauseId::from(i)) {
-                continue;
-            }
-
-            #[cfg(feature = "just_used")]
-            {
-                let used = c.is(Flag::JUST_USED);
-                if used {
-                    c.turn_off(Flag::JUST_USED);
-                    continue;
-                }
-            }
-
-            // This is the best at least for 3SAT360.
-
-            let act_v: f64 = c
-                .lits
-                .iter()
-                .fold(0.0, |acc, l| acc.max(asg.activity(l.vi())));
-
-            #[cfg(feature = "clause_rewarding")]
-            let act_c = c.reward;
-            #[cfg(not(feature = "clause_rewarding"))]
-            let act_c = 0.25;
-
-            let weight = rank / (act_c + act_v);
-            perm.push(OrderedProxy::new(i, weight));
-        }
-        let keep = perm.len().min(nc) / 2;
-
-        let mut reduction_coeff: f64 = (nc as f64) / (self.reduction_step as f64) + 1.0;
-        self.reduction_step += self.inc_step;
-        if perm.is_empty() {
-            self.next_reduction = (reduction_coeff * self.reduction_step as f64) as usize;
-            return true;
-        }
-        if !self.use_chan_seok {
-            if clause[perm[keep].to()].rank <= *co_lbd_bound {
-                reduction_coeff *= 1.1;
-            }
-            self.next_reduction = (reduction_coeff * self.reduction_step as f64) as usize;
-        }
-        perm.sort();
-        // let thr = self.lbd_of_dp_ema.get() as u16;
-        let thr = (self.lbd_of_dp_ema.get() as u16).max(*co_lbd_bound);
-        for i in &perm[keep..] {
-            if thr <= self.clause[i.to()].rank {
-                self.remove_clause(ClauseId::from(i.to()));
-            }
-        }
-        debug_assert!(perm[0..keep].iter().all(|c| !self.clause[c.to()].is_dead()));
-        true
-    }
-
     #[cfg(feature = "strategy_adaptation")]
     /// change good learnt clauses to permanent one.
     fn make_permanent(&mut self, reinit: bool) {

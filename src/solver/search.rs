@@ -261,17 +261,18 @@ fn search(
             if asg.decision_level() == asg.root_level() {
                 return Err(SolverError::RootLevelConflict(cc));
             }
+            if a_decision_was_made {
+                a_decision_was_made = false;
+            } else {
+                state[Stat::NumDecisionConflict] += 1;
+            }
             asg.update_activity_tick();
             cdb.update_activity_tick();
             handle_conflict(asg, cdb, rst, state, &cc)?;
             rst.update(ProgressUpdate::ASG(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
             ));
-
-            if rst.restart() == Some(RestartDecision::Force) {
-                RESTART!(asg, rst);
-            }
-            if cdb.reduce(asg, asg.num_conflict) {
+            if cdb.should_reduce(asg.num_conflict) {
                 if let Some(p) = state.elapsed() {
                     if 1.0 <= p {
                         return Err(SolverError::TimeOut);
@@ -279,9 +280,8 @@ fn search(
                 } else {
                     return Err(SolverError::UndescribedError);
                 }
-                if asg.decision_level() != asg.root_level() {
-                    RESTART!(asg, rst);
-                }
+                RESTART!(asg, rst);
+                cdb.reduce(asg, asg.num_conflict);
 
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
@@ -297,7 +297,6 @@ fn search(
                 }
 
                 asg.clear_asserted_literals(cdb)?;
-
                 // display the current stats. before updating stabiliation parameters
                 state.log(
                     asg.num_conflict,
@@ -311,59 +310,28 @@ fn search(
                     ),
                 );
 
-                #[cfg(feature = "Luby_stabilization")]
-                #[cfg(feature = "dynamic_restart_threshold")]
-                {
-                    if 1 == rst.derefer(restart::property::Tusize::IntervalScale) {
-                        rst.adjust(
-                            state.config.rst_lbd_thr,
-                            state.c_lvl.get(),
-                            state.b_lvl.get(),
-                            cdb.derefer(cdb::property::Tf64::DpAverageLBD),
-                        );
-                    }
+                #[cfg(all(feature = "Luby_stabilization", feature = "dynamic_restart_threshold"))]
+                if 1 == rst.derefer(restart::property::Tusize::IntervalScale) {
+                    rst.adjust(
+                        state.config.rst_lbd_thr,
+                        state.c_lvl.get(),
+                        state.b_lvl.get(),
+                        cdb.derefer(cdb::property::Tf64::DpAverageLBD),
+                    );
                 }
 
                 state.progress(asg, cdb, elim, rst);
 
                 #[cfg(feature = "Luby_stabilization")]
                 {
-                    // update stabilization mode
-                    #[allow(unused_variables)]
-                    if let Some(new_cycle) = rst.stabilize() {
-                        if new_cycle {
-                            #[cfg(feature = "trace_equivalency")]
-                            {
-                                let num_stage = rst.derefer(restart::property::Tusize::NumStage);
-                                if new_cycle {
-                                    asg.dump_cnf(
-                                        cdb,
-                                        &format!(
-                                            "{}-stage{}.cnf",
-                                            state
-                                                .config
-                                                .cnf_file
-                                                .file_stem()
-                                                .unwrap()
-                                                .to_string_lossy(),
-                                            num_stage
-                                        ),
-                                    );
-                                }
-                            }
-                        }
-                    }
+                    rst.stabilize();
                     // call the enhanced phase saver
                     asg.handle(SolverEvent::Stabilize(
                         rst.derefer(restart::property::Tusize::IntervalScale),
                     ));
-                    // assert!(asg.trail_saved.is_empty());
                 }
-            }
-            if a_decision_was_made {
-                a_decision_was_made = false;
-            } else {
-                state[Stat::NumDecisionConflict] += 1;
+            } else if rst.restart() == Some(RestartDecision::Force) {
+                RESTART!(asg, rst);
             }
             if let Some(na) = asg.best_assigned() {
                 state.flush("");
