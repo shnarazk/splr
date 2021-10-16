@@ -107,7 +107,7 @@ pub fn vivify(
                                     asg.backtrack_sandbox();
                                     continue 'next_clause;
                                 } else {
-                                    assert!(clits.len() != 2 || decisions.len() != 2);
+                                    debug_assert!(clits.len() != 2 || decisions.len() != 2);
                                     seen[0] = num_check;
                                     vec =
                                         asg.analyze_sandbox(cdb, &decisions, &cnfl_lits, &mut seen);
