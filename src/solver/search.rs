@@ -309,21 +309,20 @@ fn search(
                         rst.derefer(restart::property::Tf64::RestartThreshold),
                     ),
                 );
-
-                #[cfg(all(feature = "Luby_stabilization", feature = "dynamic_restart_threshold"))]
-                if 1 == rst.derefer(restart::property::Tusize::IntervalScale) {
-                    rst.adjust(
-                        state.config.rst_lbd_thr,
-                        state.c_lvl.get(),
-                        state.b_lvl.get(),
-                        cdb.derefer(cdb::property::Tf64::DpAverageLBD),
-                    );
-                }
-
                 state.progress(asg, cdb, elim, rst);
 
                 #[cfg(feature = "Luby_stabilization")]
                 {
+                    #[cfg(feature = "dynamic_restart_threshold")]
+                    if 1 == rst.derefer(restart::property::Tusize::IntervalScale) {
+                        rst.adjust(
+                            state.config.rst_lbd_thr,
+                            state.c_lvl.get(),
+                            state.b_lvl.get(),
+                            cdb.derefer(cdb::property::Tf64::DpAverageLBD),
+                        );
+                    }
+
                     rst.stabilize();
                     // call the enhanced phase saver
                     asg.handle(SolverEvent::Stabilize(
