@@ -68,11 +68,12 @@ impl AssignStack {
                     debug_assert_eq!(self.assigned(link), Some(true));
                     self.num_repropagation += 1;
 
-                    #[cfg(feature = "chrono_BT")]
-                    self.assign_by_implication(lit, dl, old_reason);
-
-                    #[cfg(not(feature = "chrono_BT"))]
-                    self.assign_by_implication(lit, old_reason);
+                    self.assign_by_implication(
+                        lit,
+                        old_reason,
+                        #[cfg(feature = "chrono_BT")]
+                        dl,
+                    );
                 }
                 // reason refinement by ignoring this dependecy
                 (None, AssignReason::Implication(c)) if q < cdb[c].rank => {
@@ -87,11 +88,12 @@ impl AssignStack {
                         .all(|l| self.assigned(*l) == Some(false)));
                     self.num_repropagation += 1;
 
-                    #[cfg(feature = "chrono_BT")]
-                    self.assign_by_implication(lit, dl, old_reason);
-
-                    #[cfg(not(feature = "chrono_BT"))]
-                    self.assign_by_implication(lit, old_reason);
+                    self.assign_by_implication(
+                        lit,
+                        old_reason,
+                        #[cfg(feature = "chrono_BT")]
+                        dl,
+                    );
                 }
                 (Some(false), AssignReason::BinaryLink(link)) => {
                     debug_assert_ne!(link.vi(), lit.vi());

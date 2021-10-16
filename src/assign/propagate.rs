@@ -17,10 +17,12 @@ pub trait PropagateIF {
     ///
     /// ## Warning
     /// Callers must assure the consistency after this assignment.
-    #[cfg(feature = "chrono_BT")]
-    fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, reason: AssignReason);
-    #[cfg(not(feature = "chrono_BT"))]
-    fn assign_by_implication(&mut self, l: Lit, reason: AssignReason);
+    fn assign_by_implication(
+        &mut self,
+        l: Lit,
+        reason: AssignReason,
+        #[cfg(feature = "chrono_BT")] lv: DecisionLevel,
+    );
     /// unsafe assume (assign by decision); doesn't emit an exception.
     /// ## Caveat
     /// Callers have to assure the consistency after this assignment.
@@ -131,8 +133,12 @@ impl PropagateIF for AssignStack {
             _ => Err(SolverError::RootLevelConflict((l, self.reason[l.vi()]))),
         }
     }
-    #[cfg(feature = "chrono_BT")]
-    fn assign_by_implication(&mut self, l: Lit, lv: DecisionLevel, reason: AssignReason) {
+    fn assign_by_implication(
+        &mut self,
+        l: Lit,
+        reason: AssignReason,
+        #[cfg(feature = "chrono_BT")] lv: DecisionLevel,
+    ) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be enqueued");
         debug_assert!(l.vi() < self.var.len());
         // The following doesn't hold anymore by using chronoBT.
@@ -146,38 +152,10 @@ impl PropagateIF for AssignStack {
         debug_assert_eq!(self.reason[vi], AssignReason::None);
         debug_assert!(self.trail.iter().all(|rl| *rl != l));
         set_assign!(self, l);
-        self.level[vi] = lv;
-        self.reason[vi] = reason;
-        self.reward_at_assign(vi);
-        debug_assert!(!self.trail.contains(&l));
-        debug_assert!(!self.trail.contains(&!l));
-        self.trail.push(l);
-        if self.root_level == lv {
-            self.make_var_asserted(vi);
-        }
 
-        #[cfg(feature = "boundary_check")]
-        {
-            self.var[vi].propagated_at = self.num_conflict;
-            self.var[vi].state = VarState::Assigned(self.num_conflict);
-        }
-    }
-    #[cfg(not(feature = "chrono_BT"))]
-    fn assign_by_implication(&mut self, l: Lit, reason: AssignReason) {
-        debug_assert!(usize::from(l) != 0, "Null literal is about to be enqueued");
-        debug_assert!(l.vi() < self.var.len());
-        // The following doesn't hold anymore by using chronoBT.
-        // assert!(self.trail_lim.is_empty() || !cid.is_none());
-        let vi = l.vi();
-        debug_assert!(!self.var[vi].is(Flag::ELIMINATED));
-        debug_assert!(
-            var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
-        );
-        debug_assert_eq!(self.assign[vi], None);
-        debug_assert_eq!(self.reason[vi], AssignReason::None);
-        debug_assert!(self.trail.iter().all(|rl| *rl != l));
-        set_assign!(self, l);
+        #[cfg(not(feature = "chrono_BT"))]
         let lv = self.decision_level();
+
         self.level[vi] = lv;
         self.reason[vi] = reason;
         self.reward_at_assign(vi);
@@ -394,14 +372,12 @@ impl PropagateIF for AssignStack {
                     }
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
-                        #[cfg(feature = "chrono_BT")]
                         self.assign_by_implication(
                             blocker,
-                            self.level[propagating.vi()],
                             AssignReason::BinaryLink(propagating),
+                            #[cfg(feature = "chrono_BT")]
+                            self.level[propagating.vi()],
                         );
-                        #[cfg(not(feature = "chrono_BT"))]
-                        self.assign_by_implication(blocker, AssignReason::BinaryLink(propagating));
                     }
                 }
             }
@@ -561,10 +537,12 @@ impl PropagateIF for AssignStack {
                 debug_assert_eq!(self.assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
 
-                #[cfg(feature = "chrono_BT")]
-                self.assign_by_implication(cached, dl, AssignReason::Implication(cid));
-                #[cfg(not(feature = "chrono_BT"))]
-                self.assign_by_implication(cached, AssignReason::Implication(cid));
+                self.assign_by_implication(
+                    cached,
+                    AssignReason::Implication(cid),
+                    #[cfg(feature = "chrono_BT")]
+                    dl,
+                );
 
                 #[cfg(feature = "boundary_check")]
                 {
@@ -634,14 +612,12 @@ impl PropagateIF for AssignStack {
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
 
-                        #[cfg(feature = "chrono_BT")]
                         self.assign_by_implication(
                             blocker,
-                            self.level[false_lit.vi()],
                             AssignReason::BinaryLink(propagating),
+                            #[cfg(feature = "chrono_BT")]
+                            self.level[false_lit.vi()],
                         );
-                        #[cfg(not(feature = "chrono_BT"))]
-                        self.assign_by_implication(blocker, AssignReason::BinaryLink(propagating));
                     }
                 }
             }
@@ -773,10 +749,12 @@ impl PropagateIF for AssignStack {
                 debug_assert_eq!(self.assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
 
-                #[cfg(feature = "chrono_BT")]
-                self.assign_by_implication(cached, dl, AssignReason::Implication(cid));
-                #[cfg(not(feature = "chrono_BT"))]
-                self.assign_by_implication(cached, AssignReason::Implication(cid));
+                self.assign_by_implication(
+                    cached,
+                    AssignReason::Implication(cid),
+                    #[cfg(feature = "chrono_BT")]
+                    dl,
+                );
 
                 #[cfg(feature = "boundary_check")]
                 {

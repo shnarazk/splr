@@ -183,11 +183,12 @@ pub fn handle_conflict(
             debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
 
-            #[cfg(feature = "chrono_BT")]
-            asg.assign_by_implication(l0, assign_level, AssignReason::BinaryLink(!l1));
-            #[cfg(not(feature = "chrono_BT"))]
-            asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1));
-
+            asg.assign_by_implication(
+                l0,
+                AssignReason::BinaryLink(!l1),
+                #[cfg(feature = "chrono_BT")]
+                assign_level,
+            );
             // || check_graph(asg, cdb, l0, "biclause");
             rst.update(ProgressUpdate::LBD(1));
             for cid in &state.derive20 {
@@ -202,12 +203,12 @@ pub fn handle_conflict(
 
             debug_assert_eq!(cdb[cid].lit0(), l0);
             debug_assert_eq!(asg.assigned(l0), None);
-
-            #[cfg(feature = "chrono_BT")]
-            asg.assign_by_implication(l0, assign_level, AssignReason::Implication(cid));
-            #[cfg(not(feature = "chrono_BT"))]
-            asg.assign_by_implication(l0, AssignReason::Implication(cid));
-
+            asg.assign_by_implication(
+                l0,
+                AssignReason::Implication(cid),
+                #[cfg(feature = "chrono_BT")]
+                assign_level,
+            );
             // || check_graph(asg, cdb, l0, "clause");
             let lbd = cdb[cid].rank;
             rst.update(ProgressUpdate::LBD(lbd));
@@ -227,12 +228,12 @@ pub fn handle_conflict(
             );
             debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
-
-            #[cfg(feature = "chrono_BT")]
-            asg.assign_by_implication(l0, assign_level, AssignReason::BinaryLink(!l1));
-            #[cfg(not(feature = "chrono_BT"))]
-            asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1));
-
+            asg.assign_by_implication(
+                l0,
+                AssignReason::BinaryLink(!l1),
+                #[cfg(feature = "chrono_BT")]
+                assign_level,
+            );
             // || check_graph(asg, cdb, l0, "registeredclause");
         }
         RefClause::UnitClause(_) => panic!("impossible"),
