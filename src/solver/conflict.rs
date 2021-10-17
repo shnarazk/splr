@@ -272,7 +272,6 @@ fn conflict_analyze(
         debug_assert_ne!(root_level, lvl);
         if dl == lvl {
             path_cnt += 1;
-            #[cfg(feature = "conflict_side_rewarding")]
             asg.reward_at_analysis(vi);
         } else {
             debug_assert!(lvl < dl);
@@ -285,13 +284,12 @@ fn conflict_analyze(
             AssignReason::BinaryLink(l) => {
                 let vi = l.vi();
                 if !asg.var(vi).is(Flag::CA_SEEN) {
-                    assert_eq!(asg.level(vi), dl, "strange level binary clause");
+                    debug_assert_eq!(asg.level(vi), dl, "strange level binary clause");
                     // if root_level == asg.level(vi) { continue; }
                     debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
                     debug_assert!(asg.assign(vi).is_some());
                     asg.var_mut(vi).turn_on(Flag::CA_SEEN);
                     path_cnt += 1;
-                    #[cfg(feature = "conflict_side_rewarding")]
                     asg.reward_at_analysis(vi);
                 }
             }
@@ -331,13 +329,10 @@ fn conflict_analyze(
                         if dl == lvl {
                             // println!("- flag for {} which level is {}", q.int(), lvl);
                             path_cnt += 1;
-
-                            #[cfg(feature = "conflict_side_rewarding")]
                             asg.reward_at_analysis(vi);
                         } else {
                             #[cfg(feature = "trace_analysis")]
                             println!("- push {} to learnt, which level is {}", q, lvl);
-
                             learnt.push(*q);
                         }
                     } else {
