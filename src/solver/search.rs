@@ -246,6 +246,7 @@ fn search(
     rst: &mut Restarter,
     state: &mut State,
 ) -> Result<bool, SolverError> {
+    #[cfg(feature = "strategy_adaptation")]
     let mut a_decision_was_made = false;
 
     #[cfg(feature = "Luby_restart")]
@@ -255,17 +256,24 @@ fn search(
         if !asg.remains() {
             let lit = asg.select_decision_literal();
             asg.assign_by_decision(lit);
-            a_decision_was_made = true;
+
+            #[cfg(feature = "strategy_adaptation")]
+            {
+                a_decision_was_made = true;
+            }
         }
         if let Err(cc) = asg.propagate(cdb) {
             if asg.decision_level() == asg.root_level() {
                 return Err(SolverError::RootLevelConflict(cc));
             }
+
+            #[cfg(feature = "strategy_adaptation")]
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
-                state[Stat::NumDecisionConflict] += 1;
+                state[Stat::NoDecisionConflict] += 1;
             }
+
             asg.update_activity_tick();
             cdb.update_activity_tick();
             handle_conflict(asg, cdb, rst, state, &cc)?;
@@ -338,7 +346,7 @@ fn search(
             }
             #[cfg(feature = "strategy_adaptation")]
             if asg.num_conflict % (10 * state.reflection_interval) == 0 {
-                adapt_modules(asg, rst, state);
+                adapt_modules(asg, cdb, rst, state);
             }
         }
     }
@@ -432,7 +440,12 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
 }
 
 #[cfg(feature = "strategy_adaptation")]
-fn adapt_modules(asg: &mut AssignStack, rst: &mut Restarter, state: &mut State) {
+fn adapt_modules(
+    asg: &mut AssignStack,
+    cdb: &mut ClauseDB,
+    rst: &mut Restarter,
+    state: &mut State,
+) {
     let asg_num_conflict = asg.num_conflict;
     if 10 * state.reflection_interval == asg_num_conflict {
         // Need to call it before `cdb.adapt_to`

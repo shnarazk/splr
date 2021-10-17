@@ -190,8 +190,9 @@ impl Instantiate for ClauseDB {
                     (crate::state::SearchStrategy::Generic, _) => (),
                     (crate::state::SearchStrategy::LowDecisions, _) => {
                         self.co_lbd_bound = 4;
-                        self.reduction_coeff =
-                            (num_conflict as f64 / self.next_reduction as f64 + 1.0) as usize;
+                        // FIXME no more ClauseDB::reduction_coeff
+                        // self.reduction_coeff =
+                        //    (num_conflict as f64 / self.next_reduction as f64 + 1.0) as usize;
                         self.first_reduction = 2000;
                         self.use_chan_seok = true;
                         self.inc_step = 0;
@@ -1397,33 +1398,32 @@ impl ClauseDB {
         // move some clauses with good LBDs (col_lbd_bound) to Permanent
         let ClauseDB {
             ref mut clause,
-            ref mut certificate_store,
+            ref mut certification_store,
+            ref mut num_clause,
+            ref mut num_bi_clause,
+            ref mut num_learnt,
+            ref mut bi_clause,
+            ref mut watch_cache,
             ..
         } = self;
-        for c in &mut clause[1..] {
+        for (i, c) in clause.iter_mut().enumerate() {
             if c.is_dead() || !c.is(Flag::LEARNT) {
                 continue;
             }
             if c.rank < self.co_lbd_bound {
                 c.turn_off(Flag::LEARNT);
-                self.num_learnt -= 1;
+                *num_learnt -= 1;
             } else if reinit {
-                if !c.is_dead() {
-                    certificate_store.push_delete(&c.lits);
-                    let l0 = c.lits[0];
-                    let l1 = c.lits[1];
-                    if c.len() == 2 {
-                        self.bi_clause[l0].remove(&l1);
-                        self.bi_clause[l1].remove(&l0);
-                        self.num_bi_clause -= 1;
-                    } else {
-                        self.watcher[!l0].remove(&cid);
-                        self.watcher[!l1].remove(&cid);
-                    }
-                    self.num_clause -= 1;
-                    self.certification_store.push_delete(&c.lits);
-                    c.lits.clear();
-                }
+                remove_clause_fn(
+                    certification_store,
+                    bi_clause,
+                    watch_cache,
+                    num_bi_clause,
+                    num_clause,
+                    num_learnt,
+                    ClauseId::from(i),
+                    c,
+                );
             }
         }
     }
@@ -1432,7 +1432,7 @@ impl ClauseDB {
 #[inline]
 #[allow(clippy::too_many_arguments)]
 fn remove_clause_fn(
-    certificate_store: &mut CertificationStore,
+    certification_store: &mut CertificationStore,
     bi_clause: &mut [BiClause],
     watcher: &mut [WatchCache],
     num_bi_clause: &mut usize,
@@ -1456,7 +1456,7 @@ fn remove_clause_fn(
         *num_learnt -= 1;
     }
     *num_clause -= 1;
-    certificate_store.delete_clause(&c.lits);
+    certification_store.delete_clause(&c.lits);
     c.lits.clear();
 }
 
