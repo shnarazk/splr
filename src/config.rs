@@ -318,10 +318,16 @@ impl Config {
                 "best phase tracking",
                 #[cfg(feature = "bi_clause_completion")]
                 "binary clause completion",
+                #[cfg(feature = "chrono_BT")]
+                "chrono_BT",
                 #[cfg(feature = "clause_elimination")]
                 "clause elimination",
                 #[cfg(feature = "clause_vivification")]
                 "clause vivification",
+                #[cfg(feature = "deterministic_iterators")]
+                "deterministic_iterators",
+                #[cfg(feature = "dynamic_restart_threshold")]
+                "dynamic_restart_threshold",
                 #[cfg(feature = "EMA_calibration")]
                 "EMA calibration",
                 #[cfg(feature = "EVSIDS")]
@@ -337,13 +343,17 @@ impl Config {
                 #[cfg(feature = "Luby_stabilization")]
                 "Luby stabilization",
                 #[cfg(feature = "reason_side_rewarding")]
-                "reason side rewarding",
+                "reason-side rewarding",
                 #[cfg(feature = "rephase")]
                 "stage-based rephase",
                 #[cfg(feature = "strategy_adaptation")]
                 "strategy adaptation",
+                #[cfg(feature = "suppress_binary_link")]
+                "suppress binary links",
                 #[cfg(feature = "trail_saving")]
                 "trail saving",
+                #[cfg(feature = "unsafe_access")]
+                "unsafe access",
             ];
             println!(
                 "{}\nActivated features: {}\n{}",
