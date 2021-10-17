@@ -314,6 +314,25 @@ impl PropagateIF for AssignStack {
     fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
         let dl = self.decision_level();
 
+        macro_rules! minimized_reason {
+            ($lit: expr) => {
+                // AssignReason::BinaryLink($lit)
+                // if let r@AssignReason::BinaryLink(_) = self.reason[$lit.vi()] {
+                //     r
+                // } else {
+                //     AssignReason::BinaryLink($lit)
+                // },
+                // {
+                //     let r = self.reason[$lit.vi()];
+                //     if !matches!(r, AssignReason::Decision(_)) {
+                //         r
+                //     } else {
+                //         AssignReason::BinaryLink($lit)
+                //     }
+                // }
+            };
+        }
+
         #[cfg(feature = "trail_saving")]
         if let cc @ Err(_) = self.from_saved_trail(cdb) {
             self.num_propagation += 1;
@@ -374,13 +393,13 @@ impl PropagateIF for AssignStack {
                             cdb[cid].moved_at = Propagate::EmitConflict(self.num_conflict, blocker);
                         }
 
-                        return Err((blocker, AssignReason::BinaryLink(propagating)));
+                        return Err((blocker, minimized_reason!(propagating)));
                     }
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
                         self.assign_by_implication(
                             blocker,
-                            AssignReason::BinaryLink(propagating),
+                            minimized_reason!(propagating),
                             #[cfg(feature = "chrono_BT")]
                             self.level[propagating.vi()],
                         );
