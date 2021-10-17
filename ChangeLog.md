@@ -1,6 +1,7 @@
 ## 0.14.0, 2021-1 -  
 
 - `ConflictContext` uses `AssignReason`
+- add feature 'deterministic_iterators' to make Splr reproducible
 
 ## 0.13.0, 2021-10-11
 

@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.14.0-beta.1"
+version = "0.14.0-beta.2"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2018"
@@ -34,13 +34,13 @@ default = [
         ]
 best_phases_tracking = []
 bi_clause_completion = []
-boundary_check = ["deterministic_iterator"]
+boundary_check = ["deterministic_iterators"]
 clause_elimination = []
 clause_rewarding = []
 clause_vivification = []
 chrono_BT = []
 debug_propagation = []
-deterministic_iterator = []
+deterministic_iterators = []
 dynamic_restart_threshold = []
 EMA_calibration = []
 EVSIDS = []
@@ -56,9 +56,9 @@ reason_side_rewarding = []
 rephase = ["best_phases_tracking"]
 strategy_adaptation = []
 support_user_assumption = []
-trace_analysis = ["deterministic_iterator"]
-trace_elimination = ["deterministic_iterator"]
-trace_equivalency = ["deterministic_iterator"]
+trace_analysis = ["deterministic_iterators"]
+trace_elimination = ["deterministic_iterators"]
+trace_equivalency = ["deterministic_iterators"]
 trail_saving = []
 unsafe_access = []
 

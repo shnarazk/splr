@@ -348,11 +348,11 @@ impl PropagateIF for AssignStack {
             // while the key of watch_cache is watching literals.
             // Therefore keys to access appropriate targets have the opposite phases.
             //
-            #[cfg(not(feature = "deterministic_iterator"))]
+            #[cfg(not(feature = "deterministic_iterators"))]
             let iterable = cdb.bi_clause_map(false_lit);
-            #[cfg(feature = "deterministic_iterator")]
+            #[cfg(feature = "deterministic_iterators")]
             let mut iterable = cdb.bi_clause_map(false_lit).iter().collect::<Vec<_>>();
-            #[cfg(feature = "deterministic_iterator")]
+            #[cfg(feature = "deterministic_iterators")]
             iterable.sort();
             for (&blocker, &cid) in iterable.iter() {
                 debug_assert!(!cdb[cid].is_dead());
@@ -604,11 +604,11 @@ impl PropagateIF for AssignStack {
             //
             //## binary loop
             //
-            #[cfg(not(feature = "deterministic_iterator"))]
+            #[cfg(not(feature = "deterministic_iterators"))]
             let iterable = cdb.bi_clause_map(false_lit);
-            #[cfg(feature = "deterministic_iterator")]
+            #[cfg(feature = "deterministic_iterators")]
             let mut iterable = cdb.bi_clause_map(false_lit).iter().collect::<Vec<_>>();
-            #[cfg(feature = "deterministic_iterator")]
+            #[cfg(feature = "deterministic_iterators")]
             iterable.sort();
             for (&blocker, &cid) in iterable.iter() {
                 debug_assert!(!cdb[cid].is_dead());
