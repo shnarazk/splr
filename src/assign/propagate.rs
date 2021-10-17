@@ -314,22 +314,24 @@ impl PropagateIF for AssignStack {
     fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
         let dl = self.decision_level();
 
+        #[cfg(feature = "suppress_binary_link")]
         macro_rules! minimized_reason {
             ($lit: expr) => {
-                // AssignReason::BinaryLink($lit)
+                match self.reason[$lit.vi()] {
+                    AssignReason::Decision(_) => AssignReason::BinaryLink($lit),
+                    r => r,
+                }
                 // if let r@AssignReason::BinaryLink(_) = self.reason[$lit.vi()] {
                 //     r
                 // } else {
                 //     AssignReason::BinaryLink($lit)
                 // },
-                // {
-                //     let r = self.reason[$lit.vi()];
-                //     if !matches!(r, AssignReason::Decision(_)) {
-                //         r
-                //     } else {
-                //         AssignReason::BinaryLink($lit)
-                //     }
-                // }
+            };
+        }
+        #[cfg(not(feature = "suppress_binary_link"))]
+        macro_rules! minimized_reason {
+            ($lit: expr) => {
+                AssignReason::BinaryLink($lit)
             };
         }
 
@@ -347,9 +349,10 @@ impl PropagateIF for AssignStack {
             self.num_propagation += 1;
             self.q_head += 1;
             #[cfg(feature = "debug_propagation")]
-            assert!(!self.var[p.vi()].is(Flag::PROPAGATED));
-            #[cfg(feature = "debug_propagation")]
-            self.var[p.vi()].turn_on(Flag::PROPAGATED);
+            {
+                assert!(!self.var[p.vi()].is(Flag::PROPAGATED));
+                self.var[p.vi()].turn_on(Flag::PROPAGATED);
+            }
             let propagating = Lit::from(usize::from(*p));
             let false_lit = !*p;
 
