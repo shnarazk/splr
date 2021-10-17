@@ -261,6 +261,15 @@ fn conflict_analyze(
     let dl = asg.decision_level();
     let mut path_cnt = 0;
     let (mut p, mut reason) = cc;
+
+    macro_rules! conflict_level {
+        ($vi: expr) => {
+            path_cnt += 1;
+            //## Conflict-Side Rewarding
+            asg.reward_at_analysis($vi);
+        };
+    }
+
     {
         #[cfg(feature = "trace_analysis")]
         println!("- handle conflicting literal {}", p);
@@ -271,14 +280,13 @@ fn conflict_analyze(
         let lvl = asg.level(vi);
         debug_assert_ne!(root_level, lvl);
         if dl == lvl {
-            path_cnt += 1;
-            asg.reward_at_analysis(vi);
+            conflict_level!(vi);
         } else {
             debug_assert!(lvl < dl);
             learnt.push(p);
         }
     }
-    let mut ti = asg.stack_len() - 1; // trail index
+    let mut trail_index = asg.stack_len() - 1;
     loop {
         match reason {
             AssignReason::BinaryLink(l) => {
@@ -289,8 +297,7 @@ fn conflict_analyze(
                     debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
                     debug_assert!(asg.assign(vi).is_some());
                     asg.var_mut(vi).turn_on(Flag::CA_SEEN);
-                    path_cnt += 1;
-                    asg.reward_at_analysis(vi);
+                    conflict_level!(vi);
                 }
             }
             AssignReason::Implication(cid) => {
@@ -328,8 +335,7 @@ fn conflict_analyze(
                         asg.var_mut(vi).turn_on(Flag::CA_SEEN);
                         if dl == lvl {
                             // println!("- flag for {} which level is {}", q.int(), lvl);
-                            path_cnt += 1;
-                            asg.reward_at_analysis(vi);
+                            conflict_level!(vi);
                         } else {
                             #[cfg(feature = "trace_analysis")]
                             println!("- push {} to learnt, which level is {}", q, lvl);
@@ -381,7 +387,7 @@ fn conflict_analyze(
          */
         // set the index of the next literal to ti
         while {
-            let vi = asg.stack(ti).vi();
+            let vi = asg.stack(trail_index).vi();
 
             #[cfg(feature = "boundary_check")]
             if asg.level_ref().len() <= vi {
@@ -412,9 +418,9 @@ fn conflict_analyze(
                 tracer(asg, cdb);
             }
 
-            ti -= 1;
+            trail_index -= 1;
         }
-        p = asg.stack(ti);
+        p = asg.stack(trail_index);
 
         #[cfg(feature = "trace_analysis")]
         println!("- move to flagged {}; num path: {}", p.vi(), path_cnt - 1,);
@@ -426,8 +432,8 @@ fn conflict_analyze(
         if path_cnt == 0 {
             break;
         }
-        debug_assert!(0 < ti);
-        ti -= 1;
+        debug_assert!(0 < trail_index);
+        trail_index -= 1;
         reason = asg.reason(p.vi());
     }
     debug_assert!(learnt.iter().all(|l| *l != !p));
