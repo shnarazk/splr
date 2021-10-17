@@ -17,16 +17,17 @@ bitflags = "^1.3"
 
 [features]
 default = [
-        # DEBUG "boundary_check",
-        # increase memory pressure "bi_clause_completion",
+        # "boundary_check", # DEBUG
+        # "bi_clause_completion", # increase memory pressure
         "clause_elimination",
         # "clause_rewarding",
         "clause_vivification",
+        # "deterministic_iterators", # DEBUG
         "dynamic_restart_threshold",
         # "incremental_solver",
         "LRB_rewarding",
         "Luby_stabilization",
-        # DEBUG "maintain_watch_cache",
+        # "maintain_watch_cache", # DEBUG
         "reason_side_rewarding",
         "rephase",
         "trail_saving",
