@@ -317,15 +317,11 @@ impl PropagateIF for AssignStack {
         #[cfg(feature = "suppress_binary_link")]
         macro_rules! minimized_reason {
             ($lit: expr) => {
-                match self.reason[$lit.vi()] {
-                    AssignReason::Decision(_) => AssignReason::BinaryLink($lit),
-                    r => r,
+                if let r @ AssignReason::BinaryLink(_) = self.reason[$lit.vi()] {
+                    r
+                } else {
+                    AssignReason::BinaryLink($lit)
                 }
-                // if let r@AssignReason::BinaryLink(_) = self.reason[$lit.vi()] {
-                //     r
-                // } else {
-                //     AssignReason::BinaryLink($lit)
-                // },
             };
         }
         #[cfg(not(feature = "suppress_binary_link"))]
