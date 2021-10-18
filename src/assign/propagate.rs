@@ -332,7 +332,7 @@ impl PropagateIF for AssignStack {
             };
         }
 
-        #[cfg(feature = "suppress_binary_link")]
+        #[cfg(feature = "suppress_reason_chain")]
         macro_rules! minimized_reason {
             ($lit: expr) => {
                 if let r @ AssignReason::BinaryLink(_) = self.reason[$lit.vi()] {
@@ -342,7 +342,7 @@ impl PropagateIF for AssignStack {
                 }
             };
         }
-        #[cfg(not(feature = "suppress_binary_link"))]
+        #[cfg(not(feature = "suppress_reason_chain"))]
         macro_rules! minimized_reason {
             ($lit: expr) => {
                 AssignReason::BinaryLink($lit)

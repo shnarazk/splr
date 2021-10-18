@@ -348,8 +348,8 @@ impl Config {
                 "stage-based rephase",
                 #[cfg(feature = "strategy_adaptation")]
                 "strategy adaptation",
-                #[cfg(feature = "suppress_binary_link")]
-                "suppress binary links",
+                #[cfg(feature = "suppress_reason_chain")]
+                "suppress reason chain",
                 #[cfg(feature = "trail_saving")]
                 "trail saving",
                 #[cfg(feature = "unsafe_access")]

@@ -30,7 +30,7 @@ default = [
         # "maintain_watch_cache", # DEBUG
         "reason_side_rewarding",
         "rephase",
-        "suppress_binary_link",
+        "suppress_reason_chain",
         "trail_saving",
         "unsafe_access"
         ]
@@ -58,7 +58,7 @@ reason_side_rewarding = []
 rephase = ["best_phases_tracking"]
 strategy_adaptation = []
 support_user_assumption = []
-suppress_binary_link = []
+suppress_reason_chain = []
 trace_analysis = ["deterministic_iterators"]
 trace_elimination = ["deterministic_iterators"]
 trace_equivalency = ["deterministic_iterators"]
