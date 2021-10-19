@@ -312,25 +312,71 @@ impl PropagateIF for AssignStack {
     ///  - The order of literals in binary clauses will be modified to hold
     ///    propagation order.
     fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
-        let dl = self.decision_level();
-
-        #[cfg(feature = "trail_saving")]
-        if let cc @ Err(_) = self.from_saved_trail(cdb) {
-            self.num_propagation += 1;
-            self.num_conflict += 1;
-            self.num_reconflict += 1;
-            self.dpc_ema.update(self.num_decision);
-            self.ppc_ema.update(self.num_propagation);
-            return cc;
+        #[cfg(feature = "boundary_check")]
+        macro_rules! check_in {
+            ($cid: expr, $tag :expr) => {
+                cdb[cid].moved_at = $tag;
+            };
+        }
+        #[cfg(not(feature = "boundary_check"))]
+        macro_rules! check_in {
+            ($cid: expr, $tag :expr) => {};
         }
 
+        macro_rules! conflict_path {
+            ($lit: expr, $reason: expr) => {
+                self.dpc_ema.update(self.num_decision);
+                self.ppc_ema.update(self.num_propagation);
+                self.num_conflict += 1;
+                return Err(($lit, $reason));
+            };
+        }
+
+        #[cfg(feature = "suppress_reason_chain")]
+        macro_rules! minimized_reason {
+            ($lit: expr) => {
+                if let r @ AssignReason::BinaryLink(_) = self.reason[$lit.vi()] {
+                    r
+                } else {
+                    AssignReason::BinaryLink($lit)
+                }
+            };
+        }
+        #[cfg(not(feature = "suppress_reason_chain"))]
+        macro_rules! minimized_reason {
+            ($lit: expr) => {
+                AssignReason::BinaryLink($lit)
+            };
+        }
+
+        #[cfg(feature = "trail_saving")]
+        macro_rules! from_saved_trail {
+            () => {
+                if let cc @ Err(_) = self.from_saved_trail(cdb) {
+                    self.num_propagation += 1;
+                    self.num_conflict += 1;
+                    self.num_reconflict += 1;
+                    self.dpc_ema.update(self.num_decision);
+                    self.ppc_ema.update(self.num_propagation);
+                    return cc;
+                }
+            };
+        }
+        #[cfg(not(feature = "trail_saving"))]
+        macro_rules! from_saved_trail {
+            () => {};
+        }
+
+        let dl = self.decision_level();
+        from_saved_trail!();
         while let Some(p) = self.trail.get(self.q_head) {
             self.num_propagation += 1;
             self.q_head += 1;
             #[cfg(feature = "debug_propagation")]
-            assert!(!self.var[p.vi()].is(Flag::PROPAGATED));
-            #[cfg(feature = "debug_propagation")]
-            self.var[p.vi()].turn_on(Flag::PROPAGATED);
+            {
+                assert!(!self.var[p.vi()].is(Flag::PROPAGATED));
+                self.var[p.vi()].turn_on(Flag::PROPAGATED);
+            }
             let propagating = Lit::from(usize::from(*p));
             let false_lit = !*p;
 
@@ -358,29 +404,18 @@ impl PropagateIF for AssignStack {
                 debug_assert!(!cdb[cid].is_dead());
                 debug_assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
-
-                #[cfg(feature = "boundary_check")]
                 debug_assert_eq!(cdb[cid].len(), 2);
-
                 match lit_assign!(self, blocker) {
                     Some(true) => (),
                     Some(false) => {
-                        self.dpc_ema.update(self.num_decision);
-                        self.ppc_ema.update(self.num_propagation);
-                        self.num_conflict += 1;
-
-                        #[cfg(feature = "boundary_check")]
-                        {
-                            cdb[cid].moved_at = Propagate::EmitConflict(self.num_conflict, blocker);
-                        }
-
-                        return Err((blocker, AssignReason::BinaryLink(propagating)));
+                        check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, blocker));
+                        conflict_path!(blocker, minimized_reason!(propagating));
                     }
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
                         self.assign_by_implication(
                             blocker,
-                            AssignReason::BinaryLink(propagating),
+                            minimized_reason!(propagating),
                             #[cfg(feature = "chrono_BT")]
                             self.level[propagating.vi()],
                         );
@@ -432,12 +467,7 @@ impl PropagateIF for AssignStack {
                     // In this path, we use only `AssignStack::assign`.
                     // assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
                     cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
-
-                    #[cfg(feature = "boundary_check")]
-                    {
-                        cdb[cid].moved_at = Propagate::CacheSatisfied(self.num_conflict);
-                    }
-
+                    check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
                     continue 'next_clause;
                 }
                 {
@@ -456,25 +486,18 @@ impl PropagateIF for AssignStack {
                         if Some(true) == other_watch_value {
                             debug_assert!(!self.var[other.vi()].is(Flag::ELIMINATED));
                             // In this path, we use only `AssignStack::assign`.
-                            // assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
                             cdb.transform_by_restoring_watch_cache(
                                 propagating,
                                 &mut source,
                                 Some(other),
                             );
-
-                            #[cfg(feature = "boundary_check")]
-                            {
-                                cdb[cid].moved_at = Propagate::CacheSatisfied(self.num_conflict);
-                            }
-
+                            check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
                             continue 'next_clause;
                         }
                         updated_cache = Some(other);
                     }
                     let c = &cdb[cid];
                     debug_assert!(lit0 == false_lit || lit1 == false_lit);
-                    // let false_watch_pos = (lit1 == false_lit) as usize;
                     //
                     //## Search an un-falsified literal
                     //
@@ -491,20 +514,11 @@ impl PropagateIF for AssignStack {
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
                             cdb[cid].search_from = k as u32 + 1;
-                            debug_assert!(
-                                self.assigned(!new_watch) == Some(true)
-                                    || self.assigned(!new_watch) == None
+                            debug_assert_ne!(self.assigned(new_watch), Some(true));
+                            check_in!(
+                                cid,
+                                Propagate::FindNewWatch(self.num_conflict, propagating, new_watch)
                             );
-
-                            #[cfg(feature = "boundary_check")]
-                            {
-                                cdb[cid].moved_at = Propagate::FindNewWatch(
-                                    self.num_conflict,
-                                    propagating,
-                                    new_watch,
-                                );
-                            }
-
                             continue 'next_clause;
                         }
                     }
@@ -515,20 +529,12 @@ impl PropagateIF for AssignStack {
                 // cdb.reregister_watch_cache(propagating, Some(wc_proxy));
                 cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
                 if other_watch_value == Some(false) {
-                    self.num_conflict += 1;
-                    self.dpc_ema.update(self.num_decision);
-                    self.ppc_ema.update(self.num_propagation);
-
                     #[cfg(feature = "hashed_watch_cache")]
                     while cdb.reregister_watch_cache(propagating, watches.next().deref_watch()) {}
                     #[cfg(not(feature = "hashed_watch_cache"))]
                     cdb.restore_detached_watch_cache(propagating, source);
-
-                    #[cfg(feature = "boundary_check")]
-                    {
-                        cdb[cid].moved_at = Propagate::EmitConflict(self.num_conflict, cached);
-                    }
-                    return Err((cached, AssignReason::Implication(cid)));
+                    check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, cached));
+                    conflict_path!(cached, AssignReason::Implication(cid));
                 }
 
                 #[cfg(feature = "chrono_BT")]
@@ -542,28 +548,15 @@ impl PropagateIF for AssignStack {
                 debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
-
                 self.assign_by_implication(
                     cached,
                     AssignReason::Implication(cid),
                     #[cfg(feature = "chrono_BT")]
                     dl,
                 );
-
-                #[cfg(feature = "boundary_check")]
-                {
-                    cdb[cid].moved_at = Propagate::BecameUnit(self.num_conflict, cached);
-                }
+                check_in!(cid, Propagate::BecameUnit(self.num_conflict, cached));
             }
-            #[cfg(feature = "trail_saving")]
-            if let cc @ Err(_) = self.from_saved_trail(cdb) {
-                self.num_propagation += 1;
-                self.num_conflict += 1;
-                self.num_reconflict += 1;
-                self.dpc_ema.update(self.num_decision);
-                self.ppc_ema.update(self.num_propagation);
-                return cc;
-            }
+            from_saved_trail!();
         }
         let na = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
         if self.num_best_assign <= na && 0 < dl {
@@ -579,12 +572,28 @@ impl PropagateIF for AssignStack {
     // 1. delete codes about reward
     // 1. delete codes about best-phases
     // 1. delete codes about search_from
-    // 1. delete codes about stats: num_*, ema_*
+    // 1. delete codes about trail_saving
+    // 1. delete codes about stat counters: num_*, ema_*
     // 1. delete comments
     // 1. (allow dead clauses)
     // 1. (allow eliminated vars)
     //
     fn propagate_sandbox(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
+        #[cfg(feature = "boundary_check")]
+        macro_rules! check_in {
+            ($cid: expr, $tag :expr) => {
+                cdb[cid].moved_at = $tag;
+            };
+        }
+        #[cfg(not(feature = "boundary_check"))]
+        macro_rules! check_in {
+            ($cid: expr, $tag :expr) => {};
+        }
+        macro_rules! conflict_path {
+            ($lit: expr, $reason: expr) => {
+                return Err(($lit, $reason));
+            };
+        }
         while let Some(p) = self.trail.get(self.q_head) {
             self.q_head += 1;
             #[cfg(feature = "debug_propagation")]
@@ -599,8 +608,6 @@ impl PropagateIF for AssignStack {
                 self.var[p.vi()].propagated_at = self.num_conflict;
                 self.var[p.vi()].state = VarState::Propagated(self.num_conflict);
             }
-            // we have to drop `p` here to use self as a mutable reference again later.
-
             //
             //## binary loop
             //
@@ -620,7 +627,7 @@ impl PropagateIF for AssignStack {
 
                 match lit_assign!(self, blocker) {
                     Some(true) => (),
-                    Some(false) => return Err((blocker, AssignReason::BinaryLink(propagating))),
+                    Some(false) => conflict_path!(blocker, AssignReason::BinaryLink(propagating)),
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
 
@@ -660,12 +667,7 @@ impl PropagateIF for AssignStack {
                 let mut updated_cache: Option<Lit> = None;
                 if let Some(true) = other_watch_value {
                     cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
-
-                    #[cfg(feature = "boundary_check")]
-                    {
-                        cdb[cid].moved_at = Propagate::SandboxCacheSatisfied(self.num_conflict);
-                    }
-
+                    check_in!(cid, Propagate::SandboxCacheSatisfied(self.num_conflict));
                     continue 'next_clause;
                 }
                 {
@@ -688,13 +690,7 @@ impl PropagateIF for AssignStack {
                                 &mut source,
                                 Some(other),
                             );
-
-                            #[cfg(feature = "boundary_check")]
-                            {
-                                cdb[cid].moved_at =
-                                    Propagate::SandboxCacheSatisfied(self.num_conflict);
-                            }
-
+                            check_in!(cid, Propagate::SandboxCacheSatisfied(self.num_conflict));
                             continue 'next_clause;
                         }
                         updated_cache = Some(other);
@@ -717,16 +713,14 @@ impl PropagateIF for AssignStack {
                                 self.assigned(!new_watch) == Some(true)
                                     || self.assigned(!new_watch) == None
                             );
-
-                            #[cfg(feature = "boundary_check")]
-                            {
-                                cdb[cid].moved_at = Propagate::SandboxFindNewWatch(
+                            check_in!(
+                                cid,
+                                Propagate::SandboxFindNewWatch(
                                     self.num_conflict,
                                     false_lit,
                                     new_watch,
-                                );
-                            }
-
+                                )
+                            );
                             continue 'next_clause;
                         }
                     }
@@ -740,13 +734,10 @@ impl PropagateIF for AssignStack {
                     while cdb.reregister_watch_cache(propagating, watches.next().deref_watch()) {}
                     #[cfg(not(feature = "hashed_watch_cache"))]
                     cdb.restore_detached_watch_cache(propagating, source);
-
-                    #[cfg(feature = "boundary_check")]
-                    {
-                        cdb[cid].moved_at =
-                            Propagate::SandboxEmitConflict(self.num_conflict, propagating);
-                    }
-
+                    check_in!(
+                        cid,
+                        Propagate::SandboxEmitConflict(self.num_conflict, propagating)
+                    );
                     return Err((cached, AssignReason::Implication(cid)));
                 }
 
@@ -767,11 +758,7 @@ impl PropagateIF for AssignStack {
                     #[cfg(feature = "chrono_BT")]
                     dl,
                 );
-
-                #[cfg(feature = "boundary_check")]
-                {
-                    cdb[cid].moved_at = Propagate::SandboxBecameUnit(self.num_conflict);
-                }
+                check_in!(cid, Propagate::SandboxBecameUnit(self.num_conflict));
             }
         }
         Ok(())

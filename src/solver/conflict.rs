@@ -302,8 +302,13 @@ fn conflict_analyze(
             }
             AssignReason::Implication(cid) => {
                 #[cfg(feature = "trace_analysis")]
-                println!("analyze clause {} for {}", cid, p);
-
+                println!(
+                    "analyze clause {}(first literal: {}) for {}",
+                    cid,
+                    i32::from(cdb[cid].lit0()),
+                    p
+                );
+                debug_assert!(!cdb[cid].is_dead() && 2 < cdb[cid].len());
                 cdb.mark_clause_as_used(asg, cid);
                 if cdb[cid].is(Flag::LEARNT) {
                     cdb.reward_at_analysis(cid);
@@ -311,17 +316,13 @@ fn conflict_analyze(
                     state.derive20.push(cid);
                 }
                 cdb.lbd_of_dp_ema.update(cdb[cid].rank as f64);
-                let c = &cdb[cid];
-                debug_assert!(!c.is_dead());
-
-                #[cfg(feature = "boundary_check")]
-                assert!(2 < c.len());
-
-                for q in &c[1..] {
+                for q in cdb[cid].iter().skip(1) {
                     let vi = q.vi();
                     if !asg.var(vi).is(Flag::CA_SEEN) {
                         let lvl = asg.level(vi);
                         if root_level == lvl {
+                            #[cfg(feature = "trace_analysis")]
+                            println!("- ignore {} because its level is {}", q, lvl);
                             continue;
                         }
                         debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
@@ -334,7 +335,8 @@ fn conflict_analyze(
                         debug_assert!(lvl <= dl);
                         asg.var_mut(vi).turn_on(Flag::CA_SEEN);
                         if dl == lvl {
-                            // println!("- flag for {} which level is {}", q.int(), lvl);
+                            #[cfg(feature = "trace_analysis")]
+                            println!("- flag for {} which level is {}", q.int(), lvl);
                             conflict_level!(vi);
                         } else {
                             #[cfg(feature = "trace_analysis")]
@@ -343,11 +345,7 @@ fn conflict_analyze(
                         }
                     } else {
                         #[cfg(feature = "trace_analysis")]
-                        if !asg.var(vi).is(Flag::CA_SEEN) {
-                            println!("- ignore {} because it was flagged", q);
-                        } else {
-                            println!("- ignore {} because its level is {}", q, asg.level(vi));
-                        }
+                        println!("- ignore {} because it was flagged", q);
                     }
                 }
             }
