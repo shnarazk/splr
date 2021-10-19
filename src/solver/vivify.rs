@@ -68,7 +68,7 @@ pub fn vivify(
         if c.is_dead() {
             continue;
         }
-        let is_learnt = c.is(Flag::LEARNT);
+        let is_learnt = c.is(FlagClause::LEARNT);
         c.vivified();
         let clits = c.iter().copied().collect::<Vec<Lit>>();
         if to_display <= num_check {
@@ -83,7 +83,7 @@ pub fn vivify(
         debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
         let mut decisions: Vec<Lit> = Vec::new();
         for lit in clits.iter().map(|p| *p) {
-            // assert!(!asg.var(lit.vi()).is(Flag::ELIMINATED));
+            // assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
             match asg.assigned(!lit) {
                 //## Rule 1
                 Some(false) => (),
@@ -154,7 +154,7 @@ pub fn vivify(
                                 if let Some(ci) = cdb.new_clause(asg, &mut vec, is_learnt).is_new()
                                 {
                                     cdb.set_activity(ci, cp.value());
-                                    cdb[ci].turn_on(Flag::VIVIFIED);
+                                    // cdb[ci].turn_on(FlagClause::VIVIFIED);
                                 }
                                 cdb.remove_clause(cid);
                                 num_shrink += 1;

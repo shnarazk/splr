@@ -192,7 +192,7 @@ pub fn handle_conflict(
             // || check_graph(asg, cdb, l0, "biclause");
             rst.update(ProgressUpdate::LBD(1));
             for cid in &state.derive20 {
-                cdb[cid].turn_on(Flag::DERIVE20);
+                cdb[cid].turn_on(FlagClause::DERIVE20);
             }
             #[cfg(feature = "bi_clause_completion")]
             cdb.complete_bi_clauses(asg);
@@ -214,7 +214,7 @@ pub fn handle_conflict(
             rst.update(ProgressUpdate::LBD(lbd));
             if lbd <= 20 {
                 for cid in &state.derive20 {
-                    cdb[cid].turn_on(Flag::DERIVE20);
+                    cdb[cid].turn_on(FlagClause::DERIVE20);
                 }
             }
         }
@@ -275,8 +275,8 @@ fn conflict_analyze(
         println!("- handle conflicting literal {}", p);
 
         let vi = p.vi();
-        debug_assert!(!asg.var(vi).is(Flag::CA_SEEN) && !asg.var(vi).is(Flag::ELIMINATED));
-        asg.var_mut(vi).turn_on(Flag::CA_SEEN);
+        debug_assert!(!asg.var(vi).is(FlagVar::CA_SEEN) && !asg.var(vi).is(FlagVar::ELIMINATED));
+        asg.var_mut(vi).turn_on(FlagVar::CA_SEEN);
         let lvl = asg.level(vi);
         debug_assert_ne!(root_level, lvl);
         if dl == lvl {
@@ -291,12 +291,12 @@ fn conflict_analyze(
         match reason {
             AssignReason::BinaryLink(l) => {
                 let vi = l.vi();
-                if !asg.var(vi).is(Flag::CA_SEEN) {
+                if !asg.var(vi).is(FlagVar::CA_SEEN) {
                     debug_assert_eq!(asg.level(vi), dl, "strange level binary clause");
                     // if root_level == asg.level(vi) { continue; }
-                    debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
+                    debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
                     debug_assert!(asg.assign(vi).is_some());
-                    asg.var_mut(vi).turn_on(Flag::CA_SEEN);
+                    asg.var_mut(vi).turn_on(FlagVar::CA_SEEN);
                     conflict_level!(vi);
                 }
             }
@@ -317,14 +317,14 @@ fn conflict_analyze(
                 cdb.lbd_of_dp_ema.update(cdb[cid].rank as f64);
                 for q in cdb[cid].iter().skip(1) {
                     let vi = q.vi();
-                    if !asg.var(vi).is(Flag::CA_SEEN) {
+                    if !asg.var(vi).is(FlagVar::CA_SEEN) {
                         let lvl = asg.level(vi);
                         if root_level == lvl {
                             #[cfg(feature = "trace_analysis")]
                             println!("- ignore {} because its level is {}", q, lvl);
                             continue;
                         }
-                        debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
+                        debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
                         debug_assert!(
                             asg.assign(vi).is_some(),
                             "conflict_analysis found V{} {}",
@@ -393,7 +393,7 @@ fn conflict_analyze(
 
             let lvl = asg.level(vi);
             let v = asg.var(vi);
-            !v.is(Flag::CA_SEEN) || lvl != dl
+            !v.is(FlagVar::CA_SEEN) || lvl != dl
         } {
             #[cfg(feature = "trace_analysis")]
             println!("- skip {} because it isn't flagged", asg.stack(ti));
@@ -481,7 +481,7 @@ impl State {
             new_learnt.swap(1, max_i);
         }
         for l in &to_clear {
-            asg.var_mut(l.vi()).turn_off(Flag::CA_SEEN);
+            asg.var_mut(l.vi()).turn_off(FlagVar::CA_SEEN);
         }
         level_to_return
     }
@@ -537,20 +537,20 @@ impl Lit {
                     for q in &(*c)[1..] {
                         let vi = q.vi();
                         let lv = asg.level(vi);
-                        if 0 < lv && !asg.var(vi).is(Flag::CA_SEEN) {
+                        if 0 < lv && !asg.var(vi).is(FlagVar::CA_SEEN) {
                             // if asg.reason(vi) != AssignReason::default() && levels[lv as usize] {
                             if matches!(
                                 asg.reason(vi),
                                 AssignReason::BinaryLink(_) | AssignReason::Implication(_)
                             ) && levels[lv as usize]
                             {
-                                asg.var_mut(vi).turn_on(Flag::CA_SEEN);
+                                asg.var_mut(vi).turn_on(FlagVar::CA_SEEN);
                                 stack.push(*q);
                                 clear.push(*q);
                             } else {
                                 // one of the roots is a decision var at an unchecked level.
                                 for l in &clear[top..] {
-                                    asg.var_mut(l.vi()).turn_off(Flag::CA_SEEN);
+                                    asg.var_mut(l.vi()).turn_off(FlagVar::CA_SEEN);
                                 }
                                 clear.truncate(top);
                                 return false;

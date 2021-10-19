@@ -109,7 +109,7 @@ impl VarOrderIF for VarOccHeap {
     }
     fn clear(&mut self, asg: &mut impl AssignIF) {
         for v in &mut self.heap[0..self.idxs[0] as usize] {
-            asg.var_mut(*v as usize).turn_off(Flag::ENQUEUED);
+            asg.var_mut(*v as usize).turn_off(FlagVar::ENQUEUED);
         }
         self.reset()
     }
@@ -125,7 +125,7 @@ impl VarOrderIF for VarOccHeap {
             if vi == 0 {
                 return None;
             }
-            if !asg.var(vi).is(Flag::ELIMINATED) {
+            if !asg.var(vi).is(FlagVar::ELIMINATED) {
                 return Some(vi);
             }
         }
@@ -133,7 +133,7 @@ impl VarOrderIF for VarOccHeap {
     fn rebuild(&mut self, asg: &impl AssignIF, occur: &[LitOccurs]) {
         self.reset();
         for (vi, v) in asg.var_iter().enumerate().skip(1) {
-            if asg.assign(vi).is_none() && !v.is(Flag::ELIMINATED) {
+            if asg.assign(vi).is_none() && !v.is(FlagVar::ELIMINATED) {
                 self.insert(occur, vi, true);
             }
         }

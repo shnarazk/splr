@@ -95,32 +95,32 @@ impl VarSelectIF for AssignStack {
             RephasingTarget::AntiPhases => {
                 for (vi, (b, _)) in self.best_phases.iter() {
                     let v = &mut self.var[*vi];
-                    v.set(Flag::PHASE, !*b);
+                    v.set(FlagVar::PHASE, !*b);
                 }
                 /* for vi in 1..self.num_vars {
-                    if !self.best_phases.contains_key(&vi) && !self.var[vi].is(Flag::ELIMINATED) {
-                        self.var[vi].toggle(Flag::PHASE);
+                    if !self.best_phases.contains_key(&vi) && !self.var[vi].is(FlagVar::ELIMINATED) {
+                        self.var[vi].toggle(FlagVar::PHASE);
                     }
                 } */
             }
             RephasingTarget::BestPhases => {
                 for (vi, (b, _)) in self.best_phases.iter() {
                     let v = &mut self.var[*vi];
-                    v.set(Flag::PHASE, *b);
+                    v.set(FlagVar::PHASE, *b);
                 }
             }
             RephasingTarget::Clear => (),
             RephasingTarget::FlipAll => {
                 for vi in 1..self.num_vars {
-                    if !self.var[vi].is(Flag::ELIMINATED) {
-                        self.var[vi].toggle(Flag::PHASE);
+                    if !self.var[vi].is(FlagVar::ELIMINATED) {
+                        self.var[vi].toggle(FlagVar::PHASE);
                     }
                 }
             }
             RephasingTarget::FlipBestPhase => {
                 for (vi, _) in self.best_phases.iter() {
                     let v = &mut self.var[*vi];
-                    v.set(Flag::PHASE, /* !*b */ self.phase_age % 2 == 0);
+                    v.set(FlagVar::PHASE, /* !*b */ self.phase_age % 2 == 0);
                 }
             }
             RephasingTarget::Mixin(scl) => {
@@ -130,11 +130,11 @@ impl VarSelectIF for AssignStack {
                         act_sum += scl * v.reward;
                     }
                     if 1.0 <= act_sum {
-                        // v.set(Flag::PHASE, !*b); NO: use the current phase!
+                        // v.set(FlagVar::PHASE, !*b); NO: use the current phase!
                         act_sum = 0.0;
                         num_flip += 1;
                     } else {
-                        v.set(Flag::PHASE, *b);
+                        v.set(FlagVar::PHASE, *b);
                     }
                 }
                 self.bp_divergence_ema
@@ -155,7 +155,7 @@ impl VarSelectIF for AssignStack {
     }
     fn select_decision_literal(&mut self) -> Lit {
         let vi = self.select_var();
-        Lit::from((vi, self.var[vi].is(Flag::PHASE)))
+        Lit::from((vi, self.var[vi].is(FlagVar::PHASE)))
     }
     fn update_order(&mut self, v: VarId) {
         self.update_heap(v);
@@ -163,7 +163,7 @@ impl VarSelectIF for AssignStack {
     fn rebuild_order(&mut self) {
         self.clear_heap();
         for vi in 1..self.var.len() {
-            if var_assign!(self, vi).is_none() && !self.var[vi].is(Flag::ELIMINATED) {
+            if var_assign!(self, vi).is_none() && !self.var[vi].is(FlagVar::ELIMINATED) {
                 self.insert_heap(vi);
             }
         }
@@ -175,7 +175,7 @@ impl AssignStack {
     fn select_var(&mut self) -> VarId {
         loop {
             let vi = self.get_heap_root();
-            if var_assign!(self, vi).is_none() && !self.var[vi].is(Flag::ELIMINATED) {
+            if var_assign!(self, vi).is_none() && !self.var[vi].is(FlagVar::ELIMINATED) {
                 return vi;
             }
         }

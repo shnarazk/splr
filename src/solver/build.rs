@@ -271,7 +271,7 @@ impl SatSolverIF for Solver {
     fn dump_cnf(&self, fname: &str) {
         let nv = self.asg.derefer(crate::assign::property::Tusize::NumVar);
         for vi in 1..nv {
-            if self.asg.var(vi).is(Flag::ELIMINATED) && self.asg.assign(vi).is_some() {
+            if self.asg.var(vi).is(FlagVar::ELIMINATED) && self.asg.assign(vi).is_some() {
                 panic!("conflicting var {} {:?}", vi, self.asg.assign(vi));
             }
         }

@@ -126,7 +126,7 @@ impl SolveIF for Solver {
                             }
                         }
                     }
-                    asg.var_mut(vi).set(Flag::PHASE, m < p);
+                    asg.var_mut(vi).set(FlagVar::PHASE, m < p);
                     elim.enqueue_var(asg, vi, false);
                 }
             }
@@ -145,20 +145,20 @@ impl SolveIF for Solver {
                     return Ok(Certificate::UNSAT);
                 }
                 for vi in 1..=asg.num_vars {
-                    if asg.assign(vi).is_some() || asg.var(vi).is(Flag::ELIMINATED) {
+                    if asg.assign(vi).is_some() || asg.var(vi).is(FlagVar::ELIMINATED) {
                         continue;
                     }
                     match elim.stats(vi) {
                         Some((_, 0)) => (),
                         Some((0, _)) => (),
-                        Some((p, m)) if m * 10 < p => asg.var_mut(vi).turn_on(Flag::PHASE),
-                        Some((p, m)) if p * 10 < m => asg.var_mut(vi).turn_off(Flag::PHASE),
+                        Some((p, m)) if m * 10 < p => asg.var_mut(vi).turn_on(FlagVar::PHASE),
+                        Some((p, m)) if p * 10 < m => asg.var_mut(vi).turn_off(FlagVar::PHASE),
                         _ => (),
                     }
                 }
                 let act = 1.0 / (asg.num_vars as f64).powf(0.25);
                 for vi in 1..asg.num_vars {
-                    if !asg.var(vi).is(Flag::ELIMINATED) {
+                    if !asg.var(vi).is(FlagVar::ELIMINATED) {
                         asg.set_activity(vi, act);
                     }
                 }
@@ -214,8 +214,8 @@ impl SolveIF for Solver {
 
                 // As a preparation for incremental solving, turn flags off.
                 for v in asg.var_iter_mut().skip(1) {
-                    if v.is(Flag::ELIMINATED) {
-                        v.turn_off(Flag::ELIMINATED);
+                    if v.is(FlagVar::ELIMINATED) {
+                        v.turn_off(FlagVar::ELIMINATED);
                     }
                 }
                 RESTART!(asg, rst);

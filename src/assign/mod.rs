@@ -100,7 +100,7 @@ impl fmt::Display for AssignReason {
 #[derive(Clone, Debug)]
 pub struct Var {
     /// the `Flag`s (16 bits)
-    flags: Flag,
+    flags: FlagVar,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
     reward: f64,
 

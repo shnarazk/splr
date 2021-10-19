@@ -166,17 +166,17 @@ mod tests {
         elim.activate();
         elim.simplify(asg, cdb, rst, state).expect("");
         assert_eq!(elim.num_full_elimination, 1);
-        assert!(!asg.var_iter().skip(1).all(|v| v.is(Flag::ELIMINATED)));
+        assert!(!asg.var_iter().skip(1).all(|v| v.is(FlagVar::ELIMINATED)));
         assert!(0 < asg.num_eliminated_vars);
         assert_eq!(
             asg.num_eliminated_vars,
-            asg.var_iter().filter(|v| v.is(Flag::ELIMINATED)).count()
+            asg.var_iter().filter(|v| v.is(FlagVar::ELIMINATED)).count()
         );
         let elim_vars = asg
             .var_iter()
             .enumerate()
             .skip(1)
-            .filter(|(_, v)| v.is(Flag::ELIMINATED))
+            .filter(|(_, v)| v.is(FlagVar::ELIMINATED))
             .map(|(vi, _)| vi)
             .collect::<Vec<_>>();
         assert_eq!(

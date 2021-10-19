@@ -11,7 +11,7 @@ impl Default for Clause {
     fn default() -> Clause {
         Clause {
             lits: vec![],
-            flags: Flag::empty(),
+            flags: FlagClause::empty(),
             rank: 0,
             search_from: 2,
             timestamp: 0,
@@ -175,9 +175,9 @@ impl ClauseIF for Clause {
             (!self.is_dead()).then(|| self.len() as f64)
         } else {
             (!self.is_dead()
-                && self.is(Flag::VIVIFIED)
-                && self.is(Flag::VIVIFIED2)
-                && (self.is(Flag::LEARNT) || self.is(Flag::DERIVE20)))
+             && !self.is(Flag::VIVIFIED2)
+             && !self.is(Flag::VIVIFIED)
+             && (self.is(FlagClause::LEARNT) || self.is(Flag::DERIVE20)))
             .then(|| self.reward)
         }
     }
@@ -187,17 +187,18 @@ impl ClauseIF for Clause {
             (!self.is_dead()).then(|| self.len() as f64)
         } else {
             (!self.is_dead()
-                && self.is(Flag::VIVIFIED)
-                && self.is(Flag::VIVIFIED2)
-                && (self.is(Flag::LEARNT) || self.is(Flag::DERIVE20)))
+             // && !self.is(Flag::VIVIFIED2)
+             // && !self.is(Flag::VIVIFIED)
+             && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
             .then(|| -(self.rank as f64))
         }
     }
     fn vivified(&mut self) {
-        self.turn_on(Flag::VIVIFIED);
-        self.turn_off(Flag::VIVIFIED2);
-        if !self.is(Flag::LEARNT) {
-            self.turn_off(Flag::DERIVE20);
+        // shift to 'no update after vivified' = (false, true)
+        // self.turn_on(Flag::VIVIFIED2);
+        // self.turn_on(Flag::VIVIFIED);
+        if !self.is(FlagClause::LEARNT) {
+            self.turn_off(FlagClause::DERIVE20);
         }
     }
 
@@ -208,20 +209,26 @@ impl ClauseIF for Clause {
 }
 
 impl FlagIF for Clause {
-    fn is(&self, flag: Flag) -> bool {
+    type FlagType = FlagClause;
+    #[inline]
+    fn is(&self, flag: Self::FlagType) -> bool {
         self.flags.contains(flag)
     }
-    fn set(&mut self, f: Flag, b: bool) {
+    #[inline]
+    fn set(&mut self, f: Self::FlagType, b: bool) {
         self.flags.set(f, b);
     }
-    fn toggle(&mut self, flag: Flag) {
-        self.flags.toggle(flag);
-    }
-    fn turn_off(&mut self, flag: Flag) {
+    #[inline]
+    fn turn_off(&mut self, flag: Self::FlagType) {
         self.flags.remove(flag);
     }
-    fn turn_on(&mut self, flag: Flag) {
+    #[inline]
+    fn turn_on(&mut self, flag: Self::FlagType) {
         self.flags.insert(flag);
+    }
+    #[inline]
+    fn toggle(&mut self, flag: Self::FlagType) {
+        self.flags.toggle(flag);
     }
 }
 
@@ -234,8 +241,8 @@ impl fmt::Display for Clause {
             "{{{:?}b{}{}{}}}",
             i32s(&self.lits),
             self.birth,
-            st(Flag::LEARNT, ", learnt"),
-            st(Flag::ENQUEUED, ", enqueued"),
+            st(FlagClause::LEARNT, ", learnt"),
+            st(FlagClause::ENQUEUED, ", enqueued"),
         )
     }
     #[cfg(not(feature = "boundary_check"))]
@@ -245,8 +252,8 @@ impl fmt::Display for Clause {
             f,
             "{{{:?}{}{}}}",
             i32s(&self.lits),
-            st(Flag::LEARNT, ", learnt"),
-            st(Flag::ENQUEUED, ", enqueued"),
+            st(FlagClause::LEARNT, ", learnt"),
+            st(FlagClause::ENQUEUED, ", enqueued"),
         )
     }
 }

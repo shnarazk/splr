@@ -305,7 +305,7 @@ impl ClauseDBIF for ClauseDB {
             //     panic!("done");
             // }
             // assert!(c.is_dead());
-            c.flags = Flag::empty();
+            c.flags = FlagClause::empty();
 
             #[cfg(feature = "clause_rewarding")]
             {
@@ -318,7 +318,7 @@ impl ClauseDBIF for ClauseDB {
         } else {
             cid = ClauseId::from(self.clause.len());
             let mut c = Clause {
-                flags: Flag::empty(),
+                flags: FlagClause::empty(),
                 ..Clause::default()
             };
             std::mem::swap(&mut c.lits, vec);
@@ -366,7 +366,7 @@ impl ClauseDBIF for ClauseDB {
             learnt = false;
         }
         if learnt {
-            c.turn_on(Flag::LEARNT);
+            c.turn_on(FlagClause::LEARNT);
 
             if c.rank <= 2 {
                 *num_lbd2 += 1;
@@ -400,13 +400,13 @@ impl ClauseDBIF for ClauseDB {
         if let Some(cid_used) = self.freelist.pop() {
             cid = cid_used;
             let c = &mut self[cid];
-            c.flags = Flag::empty();
+            c.flags = FlagClause::empty();
             std::mem::swap(&mut c.lits, vec);
             c.search_from = 2;
         } else {
             cid = ClauseId::from(self.clause.len());
             let mut c = Clause {
-                flags: Flag::empty(),
+                flags: FlagClause::empty(),
                 ..Clause::default()
             };
             std::mem::swap(&mut c.lits, vec);
@@ -433,7 +433,7 @@ impl ClauseDBIF for ClauseDB {
             learnt = false;
         }
         if learnt {
-            c.turn_on(Flag::LEARNT);
+            c.turn_on(FlagClause::LEARNT);
         }
         let l0 = c.lits[0];
         let l1 = c.lits[1];
@@ -730,7 +730,7 @@ impl ClauseDBIF for ClauseDB {
                 certification_store.add_clause(new_lits);
                 certification_store.delete_clause(&c.lits);
             }
-            c.turn_off(Flag::LEARNT);
+            c.turn_off(FlagClause::LEARNT);
             self.num_bi_clause += 1;
 
             if certification_store.is_active() {
@@ -806,7 +806,7 @@ impl ClauseDBIF for ClauseDB {
         // firstly sweep without consuming extra memory
         let mut need_to_shrink = false;
         for l in self[cid].iter() {
-            debug_assert!(!asg.var(l.vi()).is(Flag::ELIMINATED));
+            debug_assert!(!asg.var(l.vi()).is(FlagVar::ELIMINATED));
             match asg.assigned(*l) {
                 Some(true) => {
                     self.remove_clause(cid);
@@ -815,7 +815,7 @@ impl ClauseDBIF for ClauseDB {
                 Some(false) => {
                     need_to_shrink = true;
                 }
-                None if asg.var(l.vi()).is(Flag::ELIMINATED) => {
+                None if asg.var(l.vi()).is(FlagVar::ELIMINATED) => {
                     need_to_shrink = true;
                 }
                 None => (),
@@ -838,7 +838,7 @@ impl ClauseDBIF for ClauseDB {
         let mut new_lits = c
             .lits
             .iter()
-            .filter(|l| asg.assigned(**l).is_none() && !asg.var(l.vi()).is(Flag::ELIMINATED))
+            .filter(|l| asg.assigned(**l).is_none() && !asg.var(l.vi()).is(FlagVar::ELIMINATED))
             .copied()
             .collect::<Vec<_>>();
         match new_lits.len() {
@@ -866,7 +866,7 @@ impl ClauseDBIF for ClauseDB {
                 bi_clause[l1].insert(l0, cid);
                 std::mem::swap(&mut c.lits, &mut new_lits);
                 self.num_bi_clause += 1;
-                c.turn_off(Flag::LEARNT);
+                c.turn_off(FlagClause::LEARNT);
 
                 if certification_store.is_active() {
                     certification_store.add_clause(&c.lits);
@@ -1097,7 +1097,10 @@ impl ClauseDBIF for ClauseDB {
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
         for (i, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
-            if c.is(Flag::LEARNT) && !c.is_dead() && (self.co_lbd_bound as usize) < c.lits.len() {
+            if c.is(FlagClause::LEARNT)
+                && !c.is_dead()
+                && (self.co_lbd_bound as usize) < c.lits.len()
+            {
                 remove_clause_fn(
                     &mut self.certification_store,
                     &mut self.bi_clause,
@@ -1127,7 +1130,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId> {
         for (i, c) in self.clause.iter().enumerate().skip(1) {
-            if c.is_dead() || (strict && c.is(Flag::LEARNT)) {
+            if c.is_dead() || (strict && c.is(FlagClause::LEARNT)) {
                 continue;
             }
             match c.evaluate(model) {
@@ -1292,7 +1295,7 @@ impl ClauseDBIF for ClauseDB {
                         format!("{:?}", asg.assigned(lit)),
                         format!("{}", level),
                         format!("{}", asg.reason(lit.vi())),
-                        format!("{}", asg.var(lit.vi()).is(Flag::ELIMINATED)),
+                        format!("{}", asg.var(lit.vi()).is(FlagVar::ELIMINATED)),
                     ),
                     format!(
                         "{:>8}:{:>12} at level {:>3} by {:<20}, {:>5}",
@@ -1300,7 +1303,7 @@ impl ClauseDBIF for ClauseDB {
                         format!("{:?}", asg.assigned(*cached)),
                         format!("{}", lvl),
                         format!("{}", asg.reason(cached.vi())),
-                        format!("{}", asg.var(cached.vi()).is(Flag::ELIMINATED)),
+                        format!("{}", asg.var(cached.vi()).is(FlagVar::ELIMINATED)),
                     ),
                     format!(
                         "the mirrored({}) image: {:?}",
@@ -1381,11 +1384,11 @@ impl ClauseDB {
             ..
         } = self;
         for (i, c) in clause.iter_mut().enumerate() {
-            if c.is_dead() || !c.is(Flag::LEARNT) {
+            if c.is_dead() || !c.is(FlagClause::LEARNT) {
                 continue;
             }
             if c.rank < self.co_lbd_bound {
-                c.turn_off(Flag::LEARNT);
+                c.turn_off(FlagClause::LEARNT);
                 *num_learnt -= 1;
             } else if reinit {
                 remove_clause_fn(
@@ -1426,7 +1429,7 @@ fn remove_clause_fn(
         watcher[usize::from(!l0)].remove_watch(&cid); // .expect("db1076");
         watcher[usize::from(!l1)].remove_watch(&cid); // .expect("db1077");
     }
-    if c.is(Flag::LEARNT) {
+    if c.is(FlagClause::LEARNT) {
         *num_learnt -= 1;
     }
     *num_clause -= 1;

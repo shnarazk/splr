@@ -12,7 +12,7 @@ impl Default for Var {
     fn default() -> Var {
         Var {
             reward: 0.0,
-            flags: Flag::empty(),
+            flags: FlagVar::empty(),
 
             #[cfg(feature = "boundary_check")]
             propagated_at: 0,
@@ -27,7 +27,7 @@ impl Default for Var {
 impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
-        write!(f, "V{{{}}}", st(Flag::ELIMINATED, ", eliminated"),)
+        write!(f, "V{{{}}}", st(FlagVar::ELIMINATED, ", eliminated"),)
     }
 }
 
@@ -42,24 +42,25 @@ impl Var {
 }
 
 impl FlagIF for Var {
+    type FlagType = FlagVar;
     #[inline]
-    fn is(&self, flag: Flag) -> bool {
+    fn is(&self, flag: Self::FlagType) -> bool {
         self.flags.contains(flag)
     }
     #[inline]
-    fn set(&mut self, f: Flag, b: bool) {
+    fn set(&mut self, f: Self::FlagType, b: bool) {
         self.flags.set(f, b);
     }
     #[inline]
-    fn turn_off(&mut self, flag: Flag) {
+    fn turn_off(&mut self, flag: Self::FlagType) {
         self.flags.remove(flag);
     }
     #[inline]
-    fn turn_on(&mut self, flag: Flag) {
+    fn turn_on(&mut self, flag: Self::FlagType) {
         self.flags.insert(flag);
     }
     #[inline]
-    fn toggle(&mut self, flag: Flag) {
+    fn toggle(&mut self, flag: Self::FlagType) {
         self.flags.toggle(flag);
     }
 }
@@ -160,8 +161,8 @@ impl AssignStack {
         self.check_best_phase(vi);
     }
     pub fn make_var_eliminated(&mut self, vi: VarId) {
-        if !self.var[vi].is(Flag::ELIMINATED) {
-            self.var[vi].turn_on(Flag::ELIMINATED);
+        if !self.var[vi].is(FlagVar::ELIMINATED) {
+            self.var[vi].turn_on(FlagVar::ELIMINATED);
             self.set_activity(vi, 0.0);
             self.remove_from_heap(vi);
             debug_assert_eq!(self.decision_level(), self.root_level);

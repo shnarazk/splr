@@ -20,8 +20,8 @@ impl Eliminator {
                     did, cdb[did], cid, cdb[cid],
                 );
                 debug_assert!(!cdb[did].is_dead());
-                if !cdb[did].is(Flag::LEARNT) {
-                    cdb[cid].turn_off(Flag::LEARNT);
+                if !cdb[did].is(FlagClause::LEARNT) {
+                    cdb[cid].turn_off(FlagClause::LEARNT);
                 }
                 self.remove_cid_occur(asg, did, &mut cdb[did]);
                 cdb.remove_clause(did);
@@ -87,14 +87,14 @@ fn strengthen_clause(
     debug_assert!(!cdb[cid].is_dead());
     debug_assert!(1 < cdb[cid].len());
     match cdb.transform_by_elimination(cid, l) {
-        RefClause::Clause(ci) => {
+        RefClause::Clause(_ci) => {
             #[cfg(feature = "trace_elimination")]
             println!("cid {} drops literal {}", cid, l);
 
             elim.enqueue_clause(cid, &mut cdb[cid]);
             elim.remove_lit_occur(asg, l, cid);
-            cdb[ci].turn_on(Flag::VIVIFIED);
-            cdb[ci].turn_on(Flag::VIVIFIED2);
+            // cdb[ci].turn_on(Flag::VIVIFIED);
+            // cdb[ci].turn_on(Flag::VIVIFIED2);
             Ok(())
         }
         RefClause::Dead => panic!("impossible"),
