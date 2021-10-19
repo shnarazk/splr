@@ -985,51 +985,24 @@ impl ClauseDBIF for ClauseDB {
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
     }
-    fn mark_clause_as_used(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> bool {
-        let chan_seok_condition = if self.use_chan_seok {
-            self.co_lbd_bound as usize
-        } else {
-            0
-        };
-        let ClauseDB {
-            ref mut clause,
-            ref mut lbd_temp,
-            ..
-        } = self;
-        let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
-        let old_rank = c.rank as usize;
-        let nlevels = c.update_lbd(asg, lbd_temp);
-        debug_assert!(
-            !c.is_dead(),
-            "cdb.make_clause_as_dead received a dead clause"
-        );
-        if nlevels < old_rank {
-            match (c.is(Flag::VIVIFIED2), c.is(Flag::VIVIFIED)) {
-                _ if nlevels == 1 || nlevels + 1 < old_rank => {
-                    c.turn_on(Flag::VIVIFIED2);
-                    c.turn_off(Flag::VIVIFIED);
-                }
-                (false, false) => (),
-                (false, true) => {
-                    c.turn_on(Flag::VIVIFIED2);
-                    c.turn_off(Flag::VIVIFIED);
-                }
-                (true, false) => c.turn_on(Flag::VIVIFIED),
-                (true, true) => (),
+    fn mark_clause_as_used(&mut self, cid: ClauseId) -> bool {
+        let c = &mut self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
+        let learnt = c.is(Flag::LEARNT);
+        debug_assert!(!c.is_dead());
+        match (c.is(Flag::VIVIFIED2), c.is(Flag::VIVIFIED)) {
+            (false, false) => (),
+            (false, true) => {
+                c.turn_on(Flag::VIVIFIED2);
+                c.turn_off(Flag::VIVIFIED);
             }
-            // chan_seok_condition is zero if !use_chan_seok
-            if c.is(Flag::LEARNT) {
-                if nlevels < chan_seok_condition {
-                    c.turn_off(Flag::LEARNT);
-                    self.num_learnt -= 1;
-                    return true;
-                } else {
-                    #[cfg(feature = "just_used")]
-                    c.turn_on(Flag::JUST_USED);
-                }
-            }
+            (true, false) => c.turn_on(Flag::VIVIFIED),
+            (true, true) => (),
         }
-        false
+        #[cfg(feature = "just_used")]
+        if learnt {
+            c.turn_on(Flag::JUST_USED);
+        }
+        learnt
     }
     fn should_reduce(&mut self, num_conflicts: usize) -> bool {
         if self.use_chan_seok {
