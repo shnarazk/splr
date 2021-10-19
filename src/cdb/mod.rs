@@ -133,7 +133,7 @@ pub trait ClauseDBIF:
     fn reset(&mut self);
     /// update LBD then convert a learnt clause to permanent if needed.
     /// return `true` if it's learnt.
-    fn mark_clause_as_used(&mut self, cid: ClauseId) -> bool;
+    fn mark_as_used(&mut self, cid: ClauseId) -> bool;
     /// record an asserted literal to unsat certification.
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.

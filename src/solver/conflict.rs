@@ -309,7 +309,7 @@ fn conflict_analyze(
                     p
                 );
                 debug_assert!(!cdb[cid].is_dead() && 2 < cdb[cid].len());
-                if cdb.mark_clause_as_used(cid) {
+                if cdb.mark_as_used(cid) {
                     cdb.reward_at_analysis(cid);
                 } else {
                     state.derive20.push(cid);

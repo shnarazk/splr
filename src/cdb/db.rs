@@ -985,18 +985,19 @@ impl ClauseDBIF for ClauseDB {
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
     }
-    fn mark_clause_as_used(&mut self, cid: ClauseId) -> bool {
+    fn mark_as_used(&mut self, cid: ClauseId) -> bool {
         let c = &mut self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         let learnt = c.is(Flag::LEARNT);
         debug_assert!(!c.is_dead());
         match (c.is(Flag::VIVIFIED2), c.is(Flag::VIVIFIED)) {
-            (false, false) => (),
+            // (false, false) => (),
             (false, true) => {
                 c.turn_on(Flag::VIVIFIED2);
                 c.turn_off(Flag::VIVIFIED);
             }
             (true, false) => c.turn_on(Flag::VIVIFIED),
-            (true, true) => (),
+            // (true, true) => (),
+            _ => (),
         }
         #[cfg(feature = "just_used")]
         if learnt {

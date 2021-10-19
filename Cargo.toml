@@ -22,7 +22,7 @@ default = [
         "clause_elimination",
         # "clause_rewarding",
         "clause_vivification",
-        # "deterministic_iterators", # DEBUG
+        "deterministic_iterators", # DEBUG
         "dynamic_restart_threshold",
         # "incremental_solver",
         "LRB_rewarding",
