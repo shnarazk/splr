@@ -131,9 +131,9 @@ pub trait ClauseDBIF:
     fn reduce(&mut self, asg: &mut impl AssignIF, nc: usize);
     /// FIXME
     fn reset(&mut self);
-    /// update LBD then convert a learnt clause to permanent if needed.
+    /// update flags.
     /// return `true` if it's learnt.
-    fn mark_as_used(&mut self, cid: ClauseId) -> bool;
+    fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool;
     /// record an asserted literal to unsat certification.
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.
@@ -184,12 +184,15 @@ pub struct ClauseId {
 pub struct Clause {
     /// The literals in a clause.
     lits: Vec<Lit>,
-    /// Flags (16 bits)
-    flags: Flag,
+    /// Flags (8 bits)
+    flags: FlagClause,
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: u16,
+    /// A record of the rank at previos stage.
+    pub rank_old: u16,
     /// the index from which `propagate` starts searching an un-falsified literal.
-    pub search_from: u32,
+    /// Since it's just a hint, we don't need u32 or usize.
+    pub search_from: u16,
     /// the number of conflicts at which this clause was used in `conflict_analyze`
     timestamp: usize,
 

@@ -98,9 +98,6 @@ pub fn eliminate_var(
                     match cdb.new_clause(asg, vec, learnt_p && cdb[*n].is(FlagClause::LEARNT)) {
                         RefClause::Clause(ci) => {
                             // the merged clause might be a duplicated clause.
-                            // cdb[ci].turn_on(Flag::VIVIFIED);
-                            // cdb[ci].turn_on(Flag::VIVIFIED2);
-
                             elim.add_cid_occur(asg, ci, &mut cdb[ci], true);
 
                             #[cfg(feature = "trace_elimination")]

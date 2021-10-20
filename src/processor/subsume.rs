@@ -93,8 +93,6 @@ fn strengthen_clause(
 
             elim.enqueue_clause(cid, &mut cdb[cid]);
             elim.remove_lit_occur(asg, l, cid);
-            // cdb[ci].turn_on(Flag::VIVIFIED);
-            // cdb[ci].turn_on(Flag::VIVIFIED2);
             Ok(())
         }
         RefClause::Dead => panic!("impossible"),

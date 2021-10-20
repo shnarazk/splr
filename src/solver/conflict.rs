@@ -309,30 +309,27 @@ fn conflict_analyze(
                     p
                 );
                 debug_assert!(!cdb[cid].is_dead() && 2 < cdb[cid].len());
-                if cdb.mark_as_used(cid) {
-                    cdb.reward_at_analysis(cid);
-                } else {
+                if !cdb.update_at_analysis(asg, cid) {
                     state.derive20.push(cid);
                 }
-                cdb.lbd_of_dp_ema.update(cdb[cid].rank as f64);
                 for q in cdb[cid].iter().skip(1) {
                     let vi = q.vi();
+                    debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
+                    debug_assert!(
+                        asg.assign(vi).is_some(),
+                        "conflict_analysis found V{} {}",
+                        vi,
+                        asg.reason(vi),
+                    );
                     if !asg.var(vi).is(FlagVar::CA_SEEN) {
                         let lvl = asg.level(vi);
+                        debug_assert!(lvl <= dl);
                         if root_level == lvl {
                             #[cfg(feature = "trace_analysis")]
                             println!("- ignore {} because its level is {}", q, lvl);
                             continue;
                         }
-                        debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
-                        debug_assert!(
-                            asg.assign(vi).is_some(),
-                            "conflict_analysis found V{} {}",
-                            vi,
-                            asg.reason(vi),
-                        );
-                        debug_assert!(lvl <= dl);
-                        asg.var_mut(vi).turn_on(Flag::CA_SEEN);
+                        asg.var_mut(vi).turn_on(FlagVar::CA_SEEN);
                         if dl == lvl {
                             #[cfg(feature = "trace_analysis")]
                             println!("- flag for {} which level is {}", q.int(), lvl);

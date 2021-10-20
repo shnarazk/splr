@@ -345,6 +345,7 @@ impl ClauseDBIF for ClauseDB {
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
+            c.rank_old = 1;
 
             #[cfg(feature = "bi_clause_completion")]
             {
@@ -358,6 +359,7 @@ impl ClauseDBIF for ClauseDB {
             }
         } else {
             c.update_lbd(asg, lbd_temp);
+            c.rank_old = c.rank;
         }
         if learnt && len2 {
             *num_bi_learnt += 1;
@@ -426,8 +428,10 @@ impl ClauseDBIF for ClauseDB {
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
+            c.rank_old = 1;
         } else {
             c.update_lbd(asg, lbd_temp);
+            c.rank_old = c.rank;
         }
         if c.lits.len() <= 2 || (self.use_chan_seok && c.rank <= self.co_lbd_bound) {
             learnt = false;
@@ -985,24 +989,18 @@ impl ClauseDBIF for ClauseDB {
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
     }
-    fn mark_as_used(&mut self, cid: ClauseId) -> bool {
+    fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool {
         let c = &mut self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
-        let learnt = c.is(Flag::LEARNT);
-        debug_assert!(!c.is_dead());
-        match (c.is(Flag::VIVIFIED2), c.is(Flag::VIVIFIED)) {
-            // (false, false) => (),
-            (false, true) => {
-                c.turn_on(Flag::VIVIFIED2);
-                c.turn_off(Flag::VIVIFIED);
-            }
-            (true, false) => c.turn_on(Flag::VIVIFIED),
-            // (true, true) => (),
-            _ => (),
-        }
-        #[cfg(feature = "just_used")]
+        // Updating LBD at every analysis seems redundant.
+        // But it's crucial. Don't remove the below.
+        let rank = c.update_lbd(asg, &mut self.lbd_temp);
+        let learnt = c.is(FlagClause::LEARNT);
         if learnt {
-            c.turn_on(Flag::JUST_USED);
+            #[cfg(feature = "just_used")]
+            c.turn_on(Flag::USED);
+            self.reward_at_analysis(cid);
         }
+        self.lbd_of_dp_ema.update(rank as f64);
         learnt
     }
     fn should_reduce(&mut self, num_conflicts: usize) -> bool {

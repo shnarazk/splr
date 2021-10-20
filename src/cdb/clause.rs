@@ -13,6 +13,7 @@ impl Default for Clause {
             lits: vec![],
             flags: FlagClause::empty(),
             rank: 0,
+            rank_old: 0,
             search_from: 2,
             timestamp: 0,
 
@@ -169,15 +170,15 @@ impl ClauseIF for Clause {
     fn timestamp(&self) -> usize {
         self.timestamp
     }
+    /// smaller is better.
     #[cfg(feature = "clause_rewarding")]
     fn to_vivify(&self, initial_stage: bool) -> Option<f64> {
         if initial_stage {
             (!self.is_dead()).then(|| self.len() as f64)
         } else {
             (!self.is_dead()
-             && !self.is(Flag::VIVIFIED2)
-             && !self.is(Flag::VIVIFIED)
-             && (self.is(FlagClause::LEARNT) || self.is(Flag::DERIVE20)))
+                && self.rank * 2 <= self.rank_old
+                && (self.is(FlagClause::LEARNT) || self.is(Flag::DERIVE20)))
             .then(|| self.reward)
         }
     }
@@ -187,16 +188,13 @@ impl ClauseIF for Clause {
             (!self.is_dead()).then(|| self.len() as f64)
         } else {
             (!self.is_dead()
-             // && !self.is(Flag::VIVIFIED2)
-             // && !self.is(Flag::VIVIFIED)
-             && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
-            .then(|| -(self.rank as f64))
+                && self.rank * 2 <= self.rank_old
+                && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
+            .then(|| -((self.rank_old - self.rank) as f64 / self.rank as f64))
         }
     }
     fn vivified(&mut self) {
-        // shift to 'no update after vivified' = (false, true)
-        // self.turn_on(Flag::VIVIFIED2);
-        // self.turn_on(Flag::VIVIFIED);
+        self.rank_old = self.rank;
         if !self.is(FlagClause::LEARNT) {
             self.turn_off(FlagClause::DERIVE20);
         }
