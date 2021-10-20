@@ -154,7 +154,6 @@ pub fn vivify(
                                 if let Some(ci) = cdb.new_clause(asg, &mut vec, is_learnt).is_new()
                                 {
                                     cdb.set_activity(ci, cp.value());
-                                    // cdb[ci].turn_on(FlagClause::VIVIFIED);
                                 }
                                 cdb.remove_clause(cid);
                                 num_shrink += 1;

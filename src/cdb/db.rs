@@ -1042,15 +1042,15 @@ impl ClauseDBIF for ClauseDB {
                 asg.level(c.lit0().vi()),
                 asg.decision_level(),
             );
-            if !c.is(Flag::LEARNT) {
+            if !c.is(FlagClause::LEARNT) {
                 continue;
             }
 
             #[cfg(feature = "just_used")]
             {
-                let used = c.is(Flag::JUST_USED);
+                let used = c.is(Flag::USED);
                 if used {
-                    c.turn_off(Flag::JUST_USED);
+                    c.turn_off(Flag::USED);
                     continue;
                 }
             }

@@ -422,7 +422,7 @@ fn conflict_analyze(
         #[cfg(feature = "trace_analysis")]
         println!("- move to flagged {}; num path: {}", p.vi(), path_cnt - 1,);
 
-        asg.var_mut(p.vi()).turn_off(Flag::CA_SEEN);
+        asg.var_mut(p.vi()).turn_off(FlagVar::CA_SEEN);
         // since the trail can contain a literal which level is under `dl` after
         // the `dl`-th decision var, we must skip it.
         path_cnt -= 1;
@@ -508,20 +508,20 @@ impl Lit {
                 AssignReason::BinaryLink(l) => {
                     let vi = l.vi();
                     let lv = asg.level(vi);
-                    if 0 < lv && !asg.var(vi).is(Flag::CA_SEEN) {
+                    if 0 < lv && !asg.var(vi).is(FlagVar::CA_SEEN) {
                         // if asg.reason(vi) != AssignReason::Decision(_) && levels[lv as usize] {
                         if matches!(
                             asg.reason(vi),
                             AssignReason::Implication(_) | AssignReason::BinaryLink(_)
                         ) && levels[lv as usize]
                         {
-                            asg.var_mut(vi).turn_on(Flag::CA_SEEN);
+                            asg.var_mut(vi).turn_on(FlagVar::CA_SEEN);
                             stack.push(l);
                             clear.push(l);
                         } else {
                             // one of the roots is a decision var at an unchecked level.
                             for l in &clear[top..] {
-                                asg.var_mut(l.vi()).turn_off(Flag::CA_SEEN);
+                                asg.var_mut(l.vi()).turn_off(FlagVar::CA_SEEN);
                             }
                             clear.truncate(top);
                             return false;
@@ -663,7 +663,7 @@ fn tracer(asg: &AssignStack, cdb: &ClauseDB) {
                     .map(|r| format!(
                         " {}{:?}",
                         asg.var(Lit::from(r.lit).vi())
-                            .is(Flag::CA_SEEN)
+                            .is(FlagVar::CA_SEEN)
                             .then(|| "S")
                             .unwrap_or(" "),
                         r
