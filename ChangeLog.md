@@ -3,6 +3,8 @@
 - `ConflictContext` uses `AssignReason`
 - add feature 'deterministic_iterators' to make Splr reproducible
 - add feature 'suppress_reason_chain' that suppresses reason sequences consisting of binary clauses
+- split `Flag` to `FlagClause` and `FlagVar` to reduce memory footprint
+- select vivification targets based on LBD shrinking rate
 
 ## 0.13.0, 2021-10-11
 
