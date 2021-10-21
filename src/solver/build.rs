@@ -7,7 +7,6 @@ use {
         processor::Eliminator,
         types::*,
     },
-    std::convert::TryFrom,
 };
 
 #[cfg(not(feature = "no_IO"))]
@@ -29,7 +28,6 @@ pub trait SatSolverIF: Instantiate {
     ///
     /// ```
     /// use crate::splr::*;
-    /// use std::convert::TryFrom;
     /// use crate::splr::assign::VarManipulateIF;    // for s.asg.assign()
     ///
     /// let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
@@ -56,7 +54,6 @@ pub trait SatSolverIF: Instantiate {
     /// # Example
     ///```
     /// use crate::splr::*;
-    /// use std::convert::TryFrom;
     ///
     /// let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
     /// assert!(s.add_clause(vec![1, -2]).is_ok());
@@ -78,7 +75,6 @@ pub trait SatSolverIF: Instantiate {
     /// # Example
     /// ```
     /// use crate::splr::*;
-    /// use std::convert::TryFrom;
     ///
     /// let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
     /// assert_eq!(s.asg.num_vars, 8);
@@ -164,7 +160,6 @@ impl TryFrom<&str> for Solver {
     ///
     /// # Example
     /// ```
-    /// use std::convert::TryFrom;
     /// use crate::splr::solver::{SatSolverIF, Solver};
     ///
     /// let mut s = Solver::try_from("cnfs/sample.cnf").expect("fail to load");
@@ -432,7 +427,6 @@ impl Solver {
 mod tests {
     // use super::*;
     use crate::*;
-    use std::convert::TryFrom;
 
     #[cfg(not(feature = "no_IO"))]
     #[test]

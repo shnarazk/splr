@@ -342,7 +342,6 @@ mod tests {
         processor::EliminateIF,
         solver::Solver,
     };
-    use std::convert::TryFrom;
 
     impl Clause {
         #[allow(dead_code)]

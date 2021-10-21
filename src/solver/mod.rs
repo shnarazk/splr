@@ -17,10 +17,7 @@ pub use self::{
     validate::ValidateIF,
 };
 
-use {
-    crate::{assign::AssignStack, cdb::ClauseDB, processor::Eliminator, state::*, types::*},
-    std::convert::TryFrom,
-};
+use crate::{assign::AssignStack, cdb::ClauseDB, processor::Eliminator, state::*, types::*};
 
 /// Normal results returned by Solver.
 #[derive(Debug, PartialEq)]
@@ -71,7 +68,6 @@ pub enum SolverEvent {
 
 /// The SAT solver object consisting of 6 sub modules.
 /// ```
-/// use std::convert::TryFrom;
 /// use crate::splr::*;
 /// use crate::splr::{assign::{AssignIF, VarManipulateIF}, state::{State, StateIF}, types::*};
 ///
@@ -165,7 +161,6 @@ impl<'a> Iterator for SolverIter<'a> {
 mod tests {
     use super::*;
     use crate::assign;
-    use std::convert::{From, TryFrom};
 
     #[cfg_attr(not(feature = "no_IO"), test)]
     fn test_solver() {

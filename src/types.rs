@@ -9,7 +9,6 @@ use {
     crate::solver::SolverEvent,
     std::{
         cmp::Ordering,
-        convert::TryFrom,
         fmt,
         fs::File,
         io::{BufRead, BufReader},

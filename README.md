@@ -214,11 +214,10 @@ s VERIFIED UNSAT
 
 ### Calling Splr from Rust programs
 
-Since 0.4.0, you can use Splr in your programs.
+Since 0.4.0, you can use Splr in your programs. (Here I suppose that you uses Rust 2021.)
 
 ```rust
 use splr::*;
-use std::convert::TryFrom;
 
 fn main() {
     let v: Vec<Vec<i32>> = vec![vec![1, 2], vec![-1, 3], vec![1, -3], vec![-1, 2]];
@@ -234,7 +233,7 @@ fn main() {
 
 ```rust
 use splr::*;
-use std::{convert::TryFrom, env::args};
+use std::env::args;
 
 fn main() {
     let cnf = args().nth(1).expect("takes an arg");

@@ -6,7 +6,6 @@
 //!
 //!```
 //!  use splr::{processor::{self, EliminateIF}, solver::Solver, types::PropertyDereference};
-//!  use std::convert::TryFrom;
 //!  let mut s = Solver::try_from("cnfs/sample.cnf").expect("failed to load");
 //!  let Solver {
 //!      ref mut asg,
@@ -147,7 +146,6 @@ pub mod property {
 mod tests {
     use super::*;
     use crate::{assign::VarManipulateIF, processor::EliminateIF, solver::Solver};
-    use std::convert::TryFrom;
 
     #[test]
     fn check_elimination() {
