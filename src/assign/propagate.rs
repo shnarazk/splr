@@ -591,7 +591,7 @@ impl PropagateIF for AssignStack {
         }
         macro_rules! conflict_path {
             ($lit: expr, $reason: expr) => {
-                return Err(($lit, $reason));
+                return Err(($lit, $reason))
             };
         }
         while let Some(p) = self.trail.get(self.q_head) {
