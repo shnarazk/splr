@@ -8,11 +8,14 @@ mod clause;
 mod db;
 /// methods for UNSAT certification
 mod unsat_certificate;
+/// Implement vivification preprocessor
+mod vivify;
 /// types about watching literal
 mod watch_cache;
 
+#[cfg(feature = "clause_vivification")]
+pub use self::vivify::VivifyIF;
 pub use self::{cid::ClauseIdIF, property::*, unsat_certificate::CertificationStore};
-
 use {
     crate::{assign::AssignIF, types::*},
     std::{
@@ -43,10 +46,6 @@ pub trait ClauseIF {
     fn len(&self) -> usize;
     /// return timestamp
     fn timestamp(&self) -> usize;
-    /// return `true` if the clause should try vivification
-    fn to_vivify(&self, initial_stage: bool) -> Option<f64>;
-    /// clear flags about vivification
-    fn vivified(&mut self);
 
     #[cfg(feature = "boundary_check")]
     fn set_birth(&mut self, time: usize);

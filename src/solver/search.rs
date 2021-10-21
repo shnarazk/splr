@@ -1,6 +1,6 @@
 //! Conflict-Driven Clause Learning Search engine
 #[cfg(feature = "clause_vivification")]
-use super::vivify::vivify;
+use crate::cdb::VivifyIF;
 use {
     super::{
         conflict::handle_conflict,
@@ -66,7 +66,7 @@ impl SolveIF for Solver {
         #[cfg(feature = "clause_vivification")]
         {
             state.flush("vivifying...");
-            if vivify(asg, cdb, rst, state).is_err() {
+            if cdb.vivify(asg, rst, state).is_err() {
                 #[cfg(feature = "support_user_assumption")]
                 {
                     analyze_final(asg, state, &cdb[ci]);
@@ -295,7 +295,7 @@ fn search(
                 cdb.check_consistency(asg, "before simplify");
 
                 #[cfg(feature = "clause_vivification")]
-                vivify(asg, cdb, rst, state)?;
+                cdb.vivify(asg, rst, state)?;
 
                 #[cfg(feature = "clause_elimination")]
                 {

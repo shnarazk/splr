@@ -170,36 +170,6 @@ impl ClauseIF for Clause {
     fn timestamp(&self) -> usize {
         self.timestamp
     }
-    /// smaller is better.
-    #[cfg(feature = "clause_rewarding")]
-    fn to_vivify(&self, initial_stage: bool) -> Option<f64> {
-        if initial_stage {
-            (!self.is_dead()).then(|| self.len() as f64)
-        } else {
-            (!self.is_dead()
-                && self.rank * 2 <= self.rank_old
-                && (self.is(FlagClause::LEARNT) || self.is(Flag::DERIVE20)))
-            .then(|| self.reward)
-        }
-    }
-    #[cfg(not(feature = "clause_rewarding"))]
-    fn to_vivify(&self, initial_stage: bool) -> Option<f64> {
-        if initial_stage {
-            (!self.is_dead()).then(|| self.len() as f64)
-        } else {
-            (!self.is_dead()
-                && self.rank * 2 <= self.rank_old
-                && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
-            .then(|| -((self.rank_old - self.rank) as f64 / self.rank as f64))
-        }
-    }
-    fn vivified(&mut self) {
-        self.rank_old = self.rank;
-        if !self.is(FlagClause::LEARNT) {
-            self.turn_off(FlagClause::DERIVE20);
-        }
-    }
-
     #[cfg(feature = "boundary_check")]
     fn set_birth(&mut self, time: usize) {
         self.birth = time;
