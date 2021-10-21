@@ -398,6 +398,7 @@ fn conflict_analyze(
         //
         // set the index of the next literal to trail_index
         //
+        #[allow(clippy::blocks_in_if_conditions)]
         while {
             let vi = asg.stack(trail_index).vi();
             boundary_check!(
