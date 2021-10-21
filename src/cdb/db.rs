@@ -997,7 +997,7 @@ impl ClauseDBIF for ClauseDB {
         let learnt = c.is(FlagClause::LEARNT);
         if learnt {
             #[cfg(feature = "just_used")]
-            c.turn_on(Flag::USED);
+            c.turn_on(FlagClause::USED);
             self.reward_at_analysis(cid);
         }
         self.lbd_of_dp_ema.update(rank as f64);
@@ -1044,15 +1044,6 @@ impl ClauseDBIF for ClauseDB {
                 continue;
             }
 
-            #[cfg(feature = "just_used")]
-            {
-                let used = c.is(Flag::USED);
-                if used {
-                    c.turn_off(Flag::USED);
-                    continue;
-                }
-            }
-
             // This is the best at least for 3SAT360.
 
             let act_v: f64 = c
@@ -1064,8 +1055,22 @@ impl ClauseDBIF for ClauseDB {
             let act_c = c.reward;
             #[cfg(not(feature = "clause_rewarding"))]
             let act_c = 0.25;
-
-            let weight = rank / (act_c + act_v);
+            let weight = {
+                #[cfg(feature = "just_used")]
+                {
+                    let w = rank / (act_c + act_v);
+                    if c.is(FlagClause::USED) {
+                        c.turn_off(FlagClause::USED);
+                        0.8 * w
+                    } else {
+                        w
+                    }
+                }
+                #[cfg(not(feature = "just_used"))]
+                {
+                    rank / (act_c + act_v)
+                }
+            };
             perm.push(OrderedProxy::new(i, weight));
         }
         let keep = perm.len().min(nc) / 2;
