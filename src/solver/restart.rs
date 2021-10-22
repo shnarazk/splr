@@ -477,7 +477,7 @@ impl RestartIF for Restarter {
     fn restart(&mut self) -> Option<RestartDecision> {
         macro_rules! next_step {
             () => {
-                self.stb.step.pow(2) * self.initial_restart_step
+                self.stb.step * self.initial_restart_step
             };
         }
         if self.luby.is_active() {
