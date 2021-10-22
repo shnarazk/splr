@@ -1012,6 +1012,36 @@ impl ClauseDBIF for ClauseDB {
     }
     /// halve the number of 'learnt' or *removable* clauses.
     fn reduce(&mut self, asg: &mut impl AssignIF, nc: usize) {
+        impl Clause {
+            fn pure_weight(&self, asg: &mut impl AssignIF) -> f64 {
+                let act_v = self
+                    .iter()
+                    .fold(0.0f64, |acc, l| acc.max(asg.activity(l.vi())));
+                #[cfg(feature = "clause_rewarding")]
+                let act_c = self.reward;
+                #[cfg(not(feature = "clause_rewarding"))]
+                let act_c = 0.25;
+                self.rank as f64 / (act_c + act_v)
+            }
+            #[cfg(feature = "just_used")]
+            fn weight(&mut self, asg: &mut impl AssignIF) -> f64 {
+                let w = c.pure_weight(asg);
+                if self.is(FlagClause::USED) {
+                    self.turn_off(FlagClause::USED);
+                    0.8 * w
+                } else {
+                    w
+                }
+            }
+            #[cfg(not(feature = "just_used"))]
+            fn weight(&self, asg: &mut impl AssignIF) -> f64 {
+                self.pure_weight(asg)
+            }
+            // copied from vivify.rs
+            fn is_vivify_target(&self) -> bool {
+                self.rank * 2 <= self.rank_old
+            }
+        }
         let ClauseDB {
             ref mut clause,
             ref co_lbd_bound,
@@ -1024,11 +1054,13 @@ impl ClauseDBIF for ClauseDB {
         *num_reduction += 1;
 
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
-        for (i, c) in clause.iter_mut().enumerate().skip(1) {
-            if c.is_dead() {
-                continue;
-            }
-            let rank = c.update_lbd(asg, lbd_temp) as f64;
+        for (i, c) in clause
+            .iter_mut()
+            .enumerate()
+            .skip(1)
+            .filter(|(_, c)| !c.is_dead())
+        {
+            c.update_lbd(asg, lbd_temp);
             c.update_activity(*ordinal, *activity_decay, 0.0);
             // There's no clause stored in `reason` because the decision level is 'zero.'
             debug_assert_ne!(
@@ -1043,38 +1075,9 @@ impl ClauseDBIF for ClauseDB {
             if !c.is(FlagClause::LEARNT) {
                 continue;
             }
-
-            // This is the best at least for 3SAT360.
-
-            let act_v: f64 = c
-                .lits
-                .iter()
-                .fold(0.0, |acc, l| acc.max(asg.activity(l.vi())));
-
-            #[cfg(feature = "clause_rewarding")]
-            let act_c = c.reward;
-            #[cfg(not(feature = "clause_rewarding"))]
-            let act_c = 0.25;
-            let weight = {
-                #[cfg(feature = "just_used")]
-                {
-                    let w = rank / (act_c + act_v);
-                    if c.is(FlagClause::USED) {
-                        c.turn_off(FlagClause::USED);
-                        0.8 * w
-                    } else {
-                        w
-                    }
-                }
-                #[cfg(not(feature = "just_used"))]
-                {
-                    rank / (act_c + act_v)
-                }
-            };
-            perm.push(OrderedProxy::new(i, weight));
+            perm.push(OrderedProxy::new(i, c.weight(asg)));
         }
         let keep = perm.len().min(nc) / 2;
-
         let mut reduction_coeff: f64 = (nc as f64) / (self.reduction_step as f64) + 1.0;
         self.reduction_step += self.inc_step;
         if perm.is_empty() {
@@ -1088,14 +1091,15 @@ impl ClauseDBIF for ClauseDB {
             self.next_reduction = (reduction_coeff * self.reduction_step as f64) as usize;
         }
         perm.sort();
-        // let thr = self.lbd_of_dp_ema.get() as u16;
-        let thr = (self.lbd_of_dp_ema.get() as u16).max(*co_lbd_bound);
+        // Worse half of `perm` should be discarded now. But many people thought
+        // there're exception. Since this is the pre-stage of clause vivification,
+        // we want keep usefull clauses as many as possible.
+        // Therefore I save the clauses which will become vivification targets.
         for i in &perm[keep..] {
-            if thr <= self.clause[i.to()].rank {
+            if !self.clause[i.to()].is_vivify_target() {
                 self.remove_clause(ClauseId::from(i.to()));
             }
         }
-        debug_assert!(perm[0..keep].iter().all(|c| !self.clause[c.to()].is_dead()));
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
