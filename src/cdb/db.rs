@@ -305,7 +305,7 @@ impl ClauseDBIF for ClauseDB {
             //     panic!("done");
             // }
             // assert!(c.is_dead());
-            c.flags = Flag::empty();
+            c.flags = FlagClause::empty();
 
             #[cfg(feature = "clause_rewarding")]
             {
@@ -318,7 +318,7 @@ impl ClauseDBIF for ClauseDB {
         } else {
             cid = ClauseId::from(self.clause.len());
             let mut c = Clause {
-                flags: Flag::empty(),
+                flags: FlagClause::empty(),
                 ..Clause::default()
             };
             std::mem::swap(&mut c.lits, vec);
@@ -345,6 +345,7 @@ impl ClauseDBIF for ClauseDB {
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
+            c.rank_old = 1;
 
             #[cfg(feature = "bi_clause_completion")]
             {
@@ -358,6 +359,7 @@ impl ClauseDBIF for ClauseDB {
             }
         } else {
             c.update_lbd(asg, lbd_temp);
+            c.rank_old = c.rank;
         }
         if learnt && len2 {
             *num_bi_learnt += 1;
@@ -366,7 +368,7 @@ impl ClauseDBIF for ClauseDB {
             learnt = false;
         }
         if learnt {
-            c.turn_on(Flag::LEARNT);
+            c.turn_on(FlagClause::LEARNT);
 
             if c.rank <= 2 {
                 *num_lbd2 += 1;
@@ -400,13 +402,13 @@ impl ClauseDBIF for ClauseDB {
         if let Some(cid_used) = self.freelist.pop() {
             cid = cid_used;
             let c = &mut self[cid];
-            c.flags = Flag::empty();
+            c.flags = FlagClause::empty();
             std::mem::swap(&mut c.lits, vec);
             c.search_from = 2;
         } else {
             cid = ClauseId::from(self.clause.len());
             let mut c = Clause {
-                flags: Flag::empty(),
+                flags: FlagClause::empty(),
                 ..Clause::default()
             };
             std::mem::swap(&mut c.lits, vec);
@@ -426,14 +428,16 @@ impl ClauseDBIF for ClauseDB {
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
+            c.rank_old = 1;
         } else {
             c.update_lbd(asg, lbd_temp);
+            c.rank_old = c.rank;
         }
         if c.lits.len() <= 2 || (self.use_chan_seok && c.rank <= self.co_lbd_bound) {
             learnt = false;
         }
         if learnt {
-            c.turn_on(Flag::LEARNT);
+            c.turn_on(FlagClause::LEARNT);
         }
         let l0 = c.lits[0];
         let l1 = c.lits[1];
@@ -730,7 +734,7 @@ impl ClauseDBIF for ClauseDB {
                 certification_store.add_clause(new_lits);
                 certification_store.delete_clause(&c.lits);
             }
-            c.turn_off(Flag::LEARNT);
+            c.turn_off(FlagClause::LEARNT);
             self.num_bi_clause += 1;
 
             if certification_store.is_active() {
@@ -806,7 +810,7 @@ impl ClauseDBIF for ClauseDB {
         // firstly sweep without consuming extra memory
         let mut need_to_shrink = false;
         for l in self[cid].iter() {
-            debug_assert!(!asg.var(l.vi()).is(Flag::ELIMINATED));
+            debug_assert!(!asg.var(l.vi()).is(FlagVar::ELIMINATED));
             match asg.assigned(*l) {
                 Some(true) => {
                     self.remove_clause(cid);
@@ -815,7 +819,7 @@ impl ClauseDBIF for ClauseDB {
                 Some(false) => {
                     need_to_shrink = true;
                 }
-                None if asg.var(l.vi()).is(Flag::ELIMINATED) => {
+                None if asg.var(l.vi()).is(FlagVar::ELIMINATED) => {
                     need_to_shrink = true;
                 }
                 None => (),
@@ -838,7 +842,7 @@ impl ClauseDBIF for ClauseDB {
         let mut new_lits = c
             .lits
             .iter()
-            .filter(|l| asg.assigned(**l).is_none() && !asg.var(l.vi()).is(Flag::ELIMINATED))
+            .filter(|l| asg.assigned(**l).is_none() && !asg.var(l.vi()).is(FlagVar::ELIMINATED))
             .copied()
             .collect::<Vec<_>>();
         match new_lits.len() {
@@ -866,7 +870,7 @@ impl ClauseDBIF for ClauseDB {
                 bi_clause[l1].insert(l0, cid);
                 std::mem::swap(&mut c.lits, &mut new_lits);
                 self.num_bi_clause += 1;
-                c.turn_off(Flag::LEARNT);
+                c.turn_off(FlagClause::LEARNT);
 
                 if certification_store.is_active() {
                     certification_store.add_clause(&c.lits);
@@ -985,51 +989,19 @@ impl ClauseDBIF for ClauseDB {
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
     }
-    fn mark_clause_as_used(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> bool {
-        let chan_seok_condition = if self.use_chan_seok {
-            self.co_lbd_bound as usize
-        } else {
-            0
-        };
-        let ClauseDB {
-            ref mut clause,
-            ref mut lbd_temp,
-            ..
-        } = self;
-        let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
-        let old_rank = c.rank as usize;
-        let nlevels = c.update_lbd(asg, lbd_temp);
-        debug_assert!(
-            !c.is_dead(),
-            "cdb.make_clause_as_dead received a dead clause"
-        );
-        if nlevels < old_rank {
-            match (c.is(Flag::VIVIFIED2), c.is(Flag::VIVIFIED)) {
-                _ if nlevels == 1 || nlevels + 1 < old_rank => {
-                    c.turn_on(Flag::VIVIFIED2);
-                    c.turn_off(Flag::VIVIFIED);
-                }
-                (false, false) => (),
-                (false, true) => {
-                    c.turn_on(Flag::VIVIFIED2);
-                    c.turn_off(Flag::VIVIFIED);
-                }
-                (true, false) => c.turn_on(Flag::VIVIFIED),
-                (true, true) => (),
-            }
-            // chan_seok_condition is zero if !use_chan_seok
-            if c.is(Flag::LEARNT) {
-                if nlevels < chan_seok_condition {
-                    c.turn_off(Flag::LEARNT);
-                    self.num_learnt -= 1;
-                    return true;
-                } else {
-                    #[cfg(feature = "just_used")]
-                    c.turn_on(Flag::JUST_USED);
-                }
-            }
+    fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool {
+        let c = &mut self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
+        // Updating LBD at every analysis seems redundant.
+        // But it's crucial. Don't remove the below.
+        let rank = c.update_lbd(asg, &mut self.lbd_temp);
+        let learnt = c.is(FlagClause::LEARNT);
+        if learnt {
+            #[cfg(feature = "just_used")]
+            c.turn_on(FlagClause::USED);
+            self.reward_at_analysis(cid);
         }
-        false
+        self.lbd_of_dp_ema.update(rank as f64);
+        learnt
     }
     fn should_reduce(&mut self, num_conflicts: usize) -> bool {
         if self.use_chan_seok {
@@ -1040,6 +1012,36 @@ impl ClauseDBIF for ClauseDB {
     }
     /// halve the number of 'learnt' or *removable* clauses.
     fn reduce(&mut self, asg: &mut impl AssignIF, nc: usize) {
+        impl Clause {
+            fn pure_weight(&self, asg: &mut impl AssignIF) -> f64 {
+                let act_v = self
+                    .iter()
+                    .fold(0.0f64, |acc, l| acc.max(asg.activity(l.vi())));
+                #[cfg(feature = "clause_rewarding")]
+                let act_c = self.reward;
+                #[cfg(not(feature = "clause_rewarding"))]
+                let act_c = 0.25;
+                self.rank as f64 / (act_c + act_v)
+            }
+            #[cfg(feature = "just_used")]
+            fn weight(&mut self, asg: &mut impl AssignIF) -> f64 {
+                let w = c.pure_weight(asg);
+                if self.is(FlagClause::USED) {
+                    self.turn_off(FlagClause::USED);
+                    0.8 * w
+                } else {
+                    w
+                }
+            }
+            #[cfg(not(feature = "just_used"))]
+            fn weight(&self, asg: &mut impl AssignIF) -> f64 {
+                self.pure_weight(asg)
+            }
+            // copied from vivify.rs
+            fn is_vivify_target(&self) -> bool {
+                self.rank * 2 <= self.rank_old
+            }
+        }
         let ClauseDB {
             ref mut clause,
             ref co_lbd_bound,
@@ -1052,11 +1054,13 @@ impl ClauseDBIF for ClauseDB {
         *num_reduction += 1;
 
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
-        for (i, c) in clause.iter_mut().enumerate().skip(1) {
-            if c.is_dead() {
-                continue;
-            }
-            let rank = c.update_lbd(asg, lbd_temp) as f64;
+        for (i, c) in clause
+            .iter_mut()
+            .enumerate()
+            .skip(1)
+            .filter(|(_, c)| !c.is_dead())
+        {
+            c.update_lbd(asg, lbd_temp);
             c.update_activity(*ordinal, *activity_decay, 0.0);
             // There's no clause stored in `reason` because the decision level is 'zero.'
             debug_assert_ne!(
@@ -1068,36 +1072,12 @@ impl ClauseDBIF for ClauseDB {
                 asg.level(c.lit0().vi()),
                 asg.decision_level(),
             );
-            if !c.is(Flag::LEARNT) {
+            if !c.is(FlagClause::LEARNT) {
                 continue;
             }
-
-            #[cfg(feature = "just_used")]
-            {
-                let used = c.is(Flag::JUST_USED);
-                if used {
-                    c.turn_off(Flag::JUST_USED);
-                    continue;
-                }
-            }
-
-            // This is the best at least for 3SAT360.
-
-            let act_v: f64 = c
-                .lits
-                .iter()
-                .fold(0.0, |acc, l| acc.max(asg.activity(l.vi())));
-
-            #[cfg(feature = "clause_rewarding")]
-            let act_c = c.reward;
-            #[cfg(not(feature = "clause_rewarding"))]
-            let act_c = 0.25;
-
-            let weight = rank / (act_c + act_v);
-            perm.push(OrderedProxy::new(i, weight));
+            perm.push(OrderedProxy::new(i, c.weight(asg)));
         }
         let keep = perm.len().min(nc) / 2;
-
         let mut reduction_coeff: f64 = (nc as f64) / (self.reduction_step as f64) + 1.0;
         self.reduction_step += self.inc_step;
         if perm.is_empty() {
@@ -1111,19 +1091,23 @@ impl ClauseDBIF for ClauseDB {
             self.next_reduction = (reduction_coeff * self.reduction_step as f64) as usize;
         }
         perm.sort();
-        // let thr = self.lbd_of_dp_ema.get() as u16;
-        let thr = (self.lbd_of_dp_ema.get() as u16).max(*co_lbd_bound);
+        // Worse half of `perm` should be discarded now. But many people thought
+        // there're exception. Since this is the pre-stage of clause vivification,
+        // we want keep usefull clauses as many as possible.
+        // Therefore I save the clauses which will become vivification targets.
         for i in &perm[keep..] {
-            if thr <= self.clause[i.to()].rank {
+            if !self.clause[i.to()].is_vivify_target() {
                 self.remove_clause(ClauseId::from(i.to()));
             }
         }
-        debug_assert!(perm[0..keep].iter().all(|c| !self.clause[c.to()].is_dead()));
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
         for (i, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
-            if c.is(Flag::LEARNT) && !c.is_dead() && (self.co_lbd_bound as usize) < c.lits.len() {
+            if c.is(FlagClause::LEARNT)
+                && !c.is_dead()
+                && (self.co_lbd_bound as usize) < c.lits.len()
+            {
                 remove_clause_fn(
                     &mut self.certification_store,
                     &mut self.bi_clause,
@@ -1153,7 +1137,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId> {
         for (i, c) in self.clause.iter().enumerate().skip(1) {
-            if c.is_dead() || (strict && c.is(Flag::LEARNT)) {
+            if c.is_dead() || (strict && c.is(FlagClause::LEARNT)) {
                 continue;
             }
             match c.evaluate(model) {
@@ -1318,7 +1302,7 @@ impl ClauseDBIF for ClauseDB {
                         format!("{:?}", asg.assigned(lit)),
                         format!("{}", level),
                         format!("{}", asg.reason(lit.vi())),
-                        format!("{}", asg.var(lit.vi()).is(Flag::ELIMINATED)),
+                        format!("{}", asg.var(lit.vi()).is(FlagVar::ELIMINATED)),
                     ),
                     format!(
                         "{:>8}:{:>12} at level {:>3} by {:<20}, {:>5}",
@@ -1326,7 +1310,7 @@ impl ClauseDBIF for ClauseDB {
                         format!("{:?}", asg.assigned(*cached)),
                         format!("{}", lvl),
                         format!("{}", asg.reason(cached.vi())),
-                        format!("{}", asg.var(cached.vi()).is(Flag::ELIMINATED)),
+                        format!("{}", asg.var(cached.vi()).is(FlagVar::ELIMINATED)),
                     ),
                     format!(
                         "the mirrored({}) image: {:?}",
@@ -1407,11 +1391,11 @@ impl ClauseDB {
             ..
         } = self;
         for (i, c) in clause.iter_mut().enumerate() {
-            if c.is_dead() || !c.is(Flag::LEARNT) {
+            if c.is_dead() || !c.is(FlagClause::LEARNT) {
                 continue;
             }
             if c.rank < self.co_lbd_bound {
-                c.turn_off(Flag::LEARNT);
+                c.turn_off(FlagClause::LEARNT);
                 *num_learnt -= 1;
             } else if reinit {
                 remove_clause_fn(
@@ -1452,7 +1436,7 @@ fn remove_clause_fn(
         watcher[usize::from(!l0)].remove_watch(&cid); // .expect("db1076");
         watcher[usize::from(!l1)].remove_watch(&cid); // .expect("db1077");
     }
-    if c.is(Flag::LEARNT) {
+    if c.is(FlagClause::LEARNT) {
         *num_learnt -= 1;
     }
     *num_clause -= 1;

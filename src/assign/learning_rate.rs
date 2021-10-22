@@ -13,7 +13,7 @@ impl ActivityIF<VarId> for AssignStack {
         self.var[vi].reward = val;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
-        self.var[vi].turn_on(Flag::USED);
+        self.var[vi].turn_on(FlagVar::USED);
     }
     #[inline]
     fn reward_at_assign(&mut self, _vi: VarId) {}
@@ -41,9 +41,9 @@ impl Var {
         // 1. cancel_until -> reward_at_unassign -> assertion failed
         //
         self.reward *= decay;
-        if self.is(Flag::USED) {
+        if self.is(FlagVar::USED) {
             self.reward += reward;
-            self.turn_off(Flag::USED);
+            self.turn_off(FlagVar::USED);
         }
         self.reward
     }

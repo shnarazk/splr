@@ -319,15 +319,15 @@ impl Config {
                 #[cfg(feature = "bi_clause_completion")]
                 "binary clause completion",
                 #[cfg(feature = "chrono_BT")]
-                "chrono_BT",
+                "chrono BT",
                 #[cfg(feature = "clause_elimination")]
                 "clause elimination",
                 #[cfg(feature = "clause_vivification")]
                 "clause vivification",
                 #[cfg(feature = "deterministic_iterators")]
-                "deterministic_iterators",
+                "deterministic iterators",
                 #[cfg(feature = "dynamic_restart_threshold")]
-                "dynamic_restart_threshold",
+                "dynamic restart threshold",
                 #[cfg(feature = "EMA_calibration")]
                 "EMA calibration",
                 #[cfg(feature = "EVSIDS")]
@@ -335,7 +335,7 @@ impl Config {
                 #[cfg(feature = "incremental_solver")]
                 "incremental solver",
                 #[cfg(feature = "just_used")]
-                "use_just_used_flag",
+                "use 'just used' flag",
                 #[cfg(feature = "LRB_rewarding")]
                 "Learning-Rate Based rewarding",
                 #[cfg(feature = "Luby_restart")]

@@ -24,7 +24,7 @@ pub fn eliminate_var(
     if asg.assign(vi).is_some() || w.aborted {
         return Ok(());
     }
-    debug_assert!(!v.is(Flag::ELIMINATED));
+    debug_assert!(!v.is(FlagVar::ELIMINATED));
     // count only alive clauses
     // Note: it may contain the target literal somehow. So the following may be failed.
     // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, true)))));
@@ -61,7 +61,7 @@ pub fn eliminate_var(
     // println!("eliminate_var {}: |p|: {} and |n|: {}", vi, (*pos).len(), (*neg).len());
     // Produce clauses in cross product:
     for p in pos.iter() {
-        let learnt_p = cdb[*p].is(Flag::LEARNT);
+        let learnt_p = cdb[*p].is(FlagClause::LEARNT);
         for n in neg.iter() {
             match merge(asg, cdb, *p, *n, vi, vec) {
                 0 => {
@@ -95,12 +95,9 @@ pub fn eliminate_var(
                 }
                 _ => {
                     debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
-                    match cdb.new_clause(asg, vec, learnt_p && cdb[*n].is(Flag::LEARNT)) {
+                    match cdb.new_clause(asg, vec, learnt_p && cdb[*n].is(FlagClause::LEARNT)) {
                         RefClause::Clause(ci) => {
                             // the merged clause might be a duplicated clause.
-                            cdb[ci].turn_on(Flag::VIVIFIED);
-                            cdb[ci].turn_on(Flag::VIVIFIED2);
-
                             elim.add_cid_occur(asg, ci, &mut cdb[ci], true);
 
                             #[cfg(feature = "trace_elimination")]
@@ -129,7 +126,7 @@ pub fn eliminate_var(
         }
         #[cfg(feature = "incremental_solver")]
         {
-            if !cdb[*cid].is(Flag::LEARNT) {
+            if !cdb[*cid].is(FlagClause::LEARNT) {
                 cdb.make_permanent_immortal(*cid);
             }
         }
@@ -142,7 +139,7 @@ pub fn eliminate_var(
         }
         #[cfg(feature = "incremental_solver")]
         {
-            if !cdb[*cid].is(Flag::LEARNT) {
+            if !cdb[*cid].is(FlagClause::LEARNT) {
                 cdb.make_permanent_immortal(*cid);
             }
         }
@@ -219,12 +216,12 @@ fn merge_cost(
             continue;
         }
         debug_assert_ne!(asg.assigned(*lit), Some(false));
-        debug_assert!(!asg.var(lit.vi()).is(Flag::ELIMINATED));
+        debug_assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
         // if this is the last occurrence of this literal, count it.
         for l in c_q.iter() {
             if !*lit == *l {
                 return Some(0);
-            } else if *lit == *l || asg.var(l.vi()).is(Flag::ELIMINATED) {
+            } else if *lit == *l || asg.var(l.vi()).is(FlagVar::ELIMINATED) {
                 continue 'next_lit;
             }
         }
@@ -240,7 +237,7 @@ fn merge_cost(
                 return None;
             }
         }
-        debug_assert!(!asg.var(lit.vi()).is(Flag::ELIMINATED));
+        debug_assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
         count += 1;
     }
     cond2.map(|_| count)
@@ -280,7 +277,7 @@ fn merge(
             .collect::<Vec<_>>(),
     );
     std::mem::swap(&mut lits, vec);
-    debug_assert!(vec.iter().all(|l| !asg.var(l.vi()).is(Flag::ELIMINATED)));
+    debug_assert!(vec.iter().all(|l| !asg.var(l.vi()).is(FlagVar::ELIMINATED)));
     debug_assert!(vec.iter().all(|l| l.vi() != vi));
     vec.len()
 }
@@ -345,7 +342,6 @@ mod tests {
         processor::EliminateIF,
         solver::Solver,
     };
-    use std::convert::TryFrom;
 
     impl Clause {
         #[allow(dead_code)]
@@ -380,7 +376,7 @@ mod tests {
         elim.activate();
         elim.prepare(asg, cdb, true);
         eliminate_var(asg, cdb, elim, rst, state, vi, &mut timedout).expect("panic");
-        assert!(asg.var(vi).is(Flag::ELIMINATED));
+        assert!(asg.var(vi).is(FlagVar::ELIMINATED));
         assert!(cdb
             .iter()
             .skip(1)

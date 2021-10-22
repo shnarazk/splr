@@ -109,7 +109,7 @@ impl PropagateIF for AssignStack {
         self.cancel_until(self.root_level);
         let vi = l.vi();
         debug_assert!(vi < self.var.len());
-        debug_assert!(!self.var[vi].is(Flag::ELIMINATED));
+        debug_assert!(!self.var[vi].is(FlagVar::ELIMINATED));
         debug_assert!(self.trail_lim.is_empty());
         self.level[vi] = self.root_level;
         match var_assign!(self, vi) {
@@ -144,7 +144,7 @@ impl PropagateIF for AssignStack {
         // The following doesn't hold anymore by using chronoBT.
         // assert!(self.trail_lim.is_empty() || !cid.is_none());
         let vi = l.vi();
-        debug_assert!(!self.var[vi].is(Flag::ELIMINATED));
+        debug_assert!(!self.var[vi].is(FlagVar::ELIMINATED));
         debug_assert!(
             var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
         );
@@ -187,7 +187,7 @@ impl PropagateIF for AssignStack {
         let vi = l.vi();
         self.level[vi] = dl;
         let v = &mut self.var[vi];
-        debug_assert!(!v.is(Flag::ELIMINATED));
+        debug_assert!(!v.is(FlagVar::ELIMINATED));
         debug_assert_eq!(self.assign[vi], None);
         debug_assert_eq!(self.reason[vi], AssignReason::None);
         set_assign!(self, l);
@@ -243,8 +243,8 @@ impl PropagateIF for AssignStack {
 
             let v = &mut self.var[vi];
             #[cfg(feature = "debug_propagation")]
-            v.turn_off(Flag::PROPAGATED);
-            v.set(Flag::PHASE, var_assign!(self, vi).unwrap());
+            v.turn_off(FlagVar::PROPAGATED);
+            v.set(FlagVar::PHASE, var_assign!(self, vi).unwrap());
 
             #[cfg(feature = "boundary_check")]
             {
@@ -284,7 +284,7 @@ impl PropagateIF for AssignStack {
         debug_assert!(self.q_head == 0 || self.assign[self.trail[self.q_head - 1].vi()].is_some());
         #[cfg(feature = "debug_propagation")]
         debug_assert!(
-            self.q_head == 0 || self.var[self.trail[self.q_head - 1].vi()].is(Flag::PROPAGATED)
+            self.q_head == 0 || self.var[self.trail[self.q_head - 1].vi()].is(FlagVar::PROPAGATED)
         );
     }
     fn backtrack_sandbox(&mut self) {
@@ -374,8 +374,8 @@ impl PropagateIF for AssignStack {
             self.q_head += 1;
             #[cfg(feature = "debug_propagation")]
             {
-                assert!(!self.var[p.vi()].is(Flag::PROPAGATED));
-                self.var[p.vi()].turn_on(Flag::PROPAGATED);
+                assert!(!self.var[p.vi()].is(FlagVar::PROPAGATED));
+                self.var[p.vi()].turn_on(FlagVar::PROPAGATED);
             }
             let propagating = Lit::from(usize::from(*p));
             let false_lit = !*p;
@@ -402,7 +402,7 @@ impl PropagateIF for AssignStack {
             iterable.sort();
             for (&blocker, &cid) in iterable.iter() {
                 debug_assert!(!cdb[cid].is_dead());
-                debug_assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
+                debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
                 debug_assert_eq!(cdb[cid].len(), 2);
                 match lit_assign!(self, blocker) {
@@ -446,7 +446,7 @@ impl PropagateIF for AssignStack {
                     "dead clause in propagation: {:?}",
                     cdb.is_garbage_collected(cid),
                 );
-                debug_assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));
+                debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
                 #[cfg(feature = "maintain_watch_cache")]
                 debug_assert!(
                     cached == cdb[cid].lit0() || cached == cdb[cid].lit1(),
@@ -484,7 +484,7 @@ impl PropagateIF for AssignStack {
                         cached = other;
                         other_watch_value = lit_assign!(self, other);
                         if Some(true) == other_watch_value {
-                            debug_assert!(!self.var[other.vi()].is(Flag::ELIMINATED));
+                            debug_assert!(!self.var[other.vi()].is(FlagVar::ELIMINATED));
                             // In this path, we use only `AssignStack::assign`.
                             cdb.transform_by_restoring_watch_cache(
                                 propagating,
@@ -513,7 +513,7 @@ impl PropagateIF for AssignStack {
                             let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
-                            cdb[cid].search_from = k as u32 + 1;
+                            cdb[cid].search_from = (k + 1) as u16;
                             debug_assert_ne!(self.assigned(new_watch), Some(true));
                             check_in!(
                                 cid,
@@ -591,7 +591,7 @@ impl PropagateIF for AssignStack {
         }
         macro_rules! conflict_path {
             ($lit: expr, $reason: expr) => {
-                return Err(($lit, $reason));
+                return Err(($lit, $reason))
             };
         }
         while let Some(p) = self.trail.get(self.q_head) {
@@ -619,7 +619,7 @@ impl PropagateIF for AssignStack {
             iterable.sort();
             for (&blocker, &cid) in iterable.iter() {
                 debug_assert!(!cdb[cid].is_dead());
-                debug_assert!(!self.var[blocker.vi()].is(Flag::ELIMINATED));
+                debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
 
                 #[cfg(feature = "boundary_check")]
@@ -662,7 +662,7 @@ impl PropagateIF for AssignStack {
                     cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
                     continue;
                 }
-                debug_assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));
+                debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
                 let mut other_watch_value = lit_assign!(self, cached);
                 let mut updated_cache: Option<Lit> = None;
                 if let Some(true) = other_watch_value {
@@ -684,7 +684,7 @@ impl PropagateIF for AssignStack {
                         cached = other;
                         other_watch_value = lit_assign!(self, other);
                         if Some(true) == other_watch_value {
-                            debug_assert!(!self.var[cached.vi()].is(Flag::ELIMINATED));
+                            debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
                             cdb.transform_by_restoring_watch_cache(
                                 propagating,
                                 &mut source,
@@ -708,7 +708,7 @@ impl PropagateIF for AssignStack {
                             let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
-                            cdb[cid].search_from = k as u32 + 1;
+                            cdb[cid].search_from = (k + 1) as u16;
                             debug_assert!(
                                 self.assigned(!new_watch) == Some(true)
                                     || self.assigned(!new_watch) == None
@@ -803,7 +803,7 @@ impl AssignStack {
                 }
                 debug_assert!(cdb[cid]
                     .iter()
-                    .all(|l| !self.var[l.vi()].is(Flag::ELIMINATED)));
+                    .all(|l| !self.var[l.vi()].is(FlagVar::ELIMINATED)));
                 match cdb.transform_by_simplification(self, cid) {
                     RefClause::Clause(_) => (),
                     RefClause::Dead => (), // was a satisfied clause

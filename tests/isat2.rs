@@ -4,7 +4,7 @@
 /// cargo test --test isat2 --features incremental_solver --release -- --nocapture --test-threads=1
 ///```
 use splr::*;
-use std::{convert::TryFrom, env::args};
+use std::env::args;
 
 fn main() {
     let cnf = args().nth(1).expect("takes an arg");

@@ -142,8 +142,11 @@ impl Instantiate for AssignStack {
                 debug_assert_eq!(self.decision_level(), self.root_level);
                 self.q_head = 0;
                 self.num_asserted_vars = 0;
-                self.num_eliminated_vars =
-                    self.var.iter().filter(|v| v.is(Flag::ELIMINATED)).count();
+                self.num_eliminated_vars = self
+                    .var
+                    .iter()
+                    .filter(|v| v.is(FlagVar::ELIMINATED))
+                    .count();
                 self.rebuild_order();
             }
             e => panic!("don't call asg with {:?}", e),
@@ -268,7 +271,7 @@ impl AssignIF for AssignStack {
     #[cfg(not(feature = "no_IO"))]
     fn dump_cnf(&mut self, cdb: &impl ClauseDBIF, fname: &str) {
         for vi in 1..self.var.len() {
-            if self.var(vi).is(Flag::ELIMINATED) && self.assign[vi].is_some() {
+            if self.var(vi).is(FlagVar::ELIMINATED) && self.assign[vi].is_some() {
                 panic!("conflicting var {} {:?}", vi, self.assign[vi]);
             }
         }

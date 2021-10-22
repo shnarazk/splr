@@ -35,7 +35,7 @@ if let Ok(mut s) = Solver::build(&config) {
 ## On-memory direct conversion from a vec to a solution
 
 ```
-use {splr::*, std::convert::TryFrom};
+use splr::*;
 
 let v: Vec<Vec<i32>> = vec![vec![1, 2], vec![-1, 3], vec![1, -3], vec![-1, 2]];
 match Certificate::try_from(v).expect("panic!") {

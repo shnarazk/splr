@@ -1,9 +1,9 @@
 [package]
 name = "splr"
-version = "0.14.0-beta.3"
+version = "0.14.0-beta.4"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
-edition = "2018"
+edition = "2021"
 license = "MPL-2.0"
 readme = "README.md"
 repository = "https://github.com/shnarazk/splr"
@@ -22,7 +22,7 @@ default = [
         "clause_elimination",
         # "clause_rewarding",
         "clause_vivification",
-        # "deterministic_iterators", # DEBUG
+        "deterministic_iterators", # DEBUG
         "dynamic_restart_threshold",
         # "incremental_solver",
         "LRB_rewarding",

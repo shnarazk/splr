@@ -8,11 +8,14 @@ mod clause;
 mod db;
 /// methods for UNSAT certification
 mod unsat_certificate;
+/// Implement vivification preprocessor
+mod vivify;
 /// types about watching literal
 mod watch_cache;
 
+#[cfg(feature = "clause_vivification")]
+pub use self::vivify::VivifyIF;
 pub use self::{cid::ClauseIdIF, property::*, unsat_certificate::CertificationStore};
-
 use {
     crate::{assign::AssignIF, types::*},
     std::{
@@ -43,10 +46,6 @@ pub trait ClauseIF {
     fn len(&self) -> usize;
     /// return timestamp
     fn timestamp(&self) -> usize;
-    /// return `true` if the clause should try vivification
-    fn to_vivify(&self, initial_stage: bool) -> Option<f64>;
-    /// clear flags about vivification
-    fn vivified(&mut self);
 
     #[cfg(feature = "boundary_check")]
     fn set_birth(&mut self, time: usize);
@@ -131,8 +130,9 @@ pub trait ClauseDBIF:
     fn reduce(&mut self, asg: &mut impl AssignIF, nc: usize);
     /// FIXME
     fn reset(&mut self);
-    /// update LBD then convert a learnt clause to permanent if needed.
-    fn mark_clause_as_used(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> bool;
+    /// update flags.
+    /// return `true` if it's learnt.
+    fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool;
     /// record an asserted literal to unsat certification.
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.
@@ -183,12 +183,15 @@ pub struct ClauseId {
 pub struct Clause {
     /// The literals in a clause.
     lits: Vec<Lit>,
-    /// Flags (16 bits)
-    flags: Flag,
+    /// Flags (8 bits)
+    flags: FlagClause,
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: u16,
+    /// A record of the rank at previos stage.
+    pub rank_old: u16,
     /// the index from which `propagate` starts searching an un-falsified literal.
-    pub search_from: u32,
+    /// Since it's just a hint, we don't need u32 or usize.
+    pub search_from: u16,
     /// the number of conflicts at which this clause was used in `conflict_analyze`
     timestamp: usize,
 
@@ -391,9 +394,9 @@ mod tests {
         let c = &cdb[c1];
         assert_eq!(c.rank, 2);
         assert!(!c.is_dead());
-        assert!(!c.is(Flag::LEARNT));
+        assert!(!c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
-        assert!(!c.is(Flag::JUST_USED));
+        assert!(!c.is(Flag::USED));
 
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
@@ -401,9 +404,9 @@ mod tests {
         let c = &cdb[c2];
         assert_eq!(c.rank, 2);
         assert!(!c.is_dead());
-        assert!(c.is(Flag::LEARNT));
+        assert!(c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
-        assert!(!c.is(Flag::JUST_USED));
+        assert!(!c.is(Flag::USED));
     }
     #[test]
     fn test_clause_equality() -> () {

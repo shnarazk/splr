@@ -9,11 +9,10 @@ use {
     crate::solver::SolverEvent,
     std::{
         cmp::Ordering,
-        convert::TryFrom,
         fmt,
         fs::File,
         io::{BufRead, BufReader},
-        ops::{Index, IndexMut, Neg, Not},
+        ops::{Index, IndexMut, Not},
         path::{Path, PathBuf},
     },
 };
@@ -254,7 +253,7 @@ impl From<Lit> for i32 {
     #[inline]
     fn from(l: Lit) -> i32 {
         if l.ordinal % 2 == 0 {
-            ((l.ordinal >> 1) as i32).neg()
+            -((l.ordinal >> 1) as i32)
         } else {
             (l.ordinal >> 1) as i32
         }
@@ -265,7 +264,7 @@ impl From<&Lit> for i32 {
     #[inline]
     fn from(l: &Lit) -> i32 {
         if l.ordinal % 2 == 0 {
-            ((l.ordinal >> 1) as i32).neg()
+            -((l.ordinal >> 1) as i32)
         } else {
             (l.ordinal >> 1) as i32
         }
@@ -752,21 +751,22 @@ impl<T> Delete<T> for Vec<T> {
 
 /// API for object properties.
 pub trait FlagIF {
+    type FlagType;
     /// return true if the flag in on.
-    fn is(&self, flag: Flag) -> bool;
+    fn is(&self, flag: Self::FlagType) -> bool;
     /// set the flag.
-    fn set(&mut self, f: Flag, b: bool);
+    fn set(&mut self, f: Self::FlagType, b: bool);
     // toggle the flag.
-    fn toggle(&mut self, flag: Flag);
+    fn toggle(&mut self, flag: Self::FlagType);
     /// toggle the flag off.
-    fn turn_off(&mut self, flag: Flag);
+    fn turn_off(&mut self, flag: Self::FlagType);
     /// toggle the flag on.
-    fn turn_on(&mut self, flag: Flag);
+    fn turn_on(&mut self, flag: Self::FlagType);
 }
 
 bitflags! {
     /// Misc flags used by [`Clause`](`crate::cdb::Clause`) and [`Var`](`crate::assign::Var`).
-    pub struct Flag: u16 {
+    pub struct OldFlag: u16 {
 
         //
         //## For Clause
@@ -778,13 +778,16 @@ bitflags! {
         /// a clause or var is enqueued for eliminator.
         const ENQUEUED     = 0b0000_0000_0000_0100;
         /// for vivified clauses
+        /// meanings of (VIVIFIED2, VIVIFIED)
+        ///  - (false, false) => vivification target
+        ///  - (false, true)  => big update after vivification
+        ///  - (true,  false) => small update after vivification
+        ///  - (true,  true)  => no update after vivification
         const VIVIFIED     = 0b0000_0000_0001_0000;
         /// for a clause which decreases LBD twice after vivification
         const VIVIFIED2    = 0b0000_0000_0010_0000;
         /// a given clause derived a learnt which LBD is smaller than 20.
         const DERIVE20     = 0b0000_0000_0100_0000;
-        /// used in conflict analyze
-        const USED         = 0b0000_0000_1000_0000;
         //
         //## For Var
         //
@@ -797,11 +800,49 @@ bitflags! {
 
         #[cfg(feature = "debug_propagation")]
         /// check propagation
-        const PROPAGATED   = 0b0001_0000_0000_0000;
+        const PROPAGATED   = 0b0000_1000_0000_0000;
 
-        #[cfg(feature = "just_used")]
-        /// a clause is used recently in conflict analysis.
-        const JUST_USED    = 0b0010_0000_0000_0000;
+        //
+        //## Shared attribute
+        //
+        /// used in conflict analyze
+        const USED         = 0b0000_0001_0000_0000;
+    }
+}
+
+bitflags! {
+    /// Misc flags used by [`Clause`](`crate::cdb::Clause`).
+    pub struct FlagClause: u8 {
+        /// a clause is a generated clause by conflict analysis and is removable.
+        const LEARNT       = 0b0000_0001;
+        /// used in conflict analyze
+        const USED         = 0b0000_0010;
+        /// a clause or var is enqueued for eliminator.
+        const ENQUEUED     = 0b0000_0100;
+        /// a clause is registered in vars' occurrence list.
+        const OCCUR_LINKED = 0b0000_1000;
+        /// a given clause derived a learnt which LBD is smaller than 20.
+        const DERIVE20     = 0b0001_0000;
+    }
+}
+
+bitflags! {
+    /// Misc flags used by [`Clause`](`crate::cdb::Clause`) and [`Var`](`crate::assign::Var`).
+    pub struct FlagVar: u8 {
+        /// * the previous assigned value of a Var.
+        const PHASE        = 0b0000_0001;
+        /// used in conflict analyze
+        const USED         = 0b0000_0010;
+        /// a var is eliminated and managed by eliminator.
+        const ELIMINATED   = 0b0000_0100;
+        /// a clause or var is enqueued for eliminator.
+        const ENQUEUED     = 0b0000_1000;
+        /// a var is checked during in the current conflict analysis.
+        const CA_SEEN      = 0b0001_0000;
+
+        #[cfg(feature = "debug_propagation")]
+        /// check propagation
+        const PROPAGATED   = 0b0010_0000;
     }
 }
 
