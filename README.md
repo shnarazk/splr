@@ -7,10 +7,10 @@ It adopts various research results on modern SAT solvers:
 - Glucose-like _dynamic blocking/forcing restarts_
 - pre/in-processor to simplify CNF
 - branching variable selection based on _Learning Rate Based Branching_ with _Reason Side Rewarding_ or EVSIDS
-- _chronological backtrack_
 - [CaDiCaL](https://github.com/arminbiere/cadical)-like extended phase saving
 - _restart stabilization_ inspired by CadiCaL
 - _clause vivification_
+- _trail saving_
 
 *Many thanks to SAT researchers.*
 
