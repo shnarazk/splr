@@ -6,6 +6,7 @@
 - add feature 'suppress_reason_chain' that suppresses reason sequences consisting of binary clauses
 - split `Flag` to `FlagClause` and `FlagVar` to reduce memory footprint
 - select vivification targets based on LBD shrinking rate and they are protected from clause reduction
+- Luby stabilization adopts quadratic scaling
 
 ## 0.13.0, 2021-10-11
 
