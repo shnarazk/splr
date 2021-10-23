@@ -1095,8 +1095,10 @@ impl ClauseDBIF for ClauseDB {
         // there're exception. Since this is the pre-stage of clause vivification,
         // we want keep usefull clauses as many as possible.
         // Therefore I save the clauses which will become vivification targets.
+        let thr = self.lbd_of_dp_ema.get() as u16 * 2;
         for i in &perm[keep..] {
-            if !self.clause[i.to()].is_vivify_target() {
+            let c = &self.clause[i.to()];
+            if !c.is_vivify_target() || thr < c.rank {
                 self.remove_clause(ClauseId::from(i.to()));
             }
         }
