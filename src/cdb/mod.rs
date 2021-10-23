@@ -217,7 +217,9 @@ pub struct ClauseDB {
     bi_clause: Vec<BiClause>,
     /// container of watch literals
     watch_cache: Vec<WatchCache>,
+    /// collected free clause ids.
     freelist: Vec<ClauseId>,
+    /// see unsat_certificate.rs
     certification_store: CertificationStore,
     /// a number of clauses to emit out-of-memory exception
     soft_limit: usize,
