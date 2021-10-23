@@ -214,9 +214,9 @@ pub struct ClauseDB {
     ///## Note
     /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
     ///
-    pub bi_clause: Vec<BiClause>,
+    bi_clause: Vec<BiClause>,
     /// container of watch literals
-    pub watch_cache: Vec<WatchCache>,
+    watch_cache: Vec<WatchCache>,
     freelist: Vec<ClauseId>,
     certification_store: CertificationStore,
     /// a number of clauses to emit out-of-memory exception
