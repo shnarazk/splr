@@ -450,32 +450,6 @@ impl ClauseDBIF for ClauseDB {
         }
         RefClause::Clause(cid)
     }
-    /// remove a clause temporally
-    fn detach_clause(&mut self, cid: ClauseId) -> (Lit, Lit) {
-        let c = &self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
-        debug_assert!(1 < c.lits.len());
-        let l0 = c.lit0();
-        let l1 = c.lit1();
-        if c.len() == 2 {
-            self.bi_clause[l0].remove(&l1);
-            self.bi_clause[l1].remove(&l0);
-        } else {
-            self.watch_cache[!l0].remove_watch(&cid);
-            self.watch_cache[!l1].remove_watch(&cid);
-        }
-        (l0, l1)
-    }
-    /// push back a clause
-    fn reattach_clause(&mut self, cid: ClauseId, (l0, l1): (Lit, Lit)) {
-        let c = &self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
-        if c.len() == 2 {
-            self.bi_clause[l0].insert(l1, cid);
-            self.bi_clause[l1].insert(l0, cid);
-        } else {
-            self.watch_cache[!l0].insert_watch(cid, l1);
-            self.watch_cache[!l1].insert_watch(cid, l0);
-        }
-    }
     /// ## Warning
     /// this function is the only function that makes dead clauses
     fn remove_clause(&mut self, cid: ClauseId) {

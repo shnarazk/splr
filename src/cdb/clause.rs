@@ -167,9 +167,6 @@ impl ClauseIF for Clause {
     fn len(&self) -> usize {
         self.lits.len()
     }
-    fn timestamp(&self) -> usize {
-        self.timestamp
-    }
     #[cfg(feature = "boundary_check")]
     fn set_birth(&mut self, time: usize) {
         self.birth = time;

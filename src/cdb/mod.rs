@@ -44,8 +44,6 @@ pub trait ClauseIF {
     fn iter(&self) -> Iter<'_, Lit>;
     /// return the number of literals.
     fn len(&self) -> usize;
-    /// return timestamp
-    fn timestamp(&self) -> usize;
 
     #[cfg(feature = "boundary_check")]
     fn set_birth(&mut self, time: usize);
@@ -108,10 +106,6 @@ pub trait ClauseDBIF:
     /// And this is called only from `Eliminator::strengthen_clause`.
     fn new_clause(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
     fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>) -> RefClause;
-    /// remove a clause temporally
-    fn detach_clause(&mut self, cid: ClauseId) -> (Lit, Lit);
-    /// push back a clause
-    fn reattach_clause(&mut self, cid: ClauseId, watches: (Lit, Lit));
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn remove_clause(&mut self, cid: ClauseId);
     /// un-register a clause `cid` from clause database and make the clause dead.
