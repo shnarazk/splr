@@ -736,15 +736,12 @@ impl TryFrom<&PathBuf> for CNFReader {
 }
 
 impl<T> Delete<T> for Vec<T> {
-    fn delete_unstable<F>(&mut self, mut filter: F)
+    fn delete_unstable<F>(&mut self, filter: F)
     where
         F: FnMut(&T) -> bool,
     {
-        for (i, x) in self.iter().enumerate() {
-            if filter(x) {
-                self.swap_remove(i);
-                return;
-            }
+        if let Some(i) = self.iter().position(filter) {
+            self.swap_remove(i);
         }
     }
 }
