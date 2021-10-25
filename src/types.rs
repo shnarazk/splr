@@ -765,52 +765,6 @@ pub trait FlagIF {
 }
 
 bitflags! {
-    /// Misc flags used by [`Clause`](`crate::cdb::Clause`) and [`Var`](`crate::assign::Var`).
-    pub struct OldFlag: u16 {
-
-        //
-        //## For Clause
-        //
-        /// a clause is a generated clause by conflict analysis and is removable.
-        const LEARNT       = 0b0000_0000_0000_0001;
-        /// a clause is registered in vars' occurrence list.
-        const OCCUR_LINKED = 0b0000_0000_0000_0010;
-        /// a clause or var is enqueued for eliminator.
-        const ENQUEUED     = 0b0000_0000_0000_0100;
-        /// for vivified clauses
-        /// meanings of (VIVIFIED2, VIVIFIED)
-        ///  - (false, false) => vivification target
-        ///  - (false, true)  => big update after vivification
-        ///  - (true,  false) => small update after vivification
-        ///  - (true,  true)  => no update after vivification
-        const VIVIFIED     = 0b0000_0000_0001_0000;
-        /// for a clause which decreases LBD twice after vivification
-        const VIVIFIED2    = 0b0000_0000_0010_0000;
-        /// a given clause derived a learnt which LBD is smaller than 20.
-        const DERIVE20     = 0b0000_0000_0100_0000;
-        //
-        //## For Var
-        //
-        /// a var is eliminated and managed by eliminator.
-        const ELIMINATED   = 0b0000_0001_0000_0000;
-        /// a var is checked during in the current conflict analysis.
-        const CA_SEEN      = 0b0000_0010_0000_0000;
-        /// * the previous assigned value of a Var.
-        const PHASE        = 0b0000_0100_0000_0000;
-
-        #[cfg(feature = "debug_propagation")]
-        /// check propagation
-        const PROPAGATED   = 0b0000_1000_0000_0000;
-
-        //
-        //## Shared attribute
-        //
-        /// used in conflict analyze
-        const USED         = 0b0000_0001_0000_0000;
-    }
-}
-
-bitflags! {
     /// Misc flags used by [`Clause`](`crate::cdb::Clause`).
     pub struct FlagClause: u8 {
         /// a clause is a generated clause by conflict analysis and is removable.
@@ -827,7 +781,7 @@ bitflags! {
 }
 
 bitflags! {
-    /// Misc flags used by [`Clause`](`crate::cdb::Clause`) and [`Var`](`crate::assign::Var`).
+    /// Misc flags used by [`Var`](`crate::assign::Var`).
     pub struct FlagVar: u8 {
         /// * the previous assigned value of a Var.
         const PHASE        = 0b0000_0001;
