@@ -1,5 +1,7 @@
 /// methods on clause activity
 mod activity;
+///
+mod binary;
 /// methods on `ClauseId`
 mod cid;
 /// methods on `Clause`
