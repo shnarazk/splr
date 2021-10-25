@@ -125,7 +125,7 @@ pub type WatchCacheProxy = usize;
 pub struct WatchCacheIterator {
     pub index: usize,
     end_at: usize,
-    checksum: usize,
+    // checksum: usize,
 }
 
 impl Iterator for WatchCacheIterator {
@@ -134,7 +134,7 @@ impl Iterator for WatchCacheIterator {
         // assert!(self.checksum == self.end_at - self.index);
         (self.index < self.end_at).then(|| {
             // assert!(0 < self.checksum);
-            self.checksum -= 1;
+            // self.checksum -= 1;
             self.index
         })
     }
@@ -145,7 +145,7 @@ impl WatchCacheIterator {
         WatchCacheIterator {
             index: 0,
             end_at: len,
-            checksum: len,
+            // checksum: len,
         }
     }
     pub fn restore_entry(&mut self) {
