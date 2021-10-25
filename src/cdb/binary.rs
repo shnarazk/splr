@@ -1,6 +1,6 @@
 use {
     super::ClauseId,
-    crate::types::*,
+    crate::{solver::SolverEvent, types::*},
     std::{
         collections::HashMap,
         ops::{Index, IndexMut},
@@ -41,10 +41,25 @@ pub struct BinaryLinkDB {
     list: Vec<BinaryLinkList>,
 }
 
+impl Instantiate for BinaryLinkDB {
+    fn instantiate(_conf: &Config, cnf: &CNFDescription) -> Self {
+        let num_lit = 2 * cnf.num_of_variables + 1;
+        BinaryLinkDB {
+            hash: vec![HashMap::new(); num_lit],
+            list: vec![Vec::new(); num_lit],
+        }
+    }
+    fn handle(&mut self, _e: SolverEvent) {}
+}
+
 pub trait BinaryLinkIF {
+    /// add a mapping from a pair of Lit to a `ClauseId`
     fn add(&mut self, lit0: Lit, lit1: Lit, cid: ClauseId);
+    /// remove a pair of `Lit`s
     fn remove(&mut self, lit0: Lit, lit1: Lit) -> MaybeInconsistent;
+    /// return 'ClauseId` linked from a pair of `Lit`s
     fn search(&self, lit0: Lit, lit1: Lit) -> Option<ClauseId>;
+    /// return the watch_cache for a `Lit`
     fn watch_cache_of(&self, lit: Lit) -> &BinaryLinkList;
 }
 
