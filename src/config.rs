@@ -324,8 +324,6 @@ impl Config {
                 "clause elimination",
                 #[cfg(feature = "clause_vivification")]
                 "clause vivification",
-                #[cfg(feature = "deterministic_iterators")]
-                "deterministic iterators",
                 #[cfg(feature = "dynamic_restart_threshold")]
                 "dynamic restart threshold",
                 #[cfg(feature = "EMA_calibration")]

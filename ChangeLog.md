@@ -2,10 +2,16 @@
 
 - Rust 2021 edition
 - `ConflictContext` uses `AssignReason`
-- add feature 'deterministic_iterators' to make Splr reproducible
 - add feature 'suppress_reason_chain' that suppresses reason sequences consisting of binary clauses
 - split `Flag` to `FlagClause` and `FlagVar` to reduce memory footprint
 - select vivification targets based on LBD shrinking rate and they are protected from clause reduction
+- introduce `BinaryLinkDB` and `BinaryLinkList`
+  - Splr becomes deterministic (or monotonous) solver again
+  - (ClauseDBIF) rename `bi_clause_map` to `binary_links`
+  - remove 'hashed_watch_cache'
+  - remove `reregister_watch_cache`
+  - remove `restore_detached_watch_cache`
+  - remove `WatchCacheHash`
 
 ## 0.13.0, 2021-10-11
 

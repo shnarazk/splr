@@ -394,27 +394,23 @@ impl PropagateIF for AssignStack {
             // while the key of watch_cache is watching literals.
             // Therefore keys to access appropriate targets have the opposite phases.
             //
-            #[cfg(not(feature = "deterministic_iterators"))]
-            let iterable = cdb.bi_clause_map(false_lit);
-            #[cfg(feature = "deterministic_iterators")]
-            let mut iterable = cdb.bi_clause_map(false_lit).iter().collect::<Vec<_>>();
-            #[cfg(feature = "deterministic_iterators")]
-            iterable.sort();
-            for (&blocker, &cid) in iterable.iter() {
-                debug_assert!(!cdb[cid].is_dead());
+            for (blocker, cid) in cdb.binary_links(false_lit).iter() {
+                debug_assert!(!cdb[*cid].is_dead());
                 debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
-                debug_assert_ne!(blocker, false_lit);
-                debug_assert_eq!(cdb[cid].len(), 2);
-                match lit_assign!(self, blocker) {
+                debug_assert_ne!(*blocker, false_lit);
+                debug_assert_eq!(cdb[*cid].len(), 2);
+                match lit_assign!(self, *blocker) {
                     Some(true) => (),
                     Some(false) => {
                         check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, blocker));
-                        conflict_path!(blocker, minimized_reason!(propagating));
+                        conflict_path!(*blocker, minimized_reason!(propagating));
                     }
                     None => {
-                        debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
+                        debug_assert!(
+                            cdb[*cid].lit0() == false_lit || cdb[*cid].lit1() == false_lit
+                        );
                         self.assign_by_implication(
-                            blocker,
+                            *blocker,
                             minimized_reason!(propagating),
                             #[cfg(feature = "chrono_BT")]
                             self.level[propagating.vi()],
@@ -426,20 +422,10 @@ impl PropagateIF for AssignStack {
             //## normal clause loop
             //
             let mut source = cdb.watch_cache_iter(propagating);
-            #[cfg(feature = "hashed_watch_cache")]
-            let mut watches = source.iter();
-            'next_clause: while let Some((cid, mut cached)) = {
-                #[cfg(feature = "hashed_watch_cache")]
-                {
-                    watches.next().deref_watch()
-                }
-                #[cfg(not(feature = "hashed_watch_cache"))]
-                {
-                    source
-                        .next()
-                        .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
-                }
-            } {
+            'next_clause: while let Some((cid, mut cached)) = source
+                .next()
+                .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
+            {
                 #[cfg(feature = "boundary_check")]
                 debug_assert!(
                     !cdb[cid].is_dead(),
@@ -526,13 +512,8 @@ impl PropagateIF for AssignStack {
                         cdb.swap_watch(cid);
                     }
                 }
-                // cdb.reregister_watch_cache(propagating, Some(wc_proxy));
                 cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
                 if other_watch_value == Some(false) {
-                    #[cfg(feature = "hashed_watch_cache")]
-                    while cdb.reregister_watch_cache(propagating, watches.next().deref_watch()) {}
-                    #[cfg(not(feature = "hashed_watch_cache"))]
-                    cdb.restore_detached_watch_cache(propagating, source);
                     check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, cached));
                     conflict_path!(cached, AssignReason::Implication(cid));
                 }
@@ -611,28 +592,24 @@ impl PropagateIF for AssignStack {
             //
             //## binary loop
             //
-            #[cfg(not(feature = "deterministic_iterators"))]
-            let iterable = cdb.bi_clause_map(false_lit);
-            #[cfg(feature = "deterministic_iterators")]
-            let mut iterable = cdb.bi_clause_map(false_lit).iter().collect::<Vec<_>>();
-            #[cfg(feature = "deterministic_iterators")]
-            iterable.sort();
-            for (&blocker, &cid) in iterable.iter() {
-                debug_assert!(!cdb[cid].is_dead());
+            for (blocker, cid) in cdb.binary_links(false_lit).iter() {
+                debug_assert!(!cdb[*cid].is_dead());
                 debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
-                debug_assert_ne!(blocker, false_lit);
+                debug_assert_ne!(*blocker, false_lit);
 
                 #[cfg(feature = "boundary_check")]
                 debug_assert_eq!(cdb[cid].len(), 2);
 
-                match lit_assign!(self, blocker) {
+                match lit_assign!(self, *blocker) {
                     Some(true) => (),
-                    Some(false) => conflict_path!(blocker, AssignReason::BinaryLink(propagating)),
+                    Some(false) => conflict_path!(*blocker, AssignReason::BinaryLink(propagating)),
                     None => {
-                        debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
+                        debug_assert!(
+                            cdb[*cid].lit0() == false_lit || cdb[*cid].lit1() == false_lit
+                        );
 
                         self.assign_by_implication(
-                            blocker,
+                            *blocker,
                             AssignReason::BinaryLink(propagating),
                             #[cfg(feature = "chrono_BT")]
                             self.level[false_lit.vi()],
@@ -644,20 +621,10 @@ impl PropagateIF for AssignStack {
             //## normal clause loop
             //
             let mut source = cdb.watch_cache_iter(propagating);
-            #[cfg(feature = "hashed_watch_cache")]
-            let mut watches = source.iter();
-            'next_clause: while let Some((cid, mut cached)) = {
-                #[cfg(feature = "hashed_watch_cache")]
-                {
-                    watches.next().deref_watch()
-                }
-                #[cfg(not(feature = "hashed_watch_cache"))]
-                {
-                    source
-                        .next()
-                        .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
-                }
-            } {
+            'next_clause: while let Some((cid, mut cached)) = source
+                .next()
+                .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
+            {
                 if cdb[cid].is_dead() {
                     cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
                     continue;
@@ -730,10 +697,6 @@ impl PropagateIF for AssignStack {
                 }
                 cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
                 if other_watch_value == Some(false) {
-                    #[cfg(feature = "hashed_watch_cache")]
-                    while cdb.reregister_watch_cache(propagating, watches.next().deref_watch()) {}
-                    #[cfg(not(feature = "hashed_watch_cache"))]
-                    cdb.restore_detached_watch_cache(propagating, source);
                     check_in!(
                         cid,
                         Propagate::SandboxEmitConflict(self.num_conflict, propagating)

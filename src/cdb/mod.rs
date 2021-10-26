@@ -1,5 +1,7 @@
 /// methods on clause activity
 mod activity;
+///
+mod binary;
 /// methods on `ClauseId`
 mod cid;
 /// methods on `Clause`
@@ -15,7 +17,12 @@ mod watch_cache;
 
 #[cfg(feature = "clause_vivification")]
 pub use self::vivify::VivifyIF;
-pub use self::{cid::ClauseIdIF, property::*, unsat_certificate::CertificationStore};
+pub use self::{
+    binary::{BinaryLinkDB, BinaryLinkList},
+    cid::ClauseIdIF,
+    property::*,
+    unsat_certificate::CertificationStore,
+};
 use {
     crate::{assign::AssignIF, types::*},
     std::{
@@ -65,8 +72,13 @@ pub trait ClauseDBIF:
     fn iter(&self) -> Iter<'_, Clause>;
     /// return a mutable iterator.
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
-    /// return a watcher list for bi-clauses
-    fn bi_clause_map(&self, l: Lit) -> &BiClause;
+
+    //
+    //## interface to binary links
+    //
+
+    /// return binary links: `BinaryLinkList` connected with a `Lit`.
+    fn binary_links(&self, l: Lit) -> &BinaryLinkList;
 
     //
     //## abstraction to watch_cache
@@ -78,10 +90,6 @@ pub trait ClauseDBIF:
     fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator;
     /// detach the watch_cache referred by the head of a watch_cache iterator
     fn detach_watch_cache(&mut self, l: Lit, iter: &mut WatchCacheIterator);
-    /// register the clause to the previous watch cache
-    fn reregister_watch_cache(&mut self, l: Lit, target: Option<WatchCacheProxy>);
-    /// restore detached watch cache
-    fn restore_detached_watch_cache(&mut self, l: Lit, wi: WatchCacheIterator);
     /// Merge two watch cache
     fn merge_watch_cache(&mut self, l: Lit, wc: WatchCache);
     /// swap the first two literals in a clause.
@@ -214,7 +222,7 @@ pub struct ClauseDB {
     ///## Note
     /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
     ///
-    bi_clause: Vec<BiClause>,
+    binary_link: BinaryLinkDB,
     /// container of watch literals
     watch_cache: Vec<WatchCache>,
     /// collected free clause ids.
