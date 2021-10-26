@@ -422,20 +422,10 @@ impl PropagateIF for AssignStack {
             //## normal clause loop
             //
             let mut source = cdb.watch_cache_iter(propagating);
-            #[cfg(feature = "hashed_watch_cache")]
-            let mut watches = source.iter();
-            'next_clause: while let Some((cid, mut cached)) = {
-                #[cfg(feature = "hashed_watch_cache")]
-                {
-                    watches.next().deref_watch()
-                }
-                #[cfg(not(feature = "hashed_watch_cache"))]
-                {
-                    source
-                        .next()
-                        .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
-                }
-            } {
+            'next_clause: while let Some((cid, mut cached)) = source
+                .next()
+                .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
+            {
                 #[cfg(feature = "boundary_check")]
                 debug_assert!(
                     !cdb[cid].is_dead(),
@@ -522,13 +512,8 @@ impl PropagateIF for AssignStack {
                         cdb.swap_watch(cid);
                     }
                 }
-                // cdb.reregister_watch_cache(propagating, Some(wc_proxy));
                 cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
                 if other_watch_value == Some(false) {
-                    #[cfg(feature = "hashed_watch_cache")]
-                    while cdb.reregister_watch_cache(propagating, watches.next().deref_watch()) {}
-                    #[cfg(not(feature = "hashed_watch_cache"))]
-                    cdb.restore_detached_watch_cache(propagating, source);
                     check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, cached));
                     conflict_path!(cached, AssignReason::Implication(cid));
                 }
@@ -636,20 +621,10 @@ impl PropagateIF for AssignStack {
             //## normal clause loop
             //
             let mut source = cdb.watch_cache_iter(propagating);
-            #[cfg(feature = "hashed_watch_cache")]
-            let mut watches = source.iter();
-            'next_clause: while let Some((cid, mut cached)) = {
-                #[cfg(feature = "hashed_watch_cache")]
-                {
-                    watches.next().deref_watch()
-                }
-                #[cfg(not(feature = "hashed_watch_cache"))]
-                {
-                    source
-                        .next()
-                        .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
-                }
-            } {
+            'next_clause: while let Some((cid, mut cached)) = source
+                .next()
+                .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
+            {
                 if cdb[cid].is_dead() {
                     cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
                     continue;
@@ -722,10 +697,6 @@ impl PropagateIF for AssignStack {
                 }
                 cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
                 if other_watch_value == Some(false) {
-                    #[cfg(feature = "hashed_watch_cache")]
-                    while cdb.reregister_watch_cache(propagating, watches.next().deref_watch()) {}
-                    #[cfg(not(feature = "hashed_watch_cache"))]
-                    cdb.restore_detached_watch_cache(propagating, source);
                     check_in!(
                         cid,
                         Propagate::SandboxEmitConflict(self.num_conflict, propagating)

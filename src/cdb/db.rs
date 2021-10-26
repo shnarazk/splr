@@ -243,14 +243,7 @@ impl ClauseDBIF for ClauseDB {
 
     // watch_cache_IF
     fn fetch_watch_cache_entry(&self, lit: Lit, wix: WatchCacheProxy) -> (ClauseId, Lit) {
-        #[cfg(feature = "hashed_watch_cache")]
-        {
-            todo!()
-        }
-        #[cfg(not(feature = "hashed_watch_cache"))]
-        {
-            self.watch_cache[lit][wix]
-        }
+        self.watch_cache[lit][wix]
     }
 
     #[inline]
@@ -264,8 +257,6 @@ impl ClauseDBIF for ClauseDB {
         self.watch_cache[l].swap_remove(iter.index);
         iter.detach_entry();
     }
-    fn reregister_watch_cache(&mut self, _: Lit, _: Option<WatchCacheProxy>) {}
-    fn restore_detached_watch_cache(&mut self, _: Lit, _: WatchCacheIterator) {}
     fn merge_watch_cache(&mut self, p: Lit, wc: WatchCache) {
         self.watch_cache[p].append_watch(wc);
     }
@@ -495,14 +486,8 @@ impl ClauseDBIF for ClauseDB {
         iter: &mut WatchCacheIterator,
         op: Option<Lit>,
     ) {
-        #[cfg(feature = "hashed_watch_cache")]
-        todo!();
-
-        #[cfg(not(feature = "hashed_watch_cache"))]
-        {
-            if let Some(p) = op {
-                self.watch_cache[l][iter.index].1 = p;
-            }
+        if let Some(p) = op {
+            self.watch_cache[l][iter.index].1 = p;
         }
 
         // let cid = self.watch_cache[l][iter.index].0;
