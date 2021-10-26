@@ -242,7 +242,7 @@ impl ClauseDBIF for ClauseDB {
         self.clause.iter_mut()
     }
     #[inline]
-    fn bi_clause_map(&self, l: Lit) -> &BinaryLinkList {
+    fn binary_links(&self, l: Lit) -> &BinaryLinkList {
         self.binary_link.connect_with(l)
     }
 

@@ -394,7 +394,7 @@ impl PropagateIF for AssignStack {
             // while the key of watch_cache is watching literals.
             // Therefore keys to access appropriate targets have the opposite phases.
             //
-            for (blocker, cid) in cdb.bi_clause_map(false_lit).iter() {
+            for (blocker, cid) in cdb.binary_links(false_lit).iter() {
                 debug_assert!(!cdb[*cid].is_dead());
                 debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
                 debug_assert_ne!(*blocker, false_lit);
@@ -607,7 +607,7 @@ impl PropagateIF for AssignStack {
             //
             //## binary loop
             //
-            for (blocker, cid) in cdb.bi_clause_map(false_lit).iter() {
+            for (blocker, cid) in cdb.binary_links(false_lit).iter() {
                 debug_assert!(!cdb[*cid].is_dead());
                 debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
                 debug_assert_ne!(*blocker, false_lit);

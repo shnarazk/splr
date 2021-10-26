@@ -73,7 +73,7 @@ pub trait ClauseDBIF:
     /// return a mutable iterator.
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
     /// return a watcher list for bi-clauses
-    fn bi_clause_map(&self, l: Lit) -> &BinaryLinkList;
+    fn binary_links(&self, l: Lit) -> &BinaryLinkList;
 
     //
     //## abstraction to watch_cache
