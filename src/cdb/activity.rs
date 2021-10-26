@@ -11,7 +11,7 @@ impl ActivityIF<ClauseId> for ClauseDB {
         )
     }
     #[cfg(not(feature = "clause_rewarding"))]
-    fn activity(&mut self, _cid: ClauseId) -> f64 {
+    fn activity(&self, _cid: ClauseId) -> f64 {
         0.0
     }
     #[cfg(feature = "clause_rewarding")]

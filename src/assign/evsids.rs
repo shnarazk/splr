@@ -5,7 +5,7 @@ use {
 };
 
 impl ActivityIF<VarId> for AssignStack {
-    fn activity(&mut self, vi: VarId) -> f64 {
+    fn activity(&self, vi: VarId) -> f64 {
         self.var[vi].reward
     }
     fn set_activity(&mut self, vi: VarId, val: f64) {

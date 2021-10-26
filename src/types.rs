@@ -39,7 +39,7 @@ pub trait LitIF {
 /// API for reward based activity management.
 pub trait ActivityIF<Ix> {
     /// return one's activity.
-    fn activity(&mut self, ix: Ix) -> f64;
+    fn activity(&self, ix: Ix) -> f64;
     /// set activity
     fn set_activity(&mut self, ix: Ix, val: f64);
     /// modify one's activity at conflict analysis in `conflict_analyze` in [`solver`](`crate::solver`).
