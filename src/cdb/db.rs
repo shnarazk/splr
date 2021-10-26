@@ -273,7 +273,7 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{:?}", vec,);
         debug_assert!(1 < vec.len());
         if vec.len() == 2 {
-            if let Some(cid) = self.has_bi_clause(vec[0], vec[1]) {
+            if let Some(&cid) = self.link_to_cid(vec[0], vec[1]) {
                 self.num_reregistration += 1;
                 return RefClause::RegisteredClause(cid);
             }
@@ -382,7 +382,7 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < vec.len());
         let mut learnt: bool = true;
         if vec.len() == 2 {
-            if let Some(cid) = self.has_bi_clause(vec[0], vec[1]) {
+            if let Some(&cid) = self.link_to_cid(vec[0], vec[1]) {
                 return RefClause::RegisteredClause(cid);
             }
         }
@@ -545,7 +545,7 @@ impl ClauseDBIF for ClauseDB {
             .copied()
             .collect::<Vec<Lit>>();
         if new_lits.len() == 2 {
-            if let Some(reg) = binary_link.search(new_lits[0], new_lits[1]) {
+            if let Some(&reg) = binary_link.search(new_lits[0], new_lits[1]) {
                 //
                 //## Case:3-0
                 //
@@ -661,7 +661,7 @@ impl ClauseDBIF for ClauseDB {
         let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         debug_assert!(new_lits.len() < c.len());
         if new_lits.len() == 2 {
-            if let Some(did) = binary_link.search(new_lits[0], new_lits[1]) {
+            if let Some(&did) = binary_link.search(new_lits[0], new_lits[1]) {
                 //
                 //## Case:0
                 //
@@ -805,7 +805,7 @@ impl ClauseDBIF for ClauseDB {
                 let l0 = new_lits[0];
                 let l1 = new_lits[1];
                 debug_assert!(2 < c.lits.len());
-                if let Some(bid) = binary_link.search(l0, l1) {
+                if let Some(&bid) = binary_link.search(l0, l1) {
                     //
                     //## Case:3-0
                     //
@@ -1314,17 +1314,17 @@ impl ClauseDB {
     /// let l3 = splr::types::Lit::from(3);
     /// cdb.new_clause(&mut asg, &mut vec![l1, l2], false);
     /// cdb.new_clause(&mut asg, &mut vec![!l1, !l2, !l3], false);
-    /// assert!(cdb.has_bi_clause(l1, l2).is_some());
-    /// assert!(cdb.has_bi_clause(!l1, l2).is_none());
-    /// assert!(cdb.has_bi_clause(l1, !l2).is_none());
-    /// assert!(cdb.has_bi_clause(!l1, !l2).is_none());
+    /// assert!(cdb.link_to_cid(l1, l2).is_some());
+    /// assert!(cdb.link_to_cid(!l1, l2).is_none());
+    /// assert!(cdb.link_to_cid(l1, !l2).is_none());
+    /// assert!(cdb.link_to_cid(!l1, !l2).is_none());
     ///```
     ///
     /// this is equivalent to the following:
     ///```ignore
     /// bi_clause[l0].get(&l1).is_some()
     ///```
-    fn has_bi_clause(&self, l0: Lit, l1: Lit) -> Option<ClauseId> {
+    fn link_to_cid(&self, l0: Lit, l1: Lit) -> Option<&ClauseId> {
         self.binary_link.search(l0, l1)
     }
     #[cfg(feature = "strategy_adaptation")]

@@ -66,10 +66,12 @@ pub trait BinaryLinkIF {
     /// remove a pair of `Lit`s
     fn remove(&mut self, lit0: Lit, lit1: Lit) -> MaybeInconsistent;
     /// return 'ClauseId` linked from a pair of `Lit`s
-    fn search(&self, lit0: Lit, lit1: Lit) -> Option<ClauseId>;
+    fn search(&self, lit0: Lit, lit1: Lit) -> Option<&ClauseId>;
     /// return the all links that include `Lit`.
     /// Note this is not a `watch_list`. The other literal has an opposite phase.
     fn connect_with(&self, lit: Lit) -> &BinaryLinkList;
+    // /// sort links based on var activities
+    // fn reorder(&mut self, asg: &impl AssignIF);
     /// add new var
     fn add_new_var(&mut self);
 }
@@ -90,14 +92,62 @@ impl BinaryLinkIF for BinaryLinkDB {
         self.list[lit1].delete_unstable(|p| p.0 == lit0);
         Ok(())
     }
-    fn search(&self, lit0: Lit, lit1: Lit) -> Option<ClauseId> {
+    fn search(&self, lit0: Lit, lit1: Lit) -> Option<&ClauseId> {
         let l0 = lit0.min(lit1);
         let l1 = lit0.max(lit1);
-        self.hash.get(&(l0, l1)).copied()
+        self.hash.get(&(l0, l1))
     }
     fn connect_with(&self, lit: Lit) -> &BinaryLinkList {
         &self.list[lit]
     }
+    /*
+    fn reorder(&mut self, asg: &impl AssignIF) {
+        let nv = self.list.len() / 2;
+        let thr: f64 = (1usize..nv).map(|i| asg.activity(i)).sum::<f64>()
+            / (1usize..nv)
+                .filter(|i| {
+                    !asg.var(*i).is(FlagVar::ELIMINATED)
+                        && asg.reason(*i) != AssignReason::Decision(0)
+                })
+                .count() as f64;
+        'next_lit: for (l, vec) in self.list.iter_mut().enumerate().skip(2) {
+            if asg.var(Lit::from(l).vi()).is(FlagVar::ELIMINATED) {
+                continue 'next_lit;
+            }
+            if 0.5 * thr <= asg.activity(Lit::from(l).vi()) {
+                vec.sort_by_cached_key(|p|
+                                       (asg.activity(p.0.vi()) * -100_000.0) as isize);
+            } else {
+                // Run just the first stage of quick sort.
+                let len = vec.len();
+                let mut i = 0;
+                let mut j = len;
+                while i < j {
+                    loop {
+                        if len == i {
+                            continue 'next_lit;
+                        }
+                        if asg.activity(vec[i].0.vi()) < thr {
+                            break;
+                        }
+                        i += 1;
+                    }
+                    loop {
+                        if j == 0 {
+                            continue 'next_lit;
+                        }
+                        j -= 1;
+                        if thr < asg.activity(vec[j].0.vi()) {
+                            break;
+                        }
+                    }
+                    vec.swap(i, j);
+                    i += 1;
+                }
+            }
+        }
+    }
+    */
     fn add_new_var(&mut self) {
         for _ in 0..2 {
             self.list.push(Vec::new());
