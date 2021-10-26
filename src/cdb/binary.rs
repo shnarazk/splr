@@ -7,7 +7,6 @@ use {
     },
 };
 
-pub type BiClause = HashMap<Lit, ClauseId>;
 pub type BinaryLinkList = Vec<(Lit, ClauseId)>;
 
 impl Index<Lit> for Vec<BinaryLinkList> {
@@ -37,7 +36,7 @@ impl IndexMut<Lit> for Vec<BinaryLinkList> {
 
 #[derive(Clone, Debug)]
 pub struct BinaryLinkDB {
-    hash: Vec<BiClause>,
+    hash: Vec<HashMap<Lit, ClauseId>>,
     list: Vec<BinaryLinkList>,
 }
 

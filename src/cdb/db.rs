@@ -160,10 +160,8 @@ impl Instantiate for ClauseDB {
         let nc = cnf.num_of_clauses;
         let mut clause = Vec::with_capacity(1 + nc);
         clause.push(Clause::default());
-        let mut bi_clause = Vec::with_capacity(2 * (nv + 1));
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
         for _ in 0..2 * (nv + 1) {
-            bi_clause.push(BiClause::new());
             watcher.push(WatchCache::new());
         }
         ClauseDB {

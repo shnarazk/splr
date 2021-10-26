@@ -7,7 +7,6 @@ use {
     },
 };
 
-pub type BiClause = HashMap<Lit, ClauseId>;
 pub type WatchCacheHash = HashMap<ClauseId, Lit>;
 pub type WatchCacheList = Vec<(ClauseId, Lit)>;
 
