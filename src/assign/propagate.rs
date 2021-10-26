@@ -607,7 +607,6 @@ impl PropagateIF for AssignStack {
             //
             //## binary loop
             //
-            #[cfg(not(feature = "deterministic_iterators"))]
             for (blocker, cid) in cdb.bi_clause_map(false_lit).iter() {
                 debug_assert!(!cdb[*cid].is_dead());
                 debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
