@@ -36,14 +36,14 @@ impl IndexMut<Lit> for Vec<BinaryLinkList> {
 
 #[derive(Clone, Debug)]
 pub struct BinaryLinkDB {
-    hash: Vec<HashMap<Lit, ClauseId>>,
+    hash: HashMap<(Lit, Lit), ClauseId>,
     list: Vec<BinaryLinkList>,
 }
 
 impl Default for BinaryLinkDB {
     fn default() -> Self {
         BinaryLinkDB {
-            hash: Vec::new(),
+            hash: HashMap::new(),
             list: Vec::new(),
         }
     }
@@ -53,7 +53,7 @@ impl Instantiate for BinaryLinkDB {
     fn instantiate(_conf: &Config, cnf: &CNFDescription) -> Self {
         let num_lit = 2 * (cnf.num_of_variables + 1);
         BinaryLinkDB {
-            hash: vec![HashMap::new(); num_lit],
+            hash: HashMap::new(),
             list: vec![Vec::new(); num_lit],
         }
     }
@@ -76,27 +76,30 @@ pub trait BinaryLinkIF {
 
 impl BinaryLinkIF for BinaryLinkDB {
     fn add(&mut self, lit0: Lit, lit1: Lit, cid: ClauseId) {
-        self.hash[lit0].insert(lit1, cid);
+        let l0 = lit0.min(lit1);
+        let l1 = lit0.max(lit1);
+        self.hash.insert((l0, l1), cid);
         self.list[lit0].push((lit1, cid));
-        self.hash[lit1].insert(lit0, cid);
         self.list[lit1].push((lit0, cid));
     }
     fn remove(&mut self, lit0: Lit, lit1: Lit) -> MaybeInconsistent {
-        self.hash[lit0].remove(&lit1);
+        let l0 = lit0.min(lit1);
+        let l1 = lit0.max(lit1);
+        self.hash.remove(&(l0, l1));
         self.list[lit0].delete_unstable(|p| p.0 == lit1);
-        self.hash[lit1].remove(&lit0);
         self.list[lit1].delete_unstable(|p| p.0 == lit0);
         Ok(())
     }
     fn search(&self, lit0: Lit, lit1: Lit) -> Option<ClauseId> {
-        self.hash[lit0].get(&lit1).copied()
+        let l0 = lit0.min(lit1);
+        let l1 = lit0.max(lit1);
+        self.hash.get(&(l0, l1)).copied()
     }
     fn connect_with(&self, lit: Lit) -> &BinaryLinkList {
         &self.list[lit]
     }
     fn add_new_var(&mut self) {
         for _ in 0..2 {
-            self.hash.push(HashMap::new());
             self.list.push(Vec::new());
         }
     }
