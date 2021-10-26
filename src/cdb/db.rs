@@ -1,12 +1,9 @@
-use super::{
-    binary::{BinaryLinkIF, BinaryLinkList},
-    BinaryLinkDB,
-};
-
 use {
     super::{
-        property, watch_cache::*, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId,
-        RefClause,
+        binary::{BinaryLinkIF, BinaryLinkList},
+        property,
+        watch_cache::*,
+        BinaryLinkDB, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId, RefClause,
     },
     crate::{assign::AssignIF, solver::SolverEvent, types::*},
     std::{
