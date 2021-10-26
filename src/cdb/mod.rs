@@ -221,7 +221,6 @@ pub struct ClauseDB {
     ///## Note
     /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
     ///
-    // bi_clause: Vec<BiClause>,
     binary_link: BinaryLinkDB,
     /// container of watch literals
     watch_cache: Vec<WatchCache>,
