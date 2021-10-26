@@ -41,9 +41,18 @@ pub struct BinaryLinkDB {
     list: Vec<BinaryLinkList>,
 }
 
+impl Default for BinaryLinkDB {
+    fn default() -> Self {
+        BinaryLinkDB {
+            hash: Vec::new(),
+            list: Vec::new(),
+        }
+    }
+}
+
 impl Instantiate for BinaryLinkDB {
     fn instantiate(_conf: &Config, cnf: &CNFDescription) -> Self {
-        let num_lit = 2 * cnf.num_of_variables + 1;
+        let num_lit = 2 * (cnf.num_of_variables + 1);
         BinaryLinkDB {
             hash: vec![HashMap::new(); num_lit],
             list: vec![Vec::new(); num_lit],
@@ -59,8 +68,11 @@ pub trait BinaryLinkIF {
     fn remove(&mut self, lit0: Lit, lit1: Lit) -> MaybeInconsistent;
     /// return 'ClauseId` linked from a pair of `Lit`s
     fn search(&self, lit0: Lit, lit1: Lit) -> Option<ClauseId>;
-    /// return the watch_cache for a `Lit`
-    fn watch_cache_of(&self, lit: Lit) -> &BinaryLinkList;
+    /// return the all links that include `Lit`.
+    /// Note this is not a `watch_list`. The other literal has an opposite phase.
+    fn connect_with(&self, lit: Lit) -> &BinaryLinkList;
+    /// add new var
+    fn add_new_var(&mut self);
 }
 
 impl BinaryLinkIF for BinaryLinkDB {
@@ -80,7 +92,13 @@ impl BinaryLinkIF for BinaryLinkDB {
     fn search(&self, lit0: Lit, lit1: Lit) -> Option<ClauseId> {
         self.hash[lit0].get(&lit1).copied()
     }
-    fn watch_cache_of(&self, lit: Lit) -> &BinaryLinkList {
+    fn connect_with(&self, lit: Lit) -> &BinaryLinkList {
         &self.list[lit]
+    }
+    fn add_new_var(&mut self) {
+        for _ in 0..2 {
+            self.hash.push(HashMap::new());
+            self.list.push(Vec::new());
+        }
     }
 }

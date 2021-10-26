@@ -394,27 +394,23 @@ impl PropagateIF for AssignStack {
             // while the key of watch_cache is watching literals.
             // Therefore keys to access appropriate targets have the opposite phases.
             //
-            #[cfg(not(feature = "deterministic_iterators"))]
-            let iterable = cdb.bi_clause_map(false_lit);
-            #[cfg(feature = "deterministic_iterators")]
-            let mut iterable = cdb.bi_clause_map(false_lit).iter().collect::<Vec<_>>();
-            #[cfg(feature = "deterministic_iterators")]
-            iterable.sort();
-            for (&blocker, &cid) in iterable.iter() {
-                debug_assert!(!cdb[cid].is_dead());
+            for (blocker, cid) in cdb.bi_clause_map(false_lit).iter() {
+                debug_assert!(!cdb[*cid].is_dead());
                 debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
-                debug_assert_ne!(blocker, false_lit);
-                debug_assert_eq!(cdb[cid].len(), 2);
-                match lit_assign!(self, blocker) {
+                debug_assert_ne!(*blocker, false_lit);
+                debug_assert_eq!(cdb[*cid].len(), 2);
+                match lit_assign!(self, *blocker) {
                     Some(true) => (),
                     Some(false) => {
                         check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, blocker));
-                        conflict_path!(blocker, minimized_reason!(propagating));
+                        conflict_path!(*blocker, minimized_reason!(propagating));
                     }
                     None => {
-                        debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
+                        debug_assert!(
+                            cdb[*cid].lit0() == false_lit || cdb[*cid].lit1() == false_lit
+                        );
                         self.assign_by_implication(
-                            blocker,
+                            *blocker,
                             minimized_reason!(propagating),
                             #[cfg(feature = "chrono_BT")]
                             self.level[propagating.vi()],
@@ -612,27 +608,24 @@ impl PropagateIF for AssignStack {
             //## binary loop
             //
             #[cfg(not(feature = "deterministic_iterators"))]
-            let iterable = cdb.bi_clause_map(false_lit);
-            #[cfg(feature = "deterministic_iterators")]
-            let mut iterable = cdb.bi_clause_map(false_lit).iter().collect::<Vec<_>>();
-            #[cfg(feature = "deterministic_iterators")]
-            iterable.sort();
-            for (&blocker, &cid) in iterable.iter() {
-                debug_assert!(!cdb[cid].is_dead());
+            for (blocker, cid) in cdb.bi_clause_map(false_lit).iter() {
+                debug_assert!(!cdb[*cid].is_dead());
                 debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
-                debug_assert_ne!(blocker, false_lit);
+                debug_assert_ne!(*blocker, false_lit);
 
                 #[cfg(feature = "boundary_check")]
                 debug_assert_eq!(cdb[cid].len(), 2);
 
-                match lit_assign!(self, blocker) {
+                match lit_assign!(self, *blocker) {
                     Some(true) => (),
-                    Some(false) => conflict_path!(blocker, AssignReason::BinaryLink(propagating)),
+                    Some(false) => conflict_path!(*blocker, AssignReason::BinaryLink(propagating)),
                     None => {
-                        debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
+                        debug_assert!(
+                            cdb[*cid].lit0() == false_lit || cdb[*cid].lit1() == false_lit
+                        );
 
                         self.assign_by_implication(
-                            blocker,
+                            *blocker,
                             AssignReason::BinaryLink(propagating),
                             #[cfg(feature = "chrono_BT")]
                             self.level[false_lit.vi()],

@@ -17,7 +17,12 @@ mod watch_cache;
 
 #[cfg(feature = "clause_vivification")]
 pub use self::vivify::VivifyIF;
-pub use self::{cid::ClauseIdIF, property::*, unsat_certificate::CertificationStore};
+pub use self::{
+    binary::{BinaryLinkDB, BinaryLinkList},
+    cid::ClauseIdIF,
+    property::*,
+    unsat_certificate::CertificationStore,
+};
 use {
     crate::{assign::AssignIF, types::*},
     std::{
@@ -68,7 +73,7 @@ pub trait ClauseDBIF:
     /// return a mutable iterator.
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
     /// return a watcher list for bi-clauses
-    fn bi_clause_map(&self, l: Lit) -> &BiClause;
+    fn bi_clause_map(&self, l: Lit) -> &BinaryLinkList;
 
     //
     //## abstraction to watch_cache
@@ -216,7 +221,8 @@ pub struct ClauseDB {
     ///## Note
     /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
     ///
-    bi_clause: Vec<BiClause>,
+    // bi_clause: Vec<BiClause>,
+    binary_link: BinaryLinkDB,
     /// container of watch literals
     watch_cache: Vec<WatchCache>,
     /// collected free clause ids.
