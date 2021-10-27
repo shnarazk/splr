@@ -29,7 +29,7 @@ default = [
         # "maintain_watch_cache", # DEBUG
         "reason_side_rewarding",
         "rephase",
-        "suppress_reason_chain",
+        # "suppress_reason_chain",
         "trail_saving",
         "unsafe_access"
         ]
