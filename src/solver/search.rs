@@ -246,6 +246,9 @@ fn search(
     rst: &mut Restarter,
     state: &mut State,
 ) -> Result<bool, SolverError> {
+    #[cfg(feature = "clause_elimination")]
+    let mut next_elimination = 0;
+
     #[cfg(feature = "strategy_adaptation")]
     let mut a_decision_was_made = false;
 
@@ -299,9 +302,15 @@ fn search(
 
                 #[cfg(feature = "clause_elimination")]
                 {
-                    elim.activate();
-                    elim.simplify(asg, cdb, rst, state)?;
-                    state[Stat::NumProcessor] += 1;
+                    let num_stage = rst.derefer(restart::property::Tusize::NumStage);
+                    if num_stage == next_elimination {
+                        elim.activate();
+                        elim.simplify(asg, cdb, rst, state)?;
+                        state[Stat::NumProcessor] += 1;
+                        next_elimination += 1.4f64
+                            .powi(cdb.derefer(cdb::property::Tusize::NumClause) as i32 / 80_000)
+                            as usize;
+                    }
                 }
 
                 asg.clear_asserted_literals(cdb)?;
