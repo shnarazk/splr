@@ -5,7 +5,7 @@ It adopts various research results on modern SAT solvers:
 
 - _CDCL_, _watch literals_, _LBD_ and so on from Glucose, [Minisat](http://minisat.se) and the ancestors
 - Glucose-like _dynamic blocking/forcing restarts_
-- pre/in-processor to simplify CNF
+- pre/in-processor to simplify the given CNF
 - branching variable selection based on _Learning Rate Based Branching_ with _Reason Side Rewarding_ or EVSIDS
 - [CaDiCaL](https://github.com/arminbiere/cadical)-like extended phase saving
 - _restart stabilization_ inspired by CadiCaL
@@ -20,7 +20,7 @@ Please check [ChangeLog](ChangeLog.md) about recent updates.
 
 Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results.
 
-#### Version 0.13.0
+#### Version 0.14.0
 
 - [SAT Competition 2021](https://satcompetition.github.io/2021/), [Benchmarks main truck](https://satcompetition.github.io/2021/benchmarks.html) -- splr-0.14.0 RC (d92ced26d) solved with a 400 sec timeout:
   - 41 satisfiable problems: all the solutions were correct.
@@ -131,7 +131,7 @@ A valid assignment set for cnfs/unif-k3-r4.25-v360-c1530-S1293537826-039.cnf is 
 
 If you want to certificate unsatisfiability, use `--certify` or `-c` and use proof checker like [Grid](https://www21.in.tum.de/~lammich/grat/).
 
-Firstly run splr with the certificate option.
+Firstly run splr with the certificate option `-c`.
 
 ```plain
 $ splr -c cnfs/unif-k3-r4.25-v360-c1530-S1028159446-096.cnf
@@ -372,7 +372,7 @@ ARGS:
 
 ## Solver description
 
-Splr-0.13.0 adopts the following features by default:
+Splr-0.14.0 adopts the following features by default:
 
 - Learning-rate based (LRB) var rewarding and clause rewarding[4]
 - Reason-side var rewarding[4]
