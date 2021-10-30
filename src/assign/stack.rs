@@ -239,17 +239,18 @@ impl AssignIF for AssignStack {
                 );
             }
 
+            debug_assert!(
+                lits[reason_literals.clone()]
+                    .iter()
+                    .all(|l| extended_model[l.vi()].is_some()),
+                "impossible: pseudo clause has unassigned literal(s)."
+            );
             if lits[reason_literals.clone()]
                 .iter()
                 .all(|l| extended_model[l.vi()] == Some(!bool::from(*l)))
             {
                 let l = lits[target_index];
                 extended_model[l.vi()] = Some(bool::from(l));
-            } else if lits[reason_literals.clone()]
-                .iter()
-                .any(|l| extended_model[l.vi()].is_none())
-            {
-                panic!("impossible: pseudo clause has unassigned literal(s).");
             } else if lits[reason_literals.clone()]
                 .iter()
                 .any(|l| extended_model[l.vi()] == Some(bool::from(*l)))

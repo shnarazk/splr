@@ -128,17 +128,10 @@ impl VivifyIF for ClauseDB {
                                         asg.backtrack_sandbox();
                                     }
                                 }
-                                _ => panic!(),
+                                AssignReason::Decision(_) | AssignReason::None => {
+                                    unreachable!("vivify")
+                                }
                             }
-                            /*
-                                let cnfl_lits = &self[cc.cid].iter().copied().collect::<Vec<Lit>>();
-                                seen[0] = num_check;
-                                let mut vec = asg.analyze_sandbox(self, &decisions, cnfl_lits, &mut seen);
-                                asg.backtrack_sandbox();
-                                if clits.len() == decisions.len() && cc.cid == cid {
-                                continue 'next_clause;
-                            }
-                                 */
                             match vec.len() {
                                 0 => {
                                     state.flush("");
@@ -241,13 +234,6 @@ fn select_targets(
     }
 }
 
-fn flip(vec: &mut [Lit]) -> &mut [Lit] {
-    for l in vec.iter_mut() {
-        *l = !*l;
-    }
-    vec
-}
-
 impl AssignStack {
     /// inspect the complete implication graph to collect a disjunction of a subset of
     /// negated literals of `lits`
@@ -307,7 +293,7 @@ impl AssignStack {
                         seen[r.vi()] = key;
                     }
                 }
-                AssignReason::None => panic!("impossible"),
+                AssignReason::None => unreachable!("analyze_sandbox::AssignReason::None"),
             }
         }
         // cnfs/unsat.cnf can panic at

@@ -1,6 +1,6 @@
 /// methods on clause activity
 mod activity;
-///
+/// methods on binary link, namely binary clause
 mod binary;
 /// methods on `ClauseId`
 mod cid;
@@ -10,7 +10,7 @@ mod clause;
 mod db;
 /// methods for UNSAT certification
 mod unsat_certificate;
-/// Implement vivification preprocessor
+/// implementation of clause vivification
 mod vivify;
 /// types about watching literal
 mod watch_cache;
@@ -130,7 +130,7 @@ pub trait ClauseDBIF:
     /// # CAVEAT
     /// *precondition*: decision level == 0.
     fn reduce(&mut self, asg: &mut impl AssignIF, nc: usize);
-    /// FIXME
+    /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.
     /// return `true` if it's learnt.

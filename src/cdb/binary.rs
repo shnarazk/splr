@@ -7,6 +7,7 @@ use {
     },
 };
 
+/// storage of binary links
 pub type BinaryLinkList = Vec<(Lit, ClauseId)>;
 
 impl Index<Lit> for Vec<BinaryLinkList> {
@@ -34,6 +35,7 @@ impl IndexMut<Lit> for Vec<BinaryLinkList> {
     }
 }
 
+/// storage with mapper to `ClauseId` of binary links
 #[derive(Clone, Debug)]
 pub struct BinaryLinkDB {
     hash: HashMap<(Lit, Lit), ClauseId>,
@@ -70,10 +72,10 @@ pub trait BinaryLinkIF {
     /// return the all links that include `Lit`.
     /// Note this is not a `watch_list`. The other literal has an opposite phase.
     fn connect_with(&self, lit: Lit) -> &BinaryLinkList;
-    // /// sort links based on var activities
-    // fn reorder(&mut self, asg: &impl AssignIF);
     /// add new var
     fn add_new_var(&mut self);
+    // /// sort links based on var activities
+    // fn reorder(&mut self, asg: &impl AssignIF);
 }
 
 impl BinaryLinkIF for BinaryLinkDB {
@@ -99,6 +101,11 @@ impl BinaryLinkIF for BinaryLinkDB {
     }
     fn connect_with(&self, lit: Lit) -> &BinaryLinkList {
         &self.list[lit]
+    }
+    fn add_new_var(&mut self) {
+        for _ in 0..2 {
+            self.list.push(Vec::new());
+        }
     }
     /*
     fn reorder(&mut self, asg: &impl AssignIF) {
@@ -148,9 +155,4 @@ impl BinaryLinkIF for BinaryLinkDB {
         }
     }
     */
-    fn add_new_var(&mut self) {
-        for _ in 0..2 {
-            self.list.push(Vec::new());
-        }
-    }
 }

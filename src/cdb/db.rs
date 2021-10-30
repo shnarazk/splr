@@ -593,7 +593,7 @@ impl ClauseDBIF for ClauseDB {
                         watch_cache[!l1].update_watch(cid, l0);
                     }
                 } else {
-                    panic!("impossible");
+                    unreachable!("transform_by_elimination");
                 }
             } else if p == old_l1 {
                 watch_cache[!p].remove_watch(&cid);
@@ -614,7 +614,7 @@ impl ClauseDBIF for ClauseDB {
                         watch_cache[!l1].update_watch(cid, l0);
                     }
                 } else {
-                    panic!("impossible");
+                    unreachable!("transform_by_elimination");
                 }
             } else {
                 debug_assert_eq!(old_l0, l0);

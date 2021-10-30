@@ -54,7 +54,7 @@ pub fn handle_conflict(
     {
         let c = match cc.1 {
             AssignReason::Implication(cid) => &cdb[cid],
-            _ => panic!(), // TODO
+            _ => panic!(),
         };
         let level = asg.level_ref();
         let max_level = c.iter().map(|l| level[l.vi()]).max().unwrap();
@@ -115,7 +115,7 @@ pub fn handle_conflict(
                 // dump to certified even if it's a literal.
                 cdb.certificate_add_assertion(l0);
                 if asg.assign_at_root_level(l0).is_err() {
-                    panic!("impossible inconsistency");
+                    unreachable!("handle_conflict::root_level_conflict_by_assertion");
                 }
                 rst.handle(SolverEvent::Assert(l0.vi()));
                 return Ok(());
@@ -160,7 +160,8 @@ pub fn handle_conflict(
                     }
                 }
             }
-            _ => (),
+            AssignReason::Decision(_) => (),
+            AssignReason::None => unreachable!("handle_conflict"),
         }
     }
     if chronobt && assign_level + state.config.c_cbt_thr <= conflicting_level {
@@ -218,8 +219,6 @@ pub fn handle_conflict(
                 }
             }
         }
-        RefClause::Dead => panic!("impossible"),
-        RefClause::EmptyClause => panic!("impossible"),
         RefClause::RegisteredClause(cid) => {
             debug_assert_eq!(learnt_len, 2);
             debug_assert!(
@@ -236,7 +235,9 @@ pub fn handle_conflict(
             );
             // || check_graph(asg, cdb, l0, "registeredclause");
         }
-        RefClause::UnitClause(_) => panic!("impossible"),
+        RefClause::Dead => unreachable!("handle_conflict::RefClause::Deaf"),
+        RefClause::EmptyClause => unreachable!("handel_conflict::RefClause::EmptyClause"),
+        RefClause::UnitClause(_) => unreachable!("handle_conflict::RefClause::UnitClause"),
     }
     state.c_lvl.update(conflicting_level as f64);
     state.b_lvl.update(assign_level as f64);
@@ -247,7 +248,6 @@ pub fn handle_conflict(
 ///
 /// ## Conflict Analysis
 ///
-#[allow(clippy::cognitive_complexity)]
 fn conflict_analyze(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -501,7 +501,6 @@ impl Lit {
         let top = clear.len();
         while let Some(sl) = stack.pop() {
             match asg.reason(sl.vi()) {
-                AssignReason::Decision(_) => panic!("no idea"),
                 AssignReason::BinaryLink(l) => {
                     let vi = l.vi();
                     let lv = asg.level(vi);
@@ -551,7 +550,7 @@ impl Lit {
                         }
                     }
                 }
-                AssignReason::None => panic!("no idea"),
+                AssignReason::Decision(_) | AssignReason::None => unreachable!("is_redundant"),
             }
         }
         true

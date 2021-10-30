@@ -113,7 +113,7 @@ impl AssignStack {
                     self.insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
-                r => panic!("impossible path {:?}", r),
+                _ => unreachable!("from_saved_trail"),
             }
         }
         self.trail_saved.clear();

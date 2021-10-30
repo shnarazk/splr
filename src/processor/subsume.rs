@@ -95,8 +95,6 @@ fn strengthen_clause(
             elim.remove_lit_occur(asg, l, cid);
             Ok(())
         }
-        RefClause::Dead => panic!("impossible"),
-        RefClause::EmptyClause => panic!("impossible"),
         RefClause::RegisteredClause(_) => {
             elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
             cdb.remove_clause(cid);
@@ -112,5 +110,6 @@ fn strengthen_clause(
                 Some(false) => Err(SolverError::RootLevelConflict((l0, asg.reason(l0.vi())))),
             }
         }
+        RefClause::Dead | RefClause::EmptyClause => unreachable!("strengthen_clause"),
     }
 }
