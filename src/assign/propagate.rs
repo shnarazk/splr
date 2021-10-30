@@ -826,19 +826,3 @@ impl AssignStack {
         }
     }
 }
-
-trait WatchCacheAdapter {
-    fn deref_watch(self) -> Option<(ClauseId, Lit)>;
-}
-
-impl WatchCacheAdapter for Option<(&ClauseId, &Lit)> {
-    fn deref_watch(self) -> Option<(ClauseId, Lit)> {
-        self.map(|(c, i)| (*c, *i))
-    }
-}
-
-impl WatchCacheAdapter for Option<&(ClauseId, Lit)> {
-    fn deref_watch(self) -> Option<(ClauseId, Lit)> {
-        self.map(|(c, i)| (*c, *i))
-    }
-}
