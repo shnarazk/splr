@@ -1182,14 +1182,14 @@ impl ClauseDBIF for ClauseDB {
         let l1 = c.lits[1];
         if 2 == c.lits.len() {
             assert!(
-                self.bi_clause[l0].contains_key(&l1),
+                self.binary_link.search(l0, l1).is_some(),
                 "(watch_cache health check: binary clause l0 not found){}, cid{}{:?}",
                 mes,
                 cid,
                 c
             );
             assert!(
-                self.bi_clause[l1].contains_key(&l0),
+                self.binary_link.search(l1, l0).is_some(),
                 "(watch_cache health check: binary clause l1 not found){}, cid{}{:?}",
                 mes,
                 cid,
@@ -1225,20 +1225,6 @@ impl ClauseDBIF for ClauseDB {
                 cid,
                 c
             );
-            assert!(
-                self.bi_clause[l0].iter().all(|(_, c)| *c != cid),
-                "(watch_cache health check: clause l0 found in binary_map){}, cid{}{:?}",
-                mes,
-                cid,
-                c
-            );
-            assert!(
-                self.bi_clause[l1].iter().all(|(_, c)| *c != cid),
-                "(watch_cache health check: clause l1 found in binary_map){}, cid{}{:?}",
-                mes,
-                cid,
-                c
-            );
             (
                 self.watch_cache[!l0]
                     .iter()
@@ -1256,51 +1242,6 @@ impl ClauseDBIF for ClauseDB {
     #[cfg(feature = "boundary_check")]
     fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool> {
         self[cid].is_dead().then(|| self.freelist.contains(&cid))
-    }
-    #[cfg(feature = "boundary_check")]
-    fn check_consistency(&mut self, asg: &impl AssignIF) {
-        for (key, wc) in self.bi_clause.iter().enumerate() {
-            let lit = Lit::from(key);
-            if let Some(true) = asg.assigned(lit) {
-                continue;
-            }
-            let level = asg.level(lit.vi());
-            for (cached, cid) in wc.iter() {
-                debug_assert!(self[cid].lits.contains(&lit));
-                debug_assert!(self[cid].lits.contains(cached));
-                if let Some(true) = asg.assigned(*cached) {
-                    continue;
-                }
-                let lvl = asg.level(cached.vi());
-                assert!(
-                    level == lvl || (asg.assigned(lit) == None && asg.assigned(*cached) == None),
-                    "found a strange biclause {}{}\n - {}\n - {}\n{}\n",
-                    cid,
-                    self.clause[usize::from(*cid)],
-                    format!(
-                        "{:>8}:{:>12} at level {:>3} by {:<20}, {:>5}",
-                        format!("{}", lit),
-                        format!("{:?}", asg.assigned(lit)),
-                        format!("{}", level),
-                        format!("{}", asg.reason(lit.vi())),
-                        format!("{}", asg.var(lit.vi()).is(FlagVar::ELIMINATED)),
-                    ),
-                    format!(
-                        "{:>8}:{:>12} at level {:>3} by {:<20}, {:>5}",
-                        format!("{}", cached),
-                        format!("{:?}", asg.assigned(*cached)),
-                        format!("{}", lvl),
-                        format!("{}", asg.reason(cached.vi())),
-                        format!("{}", asg.var(cached.vi()).is(FlagVar::ELIMINATED)),
-                    ),
-                    format!(
-                        "the mirrored({}) image: {:?}",
-                        !*cached,
-                        self.bi_clause[usize::from(!*cached)].get(&!lit),
-                    ),
-                );
-            }
-        }
     }
 }
 

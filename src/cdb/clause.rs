@@ -16,8 +16,9 @@ impl Default for Clause {
             rank_old: 0,
             search_from: 2,
 
-            #[cfg(feature = "clause_rewarding")]
+            #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
             timestamp: 0,
+
             #[cfg(feature = "clause_rewarding")]
             reward: 0.0,
 
@@ -167,6 +168,12 @@ impl ClauseIF for Clause {
     }
     fn len(&self) -> usize {
         self.lits.len()
+    }
+
+    #[cfg(feature = "boundary_check")]
+    /// return timestamp.
+    fn timestamp(&self) -> usize {
+        self.timestamp
     }
     #[cfg(feature = "boundary_check")]
     fn set_birth(&mut self, time: usize) {

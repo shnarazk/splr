@@ -387,7 +387,7 @@ fn conflict_analyze(
                     reason,
                     path_cnt,
                     asg.stack_iter()
-                        .skip(trace_index)
+                        .skip(trail_index)
                         .filter(|l| matches!(asg.reason(l.vi()), AssignReason::Decision(_)))
                         .map(|l| format!("{:?}", l.report(asg)))
                         .collect::<Vec<String>>()

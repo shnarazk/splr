@@ -53,6 +53,9 @@ pub trait ClauseIF {
     fn len(&self) -> usize;
 
     #[cfg(feature = "boundary_check")]
+    /// return timestamp.
+    fn timestamp(&self) -> usize;
+    #[cfg(feature = "boundary_check")]
     fn set_birth(&mut self, time: usize);
 }
 
@@ -167,8 +170,6 @@ pub trait ClauseDBIF:
     fn watch_caches(&self, cid: ClauseId, message: &str) -> (Vec<Lit>, Vec<Lit>);
     #[cfg(feature = "boundary_check")]
     fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool>;
-    #[cfg(feature = "boundary_check")]
-    fn check_consistency(&mut self, asg: &impl AssignIF);
 }
 
 /// Clause identifier, or clause index, starting with one.
@@ -194,9 +195,10 @@ pub struct Clause {
     /// Since it's just a hint, we don't need u32 or usize.
     pub search_from: u16,
 
-    #[cfg(feature = "clause_rewarding")]
+    #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
     /// the number of conflicts at which this clause was used in `conflict_analyze`
     timestamp: usize,
+
     #[cfg(feature = "clause_rewarding")]
     /// A dynamic clause evaluation criterion based on the number of references.
     reward: f64,

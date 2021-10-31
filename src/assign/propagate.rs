@@ -315,7 +315,8 @@ impl PropagateIF for AssignStack {
         #[cfg(feature = "boundary_check")]
         macro_rules! check_in {
             ($cid: expr, $tag :expr) => {
-                cdb[cid].moved_at = $tag;
+                let ci = $cid;
+                cdb[ci].moved_at = $tag;
             };
         }
         #[cfg(not(feature = "boundary_check"))]
@@ -402,8 +403,9 @@ impl PropagateIF for AssignStack {
                 match lit_assign!(self, *blocker) {
                     Some(true) => (),
                     Some(false) => {
-                        check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, blocker));
-                        conflict_path!(*blocker, minimized_reason!(propagating));
+                        let b = *blocker; // need for 'boundary_check'
+                        check_in!(*cid, Propagate::EmitConflict(self.num_conflict + 1, b));
+                        conflict_path!(b, minimized_reason!(propagating));
                     }
                     None => {
                         debug_assert!(
@@ -563,7 +565,7 @@ impl PropagateIF for AssignStack {
         #[cfg(feature = "boundary_check")]
         macro_rules! check_in {
             ($cid: expr, $tag :expr) => {
-                cdb[cid].moved_at = $tag;
+                cdb[$cid].moved_at = $tag;
             };
         }
         #[cfg(not(feature = "boundary_check"))]
@@ -598,7 +600,7 @@ impl PropagateIF for AssignStack {
                 debug_assert_ne!(*blocker, false_lit);
 
                 #[cfg(feature = "boundary_check")]
-                debug_assert_eq!(cdb[cid].len(), 2);
+                debug_assert_eq!(cdb[*cid].len(), 2);
 
                 match lit_assign!(self, *blocker) {
                     Some(true) => (),

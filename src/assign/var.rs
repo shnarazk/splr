@@ -154,7 +154,7 @@ impl VarManipulateIF for AssignStack {
 
         #[cfg(feature = "boundary_check")]
         {
-            self.var[vi].timestamp = self.ordinal;
+            self.var[vi].timestamp = self.tick;
         }
 
         #[cfg(feature = "best_phases_tracking")]
@@ -171,7 +171,7 @@ impl VarManipulateIF for AssignStack {
 
             #[cfg(feature = "boundary_check")]
             {
-                self.var[vi].timestamp = self.ordinal;
+                self.var[vi].timestamp = self.tick;
             }
 
             #[cfg(feature = "trace_elimination")]
