@@ -315,8 +315,7 @@ impl PropagateIF for AssignStack {
         #[cfg(feature = "boundary_check")]
         macro_rules! check_in {
             ($cid: expr, $tag :expr) => {
-                let ci = $cid;
-                cdb[ci].moved_at = $tag;
+                cdb[$cid].moved_at = $tag;
             };
         }
         #[cfg(not(feature = "boundary_check"))]
