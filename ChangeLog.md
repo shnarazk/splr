@@ -12,6 +12,7 @@
   - remove `reregister_watch_cache`
   - remove `restore_detached_watch_cache`
   - remove `WatchCacheHash`
+- fix panic by clause vivification on UNSAT problems
 
 ## 0.13.0, 2021-10-11
 
