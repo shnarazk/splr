@@ -193,10 +193,10 @@ pub struct Clause {
     /// the index from which `propagate` starts searching an un-falsified literal.
     /// Since it's just a hint, we don't need u32 or usize.
     pub search_from: u16,
-    /// the number of conflicts at which this clause was used in `conflict_analyze`
-    #[cfg(feature = "clause_rewarding")]
-    timestamp: usize,
 
+    #[cfg(feature = "clause_rewarding")]
+    /// the number of conflicts at which this clause was used in `conflict_analyze`
+    timestamp: usize,
     #[cfg(feature = "clause_rewarding")]
     /// A dynamic clause evaluation criterion based on the number of references.
     reward: f64,
@@ -339,6 +339,7 @@ pub mod property {
                 Tusize::NumLearnt => self.num_learnt,
                 Tusize::NumReduction => self.num_reduction,
                 Tusize::NumReRegistration => self.num_reregistration,
+
                 #[cfg(feature = "clause_rewarding")]
                 Tusize::Timestamp => self.tick,
                 #[cfg(not(feature = "clause_rewarding"))]

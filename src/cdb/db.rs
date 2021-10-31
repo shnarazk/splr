@@ -32,6 +32,7 @@ impl Default for ClauseDB {
             activity_decay: 0.99,
             #[cfg(feature = "clause_rewarding")]
             activity_anti_decay: 0.01,
+
             lbd_temp: Vec::new(),
             num_lbd_update: 0,
             inc_step: 300,
@@ -173,10 +174,12 @@ impl Instantiate for ClauseDB {
             watch_cache: watcher,
             certification_store: CertificationStore::instantiate(config, cnf),
             soft_limit: config.c_cls_lim,
+
             #[cfg(feature = "clause_rewarding")]
             activity_decay: config.crw_dcy_rat,
             #[cfg(feature = "clause_rewarding")]
             activity_anti_decay: 1.0 - config.crw_dcy_rat,
+
             lbd_temp: vec![0; nv + 1],
             ..ClauseDB::default()
         }
@@ -330,8 +333,10 @@ impl ClauseDBIF for ClauseDB {
             ref mut num_lbd2,
             ref mut num_learnt,
             ref mut binary_link,
+
             #[cfg(feature = "clause_rewarding")]
             ref tick,
+
             ref mut watch_cache,
             ..
         } = self;
@@ -422,10 +427,12 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
+
         #[cfg(feature = "clause_rewarding")]
         {
             c.timestamp = *tick;
         }
+
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
@@ -981,10 +988,12 @@ impl ClauseDBIF for ClauseDB {
                 let act_v = self
                     .iter()
                     .fold(0.0f64, |acc, l| acc.max(asg.activity(l.vi())));
+
                 #[cfg(feature = "clause_rewarding")]
                 let act_c = self.reward;
                 #[cfg(not(feature = "clause_rewarding"))]
                 let act_c = 0.25;
+
                 self.rank as f64 / (act_c + act_v)
             }
             #[cfg(feature = "just_used")]
@@ -1011,6 +1020,7 @@ impl ClauseDBIF for ClauseDB {
             ref co_lbd_bound,
             ref mut lbd_temp,
             ref mut num_reduction,
+
             #[cfg(feature = "clause_rewarding")]
             ref tick,
             #[cfg(feature = "clause_rewarding")]

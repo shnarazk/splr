@@ -15,9 +15,9 @@ impl Default for Clause {
             rank: 0,
             rank_old: 0,
             search_from: 2,
+
             #[cfg(feature = "clause_rewarding")]
             timestamp: 0,
-
             #[cfg(feature = "clause_rewarding")]
             reward: 0.0,
 
