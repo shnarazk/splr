@@ -4,6 +4,13 @@ use {
     crate::{assign::AssignIF, cdb::ClauseDBIF, types::*},
 };
 
+#[derive(Clone, Eq, Debug, Ord, PartialEq, PartialOrd)]
+enum Subsumable {
+    None,
+    By(Lit),
+    Success,
+}
+
 impl Eliminator {
     pub fn try_subsume(
         &mut self,
@@ -13,7 +20,7 @@ impl Eliminator {
         did: ClauseId,
     ) -> MaybeInconsistent {
         match have_subsuming_lit(cdb, cid, did) {
-            Some(NULL_LIT) => {
+            Subsumable::Success => {
                 #[cfg(feature = "trace_elimination")]
                 println!(
                     "BackSubsC    => {} {} subsumed completely by {} {:#}",
@@ -28,32 +35,33 @@ impl Eliminator {
                 self.num_subsumed += 1;
             }
             // To avoid making a big clause, we have to add a condition for combining them.
-            Some(l) if cid.is_lifted_lit() => {
+            Subsumable::By(l) => {
+                debug_assert!(cid.is_lifted_lit());
                 #[cfg(feature = "trace_elimination")]
                 println!("BackSubC subsumes {} from {} and {}", l, cid, did);
                 strengthen_clause(asg, cdb, self, did, !l)?;
                 self.enqueue_var(asg, l.vi(), true);
             }
-            _ => (),
+            Subsumable::None => (),
         }
         Ok(())
     }
 }
 
 /// returns a literal if these clauses can be merged by the literal.
-fn have_subsuming_lit(cdb: &mut impl ClauseDBIF, cid: ClauseId, other: ClauseId) -> Option<Lit> {
+fn have_subsuming_lit(cdb: &mut impl ClauseDBIF, cid: ClauseId, other: ClauseId) -> Subsumable {
     debug_assert!(!other.is_lifted_lit());
     if cid.is_lifted_lit() {
         let l = Lit::from(cid);
         let oh = &cdb[other];
         for lo in oh.iter() {
             if l == !*lo {
-                return Some(l);
+                return Subsumable::By(l);
             }
         }
-        return None;
+        return Subsumable::None;
     }
-    let mut ret: Lit = NULL_LIT;
+    // let mut ret: Subsumable = Subsumable::Success;
     let ch = &cdb[cid];
     debug_assert!(1 < ch.len());
     let ob = &cdb[other];
@@ -64,14 +72,14 @@ fn have_subsuming_lit(cdb: &mut impl ClauseDBIF, cid: ClauseId, other: ClauseId)
         for lo in ob.iter() {
             if *l == *lo {
                 continue 'next;
-            } else if ret == NULL_LIT && *l == !*lo {
-                ret = *l;
-                continue 'next;
+                // } else if ret == Subsumable::Success && *l == !*lo {
+                //     ret = Subsumable::By(*l);
+                //     continue 'next;
             }
         }
-        return None;
+        return Subsumable::None;
     }
-    Some(ret)
+    Subsumable::Success
 }
 
 /// removes `l` from clause `cid`
