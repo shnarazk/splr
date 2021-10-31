@@ -83,6 +83,10 @@ pub trait VarManipulateIF {
     fn var_iter(&self) -> Iter<'_, Var>;
     /// return an mutable iterator over Vars.
     fn var_iter_mut(&mut self) -> IterMut<'_, Var>;
+    /// set var status to asserted.
+    fn make_var_asserted(&mut self, vi: VarId);
+    /// set var status to eliminated.
+    fn make_var_eliminated(&mut self, vi: VarId);
 }
 
 impl VarManipulateIF for AssignStack {
@@ -143,11 +147,7 @@ impl VarManipulateIF for AssignStack {
     fn var_iter_mut(&mut self) -> IterMut<'_, Var> {
         self.var.iter_mut()
     }
-}
-
-impl AssignStack {
-    /// make a var asserted.
-    pub fn make_var_asserted(&mut self, vi: VarId) {
+    fn make_var_asserted(&mut self, vi: VarId) {
         self.reason[vi] = AssignReason::Decision(0);
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
@@ -160,7 +160,7 @@ impl AssignStack {
         #[cfg(feature = "best_phases_tracking")]
         self.check_best_phase(vi);
     }
-    pub fn make_var_eliminated(&mut self, vi: VarId) {
+    fn make_var_eliminated(&mut self, vi: VarId) {
         if !self.var[vi].is(FlagVar::ELIMINATED) {
             self.var[vi].turn_on(FlagVar::ELIMINATED);
             self.set_activity(vi, 0.0);
@@ -196,5 +196,28 @@ impl AssignStack {
             #[cfg(feature = "boundary_check")]
             panic!("double elimination");
         }
+    }
+}
+
+impl AssignStack {
+    /// check usability of the saved best phase.
+    /// return `true` if the current best phase got invalid.
+    #[cfg(not(feature = "best_phases_tracking"))]
+    fn check_best_phase(&mut self, _: VarId) -> bool {
+        false
+    }
+    #[cfg(feature = "best_phases_tracking")]
+    fn check_best_phase(&mut self, vi: VarId) -> bool {
+        if let Some((b, _)) = self.best_phases.get(&vi) {
+            debug_assert!(self.assign[vi].is_some());
+            if self.assign[vi] != Some(*b) {
+                if self.root_level == self.level[vi] {
+                    self.best_phases.clear();
+                    self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
+                }
+                return true;
+            }
+        }
+        false
     }
 }

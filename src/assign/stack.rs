@@ -2,7 +2,10 @@
 #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
 use std::collections::HashMap;
 use {
-    super::{AssignIF, AssignStack, Var, VarHeapIF, VarIdHeap, VarManipulateIF, VarSelectIF},
+    super::{
+        AssignIF, AssignStack, TrailSavingIF, Var, VarHeapIF, VarIdHeap, VarManipulateIF,
+        VarSelectIF,
+    },
     crate::{cdb::ClauseDBIF, solver::SolverEvent, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
@@ -128,7 +131,7 @@ impl Instantiate for AssignStack {
                 }
 
                 #[cfg(feature = "trail_saving")]
-                self.clear_trail_saved();
+                self.clear_saved_trail();
             }
             SolverEvent::NewVar => {
                 self.assign.push(None);

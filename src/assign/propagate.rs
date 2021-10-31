@@ -1,7 +1,7 @@
 /// implement boolean constraint propagation, backjump
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{AssignIF, AssignStack, VarHeapIF, VarManipulateIF},
+    super::{AssignIF, AssignStack, TrailSavingIF, VarHeapIF, VarManipulateIF},
     crate::{cdb::ClauseDBIF, types::*},
 };
 
@@ -750,7 +750,8 @@ impl PropagateIF for AssignStack {
 }
 
 impl AssignStack {
-    pub fn check(&self, (b0, b1): (Lit, Lit)) {
+    #[allow(dead_code)]
+    fn check(&self, (b0, b1): (Lit, Lit)) {
         assert_ne!(self.assigned(b0), Some(false));
         assert_ne!(self.assigned(b1), Some(false));
     }
@@ -782,27 +783,6 @@ impl AssignStack {
             }
         }
         Ok(())
-    }
-
-    /// check usability of the saved best phase.
-    /// return `true` if the current best phase got invalid.
-    #[cfg(not(feature = "best_phases_tracking"))]
-    pub fn check_best_phase(&mut self, _: VarId) -> bool {
-        false
-    }
-    #[cfg(feature = "best_phases_tracking")]
-    pub fn check_best_phase(&mut self, vi: VarId) -> bool {
-        if let Some((b, _)) = self.best_phases.get(&vi) {
-            debug_assert!(self.assign[vi].is_some());
-            if self.assign[vi] != Some(*b) {
-                if self.root_level == self.level[vi] {
-                    self.best_phases.clear();
-                    self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
-                }
-                return true;
-            }
-        }
-        false
     }
     fn level_up(&mut self) {
         self.trail_lim.push(self.trail.len());

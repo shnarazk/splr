@@ -16,7 +16,10 @@ mod trail_saving;
 /// var struct and its methods
 mod var;
 
-pub use self::{propagate::PropagateIF, property::*, select::VarSelectIF, var::VarManipulateIF};
+pub use self::{
+    propagate::PropagateIF, property::*, select::VarSelectIF, trail_saving::TrailSavingIF,
+    var::VarManipulateIF,
+};
 #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
 use std::collections::HashMap;
 use {

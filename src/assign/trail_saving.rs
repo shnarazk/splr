@@ -12,14 +12,21 @@ use {
 #[cfg(feature = "chrono_BT")]
 use super::AssignIF;
 
+/// Methods on trail saving.
+pub trait TrailSavingIF {
+    fn save_trail(&mut self, to_lvl: DecisionLevel);
+    fn from_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult;
+    fn clear_saved_trail(&mut self);
+}
+
 const REASON_THRESHOLD: f64 = 1.5;
 
-impl AssignStack {
-    pub fn save_trail(&mut self, to_lvl: DecisionLevel) {
+impl TrailSavingIF for AssignStack {
+    fn save_trail(&mut self, to_lvl: DecisionLevel) {
         let lim = self.trail_lim[to_lvl as usize];
         let dl = self.trail_lim.len();
         let mut free: usize = lim;
-        self.clear_trail_saved();
+        self.clear_saved_trail();
         if 2 <= dl {
             let lim2 = self.trail_lim[dl - 2];
             let activity_threshold = self.var[self.trail[lim2].vi()].reward;
@@ -51,7 +58,7 @@ impl AssignStack {
             self.insert_heap(vi);
         }
     }
-    pub fn from_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult {
+    fn from_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult {
         let q = (REASON_THRESHOLD * cdb.derefer(cdb::property::Tf64::DpAverageLBD)).max(6.0) as u16;
 
         #[cfg(feature = "chrono_BT")]
@@ -99,13 +106,13 @@ impl AssignStack {
                     debug_assert_ne!(link.vi(), lit.vi());
                     debug_assert_eq!(self.assigned(link), Some(true));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
-                    self.clear_trail_saved();
+                    self.clear_saved_trail();
                     return Err((lit, old_reason));
                 }
                 (Some(false), AssignReason::Implication(cid)) => {
                     debug_assert!(cdb[cid].iter().all(|l| self.assigned(*l) == Some(false)));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
-                    self.clear_trail_saved();
+                    self.clear_saved_trail();
                     return Err((cdb[cid].lit0(), AssignReason::Implication(cid)));
                 }
                 (_, AssignReason::Decision(lvl)) => {
@@ -119,13 +126,16 @@ impl AssignStack {
         self.trail_saved.clear();
         Ok(())
     }
-    pub fn clear_trail_saved(&mut self) {
+    fn clear_saved_trail(&mut self) {
         for j in 0..self.trail_saved.len() {
             let l = self.trail_saved[j];
             self.insert_heap(l.vi());
         }
         self.trail_saved.clear();
     }
+}
+
+impl AssignStack {
     fn truncate_trail_saved(&mut self, len: usize) -> PropagationResult {
         self.trail_saved.truncate(len);
         Ok(())

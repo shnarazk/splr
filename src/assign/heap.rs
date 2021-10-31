@@ -1,5 +1,9 @@
 /// Heap struct for selecting decision vars
-use {super::AssignStack, crate::types::*, std::fmt};
+use {
+    super::{AssignStack, TrailSavingIF},
+    crate::types::*,
+    std::fmt,
+};
 
 /// Heap of VarId, based on var activity.
 // # Note
@@ -84,7 +88,7 @@ impl VarHeapIF for AssignStack {
     fn get_heap_root(&mut self) -> VarId {
         #[cfg(feature = "trail_saving")]
         if self.var_order.is_empty() {
-            self.clear_trail_saved();
+            self.clear_saved_trail();
         }
         let vs = self.var_order.get_root();
         if 1 < self.var_order.len() {
