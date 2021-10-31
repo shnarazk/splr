@@ -100,14 +100,6 @@ pub struct Config {
     //
 
     //
-    //## var staging
-    //
-    /// Decay rate of the extra reward for staged vars
-    pub stg_rwd_dcy: f64,
-    /// Initial value of the extra reward for staged vars
-    pub stg_rwd_val: f64,
-
-    //
     //## var rewarding
     //
     /// Var Reward Decay Rate
@@ -149,9 +141,6 @@ impl Default for Config {
             rst_lbd_slw: 8192,
             rst_lbd_thr: 1.6,
 
-            stg_rwd_dcy: 0.5,
-            stg_rwd_val: 1.0,
-
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_rat: 0.98,
             #[cfg(feature = "LRB_rewarding")]
@@ -185,7 +174,7 @@ impl Config {
                 let options_usize = [
                     "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
                 ];
-                let options_f64 = ["timeout", "cdr", "rat", "rlt", "srd", "srv", "vdr", "vds"];
+                let options_f64 = ["timeout", "cdr", "rat", "rlt", "vdr", "vds"];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
                 match seg.len() {
@@ -245,8 +234,6 @@ impl Config {
                                         "cdr" => self.crw_dcy_rat = val,
                                         "rat" => self.rst_asg_thr = val,
                                         "rlt" => self.rst_lbd_thr = val,
-                                        "srd" => self.stg_rwd_dcy = val,
-                                        "srv" => self.stg_rwd_val = val,
                                         "vdr" => self.vrw_dcy_rat = val,
                                         "vds" => self.vrw_dcy_stp = val,
 
@@ -390,9 +377,9 @@ FLAGS:
   -j, --journal             Shows sub-module logs
   -l, --log                 Uses Glucose-like progress report
   -V, --version             Prints version information
-OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m):
-      --cbt <c-cbt-thr>     Dec. lvl to use chronoBT       {:>10}
-      --cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}
+OPTIONS (\x1B[000m\x1B[031mred\x1B[000m options depend on features in Cargo.toml):
+      \x1B[000m\x1B[031m--cbt <c-cbt-thr>     Dec. lvl to use chronoBT       {:>10}\x1B[000m
+      \x1B[000m\x1B[031m--cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}\x1B[000m
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
       --ii <c-ip-int>       #cls to start in-processor     {:>10}
   -t, --timeout <timeout>   CPU time limit in sec.         {:>10}
@@ -409,10 +396,8 @@ OPTIONS (\x1B[000m\x1B[031mred options depend on features in Cargo.toml\x1B[000m
       --rls <rst-lbd-slw>   Length of LBD slow EMA         {:>10}
       --rlt <rst-lbd-thr>   Forcing restart threshold         {:>10.2}
       --rs  <rst-step>      #conflicts between restarts    {:>10}
-      --srd <stg-rwd-dcy>   Decay rate for staged var reward  {:>10.2}
-      --srv <stg-rwd-val>   Extra reward for staged vars      {:>10.2}
       --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
-      --vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}
+      \x1B[000m\x1B[031m--vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}\x1B[000m
 ARGS:
   <cnf-file>    DIMACS CNF file
 ",
@@ -434,8 +419,6 @@ ARGS:
         config.rst_lbd_slw,
         config.rst_lbd_thr,
         config.rst_step,
-        config.stg_rwd_dcy,
-        config.stg_rwd_val,
         config.vrw_dcy_rat,
         config.vrw_dcy_stp,
     )
