@@ -13,6 +13,7 @@
   - remove `restore_detached_watch_cache`
   - remove `WatchCacheHash`
 - fix panic by clause vivification on UNSAT problems
+- `Lit` uses `NonZeroU32` instead of `u32`.
 
 ## 0.13.0, 2021-10-11
 
