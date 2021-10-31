@@ -58,9 +58,8 @@ pub trait ClauseIF {
 
 /// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`remove_clause`](`crate::cdb::ClauseDBIF::remove_clause`), and so on.
 pub trait ClauseDBIF:
-    ActivityIF<ClauseId>
+    Instantiate
     + IndexMut<ClauseId, Output = Clause>
-    + Instantiate
     + PropertyDereference<property::Tusize, usize>
     + PropertyDereference<property::Tf64, f64>
 {
@@ -195,6 +194,7 @@ pub struct Clause {
     /// Since it's just a hint, we don't need u32 or usize.
     pub search_from: u16,
     /// the number of conflicts at which this clause was used in `conflict_analyze`
+    #[cfg(feature = "clause_rewarding")]
     timestamp: usize,
 
     #[cfg(feature = "clause_rewarding")]
@@ -246,8 +246,11 @@ pub struct ClauseDB {
     //## clause rewarding
     //
     /// an index for counting elapsed time
+    #[cfg(feature = "clause_rewarding")]
     ordinal: usize,
+    #[cfg(feature = "clause_rewarding")]
     activity_decay: f64,
+    #[cfg(feature = "clause_rewarding")]
     activity_anti_decay: f64,
 
     //
@@ -336,7 +339,10 @@ pub mod property {
                 Tusize::NumLearnt => self.num_learnt,
                 Tusize::NumReduction => self.num_reduction,
                 Tusize::NumReRegistration => self.num_reregistration,
+                #[cfg(feature = "clause_rewarding")]
                 Tusize::Timestamp => self.ordinal,
+                #[cfg(not(feature = "clause_rewarding"))]
+                Tusize::Timestamp => 0,
             }
         }
     }

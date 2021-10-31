@@ -26,8 +26,11 @@ impl Default for ClauseDB {
             bi_clause_completion_queue: Vec::new(),
             num_bi_clause_completion: 0,
             // lbd_frozen_clause: 30,
+            #[cfg(feature = "clause_rewarding")]
             ordinal: 0,
+            #[cfg(feature = "clause_rewarding")]
             activity_decay: 0.99,
+            #[cfg(feature = "clause_rewarding")]
             activity_anti_decay: 0.01,
             lbd_temp: Vec::new(),
             num_lbd_update: 0,
@@ -170,7 +173,9 @@ impl Instantiate for ClauseDB {
             watch_cache: watcher,
             certification_store: CertificationStore::instantiate(config, cnf),
             soft_limit: config.c_cls_lim,
+            #[cfg(feature = "clause_rewarding")]
             activity_decay: config.crw_dcy_rat,
+            #[cfg(feature = "clause_rewarding")]
             activity_anti_decay: 1.0 - config.crw_dcy_rat,
             lbd_temp: vec![0; nv + 1],
             ..ClauseDB::default()
@@ -325,12 +330,16 @@ impl ClauseDBIF for ClauseDB {
             ref mut num_lbd2,
             ref mut num_learnt,
             ref mut binary_link,
+            #[cfg(feature = "clause_rewarding")]
             ref ordinal,
             ref mut watch_cache,
             ..
         } = self;
         let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
-        c.timestamp = *ordinal;
+        #[cfg(feature = "clause_rewarding")]
+        {
+            c.timestamp = *ordinal;
+        }
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
@@ -407,12 +416,16 @@ impl ClauseDBIF for ClauseDB {
             ref mut clause,
             ref mut lbd_temp,
             ref mut binary_link,
+            #[cfg(feature = "clause_rewarding")]
             ref ordinal,
             ref mut watch_cache,
             ..
         } = self;
         let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
-        c.timestamp = *ordinal;
+        #[cfg(feature = "clause_rewarding")]
+        {
+            c.timestamp = *ordinal;
+        }
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
@@ -948,6 +961,7 @@ impl ClauseDBIF for ClauseDB {
         if learnt {
             #[cfg(feature = "just_used")]
             c.turn_on(FlagClause::USED);
+            #[cfg(feature = "clause_rewading")]
             self.reward_at_analysis(cid);
         }
         self.lbd_of_dp_ema.update(rank as f64);
@@ -997,7 +1011,9 @@ impl ClauseDBIF for ClauseDB {
             ref co_lbd_bound,
             ref mut lbd_temp,
             ref mut num_reduction,
+            #[cfg(feature = "clause_rewarding")]
             ref ordinal,
+            #[cfg(feature = "clause_rewarding")]
             ref activity_decay,
             ..
         } = self;
@@ -1011,7 +1027,10 @@ impl ClauseDBIF for ClauseDB {
             .filter(|(_, c)| !c.is_dead())
         {
             c.update_lbd(asg, lbd_temp);
+
+            #[cfg(feature = "clause_rewarding")]
             c.update_activity(*ordinal, *activity_decay, 0.0);
+
             // There's no clause stored in `reason` because the decision level is 'zero.'
             debug_assert_ne!(
                 asg.reason(c.lit0().vi()),

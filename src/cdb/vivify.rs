@@ -146,11 +146,14 @@ impl VivifyIF for ClauseDB {
                                     num_assert += 1;
                                 }
                                 _ => {
+                                    #[cfg(feature = "clause_rewarding")]
                                     if let Some(ci) =
                                         self.new_clause(asg, &mut vec, is_learnt).is_new()
                                     {
                                         self.set_activity(ci, cp.value());
                                     }
+                                    #[cfg(not(feature = "clause_rewarding"))]
+                                    self.new_clause(asg, &mut vec, is_learnt);
                                     self.remove_clause(cid);
                                     num_shrink += 1;
                                 }
@@ -354,7 +357,7 @@ impl Clause {
         } else {
             (!self.is_dead()
                 && self.rank * 2 <= self.rank_old
-                && (self.is(FlagClause::LEARNT) || self.is(Flag::DERIVE20)))
+                && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
             .then(|| self.reward)
         }
     }

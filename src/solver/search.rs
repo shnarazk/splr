@@ -278,6 +278,7 @@ fn search(
             }
 
             asg.update_activity_tick();
+            #[cfg(feature = "clause_rewarding")]
             cdb.update_activity_tick();
             handle_conflict(asg, cdb, rst, state, &cc)?;
             rst.update(ProgressUpdate::ASG(
