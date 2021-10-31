@@ -256,7 +256,7 @@ fn conflict_analyze(
 ) -> DecisionLevel {
     let learnt = &mut state.new_learnt;
     learnt.clear();
-    learnt.push(NULL_LIT);
+    learnt.push(Lit::from(i32::MAX));
     let root_level = asg.root_level();
     let dl = asg.decision_level();
     let mut path_cnt = 0;
@@ -622,7 +622,7 @@ fn dumper(asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
             asg.level(l.vi()),
             asg.reason(l.vi()),
             match asg.reason(l.vi()) {
-                AssignReason::Decision(_) => vec![NULL_LIT],
+                AssignReason::Decision(_) => vec![],
                 AssignReason::BinaryLink(lit) => vec![*l, !lit],
                 AssignReason::Implication(cid) => cdb[cid].iter().copied().collect::<Vec<Lit>>(),
                 AssignReason::None => vec![],

@@ -378,7 +378,7 @@ mod tests {
 
     #[allow(dead_code)]
     fn check_watches(cdb: &ClauseDB, cid: ClauseId) {
-        let c = &cdb.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
+        let c = &cdb.clause[NonZeroU32::get(cid.ordinal) as usize];
         if c.lits.is_empty() {
             println!("skip checking watches of an empty clause");
             return;

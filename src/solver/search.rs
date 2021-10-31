@@ -209,7 +209,7 @@ impl SolveIF for Solver {
                     .var_iter()
                     .enumerate()
                     .skip(1)
-                    .map(|(vi, _)| i32::from(Lit::from((vi, model[vi]))))
+                    .map(|(vi, _)| i32::from(Lit::from((vi, model[vi].unwrap()))))
                     .collect::<Vec<i32>>();
 
                 // As a preparation for incremental solving, turn flags off.

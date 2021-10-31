@@ -7,6 +7,7 @@ use {
     },
     crate::{assign::AssignIF, solver::SolverEvent, types::*},
     std::{
+        num::NonZeroU32,
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::{Iter, IterMut},
     },
@@ -61,7 +62,7 @@ impl Index<ClauseId> for ClauseDB {
         #[cfg(feature = "unsafe_access")]
         unsafe {
             self.clause
-                .get_unchecked(std::num::NonZeroU32::get(cid.ordinal) as usize)
+                .get_unchecked(NonZeroU32::get(cid.ordinal) as usize)
         }
         #[cfg(not(feature = "unsafe_access"))]
         &self.clause[cid.ordinal as usize]
@@ -74,7 +75,7 @@ impl IndexMut<ClauseId> for ClauseDB {
         #[cfg(feature = "unsafe_access")]
         unsafe {
             self.clause
-                .get_unchecked_mut(std::num::NonZeroU32::get(cid.ordinal) as usize)
+                .get_unchecked_mut(NonZeroU32::get(cid.ordinal) as usize)
         }
         #[cfg(not(feature = "unsafe_access"))]
         &mut self.clause[cid.ordinal as usize]
@@ -88,7 +89,7 @@ impl Index<&ClauseId> for ClauseDB {
         #[cfg(feature = "unsafe_access")]
         unsafe {
             self.clause
-                .get_unchecked(std::num::NonZeroU32::get(cid.ordinal) as usize)
+                .get_unchecked(NonZeroU32::get(cid.ordinal) as usize)
         }
         #[cfg(not(feature = "unsafe_access"))]
         &self.clause[cid.ordinal as usize]
@@ -101,7 +102,7 @@ impl IndexMut<&ClauseId> for ClauseDB {
         #[cfg(feature = "unsafe_access")]
         unsafe {
             self.clause
-                .get_unchecked_mut(std::num::NonZeroU32::get(cid.ordinal) as usize)
+                .get_unchecked_mut(NonZeroU32::get(cid.ordinal) as usize)
         }
         #[cfg(not(feature = "unsafe_access"))]
         &mut self.clause[cid.ordinal as usize]
@@ -340,7 +341,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut watch_cache,
             ..
         } = self;
-        let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
+        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
         #[cfg(feature = "clause_rewarding")]
         {
             c.timestamp = *tick;
@@ -426,7 +427,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut watch_cache,
             ..
         } = self;
-        let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
+        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
 
         #[cfg(feature = "clause_rewarding")]
         {
@@ -461,9 +462,9 @@ impl ClauseDBIF for ClauseDB {
     /// this function is the only function that makes dead clauses
     fn remove_clause(&mut self, cid: ClauseId) {
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
-        // if !self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize].is_dead() {
+        // if !self.clause[NonZeroU32::get(cid.ordinal) as usize].is_dead() {
         // }
-        let c = &mut self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
+        let c = &mut self.clause[NonZeroU32::get(cid.ordinal) as usize];
         debug_assert!(!c.is_dead());
         debug_assert!(1 < c.lits.len());
         remove_clause_fn(
@@ -480,7 +481,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn remove_clause_sandbox(&mut self, cid: ClauseId) {
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
-        let c = &mut self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
+        let c = &mut self.clause[NonZeroU32::get(cid.ordinal) as usize];
         debug_assert!(!c.is_dead());
         debug_assert!(1 < c.lits.len());
         let mut store = CertificationStore::default();
@@ -542,7 +543,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut num_bi_clause,
             ..
         } = self;
-        let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
+        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
         // debug_assert!((*ch).lits.contains(&p));
         // debug_assert!(1 < (*ch).len());
         debug_assert!(1 < usize::from(!p));
@@ -678,7 +679,7 @@ impl ClauseDBIF for ClauseDB {
             certification_store,
             ..
         } = self;
-        let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
+        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
         debug_assert!(new_lits.len() < c.len());
         if new_lits.len() == 2 {
             if let Some(&did) = binary_link.search(new_lits[0], new_lits[1]) {
@@ -810,7 +811,7 @@ impl ClauseDBIF for ClauseDB {
             certification_store,
             ..
         } = self;
-        let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
+        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
         let mut new_lits = c
             .lits
             .iter()
@@ -936,7 +937,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut watch_cache,
             ..
         } = self;
-        let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
+        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
         let other = (old == 0) as usize;
         if removed {
             debug_assert!(watch_cache[!c.lits[old]].get_watch(&cid).is_none());
@@ -960,7 +961,7 @@ impl ClauseDBIF for ClauseDB {
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
     }
     fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool {
-        let c = &mut self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
+        let c = &mut self.clause[NonZeroU32::get(cid.ordinal) as usize];
         // Updating LBD at every analysis seems redundant.
         // But it's crucial. Don't remove the below.
         let rank = c.update_lbd(asg, &mut self.lbd_temp);
@@ -1141,7 +1142,7 @@ impl ClauseDBIF for ClauseDB {
         let l0 = vec[0];
         let mut num_sat = 0;
         for (_, cid) in self.binary_link.connect_with(l0).iter() {
-            let c = &self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
+            let c = &self.clause[NonZeroU32::get(cid.ordinal) as usize];
             debug_assert!(c[0] == l0 || c[1] == l0);
             let other = c[(c[0] == l0) as usize];
             let vi = other.vi();
@@ -1163,7 +1164,7 @@ impl ClauseDBIF for ClauseDB {
     #[cfg(feature = "incremental_solver")]
     fn make_permanent_immortal(&mut self, cid: ClauseId) {
         self.eliminated_permanent.push(
-            self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize]
+            self.clause[NonZeroU32::get(cid.ordinal) as usize]
                 .lits
                 .clone(),
         );

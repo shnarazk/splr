@@ -311,16 +311,16 @@ impl Solver {
         debug_assert!(asg.decision_level() == 0);
         lits.sort();
         let mut j = 0;
-        let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means tautology.
+        let mut l_: Option<Lit> = None; // last literal; [x, x.negate()] means tautology.
         for i in 0..lits.len() {
             let li = lits[i];
             let sat = asg.assigned(li);
-            if sat == Some(true) || !li == l_ {
+            if sat == Some(true) || Some(!li) == l_ {
                 return RefClause::Dead;
-            } else if sat != Some(false) && li != l_ {
+            } else if sat != Some(false) && Some(li) != l_ {
                 lits[j] = li;
                 j += 1;
-                l_ = li;
+                l_ = Some(li);
             }
         }
         lits.truncate(j);

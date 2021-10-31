@@ -1,5 +1,5 @@
 #![cfg(feature = "clause_rewarding")]
-use {super::ClauseId, crate::types::*};
+use {super::ClauseId, crate::types::*, std::num::NonZeroU32};
 
 // Note: vivifier has its own conflict analyzer, which never call reward functions.
 impl ActivityIF<ClauseId> for ClauseDB {
@@ -11,7 +11,7 @@ impl ActivityIF<ClauseId> for ClauseDB {
     }
     #[inline]
     fn reward_at_analysis(&mut self, cid: ClauseId) {
-        self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize].update_activity(
+        self.clause[NonZeroU32::get(cid.ordinal) as usize].update_activity(
             self.tick,
             self.activity_decay,
             self.activity_anti_decay,
