@@ -26,7 +26,7 @@ impl ActivityIF<VarId> for AssignStack {
     // Note: `update_rewards` should be called before `cancel_until`
     #[inline]
     fn update_activity_tick(&mut self) {
-        self.ordinal += 1;
+        self.tick += 1;
     }
 }
 

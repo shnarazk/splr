@@ -27,7 +27,7 @@ impl Default for ClauseDB {
             num_bi_clause_completion: 0,
             // lbd_frozen_clause: 30,
             #[cfg(feature = "clause_rewarding")]
-            ordinal: 0,
+            tick: 0,
             #[cfg(feature = "clause_rewarding")]
             activity_decay: 0.99,
             #[cfg(feature = "clause_rewarding")]
@@ -331,14 +331,14 @@ impl ClauseDBIF for ClauseDB {
             ref mut num_learnt,
             ref mut binary_link,
             #[cfg(feature = "clause_rewarding")]
-            ref ordinal,
+            ref tick,
             ref mut watch_cache,
             ..
         } = self;
         let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         #[cfg(feature = "clause_rewarding")]
         {
-            c.timestamp = *ordinal;
+            c.timestamp = *tick;
         }
         let len2 = c.lits.len() == 2;
         if len2 {
@@ -417,14 +417,14 @@ impl ClauseDBIF for ClauseDB {
             ref mut lbd_temp,
             ref mut binary_link,
             #[cfg(feature = "clause_rewarding")]
-            ref ordinal,
+            ref tick,
             ref mut watch_cache,
             ..
         } = self;
         let c = &mut clause[std::num::NonZeroU32::get(cid.ordinal) as usize];
         #[cfg(feature = "clause_rewarding")]
         {
-            c.timestamp = *ordinal;
+            c.timestamp = *tick;
         }
         let len2 = c.lits.len() == 2;
         if len2 {
@@ -1012,7 +1012,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut lbd_temp,
             ref mut num_reduction,
             #[cfg(feature = "clause_rewarding")]
-            ref ordinal,
+            ref tick,
             #[cfg(feature = "clause_rewarding")]
             ref activity_decay,
             ..
@@ -1029,7 +1029,7 @@ impl ClauseDBIF for ClauseDB {
             c.update_lbd(asg, lbd_temp);
 
             #[cfg(feature = "clause_rewarding")]
-            c.update_activity(*ordinal, *activity_decay, 0.0);
+            c.update_activity(*tick, *activity_decay, 0.0);
 
             // There's no clause stored in `reason` because the decision level is 'zero.'
             debug_assert_ne!(

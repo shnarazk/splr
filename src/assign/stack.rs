@@ -57,7 +57,7 @@ impl Default for AssignStack {
             ppc_ema: EmaSU::new(100),
             cpr_ema: EmaSU::new(100),
 
-            ordinal: 0,
+            tick: 0,
             var: Vec::new(),
 
             activity_decay: 0.94,

@@ -177,7 +177,7 @@ pub struct AssignStack {
     //## Var DB
     //
     /// an index for counting elapsed time
-    ordinal: usize,
+    tick: usize,
     /// vars
     var: Vec<Var>,
 

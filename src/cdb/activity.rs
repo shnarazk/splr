@@ -12,13 +12,13 @@ impl ActivityIF<ClauseId> for ClauseDB {
     #[inline]
     fn reward_at_analysis(&mut self, cid: ClauseId) {
         self.clause[std::num::NonZeroU32::get(cid.ordinal) as usize].update_activity(
-            self.ordinal,
+            self.tick,
             self.activity_decay,
             self.activity_anti_decay,
         );
     }
     fn update_activity_tick(&mut self) {
-        self.ordinal += 1;
+        self.tick += 1;
     }
 }
 

@@ -247,7 +247,7 @@ pub struct ClauseDB {
     //
     /// an index for counting elapsed time
     #[cfg(feature = "clause_rewarding")]
-    ordinal: usize,
+    tick: usize,
     #[cfg(feature = "clause_rewarding")]
     activity_decay: f64,
     #[cfg(feature = "clause_rewarding")]
@@ -340,7 +340,7 @@ pub mod property {
                 Tusize::NumReduction => self.num_reduction,
                 Tusize::NumReRegistration => self.num_reregistration,
                 #[cfg(feature = "clause_rewarding")]
-                Tusize::Timestamp => self.ordinal,
+                Tusize::Timestamp => self.tick,
                 #[cfg(not(feature = "clause_rewarding"))]
                 Tusize::Timestamp => 0,
             }
