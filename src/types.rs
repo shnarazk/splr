@@ -165,6 +165,15 @@ impl From<usize> for Lit {
     }
 }
 
+impl From<u32> for Lit {
+    #[inline]
+    fn from(l: u32) -> Self {
+        Lit {
+            ordinal: unsafe { NonZeroU32::new_unchecked(l) },
+        }
+    }
+}
+
 impl From<i32> for Lit {
     #[inline]
     fn from(x: i32) -> Self {

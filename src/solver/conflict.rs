@@ -256,7 +256,7 @@ fn conflict_analyze(
 ) -> DecisionLevel {
     let learnt = &mut state.new_learnt;
     learnt.clear();
-    learnt.push(Lit::from(i32::MAX));
+    learnt.push(Lit::from(u32::MAX));
     let root_level = asg.root_level();
     let dl = asg.decision_level();
     let mut path_cnt = 0;
