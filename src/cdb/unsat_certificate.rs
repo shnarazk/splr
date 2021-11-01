@@ -11,6 +11,7 @@ use {
 
 const DUMP_INTERVAL: usize = 4096 * 16;
 
+/// Struct for saving UNSAT certification
 #[derive(Debug)]
 pub struct CertificationStore {
     /// clause history to make certification

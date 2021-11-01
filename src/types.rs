@@ -9,11 +9,11 @@ use {
     crate::solver::SolverEvent,
     std::{
         cmp::Ordering,
-        convert::TryFrom,
         fmt,
         fs::File,
         io::{BufRead, BufReader},
-        ops::{Index, IndexMut, Neg, Not},
+        num::NonZeroU32,
+        ops::{Index, IndexMut, Not},
         path::{Path, PathBuf},
     },
 };
@@ -35,14 +35,12 @@ pub trait LitIF {
     fn as_bool(&self) -> bool;
     /// convert to var index.
     fn vi(self) -> VarId;
-    /// return `true` if it is a valid literal, namely non-zero.
-    fn is_none(&self) -> bool;
 }
 
 /// API for reward based activity management.
 pub trait ActivityIF<Ix> {
     /// return one's activity.
-    fn activity(&mut self, ix: Ix) -> f64;
+    fn activity(&self, ix: Ix) -> f64;
     /// set activity
     fn set_activity(&mut self, ix: Ix, val: f64);
     /// modify one's activity at conflict analysis in `conflict_analyze` in [`solver`](`crate::solver`).
@@ -126,14 +124,11 @@ pub type DecisionLevel = u32;
 /// assert_eq!( 2i32, Lit::from( 2i32).into());
 /// assert_eq!(-2i32, Lit::from(-2i32).into());
 /// ```
-#[derive(Clone, Copy, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Lit {
     /// literal encoded into folded u32
-    ordinal: u32,
+    ordinal: NonZeroU32,
 }
-
-/// a dummy literal.
-pub const NULL_LIT: Lit = Lit { ordinal: 0 };
 
 impl fmt::Display for Lit {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -156,17 +151,7 @@ impl From<(VarId, bool)> for Lit {
     #[inline]
     fn from((vi, b): (VarId, bool)) -> Self {
         Lit {
-            ordinal: ((vi as u32) << 1) + (b as u32),
-        }
-    }
-}
-
-impl From<(VarId, Option<bool>)> for Lit {
-    #[inline]
-    fn from((vi, ob): (VarId, Option<bool>)) -> Self {
-        match ob {
-            None => NULL_LIT,
-            Some(b) => Lit::from((vi, b)),
+            ordinal: unsafe { NonZeroU32::new_unchecked(((vi as u32) << 1) + (b as u32)) },
         }
     }
 }
@@ -174,7 +159,18 @@ impl From<(VarId, Option<bool>)> for Lit {
 impl From<usize> for Lit {
     #[inline]
     fn from(l: usize) -> Self {
-        Lit { ordinal: l as u32 }
+        Lit {
+            ordinal: unsafe { NonZeroU32::new_unchecked(l as u32) },
+        }
+    }
+}
+
+impl From<u32> for Lit {
+    #[inline]
+    fn from(l: u32) -> Self {
+        Lit {
+            ordinal: unsafe { NonZeroU32::new_unchecked(l) },
+        }
     }
 }
 
@@ -182,7 +178,9 @@ impl From<i32> for Lit {
     #[inline]
     fn from(x: i32) -> Self {
         Lit {
-            ordinal: (if x < 0 { -2 * x } else { 2 * x + 1 }) as u32,
+            ordinal: unsafe {
+                NonZeroU32::new_unchecked((if x < 0 { -2 * x } else { 2 * x + 1 }) as u32)
+            },
         }
     }
 }
@@ -191,48 +189,19 @@ impl From<ClauseId> for Lit {
     #[inline]
     fn from(cid: ClauseId) -> Self {
         Lit {
-            ordinal: std::num::NonZeroU32::get(cid.ordinal) & 0x7FFF_FFFF,
-        }
-    }
-}
-
-/*
-/// While Lit::ordinal is private, Var::{index, assign} are public.
-/// So we define the following here.
-/// # CAVEAT
-/// Unassigned vars are converted to the null literal.
-impl From<&Var> for Lit {
-    fn from(v: &Var) -> Self {
-        match v.assign {
-            Some(true) => Lit {
-                ordinal: (v.index as u32) << 1 | 1 as u32,
-            },
-            Some(false) => Lit {
-                ordinal: (v.index as u32) << 1,
-            },
-            None => NULL_LIT,
-        }
-    }
-}
-
-impl From<&mut Var> for Lit {
-    fn from(v: &mut Var) -> Self {
-        Lit {
-            ordinal: match v.assign {
-                Some(true) => (v.index as u32) << 1 | 1 as u32,
-                _e => (v.index as u32) << 1,
+            ordinal: unsafe {
+                NonZeroU32::new_unchecked(NonZeroU32::get(cid.ordinal) & 0x7FFF_FFFF)
             },
         }
     }
 }
-*/
 
 impl From<Lit> for bool {
     /// - positive Lit (= even u32) => Some(true)
     /// - negative Lit (= odd u32)  => Some(false)
     #[inline]
     fn from(l: Lit) -> bool {
-        (l.ordinal & 1) != 0
+        (NonZeroU32::get(l.ordinal) & 1) != 0
     }
 }
 
@@ -240,7 +209,7 @@ impl From<Lit> for ClauseId {
     #[inline]
     fn from(l: Lit) -> ClauseId {
         ClauseId {
-            ordinal: std::num::NonZeroU32::new(l.ordinal | 0x8000_0000).unwrap(),
+            ordinal: unsafe { NonZeroU32::new_unchecked(NonZeroU32::get(l.ordinal) | 0x8000_0000) },
         }
     }
 }
@@ -248,17 +217,17 @@ impl From<Lit> for ClauseId {
 impl From<Lit> for usize {
     #[inline]
     fn from(l: Lit) -> usize {
-        l.ordinal as usize
+        NonZeroU32::get(l.ordinal) as usize
     }
 }
 
 impl From<Lit> for i32 {
     #[inline]
     fn from(l: Lit) -> i32 {
-        if l.ordinal % 2 == 0 {
-            ((l.ordinal >> 1) as i32).neg()
+        if NonZeroU32::get(l.ordinal) % 2 == 0 {
+            -((NonZeroU32::get(l.ordinal) >> 1) as i32)
         } else {
-            (l.ordinal >> 1) as i32
+            (NonZeroU32::get(l.ordinal) >> 1) as i32
         }
     }
 }
@@ -266,10 +235,10 @@ impl From<Lit> for i32 {
 impl From<&Lit> for i32 {
     #[inline]
     fn from(l: &Lit) -> i32 {
-        if l.ordinal % 2 == 0 {
-            ((l.ordinal >> 1) as i32).neg()
+        if NonZeroU32::get(l.ordinal) % 2 == 0 {
+            -((NonZeroU32::get(l.ordinal) >> 1) as i32)
         } else {
-            (l.ordinal >> 1) as i32
+            (NonZeroU32::get(l.ordinal) >> 1) as i32
         }
     }
 }
@@ -279,7 +248,7 @@ impl Not for Lit {
     #[inline]
     fn not(self) -> Self {
         Lit {
-            ordinal: self.ordinal ^ 1,
+            ordinal: unsafe { NonZeroU32::new_unchecked(NonZeroU32::get(self.ordinal) ^ 1) },
         }
     }
 }
@@ -352,39 +321,19 @@ impl IndexMut<Lit> for Vec<bool> {
 impl LitIF for Lit {
     #[inline]
     fn as_bool(&self) -> bool {
-        self.ordinal & 1 == 1
+        NonZeroU32::get(self.ordinal) & 1 == 1
     }
     #[inline]
     fn vi(self) -> VarId {
-        (self.ordinal >> 1) as VarId
-    }
-    #[inline]
-    fn is_none(&self) -> bool {
-        self.ordinal == 0
+        (NonZeroU32::get(self.ordinal) >> 1) as VarId
     }
 }
 
-/// Capture which literal and clause emits the present conflict.
-/// * conflict by a biclause if `link == NULL_LIT`.
-/// * conflict by a normal clause otherwise.
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub struct ConflictContext {
-    pub cid: ClauseId,
-    pub link: Lit,
-}
+/// Capture a conflict
+pub type ConflictContext = (Lit, AssignReason);
 
+/// Return type of unit propagation
 pub type PropagationResult = Result<(), ConflictContext>;
-
-impl ConflictContext {
-    pub fn conflicting_literal(&self, cdb: &ClauseDB) -> Lit {
-        let lit0 = cdb[self.cid].lit0();
-        if lit0 == self.link {
-            cdb[self.cid].lit1()
-        } else {
-            lit0
-        }
-    }
-}
 
 /// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
 pub trait EmaIF {
@@ -590,7 +539,8 @@ pub enum SolverError {
     Inconsistent,
     OutOfMemory,
     OutOfRange,
-    RootLevelConflict(Option<ClauseId>),
+    RootLevelConflict(ConflictContext),
+    EmptyClause,
     TimeOut,
     SolverBug,
     UndescribedError,
@@ -758,71 +708,64 @@ impl TryFrom<&PathBuf> for CNFReader {
 }
 
 impl<T> Delete<T> for Vec<T> {
-    fn delete_unstable<F>(&mut self, mut filter: F)
+    fn delete_unstable<F>(&mut self, filter: F)
     where
         F: FnMut(&T) -> bool,
     {
-        for (i, x) in self.iter().enumerate() {
-            if filter(x) {
-                self.swap_remove(i);
-                return;
-            }
+        if let Some(i) = self.iter().position(filter) {
+            self.swap_remove(i);
         }
     }
 }
 
 /// API for object properties.
 pub trait FlagIF {
+    type FlagType;
     /// return true if the flag in on.
-    fn is(&self, flag: Flag) -> bool;
+    fn is(&self, flag: Self::FlagType) -> bool;
     /// set the flag.
-    fn set(&mut self, f: Flag, b: bool);
+    fn set(&mut self, f: Self::FlagType, b: bool);
     // toggle the flag.
-    fn toggle(&mut self, flag: Flag);
+    fn toggle(&mut self, flag: Self::FlagType);
     /// toggle the flag off.
-    fn turn_off(&mut self, flag: Flag);
+    fn turn_off(&mut self, flag: Self::FlagType);
     /// toggle the flag on.
-    fn turn_on(&mut self, flag: Flag);
+    fn turn_on(&mut self, flag: Self::FlagType);
 }
 
 bitflags! {
-    /// Misc flags used by [`Clause`](`crate::cdb::Clause`) and [`Var`](`crate::assign::Var`).
-    pub struct Flag: u16 {
-
-        //
-        //## For Clause
-        //
+    /// Misc flags used by [`Clause`](`crate::cdb::Clause`).
+    pub struct FlagClause: u8 {
         /// a clause is a generated clause by conflict analysis and is removable.
-        const LEARNT       = 0b0000_0000_0000_0001;
-        /// a clause is registered in vars' occurrence list.
-        const OCCUR_LINKED = 0b0000_0000_0000_0010;
-        /// a clause or var is enqueued for eliminator.
-        const ENQUEUED     = 0b0000_0000_0000_0100;
-        /// for vivified clauses
-        const VIVIFIED     = 0b0000_0000_0001_0000;
-        /// for a clause which decreases LBD twice after vivification
-        const VIVIFIED2    = 0b0000_0000_0010_0000;
-        /// a given clause derived a learnt which LBD is smaller than 20.
-        const DERIVE20     = 0b0000_0000_0100_0000;
+        const LEARNT       = 0b0000_0001;
         /// used in conflict analyze
-        const USED         = 0b0000_0000_1000_0000;
-        //
-        //## For Var
-        //
-        /// a var is eliminated and managed by eliminator.
-        const ELIMINATED   = 0b0000_0001_0000_0000;
-        /// a var is checked during in the current conflict analysis.
-        const CA_SEEN      = 0b0000_0010_0000_0000;
+        const USED         = 0b0000_0010;
+        /// a clause or var is enqueued for eliminator.
+        const ENQUEUED     = 0b0000_0100;
+        /// a clause is registered in vars' occurrence list.
+        const OCCUR_LINKED = 0b0000_1000;
+        /// a given clause derived a learnt which LBD is smaller than 20.
+        const DERIVE20     = 0b0001_0000;
+    }
+}
+
+bitflags! {
+    /// Misc flags used by [`Var`](`crate::assign::Var`).
+    pub struct FlagVar: u8 {
         /// * the previous assigned value of a Var.
-        const PHASE        = 0b0000_0100_0000_0000;
+        const PHASE        = 0b0000_0001;
+        /// used in conflict analyze
+        const USED         = 0b0000_0010;
+        /// a var is eliminated and managed by eliminator.
+        const ELIMINATED   = 0b0000_0100;
+        /// a clause or var is enqueued for eliminator.
+        const ENQUEUED     = 0b0000_1000;
+        /// a var is checked during in the current conflict analysis.
+        const CA_SEEN      = 0b0001_0000;
 
         #[cfg(feature = "debug_propagation")]
         /// check propagation
-        const PROPAGATED   = 0b0001_0000_0000_0000;
-
-        #[cfg(feature = "just_used")]
-        /// a clause is used recently in conflict analysis.
-        const JUST_USED    = 0b0010_0000_0000_0000;
+        const PROPAGATED   = 0b0010_0000;
     }
 }
 

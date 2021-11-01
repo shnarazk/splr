@@ -1,5 +1,5 @@
 #[cfg(feature = "strategy_adaptation")]
-use {crate::cdb::ClauseDBIF, std::cmp::Ordering};
+use {crate::assign::AssignIF, std::cmp::Ordering};
 /// Crate `state` is a collection of internal data.
 use {
     crate::{
@@ -121,7 +121,7 @@ impl SearchStrategy {
 #[derive(Clone, Eq, PartialEq)]
 pub enum Stat {
     /// the number of 'no decision conflict'
-    NumDecisionConflict,
+    NoDecisionConflict,
     /// the number of equivalency processor invocation
     NumProcessor,
     /// the number of vivification
@@ -401,17 +401,15 @@ impl StateIF for State {
         A: AssignIF,
         C: PropertyDereference<cdb::property::Tusize, usize>,
     {
-        let asg_num_conflict = asg.refer(assign::property::Tusize::NumConflict);
-        let asg_num_decision = asg.refer(assign::property::Tusize::NumDecision);
-        let asg_num_propagation = asg.refer(assign::property::Tusize::NumPropagation);
-        let asg_num_restart = asg.refer(assign::property::Tusize::NumRestart);
-        let cdb_num_bi_learnt = cdb.refer(cdb::property::Tusize::NumBiLearnt);
-        let cdb_num_lbd2 = cdb.refer(cdb::property::Tusize::NumLBD2);
+        let asg_num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
+        let asg_num_decision = asg.derefer(assign::property::Tusize::NumDecision);
+        let cdb_num_bi_learnt = cdb.derefer(cdb::property::Tusize::NumBiLearnt);
+        let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
 
         debug_assert_eq!(self.strategy.0, SearchStrategy::Initial);
         self.strategy.0 = match () {
             _ if cdb_num_bi_learnt + 20_000 < cdb_num_lbd2 => SearchStrategy::ManyGlues,
-            _ if self[Stat::Decision] as f64 <= 1.2 * asg_num_conflict as f64 => {
+            _ if asg_num_decision as f64 <= 1.2 * asg_num_conflict as f64 => {
                 SearchStrategy::LowDecisions
             }
             _ if self[Stat::NoDecisionConflict] < 15_000 => SearchStrategy::LowSuccessive,
@@ -1052,7 +1050,7 @@ pub mod property {
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tusize {
         /// the number of 'no decision conflict'
-        NumDecisionConflict,
+        NumNoDecisionConflict,
         // the number for processor invocations
         NumProcessor,
         /// the number of vivification
@@ -1064,7 +1062,7 @@ pub mod property {
     }
 
     pub const USIZES: [Tusize; 5] = [
-        Tusize::NumDecisionConflict,
+        Tusize::NumNoDecisionConflict,
         Tusize::NumProcessor,
         Tusize::Vivification,
         Tusize::VivifiedClause,
@@ -1075,7 +1073,7 @@ pub mod property {
         #[inline]
         fn derefer(&self, k: Tusize) -> usize {
             match k {
-                Tusize::NumDecisionConflict => self[Stat::NumDecisionConflict],
+                Tusize::NumNoDecisionConflict => self[Stat::NoDecisionConflict],
                 Tusize::NumProcessor => self[Stat::NumProcessor],
                 Tusize::Vivification => self[Stat::Vivification],
                 Tusize::VivifiedClause => self[Stat::VivifiedClause],

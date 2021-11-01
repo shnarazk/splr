@@ -3,3 +3,4 @@
 *.cnf
 .ans_*
 .vscode
+*.ipynb

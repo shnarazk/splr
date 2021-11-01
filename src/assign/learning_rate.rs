@@ -6,14 +6,14 @@ use {
 
 impl ActivityIF<VarId> for AssignStack {
     #[inline]
-    fn activity(&mut self, vi: VarId) -> f64 {
+    fn activity(&self, vi: VarId) -> f64 {
         self.var[vi].reward
     }
     fn set_activity(&mut self, vi: VarId, val: f64) {
         self.var[vi].reward = val;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
-        self.var[vi].turn_on(Flag::USED);
+        self.var[vi].turn_on(FlagVar::USED);
     }
     #[inline]
     fn reward_at_assign(&mut self, _vi: VarId) {}
@@ -26,7 +26,7 @@ impl ActivityIF<VarId> for AssignStack {
     // Note: `update_rewards` should be called before `cancel_until`
     #[inline]
     fn update_activity_tick(&mut self) {
-        self.ordinal += 1;
+        self.tick += 1;
     }
 }
 
@@ -41,9 +41,9 @@ impl Var {
         // 1. cancel_until -> reward_at_unassign -> assertion failed
         //
         self.reward *= decay;
-        if self.is(Flag::USED) {
+        if self.is(FlagVar::USED) {
             self.reward += reward;
-            self.turn_off(Flag::USED);
+            self.turn_off(FlagVar::USED);
         }
         self.reward
     }

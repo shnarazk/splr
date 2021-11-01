@@ -240,7 +240,7 @@ impl EliminateIF for Eliminator {
             w.clear();
         }
         for (cid, c) in &mut cdb.iter_mut().enumerate().skip(1) {
-            if c.is_dead() || c.is(Flag::OCCUR_LINKED) {
+            if c.is_dead() || c.is(FlagClause::OCCUR_LINKED) {
                 continue;
             }
             let vec = c.iter().copied().collect::<Vec<_>>();
@@ -249,7 +249,7 @@ impl EliminateIF for Eliminator {
         }
         if force {
             for vi in 1..=asg.derefer(assign::property::Tusize::NumVar) {
-                if asg.var(vi).is(Flag::ELIMINATED) || asg.assign(vi).is_some() {
+                if asg.var(vi).is(FlagVar::ELIMINATED) || asg.assign(vi).is_some() {
                     continue;
                 }
                 self.enqueue_var(asg, vi, true);
@@ -261,8 +261,8 @@ impl EliminateIF for Eliminator {
             return;
         }
         let w = &mut self[vi];
-        if !asg.var(vi).is(Flag::ENQUEUED) && w.activity() < self.eliminate_occurrence_limit {
-            asg.var_mut(vi).turn_on(Flag::ENQUEUED);
+        if !asg.var(vi).is(FlagVar::ENQUEUED) && w.activity() < self.eliminate_occurrence_limit {
+            asg.var_mut(vi).turn_on(FlagVar::ENQUEUED);
             self.var_queue.insert(&self.var, vi, upward);
         }
     }
@@ -277,10 +277,10 @@ impl EliminateIF for Eliminator {
         // we can reset all the reasons because decision level is zero.
         #[cfg(feature = "boundary_check")]
         {
-            for v in asg.var_iter().skip(1) {
-                if asg.reason(v.index) != AssignReason::None {
+            for (i, _) in asg.var_iter().enumerate().skip(1) {
+                if asg.reason(i) != AssignReason::None {
                     assert_eq!(
-                        asg.level(v.index),
+                        asg.level(i),
                         asg.derefer(assign::property::Tusize::RootLevel) as DecisionLevel
                     );
                     // asg.reason(v.index) = AssignReason::None;
@@ -303,7 +303,7 @@ impl EliminateIF for Eliminator {
             }
         } else {
             asg.propagate_sandbox(cdb)
-                .map_err(|cc| SolverError::RootLevelConflict(Some(cc.cid)))?;
+                .map_err(SolverError::RootLevelConflict)?;
         }
         if self.mode != EliminatorMode::Dormant {
             self.stop(asg, cdb);
@@ -335,7 +335,7 @@ impl Eliminator {
         c: &mut Clause,
         enqueue: bool,
     ) {
-        if self.mode != EliminatorMode::Running || c.is(Flag::OCCUR_LINKED) {
+        if self.mode != EliminatorMode::Running || c.is(FlagClause::OCCUR_LINKED) {
             return;
         }
         let evo = self.eliminate_var_occurrence_limit;
@@ -356,7 +356,7 @@ impl Eliminator {
                 w.aborted = true;
                 continue;
             }
-            if !v.is(Flag::ELIMINATED) {
+            if !v.is(FlagVar::ELIMINATED) {
                 if bool::from(*l) {
                     debug_assert!(
                         !w.pos_occurs.contains(&cid),
@@ -381,7 +381,7 @@ impl Eliminator {
                 self.enqueue_var(asg, l.vi(), false);
             }
         }
-        c.turn_on(Flag::OCCUR_LINKED);
+        c.turn_on(FlagClause::OCCUR_LINKED);
         if enqueue {
             self.enqueue_clause(cid, c);
         }
@@ -391,7 +391,7 @@ impl Eliminator {
         debug_assert!(self.mode == EliminatorMode::Running);
         debug_assert!(!cid.is_lifted_lit());
         debug_assert!(!c.is_dead());
-        c.turn_off(Flag::OCCUR_LINKED);
+        c.turn_off(FlagClause::OCCUR_LINKED);
         for l in c.iter() {
             if asg.assign(l.vi()).is_none() {
                 self.remove_lit_occur(asg, *l, cid);
@@ -413,7 +413,7 @@ impl Eliminator {
         self.clear_var_queue(asg);
         if force {
             for c in &mut cdb.iter_mut().skip(1) {
-                c.turn_off(Flag::OCCUR_LINKED);
+                c.turn_off(FlagClause::OCCUR_LINKED);
             }
             for w in &mut self[1..] {
                 w.clear();
@@ -446,12 +446,12 @@ impl Eliminator {
                 }
                 let best: VarId = if cid.is_lifted_lit() {
                     let vi = Lit::from(cid).vi();
-                    debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
+                    debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
                     vi
                 } else {
                     let mut tmp = cdb.derefer(cdb::property::Tusize::NumClause);
                     let c = &mut cdb[cid];
-                    c.turn_off(Flag::ENQUEUED);
+                    c.turn_off(FlagClause::ENQUEUED);
                     if c.is_dead() || self.subsume_literal_limit < c.len() {
                         continue;
                     }
@@ -470,14 +470,14 @@ impl Eliminator {
                         } else {
                             w.pos_occurs.len()
                         };
-                        if !v.is(Flag::ELIMINATED) && num_sum < tmp {
+                        if !v.is(FlagVar::ELIMINATED) && num_sum < tmp {
                             b = l.vi();
                             tmp = num_sum;
                         }
                     }
                     b
                 };
-                if best == 0 || asg.var(best).is(Flag::ELIMINATED) {
+                if best == 0 || asg.var(best).is(FlagVar::ELIMINATED) {
                     continue;
                 }
                 self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
@@ -509,7 +509,7 @@ impl Eliminator {
         }
         if asg.remains() {
             asg.propagate_sandbox(cdb)
-                .map_err(|cc| SolverError::RootLevelConflict(Some(cc.cid)))?;
+                .map_err(SolverError::RootLevelConflict)?;
         }
         Ok(())
     }
@@ -530,7 +530,7 @@ impl Eliminator {
             let na = asg.stack_len();
             self.eliminate_main(asg, cdb, rst, state)?;
             asg.propagate_sandbox(cdb)
-                .map_err(|cc| SolverError::RootLevelConflict(Some(cc.cid)))?;
+                .map_err(SolverError::RootLevelConflict)?;
             if na == asg.stack_len()
                 && (!self.is_running()
                     || (0 == self.clause_queue_len() && 0 == self.var_queue_len()))
@@ -572,15 +572,15 @@ impl Eliminator {
             }
             while let Some(vi) = self.var_queue.select_var(&self.var, asg) {
                 let v = asg.var_mut(vi);
-                v.turn_off(Flag::ENQUEUED);
-                if !v.is(Flag::ELIMINATED) && asg.assign(vi).is_none() {
+                v.turn_off(FlagVar::ENQUEUED);
+                if !v.is(FlagVar::ELIMINATED) && asg.assign(vi).is_none() {
                     eliminate_var(asg, cdb, self, rst, state, vi, &mut timedout)?;
                 }
             }
             self.backward_subsumption_check(asg, cdb, &mut timedout)?;
             debug_assert!(self.clause_queue.is_empty());
             asg.propagate_sandbox(cdb)
-                .map_err(|cc| SolverError::RootLevelConflict(Some(cc.cid)))?;
+                .map_err(SolverError::RootLevelConflict)?;
             if timedout == 0 {
                 self.clear_clause_queue(cdb);
                 self.clear_var_queue(asg);
@@ -615,18 +615,18 @@ impl Eliminator {
     /// enqueue a clause into eliminator's clause queue.
     pub fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause) {
         if self.mode != EliminatorMode::Running
-            || c.is(Flag::ENQUEUED)
+            || c.is(FlagClause::ENQUEUED)
             || self.subsume_literal_limit < c.len()
         {
             return;
         }
         self.clause_queue.push(cid);
-        c.turn_on(Flag::ENQUEUED);
+        c.turn_on(FlagClause::ENQUEUED);
     }
     /// clear eliminator's clause queue.
     fn clear_clause_queue(&mut self, cdb: &mut impl ClauseDBIF) {
         for cid in &self.clause_queue {
-            cdb[*cid].turn_off(Flag::ENQUEUED);
+            cdb[*cid].turn_off(FlagClause::ENQUEUED);
         }
         self.clause_queue.clear();
     }

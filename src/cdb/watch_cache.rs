@@ -7,13 +7,7 @@ use {
     },
 };
 
-pub type BiClause = HashMap<Lit, ClauseId>;
-pub type WatchCacheHash = HashMap<ClauseId, Lit>;
 pub type WatchCacheList = Vec<(ClauseId, Lit)>;
-
-#[cfg(feature = "hashed_watch_cache")]
-pub type WatchCache = WatchCacheHash;
-#[cfg(not(feature = "hashed_watch_cache"))]
 pub type WatchCache = WatchCacheList;
 
 pub trait WatchCacheIF {
@@ -22,26 +16,6 @@ pub trait WatchCacheIF {
     fn insert_watch(&mut self, cid: ClauseId, l: Lit);
     fn append_watch(&mut self, appendant: Self);
     fn update_watch(&mut self, cid: ClauseId, l: Lit);
-}
-
-impl WatchCacheIF for WatchCacheHash {
-    fn get_watch(&self, cid: &ClauseId) -> Option<&Lit> {
-        self.get(cid)
-    }
-    fn remove_watch(&mut self, cid: &ClauseId) {
-        self.remove(cid);
-    }
-    fn insert_watch(&mut self, cid: ClauseId, l: Lit) {
-        self.insert(cid, l);
-    }
-    fn append_watch(&mut self, appendant: Self) {
-        for (k, v) in appendant.iter() {
-            self.insert(*k, *v);
-        }
-    }
-    fn update_watch(&mut self, _cid: ClauseId, _l: Lit) {
-        unimplemented!();
-    }
 }
 
 impl WatchCacheIF for WatchCacheList {
@@ -54,7 +28,7 @@ impl WatchCacheIF for WatchCacheList {
         }
     }
     fn insert_watch(&mut self, cid: ClauseId, l: Lit) {
-        // assert!(self.iter().all(|e| e.0 != cid));
+        debug_assert!(self.iter().all(|e| e.0 != cid));
         self.push((cid, l));
     }
     fn append_watch(&mut self, mut appendant: Self) {
@@ -125,7 +99,7 @@ pub type WatchCacheProxy = usize;
 pub struct WatchCacheIterator {
     pub index: usize,
     end_at: usize,
-    checksum: usize,
+    // checksum: usize,
 }
 
 impl Iterator for WatchCacheIterator {
@@ -134,7 +108,7 @@ impl Iterator for WatchCacheIterator {
         // assert!(self.checksum == self.end_at - self.index);
         (self.index < self.end_at).then(|| {
             // assert!(0 < self.checksum);
-            self.checksum -= 1;
+            // self.checksum -= 1;
             self.index
         })
     }
@@ -145,7 +119,7 @@ impl WatchCacheIterator {
         WatchCacheIterator {
             index: 0,
             end_at: len,
-            checksum: len,
+            // checksum: len,
         }
     }
     pub fn restore_entry(&mut self) {

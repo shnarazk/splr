@@ -7,7 +7,6 @@ use {
         processor::Eliminator,
         types::*,
     },
-    std::convert::TryFrom,
 };
 
 #[cfg(not(feature = "no_IO"))]
@@ -29,7 +28,6 @@ pub trait SatSolverIF: Instantiate {
     ///
     /// ```
     /// use crate::splr::*;
-    /// use std::convert::TryFrom;
     /// use crate::splr::assign::VarManipulateIF;    // for s.asg.assign()
     ///
     /// let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
@@ -56,7 +54,6 @@ pub trait SatSolverIF: Instantiate {
     /// # Example
     ///```
     /// use crate::splr::*;
-    /// use std::convert::TryFrom;
     ///
     /// let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
     /// assert!(s.add_clause(vec![1, -2]).is_ok());
@@ -78,7 +75,6 @@ pub trait SatSolverIF: Instantiate {
     /// # Example
     /// ```
     /// use crate::splr::*;
-    /// use std::convert::TryFrom;
     ///
     /// let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
     /// assert_eq!(s.asg.num_vars, 8);
@@ -164,7 +160,6 @@ impl TryFrom<&str> for Solver {
     ///
     /// # Example
     /// ```
-    /// use std::convert::TryFrom;
     /// use crate::splr::solver::{SatSolverIF, Solver};
     ///
     /// let mut s = Solver::try_from("cnfs/sample.cnf").expect("fail to load");
@@ -185,7 +180,10 @@ impl SatSolverIF for Solver {
         match self.asg.assigned(lit) {
             None => self.asg.assign_at_root_level(lit).map(|_| self),
             Some(true) => Ok(self),
-            Some(false) => Err(SolverError::RootLevelConflict(Some(ClauseId::from(lit)))),
+            Some(false) => Err(SolverError::RootLevelConflict((
+                lit,
+                self.asg.reason(lit.vi()),
+            ))),
         }
     }
     fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver, SolverError>
@@ -204,12 +202,10 @@ impl SatSolverIF for Solver {
             .collect::<Vec<Lit>>();
 
         if clause.is_empty() {
-            return Err(SolverError::RootLevelConflict(None));
+            return Err(SolverError::EmptyClause);
         }
         if self.add_unchecked_clause(&mut clause) == RefClause::EmptyClause {
-            return Err(SolverError::RootLevelConflict(Some(ClauseId::from(
-                clause[0],
-            ))));
+            return Err(SolverError::EmptyClause);
         }
         Ok(self)
     }
@@ -270,7 +266,7 @@ impl SatSolverIF for Solver {
     fn dump_cnf(&self, fname: &str) {
         let nv = self.asg.derefer(crate::assign::property::Tusize::NumVar);
         for vi in 1..nv {
-            if self.asg.var(vi).is(Flag::ELIMINATED) && self.asg.assign(vi).is_some() {
+            if self.asg.var(vi).is(FlagVar::ELIMINATED) && self.asg.assign(vi).is_some() {
                 panic!("conflicting var {} {:?}", vi, self.asg.assign(vi));
             }
         }
@@ -315,16 +311,16 @@ impl Solver {
         debug_assert!(asg.decision_level() == 0);
         lits.sort();
         let mut j = 0;
-        let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means tautology.
+        let mut l_: Option<Lit> = None; // last literal; [x, x.negate()] means tautology.
         for i in 0..lits.len() {
             let li = lits[i];
             let sat = asg.assigned(li);
-            if sat == Some(true) || !li == l_ {
+            if sat == Some(true) || Some(!li) == l_ {
                 return RefClause::Dead;
-            } else if sat != Some(false) && li != l_ {
+            } else if sat != Some(false) && Some(li) != l_ {
                 lits[j] = li;
                 j += 1;
-                l_ = li;
+                l_ = Some(li);
             }
         }
         lits.truncate(j);
@@ -367,11 +363,11 @@ impl Solver {
                     }
                     if v.is_empty() {
                         if ends_zero {
-                            return Err(SolverError::RootLevelConflict(None));
+                            return Err(SolverError::EmptyClause);
                         }
                         continue;
                     } else if self.add_unchecked_clause(&mut v) == RefClause::EmptyClause {
-                        return Err(SolverError::RootLevelConflict(Some(ClauseId::from(v[0]))));
+                        return Err(SolverError::EmptyClause);
                     }
                 }
                 Err(e) => panic!("{}", e),
@@ -408,12 +404,10 @@ impl Solver {
                 .map(|i| Lit::from(*i))
                 .collect::<Vec<Lit>>();
             if v.is_empty() {
-                return Err(SolverError::RootLevelConflict(None));
+                return Err(SolverError::EmptyClause);
             }
             if self.add_unchecked_clause(&mut lits) == RefClause::EmptyClause {
-                return Err(SolverError::RootLevelConflict(
-                    (!lits.is_empty()).then(|| ClauseId::from(lits[0])),
-                ));
+                return Err(SolverError::EmptyClause);
             }
         }
         debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
@@ -433,7 +427,6 @@ impl Solver {
 mod tests {
     // use super::*;
     use crate::*;
-    use std::convert::TryFrom;
 
     #[cfg(not(feature = "no_IO"))]
     #[test]

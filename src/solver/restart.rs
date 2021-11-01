@@ -475,9 +475,14 @@ pub enum RestartDecision {
 
 impl RestartIF for Restarter {
     fn restart(&mut self) -> Option<RestartDecision> {
+        macro_rules! next_step {
+            () => {
+                self.stb.step * self.initial_restart_step
+            };
+        }
         if self.luby.is_active() {
             self.luby.shift();
-            self.restart_step = self.initial_restart_step;
+            self.restart_step = next_step!();
             return Some(RestartDecision::Force);
         }
 
@@ -490,12 +495,12 @@ impl RestartIF for Restarter {
         {
             self.num_block += 1;
             self.after_restart = 0;
-            self.restart_step = self.stb.step * self.initial_restart_step;
+            self.restart_step = next_step!();
             return Some(RestartDecision::Block);
         }
 
         if self.lbd.is_active() {
-            self.restart_step = self.stb.step * self.initial_restart_step;
+            self.restart_step = next_step!();
             return Some(RestartDecision::Force);
         }
         None

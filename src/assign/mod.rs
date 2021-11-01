@@ -16,7 +16,10 @@ mod trail_saving;
 /// var struct and its methods
 mod var;
 
-pub use self::{propagate::PropagateIF, property::*, select::VarSelectIF, var::VarManipulateIF};
+pub use self::{
+    propagate::PropagateIF, property::*, select::VarSelectIF, trail_saving::TrailSavingIF,
+    var::VarManipulateIF,
+};
 #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
 use std::collections::HashMap;
 use {
@@ -67,8 +70,6 @@ pub trait AssignIF:
     fn extend_model(&mut self, c: &mut impl ClauseDBIF, lits: &[Lit]) -> Vec<Option<bool>>;
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
-    /// return `true` is the clause is the reason of the assignment.
-    fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
     /// dump the status as a CNF
     fn dump_cnf(&mut self, cdb: &impl ClauseDBIF, fname: &str);
 }
@@ -76,12 +77,12 @@ pub trait AssignIF:
 /// Reasons of assignments, two kinds
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum AssignReason {
-    /// asserted
-    Asserted(usize),
+    /// implication by binnary clause
+    BinaryLink(Lit),
     /// Assigned by decision
     Decision(DecisionLevel),
-    /// Assigned by a clause. If it is binary, the reason literal is stored in the 2nd.
-    Implication(ClauseId, Lit),
+    /// Assigned by a non-binary clause.
+    Implication(ClauseId),
     /// One of not assigned, assigned by decision, or asserted.
     None,
 }
@@ -89,10 +90,10 @@ pub enum AssignReason {
 impl fmt::Display for AssignReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            AssignReason::Asserted(t) => write!(f, "Asserted at {}", t),
+            &AssignReason::BinaryLink(_) => write!(f, "Implied by a binary clause"),
+            AssignReason::Decision(0) => write!(f, "Asserted"),
             AssignReason::Decision(lvl) => write!(f, "Decided at level {}", lvl),
-            AssignReason::Implication(cid, NULL_LIT) => write!(f, "Implied by {}", cid),
-            AssignReason::Implication(cid, _) => write!(f, "Implied by B{}", cid),
+            AssignReason::Implication(cid) => write!(f, "Implied by {}", cid),
             AssignReason::None => write!(f, "Not assigned"),
         }
     }
@@ -101,8 +102,8 @@ impl fmt::Display for AssignReason {
 /// Object representing a variable.
 #[derive(Clone, Debug)]
 pub struct Var {
-    /// the `Flag`s (16 bits)
-    flags: Flag,
+    /// the `Flag`s (8 bits)
+    flags: FlagVar,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
     reward: f64,
 
@@ -176,7 +177,7 @@ pub struct AssignStack {
     //## Var DB
     //
     /// an index for counting elapsed time
-    ordinal: usize,
+    tick: usize,
     /// vars
     var: Vec<Var>,
 

@@ -2,7 +2,10 @@
 #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
 use std::collections::HashMap;
 use {
-    super::{AssignIF, AssignStack, Var, VarHeapIF, VarIdHeap, VarManipulateIF, VarSelectIF},
+    super::{
+        AssignIF, AssignStack, TrailSavingIF, Var, VarHeapIF, VarIdHeap, VarManipulateIF,
+        VarSelectIF,
+    },
     crate::{cdb::ClauseDBIF, solver::SolverEvent, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
@@ -54,7 +57,7 @@ impl Default for AssignStack {
             ppc_ema: EmaSU::new(100),
             cpr_ema: EmaSU::new(100),
 
-            ordinal: 0,
+            tick: 0,
             var: Vec::new(),
 
             activity_decay: 0.94,
@@ -128,7 +131,7 @@ impl Instantiate for AssignStack {
                 }
 
                 #[cfg(feature = "trail_saving")]
-                self.clear_trail_saved();
+                self.clear_saved_trail();
             }
             SolverEvent::NewVar => {
                 self.assign.push(None);
@@ -142,8 +145,11 @@ impl Instantiate for AssignStack {
                 debug_assert_eq!(self.decision_level(), self.root_level);
                 self.q_head = 0;
                 self.num_asserted_vars = 0;
-                self.num_eliminated_vars =
-                    self.var.iter().filter(|v| v.is(Flag::ELIMINATED)).count();
+                self.num_eliminated_vars = self
+                    .var
+                    .iter()
+                    .filter(|v| v.is(FlagVar::ELIMINATED))
+                    .count();
                 self.rebuild_order();
             }
             e => panic!("don't call asg with {:?}", e),
@@ -236,17 +242,18 @@ impl AssignIF for AssignStack {
                 );
             }
 
+            debug_assert!(
+                lits[reason_literals.clone()]
+                    .iter()
+                    .all(|l| extended_model[l.vi()].is_some()),
+                "impossible: pseudo clause has unassigned literal(s)."
+            );
             if lits[reason_literals.clone()]
                 .iter()
                 .all(|l| extended_model[l.vi()] == Some(!bool::from(*l)))
             {
                 let l = lits[target_index];
                 extended_model[l.vi()] = Some(bool::from(l));
-            } else if lits[reason_literals.clone()]
-                .iter()
-                .any(|l| extended_model[l.vi()].is_none())
-            {
-                panic!("impossible: pseudo clause has unassigned literal(s).");
             } else if lits[reason_literals.clone()]
                 .iter()
                 .any(|l| extended_model[l.vi()] == Some(bool::from(*l)))
@@ -264,16 +271,11 @@ impl AssignIF for AssignStack {
         }
         false
     }
-    fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
-        let l0 = c.lit0();
-        self.assigned(l0) == Some(true)
-            && matches!(self.reason(l0.vi()), AssignReason::Implication(x, _) if x == cid)
-    }
     /// dump all active clauses and assertions as a CNF file.
     #[cfg(not(feature = "no_IO"))]
     fn dump_cnf(&mut self, cdb: &impl ClauseDBIF, fname: &str) {
         for vi in 1..self.var.len() {
-            if self.var(vi).is(Flag::ELIMINATED) && self.assign[vi].is_some() {
+            if self.var(vi).is(FlagVar::ELIMINATED) && self.assign[vi].is_some() {
                 panic!("conflicting var {} {:?}", vi, self.assign[vi]);
             }
         }

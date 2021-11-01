@@ -1,3 +1,4 @@
+#![cfg(feature = "trail_saving")]
 /// implement boolean constraint propagation, backjump
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
@@ -11,15 +12,21 @@ use {
 #[cfg(feature = "chrono_BT")]
 use super::AssignIF;
 
+/// Methods on trail saving.
+pub trait TrailSavingIF {
+    fn save_trail(&mut self, to_lvl: DecisionLevel);
+    fn from_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult;
+    fn clear_saved_trail(&mut self);
+}
+
 const REASON_THRESHOLD: f64 = 1.5;
 
-#[cfg(feature = "trail_saving")]
-impl AssignStack {
-    pub fn save_trail(&mut self, to_lvl: DecisionLevel) {
+impl TrailSavingIF for AssignStack {
+    fn save_trail(&mut self, to_lvl: DecisionLevel) {
         let lim = self.trail_lim[to_lvl as usize];
         let dl = self.trail_lim.len();
         let mut free: usize = lim;
-        self.clear_trail_saved();
+        self.clear_saved_trail();
         if 2 <= dl {
             let lim2 = self.trail_lim[dl - 2];
             let activity_threshold = self.var[self.trail[lim2].vi()].reward;
@@ -51,7 +58,7 @@ impl AssignStack {
             self.insert_heap(vi);
         }
     }
-    pub fn from_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult {
+    fn from_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult {
         let q = (REASON_THRESHOLD * cdb.derefer(cdb::property::Tf64::DpAverageLBD)).max(6.0) as u16;
 
         #[cfg(feature = "chrono_BT")]
@@ -61,60 +68,74 @@ impl AssignStack {
             let lit = self.trail_saved[i];
             let vi = lit.vi();
             let old_reason = self.reason_saved[vi];
-            match (old_reason, self.assigned(lit)) {
-                (_, Some(true)) => (),
+            match (self.assigned(lit), old_reason) {
+                (Some(true), _) => (),
+                (None, AssignReason::BinaryLink(link)) => {
+                    debug_assert_ne!(link.vi(), lit.vi());
+                    debug_assert_eq!(self.assigned(link), Some(true));
+                    self.num_repropagation += 1;
+
+                    self.assign_by_implication(
+                        lit,
+                        old_reason,
+                        #[cfg(feature = "chrono_BT")]
+                        dl,
+                    );
+                }
                 // reason refinement by ignoring this dependecy
-                (AssignReason::Implication(c, NULL_LIT), None) if q < cdb[c].rank => {
+                (None, AssignReason::Implication(c)) if q < cdb[c].rank => {
                     self.insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
-                (AssignReason::Implication(cid, NULL_LIT), None) => {
+                (None, AssignReason::Implication(cid)) => {
                     debug_assert_eq!(cdb[cid].lit0(), lit);
+                    debug_assert!(cdb[cid]
+                        .iter()
+                        .skip(1)
+                        .all(|l| self.assigned(*l) == Some(false)));
                     self.num_repropagation += 1;
 
-                    #[cfg(feature = "chrono_BT")]
-                    self.assign_by_implication(lit, dl, cid, NULL_LIT);
-                    #[cfg(not(feature = "chrono_BT"))]
-                    self.assign_by_implication(lit, cid, NULL_LIT);
+                    self.assign_by_implication(
+                        lit,
+                        old_reason,
+                        #[cfg(feature = "chrono_BT")]
+                        dl,
+                    );
                 }
-                (AssignReason::Implication(cid, l), None) => {
-                    self.num_repropagation += 1;
-
-                    #[cfg(feature = "chrono_BT")]
-                    self.assign_by_implication(lit, dl, cid, l);
-                    #[cfg(not(feature = "chrono_BT"))]
-                    self.assign_by_implication(lit, cid, l);
-                }
-                (AssignReason::Implication(cid, link), Some(false)) => {
+                (Some(false), AssignReason::BinaryLink(link)) => {
+                    debug_assert_ne!(link.vi(), lit.vi());
+                    debug_assert_eq!(self.assigned(link), Some(true));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
-                    self.clear_trail_saved();
-                    if link == NULL_LIT {
-                        return Err(ConflictContext { cid, link });
-                    }
-                    let c = &cdb[cid];
-                    let lit0 = c.lit0();
-                    return Err(ConflictContext {
-                        cid,
-                        link: if lit != lit0 { lit0 } else { c.lit1() },
-                    });
+                    self.clear_saved_trail();
+                    return Err((lit, old_reason));
                 }
-                (AssignReason::Decision(_), _) => {
+                (Some(false), AssignReason::Implication(cid)) => {
+                    debug_assert!(cdb[cid].iter().all(|l| self.assigned(*l) == Some(false)));
+                    let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
+                    self.clear_saved_trail();
+                    return Err((cdb[cid].lit0(), AssignReason::Implication(cid)));
+                }
+                (_, AssignReason::Decision(lvl)) => {
+                    debug_assert_ne!(0, lvl);
                     self.insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
-                r => panic!("impossible path {:?}", r),
+                _ => unreachable!("from_saved_trail"),
             }
         }
         self.trail_saved.clear();
         Ok(())
     }
-    pub fn clear_trail_saved(&mut self) {
+    fn clear_saved_trail(&mut self) {
         for j in 0..self.trail_saved.len() {
             let l = self.trail_saved[j];
             self.insert_heap(l.vi());
         }
         self.trail_saved.clear();
     }
+}
+
+impl AssignStack {
     fn truncate_trail_saved(&mut self, len: usize) -> PropagationResult {
         self.trail_saved.truncate(len);
         Ok(())

@@ -12,7 +12,7 @@ impl Default for Var {
     fn default() -> Var {
         Var {
             reward: 0.0,
-            flags: Flag::empty(),
+            flags: FlagVar::empty(),
 
             #[cfg(feature = "boundary_check")]
             propagated_at: 0,
@@ -27,7 +27,7 @@ impl Default for Var {
 impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
-        write!(f, "V{{{}}}", st(Flag::ELIMINATED, ", eliminated"),)
+        write!(f, "V{{{}}}", st(FlagVar::ELIMINATED, ", eliminated"),)
     }
 }
 
@@ -42,24 +42,25 @@ impl Var {
 }
 
 impl FlagIF for Var {
+    type FlagType = FlagVar;
     #[inline]
-    fn is(&self, flag: Flag) -> bool {
+    fn is(&self, flag: Self::FlagType) -> bool {
         self.flags.contains(flag)
     }
     #[inline]
-    fn set(&mut self, f: Flag, b: bool) {
+    fn set(&mut self, f: Self::FlagType, b: bool) {
         self.flags.set(f, b);
     }
     #[inline]
-    fn turn_off(&mut self, flag: Flag) {
+    fn turn_off(&mut self, flag: Self::FlagType) {
         self.flags.remove(flag);
     }
     #[inline]
-    fn turn_on(&mut self, flag: Flag) {
+    fn turn_on(&mut self, flag: Self::FlagType) {
         self.flags.insert(flag);
     }
     #[inline]
-    fn toggle(&mut self, flag: Flag) {
+    fn toggle(&mut self, flag: Self::FlagType) {
         self.flags.toggle(flag);
     }
 }
@@ -82,6 +83,10 @@ pub trait VarManipulateIF {
     fn var_iter(&self) -> Iter<'_, Var>;
     /// return an mutable iterator over Vars.
     fn var_iter_mut(&mut self) -> IterMut<'_, Var>;
+    /// set var status to asserted.
+    fn make_var_asserted(&mut self, vi: VarId);
+    /// set var status to eliminated.
+    fn make_var_eliminated(&mut self, vi: VarId);
 }
 
 impl VarManipulateIF for AssignStack {
@@ -142,26 +147,22 @@ impl VarManipulateIF for AssignStack {
     fn var_iter_mut(&mut self) -> IterMut<'_, Var> {
         self.var.iter_mut()
     }
-}
-
-impl AssignStack {
-    /// make a var asserted.
-    pub fn make_var_asserted(&mut self, vi: VarId) {
-        self.reason[vi] = AssignReason::Asserted(self.num_conflict);
+    fn make_var_asserted(&mut self, vi: VarId) {
+        self.reason[vi] = AssignReason::Decision(0);
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
 
         #[cfg(feature = "boundary_check")]
         {
-            self.var[vi].timestamp = self.ordinal;
+            self.var[vi].timestamp = self.tick;
         }
 
         #[cfg(feature = "best_phases_tracking")]
         self.check_best_phase(vi);
     }
-    pub fn make_var_eliminated(&mut self, vi: VarId) {
-        if !self.var[vi].is(Flag::ELIMINATED) {
-            self.var[vi].turn_on(Flag::ELIMINATED);
+    fn make_var_eliminated(&mut self, vi: VarId) {
+        if !self.var[vi].is(FlagVar::ELIMINATED) {
+            self.var[vi].turn_on(FlagVar::ELIMINATED);
             self.set_activity(vi, 0.0);
             self.remove_from_heap(vi);
             debug_assert_eq!(self.decision_level(), self.root_level);
@@ -170,7 +171,7 @@ impl AssignStack {
 
             #[cfg(feature = "boundary_check")]
             {
-                self.var[vi].timestamp = self.ordinal;
+                self.var[vi].timestamp = self.tick;
             }
 
             #[cfg(feature = "trace_elimination")]
@@ -195,5 +196,28 @@ impl AssignStack {
             #[cfg(feature = "boundary_check")]
             panic!("double elimination");
         }
+    }
+}
+
+impl AssignStack {
+    /// check usability of the saved best phase.
+    /// return `true` if the current best phase got invalid.
+    #[cfg(not(feature = "best_phases_tracking"))]
+    fn check_best_phase(&mut self, _: VarId) -> bool {
+        false
+    }
+    #[cfg(feature = "best_phases_tracking")]
+    fn check_best_phase(&mut self, vi: VarId) -> bool {
+        if let Some((b, _)) = self.best_phases.get(&vi) {
+            debug_assert!(self.assign[vi].is_some());
+            if self.assign[vi] != Some(*b) {
+                if self.root_level == self.level[vi] {
+                    self.best_phases.clear();
+                    self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
+                }
+                return true;
+            }
+        }
+        false
     }
 }
