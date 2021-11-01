@@ -402,8 +402,6 @@ Here is an example.
 
 ![](https://user-images.githubusercontent.com/997855/136668563-d720a329-f0d6-4711-bd8f-c4761640fe47.png)
 
-Note: the mechanism explained here is different from that used in Splr-0.10.0.
-
 #### Bibliography
 
 - [1] G. Audemard and L. Simon, "Predicting learnt clauses quality in modern SAT solvers," in _International Joint Conference on Artificial Intelligence 2009_, pp. 399–404, 2009.
