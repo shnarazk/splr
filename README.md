@@ -331,7 +331,7 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 ```plain
 $ splr --help
 A modern CDCL SAT solver in Rust
-Activated features: best phase tracking, binary clause completion, clause elimination, clause vivification, Learning-Rate based rewarding, Luby stabilization, reason side rewarding, stage-based rephase
+Activated features: best phase tracking, clause elimination, clause vivification, dynamic restart threshold, Learning-Rate Based rewarding, Luby stabilization, reason-side rewarding, stage-based rephase, trail saving, unsafe access
 
 USAGE:
   splr [FLAGS] [OPTIONS] <cnf-file>
@@ -349,23 +349,21 @@ OPTIONS (red options depend on features in Cargo.toml):
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB)         0
       --ii <c-ip-int>       #cls to start in-processor          10000
   -t, --timeout <timeout>   CPU time limit in sec.               5000
-      --ecl <elm-cls-lim>   Max #lit for clause subsume            18
+      --ecl <elm-cls-lim>   Max #lit for clause subsume            64
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.         0
       --evo <elm-var-occ>   Max #cls for var elimination        20000
   -o, --dir <io-outdir>     Output directory                         .
   -p, --proof <io-pfile>    DRAT Cert. filename                 proof.drat
   -r, --result <io-rfile>   Result filename/stdout                       
-      --ral <rst-asg-len>   Length of assign. fast EMA             24
+      --ral <rst-asg-len>   Length of assign. fast EMA             16
       --ras <rst-asg-slw>   Length of assign. slow EMA           8192
       --rat <rst-asg-thr>   Blocking restart threshold              0.60
       --rll <rst-lbd-len>   Length of LBD fast EMA                  8
       --rls <rst-lbd-slw>   Length of LBD slow EMA               8192
       --rlt <rst-lbd-thr>   Forcing restart threshold               1.60
       --rs  <rst-step>      #conflicts between restarts             2
-      --srd <stg-rwd-dcy>   Decay rate for staged var reward        0.50
-      --srv <stg-rwd-val>   Extra reward for staged vars            1.00
-      --vdr <vrw-dcy-rat>   Var reward decay rate                   0.94
-      --vds <vrw-dcy-stp>   Var reward decay change step            0.10
+      --vdr <vrw-dcy-rat>   Var reward decay rate                   0.96
+      --vds <vrw-dcy-stp>   Var reward decay change step            0.00
 ARGS:
   <cnf-file>    DIMACS CNF file
 ```
