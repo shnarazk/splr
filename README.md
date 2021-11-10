@@ -24,7 +24,7 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 
 - [SAT Competition 2021](https://satcompetition.github.io/2021/), [Benchmarks main truck](https://satcompetition.github.io/2021/benchmarks.html) -- splr-0.14.0 RC (d92ced26d) solved with a 400 sec timeout:
   - 41 satisfiable problems: all the solutions were correct.
-  - 35 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+  - 35 unsatisfiable problems: all the certifications were verified with [Grat toolchain](https://www21.in.tum.de/~lammich/grat/).
 
 ## Install
 
