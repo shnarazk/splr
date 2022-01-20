@@ -10,22 +10,13 @@ use {
 // - both fields has a fixed length. Don't use push and pop.
 // - `idxs[0]` contains the number of alive elements
 //   `indx` is positions. So the unused field 0 can hold the last position as a special case.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct VarIdHeap {
     /// order : usize -> VarId::from, -- Which var is the n-th best?
     heap: Vec<u32>,
     /// VarId : -> order : usize::from -- How good is the var?
     /// `idxs[0]` holds the number of alive elements
     idxs: Vec<u32>,
-}
-
-impl Default for VarIdHeap {
-    fn default() -> VarIdHeap {
-        VarIdHeap {
-            heap: Vec::new(),
-            idxs: Vec::new(),
-        }
-    }
 }
 
 impl fmt::Display for VarIdHeap {

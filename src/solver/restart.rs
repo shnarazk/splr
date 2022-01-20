@@ -399,7 +399,7 @@ impl GeometricStabilizer {
 }
 
 /// `Restarter` provides restart API and holds data about restart conditions.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Restarter {
     asg: ProgressASG,
     lbd: ProgressLBD,
@@ -416,25 +416,6 @@ pub struct Restarter {
     //
     num_block: usize,
     num_restart: usize,
-}
-
-impl Default for Restarter {
-    fn default() -> Restarter {
-        Restarter {
-            asg: ProgressASG::default(),
-            lbd: ProgressLBD::default(),
-            // blvl: ProgressLVL::default(),
-            // clvl: ProgressLVL::default(),
-            luby: ProgressLuby::default(),
-            stb: GeometricStabilizer::default(),
-            after_restart: 0,
-            restart_step: 0,
-            initial_restart_step: 0,
-
-            num_block: 0,
-            num_restart: 0,
-        }
-    }
 }
 
 impl Instantiate for Restarter {

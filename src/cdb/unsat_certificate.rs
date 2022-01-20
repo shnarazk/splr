@@ -12,7 +12,7 @@ use {
 const DUMP_INTERVAL: usize = 4096 * 16;
 
 /// Struct for saving UNSAT certification
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct CertificationStore {
     /// clause history to make certification
     queue: Vec<i32>,
@@ -23,16 +23,6 @@ pub struct CertificationStore {
 impl Clone for CertificationStore {
     fn clone(&self) -> Self {
         Self::default()
-    }
-}
-
-impl Default for CertificationStore {
-    fn default() -> Self {
-        CertificationStore {
-            queue: Vec::new(),
-            buffer: None,
-            target: None,
-        }
     }
 }
 

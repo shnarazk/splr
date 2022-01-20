@@ -769,15 +769,9 @@ bitflags! {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Logger {
     dest: Option<File>,
-}
-
-impl Default for Logger {
-    fn default() -> Self {
-        Logger { dest: None }
-    }
 }
 
 impl fmt::Display for Logger {
