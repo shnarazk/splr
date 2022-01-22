@@ -6,7 +6,9 @@
       defaultPackage =
         with import nixpkgs { system = "${system}"; };
         stdenv.mkDerivation {
-          name = "splr";
+          name = "splr-${version}";
+          pname = "splr";
+          version = "0.14.0-20220122";
           src = self;
           buildInputs = [ cargo rustc ];
           buildPhase = "cargo build --release";
