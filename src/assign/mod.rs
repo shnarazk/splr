@@ -187,16 +187,12 @@ pub struct AssignStack {
     /// var activity decay
     activity_decay: f64,
     /// the default value of var activity decay in configuration
+    #[cfg(feature = "EVSIDS")]
     activity_decay_default: f64,
     /// its diff
     activity_anti_decay: f64,
-    /// ONLY used in feature EVSIDS
+    #[cfg(feature = "EVSIDS")]
     activity_decay_step: f64,
-
-    //
-    //## Vivification
-    //
-    during_vivification: bool,
 }
 
 #[cfg(feature = "boundary_check")]

@@ -61,11 +61,14 @@ impl Default for AssignStack {
             var: Vec::new(),
 
             activity_decay: 0.94,
-            activity_decay_default: 0.94,
-            activity_anti_decay: 0.06,
-            activity_decay_step: 0.1,
 
-            during_vivification: false,
+            #[cfg(feature = "EVSIDS")]
+            activity_decay_default: 0.94,
+
+            activity_anti_decay: 0.06,
+
+            #[cfg(feature = "EVSIDS")]
+            activity_decay_step: 0.1,
         }
     }
 }
@@ -104,10 +107,11 @@ impl Instantiate for AssignStack {
 
             #[cfg(feature = "EVSIDS")]
             activity_decay: config.vrw_dcy_rat * 0.6,
-            #[cfg(feature = "LRB_rewarding")]
+            #[cfg(feature = "EVSIDS")]
             activity_decay_default: config.vrw_dcy_rat,
 
             activity_anti_decay: 1.0 - config.vrw_dcy_rat,
+            #[cfg(feature = "EVSIDS")]
             activity_decay_step: config.vrw_dcy_stp,
 
             ..AssignStack::default()

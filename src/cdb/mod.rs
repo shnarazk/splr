@@ -260,19 +260,15 @@ pub struct ClauseDB {
     //
     /// a working buffer for LBD calculation
     lbd_temp: Vec<usize>,
-    num_lbd_update: usize,
 
     //
     //## reduction
     //
     /// increment step of reduction threshold
     inc_step: usize,
-    /// bonus step of reduction threshold used in good progress
-    extra_inc: usize,
     first_reduction: usize,
     next_reduction: usize,
     reduction_step: usize, // renamed from `nbclausesbeforereduce`
-    reducible: bool,
 
     //
     //## statistics

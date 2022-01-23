@@ -262,7 +262,6 @@ struct ProgressLuby {
     active: bool,
     luby: LubySeries,
     next_restart: usize,
-    restart_inc: f64,
     step: usize,
 }
 
@@ -274,7 +273,6 @@ impl Default for ProgressLuby {
             active: false,
             luby: LubySeries::default(),
             next_restart: STEP,
-            restart_inc: 2.0,
             step: STEP,
         }
     }

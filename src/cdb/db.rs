@@ -35,13 +35,10 @@ impl Default for ClauseDB {
             activity_anti_decay: 0.01,
 
             lbd_temp: Vec::new(),
-            num_lbd_update: 0,
             inc_step: 300,
-            extra_inc: 1000,
             first_reduction: 1000,
             next_reduction: 1000,
             reduction_step: 1000,
-            reducible: true,
             num_clause: 0,
             num_bi_clause: 0,
             num_bi_learnt: 0,
