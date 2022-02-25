@@ -498,6 +498,38 @@ impl EmaSU {
     }
 }
 
+/// Equally-Eweighted-Average, namely, Average
+#[derive(Clone, Debug)]
+pub struct EEA<const N: usize = 32> {
+    pool: [f64; N],
+    last: usize,
+    average: f64,
+}
+
+impl<const N: usize> EmaIF for EEA<N> {
+    type Input = usize;
+    fn update(&mut self, x: Self::Input) {
+        self.average -= self.pool[self.last];
+        let val = x as f64 / N as f64;
+        self.average += val;
+        self.pool[self.last] = val;
+        self.last = (self.last + 1) % N;
+    }
+    fn get(&self) -> f64 {
+        self.average
+    }
+}
+
+impl<const N: usize> EEA<N> {
+    pub fn new(init: f64) -> Self {
+        EEA::<N> {
+            pool: [init; N],
+            last: 0,
+            average: init,
+        }
+    }
+}
+
 // A generic reference to a clause or something else.
 // we can use DEAD for simply satisfied form, f.e. an empty forms,
 // while EmptyClause can be used for simply UNSAT form.
