@@ -35,7 +35,7 @@ pub trait AssignIF:
     + PropagateIF
     + VarManipulateIF
     + PropertyDereference<property::Tusize, usize>
-    + PropertyReference<property::TEma, Ema>
+    + PropertyReference<property::TEma, EmaView>
 {
     /// return root level.
     fn root_level(&self) -> DecisionLevel;
@@ -350,15 +350,15 @@ pub mod property {
         TEma::BestPhaseDivergenceRate,
     ];
 
-    impl PropertyReference<TEma, Ema> for AssignStack {
+    impl PropertyReference<TEma, EmaView> for AssignStack {
         #[inline]
-        fn refer(&self, k: TEma) -> &Ema {
+        fn refer(&self, k: TEma) -> &EmaView {
             match k {
-                TEma::DecisionPerConflict => self.dpc_ema.get_ema(),
-                TEma::PropagationPerConflict => self.ppc_ema.get_ema(),
-                TEma::ConflictPerRestart => self.cpr_ema.get_ema(),
-                TEma::ConflictPerBaseRestart => self.cpr_ema.get_ema(),
-                TEma::BestPhaseDivergenceRate => &self.bp_divergence_ema,
+                TEma::DecisionPerConflict => self.dpc_ema.as_view(),
+                TEma::PropagationPerConflict => self.ppc_ema.as_view(),
+                TEma::ConflictPerRestart => self.cpr_ema.as_view(),
+                TEma::ConflictPerBaseRestart => self.cpr_ema.as_view(),
+                TEma::BestPhaseDivergenceRate => &self.bp_divergence_ema.as_view(),
             }
         }
     }

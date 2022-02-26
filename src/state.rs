@@ -40,12 +40,12 @@ pub trait StateIF {
     fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
-            + PropertyReference<assign::property::TEma, Ema>,
+            + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
             + PropertyDereference<cdb::property::Tf64, f64>,
         E: PropertyDereference<processor::property::Tusize, usize>,
         R: PropertyDereference<solver::restart::property::Tusize, usize>
-            + PropertyReference<solver::restart::property::TEma2, Ema2>;
+            + PropertyReference<solver::restart::property::TEma2, EmaView>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
     /// write a one-line message as log.
@@ -457,12 +457,12 @@ impl StateIF for State {
     fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
-            + PropertyReference<assign::property::TEma, Ema>,
+            + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
             + PropertyDereference<cdb::property::Tf64, f64>,
         E: PropertyDereference<processor::property::Tusize, usize>,
         R: PropertyDereference<solver::restart::property::Tusize, usize>
-            + PropertyReference<solver::restart::property::TEma2, Ema2>,
+            + PropertyReference<solver::restart::property::TEma2, EmaView>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
             self.log_messages.clear();
@@ -501,8 +501,8 @@ impl StateIF for State {
         let rst_int_scl: usize = rst.derefer(solver::restart::property::Tusize::IntervalScale);
         let rst_int_scl_max: usize =
             rst.derefer(solver::restart::property::Tusize::IntervalScaleMax);
-        let rst_asg: &Ema2 = rst.refer(solver::restart::property::TEma2::ASG);
-        let rst_lbd: &Ema2 = rst.refer(solver::restart::property::TEma2::LBD);
+        let rst_asg: &EmaView = rst.refer(solver::restart::property::TEma2::ASG);
+        let rst_lbd: &EmaView = rst.refer(solver::restart::property::TEma2::LBD);
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -591,7 +591,7 @@ impl StateIF for State {
         println!(
             "\x1B[2K         LBD|trnd:{}, avrg:{}, depG:{}, /dpc:{}",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
-            fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd.get()),
+            fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd.get_fast()),
             fm!("{:>9.4}", self, LogF64Id::DpAverageLBD, cdb_lbd_of_dp),
             fm!(
                 "{:>9.2}",
@@ -658,12 +658,12 @@ impl State {
     fn record_stats<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
-            + PropertyReference<assign::property::TEma, Ema>,
+            + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
             + PropertyDereference<cdb::property::Tf64, f64>,
         E: PropertyDereference<processor::property::Tusize, usize>,
         R: PropertyDereference<solver::restart::property::Tusize, usize>
-            + PropertyReference<solver::restart::property::TEma2, Ema2>,
+            + PropertyReference<solver::restart::property::TEma2, EmaView>,
     {
         self[LogUsizeId::NumConflict] = asg.derefer(assign::property::Tusize::NumConflict);
         self[LogUsizeId::NumDecision] = asg.derefer(assign::property::Tusize::NumDecision);
@@ -698,8 +698,8 @@ impl State {
         self[LogUsizeId::VivifiedClause] = self[Stat::VivifiedClause];
         self[LogUsizeId::VivifiedVar] = self[Stat::VivifiedVar];
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
-        let rst_lbd: &Ema2 = rst.refer(solver::restart::property::TEma2::LBD);
-        self[LogF64Id::EmaLBD] = rst_lbd.get();
+        let rst_lbd: &EmaView = rst.refer(solver::restart::property::TEma2::LBD);
+        self[LogF64Id::EmaLBD] = rst_lbd.get_fast();
         self[LogF64Id::TrendLBD] = rst_lbd.trend();
 
         self[LogF64Id::DpAverageLBD] = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
@@ -1090,12 +1090,12 @@ pub mod property {
 
     pub const EMAS: [TEma; 2] = [TEma::BackjumpLevel, TEma::ConflictLevel];
 
-    impl PropertyReference<TEma, Ema> for State {
+    impl PropertyReference<TEma, EmaView> for State {
         #[inline]
-        fn refer(&self, k: TEma) -> &Ema {
+        fn refer(&self, k: TEma) -> &EmaView {
             match k {
-                TEma::BackjumpLevel => &self.b_lvl,
-                TEma::ConflictLevel => &self.c_lvl,
+                TEma::BackjumpLevel => &self.b_lvl.as_view(),
+                TEma::ConflictLevel => &self.c_lvl.as_view(),
             }
         }
     }

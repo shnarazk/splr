@@ -1,0 +1,10 @@
+[package]
+name = "splr-ema"
+description = "various average and EMA implementations used in Splr"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[lib]
+

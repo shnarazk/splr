@@ -92,7 +92,7 @@ pub enum RestartMode {
 pub trait RestartIF:
     Instantiate
     + PropertyDereference<property::Tusize, usize>
-    + PropertyReference<property::TEma2, Ema2>
+    + PropertyReference<property::TEma2, EmaView>
 {
     /// check blocking and forcing restart condition.
     fn restart(&mut self) -> Option<RestartDecision>;
@@ -115,11 +115,13 @@ pub trait RestartIF:
     fn scale_restart_step(&mut self, scale: f64);
 }
 
+const ASG_EWA_LEN: usize = 16;
+
 /// An assignment history used for blocking restart.
 #[derive(Clone, Debug)]
 struct ProgressASG {
     enable: bool,
-    ema: Ema2,
+    ema: Ewa2<ASG_EWA_LEN>,
     /// For block restart based on average assignments: 1.40.
     /// This is called `R` in Glucose
     threshold: f64,
@@ -129,7 +131,7 @@ impl Default for ProgressASG {
     fn default() -> ProgressASG {
         ProgressASG {
             enable: true,
-            ema: Ema2::new(1),
+            ema: Ewa2::<ASG_EWA_LEN>::new(0.0),
             threshold: 1.4,
         }
     }
@@ -138,7 +140,7 @@ impl Default for ProgressASG {
 impl Instantiate for ProgressASG {
     fn instantiate(config: &Config, _cnf: &CNFDescription) -> Self {
         ProgressASG {
-            ema: Ema2::new(config.rst_asg_len).with_slow(config.rst_asg_slw),
+            ema: Ewa2::new(0.0).with_slow(config.rst_asg_slw),
             threshold: config.rst_asg_thr,
             ..ProgressASG::default()
         }
@@ -146,15 +148,21 @@ impl Instantiate for ProgressASG {
 }
 
 impl EmaIF for ProgressASG {
-    type Input = usize;
-    fn update(&mut self, n: usize) {
-        self.ema.update(n as f64);
-    }
-    fn get(&self) -> f64 {
+    fn get_fast(&self) -> f64 {
         self.ema.get()
     }
     fn trend(&self) -> f64 {
         self.ema.trend()
+    }
+}
+
+impl EmaMutIF for ProgressASG {
+    type Input = usize;
+    fn update(&mut self, n: usize) {
+        self.ema.update(n as f64);
+    }
+    fn as_view(&self) -> &EmaView {
+        self.ema.as_view()
     }
 }
 
@@ -165,11 +173,13 @@ impl ProgressEvaluator for ProgressASG {
     fn shift(&mut self) {}
 }
 
+const LBD_EWA_LEN: usize = 8;
+
 /// An EMA of learnt clauses' LBD, used for forcing restart.
 #[derive(Clone, Debug)]
 struct ProgressLBD {
     enable: bool,
-    ema: Ema2,
+    ema: Ewa2<LBD_EWA_LEN>,
     num: usize,
     sum: usize,
     /// For force restart based on average LBD of newly generated clauses: 0.80.
@@ -181,7 +191,7 @@ impl Default for ProgressLBD {
     fn default() -> ProgressLBD {
         ProgressLBD {
             enable: true,
-            ema: Ema2::new(1),
+            ema: Ewa2::<LBD_EWA_LEN>::new(0.0),
             num: 0,
             sum: 0,
             threshold: 1.4,
@@ -192,7 +202,7 @@ impl Default for ProgressLBD {
 impl Instantiate for ProgressLBD {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressLBD {
-            ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_slw),
+            ema: Ewa2::new(0.0).with_slow(config.rst_lbd_slw),
             threshold: config.rst_lbd_thr,
             ..ProgressLBD::default()
         }
@@ -200,17 +210,23 @@ impl Instantiate for ProgressLBD {
 }
 
 impl EmaIF for ProgressLBD {
+    fn get_fast(&self) -> f64 {
+        self.ema.get_fast()
+    }
+    fn trend(&self) -> f64 {
+        self.ema.trend()
+    }
+}
+
+impl EmaMutIF for ProgressLBD {
     type Input = u16;
     fn update(&mut self, d: Self::Input) {
         self.num += 1;
         self.sum += d as usize;
         self.ema.update(d as f64);
     }
-    fn get(&self) -> f64 {
-        self.ema.get()
-    }
-    fn trend(&self) -> f64 {
-        self.ema.trend()
+    fn as_view(&self) -> &EmaView {
+        self.ema.as_view()
     }
 }
 
@@ -236,15 +252,21 @@ impl Instantiate for ProgressLVL {
 }
 
 impl EmaIF for ProgressLVL {
+    fn get_fast(&self) -> f64 {
+        self.ema.get_fast()
+    }
+    fn trend(&self) -> f64 {
+        self.ema.trend()
+    }
+}
+
+impl EmaMutIF for ProgressLVL {
     type Input = usize;
     fn update(&mut self, l: usize) {
         self.ema.update(l as f64);
     }
-    fn get(&self) -> f64 {
-        self.ema.get()
-    }
-    fn trend(&self) -> f64 {
-        self.ema.trend()
+    fn as_view(&self) -> &EmaView {
+        unimplemented!()
     }
 }
 
@@ -302,6 +324,12 @@ impl fmt::Display for ProgressLuby {
 }
 
 impl EmaIF for ProgressLuby {
+    fn get_fast(&self) -> f64 {
+        self.next_restart as f64
+    }
+}
+
+impl EmaMutIF for ProgressLuby {
     type Input = usize;
     fn update(&mut self, now: usize) {
         if !self.enable {
@@ -309,8 +337,8 @@ impl EmaIF for ProgressLuby {
         }
         self.active = self.next_restart < now;
     }
-    fn get(&self) -> f64 {
-        self.next_restart as f64
+    fn as_view(&self) -> &EmaView {
+        unimplemented!()
     }
 }
 
@@ -595,12 +623,12 @@ pub mod property {
         LBD,
     }
 
-    impl PropertyReference<TEma2, Ema2> for Restarter {
+    impl PropertyReference<TEma2, EmaView> for Restarter {
         #[inline]
-        fn refer(&self, k: TEma2) -> &Ema2 {
+        fn refer(&self, k: TEma2) -> &EmaView {
             match k {
-                TEma2::ASG => &self.asg.ema,
-                TEma2::LBD => &self.lbd.ema,
+                TEma2::ASG => &self.asg.as_view(),
+                TEma2::LBD => &self.lbd.as_view(),
             }
         }
     }

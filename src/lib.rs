@@ -68,7 +68,8 @@ pub mod types;
 pub use {
     config::Config,
     solver::{Certificate, SatSolverIF, SolveIF, Solver, ValidateIF},
-    types::{Ema, Ema2, EmaIF, PropertyDereference, PropertyReference, SolverError},
+    splr_ema::*,
+    types::{PropertyDereference, PropertyReference, SolverError},
 };
 
 /// Splr version number.
