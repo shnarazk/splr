@@ -500,17 +500,17 @@ impl EmaSU {
 
 /// Equally-Weighted-Average, namely, Average
 #[derive(Clone, Debug)]
-pub struct EWA<const N: usize = 32> {
+pub struct Ewa<const N: usize = 32> {
     pool: [f64; N],
     last: usize,
     average: f64,
 }
 
-impl<const N: usize> EmaIF for EWA<N> {
-    type Input = usize;
+impl<const N: usize> EmaIF for Ewa<N> {
+    type Input = f64;
     fn update(&mut self, x: Self::Input) {
         self.average -= self.pool[self.last];
-        let val = x as f64 / N as f64;
+        let val = x / N as f64;
         self.average += val;
         self.pool[self.last] = val;
         self.last = (self.last + 1) % N;
@@ -520,9 +520,9 @@ impl<const N: usize> EmaIF for EWA<N> {
     }
 }
 
-impl<const N: usize> EWA<N> {
+impl<const N: usize> Ewa<N> {
     pub fn new(init: f64) -> Self {
-        EWA::<N> {
+        Ewa::<N> {
             pool: [init; N],
             last: 0,
             average: init,
