@@ -116,6 +116,7 @@ pub trait RestartIF:
 }
 
 const ASG_EWA_LEN: usize = 16;
+const LBD_EWA_LEN: usize = 8;
 
 /// An assignment history used for blocking restart.
 #[derive(Clone, Debug)]
@@ -172,8 +173,6 @@ impl ProgressEvaluator for ProgressASG {
     }
     fn shift(&mut self) {}
 }
-
-const LBD_EWA_LEN: usize = 8;
 
 /// An EMA of learnt clauses' LBD, used for forcing restart.
 #[derive(Clone, Debug)]
