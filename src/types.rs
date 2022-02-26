@@ -530,6 +530,71 @@ impl<const N: usize> Ewa<N> {
     }
 }
 
+/// Exponential Moving Average pair, with a calibrator if feature `EMA_calibration` is on.
+#[derive(Clone, Debug)]
+pub struct Ewa2<const N: usize = 32> {
+    fast: Ewa<N>,
+    slow: f64,
+    #[cfg(feature = "EMA_calibration")]
+    cals: f64,
+    se: f64,
+}
+
+impl EmaIF for Ewa2 {
+    type Input = f64;
+    fn get(&self) -> f64 {
+        self.fast.get()
+    }
+    #[cfg(not(feature = "EMA_calibration"))]
+    fn update(&mut self, x: Self::Input) {
+        self.fast.update(x);
+        self.slow = self.se * x + (1.0 - self.se) * self.slow;
+    }
+    #[cfg(feature = "EMA_calibration")]
+    fn update(&mut self, x: Self::Input) {
+        self.fast.update(x);
+        self.slow = self.se * x + (1.0 - self.se) * self.slow;
+        self.cals = self.se + (1.0 - self.se) * self.cals;
+    }
+    #[cfg(not(feature = "EMA_calibration"))]
+    fn reset(&mut self) {
+        self.slow = self.fast.get();
+    }
+    #[cfg(feature = "EMA_calibration")]
+    fn reset(&mut self) {
+        self.slow = self.fast.get();
+        self.cals = self.calf;
+    }
+    #[cfg(not(feature = "EMA_calibration"))]
+    fn trend(&self) -> f64 {
+        self.fast.get() / self.slow
+    }
+    #[cfg(feature = "EMA_calibration")]
+    fn trend(&self) -> f64 {
+        self.fast.get() * self.cals / self.slow
+    }
+}
+
+impl<const N: usize> Ewa2<N> {
+    pub fn new(f: usize) -> Ewa2 {
+        Ewa2 {
+            fast: Ewa::<32_usize>::new(0.0),
+            slow: 0.0,
+            #[cfg(feature = "EMA_calibration")]
+            cals: 0.0,
+            se: 1.0 / (f as f64),
+        }
+    }
+    // set secondary EMA parameter
+    pub fn with_slow(mut self, s: usize) -> Self {
+        self.se = 1.0 / (s as f64);
+        self
+    }
+    pub fn get_slow(&self) -> f64 {
+        self.slow // / self.calf
+    }
+}
+
 // A generic reference to a clause or something else.
 // we can use DEAD for simply satisfied form, f.e. an empty forms,
 // while EmptyClause can be used for simply UNSAT form.
