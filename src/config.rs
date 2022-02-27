@@ -77,18 +77,16 @@ pub struct Config {
     /// #conflicts between restarts
     pub rst_step: usize,
 
-    /// Length of assign. fast EMA
-    pub rst_asg_len: usize,
-
+    // /// Length of assign. fast EMA
+    // pub rst_asg_len: usize,
     /// Length of assign. slow EMA
     pub rst_asg_slw: usize,
 
     /// Blocking restart threshold. Originally this was the Glucose's R.
     pub rst_asg_thr: f64,
 
-    /// Length of LBD fast EMA
-    pub rst_lbd_len: usize,
-
+    // /// Length of LBD fast EMA
+    // pub rst_lbd_len: usize,
     /// Length of LBD slow EMA
     pub rst_lbd_slw: usize,
 
@@ -134,10 +132,10 @@ impl Default for Config {
             elm_var_occ: 20000,
 
             rst_step: 2,
-            rst_asg_len: 16,
+            // rst_asg_len: 16,
             rst_asg_slw: 8192,
             rst_asg_thr: 0.6,
-            rst_lbd_len: 8,
+            // rst_lbd_len: 8,
             rst_lbd_slw: 8192,
             rst_lbd_thr: 1.6,
 
@@ -172,7 +170,8 @@ impl Config {
                 ];
                 let options_u32 = ["cbt"];
                 let options_usize = [
-                    "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
+                    // "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
+                    "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ras", "rls",
                 ];
                 let options_f64 = ["timeout", "cdr", "rat", "rlt", "vdr", "vds"];
                 let options_path = ["dir", "proof", "result"];
@@ -214,9 +213,9 @@ impl Config {
                                         "evl" => self.elm_grw_lim = val,
                                         "evo" => self.elm_var_occ = val,
                                         "rs" => self.rst_step = val,
-                                        "ral" => self.rst_asg_len = val,
+                                        // "ral" => self.rst_asg_len = val,
                                         "ras" => self.rst_asg_slw = val,
-                                        "rll" => self.rst_lbd_len = val,
+                                        // "rll" => self.rst_lbd_len = val,
                                         "rls" => self.rst_lbd_slw = val,
                                         _ => panic!("invalid option: {}", name),
                                     }
@@ -389,10 +388,8 @@ OPTIONS (\x1B[000m\x1B[031mred\x1B[000m options depend on features in Cargo.toml
   -o, --dir <io-outdir>     Output directory                {:>10}
   -p, --proof <io-pfile>    DRAT Cert. filename                 {:>10}
   -r, --result <io-rfile>   Result filename/stdout             {:>10}
-      --ral <rst-asg-len>   Length of assign. fast EMA     {:>10}
       --ras <rst-asg-slw>   Length of assign. slow EMA     {:>10}
       --rat <rst-asg-thr>   Blocking restart threshold        {:>10.2}
-      --rll <rst-lbd-len>   Length of LBD fast EMA         {:>10}
       --rls <rst-lbd-slw>   Length of LBD slow EMA         {:>10}
       --rlt <rst-lbd-thr>   Forcing restart threshold         {:>10.2}
       --rs  <rst-step>      #conflicts between restarts    {:>10}
@@ -412,10 +409,10 @@ ARGS:
         config.io_odir.to_string_lossy(),
         config.io_pfile.to_string_lossy(),
         config.io_rfile.to_string_lossy(),
-        config.rst_asg_len,
+        // config.rst_asg_len,
         config.rst_asg_slw,
         config.rst_asg_thr,
-        config.rst_lbd_len,
+        // config.rst_lbd_len,
         config.rst_lbd_slw,
         config.rst_lbd_thr,
         config.rst_step,

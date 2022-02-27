@@ -115,8 +115,8 @@ pub trait RestartIF:
     fn scale_restart_step(&mut self, scale: f64);
 }
 
-const ASG_EWA_LEN: usize = 16;
-const LBD_EWA_LEN: usize = 8;
+const ASG_EWA_LEN: usize = 24;
+const LBD_EWA_LEN: usize = 24;
 
 /// An assignment history used for blocking restart.
 #[derive(Clone, Debug)]
