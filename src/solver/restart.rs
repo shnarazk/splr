@@ -405,6 +405,10 @@ impl fmt::Display for GeometricStabilizer {
 }
 
 #[cfg(feature = "Luby_stabilization")]
+/// returns
+/// - `Some(true)` - if a new cycle starts.
+/// - `Some(false)` - if restart_step is updated, or stabilized,
+/// - `None` - otherwise
 impl GeometricStabilizer {
     fn update(&mut self) -> Option<bool> {
         if self.enable {

@@ -248,6 +248,7 @@ fn search(
 ) -> Result<bool, SolverError> {
     #[cfg(feature = "clause_elimination")]
     let mut next_elimination = 0;
+    let mut new_stabilization_stage = false;
 
     #[cfg(feature = "strategy_adaptation")]
     let mut a_decision_was_made = false;
@@ -282,7 +283,7 @@ fn search(
             #[cfg(feature = "clause_rewarding")]
             cdb.update_activity_tick();
 
-            handle_conflict(asg, cdb, rst, state, &cc)?;
+            let _ = handle_conflict(asg, cdb, rst, state, &cc)?;
             rst.update(ProgressUpdate::ASG(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
             ));
@@ -295,7 +296,7 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
                 RESTART!(asg, rst);
-                cdb.reduce(asg, asg.num_conflict);
+                cdb.reduce(asg, asg.num_conflict, new_stabilization_stage);
 
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
@@ -343,12 +344,12 @@ fn search(
                         );
                     }
 
-                    rst.stabilize();
+                    new_stabilization_stage = rst.stabilize().is_some();
                     // call the enhanced phase saver
                     asg.handle(SolverEvent::Stabilize(
                         rst.derefer(restart::property::Tusize::IntervalScale),
                     ));
-                }
+                };
             } else if rst.restart() == Some(RestartDecision::Force) {
                 RESTART!(asg, rst);
             }

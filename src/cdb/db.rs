@@ -980,7 +980,7 @@ impl ClauseDBIF for ClauseDB {
         }
     }
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, nc: usize) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, nc: usize, purge_more: bool) {
         impl Clause {
             fn pure_weight(&self, asg: &mut impl AssignIF) -> f64 {
                 let act_v = self
@@ -1054,7 +1054,7 @@ impl ClauseDBIF for ClauseDB {
             }
             perm.push(OrderedProxy::new(i, c.weight(asg)));
         }
-        let keep = perm.len().min(nc) / 2;
+        let keep = perm.len().min(nc) * if purge_more { 2 } else { 3 } / 4;
         let mut reduction_coeff: f64 = (nc as f64) / (self.reduction_step as f64) + 1.0;
         self.reduction_step += self.inc_step;
         if perm.is_empty() {
