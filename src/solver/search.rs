@@ -312,7 +312,7 @@ fn search(
                         elim.simplify(asg, cdb, rst, state)?;
                         state[Stat::NumProcessor] += 1;
                         next_elimination += 1.4f64
-                            .powi(cdb.derefer(cdb::property::Tusize::NumClause) as i32 / 80_000)
+                            .powi(cdb.derefer(cdb::property::Tusize::NumClause) as i32 / 20_000)
                             as usize;
                     }
                 }

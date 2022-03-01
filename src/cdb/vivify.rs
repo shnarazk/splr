@@ -9,7 +9,7 @@ use crate::{
     types::*,
 };
 
-const VIVIFY_LIMIT: usize = 200_000;
+const VIVIFY_LIMIT: usize = 300_000;
 
 pub trait VivifyIF {
     fn vivify(
