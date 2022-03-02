@@ -307,7 +307,7 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
                 RESTART!(asg, rst);
-                cdb.reduce(asg, asg.num_conflict, increase - 500);
+                cdb.reduce(asg, asg.num_conflict, increase - 200);
                 increase = luby_scale * luby;
                 luby = luby_iter.next();
                 next_reduction = num_learnt + luby_scale * luby;
