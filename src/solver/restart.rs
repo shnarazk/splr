@@ -5,7 +5,7 @@ use {
 };
 
 #[derive(Clone, Debug)]
-struct LubySeries {
+pub struct LubySeries {
     index: usize,
     seq: isize,
     size: usize,
@@ -30,7 +30,7 @@ impl fmt::Display for LubySeries {
 impl LubySeries {
     /// Find the finite subsequence that contains index 'x', and the
     /// size of that subsequence as: 1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8
-    fn next(&mut self) -> usize {
+    pub fn next(&mut self) -> usize {
         self.index += 1;
         let mut seq = self.seq;
         let mut size = self.size;

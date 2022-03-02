@@ -1,6 +1,8 @@
 //! Conflict-Driven Clause Learning Search engine
 #[cfg(feature = "clause_vivification")]
 use crate::cdb::VivifyIF;
+
+use super::restart::LubySeries;
 use {
     super::{
         conflict::handle_conflict,
@@ -248,7 +250,12 @@ fn search(
 ) -> Result<bool, SolverError> {
     #[cfg(feature = "clause_elimination")]
     let mut next_elimination = 0;
-    let mut new_stabilization_stage = false;
+    let mut luby_scale = 1_000;
+    let mut luby_iter = LubySeries::default();
+    let mut luby = luby_iter.next();
+    let mut increase = luby_scale * luby;
+    let mut next_reduction = increase;
+    let mut num_learnt = 0;
 
     #[cfg(feature = "strategy_adaptation")]
     let mut a_decision_was_made = false;
@@ -283,11 +290,15 @@ fn search(
             #[cfg(feature = "clause_rewarding")]
             cdb.update_activity_tick();
 
-            let _ = handle_conflict(asg, cdb, rst, state, &cc)?;
+            if 1 < handle_conflict(asg, cdb, rst, state, &cc)? {
+                num_learnt += 1;
+            }
             rst.update(ProgressUpdate::ASG(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
             ));
-            if cdb.should_reduce(asg.num_conflict) {
+            if
+            /* cdb.should_reduce(asg.num_conflict) */
+            next_reduction < num_learnt {
                 if let Some(p) = state.elapsed() {
                     if 1.0 <= p {
                         return Err(SolverError::TimeOut);
@@ -296,7 +307,10 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
                 RESTART!(asg, rst);
-                cdb.reduce(asg, asg.num_conflict, new_stabilization_stage);
+                cdb.reduce(asg, asg.num_conflict, increase - 500);
+                increase = luby_scale * luby;
+                luby = luby_iter.next();
+                next_reduction = num_learnt + luby_scale * luby;
 
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
@@ -312,7 +326,7 @@ fn search(
                         elim.simplify(asg, cdb, rst, state)?;
                         state[Stat::NumProcessor] += 1;
                         next_elimination += 1.4f64
-                            .powi(cdb.derefer(cdb::property::Tusize::NumClause) as i32 / 20_000)
+                            .powi(cdb.derefer(cdb::property::Tusize::NumClause) as i32 / 40_000)
                             as usize;
                     }
                 }
@@ -344,7 +358,9 @@ fn search(
                         );
                     }
 
-                    new_stabilization_stage = rst.stabilize().is_some();
+                    if rst.stabilize() == Some(true) {
+                        luby_scale += 1_000;
+                    }
                     // call the enhanced phase saver
                     asg.handle(SolverEvent::Stabilize(
                         rst.derefer(restart::property::Tusize::IntervalScale),
