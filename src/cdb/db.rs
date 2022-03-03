@@ -35,10 +35,6 @@ impl Default for ClauseDB {
             activity_anti_decay: 0.01,
 
             lbd_temp: Vec::new(),
-            inc_step: 300,
-            first_reduction: 1000,
-            next_reduction: 1000,
-            reduction_step: 1000,
             num_clause: 0,
             num_bi_clause: 0,
             num_bi_learnt: 0,
@@ -972,15 +968,8 @@ impl ClauseDBIF for ClauseDB {
         self.lbd_of_dp_ema.update(rank as f64);
         learnt
     }
-    fn should_reduce(&mut self, num_conflicts: usize) -> bool {
-        if self.use_chan_seok {
-            self.first_reduction <= self.num_learnt
-        } else {
-            self.next_reduction <= num_conflicts
-        }
-    }
-    /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, nc: usize, portion: usize) {
+    /// reduce the number of 'learnt' or *removable* clauses.
+    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize) {
         impl Clause {
             fn pure_weight(&self, asg: &mut impl AssignIF) -> f64 {
                 let act_v = self
@@ -1015,7 +1004,6 @@ impl ClauseDBIF for ClauseDB {
         }
         let ClauseDB {
             ref mut clause,
-            ref co_lbd_bound,
             ref mut lbd_temp,
             ref mut num_reduction,
 
@@ -1056,17 +1044,8 @@ impl ClauseDBIF for ClauseDB {
         }
         // let keep = perm.len().min(nc) / portion;
         let keep = perm.len().saturating_sub(portion + 1);
-        let mut reduction_coeff: f64 = (nc as f64) / (self.reduction_step as f64) + 1.0;
-        self.reduction_step += self.inc_step;
         if perm.is_empty() {
-            self.next_reduction = (reduction_coeff * self.reduction_step as f64) as usize;
             return;
-        }
-        if !self.use_chan_seok {
-            if clause[perm[keep].to()].rank <= *co_lbd_bound {
-                reduction_coeff *= 1.1;
-            }
-            self.next_reduction = (reduction_coeff * self.reduction_step as f64) as usize;
         }
         perm.sort();
         // Worse half of `perm` should be discarded now. But many people thought

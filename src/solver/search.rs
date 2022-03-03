@@ -256,7 +256,7 @@ fn search(
     let mut luby_iter = LubySeries::default();
     let mut luby = luby_iter.next();
     let mut increase = luby_scaling * luby + keep_clauses;
-    let mut next_reduction = increase;
+    let mut next_reduction = increase + 1_000;
     let mut num_learnt = 0;
 
     #[cfg(feature = "strategy_adaptation")]
@@ -298,9 +298,7 @@ fn search(
             rst.update(ProgressUpdate::ASG(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
             ));
-            if
-            /* cdb.should_reduce(asg.num_conflict) */
-            next_reduction < num_learnt {
+            if next_reduction < num_learnt {
                 if let Some(p) = state.elapsed() {
                     if 1.0 <= p {
                         return Err(SolverError::TimeOut);
@@ -309,7 +307,7 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
                 RESTART!(asg, rst);
-                cdb.reduce(asg, asg.num_conflict, increase - keep_clauses);
+                cdb.reduce(asg, increase - keep_clauses);
                 luby = luby_iter.next();
                 increase = stabilization_age * luby_scaling * luby;
                 next_reduction = num_learnt + increase;

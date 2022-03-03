@@ -126,12 +126,10 @@ pub trait ClauseDBIF:
     fn transform_by_replacement(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause;
     /// check satisfied and nullified literals in a clause
     fn transform_by_simplification(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> RefClause;
-    /// check the condition to reduce.
-    fn should_reduce(&mut self, nc: usize) -> bool;
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, nc: usize, portion: usize);
+    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize);
     /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.
@@ -260,15 +258,6 @@ pub struct ClauseDB {
     //
     /// a working buffer for LBD calculation
     lbd_temp: Vec<usize>,
-
-    //
-    //## reduction
-    //
-    /// increment step of reduction threshold
-    inc_step: usize,
-    first_reduction: usize,
-    next_reduction: usize,
-    reduction_step: usize, // renamed from `nbclausesbeforereduce`
 
     //
     //## statistics
