@@ -251,7 +251,7 @@ fn search(
     #[cfg(feature = "clause_elimination")]
     let mut next_elimination = 0;
     let keep_clauses = 200;
-    let luby_scaling = 200;
+    let luby_scaling = 400;
     let mut stabilization_age = 1;
     let mut luby_iter = LubySeries::default();
     let mut luby = luby_iter.next();
