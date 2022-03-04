@@ -254,7 +254,7 @@ fn search(
     let luby_scaling = 400;
     let mut stabilization_age = 1;
     let mut luby_iter = LubySeries::default();
-    let mut luby = luby_iter.next();
+    let mut luby = 1;
     let mut increase = luby_scaling * luby + keep_clauses;
     let mut next_reduction = increase + 1_000;
     let mut num_learnt = 0;
