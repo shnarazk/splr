@@ -250,13 +250,13 @@ fn search(
 ) -> Result<bool, SolverError> {
     #[cfg(feature = "clause_elimination")]
     let mut next_elimination = 0;
-    let keep_clauses = 200;
-    let luby_scaling = 400;
+    let keep_clauses = 100;
+    let luby_scaling = 200;
     let mut stabilization_age = 1;
     let mut luby_iter = LubySeries::default();
-    let mut luby = 1;
+    let mut luby: usize = 1;
     let mut increase = luby_scaling * luby + keep_clauses;
-    let mut next_reduction = increase + 1_000;
+    let mut next_reduction = increase;
     let mut num_learnt = 0;
 
     #[cfg(feature = "strategy_adaptation")]
@@ -307,7 +307,11 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
                 RESTART!(asg, rst);
-                cdb.reduce(asg, increase - keep_clauses);
+                let luby_scale = (increase / luby_scaling)
+                    .next_power_of_two()
+                    .trailing_zeros() as u16
+                    - 1;
+                cdb.reduce(asg, increase - keep_clauses, luby_scale);
                 luby = luby_iter.next_unchecked();
                 increase = stabilization_age * luby_scaling * luby;
                 next_reduction = num_learnt + increase;
