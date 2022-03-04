@@ -1,60 +1,9 @@
 //! Crate `restart` provides restart heuristics.
 use {
     crate::{solver::SolverEvent, types::*},
+    splr_luby::LubySeries,
     std::fmt,
 };
-
-#[derive(Clone, Debug)]
-pub struct LubySeries {
-    index: usize,
-    seq: isize,
-    size: usize,
-}
-
-impl Default for LubySeries {
-    fn default() -> Self {
-        LubySeries {
-            index: 0,
-            seq: 0,
-            size: 1,
-        }
-    }
-}
-
-impl fmt::Display for LubySeries {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Luby[index:{}]", self.index)
-    }
-}
-
-impl LubySeries {
-    /// Find the finite subsequence that contains index 'x', and the
-    /// size of that subsequence as: 1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8
-    pub fn next(&mut self) -> usize {
-        self.index += 1;
-        let mut seq = self.seq;
-        let mut size = self.size;
-        while size < self.index + 1 {
-            self.seq = seq;
-            seq += 1;
-            self.size = size;
-            size = 2 * size + 1;
-        }
-        let mut index = self.index;
-        while size - 1 != index {
-            size = (size - 1) >> 1;
-            seq -= 1;
-            index %= size;
-        }
-        2usize.pow(seq as u32)
-    }
-    #[allow(dead_code)]
-    fn reset(&mut self) {
-        self.index = 0;
-        self.seq = 0;
-        self.size = 1;
-    }
-}
 
 /// API for restart condition.
 trait ProgressEvaluator {
@@ -347,7 +296,7 @@ impl ProgressEvaluator for ProgressLuby {
     }
     fn shift(&mut self) {
         self.active = false;
-        self.next_restart = self.step * self.luby.next();
+        self.next_restart = self.step * self.luby.next_unchecked();
     }
 }
 
@@ -419,7 +368,7 @@ impl GeometricStabilizer {
                 self.num_cycle += 1;
                 self.step_max = self.step;
             }
-            self.step = self.luby.next();
+            self.step = self.luby.next_unchecked();
             self.switch_requsted = false;
             return (self.step == 1).then(|| new_cycle);
         }
@@ -634,38 +583,5 @@ pub mod property {
                 TEma2::LBD => &self.lbd.as_view(),
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_progress_luby() {
-        let mut luby = ProgressLuby {
-            enable: true,
-            active: true,
-            step: 1,
-            next_restart: 1,
-            ..ProgressLuby::default()
-        };
-        luby.update(0);
-        for v in vec![
-            1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8, 1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1,
-        ] {
-            assert_eq!(luby.next_restart, v);
-            luby.shift();
-        }
-    }
-    #[test]
-    fn test_luby_series() {
-        let mut luby = LubySeries::default();
-        let v = vec![1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8];
-        let mut l: Vec<usize> = vec![];
-        for _ in 1..15 {
-            l.push(luby.next());
-        }
-        assert_eq!(l, v);
     }
 }

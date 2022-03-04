@@ -2,7 +2,6 @@
 #[cfg(feature = "clause_vivification")]
 use crate::cdb::VivifyIF;
 
-use super::restart::LubySeries;
 use {
     super::{
         conflict::handle_conflict,
@@ -16,6 +15,7 @@ use {
         state::{Stat, State, StateIF},
         types::*,
     },
+    splr_luby::LubySeries,
 };
 
 /// API to [`solve`](`crate::solver::SolveIF::solve`) SAT problems.
@@ -308,7 +308,7 @@ fn search(
                 }
                 RESTART!(asg, rst);
                 cdb.reduce(asg, increase - keep_clauses);
-                luby = luby_iter.next();
+                luby = luby_iter.next_unchecked();
                 increase = stabilization_age * luby_scaling * luby;
                 next_reduction = num_learnt + increase;
 
