@@ -16,6 +16,7 @@ pub use self::{
     build::SatSolverIF,
     restart::{property::*, RestartIF, Restarter},
     search::SolveIF,
+    stage::StageManager,
     validate::ValidateIF,
 };
 

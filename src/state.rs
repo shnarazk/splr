@@ -4,7 +4,7 @@ use {crate::assign::AssignIF, std::cmp::Ordering};
 use {
     crate::{
         assign, cdb, processor,
-        solver::{self, SolverEvent},
+        solver::{self, SolverEvent, StageManager},
         types::*,
     },
     std::{
@@ -166,6 +166,8 @@ pub struct State {
     pub config: Config,
     /// collection of statistics data
     pub stats: [usize; Stat::EndOfStatIndex as usize],
+    /// StageManager
+    pub stm: StageManager,
 
     #[cfg(feature = "strategy_adaptation")]
     /// tuple of current strategy and the number of conflicts at which the strategy is selected.
@@ -213,6 +215,7 @@ impl Default for State {
         State {
             config: Config::default(),
             stats: [0; Stat::EndOfStatIndex as usize],
+            stm: StageManager::default(),
 
             #[cfg(feature = "strategy_adaptation")]
             strategy: (SearchStrategy::Initial, 0),
@@ -498,9 +501,8 @@ impl StateIF for State {
 
         let rst_num_blk: usize = rst.derefer(solver::restart::property::Tusize::NumBlock);
         let rst_num_rst: usize = rst.derefer(solver::restart::property::Tusize::NumRestart);
-        let rst_int_scl: usize = rst.derefer(solver::restart::property::Tusize::IntervalScale);
-        let rst_int_scl_max: usize =
-            rst.derefer(solver::restart::property::Tusize::IntervalScaleMax);
+        let rst_int_scl: usize = self.stm.current_scale();
+        let rst_int_scl_max: usize = self.stm.max_scale();
         let rst_asg: &EmaView = rst.refer(solver::restart::property::TEma2::ASG);
         let rst_lbd: &EmaView = rst.refer(solver::restart::property::TEma2::LBD);
 
@@ -640,9 +642,8 @@ impl StateIF for State {
         );
         self[LogUsizeId::NumProcessor] = self[Stat::NumProcessor];
         self[LogUsizeId::Simplify] = elim_num_full;
-        self[LogUsizeId::Stabilize] = rst.derefer(solver::restart::property::Tusize::NumStage);
-        self[LogUsizeId::StabilizationCycle] =
-            rst.derefer(solver::restart::property::Tusize::NumCycle);
+        self[LogUsizeId::Stabilize] = self.stm.current_stage();
+        self[LogUsizeId::StabilizationCycle] = self.stm.current_cycle();
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
 
         #[cfg(feature = "strategy_adaptation")]
@@ -682,14 +683,10 @@ impl State {
             cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
         self[LogUsizeId::RestartBlock] = rst.derefer(solver::restart::property::Tusize::NumBlock);
         self[LogUsizeId::Restart] = rst.derefer(solver::restart::property::Tusize::NumRestart);
-        self[LogUsizeId::RestartIntervalScale] =
-            rst.derefer(solver::restart::property::Tusize::IntervalScale);
-        self[LogUsizeId::RestartIntervalScaleMax] =
-            rst.derefer(solver::restart::property::Tusize::IntervalScaleMax);
-        self[LogUsizeId::Stabilize] = rst.derefer(solver::restart::property::Tusize::NumStage);
-        self[LogUsizeId::StabilizationCycle] =
-            rst.derefer(solver::restart::property::Tusize::NumCycle);
-
+        self[LogUsizeId::RestartIntervalScale] = self.stm.current_scale();
+        self[LogUsizeId::RestartIntervalScaleMax] = self.stm.max_scale();
+        self[LogUsizeId::Stabilize] = self.stm.current_stage();
+        self[LogUsizeId::StabilizationCycle] = self.stm.current_cycle();
         self[LogUsizeId::NumProcessor] = self[Stat::NumProcessor];
         self[LogUsizeId::Simplify] = elim.derefer(processor::property::Tusize::NumFullElimination);
 
@@ -1059,14 +1056,26 @@ pub mod property {
         VivifiedClause,
         /// the number of vivified (asserted) vars
         VivifiedVar,
+
+        //
+        //## from stageManager
+        //
+        NumCycle,
+        NumStage,
+        IntervalScale,
+        IntervalScaleMax,
     }
 
-    pub const USIZES: [Tusize; 5] = [
+    pub const USIZES: [Tusize; 9] = [
         Tusize::NumNoDecisionConflict,
         Tusize::NumProcessor,
         Tusize::Vivification,
         Tusize::VivifiedClause,
         Tusize::VivifiedVar,
+        Tusize::NumCycle,
+        Tusize::NumStage,
+        Tusize::IntervalScale,
+        Tusize::IntervalScaleMax,
     ];
 
     impl PropertyDereference<Tusize, usize> for State {
@@ -1078,6 +1087,10 @@ pub mod property {
                 Tusize::Vivification => self[Stat::Vivification],
                 Tusize::VivifiedClause => self[Stat::VivifiedClause],
                 Tusize::VivifiedVar => self[Stat::VivifiedVar],
+                Tusize::NumCycle => self.stm.current_cycle(),
+                Tusize::NumStage => self.stm.current_stage(),
+                Tusize::IntervalScale => self.stm.current_scale(),
+                Tusize::IntervalScaleMax => self.stm.max_scale(),
             }
         }
     }

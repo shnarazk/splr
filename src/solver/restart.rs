@@ -26,17 +26,6 @@ pub enum ProgressUpdate {
     Luby,
 }
 
-/// Restart modes
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum RestartMode {
-    /// Controlled by Glucose-like forcing and blocking restart scheme
-    Dynamic = 0,
-    /// Controlled by a good old scheme
-    Luby,
-    /// Controlled by CaDiCal-like Geometric Stabilizer
-    Stabilize,
-}
-
 /// API for [`restart`](`crate::solver::RestartIF::restart`) and [`stabilize`](`crate::solver::RestartIF::stabilize`).
 pub trait RestartIF:
     Instantiate
@@ -45,14 +34,8 @@ pub trait RestartIF:
 {
     /// check blocking and forcing restart condition.
     fn restart(&mut self) -> Option<RestartDecision>;
-    /// toggle stabilization mode and return:
-    /// - `true` if a stabilization _phase_ has just ended (or a new stabilization _phase_ starts).
-    /// - `false` otherwise.
-
-    /// - `Some(true)` if returns to the base restart interval and at the beginning of a new phase.
-    /// - `Some(false)` if returns to the base restart interval
-    /// - `None` if not at the base restart interval
-    fn stabilize(&mut self) -> Option<bool>;
+    /// set stabilization parameters
+    fn set_stabilization(&mut self, step: usize, step_max: usize);
     #[cfg(feature = "dynamic_restart_threshold")]
     /// adjust restart threshold
     fn adjust(&mut self, base: f64, c_lvl: f64, b_lvl: f64, used: f64);
@@ -300,82 +283,6 @@ impl ProgressEvaluator for ProgressLuby {
     }
 }
 
-/// An implementation of CaDiCaL-style blocker.
-/// This is a stealth blocker between the other evaluators and solver;
-/// the other evaluators work as if this blocker doesn't exist.
-/// When an evaluator becomes active, we accept and shift it. But this blocker
-/// absorbs not only the forcing signal but also blocking signal.
-/// This exists in macro `reset`.
-#[derive(Clone, Debug)]
-struct GeometricStabilizer {
-    enable: bool,
-    luby: LubySeries,
-    num_cycle: usize,
-    num_stage: usize,
-    step: usize,
-    step_max: usize,
-    switch_requsted: bool,
-}
-
-impl Default for GeometricStabilizer {
-    fn default() -> Self {
-        GeometricStabilizer {
-            #[cfg(not(feature = "Luby_stabilization"))]
-            enable: false,
-            #[cfg(feature = "Luby_stabilization")]
-            enable: true,
-
-            luby: LubySeries::default(),
-            num_cycle: 0,
-            num_stage: 0,
-            step: 1,
-            step_max: 1,
-            switch_requsted: false,
-        }
-    }
-}
-
-impl Instantiate for GeometricStabilizer {
-    fn instantiate(_config: &Config, _: &CNFDescription) -> Self {
-        GeometricStabilizer::default()
-    }
-}
-
-impl fmt::Display for GeometricStabilizer {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if !self.enable {
-            write!(f, "Stabilizer(dead)")
-        } else if self.enable {
-            write!(f, "Stabilizer[step: {}, on]", self.step)
-        } else {
-            write!(f, "Stabilizer[step: {}, off]", self.step)
-        }
-    }
-}
-
-#[cfg(feature = "Luby_stabilization")]
-/// returns
-/// - `Some(true)` - if a new cycle starts.
-/// - `Some(false)` - if restart_step is updated, or stabilized,
-/// - `None` - otherwise
-impl GeometricStabilizer {
-    fn update(&mut self) -> Option<bool> {
-        if self.enable {
-            self.num_stage += 1;
-            let mut new_cycle: bool = false;
-            if self.step_max < self.step {
-                new_cycle = true;
-                self.num_cycle += 1;
-                self.step_max = self.step;
-            }
-            self.step = self.luby.next_unchecked();
-            self.switch_requsted = false;
-            return (self.step == 1).then(|| new_cycle);
-        }
-        Some(false)
-    }
-}
-
 /// `Restarter` provides restart API and holds data about restart conditions.
 #[derive(Clone, Debug, Default)]
 pub struct Restarter {
@@ -384,10 +291,13 @@ pub struct Restarter {
     // pub blvl: ProgressLVL,
     // pub clvl: ProgressLVL,
     luby: ProgressLuby,
-    stb: GeometricStabilizer,
     after_restart: usize,
     restart_step: usize,
     initial_restart_step: usize,
+
+    // stabilizer
+    stb_step: usize,
+    stb_step_max: usize,
 
     //
     //## statistics
@@ -404,7 +314,6 @@ impl Instantiate for Restarter {
             // blvl: ProgressLVL::instantiate(config, cnf),
             // clvl: ProgressLVL::instantiate(config, cnf),
             luby: ProgressLuby::instantiate(config, cnf),
-            stb: GeometricStabilizer::instantiate(config, cnf),
             restart_step: config.rst_step,
             initial_restart_step: config.rst_step,
 
@@ -436,7 +345,7 @@ impl RestartIF for Restarter {
     fn restart(&mut self) -> Option<RestartDecision> {
         macro_rules! next_step {
             () => {
-                self.stb.step * self.initial_restart_step
+                self.stb_step * self.initial_restart_step
             };
         }
         if self.luby.is_active() {
@@ -449,7 +358,7 @@ impl RestartIF for Restarter {
             return None;
         }
 
-        if self.stb.step_max * self.num_block < self.stb.step * self.num_restart
+        if self.stb_step_max * self.num_block < self.stb_step * self.num_restart
             && self.asg.is_active()
         {
             self.num_block += 1;
@@ -465,11 +374,12 @@ impl RestartIF for Restarter {
         None
     }
     #[cfg(feature = "Luby_stabilization")]
-    fn stabilize(&mut self) -> Option<bool> {
-        self.stb.update()
+    fn set_stabilization(&mut self, step: usize, step_max: usize) {
+        self.stb_step = step;
+        self.stb_step_max = step_max;
     }
     #[cfg(not(feature = "Luby_stabilization"))]
-    fn stabilize(&mut self) -> Option<bool> {
+    fn set_stabilization(&mut self, _: usize, _: usize) -> Option<bool> {
         None
     }
     #[cfg(feature = "dynamic_restart_threshold")]
@@ -524,32 +434,17 @@ pub mod property {
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tusize {
         NumBlock,
-        NumCycle,
         NumRestart,
-        NumStage,
-        IntervalScale,
-        IntervalScaleMax,
     }
 
-    pub const USIZES: [Tusize; 6] = [
-        Tusize::NumBlock,
-        Tusize::NumCycle,
-        Tusize::NumRestart,
-        Tusize::NumStage,
-        Tusize::IntervalScale,
-        Tusize::IntervalScaleMax,
-    ];
+    pub const USIZES: [Tusize; 2] = [Tusize::NumBlock, Tusize::NumRestart];
 
     impl PropertyDereference<Tusize, usize> for Restarter {
         #[inline]
         fn derefer(&self, k: Tusize) -> usize {
             match k {
                 Tusize::NumBlock => self.num_block,
-                Tusize::NumCycle => self.stb.num_cycle,
                 Tusize::NumRestart => self.num_restart,
-                Tusize::NumStage => self.stb.num_stage,
-                Tusize::IntervalScale => self.stb.step,
-                Tusize::IntervalScaleMax => self.stb.step_max,
             }
         }
     }

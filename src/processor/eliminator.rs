@@ -7,8 +7,8 @@ use {
     crate::{
         assign::{self, AssignIF},
         cdb::{self, ClauseDBIF},
-        solver::{restart, restart::RestartIF, SolverEvent},
-        state::{State, StateIF},
+        solver::{restart::RestartIF, SolverEvent},
+        state::{self, State, StateIF},
         types::*,
     },
     std::{
@@ -288,7 +288,7 @@ impl EliminateIF for Eliminator {
             }
         }
         if self.enable {
-            self.eliminate_grow_limit = rst.derefer(restart::property::Tusize::IntervalScale) / 2;
+            self.eliminate_grow_limit = state.derefer(state::property::Tusize::IntervalScale) / 2;
             self.subsume_literal_limit = (state.config.elm_cls_lim
                 + cdb.derefer(cdb::property::Tf64::DpAverageLBD) as usize)
                 / 2;

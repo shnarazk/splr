@@ -6,14 +6,13 @@ use {
     super::{
         conflict::handle_conflict,
         restart::{self, ProgressUpdate, RestartDecision, RestartIF, Restarter},
-        stage::StageManager,
         Certificate, Solver, SolverEvent, SolverResult,
     },
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
         cdb::{self, ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
-        state::{Stat, State, StateIF},
+        state::{self, Stat, State, StateIF},
         types::*,
     },
 };
@@ -250,11 +249,6 @@ fn search(
 ) -> Result<bool, SolverError> {
     #[cfg(feature = "clause_elimination")]
     let mut next_elimination = 0;
-    // let keep_clauses = 100;
-    let mut stage_manager = StageManager::new(
-        (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
-    );
-    let _next_reduction = stage_manager.current_span();
     let mut num_learnt = 0;
 
     #[cfg(feature = "strategy_adaptation")]
@@ -263,6 +257,9 @@ fn search(
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
 
+    state.stm.initialize(
+        (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
+    );
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
             let lit = asg.select_decision_literal();
@@ -296,7 +293,7 @@ fn search(
             rst.update(ProgressUpdate::ASG(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
             ));
-            if stage_manager.stage_ended(num_learnt) {
+            if state.stm.stage_ended(num_learnt) {
                 if let Some(p) = state.elapsed() {
                     if 1.0 <= p {
                         return Err(SolverError::TimeOut);
@@ -305,8 +302,8 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
                 RESTART!(asg, rst);
-                cdb.reduce(asg, stage_manager.num_reducible());
-                stage_manager.prepare_new_stage(
+                cdb.reduce(asg, state.stm.num_reducible());
+                state.stm.prepare_new_stage(
                     (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt()
                         as usize,
                     num_learnt,
@@ -320,7 +317,7 @@ fn search(
 
                 #[cfg(feature = "clause_elimination")]
                 {
-                    if stage_manager.num_stage() == next_elimination {
+                    if state.stm.current_stage() == next_elimination {
                         elim.activate();
                         elim.simplify(asg, cdb, rst, state)?;
                         state[Stat::NumProcessor] += 1;
@@ -339,7 +336,7 @@ fn search(
                         asg.derefer(assign::property::Tusize::NumUnreachableVar),
                         asg.refer(assign::property::TEma::PropagationPerConflict)
                             .get(),
-                        rst.derefer(restart::property::Tusize::IntervalScale),
+                        state.derefer(state::property::Tusize::IntervalScale),
                         rst.derefer(restart::property::Tf64::RestartThreshold),
                     ),
                 );
@@ -348,7 +345,7 @@ fn search(
                 #[cfg(feature = "Luby_stabilization")]
                 {
                     #[cfg(feature = "dynamic_restart_threshold")]
-                    if 1 == rst.derefer(restart::property::Tusize::IntervalScale) {
+                    if 1 == state.derefer(state::property::Tusize::IntervalScale) {
                         rst.adjust(
                             state.config.rst_lbd_thr,
                             state.c_lvl.get(),
@@ -357,12 +354,10 @@ fn search(
                         );
                     }
 
-                    if rst.stabilize() == Some(true) {
-                        stabilization_age += 1;
-                    }
+                    rst.set_stabilization(state.stm.current_scale(), state.stm.max_scale());
                     // call the enhanced phase saver
                     asg.handle(SolverEvent::Stabilize(
-                        rst.derefer(restart::property::Tusize::IntervalScale),
+                        state.derefer(state::property::Tusize::IntervalScale),
                     ));
                 };
             } else if rst.restart() == Some(RestartDecision::Force) {
