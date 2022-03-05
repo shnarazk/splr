@@ -12,7 +12,7 @@ use {
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
         cdb::{self, ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
-        state::{self, Stat, State, StateIF},
+        state::{Stat, State, StateIF},
         types::*,
     },
 };
@@ -336,7 +336,7 @@ fn search(
                         asg.derefer(assign::property::Tusize::NumUnreachableVar),
                         asg.refer(assign::property::TEma::PropagationPerConflict)
                             .get(),
-                        state.derefer(state::property::Tusize::IntervalScale),
+                        state.stm.current_scale(),
                         rst.derefer(restart::property::Tf64::RestartThreshold),
                     ),
                 );
@@ -344,8 +344,9 @@ fn search(
 
                 #[cfg(feature = "Luby_stabilization")]
                 {
+                    let scale = state.stm.current_scale();
                     #[cfg(feature = "dynamic_restart_threshold")]
-                    if 1 == state.derefer(state::property::Tusize::IntervalScale) {
+                    if 1 == scale {
                         rst.adjust(
                             state.config.rst_lbd_thr,
                             state.c_lvl.get(),
@@ -356,10 +357,8 @@ fn search(
 
                     rst.set_sensibility(state.stm.current_scale(), state.stm.max_scale());
                     // call the enhanced phase saver
-                    asg.handle(SolverEvent::Stabilize(
-                        state.derefer(state::property::Tusize::IntervalScale),
-                    ));
-                };
+                    asg.handle(SolverEvent::Stabilize(scale));
+                }
             } else if rst.restart() == Some(RestartDecision::Force) {
                 RESTART!(asg, rst);
             }

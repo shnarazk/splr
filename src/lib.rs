@@ -69,7 +69,6 @@ pub use {
     config::Config,
     solver::{Certificate, SatSolverIF, SolveIF, Solver, ValidateIF},
     splr_ema::*,
-    splr_luby::LubySeries,
     types::{PropertyDereference, PropertyReference, SolverError},
 };
 
