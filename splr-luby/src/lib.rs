@@ -5,6 +5,7 @@ pub struct LubySeries {
     index: usize,
     seq: isize,
     size: usize,
+    max_value: usize,
 }
 
 impl Default for LubySeries {
@@ -13,6 +14,7 @@ impl Default for LubySeries {
             index: 0,
             seq: 0,
             size: 1,
+            max_value: 1,
         }
     }
 }
@@ -43,7 +45,11 @@ impl Iterator for LubySeries {
             seq -= 1;
             index %= size;
         }
-        NonZeroU32::new(2usize.pow(seq as u32) as u32)
+        let val = 2usize.pow(seq as u32);
+        if self.max_value < val {
+            self.max_value = val;
+        }
+        NonZeroU32::new(val as u32)
     }
 }
 
@@ -64,7 +70,14 @@ impl LubySeries {
             seq -= 1;
             index %= size;
         }
-        2usize.pow(seq as u32)
+        let val = 2usize.pow(seq as u32);
+        if self.max_value < val {
+            self.max_value = val;
+        }
+        val
+    }
+    pub fn max_value(&self) -> usize {
+        self.max_value
     }
     pub fn reset(&mut self) {
         self.index = 0;
@@ -72,7 +85,6 @@ impl LubySeries {
         self.size = 1;
     }
 }
-
 
 #[cfg(test)]
 mod tests {
