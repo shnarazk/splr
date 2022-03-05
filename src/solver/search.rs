@@ -308,6 +308,7 @@ fn search(
                         as usize,
                     num_learnt,
                 );
+                let scale = state.stm.current_scale();
 
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
@@ -336,7 +337,7 @@ fn search(
                         asg.derefer(assign::property::Tusize::NumUnreachableVar),
                         asg.refer(assign::property::TEma::PropagationPerConflict)
                             .get(),
-                        state.stm.current_scale(),
+                        scale,
                         rst.derefer(restart::property::Tf64::RestartThreshold),
                     ),
                 );
@@ -344,7 +345,6 @@ fn search(
 
                 #[cfg(feature = "Luby_stabilization")]
                 {
-                    let scale = state.stm.current_scale();
                     #[cfg(feature = "dynamic_restart_threshold")]
                     if 1 == scale {
                         rst.adjust(
@@ -355,7 +355,7 @@ fn search(
                         );
                     }
 
-                    rst.set_sensibility(state.stm.current_scale(), state.stm.max_scale());
+                    rst.set_sensibility(scale, state.stm.max_scale());
                     // call the enhanced phase saver
                     asg.handle(SolverEvent::Stabilize(scale));
                 }
