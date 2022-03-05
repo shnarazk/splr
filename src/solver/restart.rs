@@ -35,7 +35,7 @@ pub trait RestartIF:
     /// check blocking and forcing restart condition.
     fn restart(&mut self) -> Option<RestartDecision>;
     /// set stabilization parameters
-    fn set_stabilization(&mut self, step: usize, step_max: usize);
+    fn set_sensibility(&mut self, step: usize, step_max: usize);
     #[cfg(feature = "dynamic_restart_threshold")]
     /// adjust restart threshold
     fn adjust(&mut self, base: f64, c_lvl: f64, b_lvl: f64, used: f64);
@@ -374,7 +374,7 @@ impl RestartIF for Restarter {
         None
     }
     #[cfg(feature = "Luby_stabilization")]
-    fn set_stabilization(&mut self, step: usize, step_max: usize) {
+    fn set_sensibility(&mut self, step: usize, step_max: usize) {
         self.stb_step = step;
         self.stb_step_max = step_max;
     }

@@ -354,7 +354,7 @@ fn search(
                         );
                     }
 
-                    rst.set_stabilization(state.stm.current_scale(), state.stm.max_scale());
+                    rst.set_sensibility(state.stm.current_scale(), state.stm.max_scale());
                     // call the enhanced phase saver
                     asg.handle(SolverEvent::Stabilize(
                         state.derefer(state::property::Tusize::IntervalScale),
