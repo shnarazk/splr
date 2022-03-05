@@ -129,7 +129,7 @@ pub trait ClauseDBIF:
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize, scale: u16);
+    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize);
     /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.

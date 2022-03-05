@@ -7,12 +7,14 @@ mod conflict;
 pub mod restart;
 /// CDCL search engine
 mod search;
+/// Stage manger (was Stabilizer)
+mod stage;
 /// Crate `validate` implements a model checker.
 mod validate;
 
 pub use self::{
     build::SatSolverIF,
-    restart::{property::*, RestartIF, RestartMode, Restarter},
+    restart::{property::*, RestartIF, Restarter},
     search::SolveIF,
     validate::ValidateIF,
 };

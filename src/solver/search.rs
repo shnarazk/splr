@@ -6,6 +6,7 @@ use {
     super::{
         conflict::handle_conflict,
         restart::{self, ProgressUpdate, RestartDecision, RestartIF, Restarter},
+        stage::StageManager,
         Certificate, Solver, SolverEvent, SolverResult,
     },
     crate::{
@@ -15,7 +16,6 @@ use {
         state::{Stat, State, StateIF},
         types::*,
     },
-    splr_luby::LubySeries,
 };
 
 /// API to [`solve`](`crate::solver::SolveIF::solve`) SAT problems.
@@ -250,13 +250,11 @@ fn search(
 ) -> Result<bool, SolverError> {
     #[cfg(feature = "clause_elimination")]
     let mut next_elimination = 0;
-    let keep_clauses = 100;
-    let luby_scaling = 200;
-    let mut stabilization_age = 1;
-    let mut luby_iter = LubySeries::default();
-    let mut luby: usize = 1;
-    let mut increase = luby_scaling * luby + keep_clauses;
-    let mut next_reduction = increase;
+    // let keep_clauses = 100;
+    let mut stage_manager = StageManager::new(
+        (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
+    );
+    let _next_reduction = stage_manager.current_span();
     let mut num_learnt = 0;
 
     #[cfg(feature = "strategy_adaptation")]
@@ -298,7 +296,7 @@ fn search(
             rst.update(ProgressUpdate::ASG(
                 asg.derefer(assign::property::Tusize::NumUnassignedVar),
             ));
-            if next_reduction < num_learnt {
+            if stage_manager.stage_ended(num_learnt) {
                 if let Some(p) = state.elapsed() {
                     if 1.0 <= p {
                         return Err(SolverError::TimeOut);
@@ -307,14 +305,12 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
                 RESTART!(asg, rst);
-                let luby_scale = (increase / luby_scaling)
-                    .next_power_of_two()
-                    .trailing_zeros() as u16
-                    - 1;
-                cdb.reduce(asg, increase - keep_clauses, luby_scale);
-                luby = luby_iter.next_unchecked();
-                increase = stabilization_age * luby_scaling * luby;
-                next_reduction = num_learnt + increase;
+                cdb.reduce(asg, stage_manager.num_reducible());
+                stage_manager.prepare_new_stage(
+                    (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt()
+                        as usize,
+                    num_learnt,
+                );
 
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
@@ -324,8 +320,7 @@ fn search(
 
                 #[cfg(feature = "clause_elimination")]
                 {
-                    let num_stage = rst.derefer(restart::property::Tusize::NumStage);
-                    if num_stage == next_elimination {
+                    if stage_manager.num_stage() == next_elimination {
                         elim.activate();
                         elim.simplify(asg, cdb, rst, state)?;
                         state[Stat::NumProcessor] += 1;
