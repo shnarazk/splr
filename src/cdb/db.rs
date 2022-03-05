@@ -969,7 +969,7 @@ impl ClauseDBIF for ClauseDB {
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize, scale: u16) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize) {
         impl Clause {
             fn pure_weight(&self, asg: &mut impl AssignIF) -> f64 {
                 let act_v = self
@@ -998,8 +998,8 @@ impl ClauseDBIF for ClauseDB {
                 self.pure_weight(asg)
             }
             // copied from vivify.rs
-            fn is_vivify_target(&self, scale: u16) -> bool {
-                self.rank * 2 + scale <= self.rank_old
+            fn is_vivify_target(&self) -> bool {
+                self.rank * 2 <= self.rank_old
             }
         }
         let ClauseDB {
@@ -1055,7 +1055,7 @@ impl ClauseDBIF for ClauseDB {
         let thr = self.lbd_of_dp_ema.get() as u16 * 2;
         for i in &perm[keep..] {
             let c = &self.clause[i.to()];
-            if !c.is_vivify_target(scale) || thr < c.rank {
+            if !c.is_vivify_target() || thr < c.rank {
                 self.remove_clause(ClauseId::from(i.to()));
             }
         }
