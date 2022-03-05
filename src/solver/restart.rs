@@ -375,8 +375,8 @@ impl RestartIF for Restarter {
     }
     #[cfg(feature = "Luby_stabilization")]
     fn set_sensibility(&mut self, step: usize, step_max: usize) {
-        self.stb_step = step;
-        self.stb_step_max = step_max;
+        self.stb_step = step; // * step;
+        self.stb_step_max = step_max; //  * step_max;
     }
     #[cfg(not(feature = "Luby_stabilization"))]
     fn set_stabilization(&mut self, _: usize, _: usize) -> Option<bool> {

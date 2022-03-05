@@ -248,7 +248,6 @@ fn search(
     state: &mut State,
 ) -> Result<bool, SolverError> {
     #[cfg(feature = "clause_elimination")]
-    let mut next_elimination = 0;
     let mut num_learnt = 0;
 
     #[cfg(feature = "strategy_adaptation")]
@@ -303,32 +302,31 @@ fn search(
                 }
                 RESTART!(asg, rst);
                 cdb.reduce(asg, state.stm.num_reducible());
-                state.stm.prepare_new_stage(
-                    (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt()
-                        as usize,
-                    num_learnt,
-                );
-                let scale = state.stm.current_scale();
 
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
 
-                #[cfg(feature = "clause_vivification")]
-                cdb.vivify(asg, rst, state)?;
+                if let Some(new_stage) = state.stm.prepare_new_stage(
+                    (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt()
+                        as usize,
+                    num_learnt,
+                ) {
+                    #[cfg(feature = "clause_vivification")]
+                    cdb.vivify(asg, rst, state)?;
 
-                #[cfg(feature = "clause_elimination")]
-                {
-                    if state.stm.current_stage() == next_elimination {
-                        elim.activate();
-                        elim.simplify(asg, cdb, rst, state)?;
-                        state[Stat::NumProcessor] += 1;
-                        next_elimination += 1.4f64
-                            .powi(cdb.derefer(cdb::property::Tusize::NumClause) as i32 / 40_000)
-                            as usize;
+                    #[cfg(feature = "clause_elimination")]
+                    {
+                        if new_stage {
+                            elim.activate();
+                            elim.simplify(asg, cdb, rst, state)?;
+                            state[Stat::NumProcessor] += 1;
+                        }
                     }
                 }
 
                 asg.clear_asserted_literals(cdb)?;
+
+                let scale = state.stm.current_scale();
                 // display the current stats. before updating stabiliation parameters
                 state.log(
                     asg.num_conflict,
