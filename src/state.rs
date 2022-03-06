@@ -270,6 +270,7 @@ impl Instantiate for State {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> State {
         State {
             config: config.clone(),
+            stm: StageManager::instantiate(config, cnf),
 
             #[cfg(feature = "strategy_adaptation")]
             strategy: (SearchStrategy::Initial, 0),

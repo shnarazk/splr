@@ -5,7 +5,7 @@ use {
         watch_cache::*,
         BinaryLinkDB, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId, RefClause,
     },
-    crate::{assign::AssignIF, solver::SolverEvent, types::*},
+    crate::{assign::AssignIF, types::*},
     std::{
         num::NonZeroU32,
         ops::{Index, IndexMut, Range, RangeFrom},

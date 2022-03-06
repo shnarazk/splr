@@ -6,7 +6,7 @@ use {
         AssignIF, AssignStack, TrailSavingIF, Var, VarHeapIF, VarIdHeap, VarManipulateIF,
         VarSelectIF,
     },
-    crate::{cdb::ClauseDBIF, solver::SolverEvent, types::*},
+    crate::{cdb::ClauseDBIF, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
 

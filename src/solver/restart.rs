@@ -1,9 +1,5 @@
 //! Crate `restart` provides restart heuristics.
-use {
-    crate::{solver::SolverEvent, types::*},
-    splr_luby::LubySeries,
-    std::fmt,
-};
+use {crate::types::*, splr_luby::LubySeries, std::fmt};
 
 /// API for restart condition.
 trait ProgressEvaluator {

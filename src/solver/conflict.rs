@@ -11,7 +11,6 @@ use {
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
-        solver::SolverEvent,
         types::*,
     },
 };

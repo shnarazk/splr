@@ -1,22 +1,20 @@
 /// Crate `types' provides various building blocks, including
 /// some common traits.
-use {
-    crate::solver::SolverEvent,
-    std::{
-        cmp::Ordering,
-        fmt,
-        fs::File,
-        io::{BufRead, BufReader},
-        num::NonZeroU32,
-        ops::{Index, IndexMut, Not},
-        path::{Path, PathBuf},
-    },
+use std::{
+    cmp::Ordering,
+    fmt,
+    fs::File,
+    io::{BufRead, BufReader},
+    num::NonZeroU32,
+    ops::{Index, IndexMut, Not},
+    path::{Path, PathBuf},
 };
 pub use {
     crate::{
         assign::AssignReason,
         cdb::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
         config::Config,
+        solver::SolverEvent,
     },
     splr_ema::*,
 };

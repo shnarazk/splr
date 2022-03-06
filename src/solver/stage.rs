@@ -2,7 +2,7 @@
 /// I define it as a 'search mode', or stage, changer.
 /// A stage is a span sharing same restart parameters.
 /// And it also define the interval of clause reduction.
-use splr_luby::LubySeries;
+use {crate::types::*, splr_luby::LubySeries};
 
 #[derive(Clone, Debug, Default)]
 pub struct StageManager {
@@ -13,6 +13,20 @@ pub struct StageManager {
     luby_iter: LubySeries,
     factor: usize,
     threshold: usize,
+}
+
+impl Instantiate for StageManager {
+    fn instantiate(_: &Config, cnf: &CNFDescription) -> StageManager {
+        let scale = (cnf.num_of_variables as f64).sqrt() as usize;
+        StageManager {
+            cycle: 1,
+            scale,
+            factor: 1,
+            threshold: scale,
+            ..StageManager::default()
+        }
+    }
+    fn handle(&mut self, _: SolverEvent) {}
 }
 
 impl StageManager {
