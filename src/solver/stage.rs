@@ -12,7 +12,7 @@ pub struct StageManager {
     #[cfg(feature = "Luby_stabilization")]
     luby_iter: LubySeries,
     factor: usize,
-    threshold: usize,
+    end_of_stage: usize,
 }
 
 impl Instantiate for StageManager {
@@ -22,7 +22,7 @@ impl Instantiate for StageManager {
             cycle: 1,
             scale,
             factor: 1,
-            threshold: scale,
+            end_of_stage: scale,
             ..StageManager::default()
         }
     }
@@ -38,14 +38,14 @@ impl StageManager {
             #[cfg(feature = "Luby_stabilization")]
             luby_iter: LubySeries::default(),
             factor: 1,
-            threshold: scale,
+            end_of_stage: scale,
         }
     }
     pub fn initialize(&mut self, scale: usize) {
         self.cycle = 1;
         self.scale = scale;
         self.factor = 1;
-        self.threshold = scale;
+        self.end_of_stage = scale;
     }
     /// return:
     /// - Some(true): it's a beginning of a new cycle and a new 2nd-level cycle.
@@ -64,7 +64,7 @@ impl StageManager {
             }
             self.stage += 1;
             let span = self.current_span();
-            self.threshold = now + span;
+            self.end_of_stage = now + span;
             new_cycle.then(|| old_factor == self.luby_iter.max_value())
         }
         #[cfg(not(feature = "Luby_stabilization"))]
@@ -77,7 +77,7 @@ impl StageManager {
         }
     }
     pub fn stage_ended(&self, now: usize) -> bool {
-        self.threshold < now
+        self.end_of_stage < now
     }
     /// return the number of conflicts in the current stage
     pub fn current_span(&self) -> usize {
