@@ -30,7 +30,7 @@ impl Default for Eliminator {
             bwdsub_assigns: 0,
             elim_lits: Vec::new(),
             eliminate_var_occurrence_limit: 1_000,
-            eliminate_combination_limit: 2.0,
+            eliminate_combination_limit: 0.0,
             eliminate_grow_limit: 0, // 64
             eliminate_occurrence_limit: 800,
             subsume_literal_limit: 100,
@@ -289,14 +289,13 @@ impl EliminateIF for Eliminator {
         }
         if self.enable {
             self.eliminate_grow_limit = state.derefer(state::property::Tusize::IntervalScale) / 2;
-            self.subsume_literal_limit = (state.config.elm_cls_lim
-                + cdb.derefer(cdb::property::Tf64::DpAverageLBD) as usize)
-                / 2;
+            self.subsume_literal_limit =
+                state.config.elm_cls_lim + cdb.derefer(cdb::property::Tf64::DpAverageLBD) as usize;
             if self.is_waiting() {
                 self.prepare(asg, cdb, true);
             }
             debug_assert!(!cdb.derefer(cdb::property::Tf64::DpAverageLBD).is_nan());
-            self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
+            // self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
             self.eliminate(asg, cdb, rst, state)?;
             if self.is_running() {
                 self.stop(asg, cdb);
