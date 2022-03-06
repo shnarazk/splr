@@ -8,21 +8,21 @@ use {crate::types::*, splr_luby::LubySeries};
 pub struct StageManager {
     cycle: usize,
     stage: usize,
-    scale: usize,
+    unit_size: usize,
     #[cfg(feature = "Luby_stabilization")]
     luby_iter: LubySeries,
-    factor: usize,
+    scale: usize,
     end_of_stage: usize,
 }
 
 impl Instantiate for StageManager {
     fn instantiate(_: &Config, cnf: &CNFDescription) -> StageManager {
-        let scale = (cnf.num_of_variables as f64).sqrt() as usize;
+        let unit_size = (cnf.num_of_variables as f64).sqrt() as usize;
         StageManager {
             cycle: 1,
-            scale,
-            factor: 1,
-            end_of_stage: scale,
+            unit_size,
+            scale: 1,
+            end_of_stage: unit_size,
             ..StageManager::default()
         }
     }
@@ -30,49 +30,49 @@ impl Instantiate for StageManager {
 }
 
 impl StageManager {
-    pub fn new(scale: usize) -> Self {
+    pub fn new(unit_size: usize) -> Self {
         StageManager {
             cycle: 1,
             stage: 0,
-            scale,
+            unit_size,
             #[cfg(feature = "Luby_stabilization")]
             luby_iter: LubySeries::default(),
-            factor: 1,
-            end_of_stage: scale,
+            scale: 1,
+            end_of_stage: unit_size,
         }
     }
-    pub fn initialize(&mut self, scale: usize) {
+    pub fn initialize(&mut self, unit_size: usize) {
         self.cycle = 1;
-        self.scale = scale;
-        self.factor = 1;
-        self.end_of_stage = scale;
+        self.unit_size = unit_size;
+        self.scale = 1;
+        self.end_of_stage = unit_size;
     }
     /// return:
     /// - Some(true): it's a beginning of a new cycle and a new 2nd-level cycle.
     /// - Some(false): a beginning of a new cycle.
     /// - None: the other case.
     pub fn prepare_new_stage(&mut self, rescale: usize, now: usize) -> Option<bool> {
-        self.scale = rescale;
+        self.unit_size = rescale;
         #[cfg(feature = "Luby_stabilization")]
         {
             let mut new_cycle = false;
-            let old_factor = self.factor;
-            self.factor = self.luby_iter.next_unchecked();
-            if self.factor == 1 {
+            let old_scale = self.scale;
+            self.scale = self.luby_iter.next_unchecked();
+            if self.scale == 1 {
                 self.cycle += 1;
                 new_cycle = true;
             }
             self.stage += 1;
             let span = self.current_span();
             self.end_of_stage = now + span;
-            new_cycle.then(|| old_factor == self.luby_iter.max_value())
+            new_cycle.then(|| old_scale == self.luby_iter.max_value())
         }
         #[cfg(not(feature = "Luby_stabilization"))]
         {
-            self.factor *= 2;
+            self.scale *= 2;
             self.stage += 1;
             let span = self.current_span();
-            self.threshold = now + span;
+            self.end_of_stage = now + span;
             None
         }
     }
@@ -81,12 +81,13 @@ impl StageManager {
     }
     /// return the number of conflicts in the current stage
     pub fn current_span(&self) -> usize {
-        self.cycle * self.scale
+        self.cycle * self.unit_size
     }
     pub fn num_reducible(&self) -> usize {
         // self.current_span() - self.scale / 2
-        self.current_span() - 2 * (self.current_span() as f64).sqrt() as usize
         // self.current_span().saturating_sub(100)
+        let num_keep = 2 * (self.current_span() as f64).sqrt() as usize;
+        self.current_span() - num_keep
     }
     pub fn current_stage(&self) -> usize {
         self.stage
@@ -94,9 +95,9 @@ impl StageManager {
     pub fn current_cycle(&self) -> usize {
         self.cycle
     }
-    /// return the factor of the current span
+    /// return the scaling factor used in the current span
     pub fn current_scale(&self) -> usize {
-        self.factor
+        self.scale
     }
     /// return the maximum factor so far.
     #[cfg(feature = "Luby_stabilization")]
@@ -105,6 +106,6 @@ impl StageManager {
     }
     #[cfg(not(feature = "Luby_stabilization"))]
     pub fn max_scale(&self) -> usize {
-        self.factor
+        self.scale
     }
 }
