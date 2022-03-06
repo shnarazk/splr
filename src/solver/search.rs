@@ -10,7 +10,7 @@ use {
     },
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
-        cdb::{self, ClauseDB, ClauseDBIF},
+        cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
         types::*,
@@ -301,7 +301,11 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
                 RESTART!(asg, rst);
-                cdb.reduce(asg, state.stm.num_reducible());
+                cdb.reduce(
+                    asg,
+                    state.stm.num_reducible(),
+                    rst.refer(restart::property::TEma2::LBD).get_slow(),
+                );
 
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
@@ -349,7 +353,7 @@ fn search(
                             state.config.rst_lbd_thr,
                             state.c_lvl.get(),
                             state.b_lvl.get(),
-                            cdb.derefer(cdb::property::Tf64::DpAverageLBD),
+                            cdb.derefer(crate::cdb::property::Tf64::DpAverageLBD),
                         );
                     }
 

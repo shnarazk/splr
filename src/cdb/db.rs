@@ -969,7 +969,7 @@ impl ClauseDBIF for ClauseDB {
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize, average_lbd: f64) {
         impl Clause {
             fn pure_weight(&self, asg: &mut impl AssignIF) -> f64 {
                 let act_v = self
@@ -1052,7 +1052,7 @@ impl ClauseDBIF for ClauseDB {
         // there're exception. Since this is the pre-stage of clause vivification,
         // we want keep usefull clauses as many as possible.
         // Therefore I save the clauses which will become vivification targets.
-        let thr = self.lbd_of_dp_ema.get() as u16 * 2;
+        let thr = ((average_lbd + self.lbd_of_dp_ema.get()) as u16).max(4);
         for i in &perm[keep..] {
             let c = &self.clause[i.to()];
             if !c.is_vivify_target() || thr < c.rank {
