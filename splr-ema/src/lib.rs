@@ -32,8 +32,10 @@ pub trait EmaMutIF: EmaIF {
     fn reset(&mut self) {}
     /// catch up with the current state.
     fn update(&mut self, x: Self::Input);
-    // return a view.
+    /// return a view.
     fn as_view(&self) -> &EmaView;
+    /// set value.
+    fn set_value(&mut self, _x: f64) {}
 }
 
 #[derive(Clone, Debug)]
@@ -94,6 +96,10 @@ impl EmaMutIF for Ema {
     fn as_view(&self) -> &EmaView {
         &self.val
     }
+    fn set_value(&mut self, x: f64) {
+        self.val.fast = x;
+        self.val.slow = x;
+    }
 }
 
 impl Ema {
@@ -107,6 +113,12 @@ impl Ema {
             cal: 0.0,
             sca: 1.0 / (s as f64),
         }
+    }
+    /// set value.
+    pub fn with_value(mut self, x: f64) -> Ema {
+        self.val.fast = x;
+        self.val.slow = x;
+        self
     }
 }
 
