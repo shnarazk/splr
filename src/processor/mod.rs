@@ -22,8 +22,8 @@
 //!```
 
 mod eliminate;
-mod eliminator;
 mod heap;
+mod simplify;
 mod subsume;
 
 use {

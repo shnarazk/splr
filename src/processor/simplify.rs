@@ -30,7 +30,6 @@ impl Default for Eliminator {
             bwdsub_assigns: 0,
             elim_lits: Vec::new(),
             eliminate_var_occurrence_limit: 1_000,
-            eliminate_combination_limit: 0.0,
             eliminate_grow_limit: 0, // 64
             eliminate_occurrence_limit: 800,
             subsume_literal_limit: 100,
