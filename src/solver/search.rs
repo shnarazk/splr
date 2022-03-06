@@ -185,18 +185,10 @@ impl SolveIF for Solver {
                 #[cfg(feature = "boundary_check")]
                 check(asg, cdb, true, "Before extending the model");
 
-                #[cfg(fueature = "boundary_check")]
-                check(asg, cdb, true, "Before extending the model");
-
                 let model = asg.extend_model(cdb, elim.eliminated_lits());
 
-                #[cfg(fueature = "boundary_check")]
-                check(
-                    asg,
-                    cdb,
-                    true,
-                    "After extending the model, (passed before extending)",
-                );
+                #[cfg(feature = "boundary_check")]
+                check(asg, cdb, true, "After extending the model");
 
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
