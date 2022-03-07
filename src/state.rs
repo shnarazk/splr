@@ -42,7 +42,8 @@ pub trait StateIF {
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
-            + PropertyDereference<cdb::property::Tf64, f64>,
+            + PropertyDereference<cdb::property::Tf64, f64>
+            + PropertyReference<cdb::property::TEma, EmaView>,
         E: PropertyDereference<processor::property::Tusize, usize>,
         R: PropertyDereference<solver::restart::property::Tusize, usize>
             + PropertyReference<solver::restart::property::TEma2, EmaView>;
@@ -463,7 +464,8 @@ impl StateIF for State {
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
-            + PropertyDereference<cdb::property::Tf64, f64>,
+            + PropertyDereference<cdb::property::Tf64, f64>
+            + PropertyReference<cdb::property::TEma, EmaView>,
         E: PropertyDereference<processor::property::Tusize, usize>,
         R: PropertyDereference<solver::restart::property::Tusize, usize>
             + PropertyReference<solver::restart::property::TEma2, EmaView>,
@@ -505,7 +507,7 @@ impl StateIF for State {
         let rst_int_scl: usize = self.stm.current_scale();
         let rst_int_scl_max: usize = self.stm.max_scale();
         let rst_asg: &EmaView = rst.refer(solver::restart::property::TEma2::ASG);
-        let rst_lbd: &EmaView = rst.refer(solver::restart::property::TEma2::LBD);
+        let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -667,7 +669,8 @@ impl State {
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
-            + PropertyDereference<cdb::property::Tf64, f64>,
+            + PropertyDereference<cdb::property::Tf64, f64>
+            + PropertyReference<cdb::property::TEma, EmaView>,
         E: PropertyDereference<processor::property::Tusize, usize>,
         R: PropertyDereference<solver::restart::property::Tusize, usize>
             + PropertyReference<solver::restart::property::TEma2, EmaView>,
@@ -701,7 +704,7 @@ impl State {
         self[LogUsizeId::VivifiedClause] = self[Stat::VivifiedClause];
         self[LogUsizeId::VivifiedVar] = self[Stat::VivifiedVar];
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
-        let rst_lbd: &EmaView = rst.refer(solver::restart::property::TEma2::LBD);
+        let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
         self[LogF64Id::EmaLBD] = rst_lbd.get_fast();
         self[LogF64Id::TrendLBD] = rst_lbd.trend();
 
@@ -869,7 +872,8 @@ impl State {
     fn dump_details<'r, A, C, E, R, V>(&mut self, asg: &A, cdb: &C, rst: &'r R)
     where
         A: PropertyDereference<assign::property::Tusize, usize>,
-        C: PropertyDereference<cdb::property::Tusize, usize>,
+        C: PropertyDereference<cdb::property::Tusize, usize>
+            + PropertyReference<cdb::property::TEma, EmaView>,
         R: PropertyDereference<solver::restart::property::Tusize, usize>
             + PropertyReference<solver::restart::property::TEma2, Ema2>,
     {
@@ -884,7 +888,7 @@ impl State {
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
         let rst_num_block = rst.derefer(solver::restart::property::Tusize::NumBlock);
         let rst_asg = rst.refer(solver::restart::property::TEma2::ASG);
-        let rst_lbd = rst.refer(solver::restart::property::TEma2::LBD);
+        let rst_lbd = cdb.refer(cdb::property::TEma::LBD);
 
         println!(
             "{:>3},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\

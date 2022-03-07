@@ -5,7 +5,7 @@ use {
         watch_cache::*,
         BinaryLinkDB, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId, RefClause,
     },
-    crate::{assign::AssignIF, types::*},
+    crate::{assign::AssignIF, cdb::ema::ProgressLBD, types::*},
     std::{
         num::NonZeroU32,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -35,6 +35,8 @@ impl Default for ClauseDB {
             activity_anti_decay: 0.01,
 
             lbd_temp: Vec::new(),
+            lbd: ProgressLBD::default(),
+
             num_clause: 0,
             num_bi_clause: 0,
             num_bi_learnt: 0,
@@ -383,6 +385,7 @@ impl ClauseDBIF for ClauseDB {
             // assert!(2 < c.lits.len());
             watch_cache[!l0].insert_watch(cid, l1);
             watch_cache[!l1].insert_watch(cid, l0);
+            self.lbd.update(c.rank);
         }
         RefClause::Clause(cid)
     }

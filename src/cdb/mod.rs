@@ -8,6 +8,8 @@ mod cid;
 mod clause;
 /// methods on `ClauseDB`
 mod db;
+/// EMA
+mod ema;
 /// methods for UNSAT certification
 mod unsat_certificate;
 /// implementation of clause vivification
@@ -24,6 +26,7 @@ pub use self::{
     unsat_certificate::CertificationStore,
 };
 use {
+    self::ema::ProgressLBD,
     crate::{assign::AssignIF, types::*},
     std::{
         num::NonZeroU32,
@@ -258,6 +261,7 @@ pub struct ClauseDB {
     //
     /// a working buffer for LBD calculation
     lbd_temp: Vec<usize>,
+    lbd: ProgressLBD,
 
     //
     //## statistics
@@ -348,6 +352,20 @@ pub mod property {
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
                 Tf64::LiteralBlockEntanglement => self.lb_entanglement.get(),
+            }
+        }
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    pub enum TEma {
+        LBD,
+    }
+
+    impl PropertyReference<TEma, EmaView> for ClauseDB {
+        #[inline]
+        fn refer(&self, k: TEma) -> &EmaView {
+            match k {
+                TEma::LBD => &self.lbd.as_view(),
             }
         }
     }

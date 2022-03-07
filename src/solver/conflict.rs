@@ -195,7 +195,6 @@ pub fn handle_conflict(
                 assign_level,
             );
             // || check_graph(asg, cdb, l0, "biclause");
-            rst.update(ProgressUpdate::LBD(1));
             for cid in &state.derive20 {
                 cdb[cid].turn_on(FlagClause::DERIVE20);
             }
@@ -217,7 +216,6 @@ pub fn handle_conflict(
             );
             // || check_graph(asg, cdb, l0, "clause");
             rank = cdb[cid].rank;
-            rst.update(ProgressUpdate::LBD(rank));
             if rank <= 20 {
                 for cid in &state.derive20 {
                     cdb[cid].turn_on(FlagClause::DERIVE20);

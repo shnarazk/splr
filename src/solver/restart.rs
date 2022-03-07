@@ -15,7 +15,6 @@ trait ProgressEvaluator {
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum ProgressUpdate {
     ASG(usize),
-    LBD(u16),
     Counter,
 
     #[cfg(feature = "Luby_restart")]
@@ -29,7 +28,7 @@ pub trait RestartIF:
     + PropertyReference<property::TEma2, EmaView>
 {
     /// check blocking and forcing restart condition.
-    fn restart(&mut self) -> Option<RestartDecision>;
+    fn restart(&mut self, lbd: &EmaView) -> Option<RestartDecision>;
     /// set stabilization parameters
     fn set_sensibility(&mut self, step: usize, step_max: usize);
     #[cfg(feature = "dynamic_restart_threshold")]
@@ -44,7 +43,6 @@ pub trait RestartIF:
 }
 
 const ASG_EWA_LEN: usize = 24;
-const LBD_EWA_LEN: usize = 24;
 
 /// An assignment history used for blocking restart.
 #[derive(Clone, Debug)]
@@ -61,7 +59,7 @@ impl Default for ProgressASG {
         ProgressASG {
             enable: true,
             ema: Ewa2::<ASG_EWA_LEN>::new(0.0),
-            threshold: 1.4,
+            threshold: 1.6,
         }
     }
 }
@@ -102,6 +100,7 @@ impl ProgressEvaluator for ProgressASG {
     fn shift(&mut self) {}
 }
 
+/*
 /// An EMA of learnt clauses' LBD, used for forcing restart.
 #[derive(Clone, Debug)]
 struct ProgressLBD {
@@ -163,6 +162,7 @@ impl ProgressEvaluator for ProgressLBD {
     }
     fn shift(&mut self) {}
 }
+*/
 
 /// An EMA of decision level.
 #[derive(Clone, Debug)]
@@ -283,7 +283,9 @@ impl ProgressEvaluator for ProgressLuby {
 #[derive(Clone, Debug, Default)]
 pub struct Restarter {
     asg: ProgressASG,
-    lbd: ProgressLBD,
+    /// For force restart based on average LBD of newly generated clauses: 0.80.
+    /// This is called `K` in Glucose
+    lbd_threshold: f64,
     // pub blvl: ProgressLVL,
     // pub clvl: ProgressLVL,
     luby: ProgressLuby,
@@ -306,7 +308,7 @@ impl Instantiate for Restarter {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
         Restarter {
             asg: ProgressASG::instantiate(config, cnf),
-            lbd: ProgressLBD::instantiate(config, cnf),
+            lbd_threshold: config.rst_lbd_thr,
             // blvl: ProgressLVL::instantiate(config, cnf),
             // clvl: ProgressLVL::instantiate(config, cnf),
             luby: ProgressLuby::instantiate(config, cnf),
@@ -338,7 +340,7 @@ pub enum RestartDecision {
 }
 
 impl RestartIF for Restarter {
-    fn restart(&mut self) -> Option<RestartDecision> {
+    fn restart(&mut self, lbd: &EmaView) -> Option<RestartDecision> {
         macro_rules! next_step {
             () => {
                 self.stb_step * self.initial_restart_step
@@ -363,7 +365,7 @@ impl RestartIF for Restarter {
             return Some(RestartDecision::Block);
         }
 
-        if self.lbd.is_active() {
+        if self.lbd_threshold < lbd.trend() {
             self.restart_step = next_step!();
             return Some(RestartDecision::Force);
         }
@@ -401,9 +403,6 @@ impl RestartIF for Restarter {
                 self.luby.update(self.after_restart);
             }
             ProgressUpdate::ASG(val) => self.asg.update(val),
-            ProgressUpdate::LBD(val) => {
-                self.lbd.update(val);
-            }
 
             #[cfg(feature = "Luby_restart")]
             ProgressUpdate::Luby => self.luby.update(0),
@@ -455,7 +454,7 @@ pub mod property {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
-                Tf64::RestartThreshold => self.lbd.threshold,
+                Tf64::RestartThreshold => self.lbd_threshold,
             }
         }
     }
@@ -463,7 +462,6 @@ pub mod property {
     #[derive(Clone, Debug, PartialEq)]
     pub enum TEma2 {
         ASG,
-        LBD,
     }
 
     impl PropertyReference<TEma2, EmaView> for Restarter {
@@ -471,7 +469,6 @@ pub mod property {
         fn refer(&self, k: TEma2) -> &EmaView {
             match k {
                 TEma2::ASG => &self.asg.as_view(),
-                TEma2::LBD => &self.lbd.as_view(),
             }
         }
     }

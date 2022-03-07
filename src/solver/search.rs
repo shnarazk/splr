@@ -10,7 +10,7 @@ use {
     },
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
-        cdb::{ClauseDB, ClauseDBIF},
+        cdb::{self, ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
         types::*,
@@ -349,7 +349,9 @@ fn search(
                     // call the enhanced phase saver
                     asg.handle(SolverEvent::Stabilize(scale));
                 }
-            } else if rst.restart() == Some(RestartDecision::Force) {
+            } else if rst.restart(cdb.refer(cdb::property::TEma::LBD))
+                == Some(RestartDecision::Force)
+            {
                 RESTART!(asg, rst);
             }
             if let Some(na) = asg.best_assigned() {
