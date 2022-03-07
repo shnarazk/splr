@@ -364,12 +364,12 @@ pub mod property {
         #[inline]
         fn refer(&self, k: TEma) -> &EmaView {
             match k {
-                TEma::AssignRate => &self.assign_rate.as_view(),
+                TEma::AssignRate => self.assign_rate.as_view(),
                 TEma::DecisionPerConflict => self.dpc_ema.as_view(),
                 TEma::PropagationPerConflict => self.ppc_ema.as_view(),
                 TEma::ConflictPerRestart => self.cpr_ema.as_view(),
                 TEma::ConflictPerBaseRestart => self.cpr_ema.as_view(),
-                TEma::BestPhaseDivergenceRate => &self.bp_divergence_ema.as_view(),
+                TEma::BestPhaseDivergenceRate => self.bp_divergence_ema.as_view(),
             }
         }
     }

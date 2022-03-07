@@ -365,7 +365,7 @@ pub mod property {
         #[inline]
         fn refer(&self, k: TEma) -> &EmaView {
             match k {
-                TEma::LBD => &self.lbd.as_view(),
+                TEma::LBD => self.lbd.as_view(),
             }
         }
     }

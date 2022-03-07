@@ -26,6 +26,7 @@ pub use {
 pub trait PropertyReference<I, O> {
     fn refer(&self, key: I) -> &O;
 }
+
 pub trait PropertyDereference<I, O: Sized> {
     fn derefer(&self, key: I) -> O;
 }

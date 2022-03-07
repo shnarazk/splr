@@ -1115,8 +1115,8 @@ pub mod property {
         #[inline]
         fn refer(&self, k: TEma) -> &EmaView {
             match k {
-                TEma::BackjumpLevel => &self.b_lvl.as_view(),
-                TEma::ConflictLevel => &self.c_lvl.as_view(),
+                TEma::BackjumpLevel => self.b_lvl.as_view(),
+                TEma::ConflictLevel => self.c_lvl.as_view(),
             }
         }
     }
