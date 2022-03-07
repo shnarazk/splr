@@ -129,7 +129,7 @@ pub trait ClauseDBIF:
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize, average_lbd: f64);
+    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize);
     /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.
@@ -276,8 +276,9 @@ pub struct ClauseDB {
     num_reduction: usize,
     /// the number of reregistration of a bi-clause
     num_reregistration: usize,
+    /// Literal Block Entanglement
     /// EMA of LBD of clauses used in conflict analysis (dependency graph)
-    pub lbd_of_dp_ema: Ema,
+    pub lb_entanglement: Ema,
 
     //
     //## incremental solving
@@ -337,16 +338,16 @@ pub mod property {
 
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tf64 {
-        DpAverageLBD,
+        LiteralBlockEntanglement,
     }
 
-    pub const F64: [Tf64; 1] = [Tf64::DpAverageLBD];
+    pub const F64: [Tf64; 1] = [Tf64::LiteralBlockEntanglement];
 
     impl PropertyDereference<Tf64, f64> for ClauseDB {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
-                Tf64::DpAverageLBD => self.lbd_of_dp_ema.get(),
+                Tf64::LiteralBlockEntanglement => self.lb_entanglement.get(),
             }
         }
     }

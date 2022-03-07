@@ -495,7 +495,7 @@ impl StateIF for State {
         let cdb_num_bi_clause = cdb.derefer(cdb::property::Tusize::NumBiClause);
         let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
-        let cdb_lbd_of_dp: f64 = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
+        let cdb_lbd_of_dp: f64 = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
 
         let elim_num_full = elim.derefer(processor::property::Tusize::NumFullElimination);
         let elim_num_sub = elim.derefer(processor::property::Tusize::NumSubsumedClause);
@@ -595,7 +595,12 @@ impl StateIF for State {
             "\x1B[2K         LBD|trnd:{}, avrg:{}, depG:{}, /dpc:{}",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd.get_fast()),
-            fm!("{:>9.4}", self, LogF64Id::DpAverageLBD, cdb_lbd_of_dp),
+            fm!(
+                "{:>9.4}",
+                self,
+                LogF64Id::LiteralBlockEntanglement,
+                cdb_lbd_of_dp
+            ),
             fm!(
                 "{:>9.2}",
                 self,
@@ -700,7 +705,8 @@ impl State {
         self[LogF64Id::EmaLBD] = rst_lbd.get_fast();
         self[LogF64Id::TrendLBD] = rst_lbd.trend();
 
-        self[LogF64Id::DpAverageLBD] = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
+        self[LogF64Id::LiteralBlockEntanglement] =
+            cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
         self[LogF64Id::DecisionPerConflict] =
             asg.refer(assign::property::TEma::DecisionPerConflict).get();
 
@@ -972,7 +978,7 @@ pub enum LogF64Id {
     DecisionPerConflict,
     ConflictPerRestart,
     PropagationPerConflict,
-    DpAverageLBD,
+    LiteralBlockEntanglement,
     End,
 }
 

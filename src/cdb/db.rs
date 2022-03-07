@@ -42,7 +42,7 @@ impl Default for ClauseDB {
             num_learnt: 0,
             num_reduction: 0,
             num_reregistration: 0,
-            lbd_of_dp_ema: Ema::new(100_000).with_value(2.0),
+            lb_entanglement: Ema::new(100_000).with_value(2.0),
             eliminated_permanent: Vec::new(),
         }
     }
@@ -966,12 +966,12 @@ impl ClauseDBIF for ClauseDB {
             self.reward_at_analysis(cid);
         }
         if 1 < rank {
-            self.lbd_of_dp_ema.update(rank as f64);
+            self.lb_entanglement.update(rank as f64);
         }
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize, average_lbd: f64) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize) {
         impl Clause {
             fn pure_weight(&self, asg: &mut impl AssignIF) -> f64 {
                 let act_v = self
@@ -1054,7 +1054,7 @@ impl ClauseDBIF for ClauseDB {
         // there're exception. Since this is the pre-stage of clause vivification,
         // we want keep usefull clauses as many as possible.
         // Therefore I save the clauses which will become vivification targets.
-        let thr = ((average_lbd/* + self.lbd_of_dp_ema.get() */) as u16).max(4);
+        let thr = (self.lb_entanglement.get() as u16).max(4);
         for i in &perm[keep..] {
             let c = &self.clause[i.to()];
             if !c.is_vivify_target() || thr < c.rank {

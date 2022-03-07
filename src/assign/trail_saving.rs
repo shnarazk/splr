@@ -56,7 +56,9 @@ impl TrailSavingIF for AssignStack {
         }
     }
     fn from_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult {
-        let q = (REASON_THRESHOLD * cdb.derefer(crate::cdb::property::Tf64::DpAverageLBD)) as u16;
+        let q = (REASON_THRESHOLD
+            * cdb.derefer(crate::cdb::property::Tf64::LiteralBlockEntanglement))
+            as u16;
 
         #[cfg(feature = "chrono_BT")]
         let dl = self.decision_level();

@@ -293,11 +293,7 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
                 RESTART!(asg, rst);
-                cdb.reduce(
-                    asg,
-                    state.stm.num_reducible(),
-                    rst.refer(restart::property::TEma2::LBD).get_slow(),
-                );
+                cdb.reduce(asg, state.stm.num_reducible());
 
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
@@ -345,7 +341,7 @@ fn search(
                             state.config.rst_lbd_thr,
                             state.c_lvl.get(),
                             state.b_lvl.get(),
-                            cdb.derefer(crate::cdb::property::Tf64::DpAverageLBD),
+                            cdb.derefer(crate::cdb::property::Tf64::LiteralBlockEntanglement),
                         );
                     }
 

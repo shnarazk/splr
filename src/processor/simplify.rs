@@ -288,13 +288,15 @@ impl EliminateIF for Eliminator {
         }
         if self.enable {
             self.eliminate_grow_limit = state.derefer(state::property::Tusize::IntervalScale) / 2;
-            self.subsume_literal_limit =
-                state.config.elm_cls_lim + cdb.derefer(cdb::property::Tf64::DpAverageLBD) as usize;
+            self.subsume_literal_limit = state.config.elm_cls_lim
+                + cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement) as usize;
             if self.is_waiting() {
                 self.prepare(asg, cdb, true);
             }
-            debug_assert!(!cdb.derefer(cdb::property::Tf64::DpAverageLBD).is_nan());
-            // self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
+            debug_assert!(!cdb
+                .derefer(cdb::property::Tf64::LiteralBlockEntanglement)
+                .is_nan());
+            // self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
             self.eliminate(asg, cdb, rst, state)?;
             if self.is_running() {
                 self.stop(asg, cdb);
