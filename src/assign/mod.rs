@@ -1,5 +1,8 @@
 /// Crate `assign` implements Boolean Constraint Propagation and decision var selection.
 /// This version can handle Chronological and Non Chronological Backtrack.
+/// Ema
+mod ema;
+/// Heap
 mod heap;
 /// Boolean constraint propagation
 mod propagate;
@@ -23,8 +26,11 @@ pub use self::{
 #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
 use std::collections::HashMap;
 use {
-    self::heap::{VarHeapIF, VarIdHeap},
-    super::{cdb::ClauseDBIF, types::*},
+    self::{
+        ema::ProgressASG,
+        heap::{VarHeapIF, VarIdHeap},
+    },
+    crate::{cdb::ClauseDBIF, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
 
@@ -166,6 +172,8 @@ pub struct AssignStack {
     num_propagation: usize,
     pub num_conflict: usize,
     num_restart: usize,
+    /// Assign rate EMA
+    assign_rate: ProgressASG,
     /// Decisions Per Conflict
     dpc_ema: EmaSU,
     /// Propagations Per Conflict
@@ -335,6 +343,7 @@ pub mod property {
 
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum TEma {
+        AssignRate,
         DecisionPerConflict,
         PropagationPerConflict,
         ConflictPerRestart,
@@ -342,7 +351,8 @@ pub mod property {
         BestPhaseDivergenceRate,
     }
 
-    pub const EMAS: [TEma; 5] = [
+    pub const EMAS: [TEma; 6] = [
+        TEma::AssignRate,
         TEma::DecisionPerConflict,
         TEma::PropagationPerConflict,
         TEma::ConflictPerRestart,
@@ -354,6 +364,7 @@ pub mod property {
         #[inline]
         fn refer(&self, k: TEma) -> &EmaView {
             match k {
+                TEma::AssignRate => &self.assign_rate.as_view(),
                 TEma::DecisionPerConflict => self.dpc_ema.as_view(),
                 TEma::PropagationPerConflict => self.ppc_ema.as_view(),
                 TEma::ConflictPerRestart => self.cpr_ema.as_view(),

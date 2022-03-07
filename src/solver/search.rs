@@ -5,7 +5,7 @@ use crate::cdb::VivifyIF;
 use {
     super::{
         conflict::handle_conflict,
-        restart::{self, ProgressUpdate, RestartDecision, RestartIF, Restarter},
+        restart::{self, RestartDecision, RestartIF, Restarter},
         Certificate, Solver, SolverEvent, SolverResult,
     },
     crate::{
@@ -281,9 +281,6 @@ fn search(
             if 1 < handle_conflict(asg, cdb, rst, state, &cc)? {
                 num_learnt += 1;
             }
-            rst.update(ProgressUpdate::ASG(
-                asg.derefer(assign::property::Tusize::NumUnassignedVar),
-            ));
             if state.stm.stage_ended(num_learnt) {
                 if let Some(p) = state.elapsed() {
                     if 1.0 <= p {
@@ -349,8 +346,10 @@ fn search(
                     // call the enhanced phase saver
                     asg.handle(SolverEvent::Stabilize(scale));
                 }
-            } else if rst.restart(cdb.refer(cdb::property::TEma::LBD))
-                == Some(RestartDecision::Force)
+            } else if rst.restart(
+                asg.refer(assign::property::TEma::AssignRate),
+                cdb.refer(cdb::property::TEma::LBD),
+            ) == Some(RestartDecision::Force)
             {
                 RESTART!(asg, rst);
             }

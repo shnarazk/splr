@@ -137,7 +137,7 @@ impl Default for Config {
             rst_asg_thr: 0.6,
             // rst_lbd_len: 8,
             rst_lbd_slw: 8192,
-            rst_lbd_thr: 1.6,
+            rst_lbd_thr: 1.4,
 
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_rat: 0.98,

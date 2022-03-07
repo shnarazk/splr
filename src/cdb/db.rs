@@ -1,11 +1,12 @@
 use {
     super::{
         binary::{BinaryLinkIF, BinaryLinkList},
+        ema::ProgressLBD,
         property,
         watch_cache::*,
         BinaryLinkDB, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId, RefClause,
     },
-    crate::{assign::AssignIF, cdb::ema::ProgressLBD, types::*},
+    crate::{assign::AssignIF, types::*},
     std::{
         num::NonZeroU32,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -170,6 +171,7 @@ impl Instantiate for ClauseDB {
             watch_cache: watcher,
             certification_store: CertificationStore::instantiate(config, cnf),
             soft_limit: config.c_cls_lim,
+            lbd: ProgressLBD::instantiate(config, cnf),
 
             #[cfg(feature = "clause_rewarding")]
             activity_decay: config.crw_dcy_rat,
@@ -360,6 +362,7 @@ impl ClauseDBIF for ClauseDB {
             c.update_lbd(asg, lbd_temp);
             c.rank_old = c.rank;
         }
+        self.lbd.update(c.rank);
         if learnt && len2 {
             *num_bi_learnt += 1;
         }
@@ -385,7 +388,6 @@ impl ClauseDBIF for ClauseDB {
             // assert!(2 < c.lits.len());
             watch_cache[!l0].insert_watch(cid, l1);
             watch_cache[!l1].insert_watch(cid, l0);
-            self.lbd.update(c.rank);
         }
         RefClause::Clause(cid)
     }
