@@ -161,7 +161,10 @@ pub struct Restarter {
     /// For force restart based on average LBD of newly generated clauses: 0.80.
     /// This is called `K` in Glucose
     lbd_threshold: f64,
+
+    #[cfg(feature = "Luby_restart")]
     luby: ProgressLuby,
+
     after_restart: usize,
     restart_step: usize,
     initial_restart_step: usize,
@@ -178,10 +181,13 @@ pub struct Restarter {
 }
 
 impl Instantiate for Restarter {
+    #[allow(unused_variables)]
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
         Restarter {
             asg_threshold: config.rst_asg_thr,
             lbd_threshold: config.rst_lbd_thr,
+
+            #[cfg(feature = "Luby_restart")]
             luby: ProgressLuby::instantiate(config, cnf),
             restart_step: config.rst_step,
             initial_restart_step: config.rst_step,
@@ -217,12 +223,15 @@ impl RestartIF for Restarter {
                 self.stb_step * self.initial_restart_step
             };
         }
-        if self.luby.is_active() {
-            self.luby.shift();
-            self.restart_step = next_step!();
-            return Some(RestartDecision::Force);
+        self.after_restart += 1;
+        #[cfg(feature = "Luby_restart")]
+        {
+            if self.luby.is_active() {
+                self.luby.shift();
+                self.restart_step = next_step!();
+                return Some(RestartDecision::Force);
+            }
         }
-
         if self.after_restart < self.restart_step {
             return None;
         }
@@ -271,7 +280,6 @@ impl RestartIF for Restarter {
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
             ProgressUpdate::Counter => {
-                self.after_restart += 1;
                 self.luby.update(self.after_restart);
             }
             // ProgressUpdate::ASG(val) => self.asg.update(val),
