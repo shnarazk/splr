@@ -93,7 +93,7 @@ impl Instantiate for AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
             assign: vec![None; 1 + nv],
-            level: vec![DecisionLevel::default(); nv + 1],
+            level: (0..nv as u32 + 1).collect::<Vec<_>>(), // each literal occupies a single level.
             reason: vec![AssignReason::None; nv + 1],
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv),
