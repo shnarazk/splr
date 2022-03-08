@@ -120,7 +120,9 @@ pub fn handle_conflict(
                 if asg.assign_at_root_level(l0).is_err() {
                     unreachable!("handle_conflict::root_level_conflict_by_assertion");
                 }
-                rst.handle(SolverEvent::Assert(l0.vi()));
+                let vi = l0.vi();
+                rst.handle(SolverEvent::Assert(vi));
+                cdb.handle(SolverEvent::Assert(vi));
                 return Ok(0);
             }
         }
