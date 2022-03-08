@@ -402,24 +402,30 @@ mod tests {
         };
         let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        asg.assign_by_decision(lit(1));
-        asg.assign_by_decision(lit(-2));
+        // Now `asg.level` = [_, 1, 2, 3, 4, 5, 6].
+        let c0 = cdb
+            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
+            .as_cid();
+        assert_eq!(cdb[c0].rank, 4);
 
+        asg.assign_by_decision(lit(-2)); // at level 1
+        asg.assign_by_decision(lit(1)); // at level 2
+                                        // Now `asg.level` = [_, 2, 1, 3, 4, 5, 6].
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
         let c = &cdb[c1];
-        assert_eq!(c.rank, 2);
+
+        assert_eq!(c.rank, 3);
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
         assert!(!c.is(Flag::USED));
-
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
             .as_cid();
         let c = &cdb[c2];
-        assert_eq!(c.rank, 2);
+        assert_eq!(c.rank, 3);
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
