@@ -1,6 +1,7 @@
 use {
     super::{
         binary::{BinaryLinkIF, BinaryLinkList},
+        ema::ProgressLBD,
         property,
         watch_cache::*,
         BinaryLinkDB, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId, RefClause,
@@ -35,6 +36,8 @@ impl Default for ClauseDB {
             activity_anti_decay: 0.01,
 
             lbd_temp: Vec::new(),
+            lbd: ProgressLBD::default(),
+
             num_clause: 0,
             num_bi_clause: 0,
             num_bi_learnt: 0,
@@ -42,7 +45,7 @@ impl Default for ClauseDB {
             num_learnt: 0,
             num_reduction: 0,
             num_reregistration: 0,
-            lbd_of_dp_ema: Ema::new(100_000),
+            lb_entanglement: Ema::new(100_000).with_value(2.0),
             eliminated_permanent: Vec::new(),
         }
     }
@@ -168,6 +171,7 @@ impl Instantiate for ClauseDB {
             watch_cache: watcher,
             certification_store: CertificationStore::instantiate(config, cnf),
             soft_limit: config.c_cls_lim,
+            lbd: ProgressLBD::instantiate(config, cnf),
 
             #[cfg(feature = "clause_rewarding")]
             activity_decay: config.crw_dcy_rat,
@@ -211,6 +215,9 @@ impl Instantiate for ClauseDB {
                     (crate::state::SearchStrategy::LowSuccessive, _) => (),
                     (crate::state::SearchStrategy::ManyGlues, _) => (),
                 }
+            }
+            SolverEvent::Assert(_) => {
+                self.lbd.update(0);
             }
             SolverEvent::NewVar => {
                 self.binary_link.add_new_var();
@@ -358,6 +365,7 @@ impl ClauseDBIF for ClauseDB {
             c.update_lbd(asg, lbd_temp);
             c.rank_old = c.rank;
         }
+        self.lbd.update(c.rank);
         if learnt && len2 {
             *num_bi_learnt += 1;
         }
@@ -965,7 +973,9 @@ impl ClauseDBIF for ClauseDB {
             #[cfg(feature = "clause_rewading")]
             self.reward_at_analysis(cid);
         }
-        self.lbd_of_dp_ema.update(rank as f64);
+        if 1 < rank {
+            self.lb_entanglement.update(rank as f64);
+        }
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
@@ -1052,7 +1062,7 @@ impl ClauseDBIF for ClauseDB {
         // there're exception. Since this is the pre-stage of clause vivification,
         // we want keep usefull clauses as many as possible.
         // Therefore I save the clauses which will become vivification targets.
-        let thr = self.lbd_of_dp_ema.get() as u16 * 2;
+        let thr = (self.lb_entanglement.get() as u16).max(4);
         for i in &perm[keep..] {
             let c = &self.clause[i.to()];
             if !c.is_vivify_target() || thr < c.rank {

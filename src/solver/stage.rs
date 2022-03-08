@@ -84,10 +84,9 @@ impl StageManager {
         self.cycle * self.unit_size
     }
     pub fn num_reducible(&self) -> usize {
-        // self.current_span() - self.scale / 2
-        // self.current_span().saturating_sub(100)
-        let num_keep = 2 * (self.current_span() as f64).sqrt() as usize;
-        self.current_span() - num_keep
+        let span = self.current_span();
+        let keep = 2 * (span as f64).sqrt() as usize;
+        span - keep
     }
     pub fn current_stage(&self) -> usize {
         self.stage

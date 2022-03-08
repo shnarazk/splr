@@ -12,156 +12,29 @@ trait ProgressEvaluator {
 }
 
 /// Update progress observer sub-modules
+#[cfg(feature = "Luby_restart")]
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub enum ProgressUpdate {
-    ASG(usize),
-    LBD(u16),
+enum ProgressUpdate {
     Counter,
-
-    #[cfg(feature = "Luby_restart")]
     Luby,
 }
 
 /// API for [`restart`](`crate::solver::RestartIF::restart`) and [`stabilize`](`crate::solver::RestartIF::stabilize`).
-pub trait RestartIF:
-    Instantiate
-    + PropertyDereference<property::Tusize, usize>
-    + PropertyReference<property::TEma2, EmaView>
-{
+pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> {
     /// check blocking and forcing restart condition.
-    fn restart(&mut self) -> Option<RestartDecision>;
+    fn restart(&mut self, asg: &EmaView, lbd: &EmaView) -> Option<RestartDecision>;
     /// set stabilization parameters
     fn set_sensibility(&mut self, step: usize, step_max: usize);
     #[cfg(feature = "dynamic_restart_threshold")]
     /// adjust restart threshold
     fn adjust(&mut self, base: f64, c_lvl: f64, b_lvl: f64, used: f64);
+    #[cfg(feature = "Luby_restart")]
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
 
     #[cfg(feature = "Luby_restart")]
     /// dynamic adaptation of restart interval
     fn scale_restart_step(&mut self, scale: f64);
-}
-
-const ASG_EWA_LEN: usize = 24;
-const LBD_EWA_LEN: usize = 24;
-
-/// An assignment history used for blocking restart.
-#[derive(Clone, Debug)]
-struct ProgressASG {
-    enable: bool,
-    ema: Ewa2<ASG_EWA_LEN>,
-    /// For block restart based on average assignments: 1.40.
-    /// This is called `R` in Glucose
-    threshold: f64,
-}
-
-impl Default for ProgressASG {
-    fn default() -> ProgressASG {
-        ProgressASG {
-            enable: true,
-            ema: Ewa2::<ASG_EWA_LEN>::new(0.0),
-            threshold: 1.4,
-        }
-    }
-}
-
-impl Instantiate for ProgressASG {
-    fn instantiate(config: &Config, _cnf: &CNFDescription) -> Self {
-        ProgressASG {
-            ema: Ewa2::new(0.0).with_slow(config.rst_asg_slw),
-            threshold: config.rst_asg_thr,
-            ..ProgressASG::default()
-        }
-    }
-}
-
-impl EmaIF for ProgressASG {
-    fn get_fast(&self) -> f64 {
-        self.ema.get()
-    }
-    fn trend(&self) -> f64 {
-        self.ema.trend()
-    }
-}
-
-impl EmaMutIF for ProgressASG {
-    type Input = usize;
-    fn update(&mut self, n: usize) {
-        self.ema.update(n as f64);
-    }
-    fn as_view(&self) -> &EmaView {
-        self.ema.as_view()
-    }
-}
-
-impl ProgressEvaluator for ProgressASG {
-    fn is_active(&self) -> bool {
-        self.enable && self.trend() < self.threshold
-    }
-    fn shift(&mut self) {}
-}
-
-/// An EMA of learnt clauses' LBD, used for forcing restart.
-#[derive(Clone, Debug)]
-struct ProgressLBD {
-    enable: bool,
-    ema: Ewa2<LBD_EWA_LEN>,
-    num: usize,
-    sum: usize,
-    /// For force restart based on average LBD of newly generated clauses: 0.80.
-    /// This is called `K` in Glucose
-    threshold: f64,
-}
-
-impl Default for ProgressLBD {
-    fn default() -> ProgressLBD {
-        ProgressLBD {
-            enable: true,
-            ema: Ewa2::<LBD_EWA_LEN>::new(0.0),
-            num: 0,
-            sum: 0,
-            threshold: 1.4,
-        }
-    }
-}
-
-impl Instantiate for ProgressLBD {
-    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
-        ProgressLBD {
-            ema: Ewa2::new(0.0).with_slow(config.rst_lbd_slw),
-            threshold: config.rst_lbd_thr,
-            ..ProgressLBD::default()
-        }
-    }
-}
-
-impl EmaIF for ProgressLBD {
-    fn get_fast(&self) -> f64 {
-        self.ema.get_fast()
-    }
-    fn trend(&self) -> f64 {
-        self.ema.trend()
-    }
-}
-
-impl EmaMutIF for ProgressLBD {
-    type Input = u16;
-    fn update(&mut self, d: Self::Input) {
-        self.num += 1;
-        self.sum += d as usize;
-        self.ema.update(d as f64);
-    }
-    fn as_view(&self) -> &EmaView {
-        self.ema.as_view()
-    }
-}
-
-impl ProgressEvaluator for ProgressLBD {
-    fn is_active(&self) -> bool {
-        self.enable && self.threshold < self.trend()
-    }
-    fn shift(&mut self) {}
 }
 
 /// An EMA of decision level.
@@ -282,11 +155,16 @@ impl ProgressEvaluator for ProgressLuby {
 /// `Restarter` provides restart API and holds data about restart conditions.
 #[derive(Clone, Debug, Default)]
 pub struct Restarter {
-    asg: ProgressASG,
-    lbd: ProgressLBD,
-    // pub blvl: ProgressLVL,
-    // pub clvl: ProgressLVL,
+    /// For block restart based on average assignments: 1.40.
+    /// This is called `R` in Glucose
+    asg_threshold: f64,
+    /// For force restart based on average LBD of newly generated clauses: 0.80.
+    /// This is called `K` in Glucose
+    lbd_threshold: f64,
+
+    #[cfg(feature = "Luby_restart")]
     luby: ProgressLuby,
+
     after_restart: usize,
     restart_step: usize,
     initial_restart_step: usize,
@@ -303,12 +181,13 @@ pub struct Restarter {
 }
 
 impl Instantiate for Restarter {
+    #[allow(unused_variables)]
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
         Restarter {
-            asg: ProgressASG::instantiate(config, cnf),
-            lbd: ProgressLBD::instantiate(config, cnf),
-            // blvl: ProgressLVL::instantiate(config, cnf),
-            // clvl: ProgressLVL::instantiate(config, cnf),
+            asg_threshold: config.rst_asg_thr,
+            lbd_threshold: config.rst_lbd_thr,
+
+            #[cfg(feature = "Luby_restart")]
             luby: ProgressLuby::instantiate(config, cnf),
             restart_step: config.rst_step,
             initial_restart_step: config.rst_step,
@@ -338,24 +217,27 @@ pub enum RestartDecision {
 }
 
 impl RestartIF for Restarter {
-    fn restart(&mut self) -> Option<RestartDecision> {
+    fn restart(&mut self, asg: &EmaView, lbd: &EmaView) -> Option<RestartDecision> {
         macro_rules! next_step {
             () => {
                 self.stb_step * self.initial_restart_step
             };
         }
-        if self.luby.is_active() {
-            self.luby.shift();
-            self.restart_step = next_step!();
-            return Some(RestartDecision::Force);
+        self.after_restart += 1;
+        #[cfg(feature = "Luby_restart")]
+        {
+            if self.luby.is_active() {
+                self.luby.shift();
+                self.restart_step = next_step!();
+                return Some(RestartDecision::Force);
+            }
         }
-
         if self.after_restart < self.restart_step {
             return None;
         }
 
         if self.stb_step_max * self.num_block < self.stb_step * self.num_restart
-            && self.asg.is_active()
+            && asg.trend() < self.asg_threshold
         {
             self.num_block += 1;
             self.after_restart = 0;
@@ -363,7 +245,7 @@ impl RestartIF for Restarter {
             return Some(RestartDecision::Block);
         }
 
-        if self.lbd.is_active() {
+        if self.lbd_threshold < lbd.trend() {
             self.restart_step = next_step!();
             return Some(RestartDecision::Force);
         }
@@ -394,32 +276,27 @@ impl RestartIF for Restarter {
                 .powf(CONTROL_FACTOR)
                 .clamp(1.0, base);
     }
+    #[cfg(feature = "Luby_restart")]
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
             ProgressUpdate::Counter => {
-                self.after_restart += 1;
                 self.luby.update(self.after_restart);
             }
-            ProgressUpdate::ASG(val) => self.asg.update(val),
-            ProgressUpdate::LBD(val) => {
-                self.lbd.update(val);
-            }
-
-            #[cfg(feature = "Luby_restart")]
+            // ProgressUpdate::ASG(val) => self.asg.update(val),
             ProgressUpdate::Luby => self.luby.update(0),
         }
     }
     #[cfg(feature = "Luby_restart")]
     fn scale_restart_step(&mut self, scale: f64) {
         const LIMIT: f64 = 1.2;
-        let thr = self.lbd.threshold * scale;
+        let thr = self.lbd_threshold * scale;
         if LIMIT <= thr {
-            self.lbd.threshold = thr;
+            self.lbd_threshold = thr;
         } else {
-            self.lbd.threshold += LIMIT;
-            self.lbd.threshold *= 0.5;
+            self.lbd_threshold += LIMIT;
+            self.lbd_threshold *= 0.5;
         }
-        dbg!(self.lbd.threshold);
+        dbg!(self.lbd_threshold);
     }
 }
 
@@ -455,23 +332,7 @@ pub mod property {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
-                Tf64::RestartThreshold => self.lbd.threshold,
-            }
-        }
-    }
-
-    #[derive(Clone, Debug, PartialEq)]
-    pub enum TEma2 {
-        ASG,
-        LBD,
-    }
-
-    impl PropertyReference<TEma2, EmaView> for Restarter {
-        #[inline]
-        fn refer(&self, k: TEma2) -> &EmaView {
-            match k {
-                TEma2::ASG => &self.asg.as_view(),
-                TEma2::LBD => &self.lbd.as_view(),
+                Tf64::RestartThreshold => self.lbd_threshold,
             }
         }
     }

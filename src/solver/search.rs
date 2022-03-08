@@ -5,7 +5,7 @@ use crate::cdb::VivifyIF;
 use {
     super::{
         conflict::handle_conflict,
-        restart::{self, ProgressUpdate, RestartDecision, RestartIF, Restarter},
+        restart::{self, RestartDecision, RestartIF, Restarter},
         Certificate, Solver, SolverEvent, SolverResult,
     },
     crate::{
@@ -185,18 +185,10 @@ impl SolveIF for Solver {
                 #[cfg(feature = "boundary_check")]
                 check(asg, cdb, true, "Before extending the model");
 
-                #[cfg(fueature = "boundary_check")]
-                check(asg, cdb, true, "Before extending the model");
-
                 let model = asg.extend_model(cdb, elim.eliminated_lits());
 
-                #[cfg(fueature = "boundary_check")]
-                check(
-                    asg,
-                    cdb,
-                    true,
-                    "After extending the model, (passed before extending)",
-                );
+                #[cfg(feature = "boundary_check")]
+                check(asg, cdb, true, "After extending the model");
 
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
@@ -289,9 +281,6 @@ fn search(
             if 1 < handle_conflict(asg, cdb, rst, state, &cc)? {
                 num_learnt += 1;
             }
-            rst.update(ProgressUpdate::ASG(
-                asg.derefer(assign::property::Tusize::NumUnassignedVar),
-            ));
             if state.stm.stage_ended(num_learnt) {
                 if let Some(p) = state.elapsed() {
                     if 1.0 <= p {
@@ -349,7 +338,7 @@ fn search(
                             state.config.rst_lbd_thr,
                             state.c_lvl.get(),
                             state.b_lvl.get(),
-                            cdb.derefer(cdb::property::Tf64::DpAverageLBD),
+                            cdb.derefer(crate::cdb::property::Tf64::LiteralBlockEntanglement),
                         );
                     }
 
@@ -357,7 +346,11 @@ fn search(
                     // call the enhanced phase saver
                     asg.handle(SolverEvent::Stabilize(scale));
                 }
-            } else if rst.restart() == Some(RestartDecision::Force) {
+            } else if rst.restart(
+                asg.refer(assign::property::TEma::AssignRate),
+                cdb.refer(cdb::property::TEma::LBD),
+            ) == Some(RestartDecision::Force)
+            {
                 RESTART!(asg, rst);
             }
             if let Some(na) = asg.best_assigned() {

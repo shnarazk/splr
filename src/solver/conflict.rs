@@ -1,13 +1,12 @@
 //! Conflict Analysis
 
+#[cfg(feature = "Luby_restart")]
+use super::restart::{ProgressUpdate, RestartIF};
 #[cfg(feature = "boundary_check")]
 use crate::assign::DebugReportIF;
 
 use {
-    super::{
-        restart::{ProgressUpdate, RestartIF, Restarter},
-        State,
-    },
+    super::{restart::Restarter, State},
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
@@ -50,6 +49,7 @@ pub fn handle_conflict(
     #[cfg(not(feature = "chrono_BT"))]
     let chronobt: bool = false;
 
+    #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Counter);
     // rst.block_restart(); // to update asg progress_evaluator
 
@@ -120,7 +120,9 @@ pub fn handle_conflict(
                 if asg.assign_at_root_level(l0).is_err() {
                     unreachable!("handle_conflict::root_level_conflict_by_assertion");
                 }
-                rst.handle(SolverEvent::Assert(l0.vi()));
+                let vi = l0.vi();
+                rst.handle(SolverEvent::Assert(vi));
+                cdb.handle(SolverEvent::Assert(vi));
                 return Ok(0);
             }
         }
@@ -195,7 +197,6 @@ pub fn handle_conflict(
                 assign_level,
             );
             // || check_graph(asg, cdb, l0, "biclause");
-            rst.update(ProgressUpdate::LBD(1));
             for cid in &state.derive20 {
                 cdb[cid].turn_on(FlagClause::DERIVE20);
             }
@@ -217,7 +218,6 @@ pub fn handle_conflict(
             );
             // || check_graph(asg, cdb, l0, "clause");
             rank = cdb[cid].rank;
-            rst.update(ProgressUpdate::LBD(rank));
             if rank <= 20 {
                 for cid in &state.derive20 {
                     cdb[cid].turn_on(FlagClause::DERIVE20);
