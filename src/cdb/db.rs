@@ -216,6 +216,9 @@ impl Instantiate for ClauseDB {
                     (crate::state::SearchStrategy::ManyGlues, _) => (),
                 }
             }
+            SolverEvent::Assert(_) => {
+                self.lbd.update(0);
+            }
             SolverEvent::NewVar => {
                 self.binary_link.add_new_var();
                 // for negated literal
