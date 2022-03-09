@@ -53,8 +53,7 @@ impl StageManager {
     /// - None: the other case.
     pub fn prepare_new_stage(&mut self, rescale: usize, now: usize) -> Option<bool> {
         self.unit_size = rescale;
-        #[cfg(feature = "Luby_stabilization")]
-        {
+        if cfg!(feature = "Luby_stabilization") {
             let mut new_cycle = false;
             let old_scale = self.scale;
             self.scale = self.luby_iter.next_unchecked();
@@ -66,9 +65,7 @@ impl StageManager {
             let span = self.current_span();
             self.end_of_stage = now + span;
             new_cycle.then(|| old_scale == self.luby_iter.max_value())
-        }
-        #[cfg(not(feature = "Luby_stabilization"))]
-        {
+        } else {
             self.scale *= 2;
             self.stage += 1;
             let span = self.current_span();
@@ -83,11 +80,6 @@ impl StageManager {
     pub fn current_span(&self) -> usize {
         self.cycle * self.unit_size
     }
-    pub fn num_reducible(&self) -> usize {
-        let span = self.current_span();
-        let keep = 2 * (span as f64).sqrt() as usize;
-        span - keep
-    }
     pub fn current_stage(&self) -> usize {
         self.stage
     }
@@ -98,13 +90,18 @@ impl StageManager {
     pub fn current_scale(&self) -> usize {
         self.scale
     }
-    /// return the maximum factor so far.
-    #[cfg(feature = "Luby_stabilization")]
-    pub fn max_scale(&self) -> usize {
-        self.luby_iter.max_value()
+    pub fn num_reducible(&self) -> usize {
+        const REDUCTION_FACTOR: f64 = 2.0;
+        let span = self.current_span();
+        let keep = (REDUCTION_FACTOR * (self.unit_size as f64).powf(0.75)) as usize;
+        span.saturating_sub(keep)
     }
-    #[cfg(not(feature = "Luby_stabilization"))]
+    /// return the maximum factor so far.
     pub fn max_scale(&self) -> usize {
-        self.scale
+        if cfg!(feature = "Luby_stabilization") {
+            self.luby_iter.max_value()
+        } else {
+            self.scale
+        }
     }
 }
