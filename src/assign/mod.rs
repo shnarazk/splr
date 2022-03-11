@@ -160,6 +160,11 @@ pub struct AssignStack {
     phase_age: usize,
 
     //
+    //## Stage
+    //
+    pub stage_scale: usize,
+
+    //
     //## Statistics
     //
     /// the number of vars.

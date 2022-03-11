@@ -300,6 +300,8 @@ fn search(
                         as usize,
                     num_learnt,
                 ) {
+                    asg.stage_scale = state.stm.current_scale();
+
                     #[cfg(feature = "clause_vivification")]
                     cdb.vivify(asg, rst, state)?;
 

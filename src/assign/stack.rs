@@ -46,6 +46,8 @@ impl Default for AssignStack {
             #[cfg(feature = "rephase")]
             phase_age: 0,
 
+            stage_scale: 1,
+
             num_vars: 0,
             num_asserted_vars: 0,
             num_eliminated_vars: 0,
