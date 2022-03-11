@@ -16,8 +16,6 @@ pub trait TrailSavingIF {
     fn clear_saved_trail(&mut self);
 }
 
-const REASON_THRESHOLD: f64 = 2.0;
-
 impl TrailSavingIF for AssignStack {
     fn save_trail(&mut self, to_lvl: DecisionLevel) {
         let lim = self.trail_lim[to_lvl as usize];

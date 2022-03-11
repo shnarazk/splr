@@ -295,19 +295,23 @@ fn search(
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
 
-                if let Some(new_stage) = state.stm.prepare_new_stage(
+                if let Some(meta_cycle) = state.stm.prepare_new_stage(
                     (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt()
                         as usize,
                     num_learnt,
                 ) {
-                    asg.stage_scale = state.stm.current_scale();
-
+                    let scale = state.stm.current_scale();
+                    let max_scale = state.stm.max_scale();
+                    asg.stage_scale = scale;
+                    if meta_cycle {
+                        asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
+                    }
                     #[cfg(feature = "clause_vivification")]
                     cdb.vivify(asg, rst, state)?;
 
                     #[cfg(feature = "clause_elimination")]
                     {
-                        if new_stage {
+                        if meta_cycle {
                             elim.activate();
                             elim.simplify(asg, cdb, rst, state)?;
                             state[Stat::NumProcessor] += 1;
