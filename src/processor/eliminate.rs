@@ -10,6 +10,9 @@ use {
     },
 };
 
+// Stop elimination if a generated resolvent is larger than this
+const COMBINATION_LIMIT: f64 = 32.0;
+
 pub fn eliminate_var(
     asg: &mut impl AssignIF,
     cdb: &mut impl ClauseDBIF,
@@ -44,7 +47,6 @@ pub fn eliminate_var(
             &w.neg_occurs,
             vi,
             elim.eliminate_grow_limit,
-            elim.eliminate_combination_limit,
         )
     {
         return Ok(());
@@ -160,7 +162,6 @@ fn skip_var_elimination(
     neg: &[ClauseId],
     v: VarId,
     grow_limit: usize,
-    combination_limit: f64,
 ) -> bool {
     // avoid thrashing
     let limit = match cdb.check_size() {
@@ -181,9 +182,7 @@ fn skip_var_elimination(
                 cnt += 1;
                 average_len *= 1.0 - scale;
                 average_len += scale * clause_size as f64;
-                if clslen + limit < cnt
-                    || (combination_limit != 0.0 && combination_limit < average_len)
-                {
+                if clslen + limit < cnt || COMBINATION_LIMIT < average_len {
                     return true;
                 }
             } else {

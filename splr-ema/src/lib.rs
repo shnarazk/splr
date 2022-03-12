@@ -32,8 +32,10 @@ pub trait EmaMutIF: EmaIF {
     fn reset(&mut self) {}
     /// catch up with the current state.
     fn update(&mut self, x: Self::Input);
-    // return a view.
+    /// return a view.
     fn as_view(&self) -> &EmaView;
+    /// set value.
+    fn set_value(&mut self, _x: f64) {}
 }
 
 #[derive(Clone, Debug)]
@@ -94,6 +96,10 @@ impl EmaMutIF for Ema {
     fn as_view(&self) -> &EmaView {
         &self.val
     }
+    fn set_value(&mut self, x: f64) {
+        self.val.fast = x;
+        self.val.slow = x;
+    }
 }
 
 impl Ema {
@@ -107,6 +113,12 @@ impl Ema {
             cal: 0.0,
             sca: 1.0 / (s as f64),
         }
+    }
+    /// set value.
+    pub fn with_value(mut self, x: f64) -> Ema {
+        self.val.fast = x;
+        self.val.slow = x;
+        self
     }
 }
 
@@ -298,6 +310,7 @@ pub struct Ewa2<const N: usize> {
     #[cfg(feature = "EMA_calibration")]
     cals: f64,
     se: f64,
+    sx: f64,
 }
 
 impl<const N: usize> EmaIF for Ewa2<N> {
@@ -322,10 +335,10 @@ impl<const N: usize> EmaMutIF for Ewa2<N> {
         self.ema.fast += val;
         self.pool[self.last] = val;
         self.last = (self.last + 1) % N;
-        self.ema.slow = self.se * x + (1.0 - self.se) * self.ema.slow;
+        self.ema.slow = self.se * x + self.sx * self.ema.slow;
         #[cfg(feature = "EMA_calibration")]
         {
-            self.cals = self.se + (1.0 - self.se) * self.cals;
+            self.cals = self.se + self.sx * self.cals;
         }
     }
     #[cfg(not(feature = "EMA_calibration"))]
@@ -354,11 +367,13 @@ impl<const N: usize> Ewa2<N> {
             #[cfg(feature = "EMA_calibration")]
             cals: initial,
             se: 1.0 / (N as f64),
+            sx: 1.0 - 1.0 / (N as f64),
         }
     }
     // set secondary EMA parameter
     pub fn with_slow(mut self, s: usize) -> Self {
         self.se = 1.0 / (s as f64);
+        self.sx = 1.0 - self.se;
         self
     }
 }

@@ -8,6 +8,8 @@ mod cid;
 mod clause;
 /// methods on `ClauseDB`
 mod db;
+/// EMA
+mod ema;
 /// methods for UNSAT certification
 mod unsat_certificate;
 /// implementation of clause vivification
@@ -24,6 +26,7 @@ pub use self::{
     unsat_certificate::CertificationStore,
 };
 use {
+    self::ema::ProgressLBD,
     crate::{assign::AssignIF, types::*},
     std::{
         num::NonZeroU32,
@@ -126,12 +129,10 @@ pub trait ClauseDBIF:
     fn transform_by_replacement(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause;
     /// check satisfied and nullified literals in a clause
     fn transform_by_simplification(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> RefClause;
-    /// check the condition to reduce.
-    fn should_reduce(&mut self, nc: usize) -> bool;
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, nc: usize);
+    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize);
     /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.
@@ -260,15 +261,7 @@ pub struct ClauseDB {
     //
     /// a working buffer for LBD calculation
     lbd_temp: Vec<usize>,
-
-    //
-    //## reduction
-    //
-    /// increment step of reduction threshold
-    inc_step: usize,
-    first_reduction: usize,
-    next_reduction: usize,
-    reduction_step: usize, // renamed from `nbclausesbeforereduce`
+    lbd: ProgressLBD,
 
     //
     //## statistics
@@ -287,8 +280,9 @@ pub struct ClauseDB {
     num_reduction: usize,
     /// the number of reregistration of a bi-clause
     num_reregistration: usize,
+    /// Literal Block Entanglement
     /// EMA of LBD of clauses used in conflict analysis (dependency graph)
-    pub lbd_of_dp_ema: Ema,
+    pub lb_entanglement: Ema,
 
     //
     //## incremental solving
@@ -348,16 +342,30 @@ pub mod property {
 
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tf64 {
-        DpAverageLBD,
+        LiteralBlockEntanglement,
     }
 
-    pub const F64: [Tf64; 1] = [Tf64::DpAverageLBD];
+    pub const F64: [Tf64; 1] = [Tf64::LiteralBlockEntanglement];
 
     impl PropertyDereference<Tf64, f64> for ClauseDB {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
-                Tf64::DpAverageLBD => self.lbd_of_dp_ema.get(),
+                Tf64::LiteralBlockEntanglement => self.lb_entanglement.get(),
+            }
+        }
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    pub enum TEma {
+        LBD,
+    }
+
+    impl PropertyReference<TEma, EmaView> for ClauseDB {
+        #[inline]
+        fn refer(&self, k: TEma) -> &EmaView {
+            match k {
+                TEma::LBD => self.lbd.as_view(),
             }
         }
     }
@@ -394,24 +402,30 @@ mod tests {
         };
         let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        asg.assign_by_decision(lit(1));
-        asg.assign_by_decision(lit(-2));
+        // Now `asg.level` = [_, 1, 2, 3, 4, 5, 6].
+        let c0 = cdb
+            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
+            .as_cid();
+        assert_eq!(cdb[c0].rank, 4);
 
+        asg.assign_by_decision(lit(-2)); // at level 1
+        asg.assign_by_decision(lit(1)); // at level 2
+                                        // Now `asg.level` = [_, 2, 1, 3, 4, 5, 6].
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
         let c = &cdb[c1];
-        assert_eq!(c.rank, 2);
+
+        assert_eq!(c.rank, 3);
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
         assert!(!c.is(Flag::USED));
-
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
             .as_cid();
         let c = &cdb[c2];
-        assert_eq!(c.rank, 2);
+        assert_eq!(c.rank, 3);
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]

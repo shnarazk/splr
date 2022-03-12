@@ -1,10 +1,11 @@
 //! Conflict-Driven Clause Learning Search engine
 #[cfg(feature = "clause_vivification")]
 use crate::cdb::VivifyIF;
+
 use {
     super::{
         conflict::handle_conflict,
-        restart::{self, ProgressUpdate, RestartDecision, RestartIF, Restarter},
+        restart::{self, RestartDecision, RestartIF, Restarter},
         Certificate, Solver, SolverEvent, SolverResult,
     },
     crate::{
@@ -184,18 +185,10 @@ impl SolveIF for Solver {
                 #[cfg(feature = "boundary_check")]
                 check(asg, cdb, true, "Before extending the model");
 
-                #[cfg(fueature = "boundary_check")]
-                check(asg, cdb, true, "Before extending the model");
-
                 let model = asg.extend_model(cdb, elim.eliminated_lits());
 
-                #[cfg(fueature = "boundary_check")]
-                check(
-                    asg,
-                    cdb,
-                    true,
-                    "After extending the model, (passed before extending)",
-                );
+                #[cfg(feature = "boundary_check")]
+                check(asg, cdb, true, "After extending the model");
 
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
@@ -247,7 +240,7 @@ fn search(
     state: &mut State,
 ) -> Result<bool, SolverError> {
     #[cfg(feature = "clause_elimination")]
-    let mut next_elimination = 0;
+    let mut num_learnt = 0;
 
     #[cfg(feature = "strategy_adaptation")]
     let mut a_decision_was_made = false;
@@ -255,6 +248,9 @@ fn search(
     #[cfg(feature = "Luby_restart")]
     rst.update(ProgressUpdate::Luby);
 
+    state.stm.initialize(
+        (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
+    );
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
             let lit = asg.select_decision_literal();
@@ -282,11 +278,10 @@ fn search(
             #[cfg(feature = "clause_rewarding")]
             cdb.update_activity_tick();
 
-            handle_conflict(asg, cdb, rst, state, &cc)?;
-            rst.update(ProgressUpdate::ASG(
-                asg.derefer(assign::property::Tusize::NumUnassignedVar),
-            ));
-            if cdb.should_reduce(asg.num_conflict) {
+            if 1 < handle_conflict(asg, cdb, rst, state, &cc)? {
+                num_learnt += 1;
+            }
+            if state.stm.stage_ended(num_learnt) {
                 if let Some(p) = state.elapsed() {
                     if 1.0 <= p {
                         return Err(SolverError::TimeOut);
@@ -295,28 +290,38 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
                 RESTART!(asg, rst);
-                cdb.reduce(asg, asg.num_conflict);
+                cdb.reduce(asg, state.stm.num_reducible());
 
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
 
-                #[cfg(feature = "clause_vivification")]
-                cdb.vivify(asg, rst, state)?;
+                if let Some(meta_cycle) = state.stm.prepare_new_stage(
+                    (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt()
+                        as usize,
+                    num_learnt,
+                ) {
+                    let scale = state.stm.current_scale();
+                    let max_scale = state.stm.max_scale();
+                    asg.stage_scale = scale;
+                    if meta_cycle {
+                        asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
+                    }
+                    #[cfg(feature = "clause_vivification")]
+                    cdb.vivify(asg, rst, state)?;
 
-                #[cfg(feature = "clause_elimination")]
-                {
-                    let num_stage = rst.derefer(restart::property::Tusize::NumStage);
-                    if num_stage == next_elimination {
-                        elim.activate();
-                        elim.simplify(asg, cdb, rst, state)?;
-                        state[Stat::NumProcessor] += 1;
-                        next_elimination += 1.4f64
-                            .powi(cdb.derefer(cdb::property::Tusize::NumClause) as i32 / 80_000)
-                            as usize;
+                    #[cfg(feature = "clause_elimination")]
+                    {
+                        if meta_cycle {
+                            elim.activate();
+                            elim.simplify(asg, cdb, rst, state)?;
+                            state[Stat::NumProcessor] += 1;
+                        }
                     }
                 }
 
                 asg.clear_asserted_literals(cdb)?;
+
+                let scale = state.stm.current_scale();
                 // display the current stats. before updating stabiliation parameters
                 state.log(
                     asg.num_conflict,
@@ -325,7 +330,7 @@ fn search(
                         asg.derefer(assign::property::Tusize::NumUnreachableVar),
                         asg.refer(assign::property::TEma::PropagationPerConflict)
                             .get(),
-                        rst.derefer(restart::property::Tusize::IntervalScale),
+                        scale,
                         rst.derefer(restart::property::Tf64::RestartThreshold),
                     ),
                 );
@@ -334,22 +339,24 @@ fn search(
                 #[cfg(feature = "Luby_stabilization")]
                 {
                     #[cfg(feature = "dynamic_restart_threshold")]
-                    if 1 == rst.derefer(restart::property::Tusize::IntervalScale) {
+                    if 1 == scale {
                         rst.adjust(
                             state.config.rst_lbd_thr,
                             state.c_lvl.get(),
                             state.b_lvl.get(),
-                            cdb.derefer(cdb::property::Tf64::DpAverageLBD),
+                            cdb.derefer(crate::cdb::property::Tf64::LiteralBlockEntanglement),
                         );
                     }
 
-                    rst.stabilize();
+                    rst.set_sensibility(scale, state.stm.max_scale());
                     // call the enhanced phase saver
-                    asg.handle(SolverEvent::Stabilize(
-                        rst.derefer(restart::property::Tusize::IntervalScale),
-                    ));
+                    asg.handle(SolverEvent::Stabilize(scale));
                 }
-            } else if rst.restart() == Some(RestartDecision::Force) {
+            } else if rst.restart(
+                asg.refer(assign::property::TEma::AssignRate),
+                cdb.refer(cdb::property::TEma::LBD),
+            ) == Some(RestartDecision::Force)
+            {
                 RESTART!(asg, rst);
             }
             if let Some(na) = asg.best_assigned() {

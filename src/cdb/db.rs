@@ -1,11 +1,12 @@
 use {
     super::{
         binary::{BinaryLinkIF, BinaryLinkList},
+        ema::ProgressLBD,
         property,
         watch_cache::*,
         BinaryLinkDB, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId, RefClause,
     },
-    crate::{assign::AssignIF, solver::SolverEvent, types::*},
+    crate::{assign::AssignIF, types::*},
     std::{
         num::NonZeroU32,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -35,10 +36,8 @@ impl Default for ClauseDB {
             activity_anti_decay: 0.01,
 
             lbd_temp: Vec::new(),
-            inc_step: 300,
-            first_reduction: 1000,
-            next_reduction: 1000,
-            reduction_step: 1000,
+            lbd: ProgressLBD::default(),
+
             num_clause: 0,
             num_bi_clause: 0,
             num_bi_learnt: 0,
@@ -46,7 +45,7 @@ impl Default for ClauseDB {
             num_learnt: 0,
             num_reduction: 0,
             num_reregistration: 0,
-            lbd_of_dp_ema: Ema::new(100_000),
+            lb_entanglement: Ema::new(100_000).with_value(2.0),
             eliminated_permanent: Vec::new(),
         }
     }
@@ -172,6 +171,7 @@ impl Instantiate for ClauseDB {
             watch_cache: watcher,
             certification_store: CertificationStore::instantiate(config, cnf),
             soft_limit: config.c_cls_lim,
+            lbd: ProgressLBD::instantiate(config, cnf),
 
             #[cfg(feature = "clause_rewarding")]
             activity_decay: config.crw_dcy_rat,
@@ -215,6 +215,9 @@ impl Instantiate for ClauseDB {
                     (crate::state::SearchStrategy::LowSuccessive, _) => (),
                     (crate::state::SearchStrategy::ManyGlues, _) => (),
                 }
+            }
+            SolverEvent::Assert(_) => {
+                self.lbd.update(0);
             }
             SolverEvent::NewVar => {
                 self.binary_link.add_new_var();
@@ -362,6 +365,7 @@ impl ClauseDBIF for ClauseDB {
             c.update_lbd(asg, lbd_temp);
             c.rank_old = c.rank;
         }
+        self.lbd.update(c.rank);
         if learnt && len2 {
             *num_bi_learnt += 1;
         }
@@ -969,18 +973,13 @@ impl ClauseDBIF for ClauseDB {
             #[cfg(feature = "clause_rewading")]
             self.reward_at_analysis(cid);
         }
-        self.lbd_of_dp_ema.update(rank as f64);
+        if 1 < rank {
+            self.lb_entanglement.update(rank as f64);
+        }
         learnt
     }
-    fn should_reduce(&mut self, num_conflicts: usize) -> bool {
-        if self.use_chan_seok {
-            self.first_reduction <= self.num_learnt
-        } else {
-            self.next_reduction <= num_conflicts
-        }
-    }
-    /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, nc: usize) {
+    /// reduce the number of 'learnt' or *removable* clauses.
+    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize) {
         impl Clause {
             fn pure_weight(&self, asg: &mut impl AssignIF) -> f64 {
                 let act_v = self
@@ -1015,7 +1014,6 @@ impl ClauseDBIF for ClauseDB {
         }
         let ClauseDB {
             ref mut clause,
-            ref co_lbd_bound,
             ref mut lbd_temp,
             ref mut num_reduction,
 
@@ -1054,25 +1052,17 @@ impl ClauseDBIF for ClauseDB {
             }
             perm.push(OrderedProxy::new(i, c.weight(asg)));
         }
-        let keep = perm.len().min(nc) / 2;
-        let mut reduction_coeff: f64 = (nc as f64) / (self.reduction_step as f64) + 1.0;
-        self.reduction_step += self.inc_step;
+        // let keep = perm.len().min(nc) / portion;
+        let keep = perm.len().saturating_sub(portion + 1);
         if perm.is_empty() {
-            self.next_reduction = (reduction_coeff * self.reduction_step as f64) as usize;
             return;
-        }
-        if !self.use_chan_seok {
-            if clause[perm[keep].to()].rank <= *co_lbd_bound {
-                reduction_coeff *= 1.1;
-            }
-            self.next_reduction = (reduction_coeff * self.reduction_step as f64) as usize;
         }
         perm.sort();
         // Worse half of `perm` should be discarded now. But many people thought
         // there're exception. Since this is the pre-stage of clause vivification,
         // we want keep usefull clauses as many as possible.
         // Therefore I save the clauses which will become vivification targets.
-        let thr = self.lbd_of_dp_ema.get() as u16 * 2;
+        let thr = (self.lb_entanglement.get() as u16).max(4);
         for i in &perm[keep..] {
             let c = &self.clause[i.to()];
             if !c.is_vivify_target() || thr < c.rank {

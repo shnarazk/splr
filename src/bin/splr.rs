@@ -288,10 +288,10 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c          LBD|avrg:{:>9.4}, trnd:{:>9.4}, depG:{:>9.4}, /dpc:{:>9.2},\n",
+            "c          LBD|avrg:{:>9.4}, trnd:{:>9.4}, entg:{:>9.4}, /dpc:{:>9.2},\n",
             state[LogF64Id::EmaLBD],
             state[LogF64Id::TrendLBD],
-            state[LogF64Id::DpAverageLBD],
+            state[LogF64Id::LiteralBlockEntanglement],
             state[LogF64Id::DecisionPerConflict],
         )
         .as_bytes(),

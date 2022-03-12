@@ -9,6 +9,8 @@ use crate::{
     types::*,
 };
 
+const VIVIFY_LIMIT: usize = 80_000;
+
 pub trait VivifyIF {
     fn vivify(
         &mut self,
@@ -26,7 +28,7 @@ impl VivifyIF for ClauseDB {
         rst: &mut Restarter,
         state: &mut State,
     ) -> MaybeInconsistent {
-        const NUM_TARGETS: Option<usize> = Some(80_000);
+        const NUM_TARGETS: Option<usize> = Some(VIVIFY_LIMIT);
         if asg.remains() {
             asg.propagate_sandbox(self).map_err(|cc| {
                 state.log(asg.num_conflict, "By vivifier");
@@ -163,6 +165,9 @@ impl VivifyIF for ClauseDB {
                         //## Rule 4
                     }
                 }
+            }
+            if VIVIFY_LIMIT < num_check {
+                break;
             }
         }
         asg.backtrack_sandbox();
