@@ -182,16 +182,16 @@ impl VivifyIF for ClauseDB {
             "vivified(assert:{} shorten:{}), ",
             num_assert, num_shrink
         ));
-        state.log(
-            asg.num_conflict,
-            format!(
-                "vivify:{:5}, pick:{:>8}, assert:{:>8}, shorten:{:>8}",
-                state[Stat::Vivification],
-                num_check,
-                num_assert,
-                num_shrink,
-            ),
-        );
+        // state.log(
+        //     asg.num_conflict,
+        //     format!(
+        //         "vivify:{:5}, pick:{:>8}, assert:{:>8}, shorten:{:>8}",
+        //         state[Stat::Vivification],
+        //         num_check,
+        //         num_assert,
+        //         num_shrink,
+        //     ),
+        // );
         state[Stat::VivifiedClause] += num_shrink;
         state[Stat::VivifiedVar] += num_assert;
         Ok(())

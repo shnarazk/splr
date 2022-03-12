@@ -295,27 +295,38 @@ fn search(
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
 
-                if let Some(meta_cycle) = state.stm.prepare_new_stage(
+                let stage: Option<bool> = state.stm.prepare_new_stage(
                     (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt()
                         as usize,
                     num_learnt,
-                ) {
+                );
+                if stage.is_some() {
                     let scale = state.stm.current_scale();
                     let max_scale = state.stm.max_scale();
                     asg.stage_scale = scale;
-                    if meta_cycle {
+                    if stage == Some(true) {
                         asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
                     }
                     #[cfg(feature = "clause_vivification")]
                     cdb.vivify(asg, rst, state)?;
 
                     #[cfg(feature = "clause_elimination")]
-                    {
-                        if meta_cycle {
-                            elim.activate();
-                            elim.simplify(asg, cdb, rst, state)?;
-                            state[Stat::NumProcessor] += 1;
-                        }
+                    if stage == Some(true) {
+                        elim.activate();
+                        elim.simplify(asg, cdb, rst, state)?;
+                        state[Stat::NumProcessor] += 1;
+                    }
+
+                    #[cfg(feature = "dynamic_restart_threshold")]
+                    if stage == Some(true) {
+                        rst.adjust(
+                            state.stm.current_span(),
+                            // state.config.rst_lbd_thr,
+                            // state.c_lvl.get(),
+                            // state.b_lvl.get(),
+                            // cdb.derefer(crate::cdb::property::Tf64::LiteralBlockEntanglement),
+                            // cdb.refer(crate::cdb::property::TEma::LBD).get(),
+                        );
                     }
                 }
 
@@ -323,31 +334,47 @@ fn search(
 
                 let scale = state.stm.current_scale();
                 // display the current stats. before updating stabiliation parameters
-                state.log(
-                    asg.num_conflict,
-                    format!(
-                        "core:{:>9}, cpr:{:>9.2}, scale:{:>4}, rlt:{:>7.4}",
-                        asg.derefer(assign::property::Tusize::NumUnreachableVar),
-                        asg.refer(assign::property::TEma::PropagationPerConflict)
-                            .get(),
-                        scale,
-                        rst.derefer(restart::property::Tf64::RestartThreshold),
-                    ),
-                );
+                match stage {
+                    None => {
+                        state.log(
+                            asg.num_conflict,
+                            format!(
+                                "                     stage:{:>5}, scale:{:>5}, core:{:>9}, cpr:{:>9.2}",
+                                state.stm.current_stage(),
+                                scale,
+                                asg.derefer(assign::property::Tusize::NumUnreachableVar),
+                                asg.refer(assign::property::TEma::PropagationPerConflict)
+                                    .get(),
+                            ),
+                        );
+                    }
+                    Some(false) => {
+                        state.log(
+                            asg.num_conflict,
+                            format!(
+                                "         cycle:{:4}, stage:{:>5}",
+                                state.stm.current_cycle(),
+                                state.stm.current_stage()
+                            ),
+                        );
+                    }
+                    Some(true) => {
+                        state.log(
+                            asg.num_conflict,
+                            format!(
+                                "L2:{:4}, cycle:{:4}, stage:{:>5}, rlt:{:>7.4}",
+                                state.stm.max_scale(),
+                                state.stm.current_cycle(),
+                                state.stm.current_stage(),
+                                rst.derefer(restart::property::Tf64::RestartThreshold),
+                            ),
+                        );
+                    }
+                }
                 state.progress(asg, cdb, elim, rst);
 
                 #[cfg(feature = "Luby_stabilization")]
                 {
-                    #[cfg(feature = "dynamic_restart_threshold")]
-                    if 1 == scale {
-                        rst.adjust(
-                            state.config.rst_lbd_thr,
-                            state.c_lvl.get(),
-                            state.b_lvl.get(),
-                            cdb.derefer(crate::cdb::property::Tf64::LiteralBlockEntanglement),
-                        );
-                    }
-
                     rst.set_sensibility(scale, state.stm.max_scale());
                     // call the enhanced phase saver
                     asg.handle(SolverEvent::Stabilize(scale));

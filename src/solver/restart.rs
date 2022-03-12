@@ -27,7 +27,7 @@ pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> 
     fn set_sensibility(&mut self, step: usize, step_max: usize);
     #[cfg(feature = "dynamic_restart_threshold")]
     /// adjust restart threshold
-    fn adjust(&mut self, base: f64, c_lvl: f64, b_lvl: f64, used: f64);
+    fn adjust(&mut self, max_scale: usize);
     #[cfg(feature = "Luby_restart")]
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
@@ -178,6 +178,7 @@ pub struct Restarter {
     //
     num_block: usize,
     num_restart: usize,
+    num_restart_1: usize,
 }
 
 impl Instantiate for Restarter {
@@ -261,21 +262,30 @@ impl RestartIF for Restarter {
         None
     }
     #[cfg(feature = "dynamic_restart_threshold")]
-    fn adjust(&mut self, base: f64, c_lvl: f64, b_lvl: f64, used: f64) {
-        const DECAY: f64 = 0.75;
-        const CONTROL_FACTOR: f64 = 0.4;
-        self.lbd.threshold *= DECAY;
-        // * The larger ratio of conflicting level to backjumped level, the smaller threshold we need.
-        //   Probably there are better clauses.
-        // * The larger learnt clauses, compared with useful clauses, we get, the smaller threshold we need.
-        //   Probably there are many bad branches.
-        self.lbd.threshold += (1.0 - DECAY)
-            * (c_lvl * self.lbd.ema.get() / b_lvl)
-                .log(used)
-                .max(1.0)
-                .powf(CONTROL_FACTOR)
-                .clamp(1.0, base);
+    fn adjust(&mut self, span: usize) {
+        let center: f64 = 1.1;
+        let increase = (self.num_restart - self.num_restart_1) as f64;
+        let scale = increase.max(2.0).log(span as f64) - center;
+        if 0.2 < scale.abs() {
+            self.lbd_threshold = self.lbd_threshold.powf(1.0 + 0.2 * scale);
+        }
+        self.num_restart_1 = self.num_restart;
     }
+    // fn adjust(&mut self, base: f64, c_lvl: f64, b_lvl: f64, used: f64, lbd: f64) {
+    //     const DECAY: f64 = 0.75;
+    //     const CONTROL_FACTOR: f64 = 0.4;
+    //     self.lbd_threshold *= DECAY;
+    //     // * The larger ratio of conflicting level to backjumped level, the smaller threshold we need.
+    //     //   Probably there are better clauses.
+    //     // * The larger learnt clauses, compared with useful clauses, we get, the smaller threshold we need.
+    //     //   Probably there are many bad branches.
+    //     self.lbd_threshold += (1.0 - DECAY)
+    //         * (c_lvl * lbd / b_lvl)
+    //             .log(used)
+    //             .max(1.0)
+    //             .powf(CONTROL_FACTOR)
+    //             .clamp(1.1, base);
+    // }
     #[cfg(feature = "Luby_restart")]
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
