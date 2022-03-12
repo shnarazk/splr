@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.15.0-alpha2"
+version = "0.15.0-alpha3"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2021"
@@ -24,7 +24,7 @@ default = [
         "clause_elimination",
         # "clause_rewarding",
         "clause_vivification",
-        # "dynamic_restart_threshold",
+        "dynamic_restart_threshold",
         # "incremental_solver",
         "LRB_rewarding",
         "Luby_stabilization",
