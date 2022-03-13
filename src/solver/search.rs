@@ -369,7 +369,7 @@ fn dump_stage(state: &mut State, asg: &AssignStack, rst: &Restarter, current_sta
         asg.num_conflict,
         match current_stage {
             None => format!(
-                "                   stg:{:>5}, scale:{:>5}, cpr:{:>9.2}",
+                "                   stg:{:>5}, scl:{:>4}, cpr:{:>9.2}",
                 stage,
                 scale,
                 asg.refer(assign::property::TEma::ConflictPerRestart).get(),

@@ -45,7 +45,8 @@ pub trait StateIF {
             + PropertyDereference<cdb::property::Tf64, f64>
             + PropertyReference<cdb::property::TEma, EmaView>,
         E: PropertyDereference<processor::property::Tusize, usize>,
-        R: PropertyDereference<solver::restart::property::Tusize, usize>;
+        R: PropertyDereference<solver::restart::property::Tusize, usize>
+            + PropertyDereference<solver::restart::property::Tf64, f64>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
     /// write a one-line message as log.
@@ -464,7 +465,8 @@ impl StateIF for State {
             + PropertyDereference<cdb::property::Tf64, f64>
             + PropertyReference<cdb::property::TEma, EmaView>,
         E: PropertyDereference<processor::property::Tusize, usize>,
-        R: PropertyDereference<solver::restart::property::Tusize, usize>,
+        R: PropertyDereference<solver::restart::property::Tusize, usize>
+            + PropertyDereference<solver::restart::property::Tf64, f64>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
             self.log_messages.clear();
@@ -500,10 +502,10 @@ impl StateIF for State {
 
         let rst_num_blk: usize = rst.derefer(solver::restart::property::Tusize::NumBlock);
         let rst_num_rst: usize = rst.derefer(solver::restart::property::Tusize::NumRestart);
-        let rst_int_scl: usize = self.stm.current_scale();
         let rst_int_scl_max: usize = self.stm.max_scale();
         let rst_asg: &EmaView = asg.refer(assign::property::TEma::AssignRate);
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
+        let rst_lbd_thr: f64 = rst.derefer(solver::restart::property::Tf64::RestartThreshold);
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -578,10 +580,10 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, *scl:{}, sclM:{}",
+            "\x1B[2K     Restart|#BLK:{}, #RST:{}, thrd:{}, sclM:{}",
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
-            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-            im!("{:>9}", self, LogUsizeId::RestartIntervalScale, rst_int_scl),
+            im!("{:>9.4}", self, LogUsizeId::Restart, rst_num_rst),
+            fm!("{:>9}", self, LogF64Id::RestartThreshold, rst_lbd_thr),
             im!(
                 "{:>9}",
                 self,
@@ -667,7 +669,8 @@ impl State {
             + PropertyDereference<cdb::property::Tf64, f64>
             + PropertyReference<cdb::property::TEma, EmaView>,
         E: PropertyDereference<processor::property::Tusize, usize>,
-        R: PropertyDereference<solver::restart::property::Tusize, usize>,
+        R: PropertyDereference<solver::restart::property::Tusize, usize>
+            + PropertyDereference<solver::restart::property::Tf64, f64>,
     {
         self[LogUsizeId::NumConflict] = asg.derefer(assign::property::Tusize::NumConflict);
         self[LogUsizeId::NumDecision] = asg.derefer(assign::property::Tusize::NumDecision);
@@ -686,7 +689,6 @@ impl State {
             cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
         self[LogUsizeId::RestartBlock] = rst.derefer(solver::restart::property::Tusize::NumBlock);
         self[LogUsizeId::Restart] = rst.derefer(solver::restart::property::Tusize::NumRestart);
-        self[LogUsizeId::RestartIntervalScale] = self.stm.current_scale();
         self[LogUsizeId::RestartIntervalScaleMax] = self.stm.max_scale();
         self[LogUsizeId::Stabilize] = self.stm.current_stage();
         self[LogUsizeId::StabilizationCycle] = self.stm.current_cycle();
@@ -941,7 +943,6 @@ pub enum LogUsizeId {
     RestartBlock,
     RestartCancel,
     RestartStabilize,
-    RestartIntervalScale,
     RestartIntervalScaleMax,
     Stabilize,
     StabilizationCycle,
@@ -975,6 +976,7 @@ pub enum LogF64Id {
     ConflictPerRestart,
     PropagationPerConflict,
     LiteralBlockEntanglement,
+    RestartThreshold,
     End,
 }
 
