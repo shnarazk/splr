@@ -178,7 +178,7 @@ pub struct Restarter {
     //
     num_block: usize,
     num_restart: usize,
-    num_restart_1: usize,
+    num_restart_pre: usize,
 }
 
 impl Instantiate for Restarter {
@@ -263,13 +263,13 @@ impl RestartIF for Restarter {
     }
     #[cfg(feature = "dynamic_restart_threshold")]
     fn adjust(&mut self, span: usize) {
-        let center: f64 = 1.2;
-        let increase = (self.num_restart - self.num_restart_1) as f64;
+        let center: f64 = 1.0;
+        let increase = (self.num_restart - self.num_restart_pre) as f64;
         let scale = increase.max(2.0).log(span as f64) - center;
         if 0.2 < scale.abs() {
             self.lbd_threshold = self.lbd_threshold.powf(1.0 + 0.2 * scale);
         }
-        self.num_restart_1 = self.num_restart;
+        self.num_restart_pre = self.num_restart;
     }
     // fn adjust(&mut self, base: f64, c_lvl: f64, b_lvl: f64, used: f64, lbd: f64) {
     //     const DECAY: f64 = 0.75;
