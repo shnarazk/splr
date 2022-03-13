@@ -178,6 +178,8 @@ pub struct Restarter {
     //
     num_block: usize,
     num_restart: usize,
+
+    #[cfg(feature = "dynamic_restart_threshold")]
     num_restart_pre: usize,
 }
 

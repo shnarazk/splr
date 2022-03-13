@@ -302,11 +302,12 @@ fn search(
                 );
                 let scale = state.stm.current_scale();
                 let max_scale = state.stm.max_scale();
-                let span = state.stm.current_span();
                 if let Some(level2) = next_stage {
                     asg.stage_scale = scale;
+
                     #[cfg(feature = "clause_vivification")]
                     cdb.vivify(asg, rst, state)?;
+
                     if level2 {
                         asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
 
@@ -314,7 +315,7 @@ fn search(
                         elim.simplify(asg, cdb, rst, state, false)?;
 
                         #[cfg(feature = "dynamic_restart_threshold")]
-                        rst.adjust(span);
+                        rst.adjust(state.stm.current_span());
                     }
                 }
                 asg.clear_asserted_literals(cdb)?;
@@ -364,39 +365,25 @@ fn dump_stage(state: &mut State, asg: &AssignStack, rst: &Restarter, current_sta
     let scale = state.stm.current_scale();
     let stage = state.stm.current_stage();
     let segment = state.stm.current_segment();
-    match current_stage {
-        None => {
-            state.log(
-                asg.num_conflict,
-                format!(
-                    "                    stg:{:>5}, scale:{:>5}, core:{:>9}, cpr:{:>9.2}",
-                    stage,
-                    scale,
-                    asg.derefer(assign::property::Tusize::NumUnreachableVar),
-                    asg.refer(assign::property::TEma::PropagationPerConflict)
-                        .get(),
-                ),
-            );
-        }
-        Some(false) => {
-            state.log(
-                asg.num_conflict,
-                format!("          cyc:{:4}, stg:{:>5}", cycle, stage,),
-            );
-        }
-        Some(true) => {
-            state.log(
-                asg.num_conflict,
-                format!(
-                    "seg:{:4}, cyc:{:4}, stg:{:>5}, rlt:{:>7.4}",
-                    segment,
-                    cycle,
-                    stage,
-                    rst.derefer(restart::property::Tf64::RestartThreshold),
-                ),
-            );
-        }
-    }
+    state.log(
+        asg.num_conflict,
+        match current_stage {
+            None => format!(
+                "                   stg:{:>5}, scale:{:>5}, cpr:{:>9.2}",
+                stage,
+                scale,
+                asg.refer(assign::property::TEma::ConflictPerRestart).get(),
+            ),
+            Some(false) => format!("         cyc:{:4}, stg:{:>5}", cycle, stage),
+            Some(true) => format!(
+                "seg:{:3}, cyc:{:4}, stg:{:>5}, rlt:{:>7.4}",
+                segment,
+                cycle,
+                stage,
+                rst.derefer(restart::property::Tf64::RestartThreshold),
+            ),
+        },
+    );
 }
 
 #[cfg(feature = "boundary_check")]
