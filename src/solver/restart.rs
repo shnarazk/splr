@@ -267,9 +267,9 @@ impl RestartIF for Restarter {
     fn adjust(&mut self, span: usize) {
         let center: f64 = 1.0;
         let increase = (self.num_restart - self.num_restart_pre) as f64;
-        let scale = increase.max(2.0).log(span as f64) - center;
-        if 0.2 < scale.abs() {
-            self.lbd_threshold = self.lbd_threshold.powf(1.0 + 0.2 * scale);
+        let scale = increase.log(span as f64) - center;
+        if 0.25 < scale.abs() {
+            self.lbd_threshold = self.lbd_threshold.powf(center + 0.5 * scale);
         }
         self.num_restart_pre = self.num_restart;
     }

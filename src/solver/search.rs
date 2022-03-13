@@ -315,7 +315,9 @@ fn search(
                         elim.simplify(asg, cdb, rst, state, false)?;
 
                         #[cfg(feature = "dynamic_restart_threshold")]
-                        rst.adjust(state.stm.current_span());
+                        if 0 < state.stm.current_segment() {
+                            rst.adjust(state.stm.current_span());
+                        }
                     }
                 }
                 asg.clear_asserted_literals(cdb)?;
