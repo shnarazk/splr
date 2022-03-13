@@ -237,6 +237,7 @@ fn search(
     rst: &mut Restarter,
     state: &mut State,
 ) -> Result<bool, SolverError> {
+    let mut current_stage: Option<bool> = Some(true);
     #[cfg(feature = "clause_elimination")]
     let mut num_learnt = 0;
 
@@ -293,80 +294,30 @@ fn search(
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
 
-                let stage: Option<bool> = state.stm.prepare_new_stage(
+                dump_stage(state, asg, rst, current_stage);
+                let next_stage: Option<bool> = state.stm.prepare_new_stage(
                     (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt()
                         as usize,
                     num_learnt,
                 );
-                if stage.is_some() {
-                    let scale = state.stm.current_scale();
-                    let max_scale = state.stm.max_scale();
+                let scale = state.stm.current_scale();
+                let max_scale = state.stm.max_scale();
+                let span = state.stm.current_span();
+                if let Some(level2) = next_stage {
                     asg.stage_scale = scale;
-                    if stage == Some(true) {
-                        asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
-                    }
                     #[cfg(feature = "clause_vivification")]
                     cdb.vivify(asg, rst, state)?;
+                    if level2 {
+                        asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
 
-                    #[cfg(feature = "clause_elimination")]
-                    if stage == Some(true) {
+                        #[cfg(feature = "clause_elimination")]
                         elim.simplify(asg, cdb, rst, state, false)?;
-                    }
 
-                    #[cfg(feature = "dynamic_restart_threshold")]
-                    if stage == Some(true) {
-                        rst.adjust(
-                            state.stm.current_span(),
-                            // state.config.rst_lbd_thr,
-                            // state.c_lvl.get(),
-                            // state.b_lvl.get(),
-                            // cdb.derefer(crate::cdb::property::Tf64::LiteralBlockEntanglement),
-                            // cdb.refer(crate::cdb::property::TEma::LBD).get(),
-                        );
+                        #[cfg(feature = "dynamic_restart_threshold")]
+                        rst.adjust(span);
                     }
                 }
-
                 asg.clear_asserted_literals(cdb)?;
-
-                let scale = state.stm.current_scale();
-                // display the current stats. before updating stabiliation parameters
-                match stage {
-                    None => {
-                        state.log(
-                            asg.num_conflict,
-                            format!(
-                                "                     stage:{:>5}, scale:{:>5}, core:{:>9}, cpr:{:>9.2}",
-                                state.stm.current_stage(),
-                                scale,
-                                asg.derefer(assign::property::Tusize::NumUnreachableVar),
-                                asg.refer(assign::property::TEma::PropagationPerConflict)
-                                    .get(),
-                            ),
-                        );
-                    }
-                    Some(false) => {
-                        state.log(
-                            asg.num_conflict,
-                            format!(
-                                "         cycle:{:4}, stage:{:>5}",
-                                state.stm.current_cycle(),
-                                state.stm.current_stage()
-                            ),
-                        );
-                    }
-                    Some(true) => {
-                        state.log(
-                            asg.num_conflict,
-                            format!(
-                                "L2:{:4}, cycle:{:4}, stage:{:>5}, rlt:{:>7.4}",
-                                state.stm.max_scale(),
-                                state.stm.current_cycle(),
-                                state.stm.current_stage(),
-                                rst.derefer(restart::property::Tf64::RestartThreshold),
-                            ),
-                        );
-                    }
-                }
                 state.progress(asg, cdb, elim, rst);
 
                 #[cfg(feature = "Luby_stabilization")]
@@ -375,6 +326,7 @@ fn search(
                     // call the enhanced phase saver
                     asg.handle(SolverEvent::Stabilize(scale));
                 }
+                current_stage = next_stage;
             } else if rst.restart(
                 asg.refer(assign::property::TEma::AssignRate),
                 cdb.refer(cdb::property::TEma::LBD),
@@ -404,6 +356,47 @@ fn search(
         ),
     );
     Ok(true)
+}
+
+fn dump_stage(state: &mut State, asg: &AssignStack, rst: &Restarter, current_stage: Option<bool>) {
+    // display the current stats. before updating stabiliation parameters
+    let cycle = state.stm.current_cycle();
+    let scale = state.stm.current_scale();
+    let max_scale = state.stm.max_scale();
+    let stage = state.stm.current_stage();
+    match current_stage {
+        None => {
+            state.log(
+                asg.num_conflict,
+                format!(
+                    "                     stage:{:>5}, scale:{:>5}, core:{:>9}, cpr:{:>9.2}",
+                    stage,
+                    scale,
+                    asg.derefer(assign::property::Tusize::NumUnreachableVar),
+                    asg.refer(assign::property::TEma::PropagationPerConflict)
+                        .get(),
+                ),
+            );
+        }
+        Some(false) => {
+            state.log(
+                asg.num_conflict,
+                format!("         cycle:{:4}, stage:{:>5}", cycle, stage,),
+            );
+        }
+        Some(true) => {
+            state.log(
+                asg.num_conflict,
+                format!(
+                    "L2:{:4}, cycle:{:4}, stage:{:>5}, rlt:{:>7.4}",
+                    max_scale,
+                    cycle,
+                    stage,
+                    rst.derefer(restart::property::Tf64::RestartThreshold),
+                ),
+            );
+        }
+    }
 }
 
 #[cfg(feature = "boundary_check")]
