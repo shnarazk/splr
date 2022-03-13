@@ -502,10 +502,10 @@ impl StateIF for State {
 
         let rst_num_blk: usize = rst.derefer(solver::restart::property::Tusize::NumBlock);
         let rst_num_rst: usize = rst.derefer(solver::restart::property::Tusize::NumRestart);
-        let rst_int_scl_max: usize = self.stm.max_scale();
         let rst_asg: &EmaView = asg.refer(assign::property::TEma::AssignRate);
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
         let rst_lbd_thr: f64 = rst.derefer(solver::restart::property::Tf64::RestartThreshold);
+        let stg_segment: usize = self.stm.current_segment();
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -580,16 +580,11 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, thrd:{}, sclM:{}",
+            "\x1B[2K     Restart|#BLK:{}, #RST:{}, thrd:{}, #seg:{}",
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
             fm!("{:>9.4}", self, LogF64Id::RestartThreshold, rst_lbd_thr),
-            im!(
-                "{:>9}",
-                self,
-                LogUsizeId::RestartIntervalScaleMax,
-                rst_int_scl_max
-            ),
+            im!("{:>9}", self, LogUsizeId::StageSegment, stg_segment),
         );
         println!(
             "\x1B[2K         LBD|trnd:{}, avrg:{}, entg:{}, /dpc:{}",
@@ -689,7 +684,7 @@ impl State {
             cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
         self[LogUsizeId::RestartBlock] = rst.derefer(solver::restart::property::Tusize::NumBlock);
         self[LogUsizeId::Restart] = rst.derefer(solver::restart::property::Tusize::NumRestart);
-        self[LogUsizeId::RestartIntervalScaleMax] = self.stm.max_scale();
+        self[LogUsizeId::StageSegment] = self.stm.max_scale();
         self[LogUsizeId::Stabilize] = self.stm.current_stage();
         self[LogUsizeId::StabilizationCycle] = self.stm.current_cycle();
         self[LogUsizeId::Simplify] = elim.derefer(processor::property::Tusize::NumFullElimination);
@@ -943,7 +938,7 @@ pub enum LogUsizeId {
     RestartBlock,
     RestartCancel,
     RestartStabilize,
-    RestartIntervalScaleMax,
+    StageSegment,
     Stabilize,
     StabilizationCycle,
 

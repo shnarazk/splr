@@ -278,11 +278,11 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c      Restart|#BLK:{:>9}, #RST:{:>9}, thrd:{:>9}, sclM:{:>9},\n",
+            "c      Restart|#BLK:{:>9}, #RST:{:>9}, thrd:{:>9}, #seg:{:>9},\n",
             state[LogUsizeId::RestartBlock],
             state[LogUsizeId::Restart],
             state[LogF64Id::RestartThreshold],
-            state[LogUsizeId::RestartIntervalScaleMax],
+            state[LogUsizeId::StageSegment],
         )
         .as_bytes(),
     )?;
