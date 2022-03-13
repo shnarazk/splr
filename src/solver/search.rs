@@ -358,18 +358,18 @@ fn search(
     Ok(true)
 }
 
+/// display the current stats. before updating stabiliation parameters
 fn dump_stage(state: &mut State, asg: &AssignStack, rst: &Restarter, current_stage: Option<bool>) {
-    // display the current stats. before updating stabiliation parameters
     let cycle = state.stm.current_cycle();
     let scale = state.stm.current_scale();
-    let max_scale = state.stm.max_scale();
     let stage = state.stm.current_stage();
+    let segment = state.stm.current_segment();
     match current_stage {
         None => {
             state.log(
                 asg.num_conflict,
                 format!(
-                    "                     stage:{:>5}, scale:{:>5}, core:{:>9}, cpr:{:>9.2}",
+                    "                    stg:{:>5}, scale:{:>5}, core:{:>9}, cpr:{:>9.2}",
                     stage,
                     scale,
                     asg.derefer(assign::property::Tusize::NumUnreachableVar),
@@ -381,15 +381,15 @@ fn dump_stage(state: &mut State, asg: &AssignStack, rst: &Restarter, current_sta
         Some(false) => {
             state.log(
                 asg.num_conflict,
-                format!("         cycle:{:4}, stage:{:>5}", cycle, stage,),
+                format!("          cyc:{:4}, stg:{:>5}", cycle, stage,),
             );
         }
         Some(true) => {
             state.log(
                 asg.num_conflict,
                 format!(
-                    "L2:{:4}, cycle:{:4}, stage:{:>5}, rlt:{:>7.4}",
-                    max_scale,
+                    "seg:{:4}, cyc:{:4}, stg:{:>5}, rlt:{:>7.4}",
+                    segment,
                     cycle,
                     stage,
                     rst.derefer(restart::property::Tf64::RestartThreshold),
