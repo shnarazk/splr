@@ -253,8 +253,8 @@ impl RestartIF for Restarter {
     }
     #[cfg(feature = "Luby_stabilization")]
     fn set_sensibility(&mut self, step: usize, step_max: usize) {
-        self.stb_step = step; // * step;
-        self.stb_step_max = step_max; //  * step_max;
+        self.stb_step = step;
+        self.stb_step_max = step_max;
     }
     #[cfg(not(feature = "Luby_stabilization"))]
     fn set_stabilization(&mut self, _: usize, _: usize) -> Option<bool> {
@@ -270,21 +270,6 @@ impl RestartIF for Restarter {
         }
         self.num_restart_pre = self.num_restart;
     }
-    // fn adjust(&mut self, base: f64, c_lvl: f64, b_lvl: f64, used: f64, lbd: f64) {
-    //     const DECAY: f64 = 0.75;
-    //     const CONTROL_FACTOR: f64 = 0.4;
-    //     self.lbd_threshold *= DECAY;
-    //     // * The larger ratio of conflicting level to backjumped level, the smaller threshold we need.
-    //     //   Probably there are better clauses.
-    //     // * The larger learnt clauses, compared with useful clauses, we get, the smaller threshold we need.
-    //     //   Probably there are many bad branches.
-    //     self.lbd_threshold += (1.0 - DECAY)
-    //         * (c_lvl * lbd / b_lvl)
-    //             .log(used)
-    //             .max(1.0)
-    //             .powf(CONTROL_FACTOR)
-    //             .clamp(1.1, base);
-    // }
     #[cfg(feature = "Luby_restart")]
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
@@ -305,7 +290,6 @@ impl RestartIF for Restarter {
             self.lbd_threshold += LIMIT;
             self.lbd_threshold *= 0.5;
         }
-        dbg!(self.lbd_threshold);
     }
 }
 
