@@ -122,8 +122,6 @@ impl SearchStrategy {
 pub enum Stat {
     /// the number of 'no decision conflict'
     NoDecisionConflict,
-    /// the number of equivalency processor invocation
-    NumProcessor,
     /// the number of vivification
     Vivification,
     /// the number of vivified (shrunk) clauses
@@ -646,7 +644,6 @@ impl StateIF for State {
                 asg_cpr_ema.get()
             )
         );
-        self[LogUsizeId::NumProcessor] = self[Stat::NumProcessor];
         self[LogUsizeId::Simplify] = elim_num_full;
         self[LogUsizeId::Stabilize] = self.stm.current_stage();
         self[LogUsizeId::StabilizationCycle] = self.stm.current_cycle();
@@ -693,7 +690,6 @@ impl State {
         self[LogUsizeId::RestartIntervalScaleMax] = self.stm.max_scale();
         self[LogUsizeId::Stabilize] = self.stm.current_stage();
         self[LogUsizeId::StabilizationCycle] = self.stm.current_cycle();
-        self[LogUsizeId::NumProcessor] = self[Stat::NumProcessor];
         self[LogUsizeId::Simplify] = elim.derefer(processor::property::Tusize::NumFullElimination);
 
         self[LogUsizeId::SubsumedClause] =
@@ -953,7 +949,6 @@ pub enum LogUsizeId {
     //
     //## pre(in)-processor
     //
-    NumProcessor,
     Simplify,
     SubsumedClause,
     VivifiedClause,
@@ -1056,8 +1051,6 @@ pub mod property {
     pub enum Tusize {
         /// the number of 'no decision conflict'
         NumNoDecisionConflict,
-        // the number for processor invocations
-        NumProcessor,
         /// the number of vivification
         Vivification,
         /// the number of vivified (shrunk) clauses
@@ -1074,9 +1067,8 @@ pub mod property {
         IntervalScaleMax,
     }
 
-    pub const USIZES: [Tusize; 9] = [
+    pub const USIZES: [Tusize; 8] = [
         Tusize::NumNoDecisionConflict,
-        Tusize::NumProcessor,
         Tusize::Vivification,
         Tusize::VivifiedClause,
         Tusize::VivifiedVar,
@@ -1091,7 +1083,6 @@ pub mod property {
         fn derefer(&self, k: Tusize) -> usize {
             match k {
                 Tusize::NumNoDecisionConflict => self[Stat::NoDecisionConflict],
-                Tusize::NumProcessor => self[Stat::NumProcessor],
                 Tusize::Vivification => self[Stat::Vivification],
                 Tusize::VivifiedClause => self[Stat::VivifiedClause],
                 Tusize::VivifiedVar => self[Stat::VivifiedVar],

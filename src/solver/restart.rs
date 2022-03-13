@@ -263,7 +263,7 @@ impl RestartIF for Restarter {
     }
     #[cfg(feature = "dynamic_restart_threshold")]
     fn adjust(&mut self, span: usize) {
-        let center: f64 = 1.1;
+        let center: f64 = 1.2;
         let increase = (self.num_restart - self.num_restart_1) as f64;
         let scale = increase.max(2.0).log(span as f64) - center;
         if 0.2 < scale.abs() {

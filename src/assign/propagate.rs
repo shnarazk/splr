@@ -730,7 +730,7 @@ impl PropagateIF for AssignStack {
         Ok(())
     }
     fn clear_asserted_literals(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
-        assert_eq!(self.decision_level(), self.root_level);
+        debug_assert_eq!(self.decision_level(), self.root_level);
         loop {
             if self.remains() {
                 self.propagate_sandbox(cdb)

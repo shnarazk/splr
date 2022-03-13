@@ -12,7 +12,7 @@ use {
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
         cdb::{self, ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
-        state::{Stat, State, StateIF},
+        state::{State, StateIF},
         types::*,
     },
 };
@@ -63,7 +63,6 @@ impl SolveIF for Solver {
         state.flush("");
         state.flush("Preprocessing stage: ");
 
-        state[Stat::NumProcessor] += 1;
         #[cfg(feature = "clause_vivification")]
         {
             state.flush("vivifying...");
@@ -78,7 +77,7 @@ impl SolveIF for Solver {
             assert!(!asg.remains());
         }
         debug_assert_eq!(asg.decision_level(), asg.root_level());
-        if elim.simplify(asg, cdb, rst, state).is_err() {
+        if elim.simplify(asg, cdb, rst, state, true).is_err() {
             if cdb.check_size().is_err() {
                 return Err(SolverError::OutOfMemory);
             }
@@ -99,7 +98,6 @@ impl SolveIF for Solver {
             // Otherwise all literals are assigned wrongly.
 
             state.flush("phasing...");
-            elim.activate();
             elim.prepare(asg, cdb, true);
             for vi in 1..=asg.num_vars {
                 if asg.assign(vi).is_some() {
@@ -136,7 +134,7 @@ impl SolveIF for Solver {
             //
             if USE_PRE_PROCESSING_ELIMINATOR {
                 state.flush("simplifying...");
-                if elim.simplify(asg, cdb, rst, state).is_err() {
+                if elim.simplify(asg, cdb, rst, state, false).is_err() {
                     // Why inconsistent? Because the CNF contains a conflict, not an error!
                     // Or out of memory.
                     state.progress(asg, cdb, elim, rst);
@@ -312,9 +310,7 @@ fn search(
 
                     #[cfg(feature = "clause_elimination")]
                     if stage == Some(true) {
-                        elim.activate();
-                        elim.simplify(asg, cdb, rst, state)?;
-                        state[Stat::NumProcessor] += 1;
+                        elim.simplify(asg, cdb, rst, state, false)?;
                     }
 
                     #[cfg(feature = "dynamic_restart_threshold")]

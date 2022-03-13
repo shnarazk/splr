@@ -220,20 +220,12 @@ impl Instantiate for Eliminator {
 }
 
 impl EliminateIF for Eliminator {
-    fn activate(&mut self) {
-        if self.enable {
-            debug_assert!(self.mode != EliminatorMode::Running);
-            self.mode = EliminatorMode::Waiting;
-        }
-    }
     fn is_running(&self) -> bool {
         self.enable && self.mode == EliminatorMode::Running
     }
     fn prepare(&mut self, asg: &mut impl AssignIF, cdb: &mut impl ClauseDBIF, force: bool) {
         debug_assert!(self.enable);
-        if self.mode != EliminatorMode::Waiting {
-            return;
-        }
+        debug_assert_eq!(self.mode, EliminatorMode::Dormant);
         self.mode = EliminatorMode::Running;
         for w in &mut self[1..] {
             w.clear();
@@ -254,6 +246,7 @@ impl EliminateIF for Eliminator {
                 self.enqueue_var(asg, vi, true);
             }
         }
+        debug_assert_eq!(self.mode, EliminatorMode::Running);
     }
     fn enqueue_var(&mut self, asg: &mut impl AssignIF, vi: VarId, upward: bool) {
         if self.mode != EliminatorMode::Running {
@@ -271,6 +264,7 @@ impl EliminateIF for Eliminator {
         cdb: &mut impl ClauseDBIF,
         rst: &mut impl RestartIF,
         state: &mut State,
+        force_run: bool,
     ) -> MaybeInconsistent {
         debug_assert_eq!(asg.decision_level(), 0);
         // we can reset all the reasons because decision level is zero.
@@ -287,20 +281,17 @@ impl EliminateIF for Eliminator {
             }
         }
         if self.enable {
+            if !force_run && self.mode == EliminatorMode::Dormant {
+                self.prepare(asg, cdb, true);
+            }
             self.eliminate_grow_limit = state.derefer(state::property::Tusize::IntervalScale) / 2;
             self.subsume_literal_limit = state.config.elm_cls_lim
                 + cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement) as usize;
-            if self.is_waiting() {
-                self.prepare(asg, cdb, true);
-            }
             debug_assert!(!cdb
                 .derefer(cdb::property::Tf64::LiteralBlockEntanglement)
                 .is_nan());
             // self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
             self.eliminate(asg, cdb, rst, state)?;
-            if self.is_running() {
-                self.stop(asg, cdb);
-            }
         } else {
             asg.propagate_sandbox(cdb)
                 .map_err(SolverError::RootLevelConflict)?;
@@ -398,10 +389,6 @@ impl Eliminator {
                 self.enqueue_var(asg, l.vi(), true);
             }
         }
-    }
-    /// check if the eliminator is active and waits for next `eliminate`.
-    fn is_waiting(&self) -> bool {
-        self.mode == EliminatorMode::Waiting
     }
     /// set eliminator's mode to **dormant**.
     // Due to a potential bug of killing clauses and difficulty about

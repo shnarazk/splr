@@ -53,8 +53,6 @@ use {
 /// assert_eq!(elim.simplify(&mut s.asg, &mut s.cdb, &mut s.rst, &mut s.state), Ok(()));
 ///```
 pub trait EliminateIF: Instantiate {
-    /// set eliminator's mode to **ready**.
-    fn activate(&mut self);
     /// check if the eliminator is running.
     fn is_running(&self) -> bool;
     /// rebuild occur lists.
@@ -64,6 +62,7 @@ pub trait EliminateIF: Instantiate {
     /// simplify database by:
     /// * removing satisfiable clauses
     /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.
+    /// Note: `force_run` is used only at the beginning of `solve' for simple satisfiability check
     ///
     /// # Errors
     ///
@@ -74,6 +73,7 @@ pub trait EliminateIF: Instantiate {
         cdb: &mut impl ClauseDBIF,
         rst: &mut impl RestartIF,
         state: &mut State,
+        force_run: bool,
     ) -> MaybeInconsistent;
     /// return the order of vars based on their occurrences
     fn sorted_iterator(&self) -> Iter<'_, u32>;
@@ -86,7 +86,6 @@ pub trait EliminateIF: Instantiate {
 #[derive(Copy, Clone, Eq, Debug, PartialEq)]
 enum EliminatorMode {
     Dormant,
-    Waiting,
     Running,
 }
 
