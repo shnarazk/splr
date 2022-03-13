@@ -372,7 +372,6 @@ mod tests {
         let mut timedout = 10_000;
         let vi = 4;
 
-        elim.activate();
         elim.prepare(asg, cdb, true);
         eliminate_var(asg, cdb, elim, rst, state, vi, &mut timedout).expect("panic");
         assert!(asg.var(vi).is(FlagVar::ELIMINATED));
