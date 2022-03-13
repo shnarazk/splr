@@ -295,6 +295,9 @@ fn search(
                 cdb.check_consistency(asg, "before simplify");
 
                 dump_stage(state, asg, rst, current_stage);
+                #[cfg(feature = "dynamic_restart_threshold")]
+                let span_pre = state.stm.current_span();
+
                 let next_stage: Option<bool> = state.stm.prepare_new_stage(
                     (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt()
                         as usize,
@@ -302,21 +305,21 @@ fn search(
                 );
                 let scale = state.stm.current_scale();
                 let max_scale = state.stm.max_scale();
-                if let Some(level2) = next_stage {
+                if let Some(new_segment) = next_stage {
                     asg.stage_scale = scale;
 
                     #[cfg(feature = "clause_vivification")]
                     cdb.vivify(asg, rst, state)?;
 
-                    if level2 {
+                    if new_segment {
                         asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
 
                         #[cfg(feature = "clause_elimination")]
                         elim.simplify(asg, cdb, rst, state, false)?;
 
                         #[cfg(feature = "dynamic_restart_threshold")]
-                        if 0 < state.stm.current_segment() {
-                            rst.adjust(state.stm.current_span());
+                        if 1 < state.stm.current_segment() {
+                            rst.adjust(span_pre);
                         }
                     }
                 }

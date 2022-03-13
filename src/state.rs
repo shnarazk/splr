@@ -582,8 +582,8 @@ impl StateIF for State {
         println!(
             "\x1B[2K     Restart|#BLK:{}, #RST:{}, thrd:{}, sclM:{}",
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
-            im!("{:>9.4}", self, LogUsizeId::Restart, rst_num_rst),
-            fm!("{:>9}", self, LogF64Id::RestartThreshold, rst_lbd_thr),
+            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
+            fm!("{:>9.4}", self, LogF64Id::RestartThreshold, rst_lbd_thr),
             im!(
                 "{:>9}",
                 self,

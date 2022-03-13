@@ -103,10 +103,7 @@ impl Default for ProgressLuby {
 impl Instantiate for ProgressLuby {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressLuby {
-            #[cfg(feature = "Luby_restart")]
-            enable: true,
-            #[cfg(not(feature = "Luby_restart"))]
-            enable: false,
+            enable: cfg!(feature = "Luby_restart"),
             step: config.rst_step,
             ..ProgressLuby::default()
         }
