@@ -319,7 +319,7 @@ fn search(
 
                         #[cfg(feature = "dynamic_restart_threshold")]
                         if 1 < state.stm.current_segment() {
-                            rst.adjust(span_pre);
+                            rst.adjust_threshold(span_pre);
                         }
                     }
                 }

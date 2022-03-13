@@ -27,7 +27,7 @@ pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> 
     fn set_sensibility(&mut self, step: usize, step_max: usize);
     #[cfg(feature = "dynamic_restart_threshold")]
     /// adjust restart threshold
-    fn adjust(&mut self, max_scale: usize);
+    fn adjust_threshold(&mut self, max_scale: usize);
     #[cfg(feature = "Luby_restart")]
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
@@ -261,7 +261,7 @@ impl RestartIF for Restarter {
         None
     }
     #[cfg(feature = "dynamic_restart_threshold")]
-    fn adjust(&mut self, span: usize) {
+    fn adjust_threshold(&mut self, span: usize) {
         let center: f64 = 1.0;
         let increase = (self.num_restart - self.num_restart_pre) as f64;
         let scale = increase.log(span as f64) - center;
