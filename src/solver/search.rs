@@ -68,9 +68,8 @@ impl SolveIF for Solver {
             state.flush("vivifying...");
             if cdb.vivify(asg, rst, state).is_err() {
                 #[cfg(feature = "support_user_assumption")]
-                {
-                    analyze_final(asg, state, &cdb[ci]);
-                }
+                analyze_final(asg, state, &cdb[ci]);
+
                 state.log(asg.num_conflict, "By vivifier as a pre-possessor");
                 return Ok(Certificate::UNSAT);
             }
@@ -174,9 +173,8 @@ impl SolveIF for Solver {
         match answer {
             Ok(true) => {
                 #[cfg(feature = "trace_equivalency")]
-                {
-                    asg.dump_cnf(cdb, "last-step.cnf");
-                }
+                asg.dump_cnf(cdb, "last-step.cnf");
+
                 // As a preparation for incremental solving, we need to backtrack to the
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
@@ -214,9 +212,8 @@ impl SolveIF for Solver {
             }
             Ok(false) | Err(SolverError::EmptyClause | SolverError::RootLevelConflict(_)) => {
                 #[cfg(feature = "support_user_assumption")]
-                {
-                    analyze_final(asg, state, &cdb[ci]);
-                }
+                analyze_final(asg, state, &cdb[ci]);
+
                 RESTART!(asg, rst);
                 Ok(Certificate::UNSAT)
             }
