@@ -322,8 +322,6 @@ impl Config {
                 "use 'just used' flag",
                 #[cfg(feature = "LRB_rewarding")]
                 "Learning-Rate Based rewarding",
-                #[cfg(feature = "Luby_restart")]
-                "Luby restart",
                 #[cfg(feature = "Luby_stabilization")]
                 "Luby stabilization",
                 #[cfg(feature = "reason_side_rewarding")]

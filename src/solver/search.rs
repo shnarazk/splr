@@ -244,9 +244,6 @@ fn search(
     #[cfg(feature = "strategy_adaptation")]
     let mut a_decision_was_made = false;
 
-    #[cfg(feature = "Luby_restart")]
-    rst.update(ProgressUpdate::Luby);
-
     state.stm.initialize(
         (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
     );

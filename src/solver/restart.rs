@@ -1,5 +1,5 @@
 //! Crate `restart` provides restart heuristics.
-use {crate::types::*, splr_luby::LubySeries, std::fmt};
+use crate::types::*;
 
 /// API for restart condition.
 trait ProgressEvaluator {
@@ -11,14 +11,6 @@ trait ProgressEvaluator {
     fn shift(&mut self);
 }
 
-/// Update progress observer sub-modules
-#[cfg(feature = "Luby_restart")]
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-enum ProgressUpdate {
-    Counter,
-    Luby,
-}
-
 /// API for [`restart`](`crate::solver::RestartIF::restart`) and [`stabilize`](`crate::solver::RestartIF::stabilize`).
 pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> {
     /// check blocking and forcing restart condition.
@@ -28,125 +20,6 @@ pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> 
     #[cfg(feature = "dynamic_restart_threshold")]
     /// adjust restart threshold
     fn adjust_threshold(&mut self, max_scale: usize, segment: usize);
-    #[cfg(feature = "Luby_restart")]
-    /// update specific sub-module
-    fn update(&mut self, kind: ProgressUpdate);
-
-    #[cfg(feature = "Luby_restart")]
-    /// dynamic adaptation of restart interval
-    fn scale_restart_step(&mut self, scale: f64);
-}
-
-/// An EMA of decision level.
-#[derive(Clone, Debug)]
-struct ProgressLVL {
-    ema: Ema2,
-}
-
-impl Instantiate for ProgressLVL {
-    fn instantiate(_: &Config, _: &CNFDescription) -> Self {
-        ProgressLVL {
-            ema: Ema2::new(100).with_slow(800),
-        }
-    }
-}
-
-impl EmaIF for ProgressLVL {
-    fn get_fast(&self) -> f64 {
-        self.ema.get_fast()
-    }
-    fn trend(&self) -> f64 {
-        self.ema.trend()
-    }
-}
-
-impl EmaMutIF for ProgressLVL {
-    type Input = usize;
-    fn update(&mut self, l: usize) {
-        self.ema.update(l as f64);
-    }
-    fn as_view(&self) -> &EmaView {
-        unimplemented!()
-    }
-}
-
-impl ProgressEvaluator for ProgressLVL {
-    fn is_active(&self) -> bool {
-        todo!()
-    }
-    fn shift(&mut self) {}
-}
-
-/// An implementation of Luby series.
-#[derive(Clone, Debug)]
-struct ProgressLuby {
-    enable: bool,
-    active: bool,
-    luby: LubySeries,
-    next_restart: usize,
-    step: usize,
-}
-
-impl Default for ProgressLuby {
-    fn default() -> Self {
-        const STEP: usize = 100;
-        ProgressLuby {
-            enable: false,
-            active: false,
-            luby: LubySeries::default(),
-            next_restart: STEP,
-            step: STEP,
-        }
-    }
-}
-
-impl Instantiate for ProgressLuby {
-    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
-        ProgressLuby {
-            enable: cfg!(feature = "Luby_restart"),
-            step: config.rst_step,
-            ..ProgressLuby::default()
-        }
-    }
-}
-
-impl fmt::Display for ProgressLuby {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.enable {
-            write!(f, "Luby[step:{}]", self.next_restart)
-        } else {
-            write!(f, "Luby(deactivated)")
-        }
-    }
-}
-
-impl EmaIF for ProgressLuby {
-    fn get_fast(&self) -> f64 {
-        self.next_restart as f64
-    }
-}
-
-impl EmaMutIF for ProgressLuby {
-    type Input = usize;
-    fn update(&mut self, now: usize) {
-        if !self.enable {
-            return;
-        }
-        self.active = self.next_restart < now;
-    }
-    fn as_view(&self) -> &EmaView {
-        unimplemented!()
-    }
-}
-
-impl ProgressEvaluator for ProgressLuby {
-    fn is_active(&self) -> bool {
-        self.enable && self.active
-    }
-    fn shift(&mut self) {
-        self.active = false;
-        self.next_restart = self.step * self.luby.next_unchecked();
-    }
 }
 
 /// `Restarter` provides restart API and holds data about restart conditions.
@@ -158,9 +31,6 @@ pub struct Restarter {
     /// For force restart based on average LBD of newly generated clauses: 0.80.
     /// This is called `K` in Glucose
     lbd_threshold: f64,
-
-    #[cfg(feature = "Luby_restart")]
-    luby: ProgressLuby,
 
     after_restart: usize,
     restart_step: usize,
@@ -186,9 +56,6 @@ impl Instantiate for Restarter {
         Restarter {
             asg_threshold: config.rst_asg_thr,
             lbd_threshold: config.rst_lbd_thr,
-
-            #[cfg(feature = "Luby_restart")]
-            luby: ProgressLuby::instantiate(config, cnf),
             restart_step: config.rst_step,
             initial_restart_step: config.rst_step,
 
@@ -224,14 +91,6 @@ impl RestartIF for Restarter {
             };
         }
         self.after_restart += 1;
-        #[cfg(feature = "Luby_restart")]
-        {
-            if self.luby.is_active() {
-                self.luby.shift();
-                self.restart_step = next_step!();
-                return Some(RestartDecision::Force);
-            }
-        }
         if self.after_restart < self.restart_step {
             return None;
         }
@@ -277,27 +136,6 @@ impl RestartIF for Restarter {
         //     scale,
         //     self.lbd_threshold,
         // );
-    }
-    #[cfg(feature = "Luby_restart")]
-    fn update(&mut self, kind: ProgressUpdate) {
-        match kind {
-            ProgressUpdate::Counter => {
-                self.luby.update(self.after_restart);
-            }
-            // ProgressUpdate::ASG(val) => self.asg.update(val),
-            ProgressUpdate::Luby => self.luby.update(0),
-        }
-    }
-    #[cfg(feature = "Luby_restart")]
-    fn scale_restart_step(&mut self, scale: f64) {
-        const LIMIT: f64 = 1.2;
-        let thr = self.lbd_threshold * scale;
-        if LIMIT <= thr {
-            self.lbd_threshold = thr;
-        } else {
-            self.lbd_threshold += LIMIT;
-            self.lbd_threshold *= 0.5;
-        }
     }
 }
 

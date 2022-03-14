@@ -1,7 +1,5 @@
 //! Conflict Analysis
 
-#[cfg(feature = "Luby_restart")]
-use super::restart::{ProgressUpdate, RestartIF};
 #[cfg(feature = "boundary_check")]
 use crate::assign::DebugReportIF;
 
@@ -48,10 +46,6 @@ pub fn handle_conflict(
     let chronobt = 1000 < asg.num_conflict && 0 < state.config.c_cbt_thr;
     #[cfg(not(feature = "chrono_BT"))]
     let chronobt: bool = false;
-
-    #[cfg(feature = "Luby_restart")]
-    rst.update(ProgressUpdate::Counter);
-    // rst.block_restart(); // to update asg progress_evaluator
 
     #[cfg(feature = "chrono_BT")]
     {
