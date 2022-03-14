@@ -263,11 +263,11 @@ impl RestartIF for Restarter {
     #[cfg(feature = "dynamic_restart_threshold")]
     fn adjust_threshold(&mut self, span: usize, segment: usize) {
         let center: f64 = 1.0;
-        let increase = (self.num_restart - self.num_restart_pre) as f64;
-        let scale = increase.log((segment.pow(2) * span) as f64) - center;
-        if 0.25 < scale.abs() {
-            self.lbd_threshold = self.lbd_threshold.powf(center + 0.5 * scale);
-        }
+        let expects = segment as f64 * span as f64;
+        let restarts = (self.num_restart - self.num_restart_pre) as f64;
+        let index = restarts.log(expects) - center;
+        let scale = 0.2 * index.signum() * index.powi(2);
+        self.lbd_threshold = self.lbd_threshold.powf(center + scale);
         self.num_restart_pre = self.num_restart;
         // println!(
         //     "segment:{:>4}, scaled span:{:>5}, increase:{:>5}, scale:{:>8.3}, threshold:{:8.3}",
