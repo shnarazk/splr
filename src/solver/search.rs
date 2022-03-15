@@ -280,13 +280,10 @@ fn search(
                     }
                     if new_segment {
                         asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
-
                         if cfg!(feature = "clause_elimination") {
                             elim.simplify(asg, cdb, rst, state, false)?;
                         }
-                        if cfg!(feature = "dynamic_restart_threshold")
-                            && 1 < state.stm.current_segment()
-                        {
+                        if cfg!(feature = "dynamic_restart_threshold") {
                             rst.adjust_threshold(span_pre, state.stm.current_segment());
                         }
                     }

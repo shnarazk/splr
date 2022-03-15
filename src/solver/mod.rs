@@ -39,7 +39,7 @@ pub enum Certificate {
 pub type SolverResult = Result<Certificate, SolverError>;
 
 /// define sub-modules' responsibilities
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SolverEvent {
     /// asserting a var.
     Assert(VarId),

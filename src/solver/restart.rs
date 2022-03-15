@@ -1,24 +1,14 @@
 //! Crate `restart` provides restart heuristics.
 use crate::types::*;
 
-/// API for restart condition.
-trait ProgressEvaluator {
-    /// map the value into a bool for forcing/blocking restart.
-    fn is_active(&self) -> bool;
-    /// reset internal state to the initial one.
-    fn reset_progress(&mut self) {}
-    /// calculate and set up the next condition.
-    fn shift(&mut self);
-}
-
 /// API for [`restart`](`crate::solver::RestartIF::restart`) and [`stabilize`](`crate::solver::RestartIF::stabilize`).
 pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> {
+    /// adjust restart threshold
+    fn adjust_threshold(&mut self, max_scale: usize, segment: usize);
     /// check blocking and forcing restart condition.
     fn restart(&mut self, asg: &EmaView, lbd: &EmaView) -> Option<RestartDecision>;
     /// set stabilization parameters
     fn set_sensibility(&mut self, step: usize, step_max: usize);
-    /// adjust restart threshold
-    fn adjust_threshold(&mut self, max_scale: usize, segment: usize);
 }
 
 /// `Restarter` provides restart API and holds data about restart conditions.
@@ -55,18 +45,13 @@ impl Instantiate for Restarter {
             lbd_threshold: config.rst_lbd_thr,
             restart_step: config.rst_step,
             initial_restart_step: config.rst_step,
-
             ..Restarter::default()
         }
     }
     fn handle(&mut self, e: SolverEvent) {
-        match e {
-            SolverEvent::Assert(_) => (),
-            SolverEvent::Restart => {
-                self.after_restart = 0;
-                self.num_restart += 1;
-            }
-            _ => (),
+        if e == SolverEvent::Restart {
+            self.after_restart = 0;
+            self.num_restart += 1;
         }
     }
 }
@@ -81,6 +66,26 @@ pub enum RestartDecision {
 }
 
 impl RestartIF for Restarter {
+    fn adjust_threshold(&mut self, span: usize, segment: usize) {
+        let center: f64 = 0.9;
+        let expects = (span * 2_usize.pow(segment as u32) / self.initial_restart_step) as f64;
+        if expects < 100.0 {
+            return;
+        }
+        let restarts = (self.num_restart - self.num_restart_pre) as f64;
+        let scale = restarts.log(expects) - center;
+        let s = 0.7 * scale.signum() * scale.powi(2);
+        self.lbd_threshold = self.lbd_threshold.powf(center + s);
+        self.num_restart_pre = self.num_restart;
+        // println!(
+        //     "segment:{:>4}, scaled span:{:>5}, increase:{:>5}, scale:{:>8.3}, threshold:{:8.3}",
+        //     segment,
+        //     segment.pow(2) * span,
+        //     increase,
+        //     scale,
+        //     self.lbd_threshold,
+        // );
+    }
     fn restart(&mut self, asg: &EmaView, lbd: &EmaView) -> Option<RestartDecision> {
         macro_rules! next_step {
             () => {
@@ -110,23 +115,6 @@ impl RestartIF for Restarter {
     fn set_sensibility(&mut self, step: usize, step_max: usize) {
         self.stb_step = step;
         self.stb_step_max = step_max;
-    }
-    fn adjust_threshold(&mut self, span: usize, segment: usize) {
-        let center: f64 = 0.9;
-        let expects = (span * 2_usize.pow(segment as u32) / self.initial_restart_step) as f64;
-        let restarts = (self.num_restart - self.num_restart_pre) as f64;
-        let scale = restarts.log(expects) - center;
-        let s = 0.6 * scale.signum() * scale.powi(2);
-        self.lbd_threshold = self.lbd_threshold.powf(center + s);
-        self.num_restart_pre = self.num_restart;
-        // println!(
-        //     "segment:{:>4}, scaled span:{:>5}, increase:{:>5}, scale:{:>8.3}, threshold:{:8.3}",
-        //     segment,
-        //     segment.pow(2) * span,
-        //     increase,
-        //     scale,
-        //     self.lbd_threshold,
-        // );
     }
 }
 
