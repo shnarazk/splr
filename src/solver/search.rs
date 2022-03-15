@@ -238,9 +238,6 @@ fn search(
     #[cfg(feature = "clause_elimination")]
     let mut num_learnt = 0;
 
-    #[cfg(feature = "strategy_adaptation")]
-    let mut a_decision_was_made = false;
-
     state.stm.initialize(
         (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
     );
@@ -248,24 +245,11 @@ fn search(
         if !asg.remains() {
             let lit = asg.select_decision_literal();
             asg.assign_by_decision(lit);
-
-            #[cfg(feature = "strategy_adaptation")]
-            {
-                a_decision_was_made = true;
-            }
         }
         if let Err(cc) = asg.propagate(cdb) {
             if asg.decision_level() == asg.root_level() {
                 return Err(SolverError::RootLevelConflict(cc));
             }
-
-            #[cfg(feature = "strategy_adaptation")]
-            if a_decision_was_made {
-                a_decision_was_made = false;
-            } else {
-                state[Stat::NoDecisionConflict] += 1;
-            }
-
             asg.update_activity_tick();
 
             #[cfg(feature = "clause_rewarding")]
@@ -337,10 +321,6 @@ fn search(
             if let Some(na) = asg.best_assigned() {
                 state.flush("");
                 state.flush(format!("unreachable core: {}", na));
-            }
-            #[cfg(feature = "strategy_adaptation")]
-            if asg.num_conflict % (10 * state.reflection_interval) == 0 {
-                adapt_modules(asg, cdb, rst, state);
             }
         }
     }
@@ -458,28 +438,6 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
         );
         panic!();
     }
-}
-
-#[cfg(feature = "strategy_adaptation")]
-fn adapt_modules(
-    asg: &mut AssignStack,
-    cdb: &mut ClauseDB,
-    rst: &mut Restarter,
-    state: &mut State,
-) {
-    let asg_num_conflict = asg.num_conflict;
-    if 10 * state.reflection_interval == asg_num_conflict {
-        // Need to call it before `cdb.adapt_to`
-        // 'decision_level == 0' is required by `cdb.adapt_to`.
-        RESTART!(asg, rst);
-        state.select_strategy(asg, cdb);
-    }
-    #[cfg(feature = "boundary_check")]
-    debug_assert!(state.strategy.1 != asg_num_conflict || 0 == asg.decision_level());
-
-    asg.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
-    cdb.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
-    rst.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
 }
 
 #[cfg(feature = "support_user_assumption")]

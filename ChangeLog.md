@@ -11,6 +11,7 @@
     - var activity rescaling
     - restart threshold reconfiguration
   - drop `solver::restart::GeometricStabilizer` and `solver::restart::ProgressLuby`
+- Drop feature 'strategy_adaptation'
 
 ## 0.14.0, 2021-11-01
 

@@ -328,8 +328,6 @@ impl Config {
                 "reason-side rewarding",
                 #[cfg(feature = "rephase")]
                 "stage-based rephase",
-                #[cfg(feature = "strategy_adaptation")]
-                "strategy adaptation",
                 #[cfg(feature = "suppress_reason_chain")]
                 "suppress reason chain",
                 #[cfg(feature = "trail_saving")]

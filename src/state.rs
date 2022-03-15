@@ -1,5 +1,3 @@
-#[cfg(feature = "strategy_adaptation")]
-use {crate::assign::AssignIF, std::cmp::Ordering};
 /// Crate `state` is a collection of internal data.
 use {
     crate::{
@@ -14,10 +12,7 @@ use {
         time::{Duration, Instant},
     },
 };
-#[cfg(not(feature = "strategy_adaptation"))]
 const PROGRESS_REPORT_ROWS: usize = 8;
-#[cfg(feature = "strategy_adaptation")]
-const PROGRESS_REPORT_ROWS: usize = 9;
 
 /// API for state/statistics management, providing [`progress`](`crate::state::StateIF::progress`).
 pub trait StateIF {
@@ -26,14 +21,6 @@ pub trait StateIF {
     /// return elapsed time as a fraction.
     /// return None if something is wrong.
     fn elapsed(&self) -> Option<f64>;
-
-    #[cfg(feature = "strategy_adaptation")]
-    /// change heuristics based on stat data.
-    fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
-    where
-        A: AssignIF,
-        C: PropertyDereference<cdb::property::Tusize, usize>;
-
     /// write a header of stat data to stdio.
     fn progress_header(&mut self);
     /// write stat data to stdio.
@@ -53,76 +40,9 @@ pub trait StateIF {
     fn log<S: AsRef<str>>(&mut self, tick: usize, mes: S);
 }
 
-#[cfg(feature = "strategy_adaptation")]
-/// A collection of named search heuristics.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SearchStrategy {
-    /// The initial search phase to determine a main strategy
-    Initial,
-    /// Non-Specific-Instance using a generic setting
-    Generic,
-    /// Many-Low-Level-Conflicts using Chan Seok heuristics
-    LowDecisions,
-    /// High-Successive-Conflicts using Chan Seok heuristics
-    HighSuccessive,
-    /// Low-Successive-Conflicts using Luby sequence
-    LowSuccessive,
-    /// Many-Glue-Clauses
-    ManyGlues,
-}
-
-#[cfg(feature = "strategy_adaptation")]
-impl fmt::Display for SearchStrategy {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        if formatter.alternate() {
-            write!(formatter, "{}", self.to_str())
-        } else {
-            let name = match self {
-                SearchStrategy::Initial => "Initial",
-                SearchStrategy::Generic => "Generic",
-                SearchStrategy::LowDecisions => "LowDecs",
-                SearchStrategy::HighSuccessive => "HighSucc",
-                SearchStrategy::LowSuccessive => "LowSucc",
-                SearchStrategy::ManyGlues => "ManyGlue",
-            };
-            if let Some(w) = formatter.width() {
-                match name.len().cmp(&w) {
-                    Ordering::Equal => write!(formatter, "{}", name),
-                    Ordering::Less => write!(formatter, "{}{}", " ".repeat(w - name.len()), name),
-                    Ordering::Greater => write!(formatter, "{}", &name[..w]),
-                }
-            } else {
-                write!(formatter, "{}", name)
-            }
-        }
-    }
-}
-
-#[cfg(feature = "strategy_adaptation")]
-impl SearchStrategy {
-    pub fn to_str(self) -> &'static str {
-        match self {
-            // in the initial search phase to determine a main strategy
-            SearchStrategy::Initial => "Initial search phase before a main strategy",
-            // Non-Specific-Instance using a generic setting
-            SearchStrategy::Generic => "Generic (using a generic parameter set)",
-            // Many-Low-Level-Conflicts using Chan Seok heuristics
-            SearchStrategy::LowDecisions => "LowDecisions (many conflicts at low levels)",
-            // High-Successive-Conflicts using Chan Seok heuristics
-            SearchStrategy::HighSuccessive => "HighSuccessiveConflict (long decision chains)",
-            // Low-Successive-Conflicts-Luby w/ Luby sequence
-            SearchStrategy::LowSuccessive => "LowSuccessive (successive conflicts)",
-            // Many-Glue-Clauses
-            SearchStrategy::ManyGlues => "ManyGlueClauses",
-        }
-    }
-}
-
 /// stat index.
 #[derive(Clone, Eq, PartialEq)]
 pub enum Stat {
-    /// the number of 'no decision conflict'
-    NoDecisionConflict,
     /// the number of vivification
     Vivification,
     /// the number of vivified (shrunk) clauses
@@ -167,11 +87,6 @@ pub struct State {
     pub stats: [usize; Stat::EndOfStatIndex as usize],
     /// StageManager
     pub stm: StageManager,
-
-    #[cfg(feature = "strategy_adaptation")]
-    /// tuple of current strategy and the number of conflicts at which the strategy is selected.
-    pub strategy: (SearchStrategy, usize),
-
     /// problem description
     pub target: CNFDescription,
     /// strategy adjustment interval in conflict
@@ -215,10 +130,6 @@ impl Default for State {
             config: Config::default(),
             stats: [0; Stat::EndOfStatIndex as usize],
             stm: StageManager::default(),
-
-            #[cfg(feature = "strategy_adaptation")]
-            strategy: (SearchStrategy::Initial, 0),
-
             target: CNFDescription::default(),
             reflection_interval: 10_000,
 
@@ -270,10 +181,6 @@ impl Instantiate for State {
         State {
             config: config.clone(),
             stm: StageManager::instantiate(config, cnf),
-
-            #[cfg(feature = "strategy_adaptation")]
-            strategy: (SearchStrategy::Initial, 0),
-
             target: cnf.clone(),
             time_limit: config.c_timeout,
             ..State::default()
@@ -294,9 +201,6 @@ impl Instantiate for State {
 
             #[cfg(feature = "clause_vivification")]
             SolverEvent::Vivify(_) => (),
-
-            #[cfg(feature = "strategy_adaptation")]
-            SolverEvent::Adapt(_, _) => (),
         }
     }
 }
@@ -397,29 +301,6 @@ impl StateIF for State {
             self.start.elapsed().as_secs_f64()
                 / Duration::from_secs(self.config.c_timeout as u64).as_secs_f64(),
         )
-    }
-    #[cfg(feature = "strategy_adaptation")]
-    fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
-    where
-        A: AssignIF,
-        C: PropertyDereference<cdb::property::Tusize, usize>,
-    {
-        let asg_num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
-        let asg_num_decision = asg.derefer(assign::property::Tusize::NumDecision);
-        let cdb_num_bi_learnt = cdb.derefer(cdb::property::Tusize::NumBiLearnt);
-        let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
-
-        debug_assert_eq!(self.strategy.0, SearchStrategy::Initial);
-        self.strategy.0 = match () {
-            _ if cdb_num_bi_learnt + 20_000 < cdb_num_lbd2 => SearchStrategy::ManyGlues,
-            _ if asg_num_decision as f64 <= 1.2 * asg_num_conflict as f64 => {
-                SearchStrategy::LowDecisions
-            }
-            _ if self[Stat::NoDecisionConflict] < 15_000 => SearchStrategy::LowSuccessive,
-            _ if 54_400 < self[Stat::NoDecisionConflict] => SearchStrategy::HighSuccessive,
-            _ => SearchStrategy::Generic,
-        };
-        self.strategy.1 = asg_num_conflict;
     }
     fn progress_header(&mut self) {
         if !self.config.splr_interface || self.config.quiet_mode {
@@ -645,11 +526,6 @@ impl StateIF for State {
         self[LogUsizeId::Stabilize] = self.stm.current_stage();
         self[LogUsizeId::StabilizationCycle] = self.stm.current_cycle();
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
-
-        #[cfg(feature = "strategy_adaptation")]
-        {
-            println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
-        }
         self.flush("");
     }
 }
@@ -1046,8 +922,6 @@ pub mod property {
 
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tusize {
-        /// the number of 'no decision conflict'
-        NumNoDecisionConflict,
         /// the number of vivification
         Vivification,
         /// the number of vivified (shrunk) clauses
@@ -1064,8 +938,7 @@ pub mod property {
         IntervalScaleMax,
     }
 
-    pub const USIZES: [Tusize; 8] = [
-        Tusize::NumNoDecisionConflict,
+    pub const USIZES: [Tusize; 7] = [
         Tusize::Vivification,
         Tusize::VivifiedClause,
         Tusize::VivifiedVar,
@@ -1079,7 +952,6 @@ pub mod property {
         #[inline]
         fn derefer(&self, k: Tusize) -> usize {
             match k {
-                Tusize::NumNoDecisionConflict => self[Stat::NoDecisionConflict],
                 Tusize::Vivification => self[Stat::Vivification],
                 Tusize::VivifiedClause => self[Stat::VivifiedClause],
                 Tusize::VivifiedVar => self[Stat::VivifiedVar],

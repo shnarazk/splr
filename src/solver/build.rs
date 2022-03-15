@@ -375,13 +375,6 @@ impl Solver {
         }
         debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
-
-        #[cfg(feature = "strategy_adaptation")]
-        {
-            self.asg.handle(SolverEvent::Adapt(self.state.strategy, 0));
-            self.rst.handle(SolverEvent::Adapt(self.state.strategy, 0));
-        }
-
         Ok(self)
     }
     fn inject_from_vec<V>(mut self, v: &[V]) -> Result<Solver, SolverError>
@@ -412,13 +405,6 @@ impl Solver {
         }
         debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
-
-        #[cfg(feature = "strategy_adaptation")]
-        {
-            self.asg.handle(SolverEvent::Adapt(self.state.strategy, 0));
-            self.rst.handle(SolverEvent::Adapt(self.state.strategy, 0));
-        }
-
         Ok(self)
     }
 }

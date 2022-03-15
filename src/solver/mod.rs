@@ -41,12 +41,6 @@ pub type SolverResult = Result<Certificate, SolverError>;
 /// define sub-modules' responsibilities
 #[derive(Clone, Copy, Debug)]
 pub enum SolverEvent {
-    #[cfg(feature = "strategy_adaptation")]
-    /// set up internal parameters.
-    /// # CAVEAT
-    /// some implementation might have a special premise to call: decision_level == 0.
-    Adapt((SearchStrategy, usize), usize),
-
     /// asserting a var.
     Assert(VarId),
     /// conflict by unit propagation.

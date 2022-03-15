@@ -185,37 +185,6 @@ impl Instantiate for ClauseDB {
     fn handle(&mut self, e: SolverEvent) {
         #[allow(clippy::single_match)]
         match e {
-            #[cfg(feature = "strategy_adaptation")]
-            SolverEvent::Adapt(strategy, num_conflict) => {
-                // # PRECONDITION
-                // decision level must be 0 if `state.strategy.1` == `state[Stat::Conflict]`
-                match strategy {
-                    (_, n) if n != num_conflict => (),
-                    (crate::state::SearchStrategy::Initial, _) => (),
-                    (crate::state::SearchStrategy::Generic, _) => (),
-                    (crate::state::SearchStrategy::LowDecisions, _) => {
-                        self.co_lbd_bound = 4;
-                        // FIXME no more ClauseDB::reduction_coeff
-                        // self.reduction_coeff =
-                        //    (num_conflict as f64 / self.next_reduction as f64 + 1.0) as usize;
-                        self.first_reduction = 2000;
-                        self.use_chan_seok = true;
-                        self.inc_step = 0;
-                        self.next_reduction = 2000;
-                        // This call requires 'decision level == 0'.
-                        self.make_permanent(true);
-                    }
-                    (crate::state::SearchStrategy::HighSuccessive, _) => {
-                        self.co_lbd_bound = 3;
-                        self.first_reduction = 30000;
-                        self.use_chan_seok = true;
-                        // This call requires 'decision level == 0'.
-                        self.make_permanent(false);
-                    }
-                    (crate::state::SearchStrategy::LowSuccessive, _) => (),
-                    (crate::state::SearchStrategy::ManyGlues, _) => (),
-                }
-            }
             SolverEvent::Assert(_) => {
                 self.lbd.update(0);
             }
@@ -1284,42 +1253,6 @@ impl ClauseDB {
     ///```
     fn link_to_cid(&self, l0: Lit, l1: Lit) -> Option<&ClauseId> {
         self.binary_link.search(l0, l1)
-    }
-    #[cfg(feature = "strategy_adaptation")]
-    /// change good learnt clauses to permanent one.
-    fn make_permanent(&mut self, reinit: bool) {
-        // Adjusting for low decision levels.
-        // move some clauses with good LBDs (col_lbd_bound) to Permanent
-        let ClauseDB {
-            ref mut clause,
-            ref mut certification_store,
-            ref mut num_clause,
-            ref mut num_bi_clause,
-            ref mut num_learnt,
-            ref mut bi_clause,
-            ref mut watch_cache,
-            ..
-        } = self;
-        for (i, c) in clause.iter_mut().enumerate() {
-            if c.is_dead() || !c.is(FlagClause::LEARNT) {
-                continue;
-            }
-            if c.rank < self.co_lbd_bound {
-                c.turn_off(FlagClause::LEARNT);
-                *num_learnt -= 1;
-            } else if reinit {
-                remove_clause_fn(
-                    certification_store,
-                    bi_clause,
-                    watch_cache,
-                    num_bi_clause,
-                    num_clause,
-                    num_learnt,
-                    ClauseId::from(i),
-                    c,
-                );
-            }
-        }
     }
 }
 
