@@ -95,7 +95,7 @@ mod tests {
         let mut luby = LubySeries::default();
         let v = vec![1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8];
         let mut l: Vec<usize> = vec![];
-        for _ in 1..15 {
+        for _ in v.iter() {
             l.push(luby.next_unchecked());
         }
         assert_eq!(l, v);
