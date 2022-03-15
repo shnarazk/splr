@@ -23,7 +23,6 @@ impl Default for ClauseDB {
             freelist: Vec::new(),
             certification_store: CertificationStore::default(),
             soft_limit: 0, // 248_000_000
-            use_chan_seok: false,
             co_lbd_bound: 4,
             bi_clause_completion_queue: Vec::new(),
             num_bi_clause_completion: 0,
@@ -246,7 +245,7 @@ impl ClauseDBIF for ClauseDB {
         &mut self,
         asg: &mut impl AssignIF,
         vec: &mut Vec<Lit>,
-        mut learnt: bool,
+        learnt: bool,
     ) -> RefClause {
         debug_assert!(1 < vec.len());
         debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{:?}", vec,);
@@ -333,28 +332,24 @@ impl ClauseDBIF for ClauseDB {
             c.rank_old = c.rank;
         }
         self.lbd.update(c.rank);
-        if learnt && len2 {
-            *num_bi_learnt += 1;
-        }
-        if len2 || (self.use_chan_seok && c.rank <= self.co_lbd_bound) {
-            learnt = false;
-        }
+        *num_clause += 1;
         if learnt {
-            c.turn_on(FlagClause::LEARNT);
-            *num_learnt += 1;
-            if c.rank <= 2 {
-                *num_lbd2 += 1;
+            if len2 {
+                *num_bi_learnt += 1;
+            } else {
+                c.turn_on(FlagClause::LEARNT);
+                *num_learnt += 1;
+                if c.rank <= 2 {
+                    *num_lbd2 += 1;
+                }
             }
         }
-        *num_clause += 1;
         let l0 = c.lits[0];
         let l1 = c.lits[1];
         if len2 {
-            // assert_eq!(c.lits.len(), 2);
             *num_bi_clause += 1;
             binary_link.add(l0, l1, cid);
         } else {
-            // assert!(2 < c.lits.len());
             watch_cache[!l0].insert_watch(cid, l1);
             watch_cache[!l1].insert_watch(cid, l0);
         }
@@ -362,7 +357,6 @@ impl ClauseDBIF for ClauseDB {
     }
     fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, vec: &mut Vec<Lit>) -> RefClause {
         debug_assert!(1 < vec.len());
-        let mut learnt: bool = true;
         if vec.len() == 2 {
             if let Some(&cid) = self.link_to_cid(vec[0], vec[1]) {
                 return RefClause::RegisteredClause(cid);
@@ -408,11 +402,6 @@ impl ClauseDBIF for ClauseDB {
         } else {
             c.update_lbd(asg, lbd_temp);
             c.rank_old = c.rank;
-        }
-        if c.lits.len() <= 2 || (self.use_chan_seok && c.rank <= self.co_lbd_bound) {
-            learnt = false;
-        }
-        if learnt {
             c.turn_on(FlagClause::LEARNT);
         }
         let l0 = c.lits[0];

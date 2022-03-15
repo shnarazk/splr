@@ -233,8 +233,6 @@ pub struct ClauseDB {
     certification_store: CertificationStore,
     /// a number of clauses to emit out-of-memory exception
     soft_limit: usize,
-    /// flag for Chan Seok heuristics; this value is exported with `Export:mode`
-    use_chan_seok: bool,
     /// 'small' clause threshold
     co_lbd_bound: u16,
     // not in use
@@ -393,7 +391,7 @@ mod tests {
     }
 
     #[test]
-    fn test_clause_instantiation() -> () {
+    fn test_clause_instantiation() {
         let config = Config::default();
         let cnf = CNFDescription {
             num_of_variables: 4,
