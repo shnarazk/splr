@@ -1,3 +1,17 @@
+## 0.15.0, 2022-  -
+
+- Add `solver::StageManager` for Luby stabilization, which defines stages, cycles, and segments based on Luby series.
+  - At the end of stages, solver runs the following:
+    - clause reduction
+    - trail-saving reconfiguration
+  - At the end of cycles, solver runs the following:
+    - clause vivification
+  - At the end of segments, solver runs the following:
+    - clause subsumption and var elimination
+    - var activity rescaling
+    - restart threshold reconfiguration
+  - drop `solver::restart::GeometricStabilizer` and `solver::restart::ProgressLuby`
+
 ## 0.14.0, 2021-11-01
 
 - Rust 2021 edition
