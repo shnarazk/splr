@@ -130,14 +130,8 @@ impl Instantiate for AssignStack {
             SolverEvent::Eliminate(vi) => {
                 self.make_var_eliminated(vi);
             }
-            #[allow(unused_variables)]
             SolverEvent::Stage(scale) => {
-                #[cfg(feature = "rephase")]
-                {
-                    self.check_consistency_of_best_phases();
-                    self.select_rephasing_target(None, scale);
-                }
-
+                self.stage_scale = scale;
                 #[cfg(feature = "trail_saving")]
                 self.clear_saved_trail();
             }

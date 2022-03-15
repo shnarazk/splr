@@ -275,6 +275,7 @@ fn search(
                 let max_scale = state.stm.max_scale();
                 if let Some(new_segment) = next_stage {
                     asg.stage_scale = scale;
+                    // asg.select_rephasing_target();
                     if cfg!(feature = "clause_vivification") {
                         cdb.vivify(asg, rst, state)?;
                     }
@@ -290,8 +291,9 @@ fn search(
                 }
                 asg.clear_asserted_literals(cdb)?;
                 state.progress(asg, cdb, elim, rst);
-                rst.set_sensibility(scale, state.stm.max_scale());
+                asg.select_rephasing_target();
                 asg.handle(SolverEvent::Stage(scale));
+                rst.set_sensibility(scale, state.stm.max_scale());
                 current_stage = next_stage;
             } else if rst.restart(
                 asg.refer(assign::property::TEma::AssignRate),
