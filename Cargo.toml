@@ -27,7 +27,6 @@ default = [
         "dynamic_restart_threshold",
         # "incremental_solver",
         "LRB_rewarding",
-        "Luby_stabilization",
         # "maintain_watch_cache", # DEBUG
         "reason_side_rewarding",
         "rephase",
@@ -49,7 +48,6 @@ EVSIDS = []
 incremental_solver = []
 just_used = []
 LRB_rewarding = []
-Luby_stabilization = []
 maintain_watch_cache = []
 no_IO = []
 reason_side_rewarding = []

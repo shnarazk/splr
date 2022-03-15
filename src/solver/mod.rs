@@ -56,7 +56,7 @@ pub enum SolverEvent {
     /// restart
     Restart,
     /// start a new stage of Luby stabilization. It holds new scale.
-    Stabilize(usize),
+    Stage(usize),
 
     #[cfg(feature = "clause_vivification")]
     /// Vivification: `true` for start, `false` for end.

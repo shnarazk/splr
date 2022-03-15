@@ -197,7 +197,7 @@ impl Instantiate for State {
             SolverEvent::Instantiate => (),
             SolverEvent::Reinitialize => (),
             SolverEvent::Restart => (),
-            SolverEvent::Stabilize(_) => (),
+            SolverEvent::Stage(_) => (),
 
             #[cfg(feature = "clause_vivification")]
             SolverEvent::Vivify(_) => (),
@@ -523,8 +523,8 @@ impl StateIF for State {
             )
         );
         self[LogUsizeId::Simplify] = elim_num_full;
-        self[LogUsizeId::Stabilize] = self.stm.current_stage();
-        self[LogUsizeId::StabilizationCycle] = self.stm.current_cycle();
+        self[LogUsizeId::Stage] = self.stm.current_stage();
+        self[LogUsizeId::StageCycle] = self.stm.current_cycle();
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
         self.flush("");
     }
@@ -560,9 +560,9 @@ impl State {
             cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
         self[LogUsizeId::RestartBlock] = rst.derefer(solver::restart::property::Tusize::NumBlock);
         self[LogUsizeId::Restart] = rst.derefer(solver::restart::property::Tusize::NumRestart);
+        self[LogUsizeId::Stage] = self.stm.current_stage();
+        self[LogUsizeId::StageCycle] = self.stm.current_cycle();
         self[LogUsizeId::StageSegment] = self.stm.max_scale();
-        self[LogUsizeId::Stabilize] = self.stm.current_stage();
-        self[LogUsizeId::StabilizationCycle] = self.stm.current_cycle();
         self[LogUsizeId::Simplify] = elim.derefer(processor::property::Tusize::NumFullElimination);
 
         self[LogUsizeId::SubsumedClause] =
@@ -808,15 +808,18 @@ pub enum LogUsizeId {
     PermanentClause,
 
     //
-    //## stabilization, staging and restart
+    //## restart
     //
     Restart,
     RestartBlock,
     RestartCancel,
-    RestartStabilize,
+
+    //
+    //## stage
+    //
+    Stage,
+    StageCycle,
     StageSegment,
-    Stabilize,
-    StabilizationCycle,
 
     //
     //## pre(in)-processor

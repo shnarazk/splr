@@ -303,13 +303,9 @@ fn search(
                 }
                 asg.clear_asserted_literals(cdb)?;
                 state.progress(asg, cdb, elim, rst);
-
-                #[cfg(feature = "Luby_stabilization")]
-                {
-                    rst.set_sensibility(scale, state.stm.max_scale());
-                    // call the enhanced phase saver
-                    asg.handle(SolverEvent::Stabilize(scale));
-                }
+                rst.set_sensibility(scale, state.stm.max_scale());
+                // call the enhanced phase saver
+                asg.handle(SolverEvent::Stage(scale));
                 current_stage = next_stage;
             } else if rst.restart(
                 asg.refer(assign::property::TEma::AssignRate),
