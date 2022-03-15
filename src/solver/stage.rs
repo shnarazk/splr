@@ -2,7 +2,7 @@
 /// I define it as a 'search mode', or stage, changer.
 /// A stage is a span sharing same restart parameters.
 /// And it also define the interval of clause reduction.
-use {crate::types::*, splr_luby::LubySeries};
+use crate::types::*;
 
 #[derive(Clone, Debug, Default)]
 pub struct StageManager {

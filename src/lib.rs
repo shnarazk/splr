@@ -56,6 +56,8 @@ pub mod assign;
 pub mod cdb;
 /// Crate `config` provides solver's configuration and CLI.
 pub mod config;
+/// Crate `primitive` provides some fundamental data structures.
+pub mod primitive;
 /// Crate `processor` implements a simplifier: clause subsumption and var elimination.
 pub mod processor;
 /// Crate `solver` provides the top-level API as a SAT solver.
@@ -67,8 +69,8 @@ pub mod types;
 
 pub use {
     config::Config,
+    primitive::{ema::*, luby::*},
     solver::{Certificate, SatSolverIF, SolveIF, Solver, ValidateIF},
-    splr_ema::*,
     types::{PropertyDereference, PropertyReference, SolverError},
 };
 

@@ -1,4 +1,4 @@
-use crate::{types::*, Ewa2};
+use crate::types::*;
 
 const LBD_EWA_LEN: usize = 24;
 

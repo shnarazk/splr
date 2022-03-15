@@ -1,4 +1,4 @@
-use crate::{types::*, Ewa2};
+use crate::types::*;
 
 const ASG_EWA_LEN: usize = 24;
 
@@ -20,7 +20,6 @@ impl Instantiate for ProgressASG {
     fn instantiate(config: &Config, _cnf: &CNFDescription) -> Self {
         ProgressASG {
             ema: Ewa2::new(0.0).with_slow(config.rst_asg_slw),
-            ..ProgressASG::default()
         }
     }
 }
