@@ -91,29 +91,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_progress_luby() {
-        let mut luby = ProgressLuby {
-            enable: true,
-            active: true,
-            step: 1,
-            next_restart: 1,
-            ..ProgressLuby::default()
-        };
-        luby.update(0);
-        for v in vec![
-            1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8, 1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1,
-        ] {
-            assert_eq!(luby.next_restart, v);
-            luby.shift();
-        }
-    }
-    #[test]
     fn test_luby_series() {
         let mut luby = LubySeries::default();
         let v = vec![1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8];
         let mut l: Vec<usize> = vec![];
         for _ in 1..15 {
-            l.push(luby.next());
+            l.push(luby.next_unchecked());
         }
         assert_eq!(l, v);
     }
