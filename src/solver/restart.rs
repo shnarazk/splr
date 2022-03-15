@@ -66,9 +66,13 @@ pub enum RestartDecision {
 }
 
 impl RestartIF for Restarter {
+    /// minimize the difference between the number of restarts comparing
+    /// and the expected number.
     fn adjust_threshold(&mut self, span: usize, segment: usize) {
-        let center: f64 = 0.9;
-        let expects = (span * 2_usize.pow(segment as u32) / self.initial_restart_step) as f64;
+        let center: f64 = 1.0;
+        let dissipation: f64 = 0.1;
+        let extends: f64 = span as f64 * 2.0_f64.powf(segment as f64 - dissipation);
+        let expects = extends / self.initial_restart_step as f64;
         if expects < 100.0 {
             return;
         }
@@ -77,14 +81,6 @@ impl RestartIF for Restarter {
         let s = 0.6 * scale.signum() * scale.powi(2);
         self.lbd_threshold = self.lbd_threshold.powf(center + s);
         self.num_restart_pre = self.num_restart;
-        // println!(
-        //     "segment:{:>4}, scaled span:{:>5}, increase:{:>5}, scale:{:>8.3}, threshold:{:8.3}",
-        //     segment,
-        //     segment.pow(2) * span,
-        //     increase,
-        //     scale,
-        //     self.lbd_threshold,
-        // );
     }
     fn restart(&mut self, asg: &EmaView, lbd: &EmaView) -> Option<RestartDecision> {
         macro_rules! next_step {
