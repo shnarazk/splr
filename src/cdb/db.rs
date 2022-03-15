@@ -248,8 +248,8 @@ impl ClauseDBIF for ClauseDB {
         vec: &mut Vec<Lit>,
         mut learnt: bool,
     ) -> RefClause {
-        debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{:?}", vec,);
         debug_assert!(1 < vec.len());
+        debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{:?}", vec,);
         if vec.len() == 2 {
             if let Some(&cid) = self.link_to_cid(vec[0], vec[1]) {
                 self.num_reregistration += 1;
@@ -321,12 +321,10 @@ impl ClauseDBIF for ClauseDB {
             c.rank_old = 1;
 
             #[cfg(feature = "bi_clause_completion")]
-            {
-                if learnt {
-                    for lit in c.iter() {
-                        if !bi_clause_completion_queue.contains(lit) {
-                            bi_clause_completion_queue.push(*lit);
-                        }
+            if learnt {
+                for lit in c.iter() {
+                    if !bi_clause_completion_queue.contains(lit) {
+                        bi_clause_completion_queue.push(*lit);
                     }
                 }
             }
@@ -338,16 +336,15 @@ impl ClauseDBIF for ClauseDB {
         if learnt && len2 {
             *num_bi_learnt += 1;
         }
-        if c.lits.len() <= 2 || (self.use_chan_seok && c.rank <= self.co_lbd_bound) {
+        if len2 || (self.use_chan_seok && c.rank <= self.co_lbd_bound) {
             learnt = false;
         }
         if learnt {
             c.turn_on(FlagClause::LEARNT);
-
+            *num_learnt += 1;
             if c.rank <= 2 {
                 *num_lbd2 += 1;
             }
-            *num_learnt += 1;
         }
         *num_clause += 1;
         let l0 = c.lits[0];

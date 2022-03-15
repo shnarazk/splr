@@ -17,13 +17,12 @@ mod vivify;
 /// types about watching literal
 mod watch_cache;
 
-#[cfg(feature = "clause_vivification")]
-pub use self::vivify::VivifyIF;
 pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
     cid::ClauseIdIF,
     property::*,
     unsat_certificate::CertificationStore,
+    vivify::VivifyIF,
 };
 use {
     self::ema::ProgressLBD,

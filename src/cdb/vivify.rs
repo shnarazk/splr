@@ -1,6 +1,5 @@
 //! Vivification
 #![allow(dead_code)]
-#![cfg(feature = "clause_vivification")]
 use crate::{
     assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
     cdb::{ClauseDB, ClauseDBIF, ClauseIF},

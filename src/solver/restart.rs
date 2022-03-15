@@ -17,7 +17,6 @@ pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> 
     fn restart(&mut self, asg: &EmaView, lbd: &EmaView) -> Option<RestartDecision>;
     /// set stabilization parameters
     fn set_sensibility(&mut self, step: usize, step_max: usize);
-    #[cfg(feature = "dynamic_restart_threshold")]
     /// adjust restart threshold
     fn adjust_threshold(&mut self, max_scale: usize, segment: usize);
 }
@@ -45,8 +44,6 @@ pub struct Restarter {
     //
     num_block: usize,
     num_restart: usize,
-
-    #[cfg(feature = "dynamic_restart_threshold")]
     num_restart_pre: usize,
 }
 
@@ -114,7 +111,6 @@ impl RestartIF for Restarter {
         self.stb_step = step;
         self.stb_step_max = step_max;
     }
-    #[cfg(feature = "dynamic_restart_threshold")]
     fn adjust_threshold(&mut self, span: usize, segment: usize) {
         let center: f64 = 0.9;
         let expects = (span * 2_usize.pow(segment as u32) / self.initial_restart_step) as f64;

@@ -1,7 +1,4 @@
 //! Conflict-Driven Clause Learning Search engine
-#[cfg(feature = "clause_vivification")]
-use crate::cdb::VivifyIF;
-
 use {
     super::{
         conflict::handle_conflict,
@@ -10,7 +7,7 @@ use {
     },
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
-        cdb::{self, ClauseDB, ClauseDBIF},
+        cdb::{self, ClauseDB, ClauseDBIF, VivifyIF},
         processor::{EliminateIF, Eliminator},
         state::{State, StateIF},
         types::*,
@@ -235,7 +232,6 @@ fn search(
     state: &mut State,
 ) -> Result<bool, SolverError> {
     let mut current_stage: Option<bool> = Some(true);
-    #[cfg(feature = "clause_elimination")]
     let mut num_learnt = 0;
 
     state.stm.initialize(
@@ -251,10 +247,8 @@ fn search(
                 return Err(SolverError::RootLevelConflict(cc));
             }
             asg.update_activity_tick();
-
             #[cfg(feature = "clause_rewarding")]
             cdb.update_activity_tick();
-
             if 1 < handle_conflict(asg, cdb, rst, state, &cc)? {
                 num_learnt += 1;
             }
@@ -268,14 +262,10 @@ fn search(
                 }
                 RESTART!(asg, rst);
                 cdb.reduce(asg, state.stm.num_reducible());
-
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
-
                 dump_stage(state, asg, rst, current_stage);
-                #[cfg(feature = "dynamic_restart_threshold")]
                 let span_pre = state.stm.current_span();
-
                 let next_stage: Option<bool> = state.stm.prepare_new_stage(
                     (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt()
                         as usize,
@@ -285,18 +275,18 @@ fn search(
                 let max_scale = state.stm.max_scale();
                 if let Some(new_segment) = next_stage {
                     asg.stage_scale = scale;
-
-                    #[cfg(feature = "clause_vivification")]
-                    cdb.vivify(asg, rst, state)?;
-
+                    if cfg!(feature = "clause_vivification") {
+                        cdb.vivify(asg, rst, state)?;
+                    }
                     if new_segment {
                         asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
 
-                        #[cfg(feature = "clause_elimination")]
-                        elim.simplify(asg, cdb, rst, state, false)?;
-
-                        #[cfg(feature = "dynamic_restart_threshold")]
-                        if 1 < state.stm.current_segment() {
+                        if cfg!(feature = "clause_elimination") {
+                            elim.simplify(asg, cdb, rst, state, false)?;
+                        }
+                        if cfg!(feature = "dynamic_restart_threshold")
+                            && 1 < state.stm.current_segment()
+                        {
                             rst.adjust_threshold(span_pre, state.stm.current_segment());
                         }
                     }
@@ -304,7 +294,6 @@ fn search(
                 asg.clear_asserted_literals(cdb)?;
                 state.progress(asg, cdb, elim, rst);
                 rst.set_sensibility(scale, state.stm.max_scale());
-                // call the enhanced phase saver
                 asg.handle(SolverEvent::Stage(scale));
                 current_stage = next_stage;
             } else if rst.restart(
