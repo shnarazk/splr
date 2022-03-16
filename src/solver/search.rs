@@ -290,7 +290,6 @@ fn search(
                 }
                 asg.clear_asserted_literals(cdb)?;
                 state.progress(asg, cdb, elim, rst);
-                // asg.select_rephasing_target();
                 asg.handle(SolverEvent::Stage(scale));
                 rst.set_sensibility(scale, state.stm.max_scale());
                 current_stage = next_stage;

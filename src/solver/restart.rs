@@ -57,7 +57,7 @@ impl Instantiate for Restarter {
 }
 
 /// Type for the result of `restart`.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum RestartDecision {
     /// We should block restart.
     Block,
@@ -70,6 +70,8 @@ impl RestartIF for Restarter {
     /// and the expected number.
     fn adjust_threshold(&mut self, span: usize, segment: usize) {
         let center: f64 = 1.0;
+        // Since 'span' isn't a constant, a simple calculation may get a larger number.
+        // To compensate the difference, I introduce another factor.
         let dissipation: f64 = 0.1;
         let extends: f64 = span as f64 * 2.0_f64.powf(segment as f64 - dissipation);
         let expects = extends / self.initial_restart_step as f64;
