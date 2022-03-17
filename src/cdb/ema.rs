@@ -1,6 +1,6 @@
 use crate::types::*;
 
-const LBD_EWA_LEN: usize = 24;
+const LBD_EWA_LEN: usize = 16;
 
 /// An EMA of learnt clauses' LBD, used for forcing restart.
 #[derive(Clone, Debug)]

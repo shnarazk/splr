@@ -74,7 +74,7 @@ impl RestartIF for Restarter {
         // To compensate the difference, I introduce another factor.
         let dissipation: f64 = 0.1;
         let extends: f64 = span as f64 * 2.0_f64.powf(segment as f64 - dissipation);
-        let expects = extends / self.initial_restart_step as f64;
+        let expects = extends / 8.0;
         if expects < 100.0 {
             return;
         }

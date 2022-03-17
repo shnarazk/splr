@@ -1,6 +1,6 @@
 use crate::types::*;
 
-const ASG_EWA_LEN: usize = 24;
+const ASG_EWA_LEN: usize = 16;
 
 /// An assignment history used for blocking restart.
 #[derive(Clone, Debug)]
