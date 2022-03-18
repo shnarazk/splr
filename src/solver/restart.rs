@@ -15,11 +15,11 @@ pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> 
 #[derive(Clone, Debug, Default)]
 pub struct Restarter {
     /// For block restart based on average assignments: 1.40.
-    /// This is called `R` in Glucose
-    asg_threshold: f64,
+    /// This is called `R` in Glucose.
+    block_threshold: f64,
     /// For force restart based on average LBD of newly generated clauses: 0.80.
-    /// This is called `K` in Glucose
-    lbd_threshold: f64,
+    /// This is called `K` in Glucose.
+    restart_threshold: f64,
 
     after_restart: usize,
     restart_step: usize,
@@ -38,11 +38,10 @@ pub struct Restarter {
 }
 
 impl Instantiate for Restarter {
-    #[allow(unused_variables)]
-    fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
+    fn instantiate(config: &Config, _cnf: &CNFDescription) -> Self {
         Restarter {
-            asg_threshold: config.rst_asg_thr,
-            lbd_threshold: config.rst_lbd_thr,
+            block_threshold: config.rst_asg_thr,
+            restart_threshold: config.rst_lbd_thr,
             restart_step: config.rst_step,
             initial_restart_step: config.rst_step,
             ..Restarter::default()
@@ -96,7 +95,7 @@ impl RestartIF for Restarter {
         }
 
         if self.stb_step_max * self.num_block < self.stb_step * self.num_restart
-            && asg.trend() < self.asg_threshold
+            && asg.trend() < self.block_threshold
         {
             self.num_block += 1;
             self.after_restart = 0;
@@ -104,7 +103,7 @@ impl RestartIF for Restarter {
             return Some(RestartDecision::Block);
         }
 
-        if self.lbd_threshold < lbd.trend() {
+        if self.restart_threshold < lbd.trend() {
             self.restart_step = next_step!();
             return Some(RestartDecision::Force);
         }
@@ -120,7 +119,7 @@ pub mod property {
     use super::Restarter;
     use crate::types::*;
 
-    #[derive(Clone, Copy, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tusize {
         NumBlock,
         NumRestart,
@@ -138,7 +137,7 @@ pub mod property {
         }
     }
 
-    #[derive(Clone, Copy, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tf64 {
         RestartThreshold,
     }
@@ -148,7 +147,7 @@ pub mod property {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
-                Tf64::RestartThreshold => self.lbd_threshold,
+                Tf64::RestartThreshold => self.restart_threshold,
             }
         }
     }
