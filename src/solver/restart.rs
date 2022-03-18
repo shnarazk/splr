@@ -68,19 +68,22 @@ impl RestartIF for Restarter {
     /// minimize the difference between the number of restarts comparing
     /// and the expected number.
     fn adjust_threshold(&mut self, span: usize, segment: usize) {
-        let center: f64 = 1.0;
+        let ideal_interval: f64 = (self.initial_restart_step * 3 / 2) as f64;
+        let dissipation: f64 = 0.1;
         // Since 'span' isn't a constant, a simple calculation may get a larger number.
         // To compensate the difference, I introduce another factor.
-        let dissipation: f64 = 0.1;
         let extends: f64 = span as f64 * 2.0_f64.powf(segment as f64 - dissipation);
-        let expects = extends / 8.0;
+        let expects = extends / ideal_interval;
         if expects < 100.0 {
             return;
         }
-        let restarts = (self.num_restart - self.num_restart_pre) as f64;
-        let scale = restarts.log(expects) - center;
-        let s = 0.6 * scale.signum() * scale.powi(2);
-        self.lbd_threshold = self.lbd_threshold.powf(center + s);
+        let scale = {
+            let restarts = (self.num_restart - self.num_restart_pre) as f64;
+            let center: f64 = 1.0;
+            let s = restarts.log(expects) - center;
+            center + s.signum() * s.powi(2)
+        };
+        self.restart_threshold = self.restart_threshold.powf(scale);
         self.num_restart_pre = self.num_restart;
     }
     fn restart(&mut self, asg: &EmaView, lbd: &EmaView) -> Option<RestartDecision> {
