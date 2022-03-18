@@ -81,7 +81,7 @@ impl RestartIF for Restarter {
             let restarts = (self.num_restart - self.num_restart_pre) as f64;
             let center: f64 = 1.0;
             let s = restarts.log(expects) - center;
-            center + s.signum() * s.abs().powf(1.4)
+            center + s.signum() * s.powf(1.4)
         };
         self.restart_threshold = self.restart_threshold.powf(scale);
         self.num_restart_pre = self.num_restart;
