@@ -4,7 +4,9 @@ use crate::types::*;
 /// API for [`restart`](`crate::solver::RestartIF::restart`) and [`stabilize`](`crate::solver::RestartIF::stabilize`).
 pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> {
     /// adjust restart threshold
-    fn adjust_threshold(&mut self, max_scale: usize, segment: usize, progress: bool);
+    fn adjust_threshold(&mut self, max_scale: usize, segment: usize);
+    /// activate restart condition.
+    fn activate(&mut self);
     /// check blocking and forcing restart condition.
     fn restart(&mut self, asg: &EmaView, lbd: &EmaView) -> Option<RestartDecision>;
     /// set stabilization parameters
@@ -14,14 +16,13 @@ pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> 
 /// `Restarter` provides restart API and holds data about restart conditions.
 #[derive(Clone, Debug, Default)]
 pub struct Restarter {
+    enable: bool,
     /// For block restart based on average assignments: 1.40.
     /// This is called `R` in Glucose.
     block_threshold: f64,
     /// For force restart based on average LBD of newly generated clauses: 0.80.
     /// This is called `K` in Glucose.
     restart_threshold: f64,
-    /// new scheme allow infinite threshold. So we have to keep a 'finite' value.
-    restart_threshold_pre: f64,
 
     after_restart: usize,
     restart_step: usize,
@@ -42,6 +43,7 @@ pub struct Restarter {
 impl Instantiate for Restarter {
     fn instantiate(config: &Config, _cnf: &CNFDescription) -> Self {
         Restarter {
+            enable: true,
             block_threshold: config.rst_asg_thr,
             restart_threshold: config.rst_lbd_thr,
             restart_step: config.rst_step,
@@ -69,10 +71,9 @@ pub enum RestartDecision {
 impl RestartIF for Restarter {
     /// minimize the difference between the number of restarts comparing
     /// and the expected number.
-    fn adjust_threshold(&mut self, span: usize, segment: usize, progress: bool) {
-        assert!(self.restart_threshold_pre.is_finite());
-        if self.restart_threshold.is_infinite() {
-            self.restart_threshold = self.restart_threshold_pre;
+    fn adjust_threshold(&mut self, span: usize, segment: usize) {
+        // self.enable = !self.enable;
+        if !self.enable {
             return;
         }
         let ideal_interval: f64 = 10.0; // (self.initial_restart_step + 1) as f64;
@@ -91,13 +92,13 @@ impl RestartIF for Restarter {
         };
         let power = center + scale.signum() * scale.abs().powf(1.4);
         let new_threshold = self.restart_threshold.powf(power);
-        if scale < 0.0 && !progress {
-            self.restart_threshold_pre = new_threshold;
-            self.restart_threshold = f64::INFINITY;
-        } else {
-            self.restart_threshold = new_threshold;
-            self.num_restart_pre = self.num_restart;
+        self.restart_threshold = new_threshold;
+        if scale < 0.0 {
+            self.enable = false;
         }
+    }
+    fn activate(&mut self) {
+        self.enable = true;
     }
     fn restart(&mut self, asg: &EmaView, lbd: &EmaView) -> Option<RestartDecision> {
         macro_rules! next_step {
@@ -105,6 +106,10 @@ impl RestartIF for Restarter {
                 self.stb_step * self.initial_restart_step
             };
         }
+        if !self.enable {
+            return None;
+        }
+
         self.after_restart += 1;
         if self.after_restart < self.restart_step {
             return None;
@@ -134,6 +139,22 @@ impl RestartIF for Restarter {
 pub mod property {
     use super::Restarter;
     use crate::types::*;
+
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub enum Tbool {
+        Active,
+    }
+
+    pub const BOOLS: [Tbool; 1] = [Tbool::Active];
+
+    impl PropertyDereference<Tbool, bool> for Restarter {
+        #[inline]
+        fn derefer(&self, k: Tbool) -> bool {
+            match k {
+                Tbool::Active => self.enable,
+            }
+        }
+    }
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tusize {

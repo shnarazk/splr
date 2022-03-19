@@ -233,7 +233,6 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut current_stage: Option<bool> = Some(true);
     let mut num_learnt = 0;
-    let mut found_assignment = false;
 
     state.stm.initialize(
         (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
@@ -250,10 +249,8 @@ fn search(
             asg.update_activity_tick();
             #[cfg(feature = "clause_rewarding")]
             cdb.update_activity_tick();
-            match handle_conflict(asg, cdb, rst, state, &cc)? {
-                0 => found_assignment = true,
-                n if 1 < n => num_learnt += 1,
-                _ => (),
+            if 1 < handle_conflict(asg, cdb, rst, state, &cc)? {
+                num_learnt += 1;
             }
             if state.stm.stage_ended(num_learnt) {
                 if let Some(p) = state.elapsed() {
@@ -287,13 +284,8 @@ fn search(
                             elim.simplify(asg, cdb, rst, state, false)?;
                         }
                         if cfg!(feature = "dynamic_restart_threshold") {
-                            rst.adjust_threshold(
-                                span_pre,
-                                state.stm.current_segment(),
-                                !found_assignment,
-                            );
+                            rst.adjust_threshold(span_pre, state.stm.current_segment());
                         }
-                        found_assignment = false;
                     }
                 }
                 asg.clear_asserted_literals(cdb)?;

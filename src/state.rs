@@ -33,6 +33,7 @@ pub trait StateIF {
             + PropertyReference<cdb::property::TEma, EmaView>,
         E: PropertyDereference<processor::property::Tusize, usize>,
         R: PropertyDereference<solver::restart::property::Tusize, usize>
+            + PropertyDereference<solver::restart::property::Tbool, bool>
             + PropertyDereference<solver::restart::property::Tf64, f64>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
@@ -347,6 +348,7 @@ impl StateIF for State {
             + PropertyReference<cdb::property::TEma, EmaView>,
         E: PropertyDereference<processor::property::Tusize, usize>,
         R: PropertyDereference<solver::restart::property::Tusize, usize>
+            + PropertyDereference<solver::restart::property::Tbool, bool>
             + PropertyDereference<solver::restart::property::Tf64, f64>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
@@ -464,7 +466,11 @@ impl StateIF for State {
             "\x1B[2K     Restart|#BLK:{}, #RST:{}, thrs:{}, #seg:{}",
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-            fm!("{:>9.4}", self, LogF64Id::RestartThreshold, rst_lbd_thr),
+            if rst.derefer(solver::restart::property::Tbool::Active) {
+                fm!("{:>9.4}", self, LogF64Id::RestartThreshold, rst_lbd_thr)
+            } else {
+                "      NaN".to_string()
+            },
             im!("{:>9}", self, LogUsizeId::StageSegment, stg_segment),
         );
         println!(
