@@ -4,7 +4,7 @@ use crate::types::*;
 /// API for [`restart`](`crate::solver::RestartIF::restart`) and [`stabilize`](`crate::solver::RestartIF::stabilize`).
 pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> {
     /// adjust restart threshold
-    fn adjust_threshold(&mut self, max_scale: usize, segment: usize);
+    fn adjust_threshold(&mut self, max_scale: usize, segment: usize, progress: bool);
     /// check blocking and forcing restart condition.
     fn restart(&mut self, asg: &EmaView, lbd: &EmaView) -> Option<RestartDecision>;
     /// set stabilization parameters
@@ -20,6 +20,8 @@ pub struct Restarter {
     /// For force restart based on average LBD of newly generated clauses: 0.80.
     /// This is called `K` in Glucose.
     restart_threshold: f64,
+    /// new scheme allow infinite threshold. So we have to keep a 'finite' value.
+    restart_threshold_pre: f64,
 
     after_restart: usize,
     restart_step: usize,
@@ -67,7 +69,12 @@ pub enum RestartDecision {
 impl RestartIF for Restarter {
     /// minimize the difference between the number of restarts comparing
     /// and the expected number.
-    fn adjust_threshold(&mut self, span: usize, segment: usize) {
+    fn adjust_threshold(&mut self, span: usize, segment: usize, progress: bool) {
+        assert!(self.restart_threshold_pre.is_finite());
+        if self.restart_threshold.is_infinite() {
+            self.restart_threshold = self.restart_threshold_pre;
+            return;
+        }
         let ideal_interval: f64 = 10.0; // (self.initial_restart_step + 1) as f64;
         let dissipation: f64 = 0.1;
         // Since 'span' isn't a constant, a simple calculation may get a larger number.
@@ -77,14 +84,20 @@ impl RestartIF for Restarter {
         if expects < 100.0 {
             return;
         }
+        let center: f64 = 1.0;
         let scale = {
             let restarts = (self.num_restart - self.num_restart_pre) as f64;
-            let center: f64 = 1.0;
-            let s = restarts.log(expects) - center;
-            center + s.signum() * s.powf(1.4)
+            restarts.log(expects) - center
         };
-        self.restart_threshold = self.restart_threshold.powf(scale);
-        self.num_restart_pre = self.num_restart;
+        let power = center + scale.signum() * scale.abs().powf(1.4);
+        let new_threshold = self.restart_threshold.powf(power);
+        if scale < 0.0 && !progress {
+            self.restart_threshold_pre = new_threshold;
+            self.restart_threshold = f64::INFINITY;
+        } else {
+            self.restart_threshold = new_threshold;
+            self.num_restart_pre = self.num_restart;
+        }
     }
     fn restart(&mut self, asg: &EmaView, lbd: &EmaView) -> Option<RestartDecision> {
         macro_rules! next_step {
