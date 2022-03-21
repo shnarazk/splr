@@ -355,13 +355,17 @@ pub mod property {
 
     #[derive(Clone, Debug, PartialEq)]
     pub enum TEma {
+        Entanglement,
         LBD,
     }
+
+    pub const EMAS: [TEma; 2] = [TEma::Entanglement, TEma::LBD];
 
     impl PropertyReference<TEma, EmaView> for ClauseDB {
         #[inline]
         fn refer(&self, k: TEma) -> &EmaView {
             match k {
+                TEma::Entanglement => self.lb_entanglement.as_view(),
                 TEma::LBD => self.lbd.as_view(),
             }
         }
