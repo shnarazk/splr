@@ -25,8 +25,9 @@ pub trait SolveIF {
 }
 
 macro_rules! RESTART {
-    ($asg: expr, $rst: expr) => {
+    ($asg: expr, $cdb: expr, $rst: expr) => {
         $asg.cancel_until($asg.root_level());
+        $cdb.handle(SolverEvent::Restart);
         $rst.handle(SolverEvent::Restart);
     };
 }
@@ -204,18 +205,18 @@ impl SolveIF for Solver {
                         v.turn_off(FlagVar::ELIMINATED);
                     }
                 }
-                RESTART!(asg, rst);
+                RESTART!(asg, cdb, rst);
                 Ok(Certificate::SAT(vals))
             }
             Ok(false) | Err(SolverError::EmptyClause | SolverError::RootLevelConflict(_)) => {
                 #[cfg(feature = "support_user_assumption")]
                 analyze_final(asg, state, &cdb[ci]);
 
-                RESTART!(asg, rst);
+                RESTART!(asg, cdb, rst);
                 Ok(Certificate::UNSAT)
             }
             Err(e) => {
-                RESTART!(asg, rst);
+                RESTART!(asg, cdb, rst);
                 state.progress(asg, cdb, elim, rst);
                 Err(e)
             }
@@ -260,7 +261,7 @@ fn search(
                 } else {
                     return Err(SolverError::UndescribedError);
                 }
-                RESTART!(asg, rst);
+                RESTART!(asg, cdb, rst);
                 cdb.reduce(asg, state.stm.num_reducible());
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
@@ -284,21 +285,25 @@ fn search(
                             elim.simplify(asg, cdb, rst, state, false)?;
                         }
                         if cfg!(feature = "dynamic_restart_threshold") {
-                            rst.adjust_threshold(span_pre, state.stm.current_segment());
+                            rst.set_segment_parameters(
+                                span_pre,
+                                state.stm.current_segment(),
+                                state.stm.max_scale(),
+                            );
                         }
                     }
                 }
                 asg.clear_asserted_literals(cdb)?;
                 state.progress(asg, cdb, elim, rst);
                 asg.handle(SolverEvent::Stage(scale));
-                rst.set_sensibility(scale, state.stm.max_scale());
+                rst.set_stage_parameters(scale);
                 current_stage = next_stage;
             } else if rst.restart(
                 asg.refer(assign::property::TEma::AssignRate),
                 cdb.refer(cdb::property::TEma::LBD),
             ) == Some(RestartDecision::Force)
             {
-                RESTART!(asg, rst);
+                RESTART!(asg, cdb, rst);
             }
             if let Some(na) = asg.best_assigned() {
                 state.flush("");
