@@ -106,7 +106,10 @@ impl StageManager {
         span.saturating_sub(keep)
     }
     /// return the maximum factor so far.
+    /// None: `luby_iter.max_value` holds the maximum value so far.
+    /// This means it is the value found at the last segment.
+    /// So the current value should be the next value, which is the double.
     pub fn max_scale(&self) -> usize {
-        self.luby_iter.max_value()
+        2 * self.luby_iter.max_value()
     }
 }
