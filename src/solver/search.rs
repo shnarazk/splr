@@ -323,26 +323,31 @@ fn search(
 
 /// display the current stats. before updating stabiliation parameters
 fn dump_stage(state: &mut State, asg: &AssignStack, rst: &Restarter, current_stage: Option<bool>) {
+    let active = rst.derefer(restart::property::Tbool::Active);
     let cycle = state.stm.current_cycle();
     let scale = state.stm.current_scale();
     let stage = state.stm.current_stage();
     let segment = state.stm.current_segment();
+    let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
+    let thr = if active {
+        rst.derefer(restart::property::Tf64::RestartThreshold)
+    } else {
+        f64::NAN
+    };
     state.log(
         asg.num_conflict,
         match current_stage {
             None => format!(
-                "                   stg:{:>5}, scl:{:>4}, cpr:{:>9.2}",
-                stage,
-                scale,
-                asg.refer(assign::property::TEma::ConflictPerRestart).get(),
+                "                 stg:{:>5}, scl:{:>4}, cpr:{:>9.2}, thr:{:>9.4}",
+                stage, scale, cpr, thr,
             ),
-            Some(false) => format!("         cyc:{:4}, stg:{:>5}", cycle, stage),
+            Some(false) => format!(
+                "        cyc:{:3}, stg:{:>5}, scl:{:>4}, cpr:{:>9.2}, thr:{:>9.4}",
+                cycle, stage, scale, cpr, thr,
+            ),
             Some(true) => format!(
-                "seg:{:3}, cyc:{:4}, stg:{:>5}, rlt:{:>7.4}",
-                segment,
-                cycle,
-                stage,
-                rst.derefer(restart::property::Tf64::RestartThreshold),
+                "seg:{:2}, cyc:{:3}, stg:{:>5}, scl:{:>4}, cpr:{:>9.2}, thr:{:>9.4}",
+                segment, cycle, stage, scale, cpr, thr,
             ),
         },
     );
