@@ -25,8 +25,9 @@ pub trait SolveIF {
 }
 
 macro_rules! RESTART {
-    ($asg: expr, $rst: expr) => {
+    ($asg: expr, $cdb: expr, $rst: expr) => {
         $asg.cancel_until($asg.root_level());
+        $cdb.handle(SolverEvent::Restart);
         $rst.handle(SolverEvent::Restart);
     };
 }
@@ -204,18 +205,18 @@ impl SolveIF for Solver {
                         v.turn_off(FlagVar::ELIMINATED);
                     }
                 }
-                RESTART!(asg, rst);
+                RESTART!(asg, cdb, rst);
                 Ok(Certificate::SAT(vals))
             }
             Ok(false) | Err(SolverError::EmptyClause | SolverError::RootLevelConflict(_)) => {
                 #[cfg(feature = "support_user_assumption")]
                 analyze_final(asg, state, &cdb[ci]);
 
-                RESTART!(asg, rst);
+                RESTART!(asg, cdb, rst);
                 Ok(Certificate::UNSAT)
             }
             Err(e) => {
-                RESTART!(asg, rst);
+                RESTART!(asg, cdb, rst);
                 state.progress(asg, cdb, elim, rst);
                 Err(e)
             }
@@ -260,7 +261,7 @@ fn search(
                 } else {
                     return Err(SolverError::UndescribedError);
                 }
-                RESTART!(asg, rst);
+                RESTART!(asg, cdb, rst);
                 cdb.reduce(asg, state.stm.num_reducible());
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
@@ -298,11 +299,11 @@ fn search(
                 cdb.refer(cdb::property::TEma::LBD),
             ) == Some(RestartDecision::Force)
             {
-                RESTART!(asg, rst);
+                RESTART!(asg, cdb, rst);
             }
-            if let Some(na) = asg.best_assigned() {
+            if let Some(core) = asg.best_assigned() {
                 state.flush("");
-                state.flush(format!("unreachable core: {}", na));
+                state.flush(format!("unreachable core: {}", core));
             }
         }
     }
