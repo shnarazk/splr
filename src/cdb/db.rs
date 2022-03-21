@@ -195,6 +195,10 @@ impl Instantiate for ClauseDB {
                 self.watch_cache.push(WatchCache::new());
                 self.lbd_temp.push(0);
             }
+            SolverEvent::Restart => {
+                // self.lbd.reset_to(self.lb_entanglement.get());
+                self.lbd.reset_to(0.0);
+            }
             _ => (),
         }
     }
