@@ -74,8 +74,6 @@ pub struct Config {
     //
     //## restarter
     //
-    /// #conflicts between restarts
-    pub rst_step: usize,
 
     // /// Length of assign. fast EMA
     // pub rst_asg_len: usize,
@@ -131,7 +129,6 @@ impl Default for Config {
             elm_grw_lim: 0,
             elm_var_occ: 20000,
 
-            rst_step: 6,
             // rst_asg_len: 16,
             rst_asg_slw: 8192,
             rst_asg_thr: 0.6,
@@ -171,7 +168,7 @@ impl Config {
                 let options_u32 = ["cbt"];
                 let options_usize = [
                     // "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
-                    "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ras", "rls",
+                    "cl", "ii", "stat", "ecl", "evl", "evo", "ras", "rls",
                 ];
                 let options_f64 = ["timeout", "cdr", "rat", "rlt", "vdr", "vds"];
                 let options_path = ["dir", "proof", "result"];
@@ -212,7 +209,6 @@ impl Config {
                                         "ecl" => self.elm_cls_lim = val,
                                         "evl" => self.elm_grw_lim = val,
                                         "evo" => self.elm_var_occ = val,
-                                        "rs" => self.rst_step = val,
                                         // "ral" => self.rst_asg_len = val,
                                         "ras" => self.rst_asg_slw = val,
                                         // "rll" => self.rst_lbd_len = val,
@@ -386,7 +382,6 @@ OPTIONS (\x1B[000m\x1B[031mred\x1B[000m options depend on features in Cargo.toml
       --rat <rst-asg-thr>   Blocking restart threshold        {:>10.2}
       --rls <rst-lbd-slw>   Length of LBD slow EMA         {:>10}
       --rlt <rst-lbd-thr>   Forcing restart threshold         {:>10.2}
-      --rs  <rst-step>      #conflicts between restarts    {:>10}
       --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
       \x1B[000m\x1B[031m--vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}\x1B[000m
 ARGS:
@@ -409,7 +404,6 @@ ARGS:
         // config.rst_lbd_len,
         config.rst_lbd_slw,
         config.rst_lbd_thr,
-        config.rst_step,
         config.vrw_dcy_rat,
         config.vrw_dcy_stp,
     )

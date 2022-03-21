@@ -250,8 +250,11 @@ fn search(
             asg.update_activity_tick();
             #[cfg(feature = "clause_rewarding")]
             cdb.update_activity_tick();
-            if 1 < handle_conflict(asg, cdb, rst, state, &cc)? {
-                num_learnt += 1;
+            match handle_conflict(asg, cdb, rst, state, &cc)? {
+                0 => (), // rst.activate(),
+                1 => (), // has_progress = true,
+                // 1 => (),
+                _ => num_learnt += 1,
             }
             if state.stm.stage_ended(num_learnt) {
                 if let Some(p) = state.elapsed() {
@@ -266,7 +269,6 @@ fn search(
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
                 dump_stage(state, asg, rst, current_stage);
-                let span_pre = state.stm.current_span();
                 let next_stage: Option<bool> = state.stm.prepare_new_stage(
                     (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt()
                         as usize,
@@ -285,14 +287,18 @@ fn search(
                             elim.simplify(asg, cdb, rst, state, false)?;
                         }
                         if cfg!(feature = "dynamic_restart_threshold") {
-                            rst.adjust_threshold(span_pre, state.stm.current_segment());
+                            rst.setup_segment(state.stm.max_scale());
                         }
                     }
                 }
                 asg.clear_asserted_literals(cdb)?;
                 state.progress(asg, cdb, elim, rst);
                 asg.handle(SolverEvent::Stage(scale));
-                rst.set_sensibility(scale, state.stm.max_scale());
+                rst.setup_stage(
+                    scale,
+                    state.c_lvl.get(),
+                    cdb.refer(cdb::property::TEma::Entanglement).get(),
+                );
                 current_stage = next_stage;
             } else if rst.restart(
                 asg.refer(assign::property::TEma::AssignRate),

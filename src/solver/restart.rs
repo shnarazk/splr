@@ -3,14 +3,12 @@ use crate::types::*;
 
 /// API for [`restart`](`crate::solver::RestartIF::restart`) and [`stabilize`](`crate::solver::RestartIF::stabilize`).
 pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> {
-    /// adjust restart threshold
-    fn adjust_threshold(&mut self, max_scale: usize, segment: usize);
-    /// activate restart condition.
-    fn activate(&mut self);
     /// check blocking and forcing restart condition.
     fn restart(&mut self, asg: &EmaView, lbd: &EmaView) -> Option<RestartDecision>;
     /// set stabilization parameters
-    fn set_sensibility(&mut self, step: usize, step_max: usize);
+    fn setup_stage(&mut self, stage_scale: usize, c_lvl: f64, ent: f64);
+    /// activate restart condition.
+    fn setup_segment(&mut self, max_stage: usize);
 }
 
 /// `Restarter` provides restart API and holds data about restart conditions.
@@ -20,24 +18,17 @@ pub struct Restarter {
     /// For block restart based on average assignments: 1.40.
     /// This is called `R` in Glucose.
     block_threshold: f64,
-    /// For force restart based on average LBD of newly generated clauses: 0.80.
-    /// This is called `K` in Glucose.
     restart_threshold: f64,
 
-    after_restart: usize,
-    restart_step: usize,
-    initial_restart_step: usize,
-
     // stabilizer
-    stb_step: usize,
-    stb_step_max: usize,
+    stage_scale: usize,
+    max_scale: usize,
 
     //
     //## statistics
     //
     num_block: usize,
     num_restart: usize,
-    num_restart_pre: usize,
 }
 
 impl Instantiate for Restarter {
@@ -45,15 +36,14 @@ impl Instantiate for Restarter {
         Restarter {
             enable: true,
             block_threshold: config.rst_asg_thr,
-            restart_threshold: config.rst_lbd_thr,
-            restart_step: config.rst_step,
-            initial_restart_step: config.rst_step,
+            restart_threshold: 2.0,
+            stage_scale: 1,
+            max_scale: 1,
             ..Restarter::default()
         }
     }
     fn handle(&mut self, e: SolverEvent) {
         if e == SolverEvent::Restart {
-            self.after_restart = 0;
             self.num_restart += 1;
         }
     }
@@ -69,70 +59,32 @@ pub enum RestartDecision {
 }
 
 impl RestartIF for Restarter {
-    /// minimize the difference between the number of restarts comparing
-    /// and the expected number.
-    fn adjust_threshold(&mut self, span: usize, segment: usize) {
-        // self.enable = !self.enable;
-        if !self.enable {
-            return;
-        }
-        let ideal_interval: f64 = 10.0; // (self.initial_restart_step + 1) as f64;
-        let dissipation: f64 = 0.1;
-        // Since 'span' isn't a constant, a simple calculation may get a larger number.
-        // To compensate the difference, I introduce another factor.
-        let extends: f64 = span as f64 * 2.0_f64.powf(segment as f64 - dissipation);
-        let expects = extends / ideal_interval;
-        if expects < 100.0 {
-            return;
-        }
-        let center: f64 = 1.0;
-        let scale = {
-            let restarts = (self.num_restart - self.num_restart_pre) as f64;
-            restarts.log(expects) - center
-        };
-        let power = center + scale.signum() * scale.abs().powf(1.4);
-        let new_threshold = self.restart_threshold.powf(power);
-        self.restart_threshold = new_threshold;
-        if scale < 0.0 {
-            self.enable = false;
-        }
-    }
-    fn activate(&mut self) {
-        self.enable = true;
-    }
     fn restart(&mut self, asg: &EmaView, lbd: &EmaView) -> Option<RestartDecision> {
-        macro_rules! next_step {
-            () => {
-                self.stb_step * self.initial_restart_step
-            };
-        }
         if !self.enable {
             return None;
         }
-
-        self.after_restart += 1;
-        if self.after_restart < self.restart_step {
-            return None;
-        }
-
-        if self.stb_step_max * self.num_block < self.stb_step * self.num_restart
+        if self.max_scale * self.num_block < self.stage_scale * self.num_restart
             && asg.trend() < self.block_threshold
         {
             self.num_block += 1;
-            self.after_restart = 0;
-            self.restart_step = next_step!();
             return Some(RestartDecision::Block);
         }
-
-        if self.restart_threshold < lbd.trend() {
-            self.restart_step = next_step!();
+        let l = lbd.get_fast();
+        if self.restart_threshold < l {
             return Some(RestartDecision::Force);
         }
         None
     }
-    fn set_sensibility(&mut self, step: usize, step_max: usize) {
-        self.stb_step = step;
-        self.stb_step_max = step_max;
+    fn setup_segment(&mut self, max_scale: usize) {
+        // self.enable = !self.enable;
+        self.max_scale = max_scale;
+    }
+    fn setup_stage(&mut self, stage_scale: usize, _c_lvl: f64, ent: f64) {
+        // self.enable = !self.enable;
+        self.stage_scale = stage_scale;
+        self.restart_threshold =
+            // ent * (c_lvl / ent).powf(stage_scale as f64 / self.max_scale as f64);
+        ent * ((stage_scale + 1) as f64).log(1.6)
     }
 }
 
