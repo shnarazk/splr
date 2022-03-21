@@ -29,7 +29,9 @@ pub trait EmaMutIF: EmaIF {
     /// the type of the argument of `update`.
     type Input;
     /// reset internal data.
-    fn reset(&mut self) {}
+    fn reset_to(&mut self, _: f64) {}
+    fn reset_fast(&mut self) {}
+    fn reset_slow(&mut self) {}
     /// catch up with the current state.
     fn update(&mut self, x: Self::Input);
     /// return a view.
@@ -175,12 +177,24 @@ impl EmaMutIF for Ema2 {
         self.calf = self.fe + (1.0 - self.fe) * self.calf;
         self.cals = self.se + (1.0 - self.se) * self.cals;
     }
+    fn reset_to(&mut self, val: f64) {
+        self.ema.fast = val;
+    }
     #[cfg(not(feature = "EMA_calibration"))]
-    fn reset(&mut self) {
+    fn reset_fast(&mut self) {
+        self.ema.fast = self.ema.slow;
+    }
+    #[cfg(feature = "EMA_calibration")]
+    fn reset_fast(&mut self) {
+        self.ema.fast = self.ema.slow;
+        self.calf = self.cals;
+    }
+    #[cfg(not(feature = "EMA_calibration"))]
+    fn reset_slow(&mut self) {
         self.ema.slow = self.ema.fast;
     }
     #[cfg(feature = "EMA_calibration")]
-    fn reset(&mut self) {
+    fn reset_slow(&mut self) {
         self.ema.slow = self.ema.fast;
         self.cals = self.calf;
     }
@@ -341,12 +355,23 @@ impl<const N: usize> EmaMutIF for Ewa2<N> {
             self.cals = self.se + self.sx * self.cals;
         }
     }
+    fn reset_to(&mut self, val: f64) {
+        self.ema.fast = val;
+    }
     #[cfg(not(feature = "EMA_calibration"))]
-    fn reset(&mut self) {
+    fn reset_fast(&mut self) {
+        unimplemented!();
+    }
+    #[cfg(feature = "EMA_calibration")]
+    fn reset_fast(&mut self) {
+        unimplemented!();
+    }
+    #[cfg(not(feature = "EMA_calibration"))]
+    fn reset_slow(&mut self) {
         self.ema.slow = self.ema.fast;
     }
     #[cfg(feature = "EMA_calibration")]
-    fn reset(&mut self) {
+    fn reset_slow(&mut self) {
         self.ema.slow = self.fast.get();
         self.cals = self.calf;
     }
