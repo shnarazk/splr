@@ -267,6 +267,7 @@ fn search(
                 cdb.check_consistency(asg, "before simplify");
                 dump_stage(state, asg, rst, current_stage);
                 let span_pre = state.stm.current_span();
+                let max_scale_pre = state.stm.max_scale();
                 let next_stage: Option<bool> = state.stm.prepare_new_stage(
                     (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt()
                         as usize,
@@ -288,7 +289,7 @@ fn search(
                             rst.set_segment_parameters(
                                 span_pre,
                                 state.stm.current_segment(),
-                                state.stm.max_scale(),
+                                max_scale_pre,
                             );
                         }
                     }
@@ -300,6 +301,7 @@ fn search(
                 current_stage = next_stage;
             } else if rst.restart(
                 asg.refer(assign::property::TEma::AssignRate),
+                cdb.refer(cdb::property::TEma::Entanglement),
                 cdb.refer(cdb::property::TEma::LBD),
             ) == Some(RestartDecision::Force)
             {

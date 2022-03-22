@@ -197,7 +197,7 @@ impl Instantiate for ClauseDB {
             }
             SolverEvent::Restart => {
                 // self.lbd.reset_to(self.lb_entanglement.get());
-                self.lbd.reset_to(0.0);
+                // self.lbd.reset_to(0.0);
             }
             _ => (),
         }

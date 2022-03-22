@@ -4,7 +4,7 @@ use crate::types::*;
 /// API for [`restart`](`crate::solver::RestartIF::restart`) and [`stabilize`](`crate::solver::RestartIF::stabilize`).
 pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> {
     /// check blocking and forcing restart condition.
-    fn restart(&mut self, asg: &EmaView, lbd: &EmaView) -> Option<RestartDecision>;
+    fn restart(&mut self, asg: &EmaView, ent: &EmaView, lbd: &EmaView) -> Option<RestartDecision>;
     /// set stabilization parameters
     fn set_stage_parameters(&mut self, step: usize);
     /// adjust restart threshold
@@ -14,18 +14,18 @@ pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> 
 /// `Restarter` provides restart API and holds data about restart conditions.
 #[derive(Clone, Debug, Default)]
 pub struct Restarter {
-    /// For block restart based on average assignments: 1.40.
-    /// This is called `R` in Glucose.
-    block_threshold: f64,
+    // /// For block restart based on average assignments: 1.40.
+    // /// This is called `R` in Glucose.
+    // block_threshold: f64,
     /// For force restart based on average LBD of newly generated clauses: 0.80.
     /// This is called `K` in Glucose.
     restart_threshold: f64,
 
-    after_restart: usize,
-    restart_step: usize,
-    initial_restart_step: usize,
+    penetration_energy: f64,
+    penetration_energy_charged: f64,
+    penetration_energy_default: f64,
 
-    // stabilizer
+    // stage parameter
     stage_scale: usize,
     max_scale: usize,
 
@@ -40,16 +40,17 @@ pub struct Restarter {
 impl Instantiate for Restarter {
     fn instantiate(config: &Config, _cnf: &CNFDescription) -> Self {
         Restarter {
-            block_threshold: config.rst_asg_thr,
+            // block_threshold: config.rst_asg_thr,
             restart_threshold: config.rst_lbd_thr,
-            restart_step: config.rst_step,
-            initial_restart_step: config.rst_step,
+            penetration_energy: 2.5,
+            penetration_energy_charged: 2.5,
+            penetration_energy_default: 2.5,
             ..Restarter::default()
         }
     }
     fn handle(&mut self, e: SolverEvent) {
         if e == SolverEvent::Restart {
-            self.after_restart = 0;
+            self.penetration_energy = self.penetration_energy_charged;
             self.num_restart += 1;
         }
     }
@@ -65,28 +66,22 @@ pub enum RestartDecision {
 }
 
 impl RestartIF for Restarter {
-    fn restart(&mut self, asg: &EmaView, lbd: &EmaView) -> Option<RestartDecision> {
-        macro_rules! next_step {
-            () => {
-                self.stage_scale * self.initial_restart_step
-            };
-        }
-        self.after_restart += 1;
-        if self.after_restart < self.restart_step {
-            return None;
-        }
-
-        if self.max_scale * self.num_block < self.stage_scale * self.num_restart
-            && asg.trend() < self.block_threshold
-        {
-            self.num_block += 1;
-            self.after_restart = 0;
-            self.restart_step = next_step!();
-            return Some(RestartDecision::Block);
-        }
-
-        if self.restart_threshold < lbd.trend() {
-            self.restart_step = next_step!();
+    fn restart(
+        &mut self,
+        _asg: &EmaView,
+        ent: &EmaView,
+        _lbd: &EmaView,
+    ) -> Option<RestartDecision> {
+        // if self.max_scale * self.num_block < self.stage_scale * self.num_restart
+        //     && asg.trend() < self.block_threshold
+        // {
+        //     self.num_block += 1;
+        //     return Some(RestartDecision::Block);
+        // }
+        // let trend = lbd.trend() - 1.0;
+        let trend = ent.trend() - 1.0;
+        self.penetration_energy -= trend;
+        if self.penetration_energy < 0.0 {
             return Some(RestartDecision::Force);
         }
         None
@@ -104,23 +99,43 @@ impl RestartIF for Restarter {
         if expects < 100.0 {
             return;
         }
-        let scale = {
-            let restarts = (self.num_restart - self.num_restart_pre) as f64;
-            let center: f64 = 1.0;
-            let s = restarts.log(expects) - center;
-            center + s.signum() * s.abs().powf(1.4)
-        };
-        self.restart_threshold = self.restart_threshold.powf(scale);
+        // let scale = {
+        //     let restarts = (self.num_restart - self.num_restart_pre) as f64;
+        //     let center: f64 = 1.0;
+        //     let s = restarts.log(expects) - center;
+        //     center + s.signum() * s.abs().powf(1.4)
+        // };
+        // self.penetration_energy_default = self.penetration_energy_default.powf(scale);
+        let restarts = (self.num_restart - self.num_restart_pre) as f64;
+        self.penetration_energy_default *= (restarts / expects).powf(0.75);
         self.num_restart_pre = self.num_restart;
     }
     fn set_stage_parameters(&mut self, stage_scale: usize) {
         self.stage_scale = stage_scale;
+        self.penetration_energy_charged =
+            self.penetration_energy_default * (stage_scale as f64).powi(2);
     }
 }
 
 pub mod property {
     use super::Restarter;
     use crate::types::*;
+
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub enum Tbool {
+        Active,
+    }
+
+    pub const BOOLS: [Tbool; 1] = [Tbool::Active];
+
+    impl PropertyDereference<Tbool, bool> for Restarter {
+        #[inline]
+        fn derefer(&self, k: Tbool) -> bool {
+            match k {
+                Tbool::Active => true,
+            }
+        }
+    }
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tusize {
@@ -150,7 +165,7 @@ pub mod property {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
-                Tf64::RestartThreshold => self.restart_threshold,
+                Tf64::RestartThreshold => self.penetration_energy_default,
             }
         }
     }
