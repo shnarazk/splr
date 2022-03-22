@@ -44,7 +44,7 @@ impl Default for ClauseDB {
             num_learnt: 0,
             num_reduction: 0,
             num_reregistration: 0,
-            lb_entanglement: Ema::new(100_000).with_value(2.0),
+            lb_entanglement: Ema2::new(1_000).with_slow(80_000).with_value(2.0),
             eliminated_permanent: Vec::new(),
         }
     }
