@@ -294,7 +294,7 @@ fn search(
                 asg.handle(SolverEvent::Stage(scale));
                 rst.set_stage_parameters(scale);
                 current_stage = next_stage;
-            } else if rst.restart(cdb.refer(cdb::property::TEma::Entanglement))
+            } else if rst.restart(cdb.refer(cdb::property::TEma::LBD))
                 == Some(RestartDecision::Force)
             {
                 RESTART!(asg, cdb, rst);
