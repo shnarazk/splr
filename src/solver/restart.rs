@@ -32,9 +32,9 @@ pub struct Restarter {
     //
     //## statistics
     //
-    num_block: usize,
+    // num_block: usize,
     num_restart: usize,
-    num_restart_pre: usize,
+    // num_restart_pre: usize,
 }
 
 impl Instantiate for Restarter {
@@ -43,9 +43,9 @@ impl Instantiate for Restarter {
             enable: true,
             // block_threshold: config.rst_asg_thr,
             // restart_threshold: config.rst_lbd_thr,
-            penetration_energy: 2.5,
-            penetration_energy_charged: 2.5,
-            penetration_energy_default: 2.5,
+            penetration_energy: 0.1,
+            penetration_energy_charged: 0.1,
+            penetration_energy_default: 0.1,
             ..Restarter::default()
         }
     }
@@ -69,8 +69,7 @@ pub enum RestartDecision {
 impl RestartIF for Restarter {
     fn restart(&mut self, ent: &EmaView) -> Option<RestartDecision> {
         if self.enable {
-            let trend = ent.trend() - 1.0;
-            self.penetration_energy -= trend;
+            self.penetration_energy -= ent.trend() - 1.0;
             if self.penetration_energy < 0.0 {
                 return Some(RestartDecision::Force);
             }
@@ -79,25 +78,14 @@ impl RestartIF for Restarter {
     }
     /// minimize the difference between the number of restarts comparing
     /// and the expected number.
-    fn set_segment_parameters(&mut self, span: usize, segment: usize) {
-        let ideal_interval: f64 = 10.0; // (self.initial_restart_step + 1) as f64;
-        let dissipation: f64 = 0.1;
-        // Since 'span' isn't a constant, a simple calculation may get a larger number.
-        // To compensate the difference, I introduce another factor.
-        let extends: f64 = span as f64 * 2.0_f64.powf(segment as f64 - dissipation);
-        // By disabling, the expected value should be halved.
-        let expects = 0.5 * extends / ideal_interval;
-        if expects < 32.0 {
-            return;
-        }
-        let restarts = (self.num_restart - self.num_restart_pre) as f64;
-        self.penetration_energy_default *= (restarts / expects).powf(0.8);
-        self.num_restart_pre = self.num_restart;
+    fn set_segment_parameters(&mut self, _span: usize, _segment: usize) {
+        // self.penetration_energy_default = 0.01;
+        self.penetration_energy_default *= 0.75;
     }
     fn set_stage_parameters(&mut self, stage_scale: usize) {
-        self.enable = !self.enable;
+        // self.enable = !self.enable;
         self.penetration_energy_charged =
-            self.penetration_energy_default * (stage_scale as f64).powi(2);
+            self.penetration_energy_default * (stage_scale as f64).powf(1.5);
     }
 }
 
@@ -133,7 +121,7 @@ pub mod property {
         #[inline]
         fn derefer(&self, k: Tusize) -> usize {
             match k {
-                Tusize::NumBlock => self.num_block,
+                Tusize::NumBlock => 0, // self.num_block,
                 Tusize::NumRestart => self.num_restart,
             }
         }
@@ -149,7 +137,7 @@ pub mod property {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
-                Tf64::RestartThreshold => self.penetration_energy_default,
+                Tf64::RestartThreshold => self.penetration_energy_charged,
             }
         }
     }
