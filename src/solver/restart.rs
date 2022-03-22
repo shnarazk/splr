@@ -82,7 +82,7 @@ impl RestartIF for Restarter {
     /// and the expected number.
     fn set_segment_parameters(&mut self, _span: usize, _segment: usize) {
         // self.penetration_energy_default = 0.01;
-        self.penetration_energy_default *= 0.75;
+        // self.penetration_energy_default *= 0.75;
     }
     fn set_stage_parameters(&mut self, stage_scale: usize) {
         // self.enable = !self.enable;
