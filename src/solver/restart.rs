@@ -25,7 +25,7 @@ pub struct Restarter {
     // restart_threshold: f64,
     penetration_energy: f64,
     penetration_energy_charged: f64,
-    penetration_energy_default: f64,
+    penetration_energy_unit: f64,
 
     // stage parameter
     // stage_scale: usize,
@@ -47,7 +47,7 @@ impl Instantiate for Restarter {
             // restart_threshold: config.rst_lbd_thr,
             penetration_energy: FUEL,
             penetration_energy_charged: FUEL,
-            penetration_energy_default: FUEL,
+            penetration_energy_unit: FUEL,
             ..Restarter::default()
         }
     }
@@ -87,7 +87,7 @@ impl RestartIF for Restarter {
     fn set_stage_parameters(&mut self, stage_scale: usize) {
         // self.enable = !self.enable;
         self.penetration_energy_charged =
-            self.penetration_energy_default * (stage_scale as f64).powf(1.5);
+            self.penetration_energy_unit * (stage_scale as f64).powf(1.5);
     }
 }
 
