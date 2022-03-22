@@ -11,6 +11,8 @@ pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> 
     fn set_segment_parameters(&mut self, span: usize, segment: usize);
 }
 
+const FUEL: f64 = 0.05;
+
 /// `Restarter` provides restart API and holds data about restart conditions.
 #[derive(Clone, Debug, Default)]
 pub struct Restarter {
@@ -43,9 +45,9 @@ impl Instantiate for Restarter {
             enable: true,
             // block_threshold: config.rst_asg_thr,
             // restart_threshold: config.rst_lbd_thr,
-            penetration_energy: 0.1,
-            penetration_energy_charged: 0.1,
-            penetration_energy_default: 0.1,
+            penetration_energy: FUEL,
+            penetration_energy_charged: FUEL,
+            penetration_energy_default: FUEL,
             ..Restarter::default()
         }
     }
