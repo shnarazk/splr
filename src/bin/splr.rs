@@ -278,11 +278,11 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c      Restart|#BLK:{:>9}, #RST:{:>9}, fuel:{:>9}, #seg:{:>9},\n",
-            state[LogUsizeId::RestartBlock],
+            "c      Restart|#RST:{:>9}, #seg:{:>9}, fuel:{:>9.4}, /pcr:{:>9.4}\n",
             state[LogUsizeId::Restart],
-            state[LogF64Id::RestartThreshold],
             state[LogUsizeId::StageSegment],
+            state[LogF64Id::RestartEnergy],
+            state[LogF64Id::ConflictPerRestart],
         )
         .as_bytes(),
     )?;
@@ -308,11 +308,11 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c         misc|vivC:{:>9}, subC:{:>9}, core:{:>9}, /cpr:{:>9.2},\n",
+            "c         misc|vivC:{:>9}, subC:{:>9}, core:{:>9}, ----:{:>9.2},\n",
             state[LogUsizeId::Simplify],
             state[LogUsizeId::SubsumedClause],
             state[LogUsizeId::UnreachableCore],
-            state[LogF64Id::ConflictPerRestart],
+            0.0,
         )
         .as_bytes(),
     )?;

@@ -381,11 +381,10 @@ impl StateIF for State {
         let elim_num_full = elim.derefer(processor::property::Tusize::NumFullElimination);
         let elim_num_sub = elim.derefer(processor::property::Tusize::NumSubsumedClause);
 
-        let rst_num_blk: usize = rst.derefer(solver::restart::property::Tusize::NumBlock);
         let rst_num_rst: usize = rst.derefer(solver::restart::property::Tusize::NumRestart);
         let rst_asg: &EmaView = asg.refer(assign::property::TEma::AssignRate);
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
-        let rst_lbd_thr: f64 = rst.derefer(solver::restart::property::Tf64::RestartThreshold);
+        let rst_eng: f64 = rst.derefer(solver::restart::property::Tf64::RestartThreshold);
         let stg_segment: usize = self.stm.current_segment();
 
         if self.config.use_log {
@@ -461,11 +460,16 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, fuel:{}, #seg:{}",
-            im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
+            "\x1B[2K     Restart|#RST:{}, #seg:{}, fuel:{}, /cpr:{}",
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-            fm!("{:>9.4}", self, LogF64Id::RestartThreshold, rst_lbd_thr),
             im!("{:>9}", self, LogUsizeId::StageSegment, stg_segment),
+            fm!("{:>9.4}", self, LogF64Id::RestartEnergy, rst_eng),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::ConflictPerRestart,
+                asg_cpr_ema.get()
+            )
         );
         println!(
             "\x1B[2K         LBD|trnd:{}, avrg:{}, entg:{}, /dpc:{}",
@@ -497,7 +501,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|vivC:{}, subC:{}, core:{}, /cpr:{}",
+            "\x1B[2K        misc|vivC:{}, subC:{}, core:{}, ----:{}",
             im!(
                 "{:>9}",
                 self,
@@ -515,12 +519,7 @@ impl StateIF for State {
                     asg_num_unreachables
                 }
             ),
-            fm!(
-                "{:>9.2}",
-                self,
-                LogF64Id::ConflictPerRestart,
-                asg_cpr_ema.get()
-            )
+            fm!("{:>9.2}", self, LogF64Id::End, 0.0),
         );
         self[LogUsizeId::Simplify] = elim_num_full;
         self[LogUsizeId::Stage] = self.stm.current_stage();
@@ -558,7 +557,6 @@ impl State {
         self[LogUsizeId::BiClause] = cdb.derefer(cdb::property::Tusize::NumBiClause);
         self[LogUsizeId::PermanentClause] =
             cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
-        self[LogUsizeId::RestartBlock] = rst.derefer(solver::restart::property::Tusize::NumBlock);
         self[LogUsizeId::Restart] = rst.derefer(solver::restart::property::Tusize::NumRestart);
         self[LogUsizeId::Stage] = self.stm.current_stage();
         self[LogUsizeId::StageCycle] = self.stm.current_cycle();
@@ -811,8 +809,6 @@ pub enum LogUsizeId {
     //## restart
     //
     Restart,
-    RestartBlock,
-    RestartCancel,
 
     //
     //## stage
@@ -850,7 +846,7 @@ pub enum LogF64Id {
     ConflictPerRestart,
     PropagationPerConflict,
     LiteralBlockEntanglement,
-    RestartThreshold,
+    RestartEnergy,
     End,
 }
 
