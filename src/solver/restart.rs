@@ -54,7 +54,7 @@ impl RestartIF for Restarter {
     /// minimize the difference between the number of restarts comparing
     /// and the expected number.
     fn set_segment_parameters(&mut self, _segment_scale: usize) {
-        self.penetration_energy_unit *= 0.5;
+        self.penetration_energy_unit *= 0.8;
     }
     fn set_stage_parameters(&mut self, stage_scale: usize) {
         // self.enable = !self.enable;
