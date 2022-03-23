@@ -2,7 +2,7 @@
 use {
     super::{
         conflict::handle_conflict,
-        restart::{self, RestartDecision, RestartIF, Restarter},
+        restart::{self, RestartIF, Restarter},
         Certificate, Solver, SolverEvent, SolverResult,
     },
     crate::{
@@ -266,7 +266,6 @@ fn search(
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
                 dump_stage(state, asg, rst, current_stage);
-                let span_pre = state.stm.current_span();
                 let next_stage: Option<bool> = state.stm.prepare_new_stage(
                     (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt()
                         as usize,
@@ -285,7 +284,7 @@ fn search(
                             elim.simplify(asg, cdb, rst, state, false)?;
                         }
                         if cfg!(feature = "dynamic_restart_threshold") {
-                            rst.set_segment_parameters(span_pre, state.stm.current_segment());
+                            rst.set_segment_parameters(max_scale);
                         }
                     }
                 }
@@ -294,9 +293,7 @@ fn search(
                 asg.handle(SolverEvent::Stage(scale));
                 rst.set_stage_parameters(scale);
                 current_stage = next_stage;
-            } else if rst.restart(cdb.refer(cdb::property::TEma::LBD))
-                == Some(RestartDecision::Force)
-            {
+            } else if rst.restart(cdb.refer(cdb::property::TEma::LBD)) {
                 RESTART!(asg, cdb, rst);
             }
             if let Some(na) = asg.best_assigned() {

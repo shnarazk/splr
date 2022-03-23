@@ -4,47 +4,29 @@ use crate::types::*;
 /// API for [`restart`](`crate::solver::RestartIF::restart`) and [`stabilize`](`crate::solver::RestartIF::stabilize`).
 pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> {
     /// check blocking and forcing restart condition.
-    fn restart(&mut self, ent: &EmaView) -> Option<RestartDecision>;
+    fn restart(&mut self, ent: &EmaView) -> bool;
     /// set stabilization parameters
     fn set_stage_parameters(&mut self, step: usize);
     /// adjust restart threshold
-    fn set_segment_parameters(&mut self, span: usize, segment: usize);
+    fn set_segment_parameters(&mut self, segment_scale: usize);
 }
 
-const FUEL: f64 = 0.05;
+const FUEL: f64 = 0.01;
 
 /// `Restarter` provides restart API and holds data about restart conditions.
 #[derive(Clone, Debug, Default)]
 pub struct Restarter {
     enable: bool,
-    // /// For block restart based on average assignments: 1.40.
-    // /// This is called `R` in Glucose.
-    // block_threshold: f64,
-    /// For force restart based on average LBD of newly generated clauses: 0.80.
-    /// This is called `K` in Glucose.
-    // restart_threshold: f64,
     penetration_energy: f64,
     penetration_energy_charged: f64,
     penetration_energy_unit: f64,
-
-    // stage parameter
-    // stage_scale: usize,
-    // max_scale: usize,
-
-    //
-    //## statistics
-    //
-    // num_block: usize,
     num_restart: usize,
-    // num_restart_pre: usize,
 }
 
 impl Instantiate for Restarter {
     fn instantiate(_config: &Config, _cnf: &CNFDescription) -> Self {
         Restarter {
             enable: true,
-            // block_threshold: config.rst_asg_thr,
-            // restart_threshold: config.rst_lbd_thr,
             penetration_energy: FUEL,
             penetration_energy_charged: FUEL,
             penetration_energy_unit: FUEL,
@@ -59,35 +41,25 @@ impl Instantiate for Restarter {
     }
 }
 
-/// Type for the result of `restart`.
-#[derive(Debug, Eq, PartialEq)]
-pub enum RestartDecision {
-    /// We should block restart.
-    Block,
-    /// We should restart now.
-    Force,
-}
-
 impl RestartIF for Restarter {
-    fn restart(&mut self, ent: &EmaView) -> Option<RestartDecision> {
+    fn restart(&mut self, ent: &EmaView) -> bool {
         if self.enable {
             self.penetration_energy -= ent.trend() - 1.0;
             if self.penetration_energy < 0.0 {
-                return Some(RestartDecision::Force);
+                return true;
             }
         }
-        None
+        false
     }
     /// minimize the difference between the number of restarts comparing
     /// and the expected number.
-    fn set_segment_parameters(&mut self, _span: usize, _segment: usize) {
-        // self.penetration_energy_default = 0.01;
-        // self.penetration_energy_default *= 0.75;
+    fn set_segment_parameters(&mut self, _segment_scale: usize) {
+        self.penetration_energy_unit *= 0.5;
     }
     fn set_stage_parameters(&mut self, stage_scale: usize) {
         // self.enable = !self.enable;
-        self.penetration_energy_charged =
-            self.penetration_energy_unit * (stage_scale as f64).powf(1.5);
+        self.penetration_energy_charged = self.penetration_energy_unit * (stage_scale as f64);
+        // .powf(1.5);
     }
 }
 
