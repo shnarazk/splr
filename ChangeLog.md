@@ -14,6 +14,7 @@
   - drop `solver::restart::GeometricStabilizer` and `solver::restart::ProgressLuby`
 - Drop feature 'strategy_adaptation'
 - Drop feature 'Luby_stabilization'. It became essential.
+- Glucose-like restart blocking was substituted with a simple dynamics model
 
 ## 0.14.0, 2021-11-01
 
