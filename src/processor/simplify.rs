@@ -299,6 +299,11 @@ impl EliminateIF for Eliminator {
         if self.mode != EliminatorMode::Dormant {
             self.stop(asg, cdb);
         }
+        for occur in self.var.iter_mut() {
+            occur.clear();
+        }
+        self.var_queue.clear(asg);
+        debug_assert!(self.clause_queue.is_empty());
         cdb.check_size().map(|_| ())
     }
     fn sorted_iterator(&self) -> Iter<'_, u32> {
