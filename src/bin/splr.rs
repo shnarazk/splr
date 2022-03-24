@@ -3,7 +3,6 @@ use {
     splr::{
         assign, cdb,
         config::{self, CERTIFICATION_DEFAULT_FILENAME},
-        processor,
         solver::*,
         state::{self, LogF64Id, LogUsizeId},
         Config, EmaIF, PropertyDereference, PropertyReference, SolverError, VERSION,
@@ -364,16 +363,6 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
                 "c   clause::{:<27}{:>19.3}\n",
                 format!("{:?}", key),
                 s.cdb.derefer(*key),
-            )
-            .as_bytes(),
-        )?;
-    }
-    for key in &processor::property::USIZES {
-        out.write_all(
-            format!(
-                "c   processor::{:<24}{:>15}\n",
-                format!("{:?}", key),
-                s.elim.derefer(*key),
             )
             .as_bytes(),
         )?;

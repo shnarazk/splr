@@ -47,6 +47,7 @@ impl Default for AssignStack {
             phase_age: 0,
 
             stage_scale: 1,
+            eliminated: Vec::new(),
 
             num_vars: 0,
             num_asserted_vars: 0,
@@ -201,7 +202,8 @@ impl AssignIF for AssignStack {
         (self.build_best_at == self.num_propagation).then(|| self.num_vars - self.num_best_assign)
     }
     #[allow(unused_variables)]
-    fn extend_model(&mut self, cdb: &mut impl ClauseDBIF, lits: &[Lit]) -> Vec<Option<bool>> {
+    fn extend_model(&mut self, cdb: &mut impl ClauseDBIF) -> Vec<Option<bool>> {
+        let lits = &self.eliminated;
         #[cfg(feature = "trace_elimination")]
         println!(
             "# extend_model\n - as i32: {:?}\n - as raw: {:?}",

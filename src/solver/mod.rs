@@ -20,7 +20,7 @@ pub use self::{
     validate::ValidateIF,
 };
 
-use crate::{assign::AssignStack, cdb::ClauseDB, processor::Eliminator, state::*, types::*};
+use crate::{assign::AssignStack, cdb::ClauseDB, state::*, types::*};
 
 /// Normal results returned by Solver.
 #[derive(Debug, PartialEq)]
@@ -86,8 +86,6 @@ pub struct Solver {
     pub asg: AssignStack,
     /// clause container
     pub cdb: ClauseDB,
-    /// clause and variable elimination
-    pub elim: Eliminator,
     /// restart management
     pub rst: Restarter,
     /// misc data holder

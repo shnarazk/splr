@@ -34,7 +34,6 @@ impl Default for Eliminator {
             eliminate_occurrence_limit: 800,
             subsume_literal_limit: 100,
             var: Vec::new(),
-            num_full_elimination: 0,
             num_subsumed: 0,
         }
     }
@@ -317,8 +316,8 @@ impl EliminateIF for Eliminator {
             Some((w.pos_occurs.len(), w.neg_occurs.len()))
         }
     }
-    fn eliminated_lits(&self) -> &[Lit] {
-        &self.elim_lits
+    fn eliminated_lits(&mut self) -> &mut Vec<Lit> {
+        &mut self.elim_lits
     }
 }
 
@@ -535,7 +534,6 @@ impl Eliminator {
                 break;
             }
         }
-        self.num_full_elimination += 1;
         Ok(())
     }
     /// do the elimination task

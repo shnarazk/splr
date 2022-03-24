@@ -9,7 +9,7 @@ use {
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
         cdb::{self, ClauseDB, ClauseDBIF, VivifyIF},
         processor::{EliminateIF, Eliminator},
-        state::{State, StateIF},
+        state::{Stat, State, StateIF},
         types::*,
     },
 };
@@ -49,7 +49,6 @@ impl SolveIF for Solver {
         let Solver {
             ref mut asg,
             ref mut cdb,
-            ref mut elim,
             ref mut rst,
             ref mut state,
         } = self;
@@ -57,7 +56,7 @@ impl SolveIF for Solver {
             return Err(SolverError::OutOfMemory);
         }
         state.progress_header();
-        state.progress(asg, cdb, elim, rst);
+        state.progress(asg, cdb, rst);
         state.flush("");
         state.flush("Preprocessing stage: ");
 
@@ -73,101 +72,106 @@ impl SolveIF for Solver {
             }
             assert!(!asg.remains());
         }
-        debug_assert_eq!(asg.decision_level(), asg.root_level());
-        if elim.simplify(asg, cdb, rst, state, true).is_err() {
-            if cdb.check_size().is_err() {
-                return Err(SolverError::OutOfMemory);
-            }
-            state.log(asg.num_conflict, "By eliminator");
-            return Ok(Certificate::UNSAT);
-        }
-
-        #[cfg(feature = "clause_elimination")]
         {
-            const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
-
-            //
-            //## Propagate all trivial literals (an essential step)
-            //
-            // Set appropriate phases and push all the unit clauses to assign stack.
-            // To do so, we use eliminator's occur list.
-            // Thus we have to call `activate` and `prepare` firstly, to build occur lists.
-            // Otherwise all literals are assigned wrongly.
-
-            state.flush("phasing...");
-            elim.prepare(asg, cdb, true);
-            for vi in 1..=asg.num_vars {
-                if asg.assign(vi).is_some() {
-                    continue;
+            debug_assert_eq!(asg.decision_level(), asg.root_level());
+            let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+            if elim.simplify(asg, cdb, rst, state, true).is_err() {
+                if cdb.check_size().is_err() {
+                    return Err(SolverError::OutOfMemory);
                 }
-                if let Some((p, m)) = elim.stats(vi) {
-                    // We can't call `asg.assign_at_root_level(l)` even if p or m == 0.
-                    // This means we can't pick `!l`.
-                    // This becomes a problem in the case of incremental solving.
-                    #[cfg(not(feature = "incremental_solver"))]
-                    {
-                        if m == 0 {
-                            let l = Lit::from((vi, true));
-                            assert!(asg.assigned(l).is_none());
-                            cdb.certificate_add_assertion(l);
-                            if asg.assign_at_root_level(l).is_err() {
-                                return Ok(Certificate::UNSAT);
-                            }
-                        } else if p == 0 {
-                            let l = Lit::from((vi, false));
-                            assert!(asg.assigned(l).is_none());
-                            cdb.certificate_add_assertion(l);
-                            if asg.assign_at_root_level(l).is_err() {
-                                return Ok(Certificate::UNSAT);
-                            }
-                        }
-                    }
-                    asg.var_mut(vi).set(FlagVar::PHASE, m < p);
-                    elim.enqueue_var(asg, vi, false);
-                }
+                state.log(asg.num_conflict, "By eliminator");
+                return Ok(Certificate::UNSAT);
             }
-            //
-            //## Run eliminator
-            //
-            if USE_PRE_PROCESSING_ELIMINATOR {
-                state.flush("simplifying...");
-                if elim.simplify(asg, cdb, rst, state, false).is_err() {
-                    // Why inconsistent? Because the CNF contains a conflict, not an error!
-                    // Or out of memory.
-                    state.progress(asg, cdb, elim, rst);
-                    if cdb.check_size().is_err() {
-                        return Err(SolverError::OutOfMemory);
-                    }
-                    return Ok(Certificate::UNSAT);
-                }
+
+            #[cfg(feature = "clause_elimination")]
+            {
+                const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
+
+                //
+                //## Propagate all trivial literals (an essential step)
+                //
+                // Set appropriate phases and push all the unit clauses to assign stack.
+                // To do so, we use eliminator's occur list.
+                // Thus we have to call `activate` and `prepare` firstly, to build occur lists.
+                // Otherwise all literals are assigned wrongly.
+
+                state.flush("phasing...");
+                elim.prepare(asg, cdb, true);
                 for vi in 1..=asg.num_vars {
-                    if asg.assign(vi).is_some() || asg.var(vi).is(FlagVar::ELIMINATED) {
+                    if asg.assign(vi).is_some() {
                         continue;
                     }
-                    match elim.stats(vi) {
-                        Some((_, 0)) => (),
-                        Some((0, _)) => (),
-                        Some((p, m)) if m * 10 < p => asg.var_mut(vi).turn_on(FlagVar::PHASE),
-                        Some((p, m)) if p * 10 < m => asg.var_mut(vi).turn_off(FlagVar::PHASE),
-                        _ => (),
+                    if let Some((p, m)) = elim.stats(vi) {
+                        // We can't call `asg.assign_at_root_level(l)` even if p or m == 0.
+                        // This means we can't pick `!l`.
+                        // This becomes a problem in the case of incremental solving.
+                        #[cfg(not(feature = "incremental_solver"))]
+                        {
+                            if m == 0 {
+                                let l = Lit::from((vi, true));
+                                assert!(asg.assigned(l).is_none());
+                                cdb.certificate_add_assertion(l);
+                                if asg.assign_at_root_level(l).is_err() {
+                                    return Ok(Certificate::UNSAT);
+                                }
+                            } else if p == 0 {
+                                let l = Lit::from((vi, false));
+                                assert!(asg.assigned(l).is_none());
+                                cdb.certificate_add_assertion(l);
+                                if asg.assign_at_root_level(l).is_err() {
+                                    return Ok(Certificate::UNSAT);
+                                }
+                            }
+                        }
+                        asg.var_mut(vi).set(FlagVar::PHASE, m < p);
+                        elim.enqueue_var(asg, vi, false);
                     }
                 }
-                let act = 1.0 / (asg.num_vars as f64).powf(0.25);
-                for vi in 1..asg.num_vars {
-                    if !asg.var(vi).is(FlagVar::ELIMINATED) {
-                        asg.set_activity(vi, act);
+                //
+                //## Run eliminator
+                //
+                if USE_PRE_PROCESSING_ELIMINATOR {
+                    state.flush("simplifying...");
+                    if elim.simplify(asg, cdb, rst, state, false).is_err() {
+                        // Why inconsistent? Because the CNF contains a conflict, not an error!
+                        // Or out of memory.
+                        state.progress(asg, cdb, rst);
+                        if cdb.check_size().is_err() {
+                            return Err(SolverError::OutOfMemory);
+                        }
+                        return Ok(Certificate::UNSAT);
                     }
+                    for vi in 1..=asg.num_vars {
+                        if asg.assign(vi).is_some() || asg.var(vi).is(FlagVar::ELIMINATED) {
+                            continue;
+                        }
+                        match elim.stats(vi) {
+                            Some((_, 0)) => (),
+                            Some((0, _)) => (),
+                            Some((p, m)) if m * 10 < p => asg.var_mut(vi).turn_on(FlagVar::PHASE),
+                            Some((p, m)) if p * 10 < m => asg.var_mut(vi).turn_off(FlagVar::PHASE),
+                            _ => (),
+                        }
+                    }
+                    let act = 1.0 / (asg.num_vars as f64).powf(0.25);
+                    for vi in 1..asg.num_vars {
+                        if !asg.var(vi).is(FlagVar::ELIMINATED) {
+                            asg.set_activity(vi, act);
+                        }
+                    }
+                    asg.rebuild_order();
                 }
-                asg.rebuild_order();
             }
+            asg.eliminated.append(elim.eliminated_lits());
+            state[Stat::Simplify] += 1;
+            state[Stat::SubsumedClause] = elim.num_subsumed;
         }
-
         //
         //## Search
         //
-        state.progress(asg, cdb, elim, rst);
-        let answer = search(asg, cdb, elim, rst, state);
-        state.progress(asg, cdb, elim, rst);
+        state.progress(asg, cdb, rst);
+        let answer = search(asg, cdb, rst, state);
+        state.progress(asg, cdb, rst);
         match answer {
             Ok(true) => {
                 #[cfg(feature = "trace_equivalency")]
@@ -179,7 +183,7 @@ impl SolveIF for Solver {
                 #[cfg(feature = "boundary_check")]
                 check(asg, cdb, true, "Before extending the model");
 
-                let model = asg.extend_model(cdb, elim.eliminated_lits());
+                let model = asg.extend_model(cdb);
 
                 #[cfg(feature = "boundary_check")]
                 check(asg, cdb, true, "After extending the model");
@@ -187,7 +191,7 @@ impl SolveIF for Solver {
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
                     state.log(asg.num_conflict, "failed to validate the extended model");
-                    state.progress(asg, cdb, elim, rst);
+                    state.progress(asg, cdb, rst);
                     return Err(SolverError::SolverBug);
                 }
 
@@ -217,7 +221,7 @@ impl SolveIF for Solver {
             }
             Err(e) => {
                 RESTART!(asg, cdb, rst);
-                state.progress(asg, cdb, elim, rst);
+                state.progress(asg, cdb, rst);
                 Err(e)
             }
         }
@@ -228,7 +232,6 @@ impl SolveIF for Solver {
 fn search(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
-    elim: &mut Eliminator,
     rst: &mut Restarter,
     state: &mut State,
 ) -> Result<bool, SolverError> {
@@ -281,7 +284,11 @@ fn search(
                     if new_segment {
                         asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
                         if cfg!(feature = "clause_elimination") {
+                            let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                             elim.simplify(asg, cdb, rst, state, false)?;
+                            asg.eliminated.append(elim.eliminated_lits());
+                            state[Stat::Simplify] += 1;
+                            state[Stat::SubsumedClause] = elim.num_subsumed;
                         }
                         if cfg!(feature = "dynamic_restart_threshold") {
                             rst.set_segment_parameters(max_scale);
@@ -289,7 +296,7 @@ fn search(
                     }
                 }
                 asg.clear_asserted_literals(cdb)?;
-                state.progress(asg, cdb, elim, rst);
+                state.progress(asg, cdb, rst);
                 asg.handle(SolverEvent::Stage(scale));
                 rst.set_stage_parameters(scale);
                 current_stage = next_stage;

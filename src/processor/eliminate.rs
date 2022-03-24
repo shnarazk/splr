@@ -303,31 +303,36 @@ fn make_eliminated_clauses(
     }
 }
 
-fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {
+fn make_eliminating_unit_clause(store: &mut Vec<Lit>, x: Lit) {
     #[cfg(feature = "trace_elimination")]
     println!(" - eliminator save {}", x);
-    vec.push(x);
-    vec.push(Lit::from(1usize));
+    store.push(x);
+    store.push(Lit::from(1usize));
 }
 
-fn make_eliminated_clause(cdb: &mut impl ClauseDBIF, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId) {
-    let first = vec.len();
+fn make_eliminated_clause(
+    cdb: &mut impl ClauseDBIF,
+    store: &mut Vec<Lit>,
+    vi: VarId,
+    cid: ClauseId,
+) {
+    let first = store.len();
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:
     let c = &cdb[cid];
     debug_assert!(!c.is_empty());
     for l in c.iter() {
-        vec.push(*l);
+        store.push(*l);
         if l.vi() == vi {
-            let index = vec.len() - 1;
-            debug_assert_eq!(vec[index], *l);
-            debug_assert_eq!(vec[index].vi(), vi);
+            let index = store.len() - 1;
+            debug_assert_eq!(store[index], *l);
+            debug_assert_eq!(store[index].vi(), vi);
             // swap the first literal with the 'v'. So that the literal containing 'v' will occur first in the clause.
-            vec.swap(index, first);
+            store.swap(index, first);
         }
     }
     // Store the length of the clause last:
-    debug_assert_eq!(vec[first].vi(), vi);
-    vec.push(Lit::from(c.len()));
+    debug_assert_eq!(store[first].vi(), vi);
+    store.push(Lit::from(c.len()));
     #[cfg(feature = "trace_elimination")]
     println!("# make_eliminated_clause: eliminate({}) clause {}", vi, c);
 }
@@ -364,7 +369,6 @@ mod tests {
         let Solver {
             ref mut asg,
             ref mut cdb,
-            ref mut elim,
             ref mut rst,
             ref mut state,
             ..
@@ -372,8 +376,9 @@ mod tests {
         let mut timedout = 10_000;
         let vi = 4;
 
+        let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
         elim.prepare(asg, cdb, true);
-        eliminate_var(asg, cdb, elim, rst, state, vi, &mut timedout).expect("panic");
+        eliminate_var(asg, cdb, &mut elim, rst, state, vi, &mut timedout).expect("panic");
         assert!(asg.var(vi).is(FlagVar::ELIMINATED));
         assert!(cdb
             .iter()

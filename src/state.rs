@@ -1,7 +1,7 @@
 /// Crate `state` is a collection of internal data.
 use {
     crate::{
-        assign, cdb, processor,
+        assign, cdb,
         solver::{self, SolverEvent, StageManager},
         types::*,
     },
@@ -24,14 +24,13 @@ pub trait StateIF {
     /// write a header of stat data to stdio.
     fn progress_header(&mut self);
     /// write stat data to stdio.
-    fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R)
+    fn progress<A, C, R>(&mut self, asg: &A, cdb: &C, rst: &R)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
             + PropertyDereference<cdb::property::Tf64, f64>
             + PropertyReference<cdb::property::TEma, EmaView>,
-        E: PropertyDereference<processor::property::Tusize, usize>,
         R: PropertyDereference<solver::restart::property::Tusize, usize>
             + PropertyDereference<solver::restart::property::Tf64, f64>;
     /// write a short message to stdout.
@@ -49,6 +48,10 @@ pub enum Stat {
     VivifiedClause,
     /// the number of vivified (asserted) vars
     VivifiedVar,
+    /// the number of invocations of simplify
+    Simplify,
+    /// the number of subsumed clause by processor
+    SubsumedClause,
     /// don't use this dummy (sentinel at the tail).
     EndOfStatIndex,
 }
@@ -83,6 +86,8 @@ impl IndexMut<Stat> for [usize] {
 pub struct State {
     /// solver configuration
     pub config: Config,
+    /// the problem.
+    pub cnf: CNFDescription,
     /// collection of statistics data
     pub stats: [usize; Stat::EndOfStatIndex as usize],
     /// StageManager
@@ -128,6 +133,7 @@ impl Default for State {
     fn default() -> State {
         State {
             config: Config::default(),
+            cnf: CNFDescription::default(),
             stats: [0; Stat::EndOfStatIndex as usize],
             stm: StageManager::default(),
             target: CNFDescription::default(),
@@ -180,6 +186,7 @@ impl Instantiate for State {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> State {
         State {
             config: config.clone(),
+            cnf: cnf.clone(),
             stm: StageManager::instantiate(config, cnf),
             target: cnf.clone(),
             time_limit: config.c_timeout,
@@ -338,20 +345,19 @@ impl StateIF for State {
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
-    fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R)
+    fn progress<A, C, R>(&mut self, asg: &A, cdb: &C, rst: &R)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
             + PropertyDereference<cdb::property::Tf64, f64>
             + PropertyReference<cdb::property::TEma, EmaView>,
-        E: PropertyDereference<processor::property::Tusize, usize>,
         R: PropertyDereference<solver::restart::property::Tusize, usize>
             + PropertyDereference<solver::restart::property::Tf64, f64>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
             self.log_messages.clear();
-            self.record_stats(asg, cdb, elim, rst);
+            self.record_stats(asg, cdb, rst);
             return;
         }
 
@@ -377,10 +383,6 @@ impl StateIF for State {
         let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
         let cdb_lbd_of_dp: f64 = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
-
-        let elim_num_full = elim.derefer(processor::property::Tusize::NumFullElimination);
-        let elim_num_sub = elim.derefer(processor::property::Tusize::NumSubsumedClause);
-
         let rst_num_rst: usize = rst.derefer(solver::restart::property::Tusize::NumRestart);
         let rst_asg: &EmaView = asg.refer(assign::property::TEma::AssignRate);
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
@@ -499,7 +501,12 @@ impl StateIF for State {
                 LogUsizeId::VivifiedClause,
                 self[Stat::VivifiedClause]
             ),
-            im!("{:>9}", self, LogUsizeId::SubsumedClause, elim_num_sub),
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::SubsumedClause,
+                self[Stat::SubsumedClause]
+            ),
             im!(
                 "{:>9}",
                 self,
@@ -517,7 +524,6 @@ impl StateIF for State {
                 asg_ppc_ema.get()
             ),
         );
-        self[LogUsizeId::Simplify] = elim_num_full;
         self[LogUsizeId::Stage] = self.stm.current_stage();
         self[LogUsizeId::StageCycle] = self.stm.current_cycle();
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
@@ -527,14 +533,13 @@ impl StateIF for State {
 
 impl State {
     #[allow(clippy::cognitive_complexity)]
-    fn record_stats<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R)
+    fn record_stats<A, C, R>(&mut self, asg: &A, cdb: &C, rst: &R)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
             + PropertyDereference<cdb::property::Tf64, f64>
             + PropertyReference<cdb::property::TEma, EmaView>,
-        E: PropertyDereference<processor::property::Tusize, usize>,
         R: PropertyDereference<solver::restart::property::Tusize, usize>
             + PropertyDereference<solver::restart::property::Tf64, f64>,
     {
@@ -557,10 +562,8 @@ impl State {
         self[LogUsizeId::Stage] = self.stm.current_stage();
         self[LogUsizeId::StageCycle] = self.stm.current_cycle();
         self[LogUsizeId::StageSegment] = self.stm.max_scale();
-        self[LogUsizeId::Simplify] = elim.derefer(processor::property::Tusize::NumFullElimination);
-
-        self[LogUsizeId::SubsumedClause] =
-            elim.derefer(processor::property::Tusize::NumSubsumedClause);
+        self[LogUsizeId::Simplify] = self[Stat::Simplify];
+        self[LogUsizeId::SubsumedClause] = self[Stat::SubsumedClause];
         self[LogUsizeId::VivifiedClause] = self[Stat::VivifiedClause];
         self[LogUsizeId::VivifiedVar] = self[Stat::VivifiedVar];
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
