@@ -283,7 +283,7 @@ fn merge(
 
 fn make_eliminated_clauses(
     cdb: &mut impl ClauseDBIF,
-    tmp: &mut Vec<Lit>,
+    store: &mut Vec<Lit>,
     v: VarId,
     pos: &[ClauseId],
     neg: &[ClauseId],
@@ -291,15 +291,15 @@ fn make_eliminated_clauses(
     if neg.len() < pos.len() {
         for cid in neg {
             debug_assert!(!cdb[*cid].is_dead());
-            make_eliminated_clause(cdb, tmp, v, *cid);
+            make_eliminated_clause(cdb, store, v, *cid);
         }
-        make_eliminating_unit_clause(tmp, Lit::from((v, true)));
+        make_eliminating_unit_clause(store, Lit::from((v, true)));
     } else {
         for cid in pos {
             debug_assert!(!cdb[*cid].is_dead());
-            make_eliminated_clause(cdb, tmp, v, *cid);
+            make_eliminated_clause(cdb, store, v, *cid);
         }
-        make_eliminating_unit_clause(tmp, Lit::from((v, false)));
+        make_eliminating_unit_clause(store, Lit::from((v, false)));
     }
 }
 
