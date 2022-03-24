@@ -12,7 +12,7 @@ use {
         time::{Duration, Instant},
     },
 };
-const PROGRESS_REPORT_ROWS: usize = 8;
+const PROGRESS_REPORT_ROWS: usize = 7;
 
 /// API for state/statistics management, providing [`progress`](`crate::state::StateIF::progress`).
 pub trait StateIF {
@@ -459,11 +459,14 @@ impl StateIF for State {
                 cdb_num_clause - cdb_num_learnt
             ),
         );
+        self[LogUsizeId::StageSegment] = stg_segment;
+        self[LogF64Id::RestartEnergy] = rst_eng;
+        self[LogF64Id::TrendASG] = rst_asg.trend();
         println!(
-            "\x1B[2K     Restart|#RST:{}, #seg:{}, fuel:{}, /cpr:{}",
+            "\x1B[2K    Conflict|cLvl:{}, bLvl:{}, #RST:{}, /cpr:{}",
+            fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
+            fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-            im!("{:>9}", self, LogUsizeId::StageSegment, stg_segment),
-            fm!("{:>9.4}", self, LogF64Id::RestartEnergy, rst_eng),
             fm!(
                 "{:>9.2}",
                 self,
@@ -489,19 +492,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K    Conflict|tASG:{}, cLvl:{}, bLvl:{}, /ppc:{}",
-            fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
-            fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
-            fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
-            fm!(
-                "{:>9.2}",
-                self,
-                LogF64Id::PropagationPerConflict,
-                asg_ppc_ema.get()
-            ),
-        );
-        println!(
-            "\x1B[2K        misc|vivC:{}, subC:{}, core:{}, ----:{}",
+            "\x1B[2K        misc|vivC:{}, subC:{}, core:{}, /ppc:{}",
             im!(
                 "{:>9}",
                 self,
@@ -519,7 +510,12 @@ impl StateIF for State {
                     asg_num_unreachables
                 }
             ),
-            fm!("{:>9.2}", self, LogF64Id::End, 0.0),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::PropagationPerConflict,
+                asg_ppc_ema.get()
+            ),
         );
         self[LogUsizeId::Simplify] = elim_num_full;
         self[LogUsizeId::Stage] = self.stm.current_stage();
