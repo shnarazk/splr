@@ -386,11 +386,11 @@ impl StateIF for State {
         let rst_num_rst: usize = rst.derefer(solver::restart::property::Tusize::NumRestart);
         let rst_asg: &EmaView = asg.refer(assign::property::TEma::AssignRate);
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
-        let rst_eng: f64 = rst.derefer(solver::restart::property::Tf64::RestartThreshold);
+        let rst_eng: f64 = rst.derefer(solver::restart::property::Tf64::RestartEnergy);
         let stg_segment: usize = self.stm.current_segment();
 
         if self.config.use_log {
-            self.dump(asg, cdb, rst);
+            self.dump(asg, cdb);
             return;
         }
         self.progress_cnt += 1;
@@ -697,11 +697,10 @@ impl State {
              c ========================================================================================================="
         );
     }
-    fn dump<A, C, R>(&mut self, asg: &A, cdb: &C, rst: &R)
+    fn dump<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: PropertyDereference<assign::property::Tusize, usize>,
         C: PropertyDereference<cdb::property::Tusize, usize>,
-        R: PropertyDereference<solver::restart::property::Tusize, usize>,
     {
         self.progress_cnt += 1;
         let asg_num_vars = asg.derefer(assign::property::Tusize::NumVar);
@@ -715,11 +714,9 @@ impl State {
         let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
         let cdb_num_reduction = cdb.derefer(cdb::property::Tusize::NumReduction);
-        let rst_num_block = rst.derefer(solver::restart::property::Tusize::NumBlock);
         println!(
-            "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
+            "c | {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
             asg_num_restart,                           // restart
-            rst_num_block,                             // blocked
             asg_num_conflict / asg_num_restart.max(1), // average cfc (Conflict / Restart)
             asg_num_unasserted_vars,                   // alive vars
             cdb_num_clause - cdb_num_learnt,           // given clauses
@@ -732,13 +729,12 @@ impl State {
         );
     }
     #[allow(dead_code)]
-    fn dump_details<'r, A, C, E, R, V>(&mut self, asg: &A, cdb: &C, rst: &'r R)
+    fn dump_details<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
             + PropertyReference<cdb::property::TEma, EmaView>,
-        R: PropertyDereference<solver::restart::property::Tusize, usize>,
     {
         self.progress_cnt += 1;
         let asg_num_vars = asg.derefer(assign::property::Tusize::NumVar);
@@ -749,7 +745,6 @@ impl State {
         let asg_num_restart = asg.derefer(assign::property::Tusize::NumRestart);
         let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
-        let rst_num_block = rst.derefer(solver::restart::property::Tusize::NumBlock);
         let rst_asg = asg.refer(assign::property::TEma::AssignRate);
         let rst_lbd = cdb.refer(cdb::property::TEma::LBD);
 
@@ -765,7 +760,7 @@ impl State {
             cdb_num_learnt,
             cdb_num_clause,
             0,
-            rst_num_block,
+            0,
             asg_num_restart,
             rst_asg.trend(),
             rst_lbd.get(),

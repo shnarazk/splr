@@ -332,7 +332,7 @@ fn dump_stage(state: &mut State, asg: &AssignStack, rst: &Restarter, current_sta
     let segment = state.stm.current_segment();
     let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
     let thr = if active {
-        rst.derefer(restart::property::Tf64::RestartThreshold)
+        rst.derefer(restart::property::Tf64::RestartEnergy)
     } else {
         f64::NAN
     };

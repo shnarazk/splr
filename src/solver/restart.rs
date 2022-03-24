@@ -16,7 +16,7 @@ const FUEL: f64 = 0.01;
 /// `Restarter` provides restart API and holds data about restart conditions.
 #[derive(Clone, Debug, Default)]
 pub struct Restarter {
-    enable: bool,
+    // enable: bool,
     penetration_energy: f64,
     penetration_energy_charged: f64,
     penetration_energy_unit: f64,
@@ -26,7 +26,7 @@ pub struct Restarter {
 impl Instantiate for Restarter {
     fn instantiate(_config: &Config, _cnf: &CNFDescription) -> Self {
         Restarter {
-            enable: true,
+            // enable: true,
             penetration_energy: FUEL,
             penetration_energy_charged: FUEL,
             penetration_energy_unit: FUEL,
@@ -43,13 +43,9 @@ impl Instantiate for Restarter {
 
 impl RestartIF for Restarter {
     fn restart(&mut self, ema: &EmaView) -> bool {
-        if self.enable {
-            self.penetration_energy -= ema.trend() - 1.0;
-            if self.penetration_energy < 0.0 {
-                return true;
-            }
-        }
-        false
+        /* if !self.enable { return false; } */
+        self.penetration_energy -= ema.trend() - 1.0;
+        return self.penetration_energy < 0.0;
     }
     /// minimize the difference between the number of restarts comparing
     /// and the expected number.
@@ -59,7 +55,6 @@ impl RestartIF for Restarter {
     fn set_stage_parameters(&mut self, stage_scale: usize) {
         // self.enable = !self.enable;
         self.penetration_energy_charged = self.penetration_energy_unit * (stage_scale as f64);
-        // .powf(1.5);
     }
 }
 
@@ -78,24 +73,22 @@ pub mod property {
         #[inline]
         fn derefer(&self, k: Tbool) -> bool {
             match k {
-                Tbool::Active => self.enable,
+                Tbool::Active => true, // self.enable,
             }
         }
     }
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tusize {
-        NumBlock,
         NumRestart,
     }
 
-    pub const USIZES: [Tusize; 2] = [Tusize::NumBlock, Tusize::NumRestart];
+    pub const USIZES: [Tusize; 1] = [Tusize::NumRestart];
 
     impl PropertyDereference<Tusize, usize> for Restarter {
         #[inline]
         fn derefer(&self, k: Tusize) -> usize {
             match k {
-                Tusize::NumBlock => 0, // self.num_block,
                 Tusize::NumRestart => self.num_restart,
             }
         }
@@ -103,15 +96,15 @@ pub mod property {
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tf64 {
-        RestartThreshold,
+        RestartEnergy,
     }
-    pub const F64S: [Tf64; 1] = [Tf64::RestartThreshold];
+    pub const F64S: [Tf64; 1] = [Tf64::RestartEnergy];
 
     impl PropertyDereference<Tf64, f64> for Restarter {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
-                Tf64::RestartThreshold => self.penetration_energy_charged,
+                Tf64::RestartEnergy => self.penetration_energy_charged,
             }
         }
     }
