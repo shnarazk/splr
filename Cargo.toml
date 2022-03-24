@@ -32,6 +32,7 @@ default = [
         "trail_saving",
         "unsafe_access"
         ]
+assign_rate = []
 best_phases_tracking = []
 bi_clause_completion = []
 boundary_check = []
