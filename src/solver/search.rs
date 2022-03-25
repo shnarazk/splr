@@ -67,7 +67,7 @@ impl SolveIF for Solver {
                 #[cfg(feature = "support_user_assumption")]
                 analyze_final(asg, state, &cdb[ci]);
 
-                state.log(asg.num_conflict, "By vivifier as a pre-possessor");
+                state.log(None, "By vivifier as a pre-possessor");
                 return Ok(Certificate::UNSAT);
             }
             assert!(!asg.remains());
@@ -79,7 +79,7 @@ impl SolveIF for Solver {
                 if cdb.check_size().is_err() {
                     return Err(SolverError::OutOfMemory);
                 }
-                state.log(asg.num_conflict, "By eliminator");
+                state.log(None, "By eliminator");
                 return Ok(Certificate::UNSAT);
             }
 
@@ -190,7 +190,7 @@ impl SolveIF for Solver {
 
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
-                    state.log(asg.num_conflict, "failed to validate the extended model");
+                    state.log(None, "failed to validate the extended model");
                     state.progress(asg, cdb, rst);
                     return Err(SolverError::SolverBug);
                 }
@@ -310,7 +310,7 @@ fn search(
         }
     }
     state.log(
-        asg.num_conflict,
+        None,
         format!(
             "search process finished at level {}:: {} = {} - {} - {}",
             asg.decision_level(),
@@ -331,27 +331,18 @@ fn dump_stage(state: &mut State, asg: &AssignStack, rst: &Restarter, current_sta
     let stage = state.stm.current_stage();
     let segment = state.stm.current_segment();
     let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
-    let thr = if active {
+    let fuel = if active {
         rst.derefer(restart::property::Tf64::RestartEnergy)
     } else {
         f64::NAN
     };
     state.log(
-        asg.num_conflict,
         match current_stage {
-            None => format!(
-                "                 stg:{:>5}, scl:{:>4}, cpr:{:>9.2}, thr:{:>9.4}",
-                stage, scale, cpr, thr,
-            ),
-            Some(false) => format!(
-                "        cyc:{:3}, stg:{:>5}, scl:{:>4}, cpr:{:>9.2}, thr:{:>9.4}",
-                cycle, stage, scale, cpr, thr,
-            ),
-            Some(true) => format!(
-                "seg:{:2}, cyc:{:3}, stg:{:>5}, scl:{:>4}, cpr:{:>9.2}, thr:{:>9.4}",
-                segment, cycle, stage, scale, cpr, thr,
-            ),
+            None => Some((None, None, stage)),
+            Some(false) => Some((None, Some(cycle), stage)),
+            Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
+        format!("scale: {:>5}, fuel:{:>9.6}, cpr:{:>8.2}", scale, fuel, cpr),
     );
 }
 

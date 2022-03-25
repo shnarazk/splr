@@ -30,7 +30,7 @@ impl VivifyIF for ClauseDB {
         const NUM_TARGETS: Option<usize> = Some(VIVIFY_LIMIT);
         if asg.remains() {
             asg.propagate_sandbox(self).map_err(|cc| {
-                state.log(asg.num_conflict, "By vivifier");
+                state.log(None, "By vivifier");
                 SolverError::RootLevelConflict(cc)
             })?;
         }
@@ -138,7 +138,7 @@ impl VivifyIF for ClauseDB {
                                     state.flush("");
                                     state[Stat::VivifiedClause] += num_shrink;
                                     state[Stat::VivifiedVar] += num_assert;
-                                    state.log(asg.num_conflict, "RootLevelConflict By vivify");
+                                    state.log(None, "RootLevelConflict By vivify");
                                     return Err(SolverError::EmptyClause);
                                 }
                                 1 => {

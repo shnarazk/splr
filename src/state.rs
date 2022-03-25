@@ -36,7 +36,7 @@ pub trait StateIF {
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
     /// write a one-line message as log.
-    fn log<S: AsRef<str>>(&mut self, tick: usize, mes: S);
+    fn log<S: AsRef<str>>(&mut self, tick: Option<(Option<usize>, Option<usize>, usize)>, mes: S);
 }
 
 /// stat index.
@@ -337,10 +337,24 @@ impl StateIF for State {
             stdout().flush().unwrap();
         }
     }
-    fn log<S: AsRef<str>>(&mut self, tick: usize, mes: S) {
+    fn log<S: AsRef<str>>(&mut self, tick: Option<(Option<usize>, Option<usize>, usize)>, mes: S) {
         if self.config.splr_interface && !self.config.quiet_mode && !self.config.use_log {
-            self.log_messages
-                .insert(0, format!("[{:>10}] {}", tick, mes.as_ref()));
+            self.log_messages.insert(
+                0,
+                match tick {
+                    Some((Some(seg), Some(cyc), stg)) => {
+                        format!("stage({:>2},{:>4},{:>6}): {}", seg, cyc, stg, mes.as_ref())
+                    }
+                    Some((None, Some(cyc), stg)) => {
+                        format!("stage(  ,{:>4},{:>6}): {}", cyc, stg, mes.as_ref())
+                    }
+                    Some((None, None, stg)) => {
+                        format!("stage(  ,    ,{:>6}): {}", stg, mes.as_ref())
+                    }
+                    Some(_) => unreachable!(),
+                    None => format!("### {}", mes.as_ref()),
+                },
+            );
         }
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
