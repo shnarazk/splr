@@ -45,7 +45,7 @@ impl RestartIF for Restarter {
     fn restart(&mut self, ema: &EmaView) -> bool {
         /* if !self.enable { return false; } */
         self.penetration_energy -= ema.trend() - 1.0;
-        return self.penetration_energy < 0.0;
+        self.penetration_energy < 0.0
     }
     /// minimize the difference between the number of restarts comparing
     /// and the expected number.
