@@ -23,6 +23,7 @@ impl Instantiate for StageManager {
             unit_size,
             scale: 1,
             end_of_stage: unit_size,
+            next_is_new_segment: true,
             ..StageManager::default()
         }
     }
