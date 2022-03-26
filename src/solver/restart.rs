@@ -11,7 +11,7 @@ pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> 
     fn set_segment_parameters(&mut self, segment_scale: usize);
 }
 
-const FUEL: f64 = 0.001;
+const FUEL: f64 = 0.01;
 
 /// `Restarter` provides restart API and holds data about restart conditions.
 #[derive(Clone, Debug, Default)]
@@ -54,8 +54,8 @@ impl RestartIF for Restarter {
     }
     fn set_stage_parameters(&mut self, stage_scale: usize) {
         // self.enable = !self.enable;
-        self.penetration_energy_charged =
-            self.penetration_energy_unit * (stage_scale as f64).powf(0.75);
+        let n = stage_scale.next_power_of_two() - 1;
+        self.penetration_energy_charged = self.penetration_energy_unit * (n as f64);
     }
 }
 
