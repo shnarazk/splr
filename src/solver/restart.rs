@@ -4,7 +4,7 @@ use crate::types::*;
 /// API for [`restart`](`crate::solver::RestartIF::restart`) and [`stabilize`](`crate::solver::RestartIF::stabilize`).
 pub trait RestartIF: Instantiate + PropertyDereference<property::Tusize, usize> {
     /// check blocking and forcing restart condition.
-    fn restart(&mut self, ema: &EmaView) -> bool;
+    fn restart(&mut self, ldb: &EmaView, ent: &EmaView) -> bool;
     /// set stabilization parameters
     fn set_stage_parameters(&mut self, step: usize);
     /// adjust restart threshold
