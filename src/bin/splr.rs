@@ -367,16 +367,6 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             .as_bytes(),
         )?;
     }
-    for key in &restart::property::USIZES {
-        out.write_all(
-            format!(
-                "c   restart::{:<26}{:>15}\n",
-                format!("{:?}", key),
-                s.rst.derefer(*key),
-            )
-            .as_bytes(),
-        )?;
-    }
     for key in &state::property::USIZES {
         out.write_all(
             format!(

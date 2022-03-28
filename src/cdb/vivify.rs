@@ -3,7 +3,6 @@
 use crate::{
     assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
     cdb::{ClauseDB, ClauseDBIF, ClauseIF},
-    solver::{restart, Restarter},
     state::{Stat, State, StateIF},
     types::*,
 };
@@ -11,22 +10,12 @@ use crate::{
 const VIVIFY_LIMIT: usize = 80_000;
 
 pub trait VivifyIF {
-    fn vivify(
-        &mut self,
-        asg: &mut AssignStack,
-        rst: &mut Restarter,
-        state: &mut State,
-    ) -> MaybeInconsistent;
+    fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent;
 }
 
 impl VivifyIF for ClauseDB {
     /// vivify clauses under `asg`
-    fn vivify(
-        &mut self,
-        asg: &mut AssignStack,
-        rst: &mut Restarter,
-        state: &mut State,
-    ) -> MaybeInconsistent {
+    fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent {
         const NUM_TARGETS: Option<usize> = Some(VIVIFY_LIMIT);
         if asg.remains() {
             asg.propagate_sandbox(self).map_err(|cc| {
@@ -34,12 +23,8 @@ impl VivifyIF for ClauseDB {
                 SolverError::RootLevelConflict(cc)
             })?;
         }
-        let mut clauses: Vec<OrderedProxy<ClauseId>> = select_targets(
-            asg,
-            self,
-            rst.derefer(restart::property::Tusize::NumRestart) == 0,
-            NUM_TARGETS,
-        );
+        let mut clauses: Vec<OrderedProxy<ClauseId>> =
+            select_targets(asg, self, state[Stat::Restart] == 0, NUM_TARGETS);
         if clauses.is_empty() {
             return Ok(());
         }

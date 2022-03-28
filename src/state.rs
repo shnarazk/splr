@@ -2,7 +2,7 @@
 use {
     crate::{
         assign, cdb,
-        solver::{self, SolverEvent, StageManager},
+        solver::{RestartManager, SolverEvent, StageManager},
         types::*,
     },
     std::{
@@ -24,15 +24,13 @@ pub trait StateIF {
     /// write a header of stat data to stdio.
     fn progress_header(&mut self);
     /// write stat data to stdio.
-    fn progress<A, C, R>(&mut self, asg: &A, cdb: &C, rst: &R)
+    fn progress<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
             + PropertyDereference<cdb::property::Tf64, f64>
-            + PropertyReference<cdb::property::TEma, EmaView>,
-        R: PropertyDereference<solver::restart::property::Tusize, usize>
-            + PropertyDereference<solver::restart::property::Tf64, f64>;
+            + PropertyReference<cdb::property::TEma, EmaView>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
     /// write a one-line message as log.
@@ -42,6 +40,7 @@ pub trait StateIF {
 /// stat index.
 #[derive(Clone, Eq, PartialEq)]
 pub enum Stat {
+    Restart,
     /// the number of vivification
     Vivification,
     /// the number of vivified (shrunk) clauses
@@ -90,6 +89,8 @@ pub struct State {
     pub cnf: CNFDescription,
     /// collection of statistics data
     pub stats: [usize; Stat::EndOfStatIndex as usize],
+    // Restart
+    pub restart: RestartManager,
     /// StageManager
     pub stm: StageManager,
     /// problem description
@@ -135,6 +136,7 @@ impl Default for State {
             config: Config::default(),
             cnf: CNFDescription::default(),
             stats: [0; Stat::EndOfStatIndex as usize],
+            restart: RestartManager::default(),
             stm: StageManager::default(),
             target: CNFDescription::default(),
             reflection_interval: 10_000,
@@ -187,6 +189,7 @@ impl Instantiate for State {
         State {
             config: config.clone(),
             cnf: cnf.clone(),
+            restart: RestartManager::instantiate(config, cnf),
             stm: StageManager::instantiate(config, cnf),
             target: cnf.clone(),
             time_limit: config.c_timeout,
@@ -203,7 +206,10 @@ impl Instantiate for State {
             SolverEvent::Eliminate(_) => (),
             SolverEvent::Instantiate => (),
             SolverEvent::Reinitialize => (),
-            SolverEvent::Restart => (),
+            SolverEvent::Restart => {
+                self[Stat::Restart] += 1;
+                self.restart.handle(SolverEvent::Restart);
+            }
             SolverEvent::Stage(_) => (),
 
             #[cfg(feature = "clause_vivification")]
@@ -359,19 +365,17 @@ impl StateIF for State {
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
-    fn progress<A, C, R>(&mut self, asg: &A, cdb: &C, rst: &R)
+    fn progress<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
             + PropertyDereference<cdb::property::Tf64, f64>
             + PropertyReference<cdb::property::TEma, EmaView>,
-        R: PropertyDereference<solver::restart::property::Tusize, usize>
-            + PropertyDereference<solver::restart::property::Tf64, f64>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
             self.log_messages.clear();
-            self.record_stats(asg, cdb, rst);
+            self.record_stats(asg, cdb);
             return;
         }
 
@@ -397,10 +401,10 @@ impl StateIF for State {
         let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
         let cdb_lbd_of_dp: f64 = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
-        let rst_num_rst: usize = rst.derefer(solver::restart::property::Tusize::NumRestart);
+        let rst_num_rst: usize = self[Stat::Restart];
         let rst_asg: &EmaView = asg.refer(assign::property::TEma::AssignRate);
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
-        let rst_eng: f64 = rst.derefer(solver::restart::property::Tf64::RestartEnergy);
+        let rst_eng: f64 = self.restart.penetration_energy_charged;
         let stg_segment: usize = self.stm.current_segment();
 
         if self.config.use_log {
@@ -547,15 +551,13 @@ impl StateIF for State {
 
 impl State {
     #[allow(clippy::cognitive_complexity)]
-    fn record_stats<A, C, R>(&mut self, asg: &A, cdb: &C, rst: &R)
+    fn record_stats<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
             + PropertyDereference<cdb::property::Tf64, f64>
             + PropertyReference<cdb::property::TEma, EmaView>,
-        R: PropertyDereference<solver::restart::property::Tusize, usize>
-            + PropertyDereference<solver::restart::property::Tf64, f64>,
     {
         self[LogUsizeId::NumConflict] = asg.derefer(assign::property::Tusize::NumConflict);
         self[LogUsizeId::NumDecision] = asg.derefer(assign::property::Tusize::NumDecision);
@@ -572,7 +574,7 @@ impl State {
         self[LogUsizeId::BiClause] = cdb.derefer(cdb::property::Tusize::NumBiClause);
         self[LogUsizeId::PermanentClause] =
             cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
-        self[LogUsizeId::Restart] = rst.derefer(solver::restart::property::Tusize::NumRestart);
+        self[LogUsizeId::Restart] = self[Stat::Restart];
         self[LogUsizeId::Stage] = self.stm.current_stage();
         self[LogUsizeId::StageCycle] = self.stm.current_cycle();
         self[LogUsizeId::StageSegment] = self.stm.max_scale();

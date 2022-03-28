@@ -29,7 +29,6 @@ use {
         assign::AssignIF,
         cdb::ClauseDBIF,
         processor::heap::{LitOccurs, VarOccHeap},
-        solver::restart::RestartIF,
         state::State,
         types::*,
     },
@@ -66,7 +65,6 @@ pub trait EliminateIF: Instantiate {
         &mut self,
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
-        rst: &mut impl RestartIF,
         state: &mut State,
         force_run: bool,
     ) -> MaybeInconsistent;

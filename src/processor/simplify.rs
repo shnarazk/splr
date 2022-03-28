@@ -7,7 +7,6 @@ use {
     crate::{
         assign::{self, AssignIF},
         cdb::{self, ClauseDBIF},
-        solver::{restart::RestartIF, SolverEvent},
         state::{self, State, StateIF},
         types::*,
     },
@@ -261,7 +260,6 @@ impl EliminateIF for Eliminator {
         &mut self,
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
-        rst: &mut impl RestartIF,
         state: &mut State,
         force_run: bool,
     ) -> MaybeInconsistent {
@@ -290,7 +288,7 @@ impl EliminateIF for Eliminator {
                 .derefer(cdb::property::Tf64::LiteralBlockEntanglement)
                 .is_nan());
             // self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
-            self.eliminate(asg, cdb, rst, state)?;
+            self.eliminate(asg, cdb, state)?;
         } else {
             asg.propagate_sandbox(cdb)
                 .map_err(SolverError::RootLevelConflict)?;
@@ -513,13 +511,12 @@ impl Eliminator {
         &mut self,
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
-        rst: &mut impl RestartIF,
         state: &mut State,
     ) -> MaybeInconsistent {
         let start = state.elapsed().unwrap_or(0.0);
         loop {
             let na = asg.stack_len();
-            self.eliminate_main(asg, cdb, rst, state)?;
+            self.eliminate_main(asg, cdb, state)?;
             asg.propagate_sandbox(cdb)
                 .map_err(SolverError::RootLevelConflict)?;
             if na == asg.stack_len()
@@ -541,7 +538,6 @@ impl Eliminator {
         &mut self,
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
-        rst: &mut impl RestartIF,
         state: &mut State,
     ) -> MaybeInconsistent {
         debug_assert!(asg.decision_level() == 0);
@@ -564,7 +560,7 @@ impl Eliminator {
                 let v = asg.var_mut(vi);
                 v.turn_off(FlagVar::ENQUEUED);
                 if !v.is(FlagVar::ELIMINATED) && asg.assign(vi).is_none() {
-                    eliminate_var(asg, cdb, self, rst, state, vi, &mut timedout)?;
+                    eliminate_var(asg, cdb, self, state, vi, &mut timedout)?;
                 }
             }
             self.backward_subsumption_check(asg, cdb, &mut timedout)?;

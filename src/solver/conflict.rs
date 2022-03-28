@@ -4,7 +4,7 @@
 use crate::assign::DebugReportIF;
 
 use {
-    super::{restart::Restarter, State},
+    super::State,
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
@@ -20,7 +20,6 @@ use {
 pub fn handle_conflict(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
-    rst: &mut Restarter,
     state: &mut State,
     cc: &ConflictContext,
 ) -> Result<u16, SolverError> {
@@ -115,7 +114,7 @@ pub fn handle_conflict(
                     unreachable!("handle_conflict::root_level_conflict_by_assertion");
                 }
                 let vi = l0.vi();
-                rst.handle(SolverEvent::Assert(vi));
+                state.restart.handle(SolverEvent::Assert(vi));
                 cdb.handle(SolverEvent::Assert(vi));
                 return Ok(0);
             }
