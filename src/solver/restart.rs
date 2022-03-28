@@ -49,7 +49,7 @@ impl RestartIF for RestartManager {
     }
     fn set_stage_parameters(&mut self, stage_scale: usize) {
         // self.enable = !self.enable;
-        let n = stage_scale.next_power_of_two() - 1;
+        let n = stage_scale.next_power_of_two();
         let e = self.penetration_energy_unit * (n as f64);
         self.penetration_energy_charged = e;
         self.penetration_energy = e;
