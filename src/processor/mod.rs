@@ -10,12 +10,11 @@
 //!  let Solver {
 //!      ref mut asg,
 //!      ref mut cdb,
-//!      ref mut rst,
 //!      ref mut state,
 //!      ..
 //!  } = s;
 //!  let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-//!  elim.simplify(asg, cdb, rst, state, false).expect("panic");
+//!  elim.simplify(asg, cdb, state, false).expect("panic");
 //!  assert!(0 < asg.num_eliminated_vars);
 //!```
 
@@ -44,7 +43,7 @@ use {
 /// let mut s = Solver::instantiate(&Config::default(), &CNFDescription::default());
 /// let mut elim = Eliminator::instantiate(&s.state.config, &s.state.cnf);
 /// assert_eq!(elim.is_running(), false);
-/// assert_eq!(elim.simplify(&mut s.asg, &mut s.cdb, &mut s.rst, &mut s.state, false), Ok(()));
+/// assert_eq!(elim.simplify(&mut s.asg, &mut s.cdb, &mut s.state, false), Ok(()));
 ///```
 pub trait EliminateIF: Instantiate {
     /// check if the eliminator is running.
@@ -119,13 +118,12 @@ mod tests {
         let Solver {
             ref mut asg,
             ref mut cdb,
-            ref mut rst,
             ref mut state,
             ..
         } = s;
         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
         assert!(elim.enable);
-        elim.simplify(asg, cdb, rst, state, false).expect("");
+        elim.simplify(asg, cdb, state, false).expect("");
         assert!(!asg.var_iter().skip(1).all(|v| v.is(FlagVar::ELIMINATED)));
         assert!(0 < asg.num_eliminated_vars);
         assert_eq!(
