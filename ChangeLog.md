@@ -15,6 +15,7 @@
 - Drop feature 'strategy_adaptation'
 - Drop feature 'Luby_stabilization'. It became essential.
 - Glucose-like restart blocking was substituted with a simple dynamics model
+- `Restarter` was renamed to `RestartManager` and stored in `State` as `State::restart`.
 
 ## 0.14.0, 2021-11-01
 
