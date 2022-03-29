@@ -41,7 +41,7 @@ impl Instantiate for RestartManager {
 impl RestartIF for RestartManager {
     fn restart(&mut self, lbd: &EmaView, ent: &EmaView) -> bool {
         // if !self.enable { return false; }
-        self.penetration_energy -= (lbd.trend() + ent.trend()) - 2.0;
+        self.penetration_energy -= (lbd.trend() + ent.trend().min(1.0)) - 2.0;
         self.penetration_energy < 0.0
     }
     fn set_segment_parameters(&mut self, _segment_scale: usize) {
