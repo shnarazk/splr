@@ -1,7 +1,7 @@
-//! Crate `restart` provides restart heuristics.
+//! Module `restart` provides restart heuristics.
 use crate::types::*;
 
-/// API for [`restart`](`crate::solver::RestartIF::restart`) and [`stabilize`](`crate::solver::RestartIF::stabilize`).
+/// API for [`restart`](`crate::solver::RestartIF::restart`)
 pub trait RestartIF: Instantiate {
     /// check blocking and forcing restart condition.
     fn restart(&mut self, ldb: &EmaView, ent: &EmaView) -> bool;
@@ -49,8 +49,8 @@ impl RestartIF for RestartManager {
     }
     fn set_stage_parameters(&mut self, stage_scale: usize) {
         // self.enable = !self.enable;
-        let n = stage_scale.next_power_of_two();
-        let e = self.penetration_energy_unit * (n as f64);
+        let n = stage_scale.next_power_of_two() as f64;
+        let e = self.penetration_energy_unit * n;
         self.penetration_energy_charged = e;
         self.penetration_energy = e;
     }
