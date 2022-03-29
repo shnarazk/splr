@@ -483,10 +483,15 @@ impl StateIF for State {
         self[LogF64Id::RestartEnergy] = rst_eng;
         self[LogF64Id::TrendASG] = rst_asg.trend();
         println!(
-            "\x1B[2K    Conflict|cLvl:{}, bLvl:{}, #RST:{}, /cpr:{}",
+            "\x1B[2K    Conflict|cLvl:{}, bLvl:{}, entg:{}, /cpr:{}",
             fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
-            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::LiteralBlockEntanglement,
+                cdb_lbd_of_dp
+            ),
             fm!(
                 "{:>9.2}",
                 self,
@@ -495,15 +500,10 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K         LBD|trnd:{}, avrg:{}, entg:{}, /dpc:{}",
+            "\x1B[2K         LBD|trnd:{}, avrg:{}, #RST:{}, /dpc:{}",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd.get_fast()),
-            fm!(
-                "{:>9.4}",
-                self,
-                LogF64Id::LiteralBlockEntanglement,
-                cdb_lbd_of_dp
-            ),
+            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
             fm!(
                 "{:>9.2}",
                 self,
