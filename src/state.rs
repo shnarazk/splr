@@ -500,7 +500,7 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K         LBD|trnd:{}, avrg:{}, #RST:{}, /dpc:{}",
+            "\x1B[2K    Learning|trnd:{}, avrg:{}, #RST:{}, /dpc:{}",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd.get_fast()),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
