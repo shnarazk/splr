@@ -342,7 +342,7 @@ fn dump_stage(state: &mut State, asg: &AssignStack, current_stage: Option<bool>)
             Some(false) => Some((None, Some(cycle), stage)),
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
-        format!("scale: {:>4}, fuel:{:>9.6}, cpr:{:>8.2}", scale, fuel, cpr),
+        format!("scale: {:>4}, fuel:{:>9.2}, cpr:{:>8.2}", scale, fuel, cpr),
     );
 }
 
