@@ -11,7 +11,7 @@ pub trait RestartIF: Instantiate {
     fn set_segment_parameters(&mut self, segment_scale: usize);
 }
 
-const FUEL: f64 = 0.01;
+const FUEL: f64 = 2.0;
 
 /// `RestartManager` provides restart API and holds data about restart conditions.
 #[derive(Clone, Debug, Default)]
@@ -41,16 +41,22 @@ impl Instantiate for RestartManager {
 impl RestartIF for RestartManager {
     fn restart(&mut self, lbd: &EmaView, ent: &EmaView) -> bool {
         // if !self.enable { return false; }
-        self.penetration_energy -= (lbd.trend() + ent.trend().min(1.0)) - 2.0;
+        let gscale = |x: f64| {
+            let scale = 0.5;
+            let v = x - 1.0;
+            scale * v + 1.0
+        };
+        self.penetration_energy -= (lbd.trend() + gscale(ent.trend())) - 2.0;
         self.penetration_energy < 0.0
     }
     fn set_segment_parameters(&mut self, _segment_scale: usize) {
+        // self.segment_scale = segment_scale as f64;
         self.penetration_energy_unit *= 10.0_f64.powf(-0.1);
     }
     fn set_stage_parameters(&mut self, stage_scale: usize) {
         // self.enable = !self.enable;
-        let n = stage_scale.next_power_of_two() as f64;
-        let e = self.penetration_energy_unit * n;
+        let n = stage_scale.next_power_of_two();
+        let e = self.penetration_energy_unit * (n as f64);
         self.penetration_energy_charged = e;
         self.penetration_energy = e;
     }
