@@ -400,7 +400,7 @@ impl StateIF for State {
         let cdb_num_bi_clause = cdb.derefer(cdb::property::Tusize::NumBiClause);
         let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
-        let cdb_lbd_of_dp: f64 = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
+        let cdb_lb_ent: f64 = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
         let rst_num_rst: usize = self[Stat::Restart];
         let rst_asg: &EmaView = asg.refer(assign::property::TEma::AssignRate);
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
@@ -483,15 +483,15 @@ impl StateIF for State {
         self[LogF64Id::RestartEnergy] = rst_eng;
         self[LogF64Id::TrendASG] = rst_asg.trend();
         println!(
-            "\x1B[2K    Conflict|cLvl:{}, bLvl:{}, entg:{}, /cpr:{}",
-            fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
-            fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
+            "\x1B[2K    Conflict|entg:{}, cLvl:{}, bLvl:{}, /cpr:{}",
             fm!(
-                "{:>9.2}",
+                "{:>9.4}",
                 self,
                 LogF64Id::LiteralBlockEntanglement,
-                cdb_lbd_of_dp
+                cdb_lb_ent
             ),
+            fm!("{:>9.4}", self, LogF64Id::CLevel, self.c_lvl.get()),
+            fm!("{:>9.4}", self, LogF64Id::BLevel, self.b_lvl.get()),
             fm!(
                 "{:>9.2}",
                 self,
