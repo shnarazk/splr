@@ -45,11 +45,7 @@ impl Instantiate for RestartManager {
 impl RestartIF for RestartManager {
     fn restart(&mut self, lbd: &EmaView, ent: &EmaView) -> bool {
         // if !self.enable { return false; }
-        let gscale = |x: f64| {
-            let scale = 1.0 / self.field_scale;
-            let v = x - 1.0;
-            scale * v + 1.0
-        };
+        let gscale = |x: f64| (x - 1.0) / self.field_scale + 1.0;
         self.penetration_energy -= (lbd.trend() + gscale(ent.trend())) - 2.0;
         self.penetration_energy < 0.0
     }
