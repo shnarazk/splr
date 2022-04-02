@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.15.0-alpha3"
+version = "0.15.0-alpha5"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2021"
@@ -32,6 +32,7 @@ default = [
         "trail_saving",
         "unsafe_access"
         ]
+assign_rate = []
 best_phases_tracking = []
 bi_clause_completion = []
 boundary_check = []

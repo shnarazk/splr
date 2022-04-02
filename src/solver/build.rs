@@ -1,10 +1,9 @@
 //! Solver Builder
 use {
-    super::{restart::Restarter, Certificate, Solver, SolverEvent, SolverResult, State, StateIF},
+    super::{Certificate, Solver, SolverEvent, SolverResult, State, StateIF},
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
-        processor::Eliminator,
         types::*,
     },
 };
@@ -109,18 +108,6 @@ pub trait SatSolverIF: Instantiate {
     fn dump_cnf(&self, fname: &str);
 }
 
-impl Default for Solver {
-    fn default() -> Solver {
-        Solver {
-            asg: AssignStack::default(),
-            cdb: ClauseDB::default(),
-            elim: Eliminator::default(),
-            rst: Restarter::instantiate(&Config::default(), &CNFDescription::default()),
-            state: State::default(),
-        }
-    }
-}
-
 impl Instantiate for Solver {
     /// ```
     /// use crate::{splr::config::Config, splr::types::*};
@@ -131,8 +118,6 @@ impl Instantiate for Solver {
         Solver {
             asg: AssignStack::instantiate(config, cnf),
             cdb: ClauseDB::instantiate(config, cnf),
-            elim: Eliminator::instantiate(config, cnf),
-            rst: Restarter::instantiate(config, cnf),
             state: State::instantiate(config, cnf),
         }
     }
@@ -213,13 +198,11 @@ impl SatSolverIF for Solver {
         let Solver {
             ref mut asg,
             ref mut cdb,
-            ref mut elim,
             ref mut state,
             ..
         } = self;
         asg.handle(SolverEvent::NewVar);
         cdb.handle(SolverEvent::NewVar);
-        elim.handle(SolverEvent::NewVar);
         state.handle(SolverEvent::NewVar);
         asg.num_vars
     }
@@ -241,14 +224,10 @@ impl SatSolverIF for Solver {
         let Solver {
             ref mut asg,
             ref mut cdb,
-            ref mut elim,
-            ref mut rst,
             ref mut state,
         } = self;
         asg.handle(SolverEvent::Reinitialize);
         cdb.handle(SolverEvent::Reinitialize);
-        elim.handle(SolverEvent::Reinitialize);
-        rst.handle(SolverEvent::Reinitialize);
         state.handle(SolverEvent::Reinitialize);
 
         let mut tmp = Vec::new();
@@ -338,8 +317,7 @@ impl Solver {
     #[cfg(not(feature = "no_IO"))]
     fn inject(mut self, mut reader: BufReader<File>) -> Result<Solver, SolverError> {
         self.state.progress_header();
-        self.state
-            .progress(&self.asg, &self.cdb, &self.elim, &self.rst);
+        self.state.progress(&self.asg, &self.cdb);
         self.state.flush("Initialization phase: loading...");
         let mut buf = String::new();
         loop {
@@ -382,8 +360,7 @@ impl Solver {
         V: AsRef<[i32]>,
     {
         self.state.progress_header();
-        self.state
-            .progress(&self.asg, &self.cdb, &self.elim, &self.rst);
+        self.state.progress(&self.asg, &self.cdb);
         self.state.flush("injecting...");
         for ints in v.iter() {
             for i in ints.as_ref().iter() {

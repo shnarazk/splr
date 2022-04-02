@@ -14,13 +14,13 @@ mod validate;
 
 pub use self::{
     build::SatSolverIF,
-    restart::{property::*, RestartIF, Restarter},
+    restart::{RestartIF, RestartManager},
     search::SolveIF,
     stage::StageManager,
     validate::ValidateIF,
 };
 
-use crate::{assign::AssignStack, cdb::ClauseDB, processor::Eliminator, state::*, types::*};
+use crate::{assign::AssignStack, cdb::ClauseDB, state::*, types::*};
 
 /// Normal results returned by Solver.
 #[derive(Debug, PartialEq)]
@@ -80,16 +80,12 @@ pub enum SolverEvent {
 /// }
 /// assert_eq!(Solver::try_from("cnfs/unsat.cnf").expect("can't load").solve(), Ok(Certificate::UNSAT));
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Solver {
     /// assignment management
     pub asg: AssignStack,
     /// clause container
     pub cdb: ClauseDB,
-    /// clause and variable elimination
-    pub elim: Eliminator,
-    /// restart management
-    pub rst: Restarter,
     /// misc data holder
     pub state: State,
 }

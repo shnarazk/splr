@@ -5,7 +5,7 @@ const LBD_EWA_LEN: usize = 16;
 /// An EMA of learnt clauses' LBD, used for forcing restart.
 #[derive(Clone, Debug)]
 pub struct ProgressLBD {
-    ema: Ema2,
+    ema: Ewa2<LBD_EWA_LEN>,
     num: usize,
     sum: usize,
 }
@@ -13,7 +13,7 @@ pub struct ProgressLBD {
 impl Default for ProgressLBD {
     fn default() -> ProgressLBD {
         ProgressLBD {
-            ema: Ema2::new(LBD_EWA_LEN),
+            ema: Ewa2::new(0.0),
             num: 0,
             sum: 0,
         }
@@ -23,7 +23,7 @@ impl Default for ProgressLBD {
 impl Instantiate for ProgressLBD {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressLBD {
-            ema: Ema2::new(LBD_EWA_LEN).with_slow(config.rst_lbd_slw),
+            ema: Ewa2::new(0.0).with_slow(config.rst_lbd_slw),
             ..ProgressLBD::default()
         }
     }

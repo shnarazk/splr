@@ -73,7 +73,7 @@ pub trait AssignIF:
     fn level_ref(&self) -> &[DecisionLevel];
     fn best_assigned(&mut self) -> Option<usize>;
     /// inject assignments for eliminated vars.
-    fn extend_model(&mut self, c: &mut impl ClauseDBIF, lits: &[Lit]) -> Vec<Option<bool>>;
+    fn extend_model(&mut self, c: &mut impl ClauseDBIF) -> Vec<Option<bool>>;
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
     /// dump the status as a CNF
@@ -163,6 +163,10 @@ pub struct AssignStack {
     //## Stage
     //
     pub stage_scale: usize,
+
+    //## Elimanated vars
+    //
+    pub eliminated: Vec<Lit>,
 
     //
     //## Statistics

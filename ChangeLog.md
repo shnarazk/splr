@@ -12,8 +12,11 @@
     - var activity rescaling
     - restart threshold reconfiguration
   - drop `solver::restart::GeometricStabilizer` and `solver::restart::ProgressLuby`
-- Drop feature 'strategy_adaptation'
+- `Restarter` was renamed to `RestartManager` and stored in `State` as `State::restart`.
+- Glucose-like restart blocking scheme was substituted with a simple dynamics model
 - Drop feature 'Luby_stabilization'. It became essential.
+- Drop feature 'Luby_restart'. It became essential.
+- Drop feature 'strategy_adaptation'
 
 ## 0.14.0, 2021-11-01
 

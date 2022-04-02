@@ -226,6 +226,17 @@ impl Ema2 {
     pub fn get_slow(&self) -> f64 {
         self.ema.slow // / self.calf
     }
+    /// set value.
+    pub fn with_value(mut self, x: f64) -> Self {
+        self.ema.fast = x;
+        self.ema.slow = x;
+        #[cfg(feature = "EMA_calibration")]
+        {
+            self.calf = 1.0;
+            self.cals = 1.0;
+        }
+        self
+    }
 }
 
 /// Ema of Sequence of usize

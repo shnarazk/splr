@@ -7,7 +7,6 @@ use {
     crate::{
         assign::{self, AssignIF},
         cdb::{self, ClauseDBIF},
-        solver::{restart::RestartIF, SolverEvent},
         state::{self, State, StateIF},
         types::*,
     },
@@ -34,7 +33,6 @@ impl Default for Eliminator {
             eliminate_occurrence_limit: 800,
             subsume_literal_limit: 100,
             var: Vec::new(),
-            num_full_elimination: 0,
             num_subsumed: 0,
         }
     }
@@ -262,7 +260,6 @@ impl EliminateIF for Eliminator {
         &mut self,
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
-        rst: &mut impl RestartIF,
         state: &mut State,
         force_run: bool,
     ) -> MaybeInconsistent {
@@ -291,7 +288,7 @@ impl EliminateIF for Eliminator {
                 .derefer(cdb::property::Tf64::LiteralBlockEntanglement)
                 .is_nan());
             // self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
-            self.eliminate(asg, cdb, rst, state)?;
+            self.eliminate(asg, cdb, state)?;
         } else {
             asg.propagate_sandbox(cdb)
                 .map_err(SolverError::RootLevelConflict)?;
@@ -299,6 +296,11 @@ impl EliminateIF for Eliminator {
         if self.mode != EliminatorMode::Dormant {
             self.stop(asg, cdb);
         }
+        for occur in self.var.iter_mut() {
+            occur.clear();
+        }
+        self.var_queue.clear(asg);
+        debug_assert!(self.clause_queue.is_empty());
         cdb.check_size().map(|_| ())
     }
     fn sorted_iterator(&self) -> Iter<'_, u32> {
@@ -312,8 +314,8 @@ impl EliminateIF for Eliminator {
             Some((w.pos_occurs.len(), w.neg_occurs.len()))
         }
     }
-    fn eliminated_lits(&self) -> &[Lit] {
-        &self.elim_lits
+    fn eliminated_lits(&mut self) -> &mut Vec<Lit> {
+        &mut self.elim_lits
     }
 }
 
@@ -509,13 +511,12 @@ impl Eliminator {
         &mut self,
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
-        rst: &mut impl RestartIF,
         state: &mut State,
     ) -> MaybeInconsistent {
         let start = state.elapsed().unwrap_or(0.0);
         loop {
             let na = asg.stack_len();
-            self.eliminate_main(asg, cdb, rst, state)?;
+            self.eliminate_main(asg, cdb, state)?;
             asg.propagate_sandbox(cdb)
                 .map_err(SolverError::RootLevelConflict)?;
             if na == asg.stack_len()
@@ -530,7 +531,6 @@ impl Eliminator {
                 break;
             }
         }
-        self.num_full_elimination += 1;
         Ok(())
     }
     /// do the elimination task
@@ -538,7 +538,6 @@ impl Eliminator {
         &mut self,
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
-        rst: &mut impl RestartIF,
         state: &mut State,
     ) -> MaybeInconsistent {
         debug_assert!(asg.decision_level() == 0);
@@ -561,7 +560,7 @@ impl Eliminator {
                 let v = asg.var_mut(vi);
                 v.turn_off(FlagVar::ENQUEUED);
                 if !v.is(FlagVar::ELIMINATED) && asg.assign(vi).is_none() {
-                    eliminate_var(asg, cdb, self, rst, state, vi, &mut timedout)?;
+                    eliminate_var(asg, cdb, self, state, vi, &mut timedout)?;
                 }
             }
             self.backward_subsumption_check(asg, cdb, &mut timedout)?;
