@@ -21,7 +21,6 @@ pub struct RestartManager {
     pub penetration_energy_charged: f64,
     penetration_energy_unit: f64,
     field_scale: f64,
-    // segment_factor: f64,
 }
 
 impl Instantiate for RestartManager {
@@ -31,8 +30,7 @@ impl Instantiate for RestartManager {
             penetration_energy: FUEL,
             penetration_energy_charged: FUEL,
             penetration_energy_unit: FUEL,
-            field_scale: 0.1,
-            // segment_factor: 1.0,
+            field_scale: 1.0,
         }
     }
     fn handle(&mut self, e: SolverEvent) {
