@@ -30,7 +30,7 @@ impl Instantiate for RestartManager {
             penetration_energy: FUEL,
             penetration_energy_charged: FUEL,
             penetration_energy_unit: FUEL,
-            field_scale: 1.0,
+            field_scale: 1.0 / 64.0,
         }
     }
     fn handle(&mut self, e: SolverEvent) {
