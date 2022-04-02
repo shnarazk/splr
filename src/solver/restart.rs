@@ -21,7 +21,7 @@ pub struct RestartManager {
     pub penetration_energy_charged: f64,
     penetration_energy_unit: f64,
     field_scale: f64,
-    segment_factor: f64,
+    // segment_factor: f64,
 }
 
 impl Instantiate for RestartManager {
@@ -31,8 +31,8 @@ impl Instantiate for RestartManager {
             penetration_energy: FUEL,
             penetration_energy_charged: FUEL,
             penetration_energy_unit: FUEL,
-            field_scale: 1.0,
-            segment_factor: 1.0,
+            field_scale: 0.1,
+            // segment_factor: 1.0,
         }
     }
     fn handle(&mut self, e: SolverEvent) {
@@ -45,20 +45,18 @@ impl Instantiate for RestartManager {
 impl RestartIF for RestartManager {
     fn restart(&mut self, lbd: &EmaView, ent: &EmaView) -> bool {
         // if !self.enable { return false; }
-        let gscale = |x: f64| (x - 1.0) / self.field_scale + 1.0;
+        let gscale = |x: f64| self.field_scale * (x - 1.0) + 1.0;
         self.penetration_energy -= (lbd.trend() + gscale(ent.trend())) - 2.0;
         self.penetration_energy < 0.0
     }
     fn set_segment_parameters(&mut self, segment_scale: usize) {
-        self.segment_factor = 0.5 * (segment_scale.trailing_zeros() + 1) as f64;
+        let factor = 0.5 * (segment_scale.trailing_zeros() + 1) as f64;
+        self.field_scale = 1.0 / (64.0 - factor);
         self.penetration_energy_unit *= 10.0_f64.powf(-0.1);
     }
     fn set_stage_parameters(&mut self, stage_scale: usize) {
         // self.enable = !self.enable;
-        let factor = stage_scale.count_zeros() as f64 + 1.0;
-        self.field_scale = (factor - self.segment_factor).abs();
-        let n = stage_scale; // .trailing_zeros();
-        let e = self.penetration_energy_unit * (n as f64);
+        let e = self.penetration_energy_unit * (stage_scale as f64);
         self.penetration_energy_charged = e;
         self.penetration_energy = e;
     }
