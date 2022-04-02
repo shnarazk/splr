@@ -1,6 +1,7 @@
 use crate::types::*;
 
 const LBD_EWA_LEN: usize = 16;
+const LBD_EWA_SLOW: usize = 8192;
 
 /// An EMA of learnt clauses' LBD, used for forcing restart.
 #[derive(Clone, Debug)]
@@ -21,9 +22,9 @@ impl Default for ProgressLBD {
 }
 
 impl Instantiate for ProgressLBD {
-    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
+    fn instantiate(_config: &Config, _: &CNFDescription) -> Self {
         ProgressLBD {
-            ema: Ewa2::new(0.0).with_slow(config.rst_lbd_slw),
+            ema: Ewa2::new(0.0).with_slow(LBD_EWA_SLOW),
             ..ProgressLBD::default()
         }
     }
