@@ -304,23 +304,18 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 | `LBD2`       | the accumulated number of learnt clauses which LBDs are 2                                 |
 | `BinC`       | the current number of binary learnt clauses                                               |
 | `Perm`       | the current number of given clauses and binary learnt clauses                             |
-| `#BLK`       | the number of blocking restarts                                                           |
-| `#RST`       | the number of restarts                                                                    |
-| `*scl`       | the scaling factor for restart interval used in Luby stabilization                        |
-| `sclM`       | the largest scaling factor so far                                                         |
-| `avrg`       | the EMA, Exponential Moving Average, of LBD of learnt clauses                             |
-| `trnd`       | the current trend of the LBD's EMA                                                        |
-| `depG`       | the EMA of LBD of the clauses used in conflict analysis                                   |
-| `/dpc`       | the EMA of decisions per conflict                                                         |
-| `tASG`       | the current trend of the number of assigned vars after restart                            |
+| `entg`       | the current average of 'Literal Block entanglement'                                       |
 | `cLvl`       | the EMA of decision levels at which conflicts occur                                       |
 | `bLvl`       | the EMA of decision levels to which backjumps go                                          |
-| `/ppc`       | the EMA of propagations per conflict                                                      |
+| `/cpr`       | the EMA of conflicts per restart                                                          |
+| `avrg`       | the EMA, Exponential Moving Average, of LBD of learnt clauses                             |
+| `trnd`       | the current trend of the LBD's EMA                                                        |
+| `#RST`       | the number of restarts                                                                    |
+| `/dpc`       | the EMA of decisions per conflict                                                         |
 | `vivC`       | the number of the vivified clauses                                                        |
 | `subC`       | the number of the clauses subsumed by clause elimination processor                        |
 | `core`       | the number of unreachable vars                                                            |
-| `/cpr`       | the EMA of conflicts per restart                                                          |
-| `mode`       | Selected strategy's id                                                                    |
+| `/ppc`       | the EMA of propagations per conflict                                                      |
 | `time`       | the elapsed CPU time in seconds                                                           |
 
 ## Command line options
