@@ -277,41 +277,31 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c      Restart|#RST:{:>9}, #seg:{:>9}, fuel:{:>9.4}, /pcr:{:>9.4}\n",
-            state[LogUsizeId::Restart],
-            state[LogUsizeId::StageSegment],
-            state[LogF64Id::RestartEnergy],
+            "c     Conflict|entg:{:>9.4}, cLvl:{:>9.4}, bLvl:{:>9.4}, /cpr:{:>9.2},\n",
+            state[LogF64Id::LiteralBlockEntanglement],
+            state[LogF64Id::CLevel],
+            state[LogF64Id::BLevel],
             state[LogF64Id::ConflictPerRestart],
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c          LBD|avrg:{:>9.4}, trnd:{:>9.4}, entg:{:>9.4}, /dpc:{:>9.2},\n",
+            "c      Learing|avrg:{:>9.4}, trnd:{:>9.4}, #RST:{:>9}, /dpc:{:>9.2},\n",
             state[LogF64Id::EmaLBD],
             state[LogF64Id::TrendLBD],
-            state[LogF64Id::LiteralBlockEntanglement],
+            state[LogUsizeId::Restart],
             state[LogF64Id::DecisionPerConflict],
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c     Conflict|tASG:{:>9.4}, cLvl:{:>9.2}, bLvl:{:>9.2}, /ppc:{:>9.2},\n",
-            state[LogF64Id::TrendASG],
-            state[LogF64Id::CLevel],
-            state[LogF64Id::BLevel],
-            state[LogF64Id::PropagationPerConflict],
-        )
-        .as_bytes(),
-    )?;
-    out.write_all(
-        format!(
-            "c         misc|vivC:{:>9}, subC:{:>9}, core:{:>9}, ----:{:>9.2},\n",
-            state[LogUsizeId::Simplify],
+            "c         misc|vivC:{:>9}, subC:{:>9}, core:{:>9}, /ppc:{:>9.2},\n",
+            state[LogUsizeId::VivifiedClause],
             state[LogUsizeId::SubsumedClause],
             state[LogUsizeId::UnreachableCore],
-            0.0,
+            state[LogF64Id::PropagationPerConflict],
         )
         .as_bytes(),
     )?;
