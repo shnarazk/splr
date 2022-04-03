@@ -138,7 +138,7 @@ impl Config {
                 let flags = [
                     "no-color", "quiet", "certify", "journal", "log", "help", "version",
                 ];
-                let options_u32 = ["cbt"];
+                let options_u32 = [];
                 let options_usize = ["cl", "ii", "stat", "ecl", "evl", "evo"];
                 let options_f64 = ["timeout", "cdr", "vdr", "vds"];
                 let options_path = ["dir", "proof", "result"];
@@ -159,9 +159,8 @@ impl Config {
                             }
                         } else if options_u32.contains(&name) {
                             if let Some(str) = iter.next() {
-                                if let Ok(val) = str.parse::<u32>() {
+                                if let Ok(_val) = str.parse::<u32>() {
                                     match name {
-                                        "cbt" => self.c_cbt_thr = val,
                                         _ => panic!("invalid option: {}", name),
                                     }
                                 } else {
@@ -317,6 +316,15 @@ impl Config {
 }
 
 fn help_string() -> String {
+    macro_rules! OPTION {
+        ($feature: expr, $var: expr, $line: expr) => {
+            if cfg!(feature = $feature) {
+                format!($line, $var)
+            } else {
+                "".to_string()
+            }
+        };
+    }
     let config = Config::default();
     format!(
         "
@@ -327,13 +335,11 @@ FLAGS:
   -C, --no-color            Disable coloring
   -q, --quiet               Disable any progress message
   -c, --certify             Writes a DRAT UNSAT certification file
-  -j, --journal             Shows log about segment/cycle/stage
+  -j, --journal             Shows log about restart stages
   -l, --log                 Uses Glucose-like progress report
   -V, --version             Prints version information
-OPTIONS (\x1B[000m\x1B[031mred\x1B[000m options depend on features in Cargo.toml):
-      \x1B[000m\x1B[031m--cbt <c-cbt-thr>     Dec. lvl to use chronoBT       {:>10}\x1B[000m
-      \x1B[000m\x1B[031m--cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}\x1B[000m
-      --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
+OPTIONS:
+{}      --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
       --ii <c-ip-int>       #cls to start in-processor     {:>10}
   -t, --timeout <timeout>   CPU time limit in sec.         {:>10}
       --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
@@ -343,12 +349,14 @@ OPTIONS (\x1B[000m\x1B[031mred\x1B[000m options depend on features in Cargo.toml
   -p, --proof <io-pfile>    DRAT Cert. filename                 {:>10}
   -r, --result <io-rfile>   Result filename/stdout             {:>10}
       --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
-      \x1B[000m\x1B[031m--vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}\x1B[000m
-ARGS:
+{}ARGS:
   <cnf-file>    DIMACS CNF file
 ",
-        config.c_cbt_thr,
-        config.crw_dcy_rat,
+        OPTION!(
+            "clause_rewarding",
+            config.crw_dcy_rat,
+            "       -cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}\n"
+        ),
         config.c_cls_lim,
         config.c_ip_int,
         config.c_timeout,
@@ -359,7 +367,11 @@ ARGS:
         config.io_pfile.to_string_lossy(),
         config.io_rfile.to_string_lossy(),
         config.vrw_dcy_rat,
-        config.vrw_dcy_stp,
+        OPTION!(
+            "EVSIDS",
+            config.vrw_dcy_stp,
+            "      --vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}\n"
+        ),
     )
 }
 
