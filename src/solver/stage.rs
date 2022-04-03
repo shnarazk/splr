@@ -103,7 +103,7 @@ impl StageManager {
     pub fn num_reducible(&self) -> usize {
         const REDUCTION_FACTOR: f64 = 2.0;
         let span = self.current_span();
-        let keep = (REDUCTION_FACTOR * (self.unit_size as f64).powf(0.75)) as usize;
+        let keep = (REDUCTION_FACTOR * (self.unit_size as f64)) as usize;
         span.saturating_sub(keep)
     }
     /// return the maximum factor so far.
