@@ -279,6 +279,14 @@ impl PropagateIF for AssignStack {
         if lv == self.root_level {
             self.num_restart += 1;
             self.cpr_ema.update(self.num_conflict);
+        } else {
+            #[cfg(feature = "assign_rate")]
+            self.assign_rate.update(
+                self.num_vars
+                    - self.num_asserted_vars
+                    - self.num_eliminated_vars
+                    - self.trail.len(),
+            );
         }
 
         debug_assert!(self.q_head == 0 || self.assign[self.trail[self.q_head - 1].vi()].is_some());
@@ -723,7 +731,7 @@ impl PropagateIF for AssignStack {
         Ok(())
     }
     fn clear_asserted_literals(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
-        assert_eq!(self.decision_level(), self.root_level);
+        debug_assert_eq!(self.decision_level(), self.root_level);
         loop {
             if self.remains() {
                 self.propagate_sandbox(cdb)

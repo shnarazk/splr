@@ -1,6 +1,6 @@
 use {
     super::ClauseId,
-    crate::{solver::SolverEvent, types::*},
+    crate::types::*,
     std::{
         collections::HashMap,
         ops::{Index, IndexMut},

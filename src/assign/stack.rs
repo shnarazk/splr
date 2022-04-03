@@ -3,10 +3,10 @@
 use std::collections::HashMap;
 use {
     super::{
-        AssignIF, AssignStack, TrailSavingIF, Var, VarHeapIF, VarIdHeap, VarManipulateIF,
-        VarSelectIF,
+        ema::ProgressASG, AssignIF, AssignStack, TrailSavingIF, Var, VarHeapIF, VarIdHeap,
+        VarManipulateIF, VarSelectIF,
     },
-    crate::{cdb::ClauseDBIF, solver::SolverEvent, types::*},
+    crate::{cdb::ClauseDBIF, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
 
@@ -46,6 +46,9 @@ impl Default for AssignStack {
             #[cfg(feature = "rephase")]
             phase_age: 0,
 
+            stage_scale: 1,
+            eliminated: Vec::new(),
+
             num_vars: 0,
             num_asserted_vars: 0,
             num_eliminated_vars: 0,
@@ -53,6 +56,7 @@ impl Default for AssignStack {
             num_propagation: 0,
             num_conflict: 0,
             num_restart: 0,
+            assign_rate: ProgressASG::default(),
             dpc_ema: EmaSU::new(100),
             ppc_ema: EmaSU::new(100),
             cpr_ema: EmaSU::new(100),
@@ -92,7 +96,7 @@ impl Instantiate for AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
             assign: vec![None; 1 + nv],
-            level: vec![DecisionLevel::default(); nv + 1],
+            level: (0..nv as u32 + 1).collect::<Vec<_>>(), // each literal occupies a single level.
             reason: vec![AssignReason::None; nv + 1],
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv),
@@ -103,6 +107,7 @@ impl Instantiate for AssignStack {
             reason_saved: vec![AssignReason::None; nv + 1],
 
             num_vars: cnf.num_of_variables,
+            assign_rate: ProgressASG::instantiate(config, cnf),
             var: Var::new_vars(nv),
 
             #[cfg(feature = "EVSIDS")]
@@ -126,14 +131,8 @@ impl Instantiate for AssignStack {
             SolverEvent::Eliminate(vi) => {
                 self.make_var_eliminated(vi);
             }
-            #[allow(unused_variables)]
-            SolverEvent::Stabilize(scale) => {
-                #[cfg(feature = "rephase")]
-                {
-                    self.check_consistency_of_best_phases();
-                    self.select_rephasing_target(None, scale);
-                }
-
+            SolverEvent::Stage(scale) => {
+                self.stage_scale = scale;
                 #[cfg(feature = "trail_saving")]
                 self.clear_saved_trail();
             }
@@ -203,7 +202,8 @@ impl AssignIF for AssignStack {
         (self.build_best_at == self.num_propagation).then(|| self.num_vars - self.num_best_assign)
     }
     #[allow(unused_variables)]
-    fn extend_model(&mut self, cdb: &mut impl ClauseDBIF, lits: &[Lit]) -> Vec<Option<bool>> {
+    fn extend_model(&mut self, cdb: &mut impl ClauseDBIF) -> Vec<Option<bool>> {
+        let lits = &self.eliminated;
         #[cfg(feature = "trace_elimination")]
         println!(
             "# extend_model\n - as i32: {:?}\n - as raw: {:?}",

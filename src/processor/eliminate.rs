@@ -1,20 +1,16 @@
 /// Crate `eliminator` implements clause subsumption and var elimination.
 use {
     super::Eliminator,
-    crate::{
-        assign::AssignIF,
-        cdb::ClauseDBIF,
-        solver::{restart::RestartIF, SolverEvent},
-        state::State,
-        types::*,
-    },
+    crate::{assign::AssignIF, cdb::ClauseDBIF, solver::SolverEvent, state::State, types::*},
 };
+
+// Stop elimination if a generated resolvent is larger than this
+const COMBINATION_LIMIT: f64 = 32.0;
 
 pub fn eliminate_var(
     asg: &mut impl AssignIF,
     cdb: &mut impl ClauseDBIF,
     elim: &mut Eliminator,
-    rst: &mut impl RestartIF,
     state: &mut State,
     vi: VarId,
     timedout: &mut usize,
@@ -44,7 +40,6 @@ pub fn eliminate_var(
             &w.neg_occurs,
             vi,
             elim.eliminate_grow_limit,
-            elim.eliminate_combination_limit,
         )
     {
         return Ok(());
@@ -148,7 +143,7 @@ pub fn eliminate_var(
     }
     elim[vi].clear();
     asg.handle(SolverEvent::Eliminate(vi));
-    rst.handle(SolverEvent::Eliminate(vi));
+    state.restart.handle(SolverEvent::Eliminate(vi));
     elim.backward_subsumption_check(asg, cdb, timedout)
 }
 
@@ -160,7 +155,6 @@ fn skip_var_elimination(
     neg: &[ClauseId],
     v: VarId,
     grow_limit: usize,
-    combination_limit: f64,
 ) -> bool {
     // avoid thrashing
     let limit = match cdb.check_size() {
@@ -181,9 +175,7 @@ fn skip_var_elimination(
                 cnt += 1;
                 average_len *= 1.0 - scale;
                 average_len += scale * clause_size as f64;
-                if clslen + limit < cnt
-                    || (combination_limit != 0.0 && combination_limit < average_len)
-                {
+                if clslen + limit < cnt || COMBINATION_LIMIT < average_len {
                     return true;
                 }
             } else {
@@ -284,7 +276,7 @@ fn merge(
 
 fn make_eliminated_clauses(
     cdb: &mut impl ClauseDBIF,
-    tmp: &mut Vec<Lit>,
+    store: &mut Vec<Lit>,
     v: VarId,
     pos: &[ClauseId],
     neg: &[ClauseId],
@@ -292,43 +284,48 @@ fn make_eliminated_clauses(
     if neg.len() < pos.len() {
         for cid in neg {
             debug_assert!(!cdb[*cid].is_dead());
-            make_eliminated_clause(cdb, tmp, v, *cid);
+            make_eliminated_clause(cdb, store, v, *cid);
         }
-        make_eliminating_unit_clause(tmp, Lit::from((v, true)));
+        make_eliminating_unit_clause(store, Lit::from((v, true)));
     } else {
         for cid in pos {
             debug_assert!(!cdb[*cid].is_dead());
-            make_eliminated_clause(cdb, tmp, v, *cid);
+            make_eliminated_clause(cdb, store, v, *cid);
         }
-        make_eliminating_unit_clause(tmp, Lit::from((v, false)));
+        make_eliminating_unit_clause(store, Lit::from((v, false)));
     }
 }
 
-fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {
+fn make_eliminating_unit_clause(store: &mut Vec<Lit>, x: Lit) {
     #[cfg(feature = "trace_elimination")]
     println!(" - eliminator save {}", x);
-    vec.push(x);
-    vec.push(Lit::from(1usize));
+    store.push(x);
+    store.push(Lit::from(1usize));
 }
 
-fn make_eliminated_clause(cdb: &mut impl ClauseDBIF, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId) {
-    let first = vec.len();
+fn make_eliminated_clause(
+    cdb: &mut impl ClauseDBIF,
+    store: &mut Vec<Lit>,
+    vi: VarId,
+    cid: ClauseId,
+) {
+    let first = store.len();
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:
     let c = &cdb[cid];
     debug_assert!(!c.is_empty());
     for l in c.iter() {
-        vec.push(*l);
+        store.push(*l);
         if l.vi() == vi {
-            let index = vec.len() - 1;
-            debug_assert_eq!(vec[index], *l);
-            debug_assert_eq!(vec[index].vi(), vi);
+            let index = store.len() - 1;
+            debug_assert_eq!(store[index], *l);
+            debug_assert_eq!(store[index].vi(), vi);
             // swap the first literal with the 'v'. So that the literal containing 'v' will occur first in the clause.
-            vec.swap(index, first);
+            store.swap(index, first);
         }
     }
     // Store the length of the clause last:
-    debug_assert_eq!(vec[first].vi(), vi);
-    vec.push(Lit::from(c.len()));
+    debug_assert_eq!(store[first].vi(), vi);
+    store.push(Lit::from(c.len()));
     #[cfg(feature = "trace_elimination")]
     println!("# make_eliminated_clause: eliminate({}) clause {}", vi, c);
 }
@@ -365,17 +362,15 @@ mod tests {
         let Solver {
             ref mut asg,
             ref mut cdb,
-            ref mut elim,
-            ref mut rst,
             ref mut state,
             ..
         } = Solver::try_from("cnfs/uf8.cnf").expect("failed to load");
         let mut timedout = 10_000;
         let vi = 4;
 
-        elim.activate();
+        let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
         elim.prepare(asg, cdb, true);
-        eliminate_var(asg, cdb, elim, rst, state, vi, &mut timedout).expect("panic");
+        eliminate_var(asg, cdb, &mut elim, state, vi, &mut timedout).expect("panic");
         assert!(asg.var(vi).is(FlagVar::ELIMINATED));
         assert!(cdb
             .iter()

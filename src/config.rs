@@ -72,30 +72,6 @@ pub struct Config {
     pub elm_var_occ: usize,
 
     //
-    //## restarter
-    //
-    /// #conflicts between restarts
-    pub rst_step: usize,
-
-    /// Length of assign. fast EMA
-    pub rst_asg_len: usize,
-
-    /// Length of assign. slow EMA
-    pub rst_asg_slw: usize,
-
-    /// Blocking restart threshold. Originally this was the Glucose's R.
-    pub rst_asg_thr: f64,
-
-    /// Length of LBD fast EMA
-    pub rst_lbd_len: usize,
-
-    /// Length of LBD slow EMA
-    pub rst_lbd_slw: usize,
-
-    /// Forcing restart threshold
-    pub rst_lbd_thr: f64,
-
-    //
     //## vivifier
     //
 
@@ -133,14 +109,6 @@ impl Default for Config {
             elm_grw_lim: 0,
             elm_var_occ: 20000,
 
-            rst_step: 2,
-            rst_asg_len: 16,
-            rst_asg_slw: 8192,
-            rst_asg_thr: 0.6,
-            rst_lbd_len: 8,
-            rst_lbd_slw: 8192,
-            rst_lbd_thr: 1.6,
-
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_rat: 0.98,
             #[cfg(feature = "LRB_rewarding")]
@@ -171,10 +139,8 @@ impl Config {
                     "no-color", "quiet", "certify", "journal", "log", "help", "version",
                 ];
                 let options_u32 = ["cbt"];
-                let options_usize = [
-                    "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
-                ];
-                let options_f64 = ["timeout", "cdr", "rat", "rlt", "vdr", "vds"];
+                let options_usize = ["cl", "ii", "stat", "ecl", "evl", "evo"];
+                let options_f64 = ["timeout", "cdr", "vdr", "vds"];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
                 match seg.len() {
@@ -213,11 +179,6 @@ impl Config {
                                         "ecl" => self.elm_cls_lim = val,
                                         "evl" => self.elm_grw_lim = val,
                                         "evo" => self.elm_var_occ = val,
-                                        "rs" => self.rst_step = val,
-                                        "ral" => self.rst_asg_len = val,
-                                        "ras" => self.rst_asg_slw = val,
-                                        "rll" => self.rst_lbd_len = val,
-                                        "rls" => self.rst_lbd_slw = val,
                                         _ => panic!("invalid option: {}", name),
                                     }
                                 } else {
@@ -232,8 +193,6 @@ impl Config {
                                     match name {
                                         "timeout" => self.c_timeout = val,
                                         "cdr" => self.crw_dcy_rat = val,
-                                        "rat" => self.rst_asg_thr = val,
-                                        "rlt" => self.rst_lbd_thr = val,
                                         "vdr" => self.vrw_dcy_rat = val,
                                         "vds" => self.vrw_dcy_stp = val,
 
@@ -323,16 +282,10 @@ impl Config {
                 "use 'just used' flag",
                 #[cfg(feature = "LRB_rewarding")]
                 "Learning-Rate Based rewarding",
-                #[cfg(feature = "Luby_restart")]
-                "Luby restart",
-                #[cfg(feature = "Luby_stabilization")]
-                "Luby stabilization",
                 #[cfg(feature = "reason_side_rewarding")]
                 "reason-side rewarding",
                 #[cfg(feature = "rephase")]
                 "stage-based rephase",
-                #[cfg(feature = "strategy_adaptation")]
-                "strategy adaptation",
                 #[cfg(feature = "suppress_reason_chain")]
                 "suppress reason chain",
                 #[cfg(feature = "trail_saving")]
@@ -374,7 +327,7 @@ FLAGS:
   -C, --no-color            Disable coloring
   -q, --quiet               Disable any progress message
   -c, --certify             Writes a DRAT UNSAT certification file
-  -j, --journal             Shows sub-module logs
+  -j, --journal             Shows log about segment/cycle/stage
   -l, --log                 Uses Glucose-like progress report
   -V, --version             Prints version information
 OPTIONS (\x1B[000m\x1B[031mred\x1B[000m options depend on features in Cargo.toml):
@@ -389,13 +342,6 @@ OPTIONS (\x1B[000m\x1B[031mred\x1B[000m options depend on features in Cargo.toml
   -o, --dir <io-outdir>     Output directory                {:>10}
   -p, --proof <io-pfile>    DRAT Cert. filename                 {:>10}
   -r, --result <io-rfile>   Result filename/stdout             {:>10}
-      --ral <rst-asg-len>   Length of assign. fast EMA     {:>10}
-      --ras <rst-asg-slw>   Length of assign. slow EMA     {:>10}
-      --rat <rst-asg-thr>   Blocking restart threshold        {:>10.2}
-      --rll <rst-lbd-len>   Length of LBD fast EMA         {:>10}
-      --rls <rst-lbd-slw>   Length of LBD slow EMA         {:>10}
-      --rlt <rst-lbd-thr>   Forcing restart threshold         {:>10.2}
-      --rs  <rst-step>      #conflicts between restarts    {:>10}
       --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
       \x1B[000m\x1B[031m--vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}\x1B[000m
 ARGS:
@@ -412,13 +358,6 @@ ARGS:
         config.io_odir.to_string_lossy(),
         config.io_pfile.to_string_lossy(),
         config.io_rfile.to_string_lossy(),
-        config.rst_asg_len,
-        config.rst_asg_slw,
-        config.rst_asg_thr,
-        config.rst_lbd_len,
-        config.rst_lbd_slw,
-        config.rst_lbd_thr,
-        config.rst_step,
         config.vrw_dcy_rat,
         config.vrw_dcy_stp,
     )
@@ -467,17 +406,13 @@ pub mod property {
         ChronoBtThreshold,
         ClauseRewardDecayRate,
         InprocessorInterval,
-        RestartAsgThreshold,
-        RestartLbdThreshold,
         VarRewardDecayRate,
     }
 
-    pub const F64S: [Tf64; 6] = [
+    pub const F64S: [Tf64; 4] = [
         Tf64::ChronoBtThreshold,
         Tf64::ClauseRewardDecayRate,
         Tf64::InprocessorInterval,
-        Tf64::RestartAsgThreshold,
-        Tf64::RestartLbdThreshold,
         Tf64::VarRewardDecayRate,
     ];
 
@@ -488,8 +423,6 @@ pub mod property {
                 Tf64::ChronoBtThreshold => self.c_cbt_thr as f64,
                 Tf64::ClauseRewardDecayRate => self.crw_dcy_rat,
                 Tf64::InprocessorInterval => self.c_ip_int as f64,
-                Tf64::RestartAsgThreshold => self.rst_asg_thr,
-                Tf64::RestartLbdThreshold => self.rst_lbd_thr,
                 Tf64::VarRewardDecayRate => self.vrw_dcy_rat,
             }
         }

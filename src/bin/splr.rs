@@ -3,7 +3,6 @@ use {
     splr::{
         assign, cdb,
         config::{self, CERTIFICATION_DEFAULT_FILENAME},
-        processor,
         solver::*,
         state::{self, LogF64Id, LogUsizeId},
         Config, EmaIF, PropertyDereference, PropertyReference, SolverError, VERSION,
@@ -278,58 +277,35 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c      Restart|#BLK:{:>9}, #RST:{:>9}, *scl:{:>9}, sclM:{:>9},\n",
-            state[LogUsizeId::RestartBlock],
-            state[LogUsizeId::Restart],
-            state[LogUsizeId::RestartIntervalScale],
-            state[LogUsizeId::RestartIntervalScaleMax],
+            "c     Conflict|entg:{:>9.4}, cLvl:{:>9.4}, bLvl:{:>9.4}, /cpr:{:>9.2},\n",
+            state[LogF64Id::LiteralBlockEntanglement],
+            state[LogF64Id::CLevel],
+            state[LogF64Id::BLevel],
+            state[LogF64Id::ConflictPerRestart],
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c          LBD|avrg:{:>9.4}, trnd:{:>9.4}, depG:{:>9.4}, /dpc:{:>9.2},\n",
+            "c      Learing|avrg:{:>9.4}, trnd:{:>9.4}, #RST:{:>9}, /dpc:{:>9.2},\n",
             state[LogF64Id::EmaLBD],
             state[LogF64Id::TrendLBD],
-            state[LogF64Id::DpAverageLBD],
+            state[LogUsizeId::Restart],
             state[LogF64Id::DecisionPerConflict],
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c     Conflict|tASG:{:>9.4}, cLvl:{:>9.2}, bLvl:{:>9.2}, /ppc:{:>9.2},\n",
-            state[LogF64Id::TrendASG],
-            state[LogF64Id::CLevel],
-            state[LogF64Id::BLevel],
+            "c         misc|vivC:{:>9}, subC:{:>9}, core:{:>9}, /ppc:{:>9.2},\n",
+            state[LogUsizeId::VivifiedClause],
+            state[LogUsizeId::SubsumedClause],
+            state[LogUsizeId::UnreachableCore],
             state[LogF64Id::PropagationPerConflict],
         )
         .as_bytes(),
     )?;
-    out.write_all(
-        format!(
-            "c         misc|vivC:{:>9}, subC:{:>9}, core:{:>9}, /cpr:{:>9.2},\n",
-            state[LogUsizeId::Simplify],
-            state[LogUsizeId::SubsumedClause],
-            state[LogUsizeId::UnreachableCore],
-            state[LogF64Id::ConflictPerRestart],
-        )
-        .as_bytes(),
-    )?;
-    #[cfg(not(feature = "strategy_adaptation"))]
-    {
-        out.write_all(format!("c     Strategy|mode:  generic, time:{:9.2},\n", tm).as_bytes())?;
-    }
-    #[cfg(feature = "strategy_adaptation")]
-    {
-        out.write_all(
-            format!(
-                "c     Strategy|mode:{:>15}, time:{:9.2},\n",
-                state.strategy.0, tm,
-            )
-            .as_bytes(),
-        )?;
-    }
+    out.write_all(format!("c     Strategy|mode:  generic, time:{:9.2},\n", tm).as_bytes())?;
     out.write_all("c \n".as_bytes())?;
     for key in &config::property::F64S {
         out.write_all(
@@ -377,26 +353,6 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
                 "c   clause::{:<27}{:>19.3}\n",
                 format!("{:?}", key),
                 s.cdb.derefer(*key),
-            )
-            .as_bytes(),
-        )?;
-    }
-    for key in &processor::property::USIZES {
-        out.write_all(
-            format!(
-                "c   processor::{:<24}{:>15}\n",
-                format!("{:?}", key),
-                s.elim.derefer(*key),
-            )
-            .as_bytes(),
-        )?;
-    }
-    for key in &restart::property::USIZES {
-        out.write_all(
-            format!(
-                "c   restart::{:<26}{:>15}\n",
-                format!("{:?}", key),
-                s.rst.derefer(*key),
             )
             .as_bytes(),
         )?;

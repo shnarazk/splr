@@ -28,7 +28,7 @@ macro_rules! var_assign {
 pub trait VarSelectIF {
     #[cfg(feature = "rephase")]
     /// select rephasing target
-    fn select_rephasing_target(&mut self, request: Option<RephasingTarget>, span: usize);
+    fn select_rephasing_target(&mut self);
     #[cfg(feature = "rephase")]
     /// check the consistency
     fn check_consistency_of_best_phases(&mut self);
@@ -40,106 +40,25 @@ pub trait VarSelectIF {
     fn rebuild_order(&mut self);
 }
 
-/// Phase saving modes.
-#[cfg(feature = "rephase")]
-#[derive(Debug, PartialEq)]
-pub enum RephasingTarget {
-    /// use a modified best phases
-    AntiPhases,
-    /// use best phases
-    BestPhases,
-    /// unstage all vars.
-    Clear,
-    /// reverse phases.
-    FlipAll,
-    /// use the reverse of best phase
-    FlipBestPhase,
-    /// a kind of random shuffle
-    Mixin(f64),
-}
-
-#[cfg(feature = "rephase")]
-impl std::fmt::Display for RephasingTarget {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(formatter, "{:?}", self)
-    }
-}
-
 impl VarSelectIF for AssignStack {
     #[cfg(feature = "rephase")]
-    fn select_rephasing_target(&mut self, request: Option<RephasingTarget>, scale: usize) {
+    fn select_rephasing_target(&mut self) {
         if self.best_phases.is_empty() {
             return;
         }
+        self.check_consistency_of_best_phases();
         if self.derefer(property::Tusize::NumUnassertedVar) <= self.best_phases.len() {
             self.best_phases.clear();
             return;
         }
-        let remain = self.derefer(property::Tusize::NumUnassertedVar) - self.best_phases.len() + 1;
-        if (remain as f64).log10() < scale as f64 {
-            return;
-        }
-        self.phase_age += 1;
-        // let target = request.unwrap_or_else(|| RephasingTarget::Mixin(1.0 / scale as f64));
-        let target = request.unwrap_or(RephasingTarget::BestPhases);
-        // The iteration order by an iterator on HashMap may change in each execution.
-        // So Shift and XorShift cause non-determinism. Be careful.
-        let mut num_flip = 0;
-        let mut act_sum = 0.0;
         debug_assert!(self
             .best_phases
             .iter()
             .all(|(vi, b)| self.assign[*vi] != Some(!b.0)));
         self.num_rephase += 1;
-        match target {
-            RephasingTarget::AntiPhases => {
-                for (vi, (b, _)) in self.best_phases.iter() {
-                    let v = &mut self.var[*vi];
-                    v.set(FlagVar::PHASE, !*b);
-                }
-                /* for vi in 1..self.num_vars {
-                    if !self.best_phases.contains_key(&vi) && !self.var[vi].is(FlagVar::ELIMINATED) {
-                        self.var[vi].toggle(FlagVar::PHASE);
-                    }
-                } */
-            }
-            RephasingTarget::BestPhases => {
-                for (vi, (b, _)) in self.best_phases.iter() {
-                    let v = &mut self.var[*vi];
-                    v.set(FlagVar::PHASE, *b);
-                }
-            }
-            RephasingTarget::Clear => (),
-            RephasingTarget::FlipAll => {
-                for vi in 1..self.num_vars {
-                    if !self.var[vi].is(FlagVar::ELIMINATED) {
-                        self.var[vi].toggle(FlagVar::PHASE);
-                    }
-                }
-            }
-            RephasingTarget::FlipBestPhase => {
-                for (vi, _) in self.best_phases.iter() {
-                    let v = &mut self.var[*vi];
-                    v.set(FlagVar::PHASE, /* !*b */ self.phase_age % 2 == 0);
-                }
-            }
-            RephasingTarget::Mixin(scl) => {
-                for (vi, (b, _)) in self.best_phases.iter() {
-                    let v = &mut self.var[*vi];
-                    if !v.reward.is_nan() {
-                        act_sum += scl * v.reward;
-                    }
-                    if 1.0 <= act_sum {
-                        // v.set(FlagVar::PHASE, !*b); NO: use the current phase!
-                        act_sum = 0.0;
-                        num_flip += 1;
-                    } else {
-                        v.set(FlagVar::PHASE, *b);
-                    }
-                }
-                self.bp_divergence_ema
-                    .update(num_flip as f64 / self.best_phases.len() as f64);
-            }
+        for (vi, (b, _)) in self.best_phases.iter() {
+            let v = &mut self.var[*vi];
+            v.set(FlagVar::PHASE, *b);
         }
     }
     #[cfg(feature = "rephase")]
