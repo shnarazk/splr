@@ -1021,10 +1021,11 @@ impl ClauseDBIF for ClauseDB {
         // there're exception. Since this is the pre-stage of clause vivification,
         // we want keep usefull clauses as many as possible.
         // Therefore I save the clauses which will become vivification targets.
-        let thr = (self.lb_entanglement.get() as u16).max(4);
+        let thr = (2 * self.lb_entanglement.get() as u16).max(10);
+        // let thr_d = (self.lbd.get() as u16) / 3;
         for i in &perm[keep..] {
             let c = &self.clause[i.to()];
-            if !c.is_vivify_target() || thr < c.rank {
+            if !c.is_vivify_target() && thr < c.rank {
                 self.remove_clause(ClauseId::from(i.to()));
             }
         }
