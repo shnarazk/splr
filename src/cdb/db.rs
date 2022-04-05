@@ -1024,7 +1024,7 @@ impl ClauseDBIF for ClauseDB {
         let thr = 1 + self
             .lb_entanglement
             .get_slow()
-            .min(self.lbd.get_slow().max(6.0)) as u16;
+            .min(self.lbd.get_slow().max(5.0)) as u16;
         for i in &perm[keep..] {
             let c = &self.clause[i.to()];
             if !c.is_vivify_target() || thr < c.rank {
