@@ -408,26 +408,22 @@ pub mod property {
 
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tf64 {
-        ChronoBtThreshold,
+        #[cfg(feature = "clase_rewarding")]
         ClauseRewardDecayRate,
-        InprocessorInterval,
         VarRewardDecayRate,
     }
 
-    pub const F64S: [Tf64; 4] = [
-        Tf64::ChronoBtThreshold,
-        Tf64::ClauseRewardDecayRate,
-        Tf64::InprocessorInterval,
-        Tf64::VarRewardDecayRate,
-    ];
+    #[cfg(not(feature = "clase_rewarding"))]
+    pub const F64S: [Tf64; 1] = [Tf64::VarRewardDecayRate];
+    #[cfg(feature = "clase_rewarding")]
+    pub const F64S: [Tf64; 2] = [Tf64::ClauseRewardDecayRate, Tf64::VarRewardDecayRate];
 
     impl PropertyDereference<Tf64, f64> for Config {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
-                Tf64::ChronoBtThreshold => self.c_cbt_thr as f64,
+                #[cfg(feature = "clase_rewarding")]
                 Tf64::ClauseRewardDecayRate => self.crw_dcy_rat,
-                Tf64::InprocessorInterval => self.c_ip_int as f64,
                 Tf64::VarRewardDecayRate => self.vrw_dcy_rat,
             }
         }
