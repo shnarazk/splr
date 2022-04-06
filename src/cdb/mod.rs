@@ -339,15 +339,17 @@ pub mod property {
 
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tf64 {
+        LiteralBlockDistance,
         LiteralBlockEntanglement,
     }
 
-    pub const F64: [Tf64; 1] = [Tf64::LiteralBlockEntanglement];
+    pub const F64: [Tf64; 2] = [Tf64::LiteralBlockDistance, Tf64::LiteralBlockEntanglement];
 
     impl PropertyDereference<Tf64, f64> for ClauseDB {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
+                Tf64::LiteralBlockDistance => self.lbd.get(),
                 Tf64::LiteralBlockEntanglement => self.lb_entanglement.get(),
             }
         }
