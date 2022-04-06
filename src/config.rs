@@ -15,9 +15,6 @@ pub struct Config {
     /// Soft limit of #clauses (6MC/GB)
     pub c_cls_lim: usize,
 
-    /// #cls to start in-processor
-    pub c_ip_int: usize,
-
     /// CPU time limit in sec.
     pub c_timeout: f64,
 
@@ -89,7 +86,6 @@ impl Default for Config {
         Config {
             c_cbt_thr: 100,
             c_cls_lim: 0,
-            c_ip_int: 10000,
             c_timeout: 5000.0,
 
             splr_interface: false,
@@ -139,7 +135,7 @@ impl Config {
                     "no-color", "quiet", "certify", "journal", "log", "help", "version",
                 ];
                 let options_u32 = [];
-                let options_usize = ["cl", "ii", "stat", "ecl", "evl", "evo"];
+                let options_usize = ["cl", "stat", "ecl", "evl", "evo"];
                 let options_f64 = ["timeout", "cdr", "vdr", "vds"];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
@@ -174,7 +170,6 @@ impl Config {
                                 if let Ok(val) = str.parse::<usize>() {
                                     match name {
                                         "cl" => self.c_cls_lim = val,
-                                        "ii" => self.c_ip_int = val,
                                         "ecl" => self.elm_cls_lim = val,
                                         "evl" => self.elm_grw_lim = val,
                                         "evo" => self.elm_var_occ = val,
@@ -340,7 +335,6 @@ FLAGS:
   -V, --version             Prints version information
 OPTIONS:
 {}      --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
-      --ii <c-ip-int>       #cls to start in-processor     {:>10}
   -t, --timeout <timeout>   CPU time limit in sec.         {:>10}
       --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
@@ -358,7 +352,6 @@ OPTIONS:
             "       -cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}\n"
         ),
         config.c_cls_lim,
-        config.c_ip_int,
         config.c_timeout,
         config.elm_cls_lim,
         config.elm_grw_lim,
