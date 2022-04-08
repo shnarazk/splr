@@ -1021,7 +1021,7 @@ impl ClauseDBIF for ClauseDB {
         // there're exception. Since this is the pre-stage of clause vivification,
         // we want keep usefull clauses as many as possible.
         // Therefore I save the clauses which will become vivification targets.
-        let thr = (self.lb_entanglement.get() as u16).max(4);
+        let thr = (self.lb_entanglement.get_slow() + 1.0).min(self.lbd.get_fast().max(5.0)) as u16;
         for i in &perm[keep..] {
             let c = &self.clause[i.to()];
             if !c.is_vivify_target() || thr < c.rank {

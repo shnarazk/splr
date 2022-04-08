@@ -708,9 +708,9 @@ impl State {
     }
     fn dump_header(&self) {
         println!(
-            "c |          RESTARTS           |          ORIGINAL         |              LEARNT              | Progress |\n\
-             c |       NB   Blocked  Avg Cfc |    Vars  Clauses Literals |   Red   Learnts    LBD2  Removed |          |\n\
-             c ========================================================================================================="
+            "c |      RESTARTS     |       ORIGINAL FORMULA     |       LEARNT CLAUSES     | Progress |\n\
+             c |   number av. cnfl |  Remains  Elim-ed  Clauses | #rdct   Learnts     LBD2 |          |\n\
+             c |-------------------|----------------------------|--------------------------|----------|"
         );
     }
     fn dump<A, C>(&mut self, asg: &A, cdb: &C)
@@ -731,16 +731,15 @@ impl State {
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
         let cdb_num_reduction = cdb.derefer(cdb::property::Tusize::NumReduction);
         println!(
-            "c | {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
+            "c | {:>8} {:>8} | {:>8} {:>8} {:>8} |  {:>4}  {:>8} {:>8} | {:>6.3} % |",
             asg_num_restart,                           // restart
             asg_num_conflict / asg_num_restart.max(1), // average cfc (Conflict / Restart)
             asg_num_unasserted_vars,                   // alive vars
+            asg_num_eliminated_vars,                   // eliminated vars
             cdb_num_clause - cdb_num_learnt,           // given clauses
-            0,                                         // alive literals
             cdb_num_reduction,                         // clause reduction
             cdb_num_learnt,                            // alive learnts
             cdb_num_lbd2,                              // learnts with LBD = 2
-            asg_num_conflict - cdb_num_learnt,         // removed learnts
             rate * 100.0,                              // progress
         );
     }

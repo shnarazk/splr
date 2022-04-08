@@ -360,7 +360,7 @@ impl PropagateIF for AssignStack {
         #[cfg(feature = "trail_saving")]
         macro_rules! from_saved_trail {
             () => {
-                if let cc @ Err(_) = self.from_saved_trail(cdb) {
+                if let cc @ Err(_) = self.reuse_saved_trail(cdb) {
                     self.num_propagation += 1;
                     self.num_conflict += 1;
                     self.num_reconflict += 1;
