@@ -134,7 +134,6 @@ impl Config {
                 let flags = [
                     "no-color", "quiet", "certify", "journal", "log", "help", "version",
                 ];
-                let options_u32 = [];
                 let options_usize = ["cl", "stat", "ecl", "evl", "evo"];
                 let options_f64 = ["timeout", "cdr", "vdr", "vds"];
                 let options_path = ["dir", "proof", "result"];
@@ -152,18 +151,6 @@ impl Config {
                                 "help" => help = true,
                                 "version" => version = true,
                                 _ => panic!("invalid flag: {}", name),
-                            }
-                        } else if options_u32.contains(&name) {
-                            if let Some(str) = iter.next() {
-                                if let Ok(_val) = str.parse::<u32>() {
-                                    match name {
-                                        _ => panic!("invalid option: {}", name),
-                                    }
-                                } else {
-                                    panic!("invalid value {}", name);
-                                }
-                            } else {
-                                panic!("no argument for {}", name);
                             }
                         } else if options_usize.contains(&name) {
                             if let Some(str) = iter.next() {

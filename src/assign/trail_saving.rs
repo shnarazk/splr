@@ -12,7 +12,7 @@ use super::AssignIF;
 /// Methods on trail saving.
 pub trait TrailSavingIF {
     fn save_trail(&mut self, to_lvl: DecisionLevel);
-    fn from_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult;
+    fn reuse_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult;
     fn clear_saved_trail(&mut self);
 }
 
@@ -53,7 +53,7 @@ impl TrailSavingIF for AssignStack {
             self.insert_heap(vi);
         }
     }
-    fn from_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult {
+    fn reuse_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult {
         let q = self.stage_scale.trailing_zeros() as u16
             + (cdb.derefer(crate::cdb::property::Tf64::LiteralBlockEntanglement) as u16) / 2;
 
