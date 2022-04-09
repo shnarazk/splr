@@ -1,6 +1,6 @@
 ## 0.15.0, 2022-  -
 
-- Add `solver::StageManager` for Luby stabilization, which defines stages, cycles, and segments based on Luby series.
+- Add `solver::StageManager`, which defines stages, cycles, and segments based on Luby series.
   - At the end of each stage, solver runs the following:
     - clause reduction
     - trail-saving reconfiguration
@@ -13,9 +13,9 @@
     - restart threshold reconfiguration
   - drop `solver::restart::GeometricStabilizer` and `solver::restart::ProgressLuby`
 - `Restarter` was renamed to `RestartManager` and stored in `State` as `State::restart`.
-- Glucose-like restart blocking scheme was substituted with a simple dynamics model
+- Glucose-like restart blocking scheme was substituted with a simple dynamics model.
 - Drop feature 'Luby_stabilization'. It became essential.
-- Drop feature 'Luby_restart'. It became essential.
+- Drop feature 'Luby_restart'.
 - Drop feature 'strategy_adaptation'
 
 ## 0.14.0, 2021-11-01
