@@ -248,11 +248,11 @@ impl Config {
                 #[cfg(feature = "chrono_BT")]
                 "chrono BT",
                 #[cfg(feature = "clause_elimination")]
-                "clause elimination",
+                "stage-based clause elimination",
                 #[cfg(feature = "clause_vivification")]
-                "clause vivification",
+                "stage-based clause vivification",
                 #[cfg(feature = "dynamic_restart_threshold")]
-                "dynamic restart threshold",
+                "stage-based dynamic restart threshold",
                 #[cfg(feature = "EMA_calibration")]
                 "EMA calibration",
                 #[cfg(feature = "EVSIDS")]
@@ -266,7 +266,7 @@ impl Config {
                 #[cfg(feature = "reason_side_rewarding")]
                 "reason-side rewarding",
                 #[cfg(feature = "rephase")]
-                "stage-based rephase",
+                "stage-based re-phasing",
                 #[cfg(feature = "suppress_reason_chain")]
                 "suppress reason chain",
                 #[cfg(feature = "trail_saving")]
