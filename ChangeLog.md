@@ -1,4 +1,4 @@
-## 0.15.0, 2022-  -
+## 0.15.0, 2022-05-15
 
 - Add `solver::StageManager`, which defines stages, cycles, and segments based on Luby series.
   - At the end of each stage, solver runs the following:
