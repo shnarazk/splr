@@ -14,9 +14,9 @@
                 stdenv.mkDerivation rec {
                   name = "splr-${version}";
                   pname = "splr";
-                  version = "0.14.0-20220122";
+                  version = "0.15.0-20220122";
                   src = self;
-                  buildInputs = [ cargo rustc ];
+                  buildInputs = [ cargo libiconv rustc binutils ];
                   buildPhase = "cargo build --release";
                   installPhase = ''
                     mkdir -p $out/bin
