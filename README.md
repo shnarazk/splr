@@ -321,9 +321,8 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 ## Command line options
 
 ```plain
-$ splr --help
 A modern CDCL SAT solver in Rust
-Activated features: best phase tracking, clause elimination, clause vivification, dynamic restart threshold, Learning-Rate Based rewarding, Luby stabilization, reason-side rewarding, stage-based rephase, trail saving, unsafe access
+Activated features: best phase tracking, stage-based clause elimination, stage-based clause vivification, stage-based dynamic restart threshold, Learning-Rate Based rewarding, reason-side rewarding, stage-based re-phasing, trail saving, unsafe access
 
 USAGE:
   splr [FLAGS] [OPTIONS] <cnf-file>
@@ -332,65 +331,39 @@ FLAGS:
   -C, --no-color            Disable coloring
   -q, --quiet               Disable any progress message
   -c, --certify             Writes a DRAT UNSAT certification file
-  -j, --journal             Shows sub-module logs
+  -j, --journal             Shows log about restart stages
   -l, --log                 Uses Glucose-like progress report
   -V, --version             Prints version information
-OPTIONS (red options depend on features in Cargo.toml):
-      --cbt <c-cbt-thr>     Dec. lvl to use chronoBT              100
-      --cdr <crw-dcy-rat>   Clause reward decay rate                0.95
+OPTIONS:
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB)         0
-      --ii <c-ip-int>       #cls to start in-processor          10000
   -t, --timeout <timeout>   CPU time limit in sec.               5000
       --ecl <elm-cls-lim>   Max #lit for clause subsume            64
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.         0
       --evo <elm-var-occ>   Max #cls for var elimination        20000
   -o, --dir <io-outdir>     Output directory                         .
   -p, --proof <io-pfile>    DRAT Cert. filename                 proof.drat
-  -r, --result <io-rfile>   Result filename/stdout                       
-      --ral <rst-asg-len>   Length of assign. fast EMA             16
-      --ras <rst-asg-slw>   Length of assign. slow EMA           8192
-      --rat <rst-asg-thr>   Blocking restart threshold              0.60
-      --rll <rst-lbd-len>   Length of LBD fast EMA                  8
-      --rls <rst-lbd-slw>   Length of LBD slow EMA               8192
-      --rlt <rst-lbd-thr>   Forcing restart threshold               1.60
-      --rs  <rst-step>      #conflicts between restarts             2
+  -r, --result <io-rfile>   Result filename/stdout
       --vdr <vrw-dcy-rat>   Var reward decay rate                   0.96
-      --vds <vrw-dcy-stp>   Var reward decay change step            0.00
 ARGS:
   <cnf-file>    DIMACS CNF file
 ```
 
 ## Solver description
 
-Splr-0.14.0 adopts the following features by default:
+Splr-0.15.0 adopts the following features by default:
 
 - Learning-rate based (LRB) var rewarding and clause rewarding[4]
 - Reason-side var rewarding[4]
 - ~~chronological backtrack[5]~~ disabled since 0.12 due to incorrect UNSAT certificates.
 - clause vivification[6]
-- dynamic restart based on average LBDs of learnt clauses[1]
-- dynamic restart blocking based on the number of remaining vars[2]
-- clause elimination and subsumption as pre-processor and in-processor
-- stabilization based on Luby series, or _Luby Stabilization_
-- re-phase the best phases
-- trail saving extended with reason refinement based on clause quality[3]
+- Luby series based on the number of conflicts defines 'stages', which are used as trigger of
+  - restart
+  - clause elimination and subsumption
+  - re-phase to the best phases
+  - re-configuration of trail saving extended with reason refinement based on clause quality[3].
+This means 0.15.0 discarded various dynamic control schemes used in 0.14.0. The following figure shows the details.
 
-As shown in the blow, Splr calls in-processor very frequently.
-
-![search algorithm in Splr 0.14](https://user-images.githubusercontent.com/997855/139644446-bc38de8d-937a-4f08-a942-37e0b7fd71dd.png)
-
-_Luby stabilization_ is an original mechanism to make long periods without restarts, which are called stabilized modes.
-In this method, _every clause reduction_ updates the restart interval, which usually has a constant value, as follows:
-
-```
-restart_interval = luby(n) * base_interval;
-```
-where `n` represents the number of updates, and `luby(n)` is a function returning _n_-th value of Luby series.
-The longer the solver searches, the larger the average value is. So we can periodically explore the search space more deeply.
-
-Here is an example.
-
-![](https://user-images.githubusercontent.com/997855/136668563-d720a329-f0d6-4711-bd8f-c4761640fe47.png)
+![search algorithm in Splr 0.14](https://user-images.githubusercontent.com/997855/161426178-8264d3e2-e68a-4d64-86b4-906155a51039.png)
 
 #### Bibliography
 
