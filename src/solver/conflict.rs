@@ -65,7 +65,7 @@ pub fn handle_conflict(
                 .filter(|l| *l < max_level)
                 .max()
             {
-                assert!(0 < second_level);
+                debug_assert!(0 < second_level);
                 asg.cancel_until(second_level);
                 return Ok(());
             }

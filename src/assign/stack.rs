@@ -227,8 +227,8 @@ impl AssignIF for AssignStack {
         while 0 < i {
             i -= 1;
             let width = usize::from(lits[i]);
-            assert!(0 < width);
-            assert!(width <= i);
+            debug_assert!(0 < width);
+            debug_assert!(width <= i);
             let target_index = i - width;
             let last_lit_index = i - 1;
             let reason_literals = target_index + 1..=last_lit_index;

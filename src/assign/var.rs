@@ -190,7 +190,7 @@ impl VarManipulateIF for AssignStack {
                         self.assign[vi],
                     );
                 }
-                assert!(self.root_level < self.level[vi] || self.assign[vi].is_none());
+                debug_assert!(self.root_level < self.level[vi] || self.assign[vi].is_none());
             }
         } else {
             #[cfg(feature = "boundary_check")]
