@@ -233,7 +233,12 @@ impl fmt::Display for Clause {
 
 impl Clause {
     /// update rank field with the present LBD.
+    // If it's big enough, skip the loop.
     pub fn update_lbd(&mut self, asg: &impl AssignIF, lbd_temp: &mut [usize]) -> usize {
+        if 8192 <= self.lits.len() {
+            self.rank = u16::MAX;
+            return u16::MAX as usize;
+        }
         let level = asg.level_ref();
         let key: usize = lbd_temp[0] + 1;
         lbd_temp[0] = key;
