@@ -354,15 +354,20 @@ Splr-0.15.0 adopts the following features by default:
 - clause vivification[6]
 - Luby series based on the number of conflicts defines 'stages/cycles/segments', which are used as trigger of
   - restart
-  - clause elimination and subsumption
-  - clause vivification
-  - re-phase to the best phases
+  - clause reduction
+  - in-processor (clause elimination, subsumption and vivification)
+  - re-configuration of var phases and var activities
   - re-configuration of trail saving extended with reason refinement based on clause quality[3].
 
 Splr-0.15.0 discarded various dynamic and heuristic-based control schemes used in 0.14.0.
 The following figure shows the details.
 
 ![search algorithm in Splr 0.14](https://user-images.githubusercontent.com/997855/161426178-8264d3e2-e68a-4d64-86b4-906155a51039.png)
+
+Note: I use the term here:
+- _a stage _ -- a span in which solver uses the same restart parameters
+- _a cycle_ -- a group of continuos spans of which the corresponding Luby values make a non-decreasing sequence
+- _a segment_ -- a group of continuos cycles which are separated by new maximum Luby values
 
 #### Bibliography
 
