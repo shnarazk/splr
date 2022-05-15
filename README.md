@@ -352,13 +352,15 @@ Splr-0.15.0 adopts the following features by default:
 - Reason-side var rewarding[4]
 - ~~chronological backtrack[5]~~ disabled since 0.12 due to incorrect UNSAT certificates.
 - clause vivification[6]
-- Luby series based on the number of conflicts defines 'stages', which are used as trigger of
+- Luby series based on the number of conflicts defines 'stages/cycles/segments', which are used as trigger of
   - restart
   - clause elimination and subsumption
   - clause vivification
   - re-phase to the best phases
   - re-configuration of trail saving extended with reason refinement based on clause quality[3].
-  This means 0.15.0 discarded various dynamic control schemes used in 0.14.0. The following figure shows the details.
+
+Splr-0.15.0 discarded various dynamic and heuristic-based control schemes used in 0.14.0.
+The following figure shows the details.
 
 ![search algorithm in Splr 0.14](https://user-images.githubusercontent.com/997855/161426178-8264d3e2-e68a-4d64-86b4-906155a51039.png)
 
