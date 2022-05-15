@@ -364,10 +364,10 @@ The following figure shows the details.
 
 ![search algorithm in Splr 0.14](https://user-images.githubusercontent.com/997855/161426178-8264d3e2-e68a-4d64-86b4-906155a51039.png)
 
-Note: I use the term here:
+Note: I use the following terms here:
 - _a stage_ -- a span in which solver uses the same restart parameters
 - _a cycle_ -- a group of continuos spans of which the corresponding Luby values make a non-decreasing sequence
-- _a segment_ -- a group of continuos cycles which are separated by new maximum Luby values
+- _a segment_ -- a group of continuos cycles which are separated by new maximum Luby values' occurrences
 
 #### Bibliography
 
