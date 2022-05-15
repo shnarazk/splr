@@ -1,3 +1,23 @@
+## 0.15.0, 2022-05-15
+
+- Add `solver::StageManager`, which defines stages, cycles, and segments based on Luby series.
+  - At the end of each stage, solver runs the following:
+    - clause reduction
+    - trail-saving reconfiguration
+  - At the end of each cycle, solver runs the following:
+    - clause vivification
+    - var re-phasing
+  - At the end of each segment, solver runs the following:
+    - clause subsumption and var elimination
+    - var activity rescaling
+    - restart threshold reconfiguration
+  - drop `solver::restart::GeometricStabilizer` and `solver::restart::ProgressLuby`
+- `Restarter` was renamed to `RestartManager` and stored in `State` as `State::restart`.
+- Glucose-like restart blocking scheme was substituted with a simple dynamics model.
+- Drop feature 'Luby_stabilization'. It became essential.
+- Drop feature 'Luby_restart'.
+- Drop feature 'strategy_adaptation'
+
 ## 0.14.0, 2021-11-01
 
 - Rust 2021 edition

@@ -12,27 +12,31 @@
   \If{there is no unpropagated var}{
     select a decision var and its phase\;
   }
-  \If{BCP() returns an conflict}{
+  \uIf{BCP() returns an conflict}{
     \If{decision level is root level}{
       \Return{UNSAT}\;
     }
     CONFLICT-ANALYSIS()\;
     BACKTRACK()\;
-    \uIf{there are too many learnt clauses}{
-      RESTART()\;
-      REDUCE()\;
-      ELIMINATE()\;
-      VIVIFY()\;
-      update restart threshold and interval\Comment*{\sl\small\color[gray]{0.5}// Luby Stabilization}
-      select var phases;
+  }
+  \If{restart condition holds or the current stage ends}{
+    RESTART()\;
+    \If{a new stage begins}{
+        REDUCE()\;
+        update restart conditions\;
     }
-    \ElseIf{LBD-based dynamic restart condition holds}{
-      RESTART();
+    \If{a new cycle begins}{
+        VIVIFY()\;
+        select var phases\;
+    }
+    \If{a new segment begins}{
+        ELIMINATE()\;
+        rescale var activities\;
     }
   }
 }
 \Return{SAT}\;
 }
-\caption{Main search loop in Splr-0.14 (src/solver/search.rs)}
+\caption{Main search loop in Splr-0.15 (src/solver/search.rs)}
 \end{algorithm}
 \end{document}

@@ -4,18 +4,18 @@ pub use crate::{
     assign::AssignReason,
     cdb::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
     config::Config,
+    primitive::{ema::*, luby::*},
+    solver::SolverEvent,
 };
-use {
-    crate::solver::SolverEvent,
-    std::{
-        cmp::Ordering,
-        fmt,
-        fs::File,
-        io::{BufRead, BufReader},
-        num::NonZeroU32,
-        ops::{Index, IndexMut, Not},
-        path::{Path, PathBuf},
-    },
+
+use std::{
+    cmp::Ordering,
+    fmt,
+    fs::File,
+    io::{BufRead, BufReader},
+    num::NonZeroU32,
+    ops::{Index, IndexMut, Not},
+    path::{Path, PathBuf},
 };
 
 /// API for accessing internal data in a module.
@@ -25,6 +25,7 @@ use {
 pub trait PropertyReference<I, O> {
     fn refer(&self, key: I) -> &O;
 }
+
 pub trait PropertyDereference<I, O: Sized> {
     fn derefer(&self, key: I) -> O;
 }
@@ -335,169 +336,6 @@ pub type ConflictContext = (Lit, AssignReason);
 /// Return type of unit propagation
 pub type PropagationResult = Result<(), ConflictContext>;
 
-/// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
-pub trait EmaIF {
-    /// the type of the argument of `update`.
-    type Input;
-    /// return the current value.
-    fn get(&self) -> f64;
-    /// reset internal data.
-    fn reset(&mut self) {}
-    /// catch up with the current state.
-    fn update(&mut self, x: Self::Input);
-    /// return a ratio of short / long statistics.
-    fn trend(&self) -> f64 {
-        unimplemented!()
-    }
-}
-
-/// Exponential Moving Average, with a calibrator if feature `EMA_calibration` is on.
-#[derive(Clone, Debug)]
-pub struct Ema {
-    val: f64,
-    #[cfg(feature = "EMA_calibration")]
-    cal: f64,
-    sca: f64,
-}
-
-impl EmaIF for Ema {
-    type Input = f64;
-    #[cfg(not(feature = "EMA_calibration"))]
-    fn update(&mut self, x: Self::Input) {
-        self.val = self.sca * x + (1.0 - self.sca) * self.val;
-    }
-    #[cfg(feature = "EMA_calibration")]
-    fn update(&mut self, x: Self::Input) {
-        self.val = self.sca * x + (1.0 - self.sca) * self.val;
-        self.cal = self.sca + (1.0 - self.sca) * self.cal;
-    }
-    #[cfg(feature = "EMA_calibration")]
-    fn get(&self) -> f64 {
-        self.val / self.cal
-    }
-    #[cfg(not(feature = "EMA_calibration"))]
-    fn get(&self) -> f64 {
-        self.val
-    }
-}
-
-impl Ema {
-    pub fn new(s: usize) -> Ema {
-        Ema {
-            val: 0.0,
-            #[cfg(feature = "EMA_calibration")]
-            cal: 0.0,
-            sca: 1.0 / (s as f64),
-        }
-    }
-}
-
-/// Exponential Moving Average pair, with a calibrator if feature `EMA_calibration` is on.
-#[derive(Clone, Debug)]
-pub struct Ema2 {
-    fast: f64,
-    slow: f64,
-    #[cfg(feature = "EMA_calibration")]
-    calf: f64,
-    #[cfg(feature = "EMA_calibration")]
-    cals: f64,
-    fe: f64,
-    se: f64,
-}
-
-impl EmaIF for Ema2 {
-    type Input = f64;
-    fn get(&self) -> f64 {
-        self.fast // / self.calf
-    }
-    #[cfg(not(feature = "EMA_calibration"))]
-    fn update(&mut self, x: Self::Input) {
-        self.fast = self.fe * x + (1.0 - self.fe) * self.fast;
-        self.slow = self.se * x + (1.0 - self.se) * self.slow;
-    }
-    #[cfg(feature = "EMA_calibration")]
-    fn update(&mut self, x: Self::Input) {
-        self.fast = self.fe * x + (1.0 - self.fe) * self.fast;
-        self.slow = self.se * x + (1.0 - self.se) * self.slow;
-        self.calf = self.fe + (1.0 - self.fe) * self.calf;
-        self.cals = self.se + (1.0 - self.se) * self.cals;
-    }
-    #[cfg(not(feature = "EMA_calibration"))]
-    fn reset(&mut self) {
-        self.slow = self.fast;
-    }
-    #[cfg(feature = "EMA_calibration")]
-    fn reset(&mut self) {
-        self.slow = self.fast;
-        self.cals = self.calf;
-    }
-    #[cfg(not(feature = "EMA_calibration"))]
-    fn trend(&self) -> f64 {
-        self.fast / self.slow
-    }
-    #[cfg(feature = "EMA_calibration")]
-    fn trend(&self) -> f64 {
-        self.fast / self.slow * (self.cals / self.calf)
-    }
-}
-
-impl Ema2 {
-    pub fn new(f: usize) -> Ema2 {
-        Ema2 {
-            fast: 0.0,
-            slow: 0.0,
-            #[cfg(feature = "EMA_calibration")]
-            calf: 0.0,
-            #[cfg(feature = "EMA_calibration")]
-            cals: 0.0,
-            fe: 1.0 / (f as f64),
-            se: 1.0 / (f as f64),
-        }
-    }
-    // set secondary EMA parameter
-    pub fn with_slow(mut self, s: usize) -> Ema2 {
-        self.se = 1.0 / (s as f64);
-        self
-    }
-    pub fn get_slow(&self) -> f64 {
-        self.slow // / self.calf
-    }
-}
-
-/// Ema of Sequence of usize
-#[derive(Clone, Debug)]
-pub struct EmaSU {
-    last: f64,
-    ema: Ema,
-}
-
-impl EmaIF for EmaSU {
-    type Input = usize;
-    fn update(&mut self, x: Self::Input) {
-        let diff: f64 = x as f64 - self.last;
-        self.ema.update(diff);
-        self.last = x as f64;
-    }
-    fn get(&self) -> f64 {
-        self.ema.get()
-    }
-}
-
-impl EmaSU {
-    pub fn new(s: usize) -> Self {
-        EmaSU {
-            last: 0.0,
-            ema: Ema::new(s),
-        }
-    }
-    pub fn update_base(&mut self, x: usize) {
-        self.last = x as f64;
-    }
-    pub fn get_ema(&self) -> &Ema {
-        &self.ema
-    }
-}
-
 // A generic reference to a clause or something else.
 // we can use DEAD for simply satisfied form, f.e. an empty forms,
 // while EmptyClause can be used for simply UNSAT form.
@@ -769,15 +607,9 @@ bitflags! {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Logger {
     dest: Option<File>,
-}
-
-impl Default for Logger {
-    fn default() -> Self {
-        Logger { dest: None }
-    }
 }
 
 impl fmt::Display for Logger {

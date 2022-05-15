@@ -1,15 +1,12 @@
 //! Conflict-Driven Clause Learning Search engine
-#[cfg(feature = "clause_vivification")]
-use crate::cdb::VivifyIF;
 use {
     super::{
-        conflict::handle_conflict,
-        restart::{self, ProgressUpdate, RestartDecision, RestartIF, Restarter},
-        Certificate, Solver, SolverEvent, SolverResult,
+        conflict::handle_conflict, restart::RestartIF, Certificate, Solver, SolverEvent,
+        SolverResult,
     },
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
-        cdb::{self, ClauseDB, ClauseDBIF},
+        cdb::{self, ClauseDB, ClauseDBIF, VivifyIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
         types::*,
@@ -27,9 +24,10 @@ pub trait SolveIF {
 }
 
 macro_rules! RESTART {
-    ($asg: expr, $rst: expr) => {
+    ($asg: expr, $cdb: expr, $state: expr) => {
         $asg.cancel_until($asg.root_level());
-        $rst.handle(SolverEvent::Restart);
+        $cdb.handle(SolverEvent::Restart);
+        $state.handle(SolverEvent::Restart);
     };
 }
 
@@ -50,157 +48,148 @@ impl SolveIF for Solver {
         let Solver {
             ref mut asg,
             ref mut cdb,
-            ref mut elim,
-            ref mut rst,
             ref mut state,
         } = self;
         if cdb.check_size().is_err() {
             return Err(SolverError::OutOfMemory);
         }
         state.progress_header();
-        state.progress(asg, cdb, elim, rst);
+        state.progress(asg, cdb);
         state.flush("");
         state.flush("Preprocessing stage: ");
 
-        state[Stat::NumProcessor] += 1;
         #[cfg(feature = "clause_vivification")]
         {
             state.flush("vivifying...");
-            if cdb.vivify(asg, rst, state).is_err() {
+            if cdb.vivify(asg, state).is_err() {
                 #[cfg(feature = "support_user_assumption")]
-                {
-                    analyze_final(asg, state, &cdb[ci]);
-                }
-                state.log(asg.num_conflict, "By vivifier as a pre-possessor");
+                analyze_final(asg, state, &cdb[ci]);
+
+                state.log(None, "By vivifier as a pre-possessor");
                 return Ok(Certificate::UNSAT);
             }
-            assert!(!asg.remains());
+            debug_assert!(!asg.remains());
         }
-        debug_assert_eq!(asg.decision_level(), asg.root_level());
-        if elim.simplify(asg, cdb, rst, state).is_err() {
-            if cdb.check_size().is_err() {
-                return Err(SolverError::OutOfMemory);
-            }
-            state.log(asg.num_conflict, "By eliminator");
-            return Ok(Certificate::UNSAT);
-        }
-
-        #[cfg(feature = "clause_elimination")]
         {
-            const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
-
-            //
-            //## Propagate all trivial literals (an essential step)
-            //
-            // Set appropriate phases and push all the unit clauses to assign stack.
-            // To do so, we use eliminator's occur list.
-            // Thus we have to call `activate` and `prepare` firstly, to build occur lists.
-            // Otherwise all literals are assigned wrongly.
-
-            state.flush("phasing...");
-            elim.activate();
-            elim.prepare(asg, cdb, true);
-            for vi in 1..=asg.num_vars {
-                if asg.assign(vi).is_some() {
-                    continue;
+            debug_assert_eq!(asg.decision_level(), asg.root_level());
+            let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+            if elim.simplify(asg, cdb, state, true).is_err() {
+                if cdb.check_size().is_err() {
+                    return Err(SolverError::OutOfMemory);
                 }
-                if let Some((p, m)) = elim.stats(vi) {
-                    // We can't call `asg.assign_at_root_level(l)` even if p or m == 0.
-                    // This means we can't pick `!l`.
-                    // This becomes a problem in the case of incremental solving.
-                    #[cfg(not(feature = "incremental_solver"))]
-                    {
-                        if m == 0 {
-                            let l = Lit::from((vi, true));
-                            assert!(asg.assigned(l).is_none());
-                            cdb.certificate_add_assertion(l);
-                            if asg.assign_at_root_level(l).is_err() {
-                                return Ok(Certificate::UNSAT);
-                            }
-                        } else if p == 0 {
-                            let l = Lit::from((vi, false));
-                            assert!(asg.assigned(l).is_none());
-                            cdb.certificate_add_assertion(l);
-                            if asg.assign_at_root_level(l).is_err() {
-                                return Ok(Certificate::UNSAT);
-                            }
-                        }
-                    }
-                    asg.var_mut(vi).set(FlagVar::PHASE, m < p);
-                    elim.enqueue_var(asg, vi, false);
-                }
+                state.log(None, "By eliminator");
+                return Ok(Certificate::UNSAT);
             }
-            //
-            //## Run eliminator
-            //
-            if USE_PRE_PROCESSING_ELIMINATOR {
-                state.flush("simplifying...");
-                if elim.simplify(asg, cdb, rst, state).is_err() {
-                    // Why inconsistent? Because the CNF contains a conflict, not an error!
-                    // Or out of memory.
-                    state.progress(asg, cdb, elim, rst);
-                    if cdb.check_size().is_err() {
-                        return Err(SolverError::OutOfMemory);
-                    }
-                    return Ok(Certificate::UNSAT);
-                }
+
+            #[cfg(feature = "clause_elimination")]
+            {
+                const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
+
+                //
+                //## Propagate all trivial literals (an essential step)
+                //
+                // Set appropriate phases and push all the unit clauses to assign stack.
+                // To do so, we use eliminator's occur list.
+                // Thus we have to call `activate` and `prepare` firstly, to build occur lists.
+                // Otherwise all literals are assigned wrongly.
+
+                state.flush("phasing...");
+                elim.prepare(asg, cdb, true);
                 for vi in 1..=asg.num_vars {
-                    if asg.assign(vi).is_some() || asg.var(vi).is(FlagVar::ELIMINATED) {
+                    if asg.assign(vi).is_some() {
                         continue;
                     }
-                    match elim.stats(vi) {
-                        Some((_, 0)) => (),
-                        Some((0, _)) => (),
-                        Some((p, m)) if m * 10 < p => asg.var_mut(vi).turn_on(FlagVar::PHASE),
-                        Some((p, m)) if p * 10 < m => asg.var_mut(vi).turn_off(FlagVar::PHASE),
-                        _ => (),
+                    if let Some((p, m)) = elim.stats(vi) {
+                        // We can't call `asg.assign_at_root_level(l)` even if p or m == 0.
+                        // This means we can't pick `!l`.
+                        // This becomes a problem in the case of incremental solving.
+                        #[cfg(not(feature = "incremental_solver"))]
+                        {
+                            if m == 0 {
+                                let l = Lit::from((vi, true));
+                                debug_assert!(asg.assigned(l).is_none());
+                                cdb.certificate_add_assertion(l);
+                                if asg.assign_at_root_level(l).is_err() {
+                                    return Ok(Certificate::UNSAT);
+                                }
+                            } else if p == 0 {
+                                let l = Lit::from((vi, false));
+                                debug_assert!(asg.assigned(l).is_none());
+                                cdb.certificate_add_assertion(l);
+                                if asg.assign_at_root_level(l).is_err() {
+                                    return Ok(Certificate::UNSAT);
+                                }
+                            }
+                        }
+                        asg.var_mut(vi).set(FlagVar::PHASE, m < p);
+                        elim.enqueue_var(asg, vi, false);
                     }
                 }
-                let act = 1.0 / (asg.num_vars as f64).powf(0.25);
-                for vi in 1..asg.num_vars {
-                    if !asg.var(vi).is(FlagVar::ELIMINATED) {
-                        asg.set_activity(vi, act);
+                //
+                //## Run eliminator
+                //
+                if USE_PRE_PROCESSING_ELIMINATOR {
+                    state.flush("simplifying...");
+                    if elim.simplify(asg, cdb, state, false).is_err() {
+                        // Why inconsistent? Because the CNF contains a conflict, not an error!
+                        // Or out of memory.
+                        state.progress(asg, cdb);
+                        if cdb.check_size().is_err() {
+                            return Err(SolverError::OutOfMemory);
+                        }
+                        return Ok(Certificate::UNSAT);
                     }
+                    for vi in 1..=asg.num_vars {
+                        if asg.assign(vi).is_some() || asg.var(vi).is(FlagVar::ELIMINATED) {
+                            continue;
+                        }
+                        match elim.stats(vi) {
+                            Some((_, 0)) => (),
+                            Some((0, _)) => (),
+                            Some((p, m)) if m * 10 < p => asg.var_mut(vi).turn_on(FlagVar::PHASE),
+                            Some((p, m)) if p * 10 < m => asg.var_mut(vi).turn_off(FlagVar::PHASE),
+                            _ => (),
+                        }
+                    }
+                    let act = 1.0 / (asg.num_vars as f64).powf(0.25);
+                    for vi in 1..asg.num_vars {
+                        if !asg.var(vi).is(FlagVar::ELIMINATED) {
+                            asg.set_activity(vi, act);
+                        }
+                    }
+                    asg.rebuild_order();
                 }
-                asg.rebuild_order();
             }
+            asg.eliminated.append(elim.eliminated_lits());
+            state[Stat::Simplify] += 1;
+            state[Stat::SubsumedClause] = elim.num_subsumed;
         }
-
         //
         //## Search
         //
-        state.progress(asg, cdb, elim, rst);
-        let answer = search(asg, cdb, elim, rst, state);
-        state.progress(asg, cdb, elim, rst);
+        state.progress(asg, cdb);
+        let answer = search(asg, cdb, state);
+        state.progress(asg, cdb);
         match answer {
             Ok(true) => {
                 #[cfg(feature = "trace_equivalency")]
-                {
-                    asg.dump_cnf(cdb, "last-step.cnf");
-                }
+                asg.dump_cnf(cdb, "last-step.cnf");
+
                 // As a preparation for incremental solving, we need to backtrack to the
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
                 #[cfg(feature = "boundary_check")]
                 check(asg, cdb, true, "Before extending the model");
 
-                #[cfg(fueature = "boundary_check")]
-                check(asg, cdb, true, "Before extending the model");
+                let model = asg.extend_model(cdb);
 
-                let model = asg.extend_model(cdb, elim.eliminated_lits());
-
-                #[cfg(fueature = "boundary_check")]
-                check(
-                    asg,
-                    cdb,
-                    true,
-                    "After extending the model, (passed before extending)",
-                );
+                #[cfg(feature = "boundary_check")]
+                check(asg, cdb, true, "After extending the model");
 
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
-                    state.log(asg.num_conflict, "failed to validate the extended model");
-                    state.progress(asg, cdb, elim, rst);
+                    state.log(None, "failed to validate the extended model");
+                    state.progress(asg, cdb);
                     return Err(SolverError::SolverBug);
                 }
 
@@ -218,20 +207,19 @@ impl SolveIF for Solver {
                         v.turn_off(FlagVar::ELIMINATED);
                     }
                 }
-                RESTART!(asg, rst);
+                RESTART!(asg, cdb, state);
                 Ok(Certificate::SAT(vals))
             }
             Ok(false) | Err(SolverError::EmptyClause | SolverError::RootLevelConflict(_)) => {
                 #[cfg(feature = "support_user_assumption")]
-                {
-                    analyze_final(asg, state, &cdb[ci]);
-                }
-                RESTART!(asg, rst);
+                analyze_final(asg, state, &cdb[ci]);
+
+                RESTART!(asg, cdb, state);
                 Ok(Certificate::UNSAT)
             }
             Err(e) => {
-                RESTART!(asg, rst);
-                state.progress(asg, cdb, elim, rst);
+                RESTART!(asg, cdb, state);
+                state.progress(asg, cdb);
                 Err(e)
             }
         }
@@ -242,51 +230,30 @@ impl SolveIF for Solver {
 fn search(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
-    elim: &mut Eliminator,
-    rst: &mut Restarter,
     state: &mut State,
 ) -> Result<bool, SolverError> {
-    #[cfg(feature = "clause_elimination")]
-    let mut next_elimination = 0;
+    let mut current_stage: Option<bool> = Some(true);
+    let mut num_learnt = 0;
 
-    #[cfg(feature = "strategy_adaptation")]
-    let mut a_decision_was_made = false;
-
-    #[cfg(feature = "Luby_restart")]
-    rst.update(ProgressUpdate::Luby);
-
+    state.stm.initialize(
+        (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
+    );
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
             let lit = asg.select_decision_literal();
             asg.assign_by_decision(lit);
-
-            #[cfg(feature = "strategy_adaptation")]
-            {
-                a_decision_was_made = true;
-            }
         }
         if let Err(cc) = asg.propagate(cdb) {
             if asg.decision_level() == asg.root_level() {
                 return Err(SolverError::RootLevelConflict(cc));
             }
-
-            #[cfg(feature = "strategy_adaptation")]
-            if a_decision_was_made {
-                a_decision_was_made = false;
-            } else {
-                state[Stat::NoDecisionConflict] += 1;
-            }
-
             asg.update_activity_tick();
-
             #[cfg(feature = "clause_rewarding")]
             cdb.update_activity_tick();
-
-            handle_conflict(asg, cdb, rst, state, &cc)?;
-            rst.update(ProgressUpdate::ASG(
-                asg.derefer(assign::property::Tusize::NumUnassignedVar),
-            ));
-            if cdb.should_reduce(asg.num_conflict) {
+            if 1 < handle_conflict(asg, cdb, state, &cc)? {
+                num_learnt += 1;
+            }
+            if state.stm.stage_ended(num_learnt) {
                 if let Some(p) = state.elapsed() {
                     if 1.0 <= p {
                         return Err(SolverError::TimeOut);
@@ -294,76 +261,56 @@ fn search(
                 } else {
                     return Err(SolverError::UndescribedError);
                 }
-                RESTART!(asg, rst);
-                cdb.reduce(asg, asg.num_conflict);
-
+                RESTART!(asg, cdb, state);
+                cdb.reduce(asg, state.stm.num_reducible());
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
-
-                #[cfg(feature = "clause_vivification")]
-                cdb.vivify(asg, rst, state)?;
-
-                #[cfg(feature = "clause_elimination")]
-                {
-                    let num_stage = rst.derefer(restart::property::Tusize::NumStage);
-                    if num_stage == next_elimination {
-                        elim.activate();
-                        elim.simplify(asg, cdb, rst, state)?;
-                        state[Stat::NumProcessor] += 1;
-                        next_elimination += 1.4f64
-                            .powi(cdb.derefer(cdb::property::Tusize::NumClause) as i32 / 80_000)
-                            as usize;
-                    }
-                }
-
-                asg.clear_asserted_literals(cdb)?;
-                // display the current stats. before updating stabiliation parameters
-                state.log(
-                    asg.num_conflict,
-                    format!(
-                        "core:{:>9}, cpr:{:>9.2}, scale:{:>4}, rlt:{:>7.4}",
-                        asg.derefer(assign::property::Tusize::NumUnreachableVar),
-                        asg.refer(assign::property::TEma::PropagationPerConflict)
-                            .get(),
-                        rst.derefer(restart::property::Tusize::IntervalScale),
-                        rst.derefer(restart::property::Tf64::RestartThreshold),
-                    ),
+                dump_stage(state, asg, current_stage);
+                let next_stage: Option<bool> = state.stm.prepare_new_stage(
+                    (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt()
+                        as usize,
+                    num_learnt,
                 );
-                state.progress(asg, cdb, elim, rst);
-
-                #[cfg(feature = "Luby_stabilization")]
-                {
-                    #[cfg(feature = "dynamic_restart_threshold")]
-                    if 1 == rst.derefer(restart::property::Tusize::IntervalScale) {
-                        rst.adjust(
-                            state.config.rst_lbd_thr,
-                            state.c_lvl.get(),
-                            state.b_lvl.get(),
-                            cdb.derefer(cdb::property::Tf64::DpAverageLBD),
-                        );
+                let scale = state.stm.current_scale();
+                let max_scale = state.stm.max_scale();
+                if let Some(new_segment) = next_stage {
+                    asg.select_rephasing_target();
+                    if cfg!(feature = "clause_vivification") {
+                        cdb.vivify(asg, state)?;
                     }
-
-                    rst.stabilize();
-                    // call the enhanced phase saver
-                    asg.handle(SolverEvent::Stabilize(
-                        rst.derefer(restart::property::Tusize::IntervalScale),
-                    ));
+                    if new_segment {
+                        asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
+                        if cfg!(feature = "clause_elimination") {
+                            let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+                            elim.simplify(asg, cdb, state, false)?;
+                            asg.eliminated.append(elim.eliminated_lits());
+                            state[Stat::Simplify] += 1;
+                            state[Stat::SubsumedClause] = elim.num_subsumed;
+                        }
+                        if cfg!(feature = "dynamic_restart_threshold") {
+                            state.restart.set_segment_parameters(max_scale);
+                        }
+                    }
                 }
-            } else if rst.restart() == Some(RestartDecision::Force) {
-                RESTART!(asg, rst);
+                asg.clear_asserted_literals(cdb)?;
+                state.progress(asg, cdb);
+                asg.handle(SolverEvent::Stage(scale));
+                state.restart.set_stage_parameters(scale);
+                current_stage = next_stage;
+            } else if state.restart.restart(
+                cdb.refer(cdb::property::TEma::LBD),
+                cdb.refer(cdb::property::TEma::Entanglement),
+            ) {
+                RESTART!(asg, cdb, state);
             }
             if let Some(na) = asg.best_assigned() {
                 state.flush("");
                 state.flush(format!("unreachable core: {}", na));
             }
-            #[cfg(feature = "strategy_adaptation")]
-            if asg.num_conflict % (10 * state.reflection_interval) == 0 {
-                adapt_modules(asg, cdb, rst, state);
-            }
         }
     }
     state.log(
-        asg.num_conflict,
+        None,
         format!(
             "search process finished at level {}:: {} = {} - {} - {}",
             asg.decision_level(),
@@ -374,6 +321,29 @@ fn search(
         ),
     );
     Ok(true)
+}
+
+/// display the current stats. before updating stabiliation parameters
+fn dump_stage(state: &mut State, asg: &AssignStack, current_stage: Option<bool>) {
+    let active = true; // state.rst.enable;
+    let cycle = state.stm.current_cycle();
+    let scale = state.stm.current_scale();
+    let stage = state.stm.current_stage();
+    let segment = state.stm.current_segment();
+    let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
+    let fuel = if active {
+        state.restart.penetration_energy_charged
+    } else {
+        f64::NAN
+    };
+    state.log(
+        match current_stage {
+            None => Some((None, None, stage)),
+            Some(false) => Some((None, Some(cycle), stage)),
+            Some(true) => Some((Some(segment), Some(cycle), stage)),
+        },
+        format!("scale: {:>4}, fuel:{:>9.2}, cpr:{:>8.2}", scale, fuel, cpr),
+    );
 }
 
 #[cfg(feature = "boundary_check")]
@@ -449,28 +419,6 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
         );
         panic!();
     }
-}
-
-#[cfg(feature = "strategy_adaptation")]
-fn adapt_modules(
-    asg: &mut AssignStack,
-    cdb: &mut ClauseDB,
-    rst: &mut Restarter,
-    state: &mut State,
-) {
-    let asg_num_conflict = asg.num_conflict;
-    if 10 * state.reflection_interval == asg_num_conflict {
-        // Need to call it before `cdb.adapt_to`
-        // 'decision_level == 0' is required by `cdb.adapt_to`.
-        RESTART!(asg, rst);
-        state.select_strategy(asg, cdb);
-    }
-    #[cfg(feature = "boundary_check")]
-    debug_assert!(state.strategy.1 != asg_num_conflict || 0 == asg.decision_level());
-
-    asg.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
-    cdb.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
-    rst.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
 }
 
 #[cfg(feature = "support_user_assumption")]

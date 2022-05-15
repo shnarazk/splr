@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.14.0"
+version = "0.15.0"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2021"
@@ -25,7 +25,6 @@ default = [
         "dynamic_restart_threshold",
         # "incremental_solver",
         "LRB_rewarding",
-        "Luby_stabilization",
         # "maintain_watch_cache", # DEBUG
         "reason_side_rewarding",
         "rephase",
@@ -33,6 +32,7 @@ default = [
         "trail_saving",
         "unsafe_access"
         ]
+assign_rate = []
 best_phases_tracking = []
 bi_clause_completion = []
 boundary_check = []
@@ -47,13 +47,10 @@ EVSIDS = []
 incremental_solver = []
 just_used = []
 LRB_rewarding = []
-Luby_restart = []
-Luby_stabilization = []
 maintain_watch_cache = []
 no_IO = []
 reason_side_rewarding = []
 rephase = ["best_phases_tracking"]
-strategy_adaptation = []
 support_user_assumption = []
 suppress_reason_chain = []
 trace_analysis = []
@@ -67,3 +64,4 @@ lto = "fat"
 codegen-units = 1
 opt-level = 3
 panic = "abort"
+strip = true

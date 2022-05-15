@@ -5,25 +5,22 @@
 //!# Example
 //!
 //!```
-//!  use splr::{processor::{self, EliminateIF}, solver::Solver, types::PropertyDereference};
+//!  use splr::{processor::{self, Eliminator, EliminateIF}, solver::Solver, types::{Instantiate, PropertyDereference}};
 //!  let mut s = Solver::try_from("cnfs/sample.cnf").expect("failed to load");
 //!  let Solver {
 //!      ref mut asg,
 //!      ref mut cdb,
-//!      ref mut elim,
-//!      ref mut rst,
 //!      ref mut state,
 //!      ..
 //!  } = s;
-//!  elim.activate();
-//!  elim.simplify(asg, cdb, rst, state).expect("panic");
-//!  assert_eq!(elim.derefer(processor::property::Tusize::NumFullElimination), 1);
+//!  let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+//!  elim.simplify(asg, cdb, state, false).expect("panic");
 //!  assert!(0 < asg.num_eliminated_vars);
 //!```
 
 mod eliminate;
-mod eliminator;
 mod heap;
+mod simplify;
 mod subsume;
 
 use {
@@ -31,7 +28,6 @@ use {
         assign::AssignIF,
         cdb::ClauseDBIF,
         processor::heap::{LitOccurs, VarOccHeap},
-        solver::restart::RestartIF,
         state::State,
         types::*,
     },
@@ -45,16 +41,11 @@ use {
 /// use crate::splr::solver::Solver;
 
 /// let mut s = Solver::instantiate(&Config::default(), &CNFDescription::default());
-/// let elim = &mut s.elim;
+/// let mut elim = Eliminator::instantiate(&s.state.config, &s.state.cnf);
 /// assert_eq!(elim.is_running(), false);
-/// elim.activate();
-/// // At this point, the `elim` is in `ready` mode, not `running`.
-/// assert_eq!(elim.is_running(), false);
-/// assert_eq!(elim.simplify(&mut s.asg, &mut s.cdb, &mut s.rst, &mut s.state), Ok(()));
+/// assert_eq!(elim.simplify(&mut s.asg, &mut s.cdb, &mut s.state, false), Ok(()));
 ///```
 pub trait EliminateIF: Instantiate {
-    /// set eliminator's mode to **ready**.
-    fn activate(&mut self);
     /// check if the eliminator is running.
     fn is_running(&self) -> bool;
     /// rebuild occur lists.
@@ -64,6 +55,7 @@ pub trait EliminateIF: Instantiate {
     /// simplify database by:
     /// * removing satisfiable clauses
     /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.
+    /// Note: `force_run` is used only at the beginning of `solve' for simple satisfiability check
     ///
     /// # Errors
     ///
@@ -72,21 +64,20 @@ pub trait EliminateIF: Instantiate {
         &mut self,
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
-        rst: &mut impl RestartIF,
         state: &mut State,
+        force_run: bool,
     ) -> MaybeInconsistent;
     /// return the order of vars based on their occurrences
     fn sorted_iterator(&self) -> Iter<'_, u32>;
     /// return vi's stats
     fn stats(&self, vi: VarId) -> Option<(usize, usize)>;
     /// return the constraints on eliminated literals.
-    fn eliminated_lits(&self) -> &[Lit];
+    fn eliminated_lits(&mut self) -> &mut Vec<Lit>;
 }
 
 #[derive(Copy, Clone, Eq, Debug, PartialEq)]
 enum EliminatorMode {
     Dormant,
-    Waiting,
     Running,
 }
 
@@ -102,10 +93,6 @@ pub struct Eliminator {
     elim_lits: Vec<Lit>,
     /// Maximum number of clauses to try to eliminate a var
     eliminate_var_occurrence_limit: usize,
-    /// 0 for no limit
-    /// Stop elimination if a generated resolvent is larger than this
-    /// 0 means no limit.
-    eliminate_combination_limit: f64,
     /// Stop elimination if the increase of clauses is over this
     eliminate_grow_limit: usize,
     /// A criteria by the product's of its positive occurrences and negative ones
@@ -114,31 +101,7 @@ pub struct Eliminator {
     subsume_literal_limit: usize,
     /// var
     var: Vec<LitOccurs>,
-    num_full_elimination: usize,
-    num_subsumed: usize,
-}
-
-pub mod property {
-    use super::Eliminator;
-    use crate::types::*;
-
-    #[derive(Clone, Copy, Debug, PartialEq)]
-    pub enum Tusize {
-        NumFullElimination,
-        NumSubsumedClause,
-    }
-
-    pub const USIZES: [Tusize; 2] = [Tusize::NumFullElimination, Tusize::NumSubsumedClause];
-
-    impl PropertyDereference<Tusize, usize> for Eliminator {
-        #[inline]
-        fn derefer(&self, k: Tusize) -> usize {
-            match k {
-                Tusize::NumFullElimination => self.num_full_elimination,
-                Tusize::NumSubsumedClause => self.num_subsumed,
-            }
-        }
-    }
+    pub num_subsumed: usize,
 }
 
 #[cfg(not(feature = "no_IO"))]
@@ -155,15 +118,12 @@ mod tests {
         let Solver {
             ref mut asg,
             ref mut cdb,
-            ref mut elim,
-            ref mut rst,
             ref mut state,
             ..
         } = s;
+        let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
         assert!(elim.enable);
-        elim.activate();
-        elim.simplify(asg, cdb, rst, state).expect("");
-        assert_eq!(elim.num_full_elimination, 1);
+        elim.simplify(asg, cdb, state, false).expect("");
         assert!(!asg.var_iter().skip(1).all(|v| v.is(FlagVar::ELIMINATED)));
         assert!(0 < asg.num_eliminated_vars);
         assert_eq!(

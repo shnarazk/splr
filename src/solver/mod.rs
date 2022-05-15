@@ -7,17 +7,20 @@ mod conflict;
 pub mod restart;
 /// CDCL search engine
 mod search;
+/// Stage manger (was Stabilizer)
+mod stage;
 /// Crate `validate` implements a model checker.
 mod validate;
 
 pub use self::{
     build::SatSolverIF,
-    restart::{property::*, RestartIF, RestartMode, Restarter},
+    restart::{RestartIF, RestartManager},
     search::SolveIF,
+    stage::StageManager,
     validate::ValidateIF,
 };
 
-use crate::{assign::AssignStack, cdb::ClauseDB, processor::Eliminator, state::*, types::*};
+use crate::{assign::AssignStack, cdb::ClauseDB, state::*, types::*};
 
 /// Normal results returned by Solver.
 #[derive(Debug, PartialEq)]
@@ -36,14 +39,8 @@ pub enum Certificate {
 pub type SolverResult = Result<Certificate, SolverError>;
 
 /// define sub-modules' responsibilities
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SolverEvent {
-    #[cfg(feature = "strategy_adaptation")]
-    /// set up internal parameters.
-    /// # CAVEAT
-    /// some implementation might have a special premise to call: decision_level == 0.
-    Adapt((SearchStrategy, usize), usize),
-
     /// asserting a var.
     Assert(VarId),
     /// conflict by unit propagation.
@@ -58,8 +55,8 @@ pub enum SolverEvent {
     Reinitialize,
     /// restart
     Restart,
-    /// start a new stage of Luby stabilization.
-    Stabilize(usize),
+    /// start a new stage of Luby stabilization. It holds new scale.
+    Stage(usize),
 
     #[cfg(feature = "clause_vivification")]
     /// Vivification: `true` for start, `false` for end.
@@ -83,16 +80,12 @@ pub enum SolverEvent {
 /// }
 /// assert_eq!(Solver::try_from("cnfs/unsat.cnf").expect("can't load").solve(), Ok(Certificate::UNSAT));
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Solver {
     /// assignment management
     pub asg: AssignStack,
     /// clause container
     pub cdb: ClauseDB,
-    /// clause and variable elimination
-    pub elim: Eliminator,
-    /// restart management
-    pub rst: Restarter,
     /// misc data holder
     pub state: State,
 }

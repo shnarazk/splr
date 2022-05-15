@@ -3,7 +3,6 @@ use {
     splr::{
         assign, cdb,
         config::{self, CERTIFICATION_DEFAULT_FILENAME},
-        processor,
         solver::*,
         state::{self, LogF64Id, LogUsizeId},
         Config, EmaIF, PropertyDereference, PropertyReference, SolverError, VERSION,
@@ -249,87 +248,64 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c  #conflict:{}, #decision:{}, #propagate:{},\n",
-            format!("{:>11}", state[LogUsizeId::NumConflict]),
-            format!("{:>13}", state[LogUsizeId::NumDecision]),
-            format!("{:>15}", state[LogUsizeId::NumPropagate]),
+            "c  #conflict:{:>11}, #decision:{:>13}, #propagate:{:>15},\n",
+            state[LogUsizeId::NumConflict],
+            state[LogUsizeId::NumDecision],
+            state[LogUsizeId::NumPropagate],
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c   Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{},\n",
-            format!("{:>9}", state[LogUsizeId::RemainingVar]),
-            format!("{:>9}", state[LogUsizeId::AssertedVar]),
-            format!("{:>9}", state[LogUsizeId::EliminatedVar]),
-            format!("{:>9.4}", state[LogF64Id::Progress]),
+            "c   Assignment|#rem:{:>9}, #fix:{:>9}, #elm:{:>9}, prg%:{:>9.4},\n",
+            state[LogUsizeId::RemainingVar],
+            state[LogUsizeId::AssertedVar],
+            state[LogUsizeId::EliminatedVar],
+            state[LogF64Id::Progress],
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c       Clause|Remv:{}, LBD2:{}, BinC:{}, Perm:{},\n",
-            format!("{:>9}", state[LogUsizeId::RemovableClause]),
-            format!("{:>9}", state[LogUsizeId::LBD2Clause]),
-            format!("{:>9}", state[LogUsizeId::BiClause]),
-            format!("{:>9}", state[LogUsizeId::PermanentClause]),
+            "c       Clause|Remv:{:>9}, LBD2:{:>9}, BinC:{:>9}, Perm:{:>9},\n",
+            state[LogUsizeId::RemovableClause],
+            state[LogUsizeId::LBD2Clause],
+            state[LogUsizeId::BiClause],
+            state[LogUsizeId::PermanentClause],
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c      Restart|#BLK:{}, #RST:{}, *scl:{}, sclM:{},\n",
-            format!("{:>9}", state[LogUsizeId::RestartBlock]),
-            format!("{:>9}", state[LogUsizeId::Restart]),
-            format!("{:>9}", state[LogUsizeId::RestartIntervalScale]),
-            format!("{:>9}", state[LogUsizeId::RestartIntervalScaleMax]),
+            "c     Conflict|entg:{:>9.4}, cLvl:{:>9.4}, bLvl:{:>9.4}, /cpr:{:>9.2},\n",
+            state[LogF64Id::LiteralBlockEntanglement],
+            state[LogF64Id::CLevel],
+            state[LogF64Id::BLevel],
+            state[LogF64Id::ConflictPerRestart],
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c          LBD|avrg:{}, trnd:{}, depG:{}, /dpc:{},\n",
-            format!("{:>9.4}", state[LogF64Id::EmaLBD]),
-            format!("{:>9.4}", state[LogF64Id::TrendLBD]),
-            format!("{:>9.4}", state[LogF64Id::DpAverageLBD]),
-            format!("{:>9.2}", state[LogF64Id::DecisionPerConflict]),
+            "c      Learing|avrg:{:>9.4}, trnd:{:>9.4}, #RST:{:>9}, /dpc:{:>9.2},\n",
+            state[LogF64Id::EmaLBD],
+            state[LogF64Id::TrendLBD],
+            state[LogUsizeId::Restart],
+            state[LogF64Id::DecisionPerConflict],
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c     Conflict|tASG:{}, cLvl:{}, bLvl:{}, /ppc:{},\n",
-            format!("{:>9.4}", state[LogF64Id::TrendASG]),
-            format!("{:>9.2}", state[LogF64Id::CLevel]),
-            format!("{:>9.2}", state[LogF64Id::BLevel]),
-            format!("{:>9.2}", state[LogF64Id::PropagationPerConflict]),
+            "c         misc|vivC:{:>9}, subC:{:>9}, core:{:>9}, /ppc:{:>9.2},\n",
+            state[LogUsizeId::VivifiedClause],
+            state[LogUsizeId::SubsumedClause],
+            state[LogUsizeId::UnreachableCore],
+            state[LogF64Id::PropagationPerConflict],
         )
         .as_bytes(),
     )?;
-    out.write_all(
-        format!(
-            "c         misc|vivC:{}, subC:{}, core:{}, /cpr:{},\n",
-            format!("{:>9}", state[LogUsizeId::Simplify]),
-            format!("{:>9}", state[LogUsizeId::SubsumedClause]),
-            format!("{:>9}", state[LogUsizeId::UnreachableCore]),
-            format!("{:>9.2}", state[LogF64Id::ConflictPerRestart]),
-        )
-        .as_bytes(),
-    )?;
-    #[cfg(not(feature = "strategy_adaptation"))]
-    {
-        out.write_all(format!("c     Strategy|mode:  generic, time:{:9.2},\n", tm).as_bytes())?;
-    }
-    #[cfg(feature = "strategy_adaptation")]
-    {
-        out.write_all(
-            format!(
-                "c     Strategy|mode:{:>15}, time:{:9.2},\n",
-                state.strategy.0, tm,
-            )
-            .as_bytes(),
-        )?;
-    }
+    out.write_all(format!("c     Strategy|mode:  generic, time:{:9.2},\n", tm).as_bytes())?;
     out.write_all("c \n".as_bytes())?;
     for key in &config::property::F64S {
         out.write_all(
@@ -377,26 +353,6 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
                 "c   clause::{:<27}{:>19.3}\n",
                 format!("{:?}", key),
                 s.cdb.derefer(*key),
-            )
-            .as_bytes(),
-        )?;
-    }
-    for key in &processor::property::USIZES {
-        out.write_all(
-            format!(
-                "c   processor::{:<24}{:>15}\n",
-                format!("{:?}", key),
-                s.elim.derefer(*key),
-            )
-            .as_bytes(),
-        )?;
-    }
-    for key in &restart::property::USIZES {
-        out.write_all(
-            format!(
-                "c   restart::{:<26}{:>15}\n",
-                format!("{:?}", key),
-                s.rst.derefer(*key),
             )
             .as_bytes(),
         )?;

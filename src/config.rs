@@ -15,9 +15,6 @@ pub struct Config {
     /// Soft limit of #clauses (6MC/GB)
     pub c_cls_lim: usize,
 
-    /// #cls to start in-processor
-    pub c_ip_int: usize,
-
     /// CPU time limit in sec.
     pub c_timeout: f64,
 
@@ -72,30 +69,6 @@ pub struct Config {
     pub elm_var_occ: usize,
 
     //
-    //## restarter
-    //
-    /// #conflicts between restarts
-    pub rst_step: usize,
-
-    /// Length of assign. fast EMA
-    pub rst_asg_len: usize,
-
-    /// Length of assign. slow EMA
-    pub rst_asg_slw: usize,
-
-    /// Blocking restart threshold. Originally this was the Glucose's R.
-    pub rst_asg_thr: f64,
-
-    /// Length of LBD fast EMA
-    pub rst_lbd_len: usize,
-
-    /// Length of LBD slow EMA
-    pub rst_lbd_slw: usize,
-
-    /// Forcing restart threshold
-    pub rst_lbd_thr: f64,
-
-    //
     //## vivifier
     //
 
@@ -113,7 +86,6 @@ impl Default for Config {
         Config {
             c_cbt_thr: 100,
             c_cls_lim: 0,
-            c_ip_int: 10000,
             c_timeout: 5000.0,
 
             splr_interface: false,
@@ -132,14 +104,6 @@ impl Default for Config {
             elm_cls_lim: 64,
             elm_grw_lim: 0,
             elm_var_occ: 20000,
-
-            rst_step: 2,
-            rst_asg_len: 16,
-            rst_asg_slw: 8192,
-            rst_asg_thr: 0.6,
-            rst_lbd_len: 8,
-            rst_lbd_slw: 8192,
-            rst_lbd_thr: 1.6,
 
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_rat: 0.98,
@@ -170,11 +134,8 @@ impl Config {
                 let flags = [
                     "no-color", "quiet", "certify", "journal", "log", "help", "version",
                 ];
-                let options_u32 = ["cbt"];
-                let options_usize = [
-                    "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
-                ];
-                let options_f64 = ["timeout", "cdr", "rat", "rlt", "vdr", "vds"];
+                let options_usize = ["cl", "stat", "ecl", "evl", "evo"];
+                let options_f64 = ["timeout", "cdr", "vdr", "vds"];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
                 match seg.len() {
@@ -191,33 +152,14 @@ impl Config {
                                 "version" => version = true,
                                 _ => panic!("invalid flag: {}", name),
                             }
-                        } else if options_u32.contains(&name) {
-                            if let Some(str) = iter.next() {
-                                if let Ok(val) = str.parse::<u32>() {
-                                    match name {
-                                        "cbt" => self.c_cbt_thr = val,
-                                        _ => panic!("invalid option: {}", name),
-                                    }
-                                } else {
-                                    panic!("invalid value {}", name);
-                                }
-                            } else {
-                                panic!("no argument for {}", name);
-                            }
                         } else if options_usize.contains(&name) {
                             if let Some(str) = iter.next() {
                                 if let Ok(val) = str.parse::<usize>() {
                                     match name {
                                         "cl" => self.c_cls_lim = val,
-                                        "ii" => self.c_ip_int = val,
                                         "ecl" => self.elm_cls_lim = val,
                                         "evl" => self.elm_grw_lim = val,
                                         "evo" => self.elm_var_occ = val,
-                                        "rs" => self.rst_step = val,
-                                        "ral" => self.rst_asg_len = val,
-                                        "ras" => self.rst_asg_slw = val,
-                                        "rll" => self.rst_lbd_len = val,
-                                        "rls" => self.rst_lbd_slw = val,
                                         _ => panic!("invalid option: {}", name),
                                     }
                                 } else {
@@ -232,8 +174,6 @@ impl Config {
                                     match name {
                                         "timeout" => self.c_timeout = val,
                                         "cdr" => self.crw_dcy_rat = val,
-                                        "rat" => self.rst_asg_thr = val,
-                                        "rlt" => self.rst_lbd_thr = val,
                                         "vdr" => self.vrw_dcy_rat = val,
                                         "vds" => self.vrw_dcy_stp = val,
 
@@ -308,11 +248,11 @@ impl Config {
                 #[cfg(feature = "chrono_BT")]
                 "chrono BT",
                 #[cfg(feature = "clause_elimination")]
-                "clause elimination",
+                "stage-based clause elimination",
                 #[cfg(feature = "clause_vivification")]
-                "clause vivification",
+                "stage-based clause vivification",
                 #[cfg(feature = "dynamic_restart_threshold")]
-                "dynamic restart threshold",
+                "stage-based dynamic restart threshold",
                 #[cfg(feature = "EMA_calibration")]
                 "EMA calibration",
                 #[cfg(feature = "EVSIDS")]
@@ -323,16 +263,10 @@ impl Config {
                 "use 'just used' flag",
                 #[cfg(feature = "LRB_rewarding")]
                 "Learning-Rate Based rewarding",
-                #[cfg(feature = "Luby_restart")]
-                "Luby restart",
-                #[cfg(feature = "Luby_stabilization")]
-                "Luby stabilization",
                 #[cfg(feature = "reason_side_rewarding")]
                 "reason-side rewarding",
                 #[cfg(feature = "rephase")]
-                "stage-based rephase",
-                #[cfg(feature = "strategy_adaptation")]
-                "strategy adaptation",
+                "stage-based re-phasing",
                 #[cfg(feature = "suppress_reason_chain")]
                 "suppress reason chain",
                 #[cfg(feature = "trail_saving")]
@@ -364,6 +298,15 @@ impl Config {
 }
 
 fn help_string() -> String {
+    macro_rules! OPTION {
+        ($feature: expr, $var: expr, $line: expr) => {
+            if cfg!(feature = $feature) {
+                format!($line, $var)
+            } else {
+                "".to_string()
+            }
+        };
+    }
     let config = Config::default();
     format!(
         "
@@ -374,14 +317,11 @@ FLAGS:
   -C, --no-color            Disable coloring
   -q, --quiet               Disable any progress message
   -c, --certify             Writes a DRAT UNSAT certification file
-  -j, --journal             Shows sub-module logs
+  -j, --journal             Shows log about restart stages
   -l, --log                 Uses Glucose-like progress report
   -V, --version             Prints version information
-OPTIONS (\x1B[000m\x1B[031mred\x1B[000m options depend on features in Cargo.toml):
-      \x1B[000m\x1B[031m--cbt <c-cbt-thr>     Dec. lvl to use chronoBT       {:>10}\x1B[000m
-      \x1B[000m\x1B[031m--cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}\x1B[000m
-      --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
-      --ii <c-ip-int>       #cls to start in-processor     {:>10}
+OPTIONS:
+{}      --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
   -t, --timeout <timeout>   CPU time limit in sec.         {:>10}
       --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
@@ -389,22 +329,16 @@ OPTIONS (\x1B[000m\x1B[031mred\x1B[000m options depend on features in Cargo.toml
   -o, --dir <io-outdir>     Output directory                {:>10}
   -p, --proof <io-pfile>    DRAT Cert. filename                 {:>10}
   -r, --result <io-rfile>   Result filename/stdout             {:>10}
-      --ral <rst-asg-len>   Length of assign. fast EMA     {:>10}
-      --ras <rst-asg-slw>   Length of assign. slow EMA     {:>10}
-      --rat <rst-asg-thr>   Blocking restart threshold        {:>10.2}
-      --rll <rst-lbd-len>   Length of LBD fast EMA         {:>10}
-      --rls <rst-lbd-slw>   Length of LBD slow EMA         {:>10}
-      --rlt <rst-lbd-thr>   Forcing restart threshold         {:>10.2}
-      --rs  <rst-step>      #conflicts between restarts    {:>10}
       --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
-      \x1B[000m\x1B[031m--vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}\x1B[000m
-ARGS:
+{}ARGS:
   <cnf-file>    DIMACS CNF file
 ",
-        config.c_cbt_thr,
-        config.crw_dcy_rat,
+        OPTION!(
+            "clause_rewarding",
+            config.crw_dcy_rat,
+            "       -cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}\n"
+        ),
         config.c_cls_lim,
-        config.c_ip_int,
         config.c_timeout,
         config.elm_cls_lim,
         config.elm_grw_lim,
@@ -412,15 +346,12 @@ ARGS:
         config.io_odir.to_string_lossy(),
         config.io_pfile.to_string_lossy(),
         config.io_rfile.to_string_lossy(),
-        config.rst_asg_len,
-        config.rst_asg_slw,
-        config.rst_asg_thr,
-        config.rst_lbd_len,
-        config.rst_lbd_slw,
-        config.rst_lbd_thr,
-        config.rst_step,
         config.vrw_dcy_rat,
-        config.vrw_dcy_stp,
+        OPTION!(
+            "EVSIDS",
+            config.vrw_dcy_stp,
+            "      --vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}\n"
+        ),
     )
 }
 
@@ -464,32 +395,22 @@ pub mod property {
 
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Tf64 {
-        ChronoBtThreshold,
+        #[cfg(feature = "clase_rewarding")]
         ClauseRewardDecayRate,
-        InprocessorInterval,
-        RestartAsgThreshold,
-        RestartLbdThreshold,
         VarRewardDecayRate,
     }
 
-    pub const F64S: [Tf64; 6] = [
-        Tf64::ChronoBtThreshold,
-        Tf64::ClauseRewardDecayRate,
-        Tf64::InprocessorInterval,
-        Tf64::RestartAsgThreshold,
-        Tf64::RestartLbdThreshold,
-        Tf64::VarRewardDecayRate,
-    ];
+    #[cfg(not(feature = "clase_rewarding"))]
+    pub const F64S: [Tf64; 1] = [Tf64::VarRewardDecayRate];
+    #[cfg(feature = "clase_rewarding")]
+    pub const F64S: [Tf64; 2] = [Tf64::ClauseRewardDecayRate, Tf64::VarRewardDecayRate];
 
     impl PropertyDereference<Tf64, f64> for Config {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
-                Tf64::ChronoBtThreshold => self.c_cbt_thr as f64,
+                #[cfg(feature = "clase_rewarding")]
                 Tf64::ClauseRewardDecayRate => self.crw_dcy_rat,
-                Tf64::InprocessorInterval => self.c_ip_int as f64,
-                Tf64::RestartAsgThreshold => self.rst_asg_thr,
-                Tf64::RestartLbdThreshold => self.rst_lbd_thr,
                 Tf64::VarRewardDecayRate => self.vrw_dcy_rat,
             }
         }

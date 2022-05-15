@@ -14,21 +14,11 @@ pub trait VarOrderIF {
 }
 
 /// Mapping from Literal to Clauses.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct LitOccurs {
     pub aborted: bool,
     pub pos_occurs: Vec<ClauseId>,
     pub neg_occurs: Vec<ClauseId>,
-}
-
-impl Default for LitOccurs {
-    fn default() -> LitOccurs {
-        LitOccurs {
-            aborted: false,
-            pos_occurs: Vec::new(),
-            neg_occurs: Vec::new(),
-        }
-    }
 }
 
 impl LitOccurs {

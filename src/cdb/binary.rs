@@ -1,6 +1,6 @@
 use {
     super::ClauseId,
-    crate::{solver::SolverEvent, types::*},
+    crate::types::*,
     std::{
         collections::HashMap,
         ops::{Index, IndexMut},
@@ -36,19 +36,10 @@ impl IndexMut<Lit> for Vec<BinaryLinkList> {
 }
 
 /// storage with mapper to `ClauseId` of binary links
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct BinaryLinkDB {
     hash: HashMap<(Lit, Lit), ClauseId>,
     list: Vec<BinaryLinkList>,
-}
-
-impl Default for BinaryLinkDB {
-    fn default() -> Self {
-        BinaryLinkDB {
-            hash: HashMap::new(),
-            list: Vec::new(),
-        }
-    }
 }
 
 impl Instantiate for BinaryLinkDB {

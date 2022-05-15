@@ -279,6 +279,14 @@ impl PropagateIF for AssignStack {
         if lv == self.root_level {
             self.num_restart += 1;
             self.cpr_ema.update(self.num_conflict);
+        } else {
+            #[cfg(feature = "assign_rate")]
+            self.assign_rate.update(
+                self.num_vars
+                    - self.num_asserted_vars
+                    - self.num_eliminated_vars
+                    - self.trail.len(),
+            );
         }
 
         debug_assert!(self.q_head == 0 || self.assign[self.trail[self.q_head - 1].vi()].is_some());
@@ -352,7 +360,7 @@ impl PropagateIF for AssignStack {
         #[cfg(feature = "trail_saving")]
         macro_rules! from_saved_trail {
             () => {
-                if let cc @ Err(_) = self.from_saved_trail(cdb) {
+                if let cc @ Err(_) = self.reuse_saved_trail(cdb) {
                     self.num_propagation += 1;
                     self.num_conflict += 1;
                     self.num_reconflict += 1;
@@ -671,7 +679,7 @@ impl PropagateIF for AssignStack {
                             let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
-                            cdb[cid].search_from = (k + 1) as u16;
+                            cdb[cid].search_from = (k as u16).saturating_add(1);
                             debug_assert!(
                                 self.assigned(!new_watch) == Some(true)
                                     || self.assigned(!new_watch) == None
@@ -723,7 +731,7 @@ impl PropagateIF for AssignStack {
         Ok(())
     }
     fn clear_asserted_literals(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
-        assert_eq!(self.decision_level(), self.root_level);
+        debug_assert_eq!(self.decision_level(), self.root_level);
         loop {
             if self.remains() {
                 self.propagate_sandbox(cdb)

@@ -7,8 +7,7 @@ use {
     crate::{
         assign::{self, AssignIF},
         cdb::{self, ClauseDBIF},
-        solver::{restart, restart::RestartIF, SolverEvent},
-        state::{State, StateIF},
+        state::{self, State, StateIF},
         types::*,
     },
     std::{
@@ -30,12 +29,10 @@ impl Default for Eliminator {
             bwdsub_assigns: 0,
             elim_lits: Vec::new(),
             eliminate_var_occurrence_limit: 1_000,
-            eliminate_combination_limit: 2.0,
             eliminate_grow_limit: 0, // 64
             eliminate_occurrence_limit: 800,
             subsume_literal_limit: 100,
             var: Vec::new(),
-            num_full_elimination: 0,
             num_subsumed: 0,
         }
     }
@@ -221,20 +218,12 @@ impl Instantiate for Eliminator {
 }
 
 impl EliminateIF for Eliminator {
-    fn activate(&mut self) {
-        if self.enable {
-            debug_assert!(self.mode != EliminatorMode::Running);
-            self.mode = EliminatorMode::Waiting;
-        }
-    }
     fn is_running(&self) -> bool {
         self.enable && self.mode == EliminatorMode::Running
     }
     fn prepare(&mut self, asg: &mut impl AssignIF, cdb: &mut impl ClauseDBIF, force: bool) {
         debug_assert!(self.enable);
-        if self.mode != EliminatorMode::Waiting {
-            return;
-        }
+        debug_assert_eq!(self.mode, EliminatorMode::Dormant);
         self.mode = EliminatorMode::Running;
         for w in &mut self[1..] {
             w.clear();
@@ -255,6 +244,7 @@ impl EliminateIF for Eliminator {
                 self.enqueue_var(asg, vi, true);
             }
         }
+        debug_assert_eq!(self.mode, EliminatorMode::Running);
     }
     fn enqueue_var(&mut self, asg: &mut impl AssignIF, vi: VarId, upward: bool) {
         if self.mode != EliminatorMode::Running {
@@ -270,8 +260,8 @@ impl EliminateIF for Eliminator {
         &mut self,
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
-        rst: &mut impl RestartIF,
         state: &mut State,
+        force_run: bool,
     ) -> MaybeInconsistent {
         debug_assert_eq!(asg.decision_level(), 0);
         // we can reset all the reasons because decision level is zero.
@@ -288,19 +278,17 @@ impl EliminateIF for Eliminator {
             }
         }
         if self.enable {
-            self.eliminate_grow_limit = rst.derefer(restart::property::Tusize::IntervalScale) / 2;
-            self.subsume_literal_limit = (state.config.elm_cls_lim
-                + cdb.derefer(cdb::property::Tf64::DpAverageLBD) as usize)
-                / 2;
-            if self.is_waiting() {
+            if !force_run && self.mode == EliminatorMode::Dormant {
                 self.prepare(asg, cdb, true);
             }
-            debug_assert!(!cdb.derefer(cdb::property::Tf64::DpAverageLBD).is_nan());
-            self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::DpAverageLBD);
-            self.eliminate(asg, cdb, rst, state)?;
-            if self.is_running() {
-                self.stop(asg, cdb);
-            }
+            self.eliminate_grow_limit = state.derefer(state::property::Tusize::IntervalScale) / 2;
+            self.subsume_literal_limit = state.config.elm_cls_lim
+                + cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement) as usize;
+            debug_assert!(!cdb
+                .derefer(cdb::property::Tf64::LiteralBlockEntanglement)
+                .is_nan());
+            // self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
+            self.eliminate(asg, cdb, state)?;
         } else {
             asg.propagate_sandbox(cdb)
                 .map_err(SolverError::RootLevelConflict)?;
@@ -308,6 +296,11 @@ impl EliminateIF for Eliminator {
         if self.mode != EliminatorMode::Dormant {
             self.stop(asg, cdb);
         }
+        for occur in self.var.iter_mut() {
+            occur.clear();
+        }
+        self.var_queue.clear(asg);
+        debug_assert!(self.clause_queue.is_empty());
         cdb.check_size().map(|_| ())
     }
     fn sorted_iterator(&self) -> Iter<'_, u32> {
@@ -321,8 +314,8 @@ impl EliminateIF for Eliminator {
             Some((w.pos_occurs.len(), w.neg_occurs.len()))
         }
     }
-    fn eliminated_lits(&self) -> &[Lit] {
-        &self.elim_lits
+    fn eliminated_lits(&mut self) -> &mut Vec<Lit> {
+        &mut self.elim_lits
     }
 }
 
@@ -398,10 +391,6 @@ impl Eliminator {
                 self.enqueue_var(asg, l.vi(), true);
             }
         }
-    }
-    /// check if the eliminator is active and waits for next `eliminate`.
-    fn is_waiting(&self) -> bool {
-        self.mode == EliminatorMode::Waiting
     }
     /// set eliminator's mode to **dormant**.
     // Due to a potential bug of killing clauses and difficulty about
@@ -522,13 +511,12 @@ impl Eliminator {
         &mut self,
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
-        rst: &mut impl RestartIF,
         state: &mut State,
     ) -> MaybeInconsistent {
         let start = state.elapsed().unwrap_or(0.0);
         loop {
             let na = asg.stack_len();
-            self.eliminate_main(asg, cdb, rst, state)?;
+            self.eliminate_main(asg, cdb, state)?;
             asg.propagate_sandbox(cdb)
                 .map_err(SolverError::RootLevelConflict)?;
             if na == asg.stack_len()
@@ -543,7 +531,6 @@ impl Eliminator {
                 break;
             }
         }
-        self.num_full_elimination += 1;
         Ok(())
     }
     /// do the elimination task
@@ -551,7 +538,6 @@ impl Eliminator {
         &mut self,
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
-        rst: &mut impl RestartIF,
         state: &mut State,
     ) -> MaybeInconsistent {
         debug_assert!(asg.decision_level() == 0);
@@ -574,7 +560,7 @@ impl Eliminator {
                 let v = asg.var_mut(vi);
                 v.turn_off(FlagVar::ENQUEUED);
                 if !v.is(FlagVar::ELIMINATED) && asg.assign(vi).is_none() {
-                    eliminate_var(asg, cdb, self, rst, state, vi, &mut timedout)?;
+                    eliminate_var(asg, cdb, self, state, vi, &mut timedout)?;
                 }
             }
             self.backward_subsumption_check(asg, cdb, &mut timedout)?;

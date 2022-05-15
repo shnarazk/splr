@@ -1,44 +1,30 @@
 //! Vivification
 #![allow(dead_code)]
-#![cfg(feature = "clause_vivification")]
 use crate::{
     assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
     cdb::{ClauseDB, ClauseDBIF, ClauseIF},
-    solver::{restart, Restarter},
     state::{Stat, State, StateIF},
     types::*,
 };
 
+const VIVIFY_LIMIT: usize = 80_000;
+
 pub trait VivifyIF {
-    fn vivify(
-        &mut self,
-        asg: &mut AssignStack,
-        rst: &mut Restarter,
-        state: &mut State,
-    ) -> MaybeInconsistent;
+    fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent;
 }
 
 impl VivifyIF for ClauseDB {
     /// vivify clauses under `asg`
-    fn vivify(
-        &mut self,
-        asg: &mut AssignStack,
-        rst: &mut Restarter,
-        state: &mut State,
-    ) -> MaybeInconsistent {
-        const NUM_TARGETS: Option<usize> = Some(80_000);
+    fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent {
+        const NUM_TARGETS: Option<usize> = Some(VIVIFY_LIMIT);
         if asg.remains() {
             asg.propagate_sandbox(self).map_err(|cc| {
-                state.log(asg.num_conflict, "By vivifier");
+                state.log(None, "By vivifier");
                 SolverError::RootLevelConflict(cc)
             })?;
         }
-        let mut clauses: Vec<OrderedProxy<ClauseId>> = select_targets(
-            asg,
-            self,
-            rst.derefer(restart::property::Tusize::NumRestart) == 0,
-            NUM_TARGETS,
-        );
+        let mut clauses: Vec<OrderedProxy<ClauseId>> =
+            select_targets(asg, self, state[Stat::Restart] == 0, NUM_TARGETS);
         if clauses.is_empty() {
             return Ok(());
         }
@@ -81,7 +67,7 @@ impl VivifyIF for ClauseDB {
             num_check += 1;
             debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
             let mut decisions: Vec<Lit> = Vec::new();
-            for lit in clits.iter().map(|p| *p) {
+            for lit in clits.iter().copied() {
                 // assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
                 match asg.assigned(!lit) {
                     //## Rule 1
@@ -137,7 +123,7 @@ impl VivifyIF for ClauseDB {
                                     state.flush("");
                                     state[Stat::VivifiedClause] += num_shrink;
                                     state[Stat::VivifiedVar] += num_assert;
-                                    state.log(asg.num_conflict, "RootLevelConflict By vivify");
+                                    state.log(None, "RootLevelConflict By vivify");
                                     return Err(SolverError::EmptyClause);
                                 }
                                 1 => {
@@ -164,6 +150,9 @@ impl VivifyIF for ClauseDB {
                     }
                 }
             }
+            if VIVIFY_LIMIT < num_check {
+                break;
+            }
         }
         asg.backtrack_sandbox();
         if asg.remains() {
@@ -177,16 +166,16 @@ impl VivifyIF for ClauseDB {
             "vivified(assert:{} shorten:{}), ",
             num_assert, num_shrink
         ));
-        state.log(
-            asg.num_conflict,
-            format!(
-                "vivify:{:5}, pick:{:>8}, assert:{:>8}, shorten:{:>8}",
-                state[Stat::Vivification],
-                num_check,
-                num_assert,
-                num_shrink,
-            ),
-        );
+        // state.log(
+        //     asg.num_conflict,
+        //     format!(
+        //         "vivify:{:5}, pick:{:>8}, assert:{:>8}, shorten:{:>8}",
+        //         state[Stat::Vivification],
+        //         num_check,
+        //         num_assert,
+        //         num_shrink,
+        //     ),
+        // );
         state[Stat::VivifiedClause] += num_shrink;
         state[Stat::VivifiedVar] += num_assert;
         Ok(())

@@ -30,6 +30,14 @@ impl ActivityIF<VarId> for AssignStack {
     }
 }
 
+impl AssignStack {
+    pub fn rescale_activity(&mut self, scaling: f64) {
+        for v in self.var.iter_mut().skip(1) {
+            v.reward *= scaling;
+        }
+    }
+}
+
 impl Var {
     fn update_activity(&mut self, decay: f64, reward: f64) -> f64 {
         // Note: why the condition can be broken.

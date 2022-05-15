@@ -1,5 +1,8 @@
 /// Crate `assign` implements Boolean Constraint Propagation and decision var selection.
 /// This version can handle Chronological and Non Chronological Backtrack.
+/// Ema
+mod ema;
+/// Heap
 mod heap;
 /// Boolean constraint propagation
 mod propagate;
@@ -23,8 +26,11 @@ pub use self::{
 #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
 use std::collections::HashMap;
 use {
-    self::heap::{VarHeapIF, VarIdHeap},
-    super::{cdb::ClauseDBIF, types::*},
+    self::{
+        ema::ProgressASG,
+        heap::{VarHeapIF, VarIdHeap},
+    },
+    crate::{cdb::ClauseDBIF, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
 
@@ -35,7 +41,7 @@ pub trait AssignIF:
     + PropagateIF
     + VarManipulateIF
     + PropertyDereference<property::Tusize, usize>
-    + PropertyReference<property::TEma, Ema>
+    + PropertyReference<property::TEma, EmaView>
 {
     /// return root level.
     fn root_level(&self) -> DecisionLevel;
@@ -67,7 +73,7 @@ pub trait AssignIF:
     fn level_ref(&self) -> &[DecisionLevel];
     fn best_assigned(&mut self) -> Option<usize>;
     /// inject assignments for eliminated vars.
-    fn extend_model(&mut self, c: &mut impl ClauseDBIF, lits: &[Lit]) -> Vec<Option<bool>>;
+    fn extend_model(&mut self, c: &mut impl ClauseDBIF) -> Vec<Option<bool>>;
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
     /// dump the status as a CNF
@@ -154,6 +160,15 @@ pub struct AssignStack {
     phase_age: usize,
 
     //
+    //## Stage
+    //
+    pub stage_scale: usize,
+
+    //## Elimanated vars
+    //
+    pub eliminated: Vec<Lit>,
+
+    //
     //## Statistics
     //
     /// the number of vars.
@@ -166,6 +181,8 @@ pub struct AssignStack {
     num_propagation: usize,
     pub num_conflict: usize,
     num_restart: usize,
+    /// Assign rate EMA
+    assign_rate: ProgressASG,
     /// Decisions Per Conflict
     dpc_ema: EmaSU,
     /// Propagations Per Conflict
@@ -187,16 +204,12 @@ pub struct AssignStack {
     /// var activity decay
     activity_decay: f64,
     /// the default value of var activity decay in configuration
+    #[cfg(feature = "EVSIDS")]
     activity_decay_default: f64,
     /// its diff
     activity_anti_decay: f64,
-    /// ONLY used in feature EVSIDS
+    #[cfg(feature = "EVSIDS")]
     activity_decay_step: f64,
-
-    //
-    //## Vivification
-    //
-    during_vivification: bool,
 }
 
 #[cfg(feature = "boundary_check")]
@@ -339,6 +352,7 @@ pub mod property {
 
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum TEma {
+        AssignRate,
         DecisionPerConflict,
         PropagationPerConflict,
         ConflictPerRestart,
@@ -346,7 +360,8 @@ pub mod property {
         BestPhaseDivergenceRate,
     }
 
-    pub const EMAS: [TEma; 5] = [
+    pub const EMAS: [TEma; 6] = [
+        TEma::AssignRate,
         TEma::DecisionPerConflict,
         TEma::PropagationPerConflict,
         TEma::ConflictPerRestart,
@@ -354,15 +369,16 @@ pub mod property {
         TEma::BestPhaseDivergenceRate,
     ];
 
-    impl PropertyReference<TEma, Ema> for AssignStack {
+    impl PropertyReference<TEma, EmaView> for AssignStack {
         #[inline]
-        fn refer(&self, k: TEma) -> &Ema {
+        fn refer(&self, k: TEma) -> &EmaView {
             match k {
-                TEma::DecisionPerConflict => self.dpc_ema.get_ema(),
-                TEma::PropagationPerConflict => self.ppc_ema.get_ema(),
-                TEma::ConflictPerRestart => self.cpr_ema.get_ema(),
-                TEma::ConflictPerBaseRestart => self.cpr_ema.get_ema(),
-                TEma::BestPhaseDivergenceRate => &self.bp_divergence_ema,
+                TEma::AssignRate => self.assign_rate.as_view(),
+                TEma::DecisionPerConflict => self.dpc_ema.as_view(),
+                TEma::PropagationPerConflict => self.ppc_ema.as_view(),
+                TEma::ConflictPerRestart => self.cpr_ema.as_view(),
+                TEma::ConflictPerBaseRestart => self.cpr_ema.as_view(),
+                TEma::BestPhaseDivergenceRate => self.bp_divergence_ema.as_view(),
             }
         }
     }

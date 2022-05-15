@@ -190,7 +190,7 @@ impl VarManipulateIF for AssignStack {
                         self.assign[vi],
                     );
                 }
-                assert!(self.root_level < self.level[vi] || self.assign[vi].is_none());
+                debug_assert!(self.root_level < self.level[vi] || self.assign[vi].is_none());
             }
         } else {
             #[cfg(feature = "boundary_check")]
@@ -199,14 +199,10 @@ impl VarManipulateIF for AssignStack {
     }
 }
 
+#[cfg(feature = "best_phases_tracking")]
 impl AssignStack {
     /// check usability of the saved best phase.
     /// return `true` if the current best phase got invalid.
-    #[cfg(not(feature = "best_phases_tracking"))]
-    fn check_best_phase(&mut self, _: VarId) -> bool {
-        false
-    }
-    #[cfg(feature = "best_phases_tracking")]
     fn check_best_phase(&mut self, vi: VarId) -> bool {
         if let Some((b, _)) = self.best_phases.get(&vi) {
             debug_assert!(self.assign[vi].is_some());
