@@ -221,12 +221,10 @@ impl ClauseDBIF for ClauseDB {
     fn binary_links(&self, l: Lit) -> &BinaryLinkList {
         self.binary_link.connect_with(l)
     }
-
     // watch_cache_IF
     fn fetch_watch_cache_entry(&self, lit: Lit, wix: WatchCacheProxy) -> (ClauseId, Lit) {
         self.watch_cache[lit][wix]
     }
-
     #[inline]
     fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator {
         // let mut empty = WatchCache::new();
@@ -241,7 +239,6 @@ impl ClauseDBIF for ClauseDB {
     fn merge_watch_cache(&mut self, p: Lit, wc: WatchCache) {
         self.watch_cache[p].append_watch(wc);
     }
-
     fn swap_watch(&mut self, cid: ClauseId) {
         self[cid].lits.swap(0, 1);
     }
