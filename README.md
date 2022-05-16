@@ -1,9 +1,10 @@
 ## A modern SAT Solver for Propositional Logic in Rust
 
 Splr is a modern SAT solver in [Rust](https://www.rust-lang.org), based on [Glucose 4.1](https://www.labri.fr/perso/lsimon/glucose/).
-It adopts various research results on modern SAT solvers:
+It adopts, or adopted, various research results on modern SAT solvers:
 
 - _CDCL_, _watch literals_, _LBD_ and so on from Glucose, [Minisat](http://minisat.se) and the ancestors
+- Luby series based restart control
 - Glucose-like _dynamic blocking/forcing restarts_
 - pre/in-processor to simplify the given CNF
 - branching variable selection based on _Learning Rate Based Branching_ with _Reason Side Rewarding_ or EVSIDS
@@ -20,11 +21,11 @@ Please check [ChangeLog](ChangeLog.md) about recent updates.
 
 Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results.
 
-#### Version 0.14.0
+#### Version 0.15.0
 
-- [SAT Competition 2021](https://satcompetition.github.io/2021/), [Benchmarks main truck](https://satcompetition.github.io/2021/benchmarks.html) -- splr-0.14.0 RC (d92ced26d) solved with a 400 sec timeout:
-  - 41 satisfiable problems: all the solutions were correct.
-  - 35 unsatisfiable problems: all the certifications were verified with [Grat toolchain](https://www21.in.tum.de/~lammich/grat/).
+- [SAT Competition 2021](https://satcompetition.github.io/2021/), [Benchmarks main truck](https://satcompetition.github.io/2021/benchmarks.html) -- splr-0.15.0 solved with a 300 sec timeout:
+  - 42 satisfiable problems: all the solutions were correct.
+  - 34 unsatisfiable problems: all the certifications were verified with [Grat toolchain](https://www21.in.tum.de/~lammich/grat/).
 
 ## Install
 
