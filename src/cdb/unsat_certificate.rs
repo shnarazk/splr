@@ -97,7 +97,7 @@ impl CertificationStore {
                     self.buffer = None;
                     break;
                 }
-                for _ in 0..(l.abs() as usize) {
+                for _ in 0..(l.unsigned_abs() as usize) {
                     index += 1;
                     if buf
                         .write_all(format!("{} ", self.queue[index]).as_bytes())

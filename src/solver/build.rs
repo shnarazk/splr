@@ -157,7 +157,7 @@ impl TryFrom<&str> for Solver {
 
 impl SatSolverIF for Solver {
     fn add_assignment(&mut self, val: i32) -> Result<&mut Solver, SolverError> {
-        if val == 0 || self.asg.num_vars < val.abs() as usize {
+        if val == 0 || self.asg.num_vars < val.unsigned_abs() as usize {
             return Err(SolverError::OutOfRange);
         }
         let lit = Lit::from(val);
@@ -176,7 +176,7 @@ impl SatSolverIF for Solver {
         V: AsRef<[i32]>,
     {
         for i in vec.as_ref().iter() {
-            if *i == 0 || self.asg.num_vars < i.abs() as usize {
+            if *i == 0 || self.asg.num_vars < i.unsigned_abs() as usize {
                 return Err(SolverError::OutOfRange);
             }
         }
@@ -364,7 +364,7 @@ impl Solver {
         self.state.flush("injecting...");
         for ints in v.iter() {
             for i in ints.as_ref().iter() {
-                if *i == 0 || self.asg.num_vars < i.abs() as usize {
+                if *i == 0 || self.asg.num_vars < i.unsigned_abs() as usize {
                     return Err(SolverError::OutOfRange);
                 }
             }
