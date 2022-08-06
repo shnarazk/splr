@@ -623,10 +623,12 @@ fn lit_level(
 
 #[allow(dead_code)]
 fn dumper(asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
+    use std::fmt::Write as _;
     let mut s = String::new();
     for l in bag {
-        s.push_str(&format!(
-            "{:8>} :: level {:4>}, {:?} {:?}\n",
+        writeln!(
+            s,
+            "{:8>} :: level {:4>}, {:?} {:?}",
             *l,
             asg.level(l.vi()),
             asg.reason(l.vi()),
@@ -636,7 +638,8 @@ fn dumper(asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
                 AssignReason::Implication(cid) => cdb[cid].iter().copied().collect::<Vec<Lit>>(),
                 AssignReason::None => vec![],
             },
-        ));
+        )
+        .unwrap();
     }
     s
 }
