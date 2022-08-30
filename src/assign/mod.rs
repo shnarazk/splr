@@ -282,7 +282,7 @@ pub mod property {
     use super::AssignStack;
     use crate::types::*;
 
-    #[derive(Clone, Copy, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tusize {
         NumConflict,
         NumDecision,
@@ -350,7 +350,7 @@ pub mod property {
         }
     }
 
-    #[derive(Clone, Copy, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum TEma {
         AssignRate,
         DecisionPerConflict,

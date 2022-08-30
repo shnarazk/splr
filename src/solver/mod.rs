@@ -23,7 +23,7 @@ pub use self::{
 use crate::{assign::AssignStack, cdb::ClauseDB, state::*, types::*};
 
 /// Normal results returned by Solver.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum Certificate {
     /// It is satisfiable; `vec` is such an assignment sorted by var order.
     SAT(Vec<i32>),

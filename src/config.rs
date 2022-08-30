@@ -395,7 +395,7 @@ pub mod property {
     use super::Config;
     use crate::types::*;
 
-    #[derive(Clone, Copy, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tf64 {
         #[cfg(feature = "clase_rewarding")]
         ClauseRewardDecayRate,

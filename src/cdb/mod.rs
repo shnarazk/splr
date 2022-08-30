@@ -181,7 +181,7 @@ pub struct ClauseId {
 }
 
 /// A representation of 'clause'
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct Clause {
     /// The literals in a clause.
     lits: Vec<Lit>,
@@ -291,7 +291,7 @@ pub mod property {
     use super::ClauseDB;
     use crate::types::*;
 
-    #[derive(Clone, Copy, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tusize {
         NumBiClause,
         NumBiClauseCompletion,
@@ -337,7 +337,7 @@ pub mod property {
         }
     }
 
-    #[derive(Clone, Copy, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tf64 {
         LiteralBlockDistance,
         LiteralBlockEntanglement,
@@ -355,7 +355,7 @@ pub mod property {
         }
     }
 
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Clone, Debug, Eq, PartialEq)]
     pub enum TEma {
         Entanglement,
         LBD,
@@ -435,7 +435,7 @@ mod tests {
         assert!(!c.is(Flag::USED));
     }
     #[test]
-    fn test_clause_equality() -> () {
+    fn test_clause_equality() {
         let config = Config::default();
         let cnf = CNFDescription {
             num_of_variables: 4,
@@ -451,13 +451,12 @@ mod tests {
             .as_cid();
         // cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
-        assert_eq!(c1 == c1, true);
         assert_ne!(c1, c2);
         // assert_eq!(cdb.activity(c2), 2.4);
     }
 
     #[test]
-    fn test_clause_iterator() -> () {
+    fn test_clause_iterator() {
         let config = Config::default();
         let cnf = CNFDescription {
             num_of_variables: 4,
