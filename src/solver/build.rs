@@ -416,16 +416,3 @@ mod tests {
         );
     }
 }
-
-#[cfg(feature = "incremental_solver")]
-#[test]
-fn test_solver_iter() {
-    let mut slv = Solver::instantiate(
-        &Config::default(),
-        &CNFDescription {
-            num_of_variables: 8,
-            ..CNFDescription::default()
-        },
-    );
-    assert_eq!(slv.iter().count(), 256);
-}
