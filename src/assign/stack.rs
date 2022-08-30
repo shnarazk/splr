@@ -203,7 +203,11 @@ impl AssignIF for AssignStack {
     }
     #[allow(unused_variables)]
     fn extend_model(&mut self, cdb: &mut impl ClauseDBIF) -> Vec<Option<bool>> {
+        #[cfg(not(feature = "incremental_solver"))]
         let lits = &self.eliminated;
+        #[cfg(feature = "incremental_solver")]
+        let lits = &self.eliminated.clone();
+
         #[cfg(feature = "trace_elimination")]
         println!(
             "# extend_model\n - as i32: {:?}\n - as raw: {:?}",
@@ -238,10 +242,7 @@ impl AssignIF for AssignStack {
             {
                 cdb.new_clause(
                     self,
-                    &mut lits[target_index..=last_lit_index]
-                        .iter()
-                        .copied()
-                        .collect::<Vec<Lit>>(),
+                    &mut lits[target_index..=last_lit_index].to_vec(),
                     false,
                 );
             }
