@@ -1,6 +1,6 @@
 ## 0.16.0, 2022-09-??
 
-- redefine feature 'clause_elimination' to 'no_clause_elimination' that is activated
+- define feature 'clause_elimination' instead of 'no_clause_elimination', which is activated
   by feature 'incremental_solver'
 - cargo clippy
 
