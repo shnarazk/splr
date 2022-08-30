@@ -15,7 +15,7 @@
 //!  } = s;
 //!  let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
 //!  elim.simplify(asg, cdb, state, false).expect("panic");
-//!  assert!(0 < asg.num_eliminated_vars);
+//!  assert!(!state.config.enable_eliminator || 0 < asg.num_eliminated_vars);
 //!```
 
 mod eliminate;
@@ -113,6 +113,9 @@ mod tests {
     #[test]
     fn check_elimination() {
         let mut config = Config::default();
+        if !config.enable_eliminator {
+            return;
+        }
         config.quiet_mode = true;
         let mut s = Solver::try_from("cnfs/sample.cnf").expect("failed to load");
         let Solver {

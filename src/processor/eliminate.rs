@@ -365,6 +365,9 @@ mod tests {
             ref mut state,
             ..
         } = Solver::try_from("cnfs/uf8.cnf").expect("failed to load");
+        if !state.config.enable_eliminator {
+            return;
+        }
         let mut timedout = 10_000;
         let vi = 4;
 

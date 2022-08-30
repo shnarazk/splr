@@ -19,7 +19,7 @@ bitflags = "^1.3"
 default = [
         # "boundary_check", # DEBUG
         # "bi_clause_completion", # increase memory pressure
-        "clause_elimination",
+        # "no_clause_elimination",
         # "clause_rewarding",
         "clause_vivification",
         "dynamic_restart_threshold",
@@ -37,14 +37,14 @@ best_phases_tracking = []
 bi_clause_completion = []
 boundary_check = []
 chrono_BT = []
-clause_elimination = []
+no_clause_elimination = []
 clause_rewarding = []
 clause_vivification = []
 debug_propagation = []
 dynamic_restart_threshold = []
 EMA_calibration = []
 EVSIDS = []
-incremental_solver = []
+incremental_solver = ["no_clause_elimination"]
 just_used = []
 LRB_rewarding = []
 maintain_watch_cache = []

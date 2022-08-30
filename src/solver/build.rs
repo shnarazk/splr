@@ -233,6 +233,7 @@ impl SatSolverIF for Solver {
         let mut tmp = Vec::new();
         std::mem::swap(&mut tmp, &mut cdb.eliminated_permanent);
         while let Some(mut vec) = tmp.pop() {
+            assert!(1 < vec.len());
             cdb.new_clause(asg, &mut vec, false);
         }
     }

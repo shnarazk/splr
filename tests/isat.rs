@@ -44,7 +44,7 @@ fn drive(cnf: &str, mother: Vec<i32>) {
 fn run(cnf: &str, assigns: &[i32], switch: bool) -> usize {
     println!("-------------------- {:?}, {}", assigns, switch);
     let mut solver = Solver::try_from(cnf).expect("panic");
-    solver.elim.enable = switch;
+    // solver.state.config.enable_eliminator = switch;
     for n in assigns.iter() {
         solver.add_assignment(*n).expect("no");
     }
@@ -73,13 +73,18 @@ fn run(cnf: &str, assigns: &[i32], switch: bool) -> usize {
                 }
                 // Or you can build a new clause which literals are flipped.
                 // let ans: Vec<i32> = ans.iter().map(|i| -i).collect::<Vec<i32>>();
-                match solver.add_clause(ans) {
+                assert!(1 < ans.len());
+                match solver.add_clause(ans.clone()) {
                     Err(SolverError::Inconsistent) => {
-                        println!("c no answer due to level zero conflict");
+                        println!("c no (more) answer due to level zero conflict");
+                        break;
+                    }
+                    Err(SolverError::EmptyClause) => {
+                        println!("c no (more) answer due to an empty clause");
                         break;
                     }
                     Err(e) => {
-                        println!("s UNKNOWN; {:?}", e);
+                        println!("s UNKNOWN; {:?} by {:?}", e, ans);
                         break;
                     }
                     Ok(_) => solver.reset(),

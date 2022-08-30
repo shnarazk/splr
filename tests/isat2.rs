@@ -24,6 +24,7 @@ fn all_solutions_of_uf20() {
     drive("cnfs/uf20-01.cnf", vec![-4, 5, 6, 7, 8]);
 }
 
+#[allow(dead_code)]
 /// cargo test --test isat2 --features incremental_solver --release
 /// #[cfg_attr(feature = "incremental_solver", test)]
 fn all_solutions_of_uf100() {
@@ -33,8 +34,8 @@ fn all_solutions_of_uf100() {
 fn drive(cnf: &str, mother: Vec<i32>) {
     for i in 0..=mother.len() {
         let assumptions = &mother[0..i];
-        let ns1 = run(&cnf, &assumptions, false);
-        let ns2 = run(&cnf, &assumptions, true);
+        let ns1 = run(cnf, assumptions, false);
+        let ns2 = run(cnf, assumptions, true);
         println!("#solution: {} w/o elim; {} w/ elim", ns1, ns2);
         assert_eq!(ns1, ns2);
     }
@@ -43,7 +44,8 @@ fn drive(cnf: &str, mother: Vec<i32>) {
 fn run(cnf: &str, assigns: &[i32], switch: bool) -> usize {
     println!("-------------------- {:?}, {}", assigns, switch);
     let mut solver = Solver::try_from(cnf).expect("panic");
-    solver.elim.enable = switch;
+    // solver.state.config.enable_eliminator = switch;
+    // solver.elim.enable = switch;
     for n in assigns.iter() {
         solver.add_assignment(*n).expect("no");
     }

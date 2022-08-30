@@ -19,10 +19,7 @@ use {
 impl Default for Eliminator {
     fn default() -> Eliminator {
         Eliminator {
-            #[cfg(not(feature = "clause_elimination"))]
-            enable: false,
-            #[cfg(feature = "clause_elimination")]
-            enable: true,
+            enable: !cfg(feature = "no_clause_elimination"),
             mode: EliminatorMode::Dormant,
             var_queue: VarOccHeap::new(0, 0),
             clause_queue: Vec::new(),
@@ -192,6 +189,7 @@ impl Instantiate for Eliminator {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Eliminator {
         let nv = cnf.num_of_variables;
         Eliminator {
+            enable: config.enable_eliminator,
             var_queue: VarOccHeap::new(nv, 0),
             eliminate_var_occurrence_limit: config.elm_var_occ,
             eliminate_grow_limit: config.elm_grw_lim,
@@ -222,7 +220,10 @@ impl EliminateIF for Eliminator {
         self.enable && self.mode == EliminatorMode::Running
     }
     fn prepare(&mut self, asg: &mut impl AssignIF, cdb: &mut impl ClauseDBIF, force: bool) {
-        debug_assert!(self.enable);
+        if !self.enable {
+            return;
+        }
+        // debug_assert!(self.enable);
         debug_assert_eq!(self.mode, EliminatorMode::Dormant);
         self.mode = EliminatorMode::Running;
         for w in &mut self[1..] {

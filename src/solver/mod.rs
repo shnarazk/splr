@@ -113,7 +113,8 @@ pub struct SolverIter<'a> {
 #[cfg(feature = "incremental_solver")]
 impl Solver {
     /// return an iterator on Solver. **Requires 'incremental_solver' feature**
-    ///```
+    ///```ignore
+    ///use splr::Solver;
     ///for v in Solver::try_from("cnfs/sample.cnf").expect("panic").iter() {
     ///    println!(" - answer: {:?}", v);
     ///}
@@ -131,9 +132,11 @@ impl<'a> Iterator for SolverIter<'a> {
     type Item = Vec<i32>;
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(ref v) = self.refute {
+            debug_assert!(1 < v.len());
             match self.solver.add_clause(v) {
                 Err(SolverError::Inconsistent) => return None,
-                Err(e) => panic!("s UNKNOWN: {:?}", e),
+                Err(SolverError::EmptyClause) => return None,
+                Err(e) => panic!("s UNKNOWN: {:?} by adding {:?}", e, v),
                 Ok(_) => self.solver.reset(),
             }
             self.refute = None;

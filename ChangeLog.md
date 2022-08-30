@@ -1,3 +1,9 @@
+## 0.16.0, 2022-09-??
+
+- redefine feature 'clause_elimination' to 'no_clause_elimination' that is activated
+  by feature 'incremental_solver'
+- cargo clippy
+
 ## 0.15.0, 2022-05-15
 
 - Add `solver::StageManager`, which defines stages, cycles, and segments based on Luby series.
