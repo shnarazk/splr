@@ -45,7 +45,6 @@ fn run(cnf: &str, assigns: &[i32], switch: bool) -> usize {
     println!("-------------------- {:?}, {}", assigns, switch);
     let mut solver = Solver::try_from(cnf).expect("panic");
     // solver.state.config.enable_eliminator = switch;
-    // solver.elim.enable = switch;
     for n in assigns.iter() {
         solver.add_assignment(*n).expect("no");
     }

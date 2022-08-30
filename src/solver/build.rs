@@ -230,11 +230,14 @@ impl SatSolverIF for Solver {
         cdb.handle(SolverEvent::Reinitialize);
         state.handle(SolverEvent::Reinitialize);
 
-        let mut tmp = Vec::new();
-        std::mem::swap(&mut tmp, &mut cdb.eliminated_permanent);
-        while let Some(mut vec) = tmp.pop() {
-            assert!(1 < vec.len());
-            cdb.new_clause(asg, &mut vec, false);
+        #[cfg(not(feature = "no_clause_elimination"))]
+        {
+            let mut tmp = Vec::new();
+            std::mem::swap(&mut tmp, &mut cdb.eliminated_permanent);
+            while let Some(mut vec) = tmp.pop() {
+                // TODO: handle unit clauses
+                cdb.new_clause(asg, &mut vec, false);
+            }
         }
     }
     #[cfg(not(feature = "no_IO"))]
