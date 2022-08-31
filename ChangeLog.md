@@ -1,6 +1,6 @@
 ## 0.16.0, 2022-09-??
 
-- re-implement feature 'incremental solver' correctly
+- (WIP) re-implement feature 'incremental solver' correctly
 - define feature 'no_clause_elimination' instead of 'clause_elimination', which is activated
   by feature 'incremental_solver' automatically
 - cargo clippy
