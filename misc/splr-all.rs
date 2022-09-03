@@ -16,7 +16,7 @@ fn main() {
     run(&cnf_file);
 }
 
-fn run(cnf_file: &str) {
+fn run(cnf_file: &str) -> Vec<Vec<i32>> {
     let path = std::path::PathBuf::from(cnf_file);
     let name = path.file_stem().expect("It seems a strange filename");
     let mut cnf = CNF::load(&path).expect("fail to load");
@@ -38,4 +38,5 @@ fn run(cnf_file: &str) {
     let dump = std::path::PathBuf::from(&dump_name);
     cnf.save(&dump).expect("???");
     println!("#solution: {count} => {dump_name}");
+    solutions
 }
