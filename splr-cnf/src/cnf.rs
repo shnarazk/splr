@@ -7,7 +7,7 @@ use std::{
 
 pub type Clause = Vec<i32>;
 
-#[derive(Debug, Default, Eq, PartialEq)]
+#[derive(Default, Eq, PartialEq)]
 pub struct CNF {
     num_vars: u32,
     assign: HashSet<i32>,
@@ -36,7 +36,8 @@ pub trait CnfIf: Sized {
     fn load(file: &PathBuf) -> Result<Self, Self::Error>;
     fn num_vars(&self) -> u32;
     fn num_clauses(&self) -> usize;
-    fn to_string(&self) -> String;
+    fn save(&self, file: &PathBuf) -> Result<(), Self::Error>;
+    fn dump_to_string(&self) -> String;
 }
 
 impl CnfIf for CNF {
@@ -137,7 +138,17 @@ impl CnfIf for CNF {
     fn num_clauses(&self) -> usize {
         self.clauses.len()
     }
-    fn to_string(&self) -> String {
+    fn save(&self, file: &PathBuf) -> Result<(), Self::Error> {
+        use std::io::Write;
+        if let Ok(f) = File::create(file) {
+            let mut buf = std::io::BufWriter::new(f);
+            buf.write_all(self.dump_to_string().as_bytes())
+                .map_err(|_| "fail to write".to_string())
+        } else {
+            Err("Cant create a file".to_string())
+        }
+    }
+    fn dump_to_string(&self) -> String {
         format!(
             "p cnf {} {}\n{}",
             self.num_vars,

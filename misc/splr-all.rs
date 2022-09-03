@@ -30,6 +30,7 @@ fn run(cnf_file: &str) -> usize {
         cnf.add_clause(refuter).expect("An internal error");
         println!("s SATISFIABLE({count}) => {cnf}");
     }
-    // cnf.save(???);???;
+    cnf.save(&std::path::PathBuf::from("refute-all-solutions.cnf"))
+        .expect("???");
     count
 }
