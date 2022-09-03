@@ -9,6 +9,18 @@ const TOO_MANY_CLAUSES: usize = 100_000;
 
 pub type Clause = Vec<i32>;
 
+#[derive(Debug, Eq, PartialEq)]
+pub enum CNFOperationError {
+    AddingClauseExists,
+    AddingEmptyClause,
+    AddignConflictingAssingment,
+    ReadingCNFFile,
+    ParsingCNF,
+    CreatingCNFFile,
+    WritingCNFFile,
+    UnknownError(String),
+}
+
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct CNF {
     num_vars: u32,
@@ -44,7 +56,7 @@ pub trait CnfIf: Sized {
 }
 
 impl CnfIf for CNF {
-    type Error = String;
+    type Error = CNFOperationError;
     fn add_clause<C: AsRef<Clause>>(&mut self, clause: C) -> Result<&mut CNF, Self::Error> {
         let c = clause.as_ref().clone();
         let mut cc = c.clone();
@@ -54,7 +66,7 @@ impl CnfIf for CNF {
             self.cls_map.clear();
         }
         if !self.no_check_uniqueness && self.cls_map.iter().any(|ref_c| *ref_c == cc) {
-            return Err("ExistsAlready".to_string());
+            return Err(CNFOperationError::AddingClauseExists);
         }
         assert!(!c.is_empty());
         self.num_vars = self
@@ -72,12 +84,12 @@ impl CnfIf for CNF {
         for ref_c in clauses.as_ref().iter() {
             match ref_c.len() {
                 0 => {
-                    return Err("".to_string());
+                    return Err(CNFOperationError::AddingEmptyClause);
                 }
                 1 => {
                     let l: i32 = ref_c[0];
                     if cnf.assign.contains(&-l) {
-                        return Err("".to_string());
+                        return Err(CNFOperationError::AddignConflictingAssingment);
                     }
                     cnf.assign.insert(l);
                 }
@@ -94,7 +106,7 @@ impl CnfIf for CNF {
         Ok(cnf)
     }
     fn load(path: &Path) -> Result<Self, Self::Error> {
-        let fs = File::open(path).map_or(Err("SolverError::IOError".to_string()), Ok)?;
+        let fs = File::open(path).map_err(|_| CNFOperationError::ReadingCNFFile)?;
         let mut reader = BufReader::new(fs);
         let mut buf = String::new();
         let mut nv: u32 = 0;
@@ -120,8 +132,10 @@ impl CnfIf for CNF {
                     }
                     assert!(!vec.is_empty());
                     if let Err(e) = cnf.add_clause(vec) {
-                        if e != "ExistsAlready" {
+                        if e == CNFOperationError::AddingClauseExists {
                             clause_extists_already = true;
+                        } else {
+                            return Err(e);
                         }
                     } else {
                         num_clause += 1;
@@ -141,12 +155,12 @@ impl CnfIf for CNF {
                     }
                 }
                 Err(e) => {
-                    return Err(format!("IOError ({e:?})"));
+                    return Err(CNFOperationError::UnknownError(format!("IOError ({e:?})")));
                 }
             }
         }
         if !found_valid_header {
-            return Err("Wrong format".to_string());
+            return Err(CNFOperationError::ParsingCNF);
         }
         if cnf.num_vars() != nv {
             println!("Warning: there are less variables than its declaration.");
@@ -170,9 +184,9 @@ impl CnfIf for CNF {
         if let Ok(f) = File::create(file) {
             let mut buf = std::io::BufWriter::new(f);
             buf.write_all(self.dump_to_string().as_bytes())
-                .map_err(|_| "fail to write".to_string())
+                .map_err(|_| CNFOperationError::WritingCNFFile)
         } else {
-            Err("Cant create a file".to_string())
+            Err(CNFOperationError::CreatingCNFFile)
         }
     }
     fn dump_to_string(&self) -> String {
