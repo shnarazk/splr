@@ -7,7 +7,7 @@ use std::{
 
 pub type Clause = Vec<i32>;
 
-#[derive(Default, Eq, PartialEq)]
+#[derive(Debug, Default, Eq, PartialEq)]
 pub struct CNF {
     num_vars: u32,
     assign: HashSet<i32>,
@@ -47,8 +47,9 @@ impl CnfIf for CNF {
         let mut cc = c.clone();
         cc.sort_unstable();
         if self.cls_map.iter().any(|ref_c| *ref_c == cc) {
-            return Err("".to_string());
+            return Err("ExistsAlready".to_string());
         }
+        assert!(!c.is_empty());
         self.num_vars = self
             .num_vars
             .max(c.iter().map(|v| v.unsigned_abs()).max().unwrap());
@@ -95,6 +96,7 @@ impl CnfIf for CNF {
             buf.clear();
             match reader.read_line(&mut buf) {
                 Ok(0) => break,
+                Ok(_) if buf.starts_with('c') => (),
                 Ok(_) if found_valid_header => {
                     let mut vec: Vec<i32> = Vec::new();
                     for seg in buf.split(' ') {
@@ -105,7 +107,11 @@ impl CnfIf for CNF {
                             vec.push(l);
                         }
                     }
-                    cnf.add_clause(vec)?;
+                    if let Err(e) = cnf.add_clause(vec) {
+                        if e != "ExistsAlready" {
+                            return Err(e);
+                        }
+                    }
                 }
                 Ok(_) => {
                     let mut iter = buf.split_whitespace();
@@ -120,16 +126,19 @@ impl CnfIf for CNF {
                     }
                 }
                 Err(e) => {
-                    println!("{}", e);
-                    return Err("SolverError::IOError".to_string());
+                    return Err(format!("IOError ({e:?})"));
                 }
             }
         }
         if !found_valid_header {
-            return Err("SolverError::Wrong format".to_string());
+            return Err("Wrong format".to_string());
         }
-        assert_eq!(nv, cnf.num_vars());
-        assert_eq!(nc, cnf.num_clauses());
+        if cnf.num_vars() != nv {
+            println!("Warning: there are less variables than its declaration.");
+        }
+        if cnf.num_clauses() != nc {
+            println!("Warning: there are less clauses than its declaration.");
+        }
         Ok(cnf)
     }
     fn num_vars(&self) -> u32 {
@@ -150,7 +159,7 @@ impl CnfIf for CNF {
     }
     fn dump_to_string(&self) -> String {
         format!(
-            "p cnf {} {}\n{}",
+            "p cnf {} {}\n{} 0\n",
             self.num_vars,
             self.clauses.len(),
             self.clauses
@@ -161,7 +170,7 @@ impl CnfIf for CNF {
                     .collect::<Vec<_>>()
                     .join(" "))
                 .collect::<Vec<_>>()
-                .join("\n"),
+                .join(" 0\n"),
         )
     }
 }
