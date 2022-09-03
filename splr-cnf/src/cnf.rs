@@ -2,7 +2,7 @@ use std::{
     collections::HashSet,
     fs::File,
     io::{BufRead, BufReader},
-    path::PathBuf,
+    path::Path,
 };
 
 pub type Clause = Vec<i32>;
@@ -33,10 +33,10 @@ pub trait CnfIf: Sized {
     // - `None`: if the clause is in it already
     fn add_clause<C: AsRef<Clause>>(&mut self, clause: C) -> Result<&mut CNF, Self::Error>;
     fn from_vec_i32<V: AsRef<[Clause]>>(clauses: V) -> Result<Self, Self::Error>;
-    fn load(file: &PathBuf) -> Result<Self, Self::Error>;
+    fn load(file: &Path) -> Result<Self, Self::Error>;
     fn num_vars(&self) -> u32;
     fn num_clauses(&self) -> usize;
-    fn save(&self, file: &PathBuf) -> Result<(), Self::Error>;
+    fn save(&self, file: &Path) -> Result<(), Self::Error>;
     fn dump_to_string(&self) -> String;
 }
 
@@ -83,7 +83,7 @@ impl CnfIf for CNF {
         cnf.num_vars = max_var;
         Ok(cnf)
     }
-    fn load(path: &PathBuf) -> Result<Self, Self::Error> {
+    fn load(path: &Path) -> Result<Self, Self::Error> {
         let fs = File::open(path).map_or(Err("SolverError::IOError".to_string()), Ok)?;
         let mut reader = BufReader::new(fs);
         let mut buf = String::new();
@@ -97,7 +97,7 @@ impl CnfIf for CNF {
                 Ok(0) => break,
                 Ok(_) if found_valid_header => {
                     let mut vec: Vec<i32> = Vec::new();
-                    for seg in buf.split(" ") {
+                    for seg in buf.split(' ') {
                         if let Ok(l) = seg.parse::<i32>() {
                             if l == 0 {
                                 break;
@@ -138,7 +138,7 @@ impl CnfIf for CNF {
     fn num_clauses(&self) -> usize {
         self.clauses.len()
     }
-    fn save(&self, file: &PathBuf) -> Result<(), Self::Error> {
+    fn save(&self, file: &Path) -> Result<(), Self::Error> {
         use std::io::Write;
         if let Ok(f) = File::create(file) {
             let mut buf = std::io::BufWriter::new(f);
