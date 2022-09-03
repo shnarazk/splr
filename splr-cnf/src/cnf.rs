@@ -5,7 +5,7 @@ use std::{
     path::Path,
 };
 
-const TOO_MANY_CLAUSES: usize = 80_000;
+const TOO_MANY_CLAUSES: usize = 100_000;
 
 pub type Clause = Vec<i32>;
 
@@ -135,6 +135,7 @@ impl CnfIf for CNF {
                                 nv = v as u32;
                                 nc = c;
                                 found_valid_header = true;
+                                cnf.no_check_uniqueness = TOO_MANY_CLAUSES < nc;
                             }
                         }
                     }
