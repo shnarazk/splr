@@ -1,4 +1,9 @@
-use std::collections::HashSet;
+use std::{
+    collections::HashSet,
+    fs::File,
+    io::{BufRead, BufReader},
+    path::PathBuf,
+};
 
 pub type Clause = Vec<i32>;
 
@@ -17,19 +22,20 @@ pub trait CnfIf: Sized {
     // - `None`: if the clause is in it already
     fn add_clause<C: AsRef<Clause>>(&mut self, clause: C) -> Result<&mut CNF, Self::Error>;
     fn from_vec_i32<V: AsRef<[Clause]>>(clauses: V) -> Result<Self, Self::Error>;
+    fn load(file: &PathBuf) -> Result<Self, Self::Error>;
     fn num_vars(&self) -> u32;
     fn num_clauses(&self) -> usize;
     fn to_string(&self) -> String;
 }
 
 impl CnfIf for CNF {
-    type Error = ();
+    type Error = String;
     fn add_clause<C: AsRef<Clause>>(&mut self, clause: C) -> Result<&mut CNF, Self::Error> {
         let c = clause.as_ref().clone();
         let mut cc = c.clone();
         cc.sort_unstable();
         if self.cls_map.iter().any(|ref_c| *ref_c == cc) {
-            return Err(());
+            return Err("".to_string());
         }
         self.num_vars = self
             .num_vars
@@ -44,12 +50,12 @@ impl CnfIf for CNF {
         for ref_c in clauses.as_ref().iter() {
             match ref_c.len() {
                 0 => {
-                    return Err(());
+                    return Err("".to_string());
                 }
                 1 => {
                     let l: i32 = ref_c[0];
                     if cnf.assign.contains(&-l) {
-                        return Err(());
+                        return Err("".to_string());
                     }
                     cnf.assign.insert(l);
                 }
@@ -63,6 +69,55 @@ impl CnfIf for CNF {
             max_var = max_var.max(ref_c.iter().map(|v| v.unsigned_abs()).max().unwrap());
         }
         cnf.num_vars = max_var;
+        Ok(cnf)
+    }
+    fn load(path: &PathBuf) -> Result<Self, Self::Error> {
+        let fs = File::open(path).map_or(Err("SolverError::IOError".to_string()), Ok)?;
+        let mut reader = BufReader::new(fs);
+        let mut buf = String::new();
+        let mut nv: u32 = 0;
+        let mut nc: usize = 0;
+        let mut found_valid_header = false;
+        let mut cnf = CNF::default();
+        loop {
+            buf.clear();
+            match reader.read_line(&mut buf) {
+                Ok(0) => break,
+                Ok(_) if found_valid_header => {
+                    let mut vec: Vec<i32> = Vec::new();
+                    for seg in buf.split(" ") {
+                        if let Ok(l) = seg.parse::<i32>() {
+                            if l == 0 {
+                                break;
+                            }
+                            vec.push(l);
+                        }
+                    }
+                    cnf.add_clause(vec)?;
+                }
+                Ok(_) => {
+                    let mut iter = buf.split_whitespace();
+                    if iter.next() == Some("p") && iter.next() == Some("cnf") {
+                        if let Some(v) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
+                            if let Some(c) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
+                                nv = v as u32;
+                                nc = c;
+                                found_valid_header = true;
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!("{}", e);
+                    return Err("SolverError::IOError".to_string());
+                }
+            }
+        }
+        if !found_valid_header {
+            return Err("SolverError::Wrong format".to_string());
+        }
+        assert_eq!(nv, cnf.num_vars());
+        assert_eq!(nc, cnf.num_clauses());
         Ok(cnf)
     }
     fn num_vars(&self) -> u32 {

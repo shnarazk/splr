@@ -4,6 +4,7 @@ pub use self::cnf::*;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn it_works() {
@@ -21,5 +22,21 @@ mod tests {
         assert_eq!(line.next(), Some("p cnf 4 2"));
         assert_eq!(line.next(), Some("1 3 2"));
         assert_eq!(line.next(), Some("-1 -4 3"));
+    }
+    #[test]
+    fn test_load_uf8() {
+        let build = CNF::load(&PathBuf::from("../cnfs/uf8.cnf"));
+        dbg!(build.is_ok());
+        let cnf = build.unwrap();
+        assert_eq!(cnf.num_clauses(), 13);
+        assert_eq!(cnf.num_vars(), 8);
+    }
+    #[test]
+    fn test_load_sample() {
+        let build = CNF::load(&PathBuf::from("../cnfs/sample.cnf"));
+        dbg!(build.is_ok());
+        let cnf = build.unwrap();
+        assert_eq!(cnf.num_clauses(), 1065);
+        assert_eq!(cnf.num_vars(), 250);
     }
 }
