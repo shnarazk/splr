@@ -13,12 +13,13 @@ use std::env::args;
 
 fn main() {
     let cnf_file = args().nth(1).expect("takes an arg");
-    let ns = run(&cnf_file);
-    println!("#solution: {}", ns);
+    run(&cnf_file);
 }
 
-fn run(cnf_file: &str) -> usize {
-    let mut cnf = CNF::load(&std::path::PathBuf::from(cnf_file)).expect("fail to load");
+fn run(cnf_file: &str) {
+    let path = std::path::PathBuf::from(cnf_file);
+    let name = path.file_stem().expect("It seems a strange filename");
+    let mut cnf = CNF::load(&path).expect("fail to load");
     println!("{cnf}");
     let mut solver = Solver::try_from(cnf_file).expect("panic");
     let mut count = 0;
@@ -28,9 +29,13 @@ fn run(cnf_file: &str) -> usize {
         let refuter: Vec<i32> = res.iter().map(|l| -l).collect::<Vec<_>>();
         solutions.push(res);
         cnf.add_clause(refuter).expect("An internal error");
-        println!("s SATISFIABLE({count}) => {cnf}");
+        let dump_name = format!("{}-refuting-{count}.cnf", name.to_string_lossy());
+        let dump = std::path::PathBuf::from(&dump_name);
+        cnf.save(&dump).expect("???");
+        println!("s SATISFIABLE({count}) => {dump_name}");
     }
-    cnf.save(&std::path::PathBuf::from("refute-all-solutions.cnf"))
-        .expect("???");
-    count
+    let dump_name = format!("{}-refuting-all{count}.cnf", name.to_string_lossy());
+    let dump = std::path::PathBuf::from(&dump_name);
+    cnf.save(&dump).expect("???");
+    println!("#solution: {count} => {dump_name}");
 }
