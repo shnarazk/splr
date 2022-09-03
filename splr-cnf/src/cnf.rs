@@ -15,6 +15,17 @@ pub struct CNF {
     cls_map: HashSet<Vec<i32>>,
 }
 
+impl std::fmt::Display for CNF {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "CNF({} vars, {} clauses)",
+            self.num_vars(),
+            self.num_clauses()
+        )
+    }
+}
+
 pub trait CnfIf: Sized {
     type Error;
     // Add a `Clause` and returns:
