@@ -5,6 +5,8 @@ use std::{
     path::Path,
 };
 
+const TOO_MANY_CLAUSES: usize = 80_000;
+
 pub type Clause = Vec<i32>;
 
 #[derive(Debug, Default, Eq, PartialEq)]
@@ -13,6 +15,7 @@ pub struct CNF {
     assign: HashSet<i32>,
     clauses: Vec<Clause>,
     cls_map: HashSet<Vec<i32>>,
+    no_check_uniqueness: bool,
 }
 
 impl std::fmt::Display for CNF {
@@ -46,14 +49,20 @@ impl CnfIf for CNF {
         let c = clause.as_ref().clone();
         let mut cc = c.clone();
         cc.sort_unstable();
-        if self.cls_map.iter().any(|ref_c| *ref_c == cc) {
+        if !self.no_check_uniqueness && TOO_MANY_CLAUSES < self.clauses.len() {
+            self.no_check_uniqueness = true;
+            self.cls_map.clear();
+        }
+        if !self.no_check_uniqueness && self.cls_map.iter().any(|ref_c| *ref_c == cc) {
             return Err("ExistsAlready".to_string());
         }
         assert!(!c.is_empty());
         self.num_vars = self
             .num_vars
             .max(c.iter().map(|v| v.unsigned_abs()).max().unwrap());
-        self.cls_map.insert(cc);
+        if !self.no_check_uniqueness {
+            self.cls_map.insert(cc);
+        }
         self.clauses.push(c);
         Ok(self)
     }
@@ -90,7 +99,9 @@ impl CnfIf for CNF {
         let mut buf = String::new();
         let mut nv: u32 = 0;
         let mut nc: usize = 0;
+        let mut num_clause: usize = 0;
         let mut found_valid_header = false;
+        let mut clause_extists_already = false;
         let mut cnf = CNF::default();
         loop {
             buf.clear();
@@ -107,10 +118,13 @@ impl CnfIf for CNF {
                             vec.push(l);
                         }
                     }
+                    assert!(!vec.is_empty());
                     if let Err(e) = cnf.add_clause(vec) {
                         if e != "ExistsAlready" {
-                            return Err(e);
+                            clause_extists_already = true;
                         }
+                    } else {
+                        num_clause += 1;
                     }
                 }
                 Ok(_) => {
@@ -136,8 +150,11 @@ impl CnfIf for CNF {
         if cnf.num_vars() != nv {
             println!("Warning: there are less variables than its declaration.");
         }
-        if cnf.num_clauses() != nc {
+        if clause_extists_already {
+            assert_eq!(cnf.num_clauses(), num_clause);
             println!("Warning: there are less clauses than its declaration.");
+        } else if cnf.num_clauses() < TOO_MANY_CLAUSES {
+            assert_eq!(cnf.num_clauses(), nc);
         }
         Ok(cnf)
     }
