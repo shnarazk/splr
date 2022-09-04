@@ -156,19 +156,6 @@ impl<'a> Iterator for SolverIter<'a> {
     }
 }
 
-#[cfg(feature = "incremental_solver")]
-#[test]
-fn test_solver_iter() {
-    let mut slv = Solver::instantiate(
-        &Config::default(),
-        &CNFDescription {
-            num_of_variables: 8,
-            ..CNFDescription::default()
-        },
-    );
-    assert_eq!(slv.iter().count(), 256);
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -277,5 +264,18 @@ mod tests {
             vec![-3i32],
         );
         sat!(vec![&v1, &v2, &v3, &v4, &v5]); // : Vec<&[i32]>
+    }
+
+    #[cfg(feature = "incremental_solver")]
+    #[test]
+    fn test_solver_iter() {
+        let mut slv = Solver::instantiate(
+            &Config::default(),
+            &CNFDescription {
+                num_of_variables: 8,
+                ..CNFDescription::default()
+            },
+        );
+        assert_eq!(slv.iter().count(), 256);
     }
 }
