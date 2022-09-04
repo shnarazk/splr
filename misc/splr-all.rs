@@ -41,7 +41,7 @@ fn run(cnf_file: &Path) -> Vec<Vec<i32>> {
     for res in solver.iter() {
         count += 1;
         if res.is_empty() {
-            // Is this possible? Yes, an empty form has the solution which contains no litteral.
+            // Is this possible? Yes, an empty form has the solution which contains no literal.
             return vec![vec![]];
         }
         let refuter: Vec<i32> = res.iter().map(|l| -l).collect::<Vec<_>>();
