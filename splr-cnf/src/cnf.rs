@@ -68,7 +68,10 @@ impl CnfIf for CNF {
         if !self.no_check_uniqueness && self.cls_map.iter().any(|ref_c| *ref_c == cc) {
             return Err(CNFOperationError::AddingClauseExists);
         }
-        assert!(!c.is_empty());
+        // assert!(!c.is_empty());
+        if c.is_empty() {
+            return Err(CNFOperationError::AddingEmptyClause);
+        }
         self.num_vars = self
             .num_vars
             .max(c.iter().map(|v| v.unsigned_abs()).max().unwrap());
@@ -130,7 +133,7 @@ impl CnfIf for CNF {
                             vec.push(l);
                         }
                     }
-                    assert!(!vec.is_empty());
+                    // assert!(!vec.is_empty());
                     if let Err(e) = cnf.add_clause(vec) {
                         if e == CNFOperationError::AddingClauseExists {
                             clause_extists_already = true;
