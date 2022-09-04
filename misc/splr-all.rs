@@ -1,6 +1,3 @@
-#![cfg(feature = "incremental_solver")]
-use ::cnf::*;
-use splr::*;
 use std::{env::args, path::Path};
 /// All solutions solver implementation based on feature 'incremental solver'
 /// But the main purpose is to check the correctness of the implementaion of
@@ -8,7 +5,7 @@ use std::{env::args, path::Path};
 ///
 /// To run me:
 ///```ignore
-/// cargo run --example all-solutions -- a.cnf
+/// cargo run --features incremental_solver --example all-solutions -- a.cnf
 ///```
 
 fn main() {
@@ -16,15 +13,37 @@ fn main() {
     run(Path::new(&cnf_file));
 }
 
+#[cfg(not(feature = "incremental_solver"))]
+fn run(_cnf_file: &Path) -> Vec<Vec<i32>> {
+    panic!(
+        "Pleane run as: cargo run --features incremental_solver --example all-solutions -- a.cnf"
+    );
+}
+
+#[cfg(feature = "incremental_solver")]
 fn run(cnf_file: &Path) -> Vec<Vec<i32>> {
+    use ::cnf::*;
+    use splr::*;
+    let mut solutions = Vec::new();
     let name = cnf_file.file_stem().expect("It seems a strange filename");
-    let mut cnf = CNF::load(cnf_file).expect("fail to load");
+    let mut cnf = match CNF::load(cnf_file) {
+        Ok(c) => c,
+        Err(CNFOperationError::AddingEmptyClause) => {
+            return Vec::new();
+        }
+        Err(e) => {
+            panic!("{e:?}");
+        }
+    };
     println!("{cnf}");
     let mut solver = Solver::try_from(cnf_file).expect("panic");
     let mut count = 0;
-    let mut solutions = Vec::new();
     for res in solver.iter() {
         count += 1;
+        if res.is_empty() {
+            // Is this possible? Yes, an empty form has the solution which contains no litteral.
+            return vec![vec![]];
+        }
         let refuter: Vec<i32> = res.iter().map(|l| -l).collect::<Vec<_>>();
         solutions.push(res);
         cnf.add_clause(refuter).expect("An internal error");
