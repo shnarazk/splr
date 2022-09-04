@@ -24,7 +24,7 @@ default = [
         # "clause_rewarding",
         "clause_vivification",
         "dynamic_restart_threshold",
-        "incremental_solver",
+        # "incremental_solver",
         "LRB_rewarding",
         # "maintain_watch_cache", # DEBUG
         "reason_side_rewarding",
