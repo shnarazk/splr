@@ -67,8 +67,9 @@ pub enum SolverEvent {
 /// ```
 /// use crate::splr::*;
 /// use crate::splr::{assign::{AssignIF, VarManipulateIF}, state::{State, StateIF}, types::*};
+/// use std::path::Path;
 ///
-/// let mut s = Solver::try_from("cnfs/sample.cnf").expect("can't load");
+/// let mut s = Solver::try_from(Path::new("cnfs/sample.cnf")).expect("can't load");
 /// assert_eq!(s.asg.derefer(assign::property::Tusize::NumVar), 250);
 /// assert_eq!(s.asg.derefer(assign::property::Tusize::NumUnassertedVar), 250);
 /// if let Ok(Certificate::SAT(v)) = s.solve() {
@@ -78,7 +79,7 @@ pub enum SolverEvent {
 /// } else {
 ///     panic!("It should be satisfied!");
 /// }
-/// assert_eq!(Solver::try_from("cnfs/unsat.cnf").expect("can't load").solve(), Ok(Certificate::UNSAT));
+/// assert_eq!(Solver::try_from(Path::new("cnfs/unsat.cnf")).expect("can't load").solve(), Ok(Certificate::UNSAT));
 /// ```
 #[derive(Clone, Debug, Default)]
 pub struct Solver {
@@ -115,7 +116,9 @@ impl Solver {
     /// return an iterator on Solver. **Requires 'incremental_solver' feature**
     ///```ignore
     ///use splr::Solver;
-    ///for v in Solver::try_from("cnfs/sample.cnf").expect("panic").iter() {
+    ///use std::path::Path;
+    ///
+    ///for v in Solver::try_from(Path::new("cnfs/sample.cnf")).expect("panic").iter() {
     ///    println!(" - answer: {:?}", v);
     ///}
     ///```

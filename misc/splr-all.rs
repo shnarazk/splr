@@ -1,7 +1,7 @@
 #![cfg(feature = "incremental_solver")]
 use ::cnf::*;
 use splr::*;
-use std::env::args;
+use std::{env::args, path::Path};
 /// All solutions solver implementation based on feature 'incremental solver'
 /// But the main purpose is to check the correctness of the implementaion of
 /// feature 'incremental solver'.
@@ -12,14 +12,13 @@ use std::env::args;
 ///```
 
 fn main() {
-    let cnf_file = args().nth(1).expect("takes an arg");
-    run(&cnf_file);
+    let cnf_file: String = args().nth(1).expect("takes an arg");
+    run(Path::new(&cnf_file));
 }
 
-fn run(cnf_file: &str) -> Vec<Vec<i32>> {
-    let path = std::path::PathBuf::from(cnf_file);
-    let name = path.file_stem().expect("It seems a strange filename");
-    let mut cnf = CNF::load(&path).expect("fail to load");
+fn run(cnf_file: &Path) -> Vec<Vec<i32>> {
+    let name = cnf_file.file_stem().expect("It seems a strange filename");
+    let mut cnf = CNF::load(cnf_file).expect("fail to load");
     println!("{cnf}");
     let mut solver = Solver::try_from(cnf_file).expect("panic");
     let mut count = 0;
@@ -30,13 +29,13 @@ fn run(cnf_file: &str) -> Vec<Vec<i32>> {
         solutions.push(res);
         cnf.add_clause(refuter).expect("An internal error");
         let dump_name = format!("{}-refuting-{count}.cnf", name.to_string_lossy());
-        let dump = std::path::PathBuf::from(&dump_name);
-        cnf.save(&dump).expect("???");
+        let dump = Path::new(&dump_name);
+        cnf.save(dump).expect("???");
         println!("s SATISFIABLE({count}) => {dump_name}");
     }
     let dump_name = format!("{}-refuting-all{count}.cnf", name.to_string_lossy());
-    let dump = std::path::PathBuf::from(&dump_name);
-    cnf.save(&dump).expect("???");
+    let dump = Path::new(&dump_name);
+    cnf.save(dump).expect("???");
     println!("#solution: {count} => {dump_name}");
     solutions
 }

@@ -23,8 +23,9 @@ It adopts various research results on SAT solvers:
 
 ```
 use splr::*;
+use std::path::Path;
 
-let config = Config::from("cnfs/sample.cnf");
+let config = Config::from(Path::new("cnfs/sample.cnf"));
 if let Ok(mut s) = Solver::build(&config) {
     if let Ok(ans) = s.solve() {
         println!("{:?}", ans);

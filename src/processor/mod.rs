@@ -6,7 +6,9 @@
 //!
 //!```
 //!  use splr::{processor::{self, Eliminator, EliminateIF}, solver::Solver, types::{Instantiate, PropertyDereference}};
-//!  let mut s = Solver::try_from("cnfs/sample.cnf").expect("failed to load");
+//!  use std::path::Path;
+//!
+//!  let mut s = Solver::try_from(Path::new("cnfs/sample.cnf")).expect("failed to load");
 //!  let Solver {
 //!      ref mut asg,
 //!      ref mut cdb,
@@ -109,6 +111,7 @@ pub struct Eliminator {
 mod tests {
     use super::*;
     use crate::{assign::VarManipulateIF, processor::EliminateIF, solver::Solver};
+    use std::path::Path;
 
     #[test]
     fn check_elimination() {
@@ -117,7 +120,7 @@ mod tests {
             return;
         }
         config.quiet_mode = true;
-        let mut s = Solver::try_from("cnfs/sample.cnf").expect("failed to load");
+        let mut s = Solver::try_from(Path::new("cnfs/sample.cnf")).expect("failed to load");
         let Solver {
             ref mut asg,
             ref mut cdb,
