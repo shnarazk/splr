@@ -12,6 +12,7 @@ use {
 use std::{
     fs::File,
     io::{BufRead, BufReader, Write},
+    path::Path,
 };
 
 /// API for SAT solver creation and modification.
@@ -28,8 +29,9 @@ pub trait SatSolverIF: Instantiate {
     /// ```
     /// use crate::splr::*;
     /// use crate::splr::assign::VarManipulateIF;    // for s.asg.assign()
+    /// use std::path::Path;
     ///
-    /// let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
+    /// let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
     /// assert!(s.add_assignment(1).is_ok());
     /// assert_eq!(s.asg.assign(1), Some(true));
     /// assert!(s.add_assignment(2).is_ok());
@@ -53,8 +55,9 @@ pub trait SatSolverIF: Instantiate {
     /// # Example
     ///```
     /// use crate::splr::*;
+    /// use std::path::Path;
     ///
-    /// let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
+    /// let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
     /// assert!(s.add_clause(vec![1, -2]).is_ok());
     /// assert!(s.add_clause(vec![2, -3]).is_ok());
     /// assert!(s.add_clause(vec![3, 4]).is_ok());
@@ -74,8 +77,9 @@ pub trait SatSolverIF: Instantiate {
     /// # Example
     /// ```
     /// use crate::splr::*;
+    /// use std::path::Path;
     ///
-    /// let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
+    /// let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
     /// assert_eq!(s.asg.num_vars, 8);
     /// assert!(matches!(s.add_assignment(9), Err(SolverError::OutOfRange)));
     /// s.add_assignment(1).expect("panic");
@@ -139,17 +143,18 @@ where
 }
 
 #[cfg(not(feature = "no_IO"))]
-impl TryFrom<&str> for Solver {
+impl TryFrom<&Path> for Solver {
     type Error = SolverError;
     /// return a new solver build for a CNF file.
     ///
     /// # Example
     /// ```
     /// use crate::splr::solver::{SatSolverIF, Solver};
+    /// use std::path::Path;
     ///
-    /// let mut s = Solver::try_from("cnfs/sample.cnf").expect("fail to load");
+    /// let mut s = Solver::try_from(Path::new("cnfs/sample.cnf")).expect("fail to load");
     ///```
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
+    fn try_from(s: &Path) -> Result<Self, Self::Error> {
         let config = Config::from(s);
         Solver::build(&config)
     }
@@ -217,7 +222,7 @@ impl SatSolverIF for Solver {
     ///```
     #[cfg(not(feature = "no_IO"))]
     fn build(config: &Config) -> Result<Solver, SolverError> {
-        let CNFReader { cnf, reader } = CNFReader::try_from(&config.cnf_file)?;
+        let CNFReader { cnf, reader } = CNFReader::try_from(Path::new(&config.cnf_file))?;
         Solver::instantiate(config, &cnf).inject(reader)
     }
     fn reset(&mut self) {
@@ -230,10 +235,14 @@ impl SatSolverIF for Solver {
         cdb.handle(SolverEvent::Reinitialize);
         state.handle(SolverEvent::Reinitialize);
 
-        let mut tmp = Vec::new();
-        std::mem::swap(&mut tmp, &mut cdb.eliminated_permanent);
-        while let Some(mut vec) = tmp.pop() {
-            cdb.new_clause(asg, &mut vec, false);
+        #[cfg(not(feature = "no_clause_elimination"))]
+        {
+            let mut tmp = Vec::new();
+            std::mem::swap(&mut tmp, &mut cdb.eliminated_permanent);
+            while let Some(mut vec) = tmp.pop() {
+                // TODO: handle unit clauses
+                cdb.new_clause(asg, &mut vec, false);
+            }
         }
     }
     #[cfg(not(feature = "no_IO"))]
@@ -390,11 +399,12 @@ impl Solver {
 mod tests {
     // use super::*;
     use crate::*;
+    use std::path::Path;
 
     #[cfg(not(feature = "no_IO"))]
     #[test]
     fn test_add_var() {
-        let mut s = Solver::try_from("cnfs/uf8.cnf").expect("can't load");
+        let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
         assert_eq!(s.asg.num_vars, 8);
         assert!(matches!(s.add_assignment(9), Err(SolverError::OutOfRange)));
         s.add_assignment(1).expect("panic");

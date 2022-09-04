@@ -1,7 +1,7 @@
 use std::{
     env,
     fs::{self, File},
-    path::PathBuf,
+    path::Path,
     process::{Command, Stdio},
 };
 
@@ -20,10 +20,13 @@ for f in ${UUF250}*.cnf; do
 
 fn main() {
     if let Some(uuf250) = env::args().nth(1) {
-        let path = PathBuf::from(uuf250);
-        for e in path.read_dir().expect(&format!("not exist {:?}", path)) {
+        let path = Path::new(&uuf250);
+        for e in path
+            .read_dir()
+            .unwrap_or_else(|_| panic!("not exist {:?}", path))
+        {
             if let Ok(cnf) = e.map(|e| e.path()) {
-                if let Some(target) = cnf.file_name().map(PathBuf::from) {
+                if let Some(target) = cnf.file_name().map(Path::new) {
                     let out = target.with_extension("out");
                     let drat = target.with_extension("drat");
                     let grat = target.with_extension("grat");

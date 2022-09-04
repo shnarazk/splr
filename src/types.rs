@@ -15,7 +15,7 @@ use std::{
     io::{BufRead, BufReader},
     num::NonZeroU32,
     ops::{Index, IndexMut, Not},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 /// API for accessing internal data in a module.
@@ -484,16 +484,9 @@ pub struct CNFReader {
     pub reader: BufReader<File>,
 }
 
-impl TryFrom<&str> for CNFReader {
+impl TryFrom<&Path> for CNFReader {
     type Error = SolverError;
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        CNFReader::try_from(&PathBuf::from(s))
-    }
-}
-
-impl TryFrom<&PathBuf> for CNFReader {
-    type Error = SolverError;
-    fn try_from(path: &PathBuf) -> Result<Self, Self::Error> {
+    fn try_from(path: &Path) -> Result<Self, Self::Error> {
         let pathname = if path.to_string_lossy().is_empty() {
             "--".to_string()
         } else {
@@ -727,9 +720,11 @@ pub enum VarState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
+
     #[test]
     fn test_cnf() {
-        if let Ok(reader) = CNFReader::try_from("cnfs/sample.cnf") {
+        if let Ok(reader) = CNFReader::try_from(Path::new("cnfs/sample.cnf")) {
             assert_eq!(reader.cnf.num_of_variables, 250);
             assert_eq!(reader.cnf.num_of_clauses, 1065);
         } else {

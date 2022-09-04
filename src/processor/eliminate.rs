@@ -339,6 +339,7 @@ mod tests {
         processor::EliminateIF,
         solver::Solver,
     };
+    use ::std::path::Path;
 
     impl Clause {
         #[allow(dead_code)]
@@ -364,7 +365,10 @@ mod tests {
             ref mut cdb,
             ref mut state,
             ..
-        } = Solver::try_from("cnfs/uf8.cnf").expect("failed to load");
+        } = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("failed to load");
+        if !state.config.enable_eliminator {
+            return;
+        }
         let mut timedout = 10_000;
         let vi = 4;
 

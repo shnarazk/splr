@@ -248,6 +248,7 @@ impl ClauseDBIF for ClauseDB {
         vec: &mut Vec<Lit>,
         learnt: bool,
     ) -> RefClause {
+        debug_assert!(!vec.is_empty());
         debug_assert!(1 < vec.len());
         debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{:?}", vec,);
         if vec.len() == 2 {

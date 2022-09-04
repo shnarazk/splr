@@ -928,7 +928,7 @@ impl IndexMut<LogF64Id> for ProgressRecord {
 pub mod property {
     use super::*;
 
-    #[derive(Clone, Copy, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tusize {
         /// the number of vivification
         Vivification,
@@ -971,7 +971,7 @@ pub mod property {
         }
     }
 
-    #[derive(Clone, Copy, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum TEma {
         BackjumpLevel,
         ConflictLevel,

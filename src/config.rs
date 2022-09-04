@@ -59,6 +59,7 @@ pub struct Config {
     //
     //## eliminator
     //
+    pub enable_eliminator: bool,
     /// Max #lit for clause subsume
     pub elm_cls_lim: usize,
 
@@ -101,6 +102,7 @@ impl Default for Config {
 
             crw_dcy_rat: 0.95,
 
+            enable_eliminator: !cfg!(feature = "no_clause_elimination"),
             elm_cls_lim: 64,
             elm_grw_lim: 0,
             elm_var_occ: 20000,
@@ -247,7 +249,7 @@ impl Config {
                 "binary clause completion",
                 #[cfg(feature = "chrono_BT")]
                 "chrono BT",
-                #[cfg(feature = "clause_elimination")]
+                #[cfg(not(feature = "no_clause_elimination"))]
                 "stage-based clause elimination",
                 #[cfg(feature = "clause_vivification")]
                 "stage-based clause vivification",
@@ -393,7 +395,7 @@ pub mod property {
     use super::Config;
     use crate::types::*;
 
-    #[derive(Clone, Copy, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tf64 {
         #[cfg(feature = "clase_rewarding")]
         ClauseRewardDecayRate,
