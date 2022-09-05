@@ -1,4 +1,4 @@
-## 0.16.0, 2022-09-0?
+## 0.16.0, 2022-09-05
 
 - (Breaking change) methods to read a file take `std::path::Path` instead of `&str`
 - (WIP) re-implement feature 'incremental solver' correctly
