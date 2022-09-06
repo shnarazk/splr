@@ -1,10 +1,9 @@
-## 0.16.0, 2022-09-05
+## 0.16.0, 2022-09-06
 
 - (Breaking change) methods to read a file take `std::path::Path` instead of `&str`
 - (WIP) re-implement feature 'incremental solver' correctly
 - Define feature 'no_clause_elimination' instead of 'clause_elimination', which is activated
   by feature 'incremental_solver' automatically
-- cargo clippy
 
 ## 0.15.0, 2022-05-15
 
