@@ -22,8 +22,8 @@ fn run(_cnf_file: &Path) -> Vec<Vec<i32>> {
 
 #[cfg(feature = "incremental_solver")]
 fn run(cnf_file: &Path) -> Vec<Vec<i32>> {
+    use splr::cnf::*;
     use splr::*;
-    use splr_cnf::*;
     let mut solutions = Vec::new();
     let name = cnf_file.file_stem().expect("It seems a strange filename");
     let mut cnf = match CNF::load(cnf_file) {
