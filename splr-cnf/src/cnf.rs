@@ -122,6 +122,7 @@ impl CnfIf for CNF {
             buf.clear();
             match reader.read_line(&mut buf) {
                 Ok(0) => break,
+                Ok(_) if buf == "\n" => (),
                 Ok(_) if buf.starts_with('c') => (),
                 Ok(_) if found_valid_header => {
                     let mut vec: Vec<i32> = Vec::new();
@@ -133,7 +134,7 @@ impl CnfIf for CNF {
                             vec.push(l);
                         }
                     }
-                    // assert!(!vec.is_empty());
+                    debug_assert!(!vec.is_empty());
                     if let Err(e) = cnf.add_clause(vec) {
                         if e == CNFOperationError::AddingClauseExists {
                             clause_extists_already = true;
