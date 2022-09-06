@@ -1,7 +1,7 @@
 ## 0.16.0, 2022-09-06
 
 - (Breaking change) methods to read a file take `std::path::Path` instead of `&str`
-- (WIP) re-implement feature 'incremental solver' correctly
+- Re-implement feature 'incremental_solver' correctly
 - Define feature 'no_clause_elimination' instead of 'clause_elimination', which is activated
   by feature 'incremental_solver' automatically
 
