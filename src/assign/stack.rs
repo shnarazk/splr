@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 use {
     super::{
-        ema::ProgressASG, AssignIF, AssignStack, TrailSavingIF, Var, VarHeapIF, VarIdHeap,
-        VarManipulateIF, VarSelectIF,
+        ema::ProgressASG, AssignIF, AssignStack, PropagateIF, TrailSavingIF, Var, VarHeapIF,
+        VarIdHeap, VarManipulateIF,
     },
     crate::{cdb::ClauseDBIF, types::*},
     std::{fmt, ops::Range, slice::Iter},
@@ -145,15 +145,14 @@ impl Instantiate for AssignStack {
                 self.var.push(Var::default());
             }
             SolverEvent::Reinitialize => {
+                self.cancel_until(self.root_level);
                 debug_assert_eq!(self.decision_level(), self.root_level);
-                self.q_head = 0;
-                self.num_asserted_vars = 0;
-                self.num_eliminated_vars = self
-                    .var
-                    .iter()
-                    .filter(|v| v.is(FlagVar::ELIMINATED))
-                    .count();
-                self.rebuild_order();
+                self.clear_saved_trail();
+                // self.num_eliminated_vars = self
+                //     .var
+                //     .iter()
+                //     .filter(|v| v.is(FlagVar::ELIMINATED))
+                //     .count();
             }
             e => panic!("don't call asg with {:?}", e),
         }
@@ -204,6 +203,7 @@ impl AssignIF for AssignStack {
     #[allow(unused_variables)]
     fn extend_model(&mut self, cdb: &mut impl ClauseDBIF) -> Vec<Option<bool>> {
         let lits = &self.eliminated;
+
         #[cfg(feature = "trace_elimination")]
         println!(
             "# extend_model\n - as i32: {:?}\n - as raw: {:?}",
@@ -234,17 +234,19 @@ impl AssignIF for AssignStack {
             let reason_literals = target_index + 1..=last_lit_index;
             i = target_index;
 
-            #[cfg(feature = "incremental_solver")]
-            {
-                cdb.new_clause(
-                    self,
-                    &mut lits[target_index..=last_lit_index]
-                        .iter()
-                        .copied()
-                        .collect::<Vec<Lit>>(),
-                    false,
-                );
-            }
+            // #[cfg(feature = "incremental_solver")]
+            // {
+            //     if target_index < last_lit_index {
+            //         cdb.new_clause(
+            //             self,
+            //             &mut lits[target_index..=last_lit_index].to_vec(),
+            //             false,
+            //         );
+            //     } else if target_index == last_lit_index {
+            //         self.assumption.push(lits[target_index]);
+            //         dbg!(lits[target_index]);
+            //     }
+            // }
 
             debug_assert!(
                 lits[reason_literals.clone()]

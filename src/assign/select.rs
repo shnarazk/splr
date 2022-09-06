@@ -8,7 +8,7 @@ use {
     crate::types::*,
 };
 
-/// ```
+/// ```ignore
 /// let x: Option<bool> = var_assign!(self, lit.vi());
 /// ```
 #[cfg(feature = "unsafe_access")]

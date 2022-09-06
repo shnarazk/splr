@@ -23,7 +23,7 @@ pub use self::{
 use crate::{assign::AssignStack, cdb::ClauseDB, state::*, types::*};
 
 /// Normal results returned by Solver.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum Certificate {
     /// It is satisfiable; `vec` is such an assignment sorted by var order.
     SAT(Vec<i32>),
@@ -67,8 +67,9 @@ pub enum SolverEvent {
 /// ```
 /// use crate::splr::*;
 /// use crate::splr::{assign::{AssignIF, VarManipulateIF}, state::{State, StateIF}, types::*};
+/// use std::path::Path;
 ///
-/// let mut s = Solver::try_from("cnfs/sample.cnf").expect("can't load");
+/// let mut s = Solver::try_from(Path::new("cnfs/sample.cnf")).expect("can't load");
 /// assert_eq!(s.asg.derefer(assign::property::Tusize::NumVar), 250);
 /// assert_eq!(s.asg.derefer(assign::property::Tusize::NumUnassertedVar), 250);
 /// if let Ok(Certificate::SAT(v)) = s.solve() {
@@ -78,7 +79,7 @@ pub enum SolverEvent {
 /// } else {
 ///     panic!("It should be satisfied!");
 /// }
-/// assert_eq!(Solver::try_from("cnfs/unsat.cnf").expect("can't load").solve(), Ok(Certificate::UNSAT));
+/// assert_eq!(Solver::try_from(Path::new("cnfs/unsat.cnf")).expect("can't load").solve(), Ok(Certificate::UNSAT));
 /// ```
 #[derive(Clone, Debug, Default)]
 pub struct Solver {
@@ -113,8 +114,11 @@ pub struct SolverIter<'a> {
 #[cfg(feature = "incremental_solver")]
 impl Solver {
     /// return an iterator on Solver. **Requires 'incremental_solver' feature**
-    ///```
-    ///for v in Solver::try_from("cnfs/sample.cnf").expect("panic").iter() {
+    ///```ignore
+    ///use splr::Solver;
+    ///use std::path::Path;
+    ///
+    ///for v in Solver::try_from(Path::new("cnfs/sample.cnf")).expect("panic").iter() {
     ///    println!(" - answer: {:?}", v);
     ///}
     ///```
@@ -131,9 +135,11 @@ impl<'a> Iterator for SolverIter<'a> {
     type Item = Vec<i32>;
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(ref v) = self.refute {
+            debug_assert!(1 < v.len());
             match self.solver.add_clause(v) {
                 Err(SolverError::Inconsistent) => return None,
-                Err(e) => panic!("s UNKNOWN: {:?}", e),
+                Err(SolverError::EmptyClause) => return None,
+                Err(e) => panic!("s UNKNOWN: {:?} by adding {:?}", e, v),
                 Ok(_) => self.solver.reset(),
             }
             self.refute = None;
@@ -258,5 +264,18 @@ mod tests {
             vec![-3i32],
         );
         sat!(vec![&v1, &v2, &v3, &v4, &v5]); // : Vec<&[i32]>
+    }
+
+    #[cfg(feature = "incremental_solver")]
+    #[test]
+    fn test_solver_iter() {
+        let mut slv = Solver::instantiate(
+            &Config::default(),
+            &CNFDescription {
+                num_of_variables: 8,
+                ..CNFDescription::default()
+            },
+        );
+        assert_eq!(slv.iter().count(), 256);
     }
 }

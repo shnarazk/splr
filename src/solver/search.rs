@@ -81,7 +81,7 @@ impl SolveIF for Solver {
                 return Ok(Certificate::UNSAT);
             }
 
-            #[cfg(feature = "clause_elimination")]
+            #[cfg(not(feature = "no_clause_elimination"))]
             {
                 const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
 
@@ -280,7 +280,7 @@ fn search(
                     }
                     if new_segment {
                         asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
-                        if cfg!(feature = "clause_elimination") {
+                        if !cfg!(feature = "no_clause_elimination") {
                             let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                             elim.simplify(asg, cdb, state, false)?;
                             asg.eliminated.append(elim.eliminated_lits());

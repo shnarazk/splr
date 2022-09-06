@@ -49,8 +49,8 @@ impl StageManager {
         self.scale = 1;
         self.end_of_stage = unit_size;
     }
-    /// return:
-    /// - Some(true): it's a beginning of a new cycle and a new 2nd-level cycle.
+    /// returns:
+    /// - Some(true): it's a beginning of a new cycle and a new cycle, a 2nd-level group.
     /// - Some(false): a beginning of a new cycle.
     /// - None: the other case.
     pub fn prepare_new_stage(&mut self, rescale: usize, now: usize) -> Option<bool> {
@@ -100,13 +100,15 @@ impl StageManager {
     pub fn current_segment(&self) -> usize {
         self.segment
     }
+    /// returns a recommending number of redicible learnt clauses, based on
+    /// the length of span.
     pub fn num_reducible(&self) -> usize {
         const REDUCTION_FACTOR: f64 = 2.0;
         let span = self.current_span();
         let keep = (REDUCTION_FACTOR * (self.unit_size as f64).powf(0.75)) as usize;
         span.saturating_sub(keep)
     }
-    /// return the maximum factor so far.
+    /// returns the maximum factor so far.
     /// None: `luby_iter.max_value` holds the maximum value so far.
     /// This means it is the value found at the last segment.
     /// So the current value should be the next value, which is the double.
