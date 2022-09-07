@@ -92,7 +92,7 @@ pub trait SatSolverIF: Instantiate {
     /// assert!(s.add_assignment(-9).is_ok());
     /// assert_eq!(s.solve(), Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8, -9])));
     /// ```
-    fn add_var(&mut self) -> usize;
+    fn add_var(&mut self) -> VarId;
     #[cfg(not(feature = "no_IO"))]
     /// make a solver and load a CNF into it.
     ///
@@ -199,7 +199,7 @@ impl SatSolverIF for Solver {
         }
         Ok(self)
     }
-    fn add_var(&mut self) -> usize {
+    fn add_var(&mut self) -> VarId {
         let Solver {
             ref mut asg,
             ref mut cdb,
@@ -209,7 +209,7 @@ impl SatSolverIF for Solver {
         asg.handle(SolverEvent::NewVar);
         cdb.handle(SolverEvent::NewVar);
         state.handle(SolverEvent::NewVar);
-        asg.num_vars
+        asg.num_vars as VarId
     }
     /// # Examples
     ///

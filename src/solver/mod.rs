@@ -278,4 +278,40 @@ mod tests {
         );
         assert_eq!(slv.iter().count(), 256);
     }
+    #[cfg(feature = "incremental_solver")]
+    #[test]
+    fn test_add_var_on_incremental_solver() {
+        let mut slv = Solver::instantiate(
+            &Config::default(),
+            &CNFDescription {
+                num_of_variables: 4,
+                ..CNFDescription::default()
+            },
+        );
+        assert!(slv.add_clause(vec![-1, -2]).is_ok());
+        assert!(slv.add_clause(vec![-3, -4]).is_ok());
+        assert!(slv.add_assignment(-2).is_ok());
+        let a = slv.add_var() as i32;
+        assert!(slv.add_clause(vec![1, 3, 4, -a]).is_ok());
+        assert!(slv.add_clause(vec![1, -3, -4, -a]).is_ok());
+        assert!(slv.add_clause(vec![-1, 3, -4, -a]).is_ok());
+        assert!(slv.add_clause(vec![-1, -3, 4, -a]).is_ok());
+        assert!(slv.add_clause(vec![-1, -3, -4, a]).is_ok());
+        assert!(slv.add_clause(vec![-1, 3, 4, a]).is_ok());
+        assert!(slv.add_clause(vec![1, -3, 4, a]).is_ok());
+        assert!(slv.add_clause(vec![1, 3, -4, a]).is_ok());
+        let b = slv.add_var() as i32;
+        assert!(slv.add_clause(vec![1, 3, -b]).is_ok());
+        assert!(slv.add_clause(vec![1, 4, -b]).is_ok());
+        assert!(slv.add_clause(vec![3, 4, -b]).is_ok());
+        assert!(slv.add_clause(vec![-1, -3, b]).is_ok());
+        assert!(slv.add_clause(vec![-1, -4, b]).is_ok());
+        assert!(slv.add_clause(vec![-3, -4, b]).is_ok());
+        assert!(slv.add_clause(vec![-1, -b]).is_ok());
+        assert!(slv.add_clause(vec![-a, -b]).is_ok());
+        // let solns: Vec<Vec<i32>> = slv.iter().collect();
+        // Use the result of
+        // cargo run --features incremental_solver --example all-solutions -- cnfs/isseu-182.cnf
+        assert_eq!(slv.iter().count(), 4);
+    }
 }

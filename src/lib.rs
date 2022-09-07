@@ -55,6 +55,8 @@ This document covers extra functions only if you built it with `cargo doc --feat
 pub mod assign;
 /// Crate `cdb` provides [`Clause`](`crate::cdb::Clause`) object and its manager [`ClauseDB`](`crate::cdb::ClauseDB`).
 pub mod cdb;
+/// Crate `cnf` provides basic operations on CNF files
+pub mod cnf;
 /// Crate `config` provides solver's configuration and CLI.
 pub mod config;
 /// Crate `primitive` provides some fundamental data structures.
