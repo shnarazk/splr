@@ -143,6 +143,8 @@ impl Instantiate for AssignStack {
                 self.expand_heap();
                 self.num_vars += 1;
                 self.var.push(Var::default());
+                #[cfg(feature = "trail_saving")]
+                self.reason_saved.push(AssignReason::None);
             }
             SolverEvent::Reinitialize => {
                 self.cancel_until(self.root_level);
