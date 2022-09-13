@@ -61,9 +61,10 @@ impl VarHeapIF for AssignStack {
         self.var_order.clear();
     }
     fn expand_heap(&mut self) {
-        self.var_order.heap.push(0);
-        self.var_order.idxs.push(0);
-        self.var_order.clear();
+        // Fill a new slot with the value that would be used in VarIdHeap::new.
+        let id = self.var_order.heap.len() as u32;
+        self.var_order.heap.push(id);
+        self.var_order.idxs.push(id);
     }
     fn update_heap(&mut self, v: VarId) {
         debug_assert!(v != 0, "Invalid VarId");

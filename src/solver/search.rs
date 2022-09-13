@@ -53,6 +53,11 @@ impl SolveIF for Solver {
         if cdb.check_size().is_err() {
             return Err(SolverError::OutOfMemory);
         }
+        #[cfg(feature = "incremental_solver")]
+        {
+            // Reinitialize AssignStack::var_order with respect for assignments.
+            asg.rebuild_order();
+        }
         state.progress_header();
         state.progress(asg, cdb);
         state.flush("");

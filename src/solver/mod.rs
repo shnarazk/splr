@@ -314,4 +314,38 @@ mod tests {
         // cargo run --features incremental_solver --example all-solutions -- cnfs/isseu-182.cnf
         assert_eq!(slv.iter().count(), 4);
     }
+    #[cfg(feature = "incremental_solver")]
+    #[test]
+    // There was an inconsAssignStack::istency in AssignStack::var_order.
+    fn test_add_var_and_add_assignment() {
+        let mut slv = Solver::instantiate(
+            &Config::default(),
+            &CNFDescription {
+                num_of_variables: 3 as usize,
+                ..CNFDescription::default()
+            },
+        );
+
+        slv.add_var();
+        assert!(slv.add_clause(vec![-1, 4]).is_ok());
+        slv.add_var();
+        assert!(slv.add_clause(vec![-2, 5]).is_ok());
+        slv.add_var();
+        assert!(slv.add_clause(vec![-1, -2, 6]).is_ok());
+        slv.add_var();
+        assert!(slv.add_clause(vec![-5, 7]).is_ok());
+        slv.add_var();
+        assert!(slv.add_clause(vec![-6, 8]).is_ok());
+        slv.add_var();
+        assert!(slv.add_clause(vec![-4, 9]).is_ok());
+        slv.add_var();
+        assert!(slv.add_clause(vec![-3, 10]).is_ok());
+        slv.add_var();
+        assert!(slv.add_clause(vec![-5, -3, 11]).is_ok());
+        assert!(slv.add_clause(vec![-6, -3, 11]).is_ok());
+        slv.add_var();
+        assert!(slv.add_clause(vec![-4, -3, 12]).is_ok());
+        assert!(slv.add_assignment(-11).is_ok());
+        assert!(slv.solve().is_ok());
+    }
 }
