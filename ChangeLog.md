@@ -1,3 +1,8 @@
+## 0.16.3, 2022-09-16
+
+- Fix another bug on `add_var` and `add_assignment` (#183)
+- Re-organize cnf module
+
 ## 0.16.2, 2022-09-07
 
 - (Breaking change) methods to read a file take `std::path::Path` instead of `&str`
