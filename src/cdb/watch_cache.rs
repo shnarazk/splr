@@ -20,7 +20,7 @@ pub trait WatchCacheIF {
 
 impl WatchCacheIF for WatchCacheList {
     fn get_watch(&self, cid: &ClauseId) -> Option<&Lit> {
-        self.iter().find_map(|e| (e.0 == *cid).then(|| &e.1))
+        self.iter().find_map(|e| (e.0 == *cid).then_some(&e.1))
     }
     fn remove_watch(&mut self, cid: &ClauseId) {
         if let Some(i) = self.iter().position(|e| e.0 == *cid) {
@@ -106,7 +106,7 @@ impl Iterator for WatchCacheIterator {
     type Item = WatchCacheProxy;
     fn next(&mut self) -> Option<Self::Item> {
         // assert!(self.checksum == self.end_at - self.index);
-        (self.index < self.end_at).then(|| {
+        (self.index < self.end_at).then_some({
             // assert!(0 < self.checksum);
             // self.checksum -= 1;
             self.index
