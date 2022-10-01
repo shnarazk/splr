@@ -279,6 +279,7 @@ fn search(
                 let scale = state.stm.current_scale();
                 let max_scale = state.stm.max_scale();
                 if let Some(new_segment) = next_stage {
+                    #[cfg(feature = "rephase")]
                     asg.select_rephasing_target();
                     if cfg!(feature = "clause_vivification") {
                         cdb.vivify(asg, state)?;
