@@ -10,12 +10,6 @@ use {
     std::{fmt, ops::Range, slice::Iter},
 };
 
-#[cfg(not(feature = "no_IO"))]
-use std::{
-    fs::File,
-    io::{BufWriter, Write},
-};
-
 impl Default for AssignStack {
     fn default() -> AssignStack {
         AssignStack {
@@ -278,40 +272,6 @@ impl AssignIF for AssignStack {
             }
         }
         false
-    }
-    /// dump all active clauses and assertions as a CNF file.
-    #[cfg(not(feature = "no_IO"))]
-    fn dump_cnf(&mut self, cdb: &impl ClauseDBIF, fname: &str) {
-        for vi in 1..self.var.len() {
-            if self.var(vi).is(FlagVar::ELIMINATED) && self.assign[vi].is_some() {
-                panic!("conflicting var {} {:?}", vi, self.assign[vi]);
-            }
-        }
-        if let Ok(out) = File::create(&fname) {
-            let mut buf = BufWriter::new(out);
-            let nv = self.num_vars;
-            let na = self.len_upto(0);
-            // let nc: usize = cdb.derefer(cdb::property::Tusize::NumClause);
-            let nc = cdb.iter().skip(1).filter(|c| !c.is_dead()).count();
-
-            buf.write_all(format!("p cnf {} {}\n", nv, nc + na).as_bytes())
-                .unwrap();
-            for c in cdb.iter().skip(1) {
-                if c.is_dead() {
-                    continue;
-                }
-                for l in c.iter() {
-                    buf.write_all(format!("{} ", i32::from(*l)).as_bytes())
-                        .unwrap();
-                }
-                buf.write_all(b"0\n").unwrap();
-            }
-            buf.write_all(b"c from trail\n").unwrap();
-            for x in self.trail.iter().take(self.len_upto(0)) {
-                buf.write_all(format!("{} 0\n", i32::from(*x)).as_bytes())
-                    .unwrap();
-            }
-        }
     }
 }
 

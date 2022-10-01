@@ -11,7 +11,7 @@ use {
 #[cfg(not(feature = "no_IO"))]
 use std::{
     fs::File,
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader},
     path::Path,
 };
 
@@ -109,7 +109,7 @@ pub trait SatSolverIF: Instantiate {
     fn save_certification(&mut self);
     #[cfg(not(feature = "no_IO"))]
     /// dump the current status as a CNF
-    fn dump_cnf(&self, fname: &str);
+    fn dump_cnf(&self, fname: &Path);
 }
 
 impl Instantiate for Solver {
@@ -251,37 +251,10 @@ impl SatSolverIF for Solver {
         self.cdb.certificate_save();
     }
     #[cfg(not(feature = "no_IO"))]
-    fn dump_cnf(&self, fname: &str) {
-        let nv = self.asg.derefer(crate::assign::property::Tusize::NumVar);
-        for vi in 1..nv {
-            if self.asg.var(vi).is(FlagVar::ELIMINATED) && self.asg.assign(vi).is_some() {
-                panic!("conflicting var {} {:?}", vi, self.asg.assign(vi));
-            }
-        }
-        if let Ok(out) = File::create(&fname) {
-            let mut buf = std::io::BufWriter::new(out);
-            let na = self
-                .asg
-                .derefer(crate::assign::property::Tusize::NumAssertedVar);
-            let nc = self.cdb.iter().skip(1).filter(|c| !c.is_dead()).count();
-            buf.write_all(format!("p cnf {} {}\n", nv, nc + na).as_bytes())
-                .unwrap();
-            for c in self.cdb.iter().skip(1) {
-                if c.is_dead() {
-                    continue;
-                }
-                for l in c.iter() {
-                    buf.write_all(format!("{} ", i32::from(*l)).as_bytes())
-                        .unwrap();
-                }
-                buf.write_all(b"0\n").unwrap();
-            }
-            buf.write_all(b"c from trail\n").unwrap();
-            for x in self.asg.stack_iter().take(self.asg.len_upto(0)) {
-                buf.write_all(format!("{} 0\n", i32::from(*x)).as_bytes())
-                    .unwrap();
-            }
-        }
+    /// dump all active clauses and assertions as a CNF file.
+    fn dump_cnf(&self, fname: &Path) {
+        let Solver { asg, cdb, .. } = self;
+        cdb.dump_cnf(asg, fname)
     }
 }
 

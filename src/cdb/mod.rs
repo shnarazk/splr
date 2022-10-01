@@ -35,6 +35,9 @@ use {
     watch_cache::*,
 };
 
+#[cfg(not(feature = "no_IO"))]
+use std::path::Path;
+
 /// API for Clause, providing literal accessors.
 pub trait ClauseIF {
     /// return true if it contains no literals; a clause after unit propagation.
@@ -170,6 +173,9 @@ pub trait ClauseDBIF:
     fn watch_caches(&self, cid: ClauseId, message: &str) -> (Vec<Lit>, Vec<Lit>);
     #[cfg(feature = "boundary_check")]
     fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool>;
+    #[cfg(not(feature = "no_IO"))]
+    /// dump all active clauses and assertions as a CNF file.
+    fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);
 }
 
 /// Clause identifier, or clause index, starting with one.
@@ -468,7 +474,7 @@ mod tests {
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
         assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
-        let mut iter = cdb[c1][0..].into_iter();
+        let mut iter = cdb[c1][0..].iter();
         assert_eq!(iter.next(), Some(&lit(1)));
         assert_eq!(iter.next(), Some(&lit(2)));
         assert_eq!(iter.next(), Some(&lit(3)));

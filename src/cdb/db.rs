@@ -14,6 +14,9 @@ use {
     },
 };
 
+#[cfg(not(feature = "no_IO"))]
+use std::{fs::File, io::Write, path::Path};
+
 impl Default for ClauseDB {
     fn default() -> ClauseDB {
         ClauseDB {
@@ -1187,6 +1190,38 @@ impl ClauseDBIF for ClauseDB {
     #[cfg(feature = "boundary_check")]
     fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool> {
         self[cid].is_dead().then(|| self.freelist.contains(&cid))
+    }
+    #[cfg(not(feature = "no_IO"))]
+    /// dump all active clauses and assertions as a CNF file.
+    fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path) {
+        let nv = asg.derefer(crate::assign::property::Tusize::NumVar);
+        for vi in 1..nv {
+            if asg.var(vi).is(FlagVar::ELIMINATED) && asg.assign(vi).is_some() {
+                panic!("conflicting var {} {:?}", vi, asg.assign(vi));
+            }
+        }
+        if let Ok(out) = File::create(&fname) {
+            let mut buf = std::io::BufWriter::new(out);
+            let na = asg.derefer(crate::assign::property::Tusize::NumAssertedVar);
+            let nc = self.iter().skip(1).filter(|c| !c.is_dead()).count();
+            buf.write_all(format!("p cnf {} {}\n", nv, nc + na).as_bytes())
+                .unwrap();
+            for c in self.iter().skip(1) {
+                if c.is_dead() {
+                    continue;
+                }
+                for l in c.iter() {
+                    buf.write_all(format!("{} ", i32::from(*l)).as_bytes())
+                        .unwrap();
+                }
+                buf.write_all(b"0\n").unwrap();
+            }
+            buf.write_all(b"c from trail\n").unwrap();
+            for x in asg.stack_iter().take(asg.len_upto(0)) {
+                buf.write_all(format!("{} 0\n", i32::from(*x)).as_bytes())
+                    .unwrap();
+            }
+        }
     }
 }
 
