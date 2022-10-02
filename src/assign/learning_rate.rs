@@ -35,6 +35,8 @@ impl AssignStack {
         for v in self.var.iter_mut().skip(1) {
             v.reward *= scaling;
         }
+        self.activity_decay = scaling;
+        self.activity_anti_decay = 1.0 - scaling;
     }
 }
 

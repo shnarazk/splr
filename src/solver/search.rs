@@ -285,7 +285,9 @@ fn search(
                         cdb.vivify(asg, state)?;
                     }
                     if new_segment {
-                        asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
+                        asg.rescale_activity(
+                            ((max_scale - scale) as f64 / max_scale as f64).powf(1.5),
+                        );
                         if !cfg!(feature = "no_clause_elimination") {
                             let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                             elim.simplify(asg, cdb, state, false)?;
