@@ -278,6 +278,13 @@ fn search(
                 );
                 let scale = state.stm.current_scale();
                 let max_scale = state.stm.max_scale();
+                asg.rescale_activity({
+                    let m = max_scale as f64;
+                    let s = scale as f64;
+                    // println!("{}/{}", m - s, m);
+                    ((m - s - 1.0) / m).powf(1.8)
+                    // ((max_scale - scale - 1) as f64 / max_scale as f64).powf(2.0)
+                });
                 if let Some(new_segment) = next_stage {
                     #[cfg(feature = "rephase")]
                     asg.select_rephasing_target();
@@ -285,9 +292,7 @@ fn search(
                         cdb.vivify(asg, state)?;
                     }
                     if new_segment {
-                        asg.rescale_activity(
-                            ((max_scale - scale - 1) as f64 / max_scale as f64).powf(2.0),
-                        );
+                        // asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
                         if !cfg!(feature = "no_clause_elimination") {
                             let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                             elim.simplify(asg, cdb, state, false)?;
