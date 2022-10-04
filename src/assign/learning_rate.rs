@@ -28,6 +28,10 @@ impl ActivityIF<VarId> for AssignStack {
     fn update_activity_tick(&mut self) {
         self.tick += 1;
     }
+    fn update_activity_decay(&mut self, scaling: f64) {
+        self.activity_decay = scaling;
+        self.activity_anti_decay = 1.0 - scaling;
+    }
 }
 
 impl AssignStack {
@@ -35,8 +39,6 @@ impl AssignStack {
         for v in self.var.iter_mut().skip(1) {
             v.reward *= scaling;
         }
-        self.activity_decay = scaling;
-        self.activity_anti_decay = 1.0 - scaling;
     }
 }
 

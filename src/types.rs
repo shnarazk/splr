@@ -67,7 +67,7 @@ pub trait ActivityIF<Ix> {
     /// update internal counter.
     fn update_activity_tick(&mut self);
     /// update reward decay.
-    fn update_activity_decay(&mut self, _index: Option<usize>) {
+    fn update_activity_decay(&mut self, _decay: f64) {
         #[cfg(debug)]
         todo!()
     }
