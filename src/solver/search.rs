@@ -286,7 +286,7 @@ fn search(
                     }
                     if new_segment {
                         asg.rescale_activity(
-                            ((max_scale - scale) as f64 / max_scale as f64).powf(1.5),
+                            ((max_scale - scale - 1) as f64 / max_scale as f64).powf(2.0),
                         );
                         if !cfg!(feature = "no_clause_elimination") {
                             let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
