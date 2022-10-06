@@ -23,13 +23,17 @@ impl VivifyIF for ClauseDB {
                 SolverError::RootLevelConflict(cc)
             })?;
         }
-        let mut clauses: Vec<OrderedProxy<ClauseId>> =
-            select_targets(asg, self, state[Stat::Restart] == 0, NUM_TARGETS);
+        let mut clauses: Vec<OrderedProxy<ClauseId>> = select_targets(
+            asg,
+            self,
+            (0 < state[Stat::Restart]).then_some(state[Stat::Vivification] % 3 == 0),
+            NUM_TARGETS,
+        );
         if clauses.is_empty() {
             return Ok(());
         }
-        let num_target = clauses.len();
         state[Stat::Vivification] += 1;
+        let num_target = clauses.len();
         // This is a reusable vector to reduce memory consumption,
         // the key is the number of invocation
         let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
@@ -185,39 +189,38 @@ impl VivifyIF for ClauseDB {
 fn select_targets(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
-    initial_stage: bool,
+    strategy: Option<bool>,
     len: Option<usize>,
 ) -> Vec<OrderedProxy<ClauseId>> {
-    if initial_stage {
-        let mut seen: Vec<Option<OrderedProxy<ClauseId>>> = vec![None; 2 * (asg.num_vars + 1)];
-        for (i, c) in cdb.iter().enumerate().skip(1) {
-            if let Some(rank) = c.to_vivify(true) {
-                let p = &mut seen[usize::from(c.lit0())];
-                if p.as_ref().map_or(0.0, |r| r.value()) < rank {
-                    *p = Some(OrderedProxy::new(ClauseId::from(i), rank));
-                }
-            }
-        }
-        let mut clauses = seen.iter().filter_map(|p| p.clone()).collect::<Vec<_>>();
+    if let Some(by_activity) = strategy {
+        let mut clauses: Vec<OrderedProxy<ClauseId>> = cdb
+            .iter()
+            .enumerate()
+            .skip(1)
+            .filter_map(|(i, c)| {
+                c.to_vivify(by_activity)
+                    .map(|r| OrderedProxy::new(ClauseId::from(i), r))
+            })
+            .collect::<Vec<_>>();
         if let Some(max_len) = len {
-            if 10 * max_len < clauses.len() {
+            if max_len < clauses.len() {
                 clauses.sort();
                 clauses.truncate(max_len);
             }
         }
         clauses
     } else {
-        let mut clauses: Vec<OrderedProxy<ClauseId>> = cdb
-            .iter()
-            .enumerate()
-            .skip(1)
-            .filter_map(|(i, c)| {
-                c.to_vivify(false)
-                    .map(|r| OrderedProxy::new_invert(ClauseId::from(i), r))
-            })
-            .collect::<Vec<_>>();
+        let mut seen: Vec<Option<OrderedProxy<ClauseId>>> = vec![None; 2 * (asg.num_vars + 1)];
+        for (i, c) in cdb.iter().enumerate().skip(1).filter(|(_, c)| !c.is_dead()) {
+            let rank = c.len() as f64;
+            let p = &mut seen[usize::from(c.lit0())];
+            if p.as_ref().map_or(0.0, |r| r.value()) < rank {
+                *p = Some(OrderedProxy::new(ClauseId::from(i), rank));
+            }
+        }
+        let mut clauses = seen.iter().filter_map(|p| p.clone()).collect::<Vec<_>>();
         if let Some(max_len) = len {
-            if max_len < clauses.len() {
+            if 10 * max_len < clauses.len() {
                 clauses.sort();
                 clauses.truncate(max_len);
             }
@@ -340,26 +343,24 @@ impl Clause {
     /// return `true` if the clause should try vivification.
     /// smaller is better.
     #[cfg(feature = "clause_rewarding")]
-    fn to_vivify(&self, initial_stage: bool) -> Option<f64> {
-        if initial_stage {
-            (!self.is_dead()).then(|| self.len() as f64)
-        } else {
-            (!self.is_dead()
-                && self.rank * 2 <= self.rank_old
-                && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
-            .then(|| self.reward)
-        }
+    fn to_vivify(&self, by_activity: bool) -> Option<f64> {
+        (!self.is_dead()
+            && self.rank * 2 <= self.rank_old
+            && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
+        .then(|| if by_activity { -self.reward } else { self.rank })
     }
     #[cfg(not(feature = "clause_rewarding"))]
-    fn to_vivify(&self, initial_stage: bool) -> Option<f64> {
-        if initial_stage {
-            (!self.is_dead()).then(|| self.len() as f64)
-        } else {
-            (!self.is_dead()
-                && self.rank * 2 <= self.rank_old
-                && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
-            .then(|| -((self.rank_old - self.rank) as f64 / self.rank as f64))
-        }
+    fn to_vivify(&self, by_activity: bool) -> Option<f64> {
+        (!self.is_dead()
+            && self.rank * 2 <= self.rank_old
+            && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
+        .then(|| {
+            if by_activity {
+                -((self.rank_old - self.rank) as f64 / self.rank as f64)
+            } else {
+                self.rank as f64
+            }
+        })
     }
     /// clear flags about vivification
     fn vivified(&mut self) {
