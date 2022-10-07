@@ -26,7 +26,7 @@ impl VivifyIF for ClauseDB {
         let mut clauses: Vec<OrderedProxy<ClauseId>> = select_targets(
             asg,
             self,
-            (0 < state[Stat::Restart]).then_some(state[Stat::Vivification] % 3 == 0),
+            (0 < state[Stat::Restart]).then_some(state[Stat::Vivification] % 2 == 0),
             NUM_TARGETS,
         );
         if clauses.is_empty() {
@@ -352,7 +352,7 @@ impl Clause {
     #[cfg(not(feature = "clause_rewarding"))]
     fn to_vivify(&self, by_activity: bool) -> Option<f64> {
         (!self.is_dead()
-            && self.rank * 2 <= self.rank_old
+            && (self.rank * 2 <= self.rank_old || self.rank + 8 < self.rank_old)
             && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
         .then(|| {
             if by_activity {
