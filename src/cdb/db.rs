@@ -802,7 +802,10 @@ impl ClauseDBIF for ClauseDB {
                 binary_link.add(l0, l1, cid);
                 std::mem::swap(&mut c.lits, &mut new_lits);
                 self.num_bi_clause += 1;
-                c.turn_off(FlagClause::LEARNT);
+                if c.is(FlagClause::LEARNT) {
+                    self.num_learnt -= 1;
+                    c.turn_off(FlagClause::LEARNT);
+                }
 
                 if certification_store.is_active() {
                     certification_store.add_clause(&c.lits);
