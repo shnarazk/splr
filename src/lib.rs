@@ -51,23 +51,23 @@ Splr provides 'incremental solver mode' if you built it with feature 'incrementa
 This document covers extra functions only if you built it with `cargo doc --features incremental_solver`.
 
 */
-/// Crate `assign` implements Boolean Constraint Propagation and decision var selection.
+/// Module `assign` implements Boolean Constraint Propagation and decision var selection.
 pub mod assign;
-/// Crate `cdb` provides [`Clause`](`crate::cdb::Clause`) object and its manager [`ClauseDB`](`crate::cdb::ClauseDB`).
+/// Module `cdb` provides [`Clause`](`crate::cdb::Clause`) object and its manager [`ClauseDB`](`crate::cdb::ClauseDB`).
 pub mod cdb;
-/// Crate `cnf` provides basic operations on CNF files
+/// Module `cnf` provides basic operations on CNF files
 pub mod cnf;
-/// Crate `config` provides solver's configuration and CLI.
+/// Module `config` provides solver's configuration and CLI.
 pub mod config;
-/// Crate `primitive` provides some fundamental data structures.
+/// Module `primitive` provides some fundamental data structures.
 pub mod primitive;
-/// Crate `processor` implements a simplifier: clause subsumption and var elimination.
+/// Module `processor` implements a simplifier: clause subsumption and var elimination.
 pub mod processor;
-/// Crate `solver` provides the top-level API as a SAT solver.
+/// Module `solver` provides the top-level API as a SAT solver.
 pub mod solver;
-/// Crate `state` is a collection of internal data.
+/// Module `state` is a collection of internal data.
 pub mod state;
-/// Crate `types` provides various building blocks, including some common traits.
+/// Module `types` provides various building blocks, including some common traits.
 pub mod types;
 
 pub use {

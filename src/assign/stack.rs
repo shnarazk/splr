@@ -200,7 +200,7 @@ impl AssignIF for AssignStack {
         &self.level
     }
     fn best_assigned(&mut self) -> Option<usize> {
-        (self.build_best_at == self.num_propagation).then(|| self.num_vars - self.num_best_assign)
+        (self.build_best_at == self.num_propagation).then_some(self.num_vars - self.num_best_assign)
     }
     #[allow(unused_variables)]
     fn extend_model(&mut self, cdb: &mut impl ClauseDBIF) -> Vec<Option<bool>> {

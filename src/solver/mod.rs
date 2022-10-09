@@ -1,15 +1,15 @@
-/// Crate `solver` provides the top-level API as a SAT solver.
+/// Module `solver` provides the top-level API as a SAT solver.
 /// API to instantiate
 mod build;
-/// Crate 'conflict' handles conflicts.
+/// Module 'conflict' handles conflicts.
 mod conflict;
-/// Crate `restart` provides restart heuristics.
+/// Module `restart` provides restart heuristics.
 pub mod restart;
 /// CDCL search engine
 mod search;
 /// Stage manger (was Stabilizer)
 mod stage;
-/// Crate `validate` implements a model checker.
+/// Module `validate` implements a model checker.
 mod validate;
 
 pub use self::{
@@ -35,7 +35,7 @@ pub enum Certificate {
 /// This captures the following three cases:
 /// * `Certificate::SAT` -- solved with a satisfiable assignment set,
 /// * `Certificate::UNSAT` -- proved that it's an unsatisfiable problem, and
-/// * `SolverException::*` -- caused by a bug
+/// * `SolverError::*` -- caused by a bug
 pub type SolverResult = Result<Certificate, SolverError>;
 
 /// define sub-modules' responsibilities
@@ -237,7 +237,7 @@ mod tests {
         // }
         let v0: Vec<Vec<i32>> = Vec::new();
         sat!(v0);
-        let v1: Vec<Vec<i32>> = Vec::from(Vec::new());
+        let v1: Vec<Vec<i32>> = Vec::new();
         sat!(v1);
         sat!(vec![vec![1i32]]);
         sat!(vec![vec![1i32], vec![-1]]);
@@ -316,7 +316,7 @@ mod tests {
     }
     #[cfg(feature = "incremental_solver")]
     #[test]
-    // There was an inconsAssignStack::istency in AssignStack::var_order.
+    // There was an inconsistency in AssignStack::var_order.
     fn test_add_var_and_add_assignment() {
         let mut slv = Solver::instantiate(
             &Config::default(),
