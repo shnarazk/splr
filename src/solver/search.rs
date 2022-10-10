@@ -278,6 +278,13 @@ fn search(
                 );
                 let scale = state.stm.current_scale();
                 let max_scale = state.stm.max_scale();
+                #[cfg(feature = "reward_annealing")]
+                {
+                    let base = (1 << (state.stm.current_segment() - 1)) - 1;
+                    let decay_index = state.stm.current_cycle() - base;
+                    let decay = (decay_index as f64 - 1.0) / decay_index as f64;
+                    asg.update_activity_decay(decay);
+                }
                 if let Some(new_segment) = next_stage {
                     #[cfg(feature = "rephase")]
                     asg.select_rephasing_target();
@@ -285,6 +292,7 @@ fn search(
                         cdb.vivify(asg, state)?;
                     }
                     if new_segment {
+                        #[cfg(not(feature = "reward_annealing"))]
                         asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
                         if !cfg!(feature = "no_clause_elimination") {
                             let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
