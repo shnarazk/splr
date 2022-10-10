@@ -342,23 +342,18 @@ impl Clause {
     #[cfg(feature = "clause_rewarding")]
     fn to_vivify(&self, initial_stage: bool) -> Option<f64> {
         if initial_stage {
-            (!self.is_dead()).then(|| self.len() as f64)
+            (!self.is_dead()).then_some(self.len() as f64)
         } else {
-            (!self.is_dead()
-                && self.rank * 2 <= self.rank_old
-                && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
-            .then(|| self.reward)
+            (!self.is_dead() && self.rank * 2 <= self.rank_old).then_some(self.reward)
         }
     }
     #[cfg(not(feature = "clause_rewarding"))]
     fn to_vivify(&self, initial_stage: bool) -> Option<f64> {
         if initial_stage {
-            (!self.is_dead()).then(|| self.len() as f64)
+            (!self.is_dead()).then_some(self.len() as f64)
         } else {
-            (!self.is_dead()
-                && self.rank * 2 <= self.rank_old
-                && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
-            .then(|| -((self.rank_old - self.rank) as f64 / self.rank as f64))
+            (!self.is_dead() && self.rank * 2 <= self.rank_old)
+                .then_some(-((self.rank_old - self.rank) as f64 / self.rank as f64))
         }
     }
     /// clear flags about vivification
