@@ -29,6 +29,12 @@ impl ActivityIF<VarId> for AssignStack {
             self.activity_decay_step *= SCALE;
         }
     }
+    fn update_activity_decay(&mut self, _: f64) {
+        self.activity_decay = self
+            .activity_decay_default
+            .min(self.activity_decay + self.activity_decay_step);
+        self.activity_anti_decay = 1.0 - self.activity_decay;
+    }
     fn update_activity_tick(&mut self) {
         const INC_SCALE: f64 = 1.01;
         if self.ordinal == 0 {
@@ -37,11 +43,5 @@ impl ActivityIF<VarId> for AssignStack {
         }
         self.ordinal += 1;
         self.activity_decay_step *= INC_SCALE;
-    }
-    fn update_activity_decay(&mut self, _index: Option<usize>) {
-        self.activity_decay = self
-            .activity_decay_default
-            .min(self.activity_decay + self.activity_decay_step);
-        self.activity_anti_decay = 1.0 - self.activity_decay;
     }
 }

@@ -23,14 +23,14 @@ impl ActivityIF<VarId> for AssignStack {
     fn reward_at_unassign(&mut self, vi: VarId) {
         self.var[vi].update_activity(self.activity_decay, self.activity_anti_decay);
     }
+    fn update_activity_decay(&mut self, scaling: f64) {
+        self.activity_decay = scaling;
+        self.activity_anti_decay = 1.0 - scaling;
+    }
     // Note: `update_rewards` should be called before `cancel_until`
     #[inline]
     fn update_activity_tick(&mut self) {
         self.tick += 1;
-    }
-    fn update_activity_decay(&mut self, scaling: f64) {
-        self.activity_decay = scaling;
-        self.activity_anti_decay = 1.0 - scaling;
     }
 }
 
