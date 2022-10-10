@@ -468,7 +468,7 @@ mod tests {
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
         assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
-        let mut iter = cdb[c1][0..].into_iter();
+        let mut iter = cdb[c1][0..].iter();
         assert_eq!(iter.next(), Some(&lit(1)));
         assert_eq!(iter.next(), Some(&lit(2)));
         assert_eq!(iter.next(), Some(&lit(3)));

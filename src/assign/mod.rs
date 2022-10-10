@@ -1,5 +1,6 @@
-/// Crate `assign` implements Boolean Constraint Propagation and decision var selection.
+/// Module `assign` implements Boolean Constraint Propagation and decision var selection.
 /// This version can handle Chronological and Non Chronological Backtrack.
+
 /// Ema
 mod ema;
 /// Heap
@@ -34,7 +35,10 @@ use {
     std::{fmt, ops::Range, slice::Iter},
 };
 
-/// API about assignment like [`decision_level`](`crate::assign::AssignIF::decision_level`), [`stack`](`crate::assign::AssignIF::stack`), [`best_assigned`](`crate::assign::AssignIF::best_assigned`), and so on.
+/// API about assignment like
+/// [`decision_level`](`crate::assign::AssignIF::decision_level`),
+/// [`stack`](`crate::assign::AssignIF::stack`),
+/// [`best_assigned`](`crate::assign::AssignIF::best_assigned`), and so on.
 pub trait AssignIF:
     ActivityIF<VarId>
     + Instantiate
@@ -80,16 +84,16 @@ pub trait AssignIF:
     fn dump_cnf(&mut self, cdb: &impl ClauseDBIF, fname: &str);
 }
 
-/// Reasons of assignments, two kinds
+/// Reasons of assignments
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum AssignReason {
-    /// implication by binnary clause
+    /// Implication by binary clause
     BinaryLink(Lit),
     /// Assigned by decision
     Decision(DecisionLevel),
     /// Assigned by a non-binary clause.
     Implication(ClauseId),
-    /// One of not assigned, assigned by decision, or asserted.
+    /// None of the above.
     None,
 }
 

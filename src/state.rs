@@ -1,4 +1,4 @@
-/// Crate `state` is a collection of internal data.
+/// Module `state` is a collection of internal data.
 use {
     crate::{
         assign, cdb,

@@ -1,4 +1,4 @@
-/// Crate `eliminator` implements clause subsumption and var elimination.
+/// Module `eliminator` implements clause subsumption and var elimination.
 use {
     super::{EliminateIF, Eliminator},
     crate::{assign::AssignIF, cdb::ClauseDBIF, types::*},

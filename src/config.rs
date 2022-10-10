@@ -1,4 +1,4 @@
-/// Crate `config` provides solver's configuration and CLI.
+/// Module `config` provides solver's configuration and CLI.
 use {crate::types::DecisionLevel, std::path::PathBuf};
 
 pub const CERTIFICATION_DEFAULT_FILENAME: &str = "proof.drat";

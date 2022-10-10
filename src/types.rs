@@ -1,4 +1,4 @@
-/// Crate `types' provides various building blocks, including
+/// Module `types' provides various building blocks, including
 /// some common traits.
 pub use crate::{
     assign::AssignReason,

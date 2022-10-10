@@ -54,26 +54,26 @@ impl Index<ClauseId> for ClauseDB {
     type Output = Clause;
     #[inline]
     fn index(&self, cid: ClauseId) -> &Clause {
+        let i = NonZeroU32::get(cid.ordinal) as usize;
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            self.clause
-                .get_unchecked(NonZeroU32::get(cid.ordinal) as usize)
+            self.clause.get_unchecked(i)
         }
         #[cfg(not(feature = "unsafe_access"))]
-        &self.clause[cid.ordinal as usize]
+        &self.clause[i]
     }
 }
 
 impl IndexMut<ClauseId> for ClauseDB {
     #[inline]
     fn index_mut(&mut self, cid: ClauseId) -> &mut Clause {
+        let i = NonZeroU32::get(cid.ordinal) as usize;
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            self.clause
-                .get_unchecked_mut(NonZeroU32::get(cid.ordinal) as usize)
+            self.clause.get_unchecked_mut(i)
         }
         #[cfg(not(feature = "unsafe_access"))]
-        &mut self.clause[cid.ordinal as usize]
+        &mut self.clause[i]
     }
 }
 
@@ -81,26 +81,26 @@ impl Index<&ClauseId> for ClauseDB {
     type Output = Clause;
     #[inline]
     fn index(&self, cid: &ClauseId) -> &Clause {
+        let i = NonZeroU32::get(cid.ordinal) as usize;
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            self.clause
-                .get_unchecked(NonZeroU32::get(cid.ordinal) as usize)
+            self.clause.get_unchecked(i)
         }
         #[cfg(not(feature = "unsafe_access"))]
-        &self.clause[cid.ordinal as usize]
+        &self.clause[i]
     }
 }
 
 impl IndexMut<&ClauseId> for ClauseDB {
     #[inline]
     fn index_mut(&mut self, cid: &ClauseId) -> &mut Clause {
+        let i = NonZeroU32::get(cid.ordinal) as usize;
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            self.clause
-                .get_unchecked_mut(NonZeroU32::get(cid.ordinal) as usize)
+            self.clause.get_unchecked_mut(i)
         }
         #[cfg(not(feature = "unsafe_access"))]
-        &mut self.clause[cid.ordinal as usize]
+        &mut self.clause[i]
     }
 }
 
