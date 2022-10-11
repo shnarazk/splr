@@ -29,6 +29,7 @@ default = [
         "reason_side_rewarding",
         "rephase",
         # "reward_annealing", # for big problems since 0.17(need to evalate with larger timeout)
+        "stochastic_local_search", # since 0.17
         # "suppress_reason_chain",
         "trail_saving",
         "unsafe_access"
@@ -53,6 +54,7 @@ no_IO = []
 reason_side_rewarding = []
 rephase = ["best_phases_tracking"]
 reward_annealing = []
+stochastic_local_search = []
 support_user_assumption = []
 suppress_reason_chain = []
 trace_analysis = []
