@@ -10,6 +10,8 @@ mod clause;
 mod db;
 /// EMA
 mod ema;
+/// methods for Stochastic Local Search
+mod sls;
 /// methods for UNSAT certification
 mod unsat_certificate;
 /// implementation of clause vivification
