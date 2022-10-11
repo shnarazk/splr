@@ -190,6 +190,12 @@ mod tests {
     }
 
     macro_rules! sat {
+        ($vec: expr, $should_be: pat) => {
+            println!("{:>46} =| ", format!("{:?}", $vec));
+            let result = Certificate::try_from($vec);
+            println!("{:?}", result);
+            assert!(matches!(result, $should_be));
+        };
         ($vec: expr) => {
             println!(
                 "{:>46} =| {:?}",
@@ -235,12 +241,12 @@ mod tests {
         //     Ok(Certificate::UNSAT) => println!("s UNSATISFIABLE"),
         //     Err(e) => panic!("{}", e),
         // }
-        let v0: Vec<Vec<i32>> = Vec::new();
-        sat!(v0);
-        let v1: Vec<Vec<i32>> = Vec::new();
-        sat!(v1);
-        sat!(vec![vec![1i32]]);
-        sat!(vec![vec![1i32], vec![-1]]);
+        let v0: Vec<Vec<i32>> = vec![];
+        sat!(v0, Ok(Certificate::SAT(_)));
+        let v1: Vec<Vec<i32>> = vec![vec![]];
+        sat!(v1, Ok(Certificate::UNSAT));
+        sat!(vec![vec![1i32]], Ok(Certificate::SAT(_)));
+        sat!(vec![vec![1i32], vec![-1]], Ok(Certificate::UNSAT));
         sat!(vec![vec![1i32, 2], vec![-1, 3], vec![1, -3], vec![-1, 2]]);
         sat!(vec![
             vec![1i32, 2],

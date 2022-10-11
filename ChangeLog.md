@@ -1,3 +1,10 @@
+## 0.17.0, 2022-??-??
+
+- (Breaking change) `Solver::try_from` and `Certificate::try_from` return `Ok` values
+  if a given vector contains an empty clause. All expressions corresponding to valid CNFs
+  should be converted to `Certificate` successfully. (#191)
+- Add a new feature 'reward_annealing'
+
 ## 0.16.3, 2022-09-16
 
 - Fix another bug on `add_var` and `add_assignment` (#183)
