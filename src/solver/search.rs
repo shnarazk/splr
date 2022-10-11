@@ -291,14 +291,19 @@ fn search(
                         #[cfg(feature = "stochastic_local_search")]
                         {
                             use cdb::StochasticLocalSearchIF;
-                            let limit = 100; // FIXME: use entanglement
-
-                            let _assignment = cdb.stochastic_local_search(asg.assign_ref(), limit);
-                            // asg.select_rephasing_target(Some(assignment));
+                            let entanglement = cdb.refer(cdb::property::TEma::Entanglement).get();
+                            if 16.0 < entanglement {
+                                let limit = entanglement.powi(2) as usize;
+                                let assignment =
+                                    cdb.stochastic_local_search(asg.assign_ref(), limit);
+                                asg.select_rephasing_target(Some(assignment));
+                            } else {
+                                asg.select_rephasing_target(None);
+                            }
                         }
                         #[cfg(not(feature = "stochastic_local_search"))]
                         {
-                            asg.select_rephasing_target();
+                            asg.select_rephasing_target(None);
                         }
                     }
                     if cfg!(feature = "clause_vivification") {

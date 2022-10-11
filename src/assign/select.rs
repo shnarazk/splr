@@ -28,7 +28,7 @@ macro_rules! var_assign {
 pub trait VarSelectIF {
     #[cfg(feature = "rephase")]
     /// select rephasing target
-    fn select_rephasing_target(&mut self);
+    fn select_rephasing_target(&mut self, assignment: Option<Vec<bool>>);
     #[cfg(feature = "rephase")]
     /// check the consistency
     fn check_consistency_of_best_phases(&mut self);
@@ -42,7 +42,14 @@ pub trait VarSelectIF {
 
 impl VarSelectIF for AssignStack {
     #[cfg(feature = "rephase")]
-    fn select_rephasing_target(&mut self) {
+    fn select_rephasing_target(&mut self, assignment: Option<Vec<bool>>) {
+        if let Some(assignment) = assignment {
+            for (vi, b) in assignment.iter().enumerate().skip(1) {
+                let v = &mut self.var[vi];
+                v.set(FlagVar::PHASE, *b);
+            }
+            return;
+        }
         if self.best_phases.is_empty() {
             return;
         }
