@@ -287,7 +287,20 @@ fn search(
                 }
                 if let Some(new_segment) = next_stage {
                     #[cfg(feature = "rephase")]
-                    asg.select_rephasing_target();
+                    {
+                        #[cfg(feature = "stochastic_local_search")]
+                        {
+                            use cdb::StochasticLocalSearchIF;
+                            let limit = 100; // FIXME: use entanglement
+
+                            let _assignment = cdb.stochastic_local_search(asg.assign_ref(), limit);
+                            // asg.select_rephasing_target(Some(assignment));
+                        }
+                        #[cfg(not(feature = "stochastic_local_search"))]
+                        {
+                            asg.select_rephasing_target();
+                        }
+                    }
                     if cfg!(feature = "clause_vivification") {
                         cdb.vivify(asg, state)?;
                     }

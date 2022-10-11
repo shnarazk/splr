@@ -10,6 +10,7 @@ mod clause;
 mod db;
 /// EMA
 mod ema;
+#[cfg(feature = "stochastic_local_search")]
 /// methods for Stochastic Local Search
 mod sls;
 /// methods for UNSAT certification
@@ -26,6 +27,9 @@ pub use self::{
     unsat_certificate::CertificationStore,
     vivify::VivifyIF,
 };
+#[cfg(feature = "stochastic_local_search")]
+pub use sls::StochasticLocalSearchIF;
+
 use {
     self::ema::ProgressLBD,
     crate::{assign::AssignIF, types::*},
