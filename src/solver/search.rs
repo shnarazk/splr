@@ -286,26 +286,7 @@ fn search(
                     asg.update_activity_decay(decay);
                 }
                 if let Some(new_segment) = next_stage {
-                    #[cfg(feature = "rephase")]
-                    {
-                        #[cfg(feature = "stochastic_local_search")]
-                        {
-                            use cdb::StochasticLocalSearchIF;
-                            let entanglement = cdb.refer(cdb::property::TEma::Entanglement).get();
-                            if 16.0 < entanglement {
-                                let limit = entanglement.powi(2) as usize;
-                                let assignment =
-                                    cdb.stochastic_local_search(asg.assign_ref(), limit);
-                                asg.select_rephasing_target(Some(assignment));
-                            } else {
-                                asg.select_rephasing_target(None);
-                            }
-                        }
-                        #[cfg(not(feature = "stochastic_local_search"))]
-                        {
-                            asg.select_rephasing_target(None);
-                        }
-                    }
+                    // a beginning of a new cycle
                     if cfg!(feature = "clause_vivification") {
                         cdb.vivify(asg, state)?;
                     }
@@ -321,6 +302,34 @@ fn search(
                         }
                         if cfg!(feature = "dynamic_restart_threshold") {
                             state.restart.set_segment_parameters(max_scale);
+                        }
+                    }
+                    #[cfg(feature = "rephase")]
+                    if new_segment
+                        || 2.5 < asg.refer(assign::property::TEma::DecisionPerConflict).get()
+                    {
+                        #[cfg(feature = "stochastic_local_search")]
+                        {
+                            use cdb::StochasticLocalSearchIF;
+                            let num_falsified = &mut state.stats[Stat::UnsatsBySLS];
+                            let entanglement = cdb.refer(cdb::property::TEma::Entanglement).get();
+                            if 120.0 / (*num_falsified as f64).log2() < entanglement {
+                                let limit = entanglement as usize;
+                                // debug_assert_eq!(asg.decision_level(), asg.root_level());
+                                let mut assignment = asg.best_phases_ref();
+                                let stats = cdb.stochastic_local_search(&mut assignment, limit);
+                                *num_falsified = stats.1;
+                                state.log(None, format!("SLS:: {} => {}", stats.0, stats.1));
+                                asg.select_rephasing_target(
+                                    (stats.1 < stats.0).then_some(assignment),
+                                );
+                            } else {
+                                asg.select_rephasing_target(None);
+                            }
+                        }
+                        #[cfg(not(feature = "stochastic_local_search"))]
+                        {
+                            asg.select_rephasing_target(None);
                         }
                     }
                 }

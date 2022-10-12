@@ -51,6 +51,8 @@ pub enum Stat {
     Simplify,
     /// the number of subsumed clause by processor
     SubsumedClause,
+    /// SLS core
+    UnsatsBySLS,
     /// don't use this dummy (sentinel at the tail).
     EndOfStatIndex,
 }
@@ -512,7 +514,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|vivC:{}, subC:{}, core:{}, /ppc:{}",
+            "\x1B[2K        misc|vivC:{}, -SLS:{}, core:{}, /ppc:{}",
             im!(
                 "{:>9}",
                 self,
@@ -522,8 +524,8 @@ impl StateIF for State {
             im!(
                 "{:>9}",
                 self,
-                LogUsizeId::SubsumedClause,
-                self[Stat::SubsumedClause]
+                LogUsizeId::UnsatsBySLS,
+                self[Stat::UnsatsBySLS]
             ),
             im!(
                 "{:>9}",
@@ -834,6 +836,11 @@ pub enum LogUsizeId {
     VivifiedClause,
     VivifiedVar,
     Vivify,
+
+    //
+    //## Stochastic Local Search
+    //
+    UnsatsBySLS,
 
     // the sentinel
     End,

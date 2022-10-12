@@ -50,7 +50,7 @@ impl StageManager {
         self.end_of_stage = unit_size;
     }
     /// returns:
-    /// - Some(true): it's a beginning of a new cycle and a new cycle, a 2nd-level group.
+    /// - Some(true): it's a beginning of a new cycle and a new segment, a 2nd-level group.
     /// - Some(false): a beginning of a new cycle.
     /// - None: the other case.
     pub fn prepare_new_stage(&mut self, rescale: usize, now: usize) -> Option<bool> {

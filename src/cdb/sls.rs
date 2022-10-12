@@ -2,44 +2,101 @@
 use {crate::types::*, std::collections::HashMap};
 
 pub trait StochasticLocalSearchIF {
-    fn stochastic_local_search(&mut self, start: &[Option<bool>], limit: usize) -> Vec<bool>;
+    fn stochastic_local_search(
+        &mut self,
+        start: &mut HashMap<VarId, bool>,
+        limit: usize,
+    ) -> (usize, usize);
 }
 
 impl StochasticLocalSearchIF for ClauseDB {
-    fn stochastic_local_search(&mut self, start: &[Option<bool>], limit: usize) -> Vec<bool> {
-        let mut assignment: Vec<bool> = start
-            .iter()
-            .map(|a| a.map_or(false, |b| b))
-            .collect::<Vec<_>>();
-        for _ in 0..limit {
+    fn stochastic_local_search(
+        &mut self,
+        assignment: &mut HashMap<VarId, bool>,
+        limit: usize,
+    ) -> (usize, usize) {
+        let mut returns = (0, 0);
+        let mut last_flip = 0;
+        for step in 0..limit {
+            let mut unsat_clauses = 0;
             let mut flip_target: HashMap<VarId, usize> = HashMap::new();
-            let mut satisfied = true;
+            let mut target_clause: Option<&Clause> = None;
             for c in self
                 .clause
                 .iter()
                 .skip(1)
-                .filter(|c| !c.is(FlagClause::LEARNT))
+                .rev()
+                .filter(|c| /* !c.is(FlagClause::LEARNT) && */ !c.is_dead())
             {
-                satisfied &= c.check_parity(&assignment, &mut flip_target);
+                let result = c.check_parity(assignment, &mut flip_target);
+                if let Some(c) = result {
+                    unsat_clauses += 1;
+                    if target_clause.is_none() || unsat_clauses == step {
+                        target_clause = result;
+                        for l in c.lits.iter() {
+                            flip_target.entry(l.vi()).or_insert(0);
+                        }
+                    }
+                }
             }
-            if satisfied {
-                return assignment;
+            if step == 1 {
+                returns = (unsat_clauses, unsat_clauses);
             }
-            let i: usize = flip_target.iter().map(|(k, v)| (*v, *k)).max().unwrap().1;
-            assignment[i] = !assignment[i];
+            returns.1 = unsat_clauses;
+            if let Some(c) = target_clause {
+                let factor = |vi| 1.4_f64.powf(-(*flip_target.get(vi).unwrap() as f64));
+                let vars = c.lits.iter().map(|l| l.vi()).collect::<Vec<_>>();
+                let index = (((step + last_flip) & 63) as f64 / 63.0)
+                    * vars.iter().map(factor).sum::<f64>();
+                let mut sum: f64 = 0.0;
+                for vi in vars.iter() {
+                    sum += factor(vi);
+                    if index <= sum {
+                        // print!(
+                        //     "step {step}: flip {} of {}| {}",
+                        //     vi,
+                        //     c.lits.len(),
+                        //     assignment[vi]
+                        // );
+                        assignment.entry(*vi).and_modify(|e| *e = !*e);
+                        // print1ln!(" -> {}", assignment[vi]);
+                        last_flip = *vi;
+                        break;
+                    }
+                }
+            } else {
+                return returns;
+            }
         }
-        assignment
+        returns
     }
 }
 
 impl Clause {
-    fn check_parity(&self, assignment: &[bool], flip_target: &mut HashMap<VarId, usize>) -> bool {
+    fn check_parity(
+        &self,
+        assignment: &mut HashMap<VarId, bool>,
+        flip_target: &mut HashMap<VarId, usize>,
+    ) -> Option<&Self> {
+        let mut num_sat = 0;
+        let mut sat_vi = 0;
         for l in self.iter() {
             let vi = l.vi();
-            if assignment[vi] != l.as_bool() {
-                *flip_target.entry(vi).or_insert(0) += 1;
+            match assignment.get(&vi) {
+                None => {
+                    // println!("{:?}|{:?}", l, self);
+                    return None;
+                }
+                Some(b) if *b == l.as_bool() => {
+                    num_sat += 1;
+                    sat_vi = vi;
+                }
+                _ => (),
             }
         }
-        todo!();
+        if num_sat == 1 {
+            *flip_target.entry(sat_vi).or_insert(0) += 1;
+        }
+        (0 == num_sat).then_some(self)
     }
 }
