@@ -305,32 +305,8 @@ fn search(
                         }
                     }
                     #[cfg(feature = "rephase")]
-                    if new_segment
-                        || 2.5 < asg.refer(assign::property::TEma::DecisionPerConflict).get()
                     {
-                        #[cfg(feature = "stochastic_local_search")]
-                        {
-                            use cdb::StochasticLocalSearchIF;
-                            let num_falsified = &mut state.stats[Stat::UnsatsBySLS];
-                            let entanglement = cdb.refer(cdb::property::TEma::Entanglement).get();
-                            if 120.0 / (*num_falsified as f64).log2() < entanglement {
-                                let limit = entanglement as usize;
-                                // debug_assert_eq!(asg.decision_level(), asg.root_level());
-                                let mut assignment = asg.best_phases_ref();
-                                let stats = cdb.stochastic_local_search(&mut assignment, limit);
-                                *num_falsified = stats.1;
-                                state.log(None, format!("SLS:: {} => {}", stats.0, stats.1));
-                                asg.select_rephasing_target(
-                                    (stats.1 < stats.0).then_some(assignment),
-                                );
-                            } else {
-                                asg.select_rephasing_target(None);
-                            }
-                        }
-                        #[cfg(not(feature = "stochastic_local_search"))]
-                        {
-                            asg.select_rephasing_target(None);
-                        }
+                        asg.select_rephasing_target(None);
                     }
                 }
                 asg.clear_asserted_literals(cdb)?;
@@ -345,8 +321,30 @@ fn search(
                 RESTART!(asg, cdb, state);
             }
             if let Some(na) = asg.best_assigned() {
-                state.flush("");
-                state.flush(format!("unreachable core: {}", na));
+                #[cfg(feature = "stochastic_local_search")]
+                {
+                    use cdb::StochasticLocalSearchIF;
+                    let mut assignment = asg.best_phases_ref();
+                    let stats = cdb.stochastic_local_search(&mut assignment, 80);
+                    state.flush("");
+                    if stats.1 < stats.0 {
+                        state.stats[Stat::UnsatsBySLS] = stats.1;
+                        state.flush(format!(
+                            "unreachable core: {}, SLS: {} -> {}",
+                            na, stats.0, stats.1
+                        ));
+                        // We need to restart in order to try the whole assignment by SLS
+                        RESTART!(asg, cdb, state);
+                        asg.select_rephasing_target(Some(assignment));
+                    } else {
+                        state.flush(format!("unreachable core: {}", na));
+                    }
+                }
+                #[cfg(not(feature = "stochastic_local_search"))]
+                {
+                    state.flush("");
+                    state.flush(format!("unreachable core: {}", na));
+                }
             }
         }
     }
