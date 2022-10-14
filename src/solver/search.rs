@@ -239,6 +239,7 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut current_stage: Option<bool> = Some(true);
     let mut num_learnt = 0;
+    let mut best_phase_updated = false;
 
     state.stm.initialize(
         (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
@@ -267,6 +268,7 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
                 RESTART!(asg, cdb, state);
+                asg.clear_asserted_literals(cdb)?;
                 cdb.reduce(asg, state.stm.num_reducible());
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
@@ -290,6 +292,29 @@ fn search(
                     if cfg!(feature = "clause_vivification") {
                         cdb.vivify(asg, state)?;
                     }
+                    #[cfg(feature = "rephase")]
+                    {
+                        #[cfg(feature = "stochastic_local_search")]
+                        if best_phase_updated {
+                            best_phase_updated = false;
+                            use cdb::StochasticLocalSearchIF;
+                            let mut assignment = asg.best_phases_ref();
+                            let stats = cdb.stochastic_local_search(&mut assignment, 100);
+                            if stats.1 < stats.0 {
+                                state.stats[Stat::UnsatsBySLS] = stats.1;
+                                state.flush(format!("SLS: {} -> {}", stats.0, stats.1));
+                                // We need to restart in order to try the whole assignment by SLS
+                                RESTART!(asg, cdb, state);
+                                asg.select_rephasing_target(Some(assignment));
+                            }
+                        } else {
+                            asg.select_rephasing_target(None);
+                        }
+                        #[cfg(not(feature = "stochastic_local_search"))]
+                        {
+                            asg.select_rephasing_target(None);
+                        }
+                    }
                     if new_segment {
                         #[cfg(not(feature = "reward_annealing"))]
                         asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
@@ -304,12 +329,7 @@ fn search(
                             state.restart.set_segment_parameters(max_scale);
                         }
                     }
-                    #[cfg(feature = "rephase")]
-                    {
-                        asg.select_rephasing_target(None);
-                    }
                 }
-                asg.clear_asserted_literals(cdb)?;
                 state.progress(asg, cdb);
                 asg.handle(SolverEvent::Stage(scale));
                 state.restart.set_stage_parameters(scale);
@@ -321,30 +341,9 @@ fn search(
                 RESTART!(asg, cdb, state);
             }
             if let Some(na) = asg.best_assigned() {
-                #[cfg(feature = "stochastic_local_search")]
-                {
-                    use cdb::StochasticLocalSearchIF;
-                    let mut assignment = asg.best_phases_ref();
-                    let stats = cdb.stochastic_local_search(&mut assignment, 80);
-                    state.flush("");
-                    if stats.1 < stats.0 {
-                        state.stats[Stat::UnsatsBySLS] = stats.1;
-                        state.flush(format!(
-                            "unreachable core: {}, SLS: {} -> {}",
-                            na, stats.0, stats.1
-                        ));
-                        // We need to restart in order to try the whole assignment by SLS
-                        RESTART!(asg, cdb, state);
-                        asg.select_rephasing_target(Some(assignment));
-                    } else {
-                        state.flush(format!("unreachable core: {}", na));
-                    }
-                }
-                #[cfg(not(feature = "stochastic_local_search"))]
-                {
-                    state.flush("");
-                    state.flush(format!("unreachable core: {}", na));
-                }
+                best_phase_updated = true;
+                state.flush("");
+                state.flush(format!("unreachable core: {}", na));
             }
         }
     }

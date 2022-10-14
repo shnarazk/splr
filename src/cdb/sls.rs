@@ -44,7 +44,7 @@ impl StochasticLocalSearchIF for ClauseDB {
             }
             returns.1 = unsat_clauses;
             if let Some(c) = target_clause {
-                let factor = |vi| 1.4_f64.powf(-(*flip_target.get(vi).unwrap() as f64));
+                let factor = |vi| 3.2_f64.powf(-(*flip_target.get(vi).unwrap() as f64));
                 let vars = c.lits.iter().map(|l| l.vi()).collect::<Vec<_>>();
                 let index = (((step + last_flip) & 63) as f64 / 63.0)
                     * vars.iter().map(factor).sum::<f64>();
@@ -59,7 +59,6 @@ impl StochasticLocalSearchIF for ClauseDB {
                         //     assignment[vi]
                         // );
                         assignment.entry(*vi).and_modify(|e| *e = !*e);
-                        // print1ln!(" -> {}", assignment[vi]);
                         last_flip = *vi;
                         break;
                     }
@@ -75,7 +74,7 @@ impl StochasticLocalSearchIF for ClauseDB {
 impl Clause {
     fn check_parity(
         &self,
-        assignment: &mut HashMap<VarId, bool>,
+        assignment: &HashMap<VarId, bool>,
         flip_target: &mut HashMap<VarId, usize>,
     ) -> Option<&Self> {
         let mut num_sat = 0;
@@ -83,14 +82,11 @@ impl Clause {
         for l in self.iter() {
             let vi = l.vi();
             match assignment.get(&vi) {
-                None => {
-                    // println!("{:?}|{:?}", l, self);
-                    return None;
-                }
                 Some(b) if *b == l.as_bool() => {
                     num_sat += 1;
                     sat_vi = vi;
                 }
+                None => unreachable!(),
                 _ => (),
             }
         }

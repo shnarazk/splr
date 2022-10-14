@@ -55,9 +55,10 @@ impl VarSelectIF for AssignStack {
                 } else {
                     Some((
                         vi,
-                        self.best_phases
-                            .get(&vi)
-                            .map_or(v.is(FlagVar::PHASE), |(b, _)| *b),
+                        self.best_phases.get(&vi).map_or(
+                            self.assign[vi].unwrap_or_else(|| v.is(FlagVar::PHASE)),
+                            |(b, _)| *b,
+                        ),
                     ))
                 }
             })
@@ -71,6 +72,7 @@ impl VarSelectIF for AssignStack {
                 v.set(FlagVar::PHASE, *b);
                 self.best_phases.insert(*vi, (*b, AssignReason::None));
             }
+            self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
             return;
         }
         if self.best_phases.is_empty() {
