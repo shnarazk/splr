@@ -239,7 +239,6 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut current_stage: Option<bool> = Some(true);
     let mut num_learnt = 0;
-    let mut best_phase_updated = false;
 
     state.stm.initialize(
         (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
@@ -256,8 +255,13 @@ fn search(
             asg.update_activity_tick();
             #[cfg(feature = "clause_rewarding")]
             cdb.update_activity_tick();
-            if 1 < handle_conflict(asg, cdb, state, &cc)? {
-                num_learnt += 1;
+            // if 1 < handle_conflict(asg, cdb, state, &cc)? {
+            //     num_learnt += 1;
+            // }
+            match handle_conflict(asg, cdb, state, &cc)? {
+                0 => state.stm.reset(),
+                1 => (),
+                _ => num_learnt += 1,
             }
             if state.stm.stage_ended(num_learnt) {
                 if let Some(p) = state.elapsed() {
@@ -292,32 +296,9 @@ fn search(
                     if cfg!(feature = "clause_vivification") {
                         cdb.vivify(asg, state)?;
                     }
-                    #[cfg(feature = "rephase")]
-                    {
-                        #[cfg(feature = "stochastic_local_search")]
-                        if best_phase_updated {
-                            best_phase_updated = false;
-                            use cdb::StochasticLocalSearchIF;
-                            let mut assignment = asg.best_phases_ref();
-                            let stats = cdb.stochastic_local_search(&mut assignment, 100);
-                            if stats.1 < stats.0 {
-                                state.stats[Stat::UnsatsBySLS] = stats.1;
-                                state.flush(format!("SLS: {} -> {}", stats.0, stats.1));
-                                // We need to restart in order to try the whole assignment by SLS
-                                RESTART!(asg, cdb, state);
-                                asg.select_rephasing_target(Some(assignment));
-                            }
-                        } else {
-                            asg.select_rephasing_target(None);
-                        }
-                        #[cfg(not(feature = "stochastic_local_search"))]
-                        {
-                            asg.select_rephasing_target(None);
-                        }
-                    }
                     if new_segment {
-                        #[cfg(not(feature = "reward_annealing"))]
-                        asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
+                        // #[cfg(not(feature = "reward_annealing"))]
+                        // asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
                         if !cfg!(feature = "no_clause_elimination") {
                             let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                             elim.simplify(asg, cdb, state, false)?;
@@ -328,6 +309,34 @@ fn search(
                         if cfg!(feature = "dynamic_restart_threshold") {
                             state.restart.set_segment_parameters(max_scale);
                         }
+                    }
+                    #[cfg(feature = "rephase")]
+                    {
+                        #[cfg(feature = "stochastic_local_search")]
+                        if new_segment {
+                            use cdb::StochasticLocalSearchIF;
+                            state.flush("SLS");
+                            let mut assignment = asg.best_phases_ref();
+                            let limit = 10 * state.stm.current_segment();
+                            let stats = cdb.stochastic_local_search(&mut assignment, limit);
+                            // Note: `stats.1 == 1` is a local minimum and it's NOT a solution.
+                            // But if the problem is UNSAT, it might be a good point close
+                            // to a root-level conflict.
+                            // Note: to force the new assignemnt effectivety, it maybe be a good idea
+                            // to relax var decay rate (temporally). So do 'reward_annealing.'
+                            /* || stats.1 == 1 */
+                            if stats.1 < stats.0 && 1 < stats.1 {
+                                state.flush(format!(": {} -> {}, ", stats.0, stats.1));
+                                state.stats[Stat::SLS] = asg.override_rephasing_target(&assignment);
+                                // } else {
+                                //     asg.select_rephasing_target();
+                            }
+                            // } else {
+                            //     asg.select_rephasing_target();
+                        }
+                        asg.select_rephasing_target();
+                        #[cfg(not(feature = "stochastic_local_search"))]
+                        asg.select_rephasing_target();
                     }
                 }
                 state.progress(asg, cdb);
@@ -341,7 +350,6 @@ fn search(
                 RESTART!(asg, cdb, state);
             }
             if let Some(na) = asg.best_assigned() {
-                best_phase_updated = true;
                 state.flush("");
                 state.flush(format!("unreachable core: {}", na));
             }

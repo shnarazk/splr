@@ -1,7 +1,9 @@
 /// Decision var selection
 
 #[cfg(feature = "rephase")]
-use {super::property, std::collections::HashMap};
+use super::property;
+#[cfg(feature = "stochastic_local_search")]
+use std::collections::HashMap;
 
 use {
     super::{AssignStack, VarHeapIF},
@@ -26,12 +28,15 @@ macro_rules! var_assign {
 
 /// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
-    #[cfg(feature = "rephase")]
+    #[cfg(feature = "stochastic_local_search")]
     /// return best phases
     fn best_phases_ref(&mut self) -> HashMap<VarId, bool>;
+    #[cfg(feature = "stochastic_local_search")]
+    /// force an assignment obtained by SLS
+    fn override_rephasing_target(&mut self, assignment: &HashMap<VarId, bool>) -> usize;
     #[cfg(feature = "rephase")]
     /// select rephasing target
-    fn select_rephasing_target(&mut self, assignment: Option<HashMap<VarId, bool>>);
+    fn select_rephasing_target(&mut self);
     #[cfg(feature = "rephase")]
     /// check the consistency
     fn check_consistency_of_best_phases(&mut self);
@@ -44,7 +49,7 @@ pub trait VarSelectIF {
 }
 
 impl VarSelectIF for AssignStack {
-    #[cfg(feature = "rephase")]
+    #[cfg(feature = "stochastic_local_search")]
     fn best_phases_ref(&mut self) -> HashMap<VarId, bool> {
         self.var
             .iter()
@@ -64,17 +69,27 @@ impl VarSelectIF for AssignStack {
             })
             .collect::<HashMap<VarId, bool>>()
     }
-    #[cfg(feature = "rephase")]
-    fn select_rephasing_target(&mut self, assignment: Option<HashMap<VarId, bool>>) {
-        if let Some(assignment) = assignment {
-            for (vi, b) in assignment.iter() {
-                let v = &mut self.var[*vi];
+    #[cfg(feature = "stochastic_local_search")]
+    fn override_rephasing_target(&mut self, assignment: &HashMap<VarId, bool>) -> usize {
+        let mut num_fliped = 0;
+        for (vi, b) in assignment.iter() {
+            let v = &mut self.var[*vi];
+            if v.is(FlagVar::PHASE) != *b {
                 v.set(FlagVar::PHASE, *b);
-                self.best_phases.insert(*vi, (*b, AssignReason::None));
+                // v.reward *= self.activity_decay;
+                // v.reward += self.activity_anti_decay;
+                // self.update_heap(*vi);
             }
-            self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
-            return;
+            if !self.best_phases.get(vi).map_or(false, |(p, _)| *p == *b) {
+                num_fliped += 1;
+                // self.best_phases.insert(*vi, (*b, AssignReason::None));
+            }
         }
+        // self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
+        num_fliped
+    }
+    #[cfg(feature = "rephase")]
+    fn select_rephasing_target(&mut self) {
         if self.best_phases.is_empty() {
             return;
         }

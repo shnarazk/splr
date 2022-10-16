@@ -49,6 +49,11 @@ impl StageManager {
         self.scale = 1;
         self.end_of_stage = unit_size;
     }
+    pub fn reset(&mut self) {
+        self.cycle = 0;
+        self.scale = 1;
+        self.end_of_stage = self.unit_size;
+    }
     /// returns:
     /// - Some(true): it's a beginning of a new cycle and a new segment, a 2nd-level group.
     /// - Some(false): a beginning of a new cycle.
