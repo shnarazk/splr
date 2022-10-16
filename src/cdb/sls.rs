@@ -16,35 +16,33 @@ impl StochasticLocalSearchIF for ClauseDB {
         limit: usize,
     ) -> (usize, usize) {
         let mut returns = (0, 0);
-        let mut last_flip = 0;
+        let mut last_flip = self.num_clause;
         for step in 0..limit {
             let mut unsat_clauses = 0;
             let mut flip_target: HashMap<VarId, usize> = HashMap::new();
             let mut target_clause: Option<&Clause> = None;
-            for c in self
-                .clause
-                .iter()
-                .skip(1)
-                .rev()
-                .filter(|c| /* !c.is(FlagClause::LEARNT) && */ !c.is_dead())
-            {
-                let result = c.check_parity(assignment, &mut flip_target);
-                if let Some(c) = result {
+            for c in self.clause.iter().skip(1).filter(|c| !c.is_dead()) {
+                if c.is_falsified(assignment, &mut flip_target) {
                     unsat_clauses += 1;
                     if target_clause.is_none() || unsat_clauses == step {
-                        target_clause = result;
+                        target_clause = Some(c);
                         for l in c.lits.iter() {
                             flip_target.entry(l.vi()).or_insert(0);
                         }
                     }
                 }
             }
-            if step == 1 {
-                returns = (unsat_clauses, unsat_clauses);
+            if step == 0 {
+                returns.0 = unsat_clauses;
             }
             returns.1 = unsat_clauses;
+            if unsat_clauses == 0 {
+                return returns;
+            }
             if let Some(c) = target_clause {
-                let factor = |vi| 3.2_f64.powf(-(*flip_target.get(vi).unwrap() as f64));
+                let beta: f64 = 2.5 - 1.5 / (1.0 + unsat_clauses as f64).log(2.0);
+                // let beta: f64 = if unsat_clauses <= 3 { 1.0 } else { 3.0 };
+                let factor = |vi| beta.powf(-(*flip_target.get(vi).unwrap() as f64));
                 let vars = c.lits.iter().map(|l| l.vi()).collect::<Vec<_>>();
                 let index = (((step + last_flip) & 63) as f64 / 63.0)
                     * vars.iter().map(factor).sum::<f64>();
@@ -52,12 +50,6 @@ impl StochasticLocalSearchIF for ClauseDB {
                 for vi in vars.iter() {
                     sum += factor(vi);
                     if index <= sum {
-                        // print!(
-                        //     "step {step}: flip {} of {}| {}",
-                        //     vi,
-                        //     c.lits.len(),
-                        //     assignment[vi]
-                        // );
                         assignment.entry(*vi).and_modify(|e| *e = !*e);
                         last_flip = *vi;
                         break;
@@ -72,17 +64,20 @@ impl StochasticLocalSearchIF for ClauseDB {
 }
 
 impl Clause {
-    fn check_parity(
+    fn is_falsified(
         &self,
         assignment: &HashMap<VarId, bool>,
         flip_target: &mut HashMap<VarId, usize>,
-    ) -> Option<&Self> {
+    ) -> bool {
         let mut num_sat = 0;
         let mut sat_vi = 0;
         for l in self.iter() {
             let vi = l.vi();
             match assignment.get(&vi) {
                 Some(b) if *b == l.as_bool() => {
+                    if num_sat == 1 {
+                        return false;
+                    }
                     num_sat += 1;
                     sat_vi = vi;
                 }
@@ -90,9 +85,11 @@ impl Clause {
                 _ => (),
             }
         }
-        if num_sat == 1 {
+        if num_sat == 0 {
+            true
+        } else {
             *flip_target.entry(sat_vi).or_insert(0) += 1;
+            false
         }
-        (0 == num_sat).then_some(self)
     }
 }
