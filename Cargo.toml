@@ -17,51 +17,57 @@ bitflags = "^1.3"
 
 [features]
 default = [
-        # "boundary_check", # for DEBUG
-        # "bi_clause_completion", # increase memory pressure
+        # "boundary_check",           # for DEBUG
+        # "bi_clause_completion",
         # "no_clause_elimination",
         # "clause_rewarding",
         "clause_vivification",
         "dynamic_restart_threshold",
         # "incremental_solver",
         "LRB_rewarding",
-        # "maintain_watch_cache", # for DEBUG
+        # "maintain_watch_cache",    # for DEBUG
         "reason_side_rewarding",
         "rephase",
-        "reward_annealing", # for big problems since 0.17(need to evalate with larger timeout)
-        "stochastic_local_search", # since 0.17
+        "reward_annealing",
+        "stochastic_local_search",
         # "suppress_reason_chain",
         "trail_saving",
         "unsafe_access"
         ]
-assign_rate = []
-best_phases_tracking = []
-bi_clause_completion = []
-boundary_check = []
-chrono_BT = []
-no_clause_elimination = []
-clause_rewarding = []
-clause_vivification = []
-debug_propagation = []
-dynamic_restart_threshold = []
-EMA_calibration = []
-EVSIDS = []
-incremental_solver = ["no_clause_elimination"]
-just_used = []
-LRB_rewarding = []
-maintain_watch_cache = []
-no_IO = []
-reason_side_rewarding = []
-rephase = ["best_phases_tracking"]
-reward_annealing = []
-stochastic_local_search = []
-support_user_assumption = []
-suppress_reason_chain = []
-trace_analysis = []
-trace_elimination = []
-trace_equivalency = []
-trail_saving = []
-unsafe_access = []
+assign_rate = []                # for debug and study
+best_phases_tracking = []       # save the best-so-far assignment, used by 'rephase'
+bi_clause_completion = []       # increase memory pressure
+boundary_check = []             # for debug
+chrono_BT = []                  # NOT WORK
+no_clause_elimination = []      # pre(in)-processor setting
+clause_rewarding = []           # clauses have activities w/ decay rate
+clause_vivification = []        # pre(in)-processor setting
+debug_propagation = []          # for debug
+dynamic_restart_threshold = []  # control restart spans like Glucose
+EMA_calibration = []            # each exponential moving average has a calbration value
+EVSIDS = []                     # Eponential Variable State Independent Decaying Sum
+incremental_solver = [          # for all solution SAT sover
+        "no_clause_elimination"
+        ]
+just_used = []                  # Var and clause have 'just_used' flags
+LRB_rewarding = []              # Vearning Rate Based rewarding, a new var activity criteria
+maintain_watch_cache = []       # for DEBUG
+no_IO = []                      # to embed Splr into non-std environments
+reason_side_rewarding = []      # an idea used in Learning-rate based rewarding
+rephase = [                     # search around the best-so-far candidate repeatedly
+        "best_phases_tracking"
+        ]
+reward_annealing = []           # use bigger and smaller decay rates cycliclly
+stochastic_local_search = [     # since 0.17
+        "reward_annealing"
+        ]
+support_user_assumption = []    # NOT WORK (defined in Glucose)
+suppress_reason_chain = []      # make direct links between a dicision var and its implications
+trace_analysis = []             # for debug
+trace_elimination = []          # for debug
+trace_equivalency = []          # for debug
+trail_saving = []               # reduce propagation cost by reusing propagation chain
+unsafe_access = []              # access elements of vectors without boundary checking
 
 [profile.release]
 lto = "fat"
