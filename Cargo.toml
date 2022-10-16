@@ -17,22 +17,29 @@ bitflags = "^1.3"
 
 [features]
 default = [
-        # "boundary_check",           # for DEBUG
-        # "bi_clause_completion",
-        # "no_clause_elimination",
-        # "clause_rewarding",
-        "clause_vivification",
-        "dynamic_restart_threshold",
+        ### Essential
         # "incremental_solver",
         "LRB_rewarding",
-        # "maintain_watch_cache",    # for DEBUG
         "reason_side_rewarding",
+        "unsafe_access",
+        "trail_saving",
+
+        ### heuristics
+        # "bi_clause_completion",
+        # "clause_rewarding",
+        "dynamic_restart_threshold",
         "rephase",
-        "reward_annealing",
+        # "reward_annealing",
         "stochastic_local_search",
         # "suppress_reason_chain",
-        "trail_saving",
-        "unsafe_access"
+
+        ### proceccor
+        # "no_clause_elimination",
+        "clause_vivification",
+
+        ### for DEBUG
+        # "boundary_check",
+        # "maintain_watch_cache",
         ]
 assign_rate = []                # for debug and study
 best_phases_tracking = []       # save the best-so-far assignment, used by 'rephase'
