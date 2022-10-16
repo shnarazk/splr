@@ -953,8 +953,8 @@ impl ClauseDBIF for ClauseDB {
                 let act_c = self.reward;
                 #[cfg(not(feature = "clause_rewarding"))]
                 let act_c = 0.25;
+
                 self.rank as f64 / (act_c + act_v)
-                // (self.rank as f64).log2().powf(1.0 - act_v)
             }
             #[cfg(feature = "just_used")]
             fn weight(&mut self, asg: &mut impl AssignIF) -> f64 {
