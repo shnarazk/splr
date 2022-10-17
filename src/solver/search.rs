@@ -239,6 +239,12 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut current_stage: Option<bool> = Some(true);
     let mut num_learnt = 0;
+    #[cfg(feature = "stochastic_local_search")]
+    let mut best_core = asg.num_vars;
+    #[cfg(feature = "stochastic_local_search")]
+    let mut best_core_updated = None;
+    #[cfg(feature = "stochastic_local_search")]
+    let mut best_sls = cdb.derefer(cdb::property::Tusize::NumClause);
 
     state.stm.initialize(
         (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
@@ -255,14 +261,14 @@ fn search(
             asg.update_activity_tick();
             #[cfg(feature = "clause_rewarding")]
             cdb.update_activity_tick();
-            // if 1 < handle_conflict(asg, cdb, state, &cc)? {
-            //     num_learnt += 1;
-            // }
-            match handle_conflict(asg, cdb, state, &cc)? {
-                0 => state.stm.reset(),
-                1 => (),
-                _ => num_learnt += 1,
+            if 1 < handle_conflict(asg, cdb, state, &cc)? {
+                num_learnt += 1;
             }
+            // match handle_conflict(asg, cdb, state, &cc)? {
+            //     0 => state.stm.reset(),
+            //     1 => (),
+            //     _ => num_learnt += 1,
+            // }
             if state.stm.stage_ended(num_learnt) {
                 if let Some(p) = state.elapsed() {
                     if 1.0 <= p {
@@ -314,30 +320,45 @@ fn search(
                     #[cfg(feature = "rephase")]
                     {
                         #[cfg(feature = "stochastic_local_search")]
-                        if new_segment {
+                        {
                             use cdb::StochasticLocalSearchIF;
-                            state.flush("SLS");
-                            let mut assignment = asg.best_phases_ref();
-                            let limit = 10 * state.stm.current_segment();
-                            let stats = cdb.stochastic_local_search(&mut assignment, limit);
-                            // Note: `stats.1 == 1` is a local minimum and it's NOT a solution.
-                            // But if the problem is UNSAT, it might be a good point close
-                            // to a root-level conflict.
-                            // Note: to force the new assignemnt effectivety, it maybe be a good idea
-                            // to relax var decay rate (temporally). So do 'reward_annealing.'
-                            /* || stats.1 == 1 */
-                            if stats.1 < stats.0 && 1 < stats.1 {
-                                state.flush(format!(": {} -> {}, ", stats.0, stats.1));
-                                state.stats[Stat::SLS] = asg.override_rephasing_target(&assignment);
-                                // } else {
-                                //     asg.select_rephasing_target();
+                            macro_rules! sls {
+                                ($assign: expr, $improved: expr, $limit: expr) => {
+                                    state.flush("SLS");
+                                    let stats = cdb.stochastic_local_search(&mut $assign, $limit);
+                                    if $improved(stats) {
+                                        best_sls = stats.1;
+                                        state.stats[Stat::SLS] = stats.1;
+                                        let num_flipped = asg.override_rephasing_target(&$assign);
+                                        state.flush(format!(
+                                            "({} clauses, {} flips), ",
+                                            stats.1, num_flipped
+                                        ));
+                                    } else {
+                                        state.flush(", ");
+                                    }
+                                };
                             }
-                            // } else {
-                            //     asg.select_rephasing_target();
+                            match (state.stm.current_cycle() % 4, best_core_updated) {
+                                (_, Some(mut assignment)) => {
+                                    let limit = 100 * state.stm.current_segment();
+                                    sls!(assignment, |c: (usize, usize)| c.1 <= c.0, limit);
+                                }
+                                (0, _) => {
+                                    let mut assignment = asg.best_phases_ref();
+                                    sls!(assignment, |c: (usize, usize)| c.1 <= best_sls, 100);
+                                }
+                                (1, _) => {
+                                    asg.select_rephasing_target();
+                                }
+                                _ => (),
+                            }
+                            best_core_updated = None;
                         }
-                        asg.select_rephasing_target();
                         #[cfg(not(feature = "stochastic_local_search"))]
-                        asg.select_rephasing_target();
+                        {
+                            asg.select_rephasing_target();
+                        }
                     }
                 }
                 state.progress(asg, cdb);
@@ -353,6 +374,12 @@ fn search(
             if let Some(na) = asg.best_assigned() {
                 state.flush("");
                 state.flush(format!("unreachable core: {}", na));
+                #[cfg(feature = "stochastic_local_search")]
+                if na < best_core {
+                    best_core = na;
+                    best_core_updated = Some(asg.best_phases_ref());
+                    best_sls = cdb.derefer(cdb::property::Tusize::NumClause);
+                }
             }
         }
     }
