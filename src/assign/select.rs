@@ -71,7 +71,7 @@ impl VarSelectIF for AssignStack {
     }
     #[cfg(feature = "stochastic_local_search")]
     fn override_rephasing_target(&mut self, assignment: &HashMap<VarId, bool>) -> usize {
-        let mut num_fliped = 0;
+        let mut num_flipped = 0;
         for (vi, b) in assignment.iter() {
             let v = &mut self.var[*vi];
             if v.is(FlagVar::PHASE) != *b {
@@ -81,12 +81,12 @@ impl VarSelectIF for AssignStack {
                 // self.update_heap(*vi);
             }
             if !self.best_phases.get(vi).map_or(false, |(p, _)| *p == *b) {
-                num_fliped += 1;
-                // self.best_phases.insert(*vi, (*b, AssignReason::None));
+                num_flipped += 1;
+                self.best_phases.insert(*vi, (*b, AssignReason::None));
             }
         }
         // self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
-        num_fliped
+        num_flipped
     }
     #[cfg(feature = "rephase")]
     fn select_rephasing_target(&mut self) {
