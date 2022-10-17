@@ -163,7 +163,7 @@ impl VivifyIF for ClauseDB {
         debug_assert!(asg.stack_is_empty() || !asg.remains());
         state.flush("");
         state.flush(format!(
-            "vivified(assert:{} shorten:{}), ",
+            "vivification(assert:{} shorten:{}), ",
             num_assert, num_shrink
         ));
         // state.log(

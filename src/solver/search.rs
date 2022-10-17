@@ -301,6 +301,7 @@ fn search(
                         // asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
                         if !cfg!(feature = "no_clause_elimination") {
                             let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+                            state.flush("clause subsumption, ");
                             elim.simplify(asg, cdb, state, false)?;
                             asg.eliminated.append(elim.eliminated_lits());
                             state[Stat::Simplify] += 1;
