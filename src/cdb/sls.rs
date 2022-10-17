@@ -17,8 +17,10 @@ impl StochasticLocalSearchIF for ClauseDB {
     ) -> (usize, usize) {
         let mut returns = (0, 0);
         let mut last_flip = self.num_clause;
-        for step in 0..limit {
+        let mut seed = 38_721_103;
+        for step in 1..=limit {
             let mut unsat_clauses = 0;
+            // CONSIDER: counting only given (permanent) clauses.
             let mut flip_target: HashMap<VarId, usize> = HashMap::new();
             let mut target_clause: Option<&Clause> = None;
             for c in self.clause.iter().skip(1).filter(|c| !c.is_dead()) {
@@ -32,20 +34,20 @@ impl StochasticLocalSearchIF for ClauseDB {
                     }
                 }
             }
-            if step == 0 {
+            if step == 1 {
                 returns.0 = unsat_clauses;
             }
             returns.1 = unsat_clauses;
             if unsat_clauses == 0 {
                 return returns;
             }
+            seed = ((((!seed * 11_304_001) % 22_003_811) ^ (!last_flip * seed)) % 31_754_873) >> 4;
             if let Some(c) = target_clause {
-                let beta: f64 = 2.5 - 1.5 / (1.0 + unsat_clauses as f64).log(2.0);
+                let beta: f64 = 3.2 - 2.1 / (1.0 + unsat_clauses as f64).log(2.0);
                 // let beta: f64 = if unsat_clauses <= 3 { 1.0 } else { 3.0 };
                 let factor = |vi| beta.powf(-(*flip_target.get(vi).unwrap() as f64));
                 let vars = c.lits.iter().map(|l| l.vi()).collect::<Vec<_>>();
-                let index = (((step + last_flip) & 63) as f64 / 63.0)
-                    * vars.iter().map(factor).sum::<f64>();
+                let index = ((seed % 100) as f64 / 100.0) * vars.iter().map(factor).sum::<f64>();
                 let mut sum: f64 = 0.0;
                 for vi in vars.iter() {
                     sum += factor(vi);
