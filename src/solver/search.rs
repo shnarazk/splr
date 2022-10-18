@@ -266,8 +266,8 @@ fn search(
             // }
             match handle_conflict(asg, cdb, state, &cc)? {
                 0 => {
-                    best_phases_invalid = true;
-                    state.stm.reset();
+                    best_phases_invalid = asg.best_phases_invalid();
+                    // state.stm.reset();
                 }
                 1 => (),
                 _ => num_learnt += 1,
@@ -313,7 +313,8 @@ fn search(
                                     let stats =
                                         cdb.stochastic_local_search(asg, &mut $assign, $limit);
                                     if $improved(stats) {
-                                        state.sls_index = stats.1;
+                                        state.sls_index += 1;
+                                        // state.sls_index = stats.1;
                                         let num_flipped = asg.override_rephasing_target(&$assign);
                                         state.flush(format!(
                                             "({} clauses, {} flips), ",
@@ -324,18 +325,13 @@ fn search(
                                     }
                                 };
                             }
-                            if best_phases_invalid {
+                            if best_phases_invalid || new_segment {
                                 best_phases_invalid = false;
                                 let mut assignment = asg.best_phases_ref(Some(false));
                                 sls!(assignment, |_: (usize, usize)| true, 200);
-                            } else {
-                                asg.select_rephasing_target();
                             }
                         }
-                        #[cfg(not(feature = "stochastic_local_search"))]
-                        {
-                            asg.select_rephasing_target();
-                        }
+                        asg.select_rephasing_target();
                     }
                     if cfg!(feature = "clause_vivification") {
                         cdb.vivify(asg, state)?;

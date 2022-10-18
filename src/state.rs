@@ -159,7 +159,7 @@ impl Default for State {
             chrono_bt_threshold: 100,
 
             #[cfg(feature = "stochastic_local_search")]
-            sls_index: 9_999_999,
+            sls_index: 0,
 
             last_asg: 0,
             new_learnt: Vec::new(),
