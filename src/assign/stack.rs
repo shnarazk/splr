@@ -196,6 +196,9 @@ impl AssignIF for AssignStack {
     fn best_assigned(&mut self) -> Option<usize> {
         (self.build_best_at == self.num_propagation).then_some(self.num_vars - self.num_best_assign)
     }
+    fn best_phases_invalid(&self) -> bool {
+        self.best_phases.is_empty()
+    }
     #[allow(unused_variables)]
     fn extend_model(&mut self, cdb: &mut impl ClauseDBIF) -> Vec<Option<bool>> {
         let lits = &self.eliminated;
