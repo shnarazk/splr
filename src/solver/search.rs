@@ -239,12 +239,12 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut current_stage: Option<bool> = Some(true);
     let mut num_learnt = 0;
+    // #[cfg(feature = "stochastic_local_search")]
+    // let mut best_core = asg.num_vars;
+    // #[cfg(feature = "stochastic_local_search")]
+    // let mut best_core_updated = None;
     #[cfg(feature = "stochastic_local_search")]
-    let mut best_core = asg.num_vars;
-    #[cfg(feature = "stochastic_local_search")]
-    let mut best_core_updated = None;
-    #[cfg(feature = "stochastic_local_search")]
-    let mut best_sls = cdb.derefer(cdb::property::Tusize::NumClause);
+    let mut best_phases_invalid = true;
 
     state.stm.initialize(
         (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
@@ -261,14 +261,17 @@ fn search(
             asg.update_activity_tick();
             #[cfg(feature = "clause_rewarding")]
             cdb.update_activity_tick();
-            if 1 < handle_conflict(asg, cdb, state, &cc)? {
-                num_learnt += 1;
-            }
-            // match handle_conflict(asg, cdb, state, &cc)? {
-            //     0 => state.stm.reset(),
-            //     1 => (),
-            //     _ => num_learnt += 1,
+            // if 1 < handle_conflict(asg, cdb, state, &cc)? {
+            //     num_learnt += 1;
             // }
+            match handle_conflict(asg, cdb, state, &cc)? {
+                0 => {
+                    best_phases_invalid = true;
+                    state.stm.reset();
+                }
+                1 => (),
+                _ => num_learnt += 1,
+            }
             if state.stm.stage_ended(num_learnt) {
                 if let Some(p) = state.elapsed() {
                     if 1.0 <= p {
@@ -299,24 +302,6 @@ fn search(
                 }
                 if let Some(new_segment) = next_stage {
                     // a beginning of a new cycle
-                    if cfg!(feature = "clause_vivification") {
-                        cdb.vivify(asg, state)?;
-                    }
-                    if new_segment {
-                        // #[cfg(not(feature = "reward_annealing"))]
-                        // asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
-                        if !cfg!(feature = "no_clause_elimination") {
-                            let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-                            state.flush("clause subsumption, ");
-                            elim.simplify(asg, cdb, state, false)?;
-                            asg.eliminated.append(elim.eliminated_lits());
-                            state[Stat::Simplify] += 1;
-                            state[Stat::SubsumedClause] = elim.num_subsumed;
-                        }
-                        if cfg!(feature = "dynamic_restart_threshold") {
-                            state.restart.set_segment_parameters(max_scale);
-                        }
-                    }
                     #[cfg(feature = "rephase")]
                     {
                         #[cfg(feature = "stochastic_local_search")]
@@ -325,10 +310,10 @@ fn search(
                             macro_rules! sls {
                                 ($assign: expr, $improved: expr, $limit: expr) => {
                                     state.flush("SLS");
-                                    let stats = cdb.stochastic_local_search(&mut $assign, $limit);
+                                    let stats =
+                                        cdb.stochastic_local_search(asg, &mut $assign, $limit);
                                     if $improved(stats) {
-                                        best_sls = stats.1;
-                                        state.stats[Stat::SLS] = stats.1;
+                                        state.sls_index = stats.1;
                                         let num_flipped = asg.override_rephasing_target(&$assign);
                                         state.flush(format!(
                                             "({} clauses, {} flips), ",
@@ -339,25 +324,35 @@ fn search(
                                     }
                                 };
                             }
-                            match (state.stm.current_cycle() % 4, best_core_updated) {
-                                (_, Some(mut assignment)) => {
-                                    let limit = 100 * state.stm.current_segment();
-                                    sls!(assignment, |c: (usize, usize)| c.1 <= c.0, limit);
-                                }
-                                (0, _) => {
-                                    let mut assignment = asg.best_phases_ref();
-                                    sls!(assignment, |c: (usize, usize)| c.1 <= best_sls, 100);
-                                }
-                                (1, _) => {
-                                    asg.select_rephasing_target();
-                                }
-                                _ => (),
+                            if best_phases_invalid {
+                                best_phases_invalid = false;
+                                let mut assignment = asg.best_phases_ref(Some(false));
+                                sls!(assignment, |_: (usize, usize)| true, 200);
+                            } else {
+                                asg.select_rephasing_target();
                             }
-                            best_core_updated = None;
                         }
                         #[cfg(not(feature = "stochastic_local_search"))]
                         {
                             asg.select_rephasing_target();
+                        }
+                    }
+                    if cfg!(feature = "clause_vivification") {
+                        cdb.vivify(asg, state)?;
+                    }
+                    if new_segment {
+                        #[cfg(not(feature = "reward_annealing"))]
+                        asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
+                        if !cfg!(feature = "no_clause_elimination") {
+                            let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+                            state.flush("clause subsumption, ");
+                            elim.simplify(asg, cdb, state, false)?;
+                            asg.eliminated.append(elim.eliminated_lits());
+                            state[Stat::Simplify] += 1;
+                            state[Stat::SubsumedClause] = elim.num_subsumed;
+                        }
+                        if cfg!(feature = "dynamic_restart_threshold") {
+                            state.restart.set_segment_parameters(max_scale);
                         }
                     }
                 }
@@ -374,12 +369,6 @@ fn search(
             if let Some(na) = asg.best_assigned() {
                 state.flush("");
                 state.flush(format!("unreachable core: {}", na));
-                #[cfg(feature = "stochastic_local_search")]
-                if na < best_core {
-                    best_core = na;
-                    best_core_updated = Some(asg.best_phases_ref());
-                    best_sls = cdb.derefer(cdb::property::Tusize::NumClause);
-                }
             }
         }
     }

@@ -112,8 +112,14 @@ pub struct State {
     /// hold conflicting user-defined *assumed* literals for UNSAT problems
     pub conflicts: Vec<Lit>,
 
+    #[cfg(feature = "chronoBT")]
     /// chronoBT threshold
     pub chrono_bt_threshold: DecisionLevel,
+
+    #[cfg(feature = "stochastic_local_search")]
+    /// criteria for SLS
+    pub sls_index: usize,
+
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
     /// working place to build learnt clauses
@@ -148,7 +154,13 @@ impl Default for State {
 
             #[cfg(feature = "support_user_assumption")]
             conflicts: Vec::new(),
+
+            #[cfg(feature = "chronoBT")]
             chrono_bt_threshold: 100,
+
+            #[cfg(feature = "stochastic_local_search")]
+            sls_index: 9_999_999,
+
             last_asg: 0,
             new_learnt: Vec::new(),
             derive20: Vec::new(),
@@ -521,7 +533,7 @@ impl StateIF for State {
                 LogUsizeId::VivifiedClause,
                 self[Stat::VivifiedClause]
             ),
-            im!("{:>9}", self, LogUsizeId::SLS, self[Stat::SLS]),
+            im!("{:>9}", self, LogUsizeId::SLS, self.sls_index),
             im!(
                 "{:>9}",
                 self,
@@ -858,6 +870,7 @@ pub enum LogF64Id {
     PropagationPerConflict,
     LiteralBlockEntanglement,
     RestartEnergy,
+
     End,
 }
 

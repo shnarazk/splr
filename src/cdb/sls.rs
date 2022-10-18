@@ -1,9 +1,17 @@
 /// Implementation of Stochastic Local Search
-use {crate::types::*, std::collections::HashMap};
+use {
+    crate::{assign::AssignIF, types::*},
+    std::collections::HashMap,
+};
 
 pub trait StochasticLocalSearchIF {
+    /// returns the decision level of the given assignment and the one of the final assignment.
+    /// Note: the lower level a set of clauses make a conflict at,
+    /// the higher learning rate a solver can keep and the better learnt clauses we will have.
+    /// This would be a better criteria that can be used in CDCL solvers.
     fn stochastic_local_search(
         &mut self,
+        asg: &impl AssignIF,
         start: &mut HashMap<VarId, bool>,
         limit: usize,
     ) -> (usize, usize);
@@ -12,20 +20,27 @@ pub trait StochasticLocalSearchIF {
 impl StochasticLocalSearchIF for ClauseDB {
     fn stochastic_local_search(
         &mut self,
+        _asg: &impl AssignIF,
         assignment: &mut HashMap<VarId, bool>,
         limit: usize,
     ) -> (usize, usize) {
-        let mut returns = (0, 0);
+        let mut returns: (usize, usize) = (0, 0);
         let mut last_flip = self.num_clause;
         let mut seed = 38_721_103;
         for step in 1..=limit {
             let mut unsat_clauses = 0;
+            // let mut level: DecisionLevel = 0;
             // CONSIDER: counting only given (permanent) clauses.
             let mut flip_target: HashMap<VarId, usize> = HashMap::new();
             let mut target_clause: Option<&Clause> = None;
             for c in self.clause.iter().skip(1).filter(|c| !c.is_dead()) {
+                // let mut cls_lvl: DecisionLevel = 0;
                 if c.is_falsified(assignment, &mut flip_target) {
                     unsat_clauses += 1;
+                    // for l in c.lits.iter() {
+                    //     cls_lvl = cls_lvl.max(asg.level(l.vi()));
+                    // }
+                    // level = level.max(cls_lvl);
                     if target_clause.is_none() || unsat_clauses == step {
                         target_clause = Some(c);
                         for l in c.lits.iter() {
@@ -36,12 +51,16 @@ impl StochasticLocalSearchIF for ClauseDB {
             }
             if step == 1 {
                 returns.0 = unsat_clauses;
+                // returns.0 = level as usize;
             }
             returns.1 = unsat_clauses;
-            if unsat_clauses == 0 {
-                return returns;
+            // returns.1 = level as usize;
+            if unsat_clauses == 0 || step == limit {
+                break;
             }
-            seed = ((((!seed * 11_304_001) % 22_003_811) ^ (!last_flip * seed)) % 31_754_873) >> 4;
+            seed = (((((!seed % 10_000_000) * 11_304_001) % 22_003_811) ^ (!last_flip * seed))
+                % 31_754_873)
+                >> 4;
             if let Some(c) = target_clause {
                 let beta: f64 = 3.2 - 2.1 / (1.0 + unsat_clauses as f64).log(2.0);
                 // let beta: f64 = if unsat_clauses <= 3 { 1.0 } else { 3.0 };
@@ -58,7 +77,7 @@ impl StochasticLocalSearchIF for ClauseDB {
                     }
                 }
             } else {
-                return returns;
+                break;
             }
         }
         returns
