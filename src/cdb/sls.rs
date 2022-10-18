@@ -26,7 +26,7 @@ impl StochasticLocalSearchIF for ClauseDB {
     ) -> (usize, usize) {
         let mut returns: (usize, usize) = (0, 0);
         let mut last_flip = self.num_clause;
-        let mut seed = 38_721_103;
+        let mut seed = 721_109;
         for step in 1..=limit {
             let mut unsat_clauses = 0;
             // let mut level: DecisionLevel = 0;
@@ -58,9 +58,9 @@ impl StochasticLocalSearchIF for ClauseDB {
             if unsat_clauses == 0 || step == limit {
                 break;
             }
-            seed = (((((!seed % 10_000_000) * 11_304_001) % 22_003_811) ^ (!last_flip * seed))
-                % 31_754_873)
-                >> 4;
+            seed = ((((!seed & 0x0000_0000_ffff_ffff) * 1_304_003) % 2_003_819)
+                ^ ((!last_flip & 0x0000_0000_ffff_ffff) * seed))
+                % 3_754_873;
             if let Some(c) = target_clause {
                 let beta: f64 = 3.2 - 2.1 / (1.0 + unsat_clauses as f64).log(2.0);
                 // let beta: f64 = if unsat_clauses <= 3 { 1.0 } else { 3.0 };
