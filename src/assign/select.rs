@@ -2,12 +2,11 @@
 
 #[cfg(feature = "rephase")]
 use super::property;
-#[cfg(feature = "stochastic_local_search")]
-use std::collections::HashMap;
 
 use {
     super::{AssignStack, VarHeapIF},
     crate::types::*,
+    std::collections::HashMap,
 };
 
 /// ```ignore
@@ -28,10 +27,8 @@ macro_rules! var_assign {
 
 /// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
-    #[cfg(feature = "stochastic_local_search")]
     /// return best phases
     fn best_phases_ref(&mut self, default_value: Option<bool>) -> HashMap<VarId, bool>;
-    #[cfg(feature = "stochastic_local_search")]
     /// force an assignment obtained by SLS
     fn override_rephasing_target(&mut self, assignment: &HashMap<VarId, bool>) -> usize;
     #[cfg(feature = "rephase")]
@@ -49,7 +46,6 @@ pub trait VarSelectIF {
 }
 
 impl VarSelectIF for AssignStack {
-    #[cfg(feature = "stochastic_local_search")]
     fn best_phases_ref(&mut self, default_value: Option<bool>) -> HashMap<VarId, bool> {
         self.var
             .iter()
@@ -69,7 +65,6 @@ impl VarSelectIF for AssignStack {
             })
             .collect::<HashMap<VarId, bool>>()
     }
-    #[cfg(feature = "stochastic_local_search")]
     fn override_rephasing_target(&mut self, assignment: &HashMap<VarId, bool>) -> usize {
         let mut num_flipped = 0;
         for (vi, b) in assignment.iter() {

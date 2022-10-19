@@ -239,11 +239,6 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut current_stage: Option<bool> = Some(true);
     let mut num_learnt = 0;
-    // #[cfg(feature = "stochastic_local_search")]
-    // let mut best_core = asg.num_vars;
-    // #[cfg(feature = "stochastic_local_search")]
-    // let mut best_core_updated = None;
-    #[cfg(feature = "stochastic_local_search")]
     let mut best_phases_invalid = true;
 
     state.stm.initialize(
@@ -293,8 +288,7 @@ fn search(
                 );
                 let scale = state.stm.current_scale();
                 let max_scale = state.stm.max_scale();
-                #[cfg(feature = "reward_annealing")]
-                {
+                if cfg!(feature = "reward_annealing") {
                     let base = (1 << (state.stm.current_segment() - 1)) - 1;
                     let decay_index = state.stm.current_cycle() - base;
                     let decay = (decay_index as f64 - 1.0) / decay_index as f64;
@@ -304,10 +298,17 @@ fn search(
                     // a beginning of a new cycle
                     #[cfg(feature = "rephase")]
                     {
-                        #[cfg(feature = "stochastic_local_search")]
-                        {
+                        if cfg!(feature = "stochastic_local_search") {
                             use cdb::StochasticLocalSearchIF;
                             macro_rules! sls {
+                                ($assign: expr, $limit: expr) => {
+                                    state.flush("SLS ");
+                                    let cls =
+                                        cdb.stochastic_local_search(asg, &mut $assign, $limit);
+                                    state.sls_index += 1;
+                                    let flips = asg.override_rephasing_target(&$assign);
+                                    state.flush(format!("({} clauses, {} flips), ", cls.1, flips));
+                                };
                                 ($assign: expr, $improved: expr, $limit: expr) => {
                                     state.flush("SLS");
                                     let stats =
@@ -328,7 +329,7 @@ fn search(
                             if best_phases_invalid || new_segment {
                                 best_phases_invalid = false;
                                 let mut assignment = asg.best_phases_ref(Some(false));
-                                sls!(assignment, |_: (usize, usize)| true, 200);
+                                sls!(assignment, 100);
                             }
                         }
                         asg.select_rephasing_target();
@@ -337,8 +338,9 @@ fn search(
                         cdb.vivify(asg, state)?;
                     }
                     if new_segment {
-                        #[cfg(not(feature = "reward_annealing"))]
-                        asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
+                        if !cfg!(feature = "reward_annealing") {
+                            asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
+                        }
                         if !cfg!(feature = "no_clause_elimination") {
                             let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                             state.flush("clause subsumption, ");
@@ -364,7 +366,7 @@ fn search(
             }
             if let Some(na) = asg.best_assigned() {
                 state.flush("");
-                state.flush(format!("unreachable core: {}", na));
+                state.flush(format!("unreachable core: {} ", na));
             }
         }
     }
