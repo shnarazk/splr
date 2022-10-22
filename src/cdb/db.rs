@@ -1028,7 +1028,7 @@ impl ClauseDBIF for ClauseDB {
         // Therefore I save the clauses which will become vivification targets.
         // And since the current Splr adopts stage-based GC policy, I drop this simple halve'em if doubled,
         // based on memomy pressure and clause sizes used in conflict analysis.
-        let entanglement = 1.5 * (self.lb_entanglement.get_slow() + self.lbd.get_slow()).powf(0.5);
+        let entanglement = 1.75 * (self.lb_entanglement.get_slow() + self.lbd.get_slow()).powf(0.5);
         let memory_pressure = 2000.0 * (self.num_learnt as f64).powf(-0.5);
         let thr = (entanglement + memory_pressure).min(entanglement) as u16;
         for i in &perm[keep..] {
