@@ -239,7 +239,9 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut current_stage: Option<bool> = Some(true);
     let mut num_learnt = 0;
-    let mut best_phases_invalid = true;
+    let mut current_core: usize = 999_999;
+    let mut core_was_rebuilt: Option<usize> = None;
+    let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
 
     state.stm.initialize(
         (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
@@ -261,7 +263,7 @@ fn search(
             // }
             match handle_conflict(asg, cdb, state, &cc)? {
                 0 => {
-                    best_phases_invalid = asg.best_phases_invalid();
+                    // best_phases_invalid = asg.best_phases_invalid();
                     // state.stm.reset();
                 }
                 1 => (),
@@ -280,7 +282,7 @@ fn search(
                 cdb.reduce(asg, state.stm.num_reducible());
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
-                dump_stage(state, asg, current_stage);
+                dump_stage(asg, cdb, state, current_stage);
                 let next_stage: Option<bool> = state.stm.prepare_new_stage(
                     (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt()
                         as usize,
@@ -302,34 +304,53 @@ fn search(
                             use cdb::StochasticLocalSearchIF;
                             macro_rules! sls {
                                 ($assign: expr, $limit: expr) => {
-                                    state.flush("SLS ");
+                                    state.sls_index += 1;
+                                    state.flush(format!(
+                                        "SLS(#{}, core: {}, steps: {})",
+                                        state.sls_index, sls_core, $limit
+                                    ));
                                     let cls =
                                         cdb.stochastic_local_search(asg, &mut $assign, $limit);
-                                    state.sls_index += 1;
-                                    let flips = asg.override_rephasing_target(&$assign);
-                                    state.flush(format!("({} clauses, {} flips), ", cls.1, flips));
+                                    asg.override_rephasing_target(&$assign);
+                                    sls_core = sls_core.min(cls.1);
                                 };
                                 ($assign: expr, $improved: expr, $limit: expr) => {
-                                    state.flush("SLS");
-                                    let stats =
+                                    state.sls_index += 1;
+                                    state.flush(format!(
+                                        "SLS(#{}, core: {}, steps: {})",
+                                        state.sls_index, sls_core, $limit
+                                    ));
+                                    let cls =
                                         cdb.stochastic_local_search(asg, &mut $assign, $limit);
-                                    if $improved(stats) {
-                                        state.sls_index += 1;
+                                    if $improved(cls) {
                                         // state.sls_index = stats.1;
-                                        let num_flipped = asg.override_rephasing_target(&$assign);
-                                        state.flush(format!(
-                                            "({} clauses, {} flips), ",
-                                            stats.1, num_flipped
-                                        ));
-                                    } else {
-                                        state.flush(", ");
+                                        asg.override_rephasing_target(&$assign);
                                     }
+                                    sls_core = sls_core.min(cls.1);
                                 };
                             }
-                            if best_phases_invalid || new_segment {
-                                best_phases_invalid = false;
+                            macro_rules! scale {
+                                ($a: expr, $b: expr) => {
+                                    ($a.saturating_sub($b.next_power_of_two().trailing_zeros())
+                                        as f64)
+                                        .powf(1.75) as usize
+                                        + 1
+                                };
+                            }
+                            let ent = cdb.refer(cdb::property::TEma::Entanglement).get() as usize;
+                            let n = cdb.derefer(cdb::property::Tusize::NumClause);
+                            if let Some(c) = core_was_rebuilt {
+                                core_was_rebuilt = None;
+                                if c < current_core {
+                                    let steps = scale!(27_u32, c) * scale!(24_u32, n) / ent;
+                                    let mut assignment = asg.best_phases_ref(Some(false));
+                                    sls!(assignment, steps);
+                                }
+                            } else if new_segment {
+                                let n = cdb.derefer(cdb::property::Tusize::NumClause);
+                                let steps = scale!(27_u32, current_core) * scale!(24_u32, n) / ent;
                                 let mut assignment = asg.best_phases_ref(Some(false));
-                                sls!(assignment, 100);
+                                sls!(assignment, steps);
                             }
                         }
                         asg.select_rephasing_target();
@@ -365,6 +386,10 @@ fn search(
                 RESTART!(asg, cdb, state);
             }
             if let Some(na) = asg.best_assigned() {
+                if current_core < na && core_was_rebuilt.is_none() {
+                    core_was_rebuilt = Some(current_core);
+                }
+                current_core = na;
                 state.flush("");
                 state.flush(format!("unreachable core: {} ", na));
             }
@@ -385,13 +410,14 @@ fn search(
 }
 
 /// display the current stats. before updating stabiliation parameters
-fn dump_stage(state: &mut State, asg: &AssignStack, current_stage: Option<bool>) {
+fn dump_stage(asg: &AssignStack, cdb: &ClauseDB, state: &mut State, current_stage: Option<bool>) {
     let active = true; // state.rst.enable;
     let cycle = state.stm.current_cycle();
     let scale = state.stm.current_scale();
     let stage = state.stm.current_stage();
     let segment = state.stm.current_segment();
     let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
+    let reduction_threshold = cdb.derefer(cdb::property::Tusize::ReductionThreshold);
     let fuel = if active {
         state.restart.penetration_energy_charged
     } else {
@@ -403,7 +429,10 @@ fn dump_stage(state: &mut State, asg: &AssignStack, current_stage: Option<bool>)
             Some(false) => Some((None, Some(cycle), stage)),
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
-        format!("scale: {:>4}, fuel:{:>9.2}, cpr:{:>8.2}", scale, fuel, cpr),
+        format!(
+            "scale: {:>4}, fuel:{:>9.2}, cpr:{:>8.2}, thr:{:>5}",
+            scale, fuel, cpr, reduction_threshold
+        ),
     );
 }
 
