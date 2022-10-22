@@ -291,9 +291,16 @@ fn search(
                 let scale = state.stm.current_scale();
                 let max_scale = state.stm.max_scale();
                 if cfg!(feature = "reward_annealing") {
-                    let base = (1 << (state.stm.current_segment() - 1)) - 1;
-                    let decay_index = state.stm.current_cycle() - base;
-                    let decay = (decay_index as f64 - 1.0) / decay_index as f64;
+                    let base = {
+                        let seg = state.stm.current_segment();
+                        if seg == 0 {
+                            state.stm.current_cycle()
+                        } else {
+                            state.stm.current_cycle() - (1 << (seg - 1))
+                        }
+                    };
+                    let decay_index: f64 = 1.25 + base as f64;
+                    let decay = (decay_index - 1.0) / decay_index;
                     asg.update_activity_decay(decay);
                 }
                 if let Some(new_segment) = next_stage {
