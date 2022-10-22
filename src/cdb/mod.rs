@@ -289,7 +289,9 @@ pub struct ClauseDB {
     num_reregistration: usize,
     /// Literal Block Entanglement
     /// EMA of LBD of clauses used in conflict analysis (dependency graph)
-    pub lb_entanglement: Ema2,
+    lb_entanglement: Ema2,
+    /// the decision level used in th last invocation of `reduce`
+    last_reduction_threshold: usize,
 
     //
     //## incremental solving
@@ -311,10 +313,11 @@ pub mod property {
         NumLearnt,
         NumReduction,
         NumReRegistration,
+        ReductionThreshold,
         Timestamp,
     }
 
-    pub const USIZES: [Tusize; 9] = [
+    pub const USIZES: [Tusize; 10] = [
         Tusize::NumBiClause,
         Tusize::NumBiClauseCompletion,
         Tusize::NumBiLearnt,
@@ -323,6 +326,7 @@ pub mod property {
         Tusize::NumLearnt,
         Tusize::NumReduction,
         Tusize::NumReRegistration,
+        Tusize::ReductionThreshold,
         Tusize::Timestamp,
     ];
 
@@ -338,6 +342,7 @@ pub mod property {
                 Tusize::NumLearnt => self.num_learnt,
                 Tusize::NumReduction => self.num_reduction,
                 Tusize::NumReRegistration => self.num_reregistration,
+                Tusize::ReductionThreshold => self.last_reduction_threshold,
 
                 #[cfg(feature = "clause_rewarding")]
                 Tusize::Timestamp => self.tick,

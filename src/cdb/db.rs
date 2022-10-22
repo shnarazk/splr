@@ -48,6 +48,7 @@ impl Default for ClauseDB {
             num_reduction: 0,
             num_reregistration: 0,
             lb_entanglement: Ema2::new(1_000).with_slow(80_000).with_value(2.0),
+            last_reduction_threshold: 0,
             eliminated_permanent: Vec::new(),
         }
     }
@@ -1022,18 +1023,21 @@ impl ClauseDBIF for ClauseDB {
         }
         perm.sort();
         // Worse half of `perm` should be discarded now. But many people thought
-        // there're exception. Since this is the pre-stage of clause vivification,
+        // there're exceptions. Since this is the pre-stage of clause vivification,
         // we want keep usefull clauses as many as possible.
         // Therefore I save the clauses which will become vivification targets.
-        // let thr = (self.lb_entanglement.get_slow() + 1.0).min(self.lbd.get_fast().max(5.0)) as u16;
-        let extra = 100.0 / (self.num_learnt as f64).log2();
-        let thr = ((self.lb_entanglement.get_slow() + self.lbd.get_slow()).log2() + extra) as u16;
+        // And since the current Splr adopts stage-based GC policy, I drop this simple halve'em if doubled,
+        // based on memomy pressure and clause sizes used in conflict analysis.
+        let entanglement = 1.5 * (self.lb_entanglement.get_slow() + self.lbd.get_slow()).powf(0.5);
+        let memory_pressure = 2000.0 * (self.num_learnt as f64).powf(-0.5);
+        let thr = (entanglement + memory_pressure).min(entanglement) as u16;
         for i in &perm[keep..] {
             let c = &self.clause[i.to()];
             if !c.is_vivify_target() || thr < c.rank {
                 self.remove_clause(ClauseId::from(i.to()));
             }
         }
+        self.last_reduction_threshold = thr as usize;
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
