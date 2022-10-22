@@ -116,10 +116,6 @@ pub struct State {
     /// chronoBT threshold
     pub chrono_bt_threshold: DecisionLevel,
 
-    #[cfg(feature = "stochastic_local_search")]
-    /// criteria for SLS
-    pub sls_index: usize,
-
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
     /// working place to build learnt clauses
@@ -130,6 +126,8 @@ pub struct State {
     pub progress_cnt: usize,
     /// keep the previous statistics values
     pub record: ProgressRecord,
+    /// criteria for SLS
+    pub sls_index: usize,
     /// start clock for timeout handling
     pub start: Instant,
     /// upper limit for timeout handling
@@ -158,14 +156,12 @@ impl Default for State {
             #[cfg(feature = "chronoBT")]
             chrono_bt_threshold: 100,
 
-            #[cfg(feature = "stochastic_local_search")]
-            sls_index: 0,
-
             last_asg: 0,
             new_learnt: Vec::new(),
             derive20: Vec::new(),
             progress_cnt: 0,
             record: ProgressRecord::default(),
+            sls_index: 0,
             start: Instant::now(),
             time_limit: 0.0,
             log_messages: Vec::new(),
