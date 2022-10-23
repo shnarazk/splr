@@ -90,7 +90,7 @@ impl StageManager {
     }
     /// returns the number of conflicts in the current stage
     pub fn current_span(&self) -> usize {
-        self.scale * self.unit_size
+        self.cycle + self.unit_size
     }
     pub fn current_stage(&self) -> usize {
         self.stage
@@ -110,14 +110,10 @@ impl StageManager {
     /// returns a recommending number of redicible learnt clauses, based on
     /// the length of span.
     pub fn num_reducible(&self) -> usize {
-        // const REDUCTION_FACTOR: f64 = 2.0;
-        // let span = self.current_span() as f64;
-        // let keep = (REDUCTION_FACTOR * (self.unit_size as f64).powf(0.75)) as usize;
-        // span.saturating_sub(keep)
-        let base = self.unit_size as f64;
-        let current_scale = self.scale as f64;
-        let keep_rate = 0.75 * current_scale.powf(0.05);
-        ((current_scale - keep_rate) * base) as usize
+        const REDUCTION_FACTOR: f64 = 2.0;
+        let span = self.current_span();
+        let keep = (REDUCTION_FACTOR * (self.unit_size as f64).powf(0.75)) as usize;
+        span.saturating_sub(keep)
     }
     /// returns the maximum factor so far.
     /// None: `luby_iter.max_value` holds the maximum value so far.
