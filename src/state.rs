@@ -359,13 +359,13 @@ impl StateIF for State {
                 0,
                 match tick {
                     Some((Some(seg), Some(cyc), stg)) => {
-                        format!("stage({:>2},{:>4},{:>5}): {}", seg, cyc, stg, mes.as_ref())
+                        format!("stage({:>3},{:>4},{:>5}): {}", seg, cyc, stg, mes.as_ref())
                     }
                     Some((None, Some(cyc), stg)) => {
-                        format!("stage(  ,{:>4},{:>5}): {}", cyc, stg, mes.as_ref())
+                        format!("stage(   ,{:>4},{:>5}): {}", cyc, stg, mes.as_ref())
                     }
                     Some((None, None, stg)) => {
-                        format!("stage(  ,    ,{:>5}): {}", stg, mes.as_ref())
+                        format!("stage(   ,    ,{:>5}): {}", stg, mes.as_ref())
                     }
                     Some(_) => unreachable!(),
                     None => format!("### {}", mes.as_ref()),

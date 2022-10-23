@@ -318,21 +318,19 @@ fn search(
                                     ));
                                     let cls =
                                         cdb.stochastic_local_search(asg, &mut $assign, $limit);
-                                    asg.override_rephasing_target(&$assign);
+                                    asg.override_rephasing_target(&$assign, true);
                                     sls_core = sls_core.min(cls.1);
                                 };
                                 ($assign: expr, $improved: expr, $limit: expr) => {
                                     state.sls_index += 1;
+                                    // state.sls_index = stats.1;
                                     state.flush(format!(
                                         "SLS(#{}, core: {}, steps: {})",
                                         state.sls_index, sls_core, $limit
                                     ));
                                     let cls =
                                         cdb.stochastic_local_search(asg, &mut $assign, $limit);
-                                    if $improved(cls) {
-                                        // state.sls_index = stats.1;
-                                        asg.override_rephasing_target(&$assign);
-                                    }
+                                    asg.override_rephasing_target(&$assign, $improved(cls));
                                     sls_core = sls_core.min(cls.1);
                                 };
                             }
@@ -347,11 +345,14 @@ fn search(
                             let ent = cdb.refer(cdb::property::TEma::Entanglement).get() as usize;
                             let n = cdb.derefer(cdb::property::Tusize::NumClause);
                             if let Some(c) = core_was_rebuilt {
-                                core_was_rebuilt = None;
                                 if c < current_core {
                                     let steps = scale!(27_u32, c) * scale!(24_u32, n) / ent;
                                     let mut assignment = asg.best_phases_ref(Some(false));
                                     sls!(assignment, steps);
+                                    core_was_rebuilt = Some(2 * c);
+                                    // core_was_rebuilt = None;
+                                } else {
+                                    core_was_rebuilt = None;
                                 }
                             } else if new_segment {
                                 let n = cdb.derefer(cdb::property::Tusize::NumClause);
@@ -437,8 +438,8 @@ fn dump_stage(asg: &AssignStack, cdb: &ClauseDB, state: &mut State, current_stag
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
         format!(
-            "scale: {:>4}, fuel:{:>9.2}, cpr:{:>8.2}, thr:{:>5}",
-            scale, fuel, cpr, reduction_threshold
+            "scale: {:>4}, fuel:{:>8.2}, cpr:{:>8.2}, reduce:{:>3}",
+            scale, fuel, cpr, reduction_threshold,
         ),
     );
 }
