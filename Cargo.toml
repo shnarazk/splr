@@ -30,7 +30,7 @@ default = [
         "dynamic_restart_threshold",
         "rephase",
         # "reward_annealing",
-        "stochastic_local_search",
+        # "stochastic_local_search",
         # "suppress_reason_chain",
 
         ### proceccor

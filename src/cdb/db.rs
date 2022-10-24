@@ -953,9 +953,9 @@ impl ClauseDBIF for ClauseDB {
                 #[cfg(feature = "clause_rewarding")]
                 let act_c = self.reward;
                 #[cfg(not(feature = "clause_rewarding"))]
-                let act_c = 0.25;
+                let act_c = 0.5;
 
-                self.rank as f64 / (act_c + act_v)
+                self.rank as f64 / (act_c + act_v.powf(0.5))
             }
             #[cfg(feature = "just_used")]
             fn weight(&mut self, asg: &mut impl AssignIF) -> f64 {
@@ -1028,12 +1028,13 @@ impl ClauseDBIF for ClauseDB {
         // Therefore I save the clauses which will become vivification targets.
         // And since the current Splr adopts stage-based GC policy, I drop this simple halve'em if doubled,
         // based on memomy pressure and clause sizes used in conflict analysis.
-        // let entanglement = 2.0 * (self.lb_entanglement.get_slow() + self.lbd.get_slow()).powf(0.5);
-        let entanglement = (self.lb_entanglement.get_slow() + self.lbd.get_slow()).powf(0.5);
-        // let memory_pressure = 2000.0 * (self.num_learnt as f64).powf(-0.5);
-        let memory_pressure = 20.0 - (self.num_learnt as f64).log2();
-        // let thr = (entanglement + memory_pressure).min(entanglement) as u16;
-        let thr = ((entanglement + memory_pressure) as u16).max(7);
+        // let entanglement = (self.lb_entanglement.get_slow() + self.lbd.get_slow()).powf(0.6);
+        let entanglement = (self.lb_entanglement.get_slow() / 2.0).max(10.0) as u16;
+        let memory_pressure = 1000.0 * (self.num_learnt as f64).powf(-0.5);
+        let thr = entanglement + memory_pressure as u16;
+        // let entanglement = (self.lb_entanglement.get_slow() + self.lbd.get_slow()).powf(0.5);
+        // let memory_pressure = 20.0 - (self.num_learnt as f64).log2();
+        // let thr = ((entanglement + memory_pressure) as u16).max(7);
         for i in &perm[keep..] {
             let c = &self.clause[i.to()];
             if !c.is_vivify_target() || thr < c.rank {

@@ -242,6 +242,7 @@ fn search(
     let mut current_core: usize = 999_999;
     let mut core_was_rebuilt: Option<usize> = None;
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
+    let mut remove_targets = 0;
 
     state.stm.initialize(
         (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
@@ -279,7 +280,7 @@ fn search(
                 }
                 RESTART!(asg, cdb, state);
                 asg.clear_asserted_literals(cdb)?;
-                cdb.reduce(asg, state.stm.num_reducible());
+                remove_targets += state.stm.num_reducible();
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
                 dump_stage(asg, cdb, state, current_stage);
@@ -299,12 +300,14 @@ fn search(
                             state.stm.current_cycle() - (1 << (seg - 1))
                         }
                     };
-                    let decay_index: f64 = 1.25 + base as f64;
-                    let decay = (decay_index - 1.0) / decay_index;
+                    let decay_index: f64 = (4 + base) as f64;
+                    let decay = decay_index / (decay_index + 1.0);
                     asg.update_activity_decay(decay);
                 }
                 if let Some(new_segment) = next_stage {
                     // a beginning of a new cycle
+                    cdb.reduce(asg, remove_targets);
+                    remove_targets = 0;
                     #[cfg(feature = "rephase")]
                     {
                         if cfg!(feature = "stochastic_local_search") {
@@ -346,17 +349,17 @@ fn search(
                             let n = cdb.derefer(cdb::property::Tusize::NumClause);
                             if let Some(c) = core_was_rebuilt {
                                 if c < current_core {
-                                    let steps = scale!(27_u32, c) * scale!(24_u32, n) / ent;
+                                    let steps = scale!(26_u32, c) * scale!(23_u32, n) / ent;
                                     let mut assignment = asg.best_phases_ref(Some(false));
                                     sls!(assignment, steps);
-                                    core_was_rebuilt = Some(2 * c);
-                                    // core_was_rebuilt = None;
+                                    // core_was_rebuilt = Some(2 * c);
+                                    core_was_rebuilt = None;
                                 } else {
                                     core_was_rebuilt = None;
                                 }
                             } else if new_segment {
                                 let n = cdb.derefer(cdb::property::Tusize::NumClause);
-                                let steps = scale!(27_u32, current_core) * scale!(24_u32, n) / ent;
+                                let steps = scale!(26_u32, current_core) * scale!(23_u32, n) / ent;
                                 let mut assignment = asg.best_phases_ref(Some(false));
                                 sls!(assignment, steps);
                             }
