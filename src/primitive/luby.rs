@@ -6,6 +6,7 @@ pub struct LubySeries {
     seq: isize,
     size: usize,
     max_value: usize,
+    carry: bool,
 }
 
 impl Default for LubySeries {
@@ -15,6 +16,7 @@ impl Default for LubySeries {
             seq: 0,
             size: 1,
             max_value: 1,
+            carry: true,
         }
     }
 }
@@ -46,8 +48,11 @@ impl Iterator for LubySeries {
             index %= size;
         }
         let val = 2usize.pow(seq as u32);
-        if self.max_value < val {
-            self.max_value = val;
+        if self.max_value == val {
+            self.carry = true;
+        } else if self.carry {
+            self.max_value *= 2;
+            self.carry = false;
         }
         NonZeroU32::new(val as u32)
     }
@@ -71,8 +76,11 @@ impl LubySeries {
             index %= size;
         }
         let val = 2usize.pow(seq as u32);
-        if self.max_value < val {
-            self.max_value = val;
+        if self.carry {
+            self.max_value *= 2;
+            self.carry = false;
+        } else if self.max_value == val {
+            self.carry = true;
         }
         val
     }
@@ -83,6 +91,8 @@ impl LubySeries {
         self.index = 0;
         self.seq = 0;
         self.size = 1;
+        self.max_value = 1;
+        self.carry = true;
     }
 }
 
