@@ -242,7 +242,6 @@ fn search(
     let mut current_core: usize = 999_999;
     let mut core_was_rebuilt: Option<usize> = None;
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
-    let mut remove_targets = 0;
 
     state.stm.initialize(
         (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
@@ -280,7 +279,7 @@ fn search(
                 }
                 RESTART!(asg, cdb, state);
                 asg.clear_asserted_literals(cdb)?;
-                remove_targets += state.stm.num_reducible();
+                cdb.reduce(asg, state.stm.num_reducible());
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
                 dump_stage(asg, cdb, state, current_stage);
@@ -306,8 +305,6 @@ fn search(
                 }
                 if let Some(new_segment) = next_stage {
                     // a beginning of a new cycle
-                    cdb.reduce(asg, remove_targets);
-                    remove_targets = 0;
                     #[cfg(feature = "rephase")]
                     {
                         if cfg!(feature = "stochastic_local_search") {
