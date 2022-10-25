@@ -23,7 +23,7 @@ impl Instantiate for StageManager {
             unit_size,
             scale: 1,
             end_of_stage: unit_size,
-            next_is_new_segment: true,
+            next_is_new_segment: false,
             ..StageManager::default()
         }
     }
@@ -40,7 +40,7 @@ impl StageManager {
             luby_iter: LubySeries::default(),
             scale: 1,
             end_of_stage: unit_size,
-            next_is_new_segment: true,
+            next_is_new_segment: false,
         }
     }
     pub fn initialize(&mut self, unit_size: usize) {
@@ -49,16 +49,16 @@ impl StageManager {
         self.scale = 1;
         self.end_of_stage = unit_size;
     }
+    pub fn reset(&mut self) {
+        self.cycle = 0;
+        self.scale = 1;
+        self.end_of_stage = self.unit_size;
+    }
     /// returns:
-    /// - Some(true): it's a beginning of a new cycle and a new cycle, a 2nd-level group.
+    /// - Some(true): it's a beginning of a new cycle and a new segment, a 2nd-level group.
     /// - Some(false): a beginning of a new cycle.
     /// - None: the other case.
     pub fn prepare_new_stage(&mut self, rescale: usize, now: usize) -> Option<bool> {
-        // self.scale *= 2;
-        // self.stage += 1;
-        // let span = self.current_span();
-        // self.end_of_stage = now + span;
-        // None
         self.unit_size = rescale;
         let mut new_cycle = false;
         let old_max = self.luby_iter.max_value();
@@ -66,7 +66,7 @@ impl StageManager {
         self.scale = self.luby_iter.next_unchecked();
         if self.scale == 1 {
             self.cycle += 1;
-            new_cycle = true;
+            new_cycle = self.cycle % 2 == 0;
             if self.next_is_new_segment {
                 self.segment += 1;
                 self.next_is_new_segment = false;
@@ -84,13 +84,13 @@ impl StageManager {
     }
     /// returns the number of conflicts in the current stage
     pub fn current_span(&self) -> usize {
-        self.cycle * self.unit_size
+        self.cycle + self.unit_size
     }
     pub fn current_stage(&self) -> usize {
         self.stage
     }
     pub fn current_cycle(&self) -> usize {
-        self.cycle
+        self.cycle / 2
     }
     /// returns the scaling factor used in the current span
     pub fn current_scale(&self) -> usize {
