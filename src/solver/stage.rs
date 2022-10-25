@@ -66,7 +66,7 @@ impl StageManager {
         self.scale = self.luby_iter.next_unchecked();
         if self.scale == 1 {
             self.cycle += 1;
-            new_cycle = self.cycle % 2 == 0;
+            new_cycle = true;
             if self.next_is_new_segment {
                 self.segment += 1;
                 self.next_is_new_segment = false;
@@ -90,7 +90,7 @@ impl StageManager {
         self.stage
     }
     pub fn current_cycle(&self) -> usize {
-        self.cycle / 2
+        self.cycle
     }
     /// returns the scaling factor used in the current span
     pub fn current_scale(&self) -> usize {
