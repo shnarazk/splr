@@ -11,6 +11,7 @@ pub struct StageManager {
     segment: usize,
     unit_size: usize,
     luby_iter: LubySeries,
+    max_scale_of_segment: usize,
     scale: usize,
     end_of_stage: usize,
     next_is_new_segment: bool,
@@ -21,9 +22,10 @@ impl Instantiate for StageManager {
         let unit_size = (cnf.num_of_variables as f64).sqrt() as usize;
         StageManager {
             unit_size,
+            max_scale_of_segment: 1,
             scale: 1,
             end_of_stage: unit_size,
-            next_is_new_segment: true,
+            next_is_new_segment: false,
             ..StageManager::default()
         }
     }
@@ -38,46 +40,53 @@ impl StageManager {
             segment: 0,
             unit_size,
             luby_iter: LubySeries::default(),
+            max_scale_of_segment: 1,
             scale: 1,
             end_of_stage: unit_size,
-            next_is_new_segment: true,
+            next_is_new_segment: false,
         }
     }
     pub fn initialize(&mut self, unit_size: usize) {
         self.cycle = 0;
         self.unit_size = unit_size;
         self.scale = 1;
+        self.max_scale_of_segment = 1;
         self.end_of_stage = unit_size;
+        self.next_is_new_segment = true;
+    }
+    pub fn reset(&mut self) {
+        self.cycle = 0;
+        self.scale = 1;
+        self.max_scale_of_segment = 1;
+        self.end_of_stage = self.unit_size;
+        self.next_is_new_segment = true;
     }
     /// returns:
-    /// - Some(true): it's a beginning of a new cycle and a new cycle, a 2nd-level group.
+    /// - Some(true): it's a beginning of a new cycle and a new segment, a 2nd-level group.
     /// - Some(false): a beginning of a new cycle.
     /// - None: the other case.
     pub fn prepare_new_stage(&mut self, rescale: usize, now: usize) -> Option<bool> {
-        // self.scale *= 2;
-        // self.stage += 1;
-        // let span = self.current_span();
-        // self.end_of_stage = now + span;
-        // None
         self.unit_size = rescale;
         let mut new_cycle = false;
-        let old_max = self.luby_iter.max_value();
-        let old_scale = self.scale;
+        let mut new_segment = false;
         self.scale = self.luby_iter.next_unchecked();
         if self.scale == 1 {
             self.cycle += 1;
             new_cycle = true;
             if self.next_is_new_segment {
+                new_segment = true;
                 self.segment += 1;
+                self.max_scale_of_segment *= 2;
                 self.next_is_new_segment = false;
             }
-        } else if old_max < self.scale {
+        }
+        if self.max_scale_of_segment == self.scale {
             self.next_is_new_segment = true;
         }
         self.stage += 1;
         let span = self.current_span();
         self.end_of_stage = now + span;
-        new_cycle.then(|| old_scale == self.luby_iter.max_value())
+        new_cycle.then_some(new_segment)
     }
     pub fn stage_ended(&self, now: usize) -> bool {
         self.end_of_stage < now
@@ -113,6 +122,6 @@ impl StageManager {
     /// This means it is the value found at the last segment.
     /// So the current value should be the next value, which is the double.
     pub fn max_scale(&self) -> usize {
-        2 * self.luby_iter.max_value()
+        self.max_scale_of_segment
     }
 }

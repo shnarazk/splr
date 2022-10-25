@@ -4,6 +4,7 @@
   if a given vector contains an empty clause. All expressions corresponding to valid CNFs
   should be converted to `Certificate` successfully. (#191)
 - Add a new feature 'reward_annealing'
+- Fix misc wrong calculations on Luby series and stage-cycle-segment model
 
 ## 0.16.3, 2022-09-16
 
