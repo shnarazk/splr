@@ -84,7 +84,7 @@ impl StageManager {
     }
     /// returns the number of conflicts in the current stage
     pub fn current_span(&self) -> usize {
-        self.cycle + self.unit_size
+        self.cycle * self.unit_size
     }
     pub fn current_stage(&self) -> usize {
         self.stage
