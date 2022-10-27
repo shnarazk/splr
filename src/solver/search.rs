@@ -270,7 +270,7 @@ fn search(
                 cdb.reduce(asg, state.stm.num_reducible());
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
-                dump_stage(state, asg, current_stage);
+                dump_stage(asg, cdb, state, current_stage);
                 let next_stage: Option<bool> = state.stm.prepare_new_stage(
                     (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt()
                         as usize,
@@ -338,13 +338,19 @@ fn search(
 }
 
 /// display the current stats. before updating stabiliation parameters
-fn dump_stage(state: &mut State, asg: &AssignStack, current_stage: Option<bool>) {
+fn dump_stage(
+    asg: &AssignStack,
+    cdb: &mut ClauseDB,
+    state: &mut State,
+    current_stage: Option<bool>,
+) {
     let active = true; // state.rst.enable;
     let cycle = state.stm.current_cycle();
     let scale = state.stm.current_scale();
     let stage = state.stm.current_stage();
     let segment = state.stm.current_segment();
     let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
+    let thr = cdb.derefer(cdb::property::Tusize::ReductionThreshold);
     let fuel = if active {
         state.restart.penetration_energy_charged
     } else {
@@ -356,7 +362,10 @@ fn dump_stage(state: &mut State, asg: &AssignStack, current_stage: Option<bool>)
             Some(false) => Some((None, Some(cycle), stage)),
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
-        format!("scale: {:>4}, fuel:{:>9.2}, cpr:{:>8.2}", scale, fuel, cpr),
+        format!(
+            "scale: {:>4}, fuel:{:>9.2}, cpr:{:>8.2}, cutoff:{:>4}",
+            scale, fuel, cpr, thr
+        ),
     );
 }
 
