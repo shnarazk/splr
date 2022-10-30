@@ -112,10 +112,10 @@ impl StageManager {
     /// returns a recommending number of redicible learnt clauses, based on
     /// the length of span.
     pub fn num_reducible(&self) -> usize {
-        const REDUCTION_FACTOR: f64 = 2.0;
         let span = self.current_span();
-        let keep = (REDUCTION_FACTOR * (self.unit_size as f64).powf(0.75)) as usize;
-        span.saturating_sub(keep)
+        let scale = (self.current_scale() as f64).sqrt();
+        let keep = scale * self.unit_size as f64;
+        span.saturating_sub(keep as usize)
     }
     /// returns the maximum factor so far.
     /// None: `luby_iter.max_value` holds the maximum value so far.
