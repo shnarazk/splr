@@ -945,16 +945,14 @@ impl ClauseDBIF for ClauseDB {
     fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize) {
         impl Clause {
             fn pure_weight(&self, asg: &mut impl AssignIF) -> f64 {
-                let act_v = self
-                    .iter()
-                    .fold(0.0f64, |acc, l| acc.max(asg.activity(l.vi())));
-
                 #[cfg(feature = "clause_rewarding")]
                 let act_c = self.reward;
                 #[cfg(not(feature = "clause_rewarding"))]
-                let act_c = 0.25;
-
-                self.rank as f64 / (act_c + act_v)
+                let act_c = {
+                    let sum: f64 = self.iter().map(|l| asg.activity(l.vi())).sum();
+                    sum / self.len() as f64
+                };
+                self.rank as f64 * (1.0 - act_c)
             }
             #[cfg(feature = "just_used")]
             fn weight(&mut self, asg: &mut impl AssignIF) -> f64 {
@@ -969,10 +967,6 @@ impl ClauseDBIF for ClauseDB {
             #[cfg(not(feature = "just_used"))]
             fn weight(&self, asg: &mut impl AssignIF) -> f64 {
                 self.pure_weight(asg)
-            }
-            // copied from vivify.rs
-            fn is_vivify_target(&self) -> bool {
-                self.rank * 2 <= self.rank_old
             }
         }
         let ClauseDB {
@@ -1015,22 +1009,13 @@ impl ClauseDBIF for ClauseDB {
             }
             perm.push(OrderedProxy::new(i, c.weight(asg)));
         }
-        // let keep = perm.len().min(nc) / portion;
         let keep = perm.len().saturating_sub(portion + 1);
         if perm.is_empty() {
             return;
         }
         perm.sort();
-        // Worse half of `perm` should be discarded now. But many people thought
-        // there're exception. Since this is the pre-stage of clause vivification,
-        // we want keep usefull clauses as many as possible.
-        // Therefore I save the clauses which will become vivification targets.
-        let thr = (self.lb_entanglement.get_slow() + 1.0).min(self.lbd.get_fast().max(5.0)) as u16;
         for i in &perm[keep..] {
-            let c = &self.clause[i.to()];
-            if !c.is_vivify_target() || thr < c.rank {
-                self.remove_clause(ClauseId::from(i.to()));
-            }
+            self.remove_clause(ClauseId::from(i.to()));
         }
     }
     fn reset(&mut self) {

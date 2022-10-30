@@ -237,7 +237,7 @@ fn search(
     cdb: &mut ClauseDB,
     state: &mut State,
 ) -> Result<bool, SolverError> {
-    let mut current_stage: Option<bool> = Some(true);
+    let mut previous_stage: Option<bool> = Some(true);
     let mut num_learnt = 0;
 
     state.stm.initialize(
@@ -270,7 +270,7 @@ fn search(
                 cdb.reduce(asg, state.stm.num_reducible());
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
-                dump_stage(state, asg, current_stage);
+                dump_stage(asg, cdb, state, previous_stage);
                 let next_stage: Option<bool> = state.stm.prepare_new_stage(
                     (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt()
                         as usize,
@@ -310,7 +310,7 @@ fn search(
                 state.progress(asg, cdb);
                 asg.handle(SolverEvent::Stage(scale));
                 state.restart.set_stage_parameters(scale);
-                current_stage = next_stage;
+                previous_stage = next_stage;
             } else if state.restart.restart(
                 cdb.refer(cdb::property::TEma::LBD),
                 cdb.refer(cdb::property::TEma::Entanglement),
@@ -338,7 +338,7 @@ fn search(
 }
 
 /// display the current stats. before updating stabiliation parameters
-fn dump_stage(state: &mut State, asg: &AssignStack, current_stage: Option<bool>) {
+fn dump_stage(asg: &AssignStack, _cdb: &mut ClauseDB, state: &mut State, shift: Option<bool>) {
     let active = true; // state.rst.enable;
     let cycle = state.stm.current_cycle();
     let scale = state.stm.current_scale();
@@ -351,7 +351,7 @@ fn dump_stage(state: &mut State, asg: &AssignStack, current_stage: Option<bool>)
         f64::NAN
     };
     state.log(
-        match current_stage {
+        match shift {
             None => Some((None, None, stage)),
             Some(false) => Some((None, Some(cycle), stage)),
             Some(true) => Some((Some(segment), Some(cycle), stage)),

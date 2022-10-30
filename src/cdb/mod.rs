@@ -285,7 +285,7 @@ pub struct ClauseDB {
     num_reregistration: usize,
     /// Literal Block Entanglement
     /// EMA of LBD of clauses used in conflict analysis (dependency graph)
-    pub lb_entanglement: Ema2,
+    lb_entanglement: Ema2,
 
     //
     //## incremental solving
