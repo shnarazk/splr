@@ -946,17 +946,15 @@ impl ClauseDBIF for ClauseDB {
     fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize) {
         impl Clause {
             fn pure_weight(&self, asg: &mut impl AssignIF) -> f64 {
-                let act_v = self
-                    .iter()
-                    .fold(0.0f64, |acc, l| acc.max(asg.activity(l.vi())));
-
                 #[cfg(feature = "clause_rewarding")]
                 let act_c = self.reward;
                 #[cfg(not(feature = "clause_rewarding"))]
-                let act_c = 0.25;
-
-                // self.rank as f64 / (act_c + act_v)
-                (self.rank + self.len() as u16) as f64 / (act_c + act_v)
+                let act_c = {
+                    // let act_c = 0.0; // 0.25;
+                    let sum: f64 = self.iter().map(|l| asg.activity(l.vi())).sum();
+                    sum / self.len() as f64
+                };
+                self.rank as f64 * (1.0 - act_c)
             }
             #[cfg(feature = "just_used")]
             fn weight(&mut self, asg: &mut impl AssignIF) -> f64 {
@@ -971,10 +969,6 @@ impl ClauseDBIF for ClauseDB {
             #[cfg(not(feature = "just_used"))]
             fn weight(&self, asg: &mut impl AssignIF) -> f64 {
                 self.pure_weight(asg)
-            }
-            // copied from vivify.rs
-            fn is_vivify_target(&self) -> bool {
-                self.rank * 2 <= self.rank_old
             }
         }
         let ClauseDB {
@@ -1023,25 +1017,10 @@ impl ClauseDBIF for ClauseDB {
             return;
         }
         perm.sort();
-        // Worse half of `perm` should be discarded now. But many people thought
-        // there're exceptions. Since this is the pre-stage of clause vivification,
-        // we want keep usefull clauses as many as possible.
-        // Therefore I save the clauses which will become vivification targets.
-
-        // And since the current Splr adopts stage-based GC policy, I drop this simple halve'em if doubled,
-        // based on memomy pressure and clause sizes used in conflict analysis.
-        let thr: u16 = if cfg!(feature = "memory_pressure_reduction") {
-            (1000.0 * (self.num_learnt as f64).powf(-0.4)) as u16
-        } else {
-            (self.lb_entanglement.get_slow() + 1.0).min(self.lbd.get_fast().max(5.0)) as u16
-        };
         for i in &perm[keep..] {
-            let c = &self.clause[i.to()];
-            if !c.is_vivify_target() || thr < c.rank {
-                self.remove_clause(ClauseId::from(i.to()));
-            }
+            self.remove_clause(ClauseId::from(i.to()));
         }
-        self.last_reduction_threshold = thr as usize;
+        // self.last_reduction_threshold = thr as usize;
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
