@@ -26,7 +26,6 @@ default = [
         # "incremental_solver",
         "LRB_rewarding",
         # "maintain_watch_cache", # for DEBUG
-        # "memory_pressure_reduction",
         "reason_side_rewarding",
         "rephase",
         # "reward_annealing", # for big problems since 0.17(need to evalate with larger timeout)
@@ -50,7 +49,6 @@ incremental_solver = ["no_clause_elimination"]
 just_used = []
 LRB_rewarding = []
 maintain_watch_cache = []
-memory_pressure_reduction = []
 no_IO = []
 reason_side_rewarding = []
 rephase = ["best_phases_tracking"]

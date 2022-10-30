@@ -48,7 +48,6 @@ impl Default for ClauseDB {
             num_reduction: 0,
             num_reregistration: 0,
             lb_entanglement: Ema2::new(1_000).with_slow(80_000).with_value(2.0),
-            last_reduction_threshold: 0,
             eliminated_permanent: Vec::new(),
         }
     }
@@ -950,7 +949,6 @@ impl ClauseDBIF for ClauseDB {
                 let act_c = self.reward;
                 #[cfg(not(feature = "clause_rewarding"))]
                 let act_c = {
-                    // let act_c = 0.0; // 0.25;
                     let sum: f64 = self.iter().map(|l| asg.activity(l.vi())).sum();
                     sum / self.len() as f64
                 };
@@ -1011,7 +1009,6 @@ impl ClauseDBIF for ClauseDB {
             }
             perm.push(OrderedProxy::new(i, c.weight(asg)));
         }
-        // let keep = perm.len().min(nc) / portion;
         let keep = perm.len().saturating_sub(portion + 1);
         if perm.is_empty() {
             return;
@@ -1020,7 +1017,6 @@ impl ClauseDBIF for ClauseDB {
         for i in &perm[keep..] {
             self.remove_clause(ClauseId::from(i.to()));
         }
-        // self.last_reduction_threshold = thr as usize;
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
