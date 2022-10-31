@@ -136,7 +136,6 @@ where
         let cnf = CNFDescription::from(vec);
         match Solver::instantiate(&config, &cnf).inject_from_vec(vec) {
             Err(SolverError::RootLevelConflict(_)) => Err(Ok(Certificate::UNSAT)),
-            Err(SolverError::EmptyClause) => Err(Ok(Certificate::UNSAT)),
             Err(e) => Err(Err(e)),
             Ok(s) => Ok(s),
         }
