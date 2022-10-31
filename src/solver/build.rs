@@ -22,7 +22,7 @@ pub trait SatSolverIF: Instantiate {
     /// # Errors
     ///
     /// * `SolverError::Inconsistent` if it conflicts with existing assignments.
-    /// * `SolverError::OutOfRange` if it is out of range for var index.
+    /// * `SolverError::InvalidLiteral` if it is out of range for var index.
     ///
     /// # Example
     ///
@@ -40,8 +40,8 @@ pub trait SatSolverIF: Instantiate {
     /// assert!(s.add_assignment(5).is_ok());
     /// assert!(s.add_assignment(8).is_ok());
     /// assert!(matches!(s.add_assignment(-1), Err(SolverError::RootLevelConflict(_))));
-    /// assert!(matches!(s.add_assignment(10), Err(SolverError::OutOfRange)));
-    /// assert!(matches!(s.add_assignment(0), Err(SolverError::OutOfRange)));
+    /// assert!(matches!(s.add_assignment(10), Err(SolverError::InvalidLiteral)));
+    /// assert!(matches!(s.add_assignment(0), Err(SolverError::InvalidLiteral)));
     /// assert_eq!(s.solve(), Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8])));
     /// ```
     fn add_assignment(&mut self, val: i32) -> Result<&mut Solver, SolverError>;
@@ -50,7 +50,7 @@ pub trait SatSolverIF: Instantiate {
     /// # Errors
     ///
     /// * `SolverError::Inconsistent` if a given clause is unit and conflicts with existing assignments.
-    /// * `SolverError::OutOfRange` if a literal in it is out of range for var index.
+    /// * `SolverError::InvalidLiteral` if a literal in it is out of range for var index.
     ///
     /// # Example
     ///```
@@ -65,8 +65,8 @@ pub trait SatSolverIF: Instantiate {
     /// assert!(s.add_clause(vec![-4, 5]).is_ok());
     /// assert!(s.add_clause(vec![-5, 6]).is_ok());
     /// assert!(s.add_clause(vec![-7, 8]).is_ok());
-    /// assert!(matches!(s.add_clause(vec![10, 11]), Err(SolverError::OutOfRange)));
-    /// assert!(matches!(s.add_clause(vec![0, 8]), Err(SolverError::OutOfRange)));
+    /// assert!(matches!(s.add_clause(vec![10, 11]), Err(SolverError::InvalidLiteral)));
+    /// assert!(matches!(s.add_clause(vec![0, 8]), Err(SolverError::InvalidLiteral)));
     /// assert_eq!(s.solve(), Ok(Certificate::UNSAT));
     ///```
     fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver, SolverError>
@@ -81,7 +81,7 @@ pub trait SatSolverIF: Instantiate {
     ///
     /// let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
     /// assert_eq!(s.asg.num_vars, 8);
-    /// assert!(matches!(s.add_assignment(9), Err(SolverError::OutOfRange)));
+    /// assert!(matches!(s.add_assignment(9), Err(SolverError::InvalidLiteral)));
     /// s.add_assignment(1).expect("panic");
     /// s.add_assignment(2).expect("panic");
     /// s.add_assignment(3).expect("panic");
@@ -100,7 +100,7 @@ pub trait SatSolverIF: Instantiate {
     ///
     /// * `SolverError::IOError` if it failed to load a CNF file.
     /// * `SolverError::Inconsistent` if the CNF is conflicting.
-    /// * `SolverError::OutOfRange` if any literal used in the CNF is out of range for var index.
+    /// * `SolverError::InvalidLiteral` if any literal used in the CNF is out of range for var index.
     fn build(config: &Config) -> Result<Solver, SolverError>;
     /// reinitialize a solver for incremental solving. **Requires 'incremental_solver' feature**
     fn reset(&mut self);
@@ -127,6 +127,20 @@ impl Instantiate for Solver {
     }
 }
 
+/// Example
+///```
+/// use crate::splr::*;
+///
+/// let v: Vec<Vec<i32>> = vec![];
+/// assert!(matches!(
+///     Solver::try_from((Config::default(), v.as_ref())),
+///     Ok(_)
+/// ));
+/// assert!(matches!(
+///     Solver::try_from((Config::default(), vec![vec![0_i32]].as_ref())),
+///     Err(Err(SolverError::InvalidLiteral))
+/// ));
+///```
 impl<V> TryFrom<(Config, &[V])> for Solver
 where
     V: AsRef<[i32]>,
@@ -136,7 +150,6 @@ where
         let cnf = CNFDescription::from(vec);
         match Solver::instantiate(&config, &cnf).inject_from_vec(vec) {
             Err(SolverError::RootLevelConflict(_)) => Err(Ok(Certificate::UNSAT)),
-            Err(SolverError::EmptyClause) => Err(Ok(Certificate::UNSAT)),
             Err(e) => Err(Err(e)),
             Ok(s) => Ok(s),
         }
@@ -164,7 +177,7 @@ impl TryFrom<&Path> for Solver {
 impl SatSolverIF for Solver {
     fn add_assignment(&mut self, val: i32) -> Result<&mut Solver, SolverError> {
         if val == 0 || self.asg.num_vars < val.unsigned_abs() as usize {
-            return Err(SolverError::OutOfRange);
+            return Err(SolverError::InvalidLiteral);
         }
         let lit = Lit::from(val);
         self.cdb.certificate_add_assertion(lit);
@@ -183,7 +196,7 @@ impl SatSolverIF for Solver {
     {
         for i in vec.as_ref().iter() {
             if *i == 0 || self.asg.num_vars < i.unsigned_abs() as usize {
-                return Err(SolverError::OutOfRange);
+                return Err(SolverError::InvalidLiteral);
             }
         }
         let mut clause = vec
@@ -348,7 +361,7 @@ impl Solver {
         for ints in v.iter() {
             for i in ints.as_ref().iter() {
                 if *i == 0 || self.asg.num_vars < i.unsigned_abs() as usize {
-                    return Err(SolverError::OutOfRange);
+                    return Err(SolverError::InvalidLiteral);
                 }
             }
             let mut lits = ints
@@ -380,7 +393,10 @@ mod tests {
     fn test_add_var() {
         let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
         assert_eq!(s.asg.num_vars, 8);
-        assert!(matches!(s.add_assignment(9), Err(SolverError::OutOfRange)));
+        assert!(matches!(
+            s.add_assignment(9),
+            Err(SolverError::InvalidLiteral)
+        ));
         s.add_assignment(1).expect("panic");
         s.add_assignment(2).expect("panic");
         s.add_assignment(3).expect("panic");

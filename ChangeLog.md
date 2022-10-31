@@ -1,8 +1,9 @@
 ## 0.17.0, 2022-??-??
 
-- (Breaking change) `Solver::try_from` and `Certificate::try_from` return `Ok` values
-  if a given vector contains an empty clause. All expressions corresponding to valid CNFs
-  should be converted to `Certificate` successfully. (#191)
+- (Breaking change) `Certificate::try_from` returns `Ok` values even if a given vector
+  contains empty clauses. All expressions corresponding to valid CNFs should be
+  converted to `Certificate` successfully. On the other hand, `Solver::try_from` still
+  returns `SolverError::EmptyClause`. (#191, #196, #197)
 - Add a new feature 'reward_annealing' (#187)
 - Fix misc wrong calculations on Luby series and stage-cycle-segment model (#194)
 - clause reduction uses revised parameters matching a Luby series based parameter shifting
