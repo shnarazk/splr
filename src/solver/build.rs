@@ -127,6 +127,20 @@ impl Instantiate for Solver {
     }
 }
 
+/// Example
+///```
+/// use crate::splr::*;
+///
+/// let v: Vec<Vec<i32>> = vec![];
+/// assert!(matches!(
+///     Solver::try_from((Config::default(), v.as_ref())),
+///     Ok(_)
+/// ));
+/// assert!(matches!(
+///     Solver::try_from((Config::default(), vec![vec![0_i32]].as_ref())),
+///     Err(Err(SolverError::InvalidLiteral))
+/// ));
+///```
 impl<V> TryFrom<(Config, &[V])> for Solver
 where
     V: AsRef<[i32]>,

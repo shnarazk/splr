@@ -95,14 +95,21 @@ pub struct Solver {
 ///```
 /// use crate::splr::*;
 ///
-/// matches!(
+/// let v: Vec<Vec<i32>> = vec![];
+/// assert!(matches!(
+///     Certificate::try_from(v),
+///     Ok(Certificate::SAT(_))
+/// ));
+/// assert!(matches!(
 ///     Certificate::try_from(vec![vec![0_i32]]),
 ///     Err(SolverError::InvalidLiteral)
-/// );
-/// matches!(
+/// ));
+///
+/// // `Solver` has another interface.
+/// assert!(matches!(
 ///     Solver::try_from((Config::default(), vec![vec![0_i32]].as_ref())),
 ///     Err(Err(SolverError::InvalidLiteral))
-/// );
+/// ));
 ///```
 impl<V: AsRef<[i32]>> TryFrom<Vec<V>> for Certificate {
     type Error = SolverError;
