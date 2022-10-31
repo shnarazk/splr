@@ -370,14 +370,21 @@ impl RefClause {
 pub enum SolverError {
     // StateUNSAT = 0,
     // StateSAT,
+    // A given CNF contains empty clauses or derives them during reading
+    EmptyClause,
+    // A clause contains a literal out of the range defined in its header.
+    // '0' is an example.
+    InvalidLiteral,
+    // Exceptions caused by file operations
     IOError,
+    // UNSAT with some internal context
     Inconsistent,
     OutOfMemory,
-    OutOfRange,
+    // UNSAT with some internal context
     RootLevelConflict(ConflictContext),
-    EmptyClause,
     TimeOut,
     SolverBug,
+    // For now, this is used for catching errors relating to clock
     UndescribedError,
 }
 
