@@ -91,6 +91,19 @@ pub struct Solver {
     pub state: State,
 }
 
+/// Example
+///```
+/// use crate::splr::*;
+///
+/// matches!(
+///     Certificate::try_from(vec![vec![0_i32]]),
+///     Err(SolverError::InvalidLiteral)
+/// );
+/// matches!(
+///     Solver::try_from((Config::default(), vec![vec![0_i32]].as_ref())),
+///     Err(Err(SolverError::InvalidLiteral))
+/// );
+///```
 impl<V: AsRef<[i32]>> TryFrom<Vec<V>> for Certificate {
     type Error = SolverError;
     fn try_from(vec: Vec<V>) -> SolverResult {
