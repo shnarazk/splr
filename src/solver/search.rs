@@ -239,6 +239,9 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut previous_stage: Option<bool> = Some(true);
     let mut num_learnt = 0;
+    let mut current_core: usize = 999_999;
+    let mut core_was_rebuilt: Option<usize> = None;
+    let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
 
     state.stm.initialize(
         (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
@@ -255,8 +258,16 @@ fn search(
             asg.update_activity_tick();
             #[cfg(feature = "clause_rewarding")]
             cdb.update_activity_tick();
-            if 1 < handle_conflict(asg, cdb, state, &cc)? {
-                num_learnt += 1;
+            // if 1 < handle_conflict(asg, cdb, state, &cc)? {
+            //     num_learnt += 1;
+            // }
+            match handle_conflict(asg, cdb, state, &cc)? {
+                0 => {
+                    // best_phases_invalid = asg.best_phases_invalid();
+                    // state.stm.reset();
+                }
+                1 => (),
+                _ => num_learnt += 1,
             }
             if state.stm.stage_ended(num_learnt) {
                 if let Some(p) = state.elapsed() {
@@ -267,6 +278,7 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
                 RESTART!(asg, cdb, state);
+                asg.clear_asserted_literals(cdb)?;
                 cdb.reduce(asg, state.stm.num_reducible());
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
@@ -278,24 +290,88 @@ fn search(
                 );
                 let scale = state.stm.current_scale();
                 let max_scale = state.stm.max_scale();
-                #[cfg(feature = "reward_annealing")]
-                {
-                    let base = (1 << (state.stm.current_segment() - 1)) - 1;
-                    let decay_index = state.stm.current_cycle() - base;
-                    let decay = (decay_index as f64 - 1.0) / decay_index as f64;
+                if cfg!(feature = "reward_annealing") {
+                    let base = {
+                        let seg = state.stm.current_segment();
+                        if seg == 0 {
+                            state.stm.current_cycle()
+                        } else {
+                            state.stm.current_cycle() - (1 << (seg - 1))
+                        }
+                    };
+                    let decay_index: f64 = 1.25 + base as f64;
+                    let decay = (decay_index - 1.0) / decay_index;
                     asg.update_activity_decay(decay);
                 }
                 if let Some(new_segment) = next_stage {
+                    // a beginning of a new cycle
                     #[cfg(feature = "rephase")]
-                    asg.select_rephasing_target();
+                    {
+                        if cfg!(feature = "stochastic_local_search") {
+                            use cdb::StochasticLocalSearchIF;
+                            macro_rules! sls {
+                                ($assign: expr, $limit: expr) => {
+                                    state.sls_index += 1;
+                                    state.flush(format!(
+                                        "SLS(#{}, core: {}, steps: {})",
+                                        state.sls_index, sls_core, $limit
+                                    ));
+                                    let cls =
+                                        cdb.stochastic_local_search(asg, &mut $assign, $limit);
+                                    asg.override_rephasing_target(&$assign);
+                                    sls_core = sls_core.min(cls.1);
+                                };
+                                ($assign: expr, $improved: expr, $limit: expr) => {
+                                    state.sls_index += 1;
+                                    state.flush(format!(
+                                        "SLS(#{}, core: {}, steps: {})",
+                                        state.sls_index, sls_core, $limit
+                                    ));
+                                    let cls =
+                                        cdb.stochastic_local_search(asg, &mut $assign, $limit);
+                                    if $improved(cls) {
+                                        // state.sls_index = stats.1;
+                                        asg.override_rephasing_target(&$assign);
+                                    }
+                                    sls_core = sls_core.min(cls.1);
+                                };
+                            }
+                            macro_rules! scale {
+                                ($a: expr, $b: expr) => {
+                                    ($a.saturating_sub($b.next_power_of_two().trailing_zeros())
+                                        as f64)
+                                        .powf(1.75) as usize
+                                        + 1
+                                };
+                            }
+                            let ent = cdb.refer(cdb::property::TEma::Entanglement).get() as usize;
+                            let n = cdb.derefer(cdb::property::Tusize::NumClause);
+                            if let Some(c) = core_was_rebuilt {
+                                core_was_rebuilt = None;
+                                if c < current_core {
+                                    let steps = scale!(27_u32, c) * scale!(24_u32, n) / ent;
+                                    let mut assignment = asg.best_phases_ref(Some(false));
+                                    sls!(assignment, steps);
+                                }
+                            } else if new_segment {
+                                let n = cdb.derefer(cdb::property::Tusize::NumClause);
+                                let steps = scale!(27_u32, current_core) * scale!(24_u32, n) / ent;
+                                let mut assignment = asg.best_phases_ref(Some(false));
+                                sls!(assignment, steps);
+                            }
+                        }
+                        asg.select_rephasing_target();
+                    }
                     if cfg!(feature = "clause_vivification") {
                         cdb.vivify(asg, state)?;
                     }
                     if new_segment {
-                        #[cfg(not(feature = "reward_annealing"))]
-                        asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
+                        if !cfg!(feature = "reward_annealing") {
+                            asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
+                        }
                         if !cfg!(feature = "no_clause_elimination") {
                             let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+                            state.flush("clause subsumption, ");
                             elim.simplify(asg, cdb, state, false)?;
                             asg.eliminated.append(elim.eliminated_lits());
                             state[Stat::Simplify] += 1;
@@ -306,7 +382,6 @@ fn search(
                         }
                     }
                 }
-                asg.clear_asserted_literals(cdb)?;
                 state.progress(asg, cdb);
                 asg.handle(SolverEvent::Stage(scale));
                 state.restart.set_stage_parameters(scale);
@@ -318,8 +393,12 @@ fn search(
                 RESTART!(asg, cdb, state);
             }
             if let Some(na) = asg.best_assigned() {
+                if current_core < na && core_was_rebuilt.is_none() {
+                    core_was_rebuilt = Some(current_core);
+                }
+                current_core = na;
                 state.flush("");
-                state.flush(format!("unreachable core: {}", na));
+                state.flush(format!("unreachable core: {} ", na));
             }
         }
     }
