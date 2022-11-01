@@ -51,6 +51,8 @@ pub enum Stat {
     Simplify,
     /// the number of subsumed clause by processor
     SubsumedClause,
+    /// for SLS
+    SLS,
     /// don't use this dummy (sentinel at the tail).
     EndOfStatIndex,
 }
@@ -124,6 +126,8 @@ pub struct State {
     pub progress_cnt: usize,
     /// keep the previous statistics values
     pub record: ProgressRecord,
+    /// progress of SLS
+    pub sls_index: usize,
     /// start clock for timeout handling
     pub start: Instant,
     /// upper limit for timeout handling
@@ -157,6 +161,7 @@ impl Default for State {
             derive20: Vec::new(),
             progress_cnt: 0,
             record: ProgressRecord::default(),
+            sls_index: 0,
             start: Instant::now(),
             time_limit: 0.0,
             log_messages: Vec::new(),
@@ -517,19 +522,14 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|vivC:{}, subC:{}, core:{}, /ppc:{}",
+            "\x1B[2K        misc|vivC:{}, !SLS:{}, core:{}, /ppc:{}",
             im!(
                 "{:>9}",
                 self,
                 LogUsizeId::VivifiedClause,
                 self[Stat::VivifiedClause]
             ),
-            im!(
-                "{:>9}",
-                self,
-                LogUsizeId::SubsumedClause,
-                self[Stat::SubsumedClause]
-            ),
+            im!("{:>9}", self, LogUsizeId::SLS, self.sls_index),
             im!(
                 "{:>9}",
                 self,
@@ -840,6 +840,11 @@ pub enum LogUsizeId {
     VivifiedVar,
     Vivify,
 
+    //
+    //## Stochastic Local Search
+    //
+    SLS,
+
     // the sentinel
     End,
 }
@@ -861,6 +866,7 @@ pub enum LogF64Id {
     PropagationPerConflict,
     LiteralBlockEntanglement,
     RestartEnergy,
+
     End,
 }
 

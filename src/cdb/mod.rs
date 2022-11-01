@@ -10,6 +10,8 @@ mod clause;
 mod db;
 /// EMA
 mod ema;
+/// methods for Stochastic Local Search
+mod sls;
 /// methods for UNSAT certification
 mod unsat_certificate;
 /// implementation of clause vivification
@@ -21,9 +23,11 @@ pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
     cid::ClauseIdIF,
     property::*,
+    sls::StochasticLocalSearchIF,
     unsat_certificate::CertificationStore,
     vivify::VivifyIF,
 };
+
 use {
     self::ema::ProgressLBD,
     crate::{assign::AssignIF, types::*},
