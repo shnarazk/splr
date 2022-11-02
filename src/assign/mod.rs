@@ -20,12 +20,7 @@ mod trail_saving;
 /// var struct and its methods
 mod var;
 
-pub use self::{
-    propagate::PropagateIF, property::*, select::VarSelectIF, trail_saving::TrailSavingIF,
-    var::VarManipulateIF,
-};
-#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
-use std::collections::HashMap;
+pub use self::{propagate::PropagateIF, property::*, select::VarSelectIF, var::VarManipulateIF};
 use {
     self::{
         ema::ProgressASG,
@@ -34,6 +29,12 @@ use {
     crate::{cdb::ClauseDBIF, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
+
+#[cfg(feature = "trail_saving")]
+pub use self::trail_saving::TrailSavingIF;
+
+#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
+use std::collections::HashMap;
 
 /// API about assignment like
 /// [`decision_level`](`crate::assign::AssignIF::decision_level`),
