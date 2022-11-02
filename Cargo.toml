@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.17.0-alpha.5"
+version = "0.17.0-alpha.6"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2021"
@@ -29,6 +29,7 @@ default = [
         "reason_side_rewarding",
         "rephase",
         # "reward_annealing",
+        # "stochastic_local_search",
         # "suppress_reason_chain",
         "trail_saving",
 
@@ -65,7 +66,7 @@ rephase = [                     # search around the best-so-far candidate repeat
         ]
 reward_annealing = []           # use bigger and smaller decay rates cycliclly
 stochastic_local_search = [     # since 0.17
-        "reward_annealing"
+        # "reward_annealing"
          ]
 support_user_assumption = []    # NOT WORK (defined in Glucose)
 suppress_reason_chain = []      # make direct links between a dicision var and its implications
