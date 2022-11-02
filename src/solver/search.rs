@@ -258,16 +258,8 @@ fn search(
             asg.update_activity_tick();
             #[cfg(feature = "clause_rewarding")]
             cdb.update_activity_tick();
-            // if 1 < handle_conflict(asg, cdb, state, &cc)? {
-            //     num_learnt += 1;
-            // }
-            match handle_conflict(asg, cdb, state, &cc)? {
-                0 => {
-                    // best_phases_invalid = asg.best_phases_invalid();
-                    // state.stm.reset();
-                }
-                1 => (),
-                _ => num_learnt += 1,
+            if 1 < handle_conflict(asg, cdb, state, &cc)? {
+                num_learnt += 1;
             }
             if state.stm.stage_ended(num_learnt) {
                 if let Some(p) = state.elapsed() {
