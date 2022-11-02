@@ -329,8 +329,8 @@ fn search(
                                     ));
                                     let cls =
                                         cdb.stochastic_local_search(asg, &mut $assign, $limit);
+                                    asg.reward_by_sls(&$assign);
                                     if $improved(cls) {
-                                        // state.sls_index = stats.1;
                                         asg.override_rephasing_target(&$assign);
                                     }
                                     sls_core = sls_core.min(cls.1);
