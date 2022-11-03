@@ -1,9 +1,10 @@
+///
 /// Heap struct for selecting decision vars
-use {
-    super::{AssignStack, TrailSavingIF},
-    crate::types::*,
-    std::fmt,
-};
+///
+use {super::AssignStack, crate::types::*, std::fmt};
+
+#[cfg(feature = "trail_saving")]
+use super::TrailSavingIF;
 
 /// Heap of VarId, based on var activity.
 // # Note

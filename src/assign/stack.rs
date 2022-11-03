@@ -1,14 +1,18 @@
 /// main struct AssignStack
-#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
-use std::collections::HashMap;
 use {
     super::{
-        ema::ProgressASG, AssignIF, AssignStack, PropagateIF, TrailSavingIF, Var, VarHeapIF,
-        VarIdHeap, VarManipulateIF,
+        ema::ProgressASG, AssignIF, AssignStack, PropagateIF, Var, VarHeapIF, VarIdHeap,
+        VarManipulateIF,
     },
     crate::{cdb::ClauseDBIF, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
+
+#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
+use std::collections::HashMap;
+
+#[cfg(feature = "trail_saving")]
+use super::TrailSavingIF;
 
 impl Default for AssignStack {
     fn default() -> AssignStack {
@@ -143,6 +147,7 @@ impl Instantiate for AssignStack {
             SolverEvent::Reinitialize => {
                 self.cancel_until(self.root_level);
                 debug_assert_eq!(self.decision_level(), self.root_level);
+                #[cfg(feature = "trail_saving")]
                 self.clear_saved_trail();
                 // self.num_eliminated_vars = self
                 //     .var

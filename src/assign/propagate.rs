@@ -1,9 +1,12 @@
 /// implement boolean constraint propagation, backjump
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{AssignIF, AssignStack, TrailSavingIF, VarHeapIF, VarManipulateIF},
+    super::{AssignIF, AssignStack, VarHeapIF, VarManipulateIF},
     crate::{cdb::ClauseDBIF, types::*},
 };
+
+#[cfg(feature = "trail_saving")]
+use super::TrailSavingIF;
 
 /// API for Boolean Constraint Propagation like
 /// [`propagate`](`crate::assign::PropagateIF::propagate`),
