@@ -520,7 +520,7 @@ impl ClauseDBIF for ClauseDB {
             return RefClause::UnitClause(lits[0]);
         }
 
-        (*c).search_from = 2;
+        c.search_from = 2;
         let mut new_lits: Vec<Lit> = lits
             .iter()
             .filter(|&l| *l != p)
@@ -1188,7 +1188,7 @@ impl ClauseDBIF for ClauseDB {
                 panic!("conflicting var {} {:?}", vi, asg.assign(vi));
             }
         }
-        if let Ok(out) = File::create(&fname) {
+        if let Ok(out) = File::create(fname) {
             let mut buf = std::io::BufWriter::new(out);
             let na = asg.derefer(crate::assign::property::Tusize::NumAssertedVar);
             let nc = self.iter().skip(1).filter(|c| !c.is_dead()).count();
