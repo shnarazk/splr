@@ -51,7 +51,7 @@ pub fn eliminate_var(
     #[cfg(feature = "trace_elimination")]
     println!("# eliminate_var {}", vi);
     // OK, eliminate the literal and build constraints on it.
-    make_eliminated_clauses(cdb, &mut elim.elim_lits, vi, &*pos, &*neg);
+    make_eliminated_clauses(cdb, &mut elim.elim_lits, vi, &pos, &neg);
     let vec = &mut state.new_learnt;
     // println!("eliminate_var {}: |p|: {} and |n|: {}", vi, (*pos).len(), (*neg).len());
     // Produce clauses in cross product:

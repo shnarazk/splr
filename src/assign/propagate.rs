@@ -688,7 +688,7 @@ impl PropagateIF for AssignStack {
                             cdb[cid].search_from = (k as u16).saturating_add(1);
                             debug_assert!(
                                 self.assigned(!new_watch) == Some(true)
-                                    || self.assigned(!new_watch) == None
+                                    || self.assigned(!new_watch).is_none()
                             );
                             check_in!(
                                 cid,

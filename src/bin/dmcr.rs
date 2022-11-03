@@ -138,7 +138,7 @@ fn main() {
         (RED, GREEN, BLUE)
     };
     let mut s = Solver::build(&config).expect("failed to load");
-    if args.assign == None {
+    if args.assign.is_none() {
         args.assign = Some(PathBuf::from(format!(
             "ans_{}",
             Path::new(&args.problem)

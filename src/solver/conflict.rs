@@ -580,7 +580,7 @@ fn lit_level(
     cdb: &ClauseDB,
     lit: Lit,
     bag: &mut Vec<Lit>,
-    mes: &str,
+    _mes: &str,
 ) -> DecisionLevel {
     if bag.contains(&lit) {
         return 0;
@@ -612,11 +612,11 @@ fn lit_level(
             cdb[cid]
                 .iter()
                 .skip(1)
-                .map(|l| lit_level(asg, cdb, !*l, bag, mes))
+                .map(|l| lit_level(asg, cdb, !*l, bag, _mes))
                 .max()
                 .unwrap()
         }
-        AssignReason::BinaryLink(b) => lit_level(asg, cdb, b, bag, mes),
+        AssignReason::BinaryLink(b) => lit_level(asg, cdb, b, bag, _mes),
         AssignReason::None => panic!("One of root of {} isn't assigned.", lit),
     }
 }
