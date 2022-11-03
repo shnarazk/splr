@@ -1,8 +1,4 @@
-#[cfg(feature = "trail_saving")]
-use super::TrailSavingIF;
 /// main struct AssignStack
-#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
-use std::collections::HashMap;
 use {
     super::{
         ema::ProgressASG, AssignIF, AssignStack, PropagateIF, Var, VarHeapIF, VarIdHeap,
@@ -11,6 +7,12 @@ use {
     crate::{cdb::ClauseDBIF, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
+
+#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
+use std::collections::HashMap;
+
+#[cfg(feature = "trail_saving")]
+use super::TrailSavingIF;
 
 impl Default for AssignStack {
     fn default() -> AssignStack {

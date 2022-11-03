@@ -1,7 +1,9 @@
 #![cfg(feature = "clause_rewarding")]
 use {super::ClauseId, crate::types::*, std::num::NonZeroU32};
 
-// Note: vivifier has its own conflict analyzer, which never call reward functions.
+/// clause activity
+/// Note: vivifier has its own conflict analyzer, which never call reward functions.
+
 impl ActivityIF<ClauseId> for ClauseDB {
     fn activity(&self, _cid: ClauseId) -> f64 {
         unreachable!()
