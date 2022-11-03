@@ -373,6 +373,10 @@ fn search(
                             state.restart.set_segment_parameters(max_scale);
                         }
                     }
+                    #[cfg(feature = "reconflicting")]
+                    {
+                        asg.explore_propagation = state.stm.current_cycle() % 2 == 0;
+                    }
                 }
                 state.progress(asg, cdb);
                 asg.handle(SolverEvent::Stage(scale));

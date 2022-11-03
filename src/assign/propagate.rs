@@ -325,6 +325,8 @@ impl PropagateIF for AssignStack {
     ///  - The order of literals in binary clauses will be modified to hold
     ///    propagation order.
     fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
+        let mut orders: Vec<(usize, usize)> = Vec::new();
+
         #[cfg(feature = "boundary_check")]
         macro_rules! check_in {
             ($cid: expr, $tag :expr) => {
@@ -341,6 +343,7 @@ impl PropagateIF for AssignStack {
                 self.dpc_ema.update(self.num_decision);
                 self.ppc_ema.update(self.num_propagation);
                 self.num_conflict += 1;
+                self.revert_propagation_orders(&orders);
                 return Err(($lit, $reason));
             };
         }
@@ -371,6 +374,7 @@ impl PropagateIF for AssignStack {
                     self.num_reconflict += 1;
                     self.dpc_ema.update(self.num_decision);
                     self.ppc_ema.update(self.num_propagation);
+                    self.revert_propagation_orders(&orders);
                     return cc;
                 }
             };
@@ -382,7 +386,7 @@ impl PropagateIF for AssignStack {
 
         let dl = self.decision_level();
         from_saved_trail!();
-        while let Some(p) = self.trail.get(self.q_head) {
+        while let Some(p) = self.reorder_unpropaged_literals(&mut orders) {
             self.num_propagation += 1;
             self.q_head += 1;
             #[cfg(feature = "debug_propagation")]
@@ -390,8 +394,8 @@ impl PropagateIF for AssignStack {
                 assert!(!self.var[p.vi()].is(FlagVar::PROPAGATED));
                 self.var[p.vi()].turn_on(FlagVar::PROPAGATED);
             }
-            let propagating = Lit::from(usize::from(*p));
-            let false_lit = !*p;
+            let propagating = Lit::from(usize::from(p));
+            let false_lit = !p;
 
             #[cfg(feature = "boundary_check")]
             {
@@ -550,6 +554,7 @@ impl PropagateIF for AssignStack {
             }
             from_saved_trail!();
         }
+        self.revert_propagation_orders(&orders);
         let na = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
         if self.num_best_assign <= na && 0 < dl {
             self.best_assign = true;
@@ -812,6 +817,45 @@ impl AssignStack {
         #[cfg(feature = "rephase")]
         {
             self.phase_age = 0;
+        }
+    }
+    fn reorder_unpropaged_literals(&mut self, orders: &mut Vec<(usize, usize)>) -> Option<Lit> {
+        macro_rules! potential {
+            ($lit: expr) => {{
+                let vi = $lit.vi();
+                let b = $lit.as_bool();
+                // let mut best_a = self.var[self.trail[start].vi()].conflict_at;
+                // let mut best_a = self.var[self.trail[start].vi()].reward;
+                let p = self.conflict_at[usize::from(Lit::from((vi, b)))];
+                let m = self.conflict_at[usize::from(Lit::from((vi, !b)))];
+                if self.explore_propagation {
+                    p.abs_diff(m)
+                } else {
+                    p
+                }
+            }};
+        }
+        (self.q_head < self.trail.len()).then(|| {
+            let start = self.q_head;
+            let mut best_i = start;
+            let mut best_p = potential!(self.trail[start]);
+            for (i, l) in self.trail.iter().enumerate().skip(start + 1) {
+                let p = potential!(*l);
+                if best_p > p {
+                    best_p = p;
+                    best_i = i;
+                }
+            }
+            if start != best_i {
+                orders.push((start, best_i));
+                self.trail.swap(start, best_i);
+            }
+            self.trail[start]
+        })
+    }
+    fn revert_propagation_orders(&mut self, orders: &[(usize, usize)]) {
+        for (i, j) in orders.iter().rev() {
+            self.trail.swap(*i, *j);
         }
     }
 }

@@ -27,6 +27,7 @@ default = [
         "dynamic_restart_threshold",
         "LRB_rewarding",
         "reason_side_rewarding",
+        "reconflicting",
         "rephase",
         # "reward_annealing",
         # "stochastic_local_search",
@@ -61,6 +62,7 @@ LRB_rewarding = []              # Vearning Rate Based rewarding, a new var activ
 maintain_watch_cache = []       # for DEBUG
 no_IO = []                      # to embed Splr into non-std environments
 reason_side_rewarding = []      # an idea used in Learning-rate based rewarding
+reconflicting = []
 rephase = [                     # search around the best-so-far candidate repeatedly
         "best_phases_tracking",
         ]

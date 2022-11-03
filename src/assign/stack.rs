@@ -69,6 +69,9 @@ impl Default for AssignStack {
 
             #[cfg(feature = "EVSIDS")]
             activity_decay_step: 0.1,
+
+            conflict_at: Vec::new(),
+            explore_propagation: true,
         }
     }
 }
@@ -115,6 +118,8 @@ impl Instantiate for AssignStack {
             #[cfg(feature = "EVSIDS")]
             activity_decay_step: config.vrw_dcy_stp,
 
+            conflict_at: vec![0; 2 * (nv + 1)],
+
             ..AssignStack::default()
         }
     }
@@ -141,6 +146,8 @@ impl Instantiate for AssignStack {
                 self.var.push(Var::default());
                 #[cfg(feature = "trail_saving")]
                 self.reason_saved.push(AssignReason::None);
+                self.conflict_at.push(0);
+                self.conflict_at.push(0);
             }
             SolverEvent::Reinitialize => {
                 self.cancel_until(self.root_level);

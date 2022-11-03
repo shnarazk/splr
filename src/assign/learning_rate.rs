@@ -14,6 +14,8 @@ impl ActivityIF<VarId> for AssignStack {
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
         self.var[vi].turn_on(FlagVar::USED);
+        let li = ((vi as usize) << 1) + (self.assign[vi].unwrap() as usize);
+        self.conflict_at[li] = self.num_conflict;
     }
     #[inline]
     fn reward_at_assign(&mut self, _vi: VarId) {}

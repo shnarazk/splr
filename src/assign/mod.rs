@@ -215,6 +215,10 @@ pub struct AssignStack {
     activity_anti_decay: f64,
     #[cfg(feature = "EVSIDS")]
     activity_decay_step: f64,
+
+    ///## reconflicting
+    pub conflict_at: Vec<usize>,
+    pub explore_propagation: bool,
 }
 
 #[cfg(feature = "boundary_check")]
