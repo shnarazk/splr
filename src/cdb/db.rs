@@ -1015,7 +1015,14 @@ impl ClauseDBIF for ClauseDB {
         }
         perm.sort();
         for i in &perm[keep..] {
-            self.remove_clause(ClauseId::from(i.to()));
+            // self.remove_clause(ClauseId::from(i.to()));
+            let c = &self.clause[i.to()];
+            let o = c.rank_old as f64;
+            let r = c.rank as f64;
+            // if 3 < c.rank.saturating_sub((c.rank_old - c.rank) / 2) {
+            if 3.0 < r * r / o {
+                self.remove_clause(ClauseId::from(i.to()));
+            }
         }
     }
     fn reset(&mut self) {

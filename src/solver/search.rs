@@ -243,6 +243,9 @@ fn search(
     let mut core_was_rebuilt: Option<usize> = None;
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
 
+    let mut end_of_cycle = super::StageManager::instantiate(&state.config, &state.cnf);
+    end_of_cycle.prepare_new_stage(0, 0);
+
     state.stm.initialize(
         (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
     );
@@ -283,17 +286,30 @@ fn search(
                 let scale = state.stm.current_scale();
                 let max_scale = state.stm.max_scale();
                 if cfg!(feature = "reward_annealing") {
-                    let base = {
-                        let seg = state.stm.current_segment();
-                        if seg == 0 {
-                            state.stm.current_cycle()
-                        } else {
-                            state.stm.current_cycle() - (1 << (seg - 1))
-                        }
-                    };
-                    let decay: f64 = 1.0 - 0.05 * 0.975_f64.powi(base as i32);
-                    // dbg!(decay);
-                    asg.update_activity_decay(decay);
+                    // let seg = state.stm.current_segment();
+                    // let base = {
+                    //     if seg == 0 {
+                    //         state.stm.current_cycle()
+                    //     } else {
+                    //         state.stm.current_cycle() - (1 << (seg - 1))
+                    //     }
+                    // };
+
+                    // asg.update_activity_decay(1.0 - 1.0 / (scale as f64 + state.c_lvl.get()));
+                    asg.update_activity_decay(1.0 - 0.5 / (scale as f64 + state.c_lvl.get()));
+
+                    // let decay: f64 = 1.0 - 0.05 * 0.995_f64.powi(base as i32);
+                    // asg.update_activity_decay(decay);
+
+                    // if end_of_cycle
+                    //     .prepare_new_stage(0, 0)
+                    //     .map_or(false, |_| 1 < scale)
+                    // {
+                    //     asg.update_activity_decay(0.75);
+                    // } else {
+                    //     asg.update_activity_decay(decay);
+                    //     // asg.update_activity_decay(state.config.vrw_dcy_rat);
+                    // }
                 }
                 if let Some(new_segment) = next_stage {
                     // a beginning of a new cycle
@@ -421,13 +437,17 @@ fn dump_stage(asg: &AssignStack, _cdb: &mut ClauseDB, state: &mut State, shift: 
     } else {
         f64::NAN
     };
+    let vdr = asg.derefer(assign::property::Tf64::VarDecayRate);
     state.log(
         match shift {
             None => Some((None, None, stage)),
             Some(false) => Some((None, Some(cycle), stage)),
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
-        format!("scale: {:>4}, fuel:{:>9.2}, cpr:{:>8.2}", scale, fuel, cpr),
+        format!(
+            "scale: {:>4}, fuel:{:>9.2}, cpr:{:>8.2}, vdr:{:>6.3}",
+            scale, fuel, cpr, vdr
+        ),
     );
 }
 

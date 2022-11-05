@@ -356,6 +356,20 @@ pub mod property {
     }
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub enum Tf64 {
+        VarDecayRate,
+    }
+
+    pub const F64S: [Tf64; 1] = [Tf64::VarDecayRate];
+
+    impl PropertyDereference<Tf64, f64> for AssignStack {
+        #[inline]
+        fn derefer(&self, _k: Tf64) -> f64 {
+            self.activity_decay
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum TEma {
         AssignRate,
         DecisionPerConflict,
