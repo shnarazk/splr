@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.17.0-alpha.6"
+version = "0.17.0-alpha.7"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2021"
@@ -27,7 +27,7 @@ default = [
         "dynamic_restart_threshold",
         "LRB_rewarding",
         "reason_side_rewarding",
-        "rephase",
+        # "rephase",
         # "reward_annealing",
         # "stochastic_local_search",
         # "suppress_reason_chain",
