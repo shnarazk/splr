@@ -241,6 +241,7 @@ fn search(
     let mut num_learnt = 0;
     let mut current_core: usize = 999_999;
     let mut core_was_rebuilt: Option<usize> = None;
+    #[cfg(feature = "rephase")]
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
 
     state.stm.initialize(

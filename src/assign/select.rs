@@ -27,8 +27,10 @@ macro_rules! var_assign {
 
 /// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
+    #[cfg(feature = "rephase")]
     /// return best phases
     fn best_phases_ref(&mut self, default_value: Option<bool>) -> HashMap<VarId, bool>;
+    #[cfg(feature = "rephase")]
     /// force an assignment obtained by SLS
     fn override_rephasing_target(&mut self, assignment: &HashMap<VarId, bool>) -> usize;
     /// give rewards to vars selected by SLS
@@ -48,6 +50,7 @@ pub trait VarSelectIF {
 }
 
 impl VarSelectIF for AssignStack {
+    #[cfg(feature = "rephase")]
     fn best_phases_ref(&mut self, default_value: Option<bool>) -> HashMap<VarId, bool> {
         self.var
             .iter()
@@ -67,6 +70,7 @@ impl VarSelectIF for AssignStack {
             })
             .collect::<HashMap<VarId, bool>>()
     }
+    #[cfg(feature = "rephase")]
     fn override_rephasing_target(&mut self, assignment: &HashMap<VarId, bool>) -> usize {
         let mut num_flipped = 0;
         for (vi, b) in assignment.iter() {

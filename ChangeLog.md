@@ -6,6 +6,7 @@
   returns `SolverError::EmptyClause`. (#191, #196, #197)
 - Add a new feature 'reward_annealing' (#187)
 - Fix misc wrong calculations on Luby series and stage-cycle-segment model (#194)
+- Fix build errors without feature 'trial_saving' or 'rephase' (#202, #205)
 - clause reduction uses revised parameters matching a Luby series based parameter shifting
   model (#195)
 

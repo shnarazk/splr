@@ -201,6 +201,7 @@ impl AssignIF for AssignStack {
     fn best_assigned(&mut self) -> Option<usize> {
         (self.build_best_at == self.num_propagation).then_some(self.num_vars - self.num_best_assign)
     }
+    #[cfg(feature = "rephase")]
     fn best_phases_invalid(&self) -> bool {
         self.best_phases.is_empty()
     }
