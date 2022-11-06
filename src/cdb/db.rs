@@ -952,7 +952,7 @@ impl ClauseDBIF for ClauseDB {
                     let sum: f64 = self.iter().map(|l| asg.activity(l.vi())).sum();
                     sum / self.len() as f64
                 };
-                self.rank as f64 * (1.0 - act_c)
+                (self.rank as f64).log2() * (1.0 - act_c)
             }
             #[cfg(feature = "just_used")]
             fn weight(&mut self, asg: &mut impl AssignIF) -> f64 {
@@ -1014,15 +1014,16 @@ impl ClauseDBIF for ClauseDB {
             return;
         }
         perm.sort();
+        let thr = 2.0; // self.lb_entanglement.get().sqrt().max(3.0);
         for i in &perm[keep..] {
-            // self.remove_clause(ClauseId::from(i.to()));
-            let c = &self.clause[i.to()];
-            let o = c.rank_old as f64;
-            let r = c.rank as f64;
-            // if 3 < c.rank.saturating_sub((c.rank_old - c.rank) / 2) {
-            if 3.0 < r * r / o {
-                self.remove_clause(ClauseId::from(i.to()));
-            }
+            self.remove_clause(ClauseId::from(i.to()));
+            // let c = &self.clause[i.to()];
+            // let o = c.rank_old as f64;
+            // let r = c.rank as f64;
+            // // if 3 < c.rank.saturating_sub((c.rank_old - c.rank) / 2) {
+            // if thr < r * r / o {
+            //     self.remove_clause(ClauseId::from(i.to()));
+            // }
         }
     }
     fn reset(&mut self) {

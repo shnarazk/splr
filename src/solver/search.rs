@@ -241,7 +241,13 @@ fn search(
     let mut num_learnt = 0;
     let mut current_core: usize = 999_999;
     let mut core_was_rebuilt: Option<usize> = None;
+    #[cfg(feature = "rephase")]
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
+    let mut scale_ema = Ema::new(2);
+    let mut slow_clvl = Ema::new(32);
+    let mut vdr_ema = Ema::new(4).with_value(state.config.vrw_dcy_rat);
+    state.config.vrw_dcy_rat = 0.95;
+    // let mut vdr_base = 10.0;
 
     let mut end_of_cycle = super::StageManager::instantiate(&state.config, &state.cnf);
     end_of_cycle.prepare_new_stage(0, 0);
@@ -286,17 +292,31 @@ fn search(
                 let scale = state.stm.current_scale();
                 let max_scale = state.stm.max_scale();
                 if cfg!(feature = "reward_annealing") {
-                    // let seg = state.stm.current_segment();
-                    // let base = {
-                    //     if seg == 0 {
-                    //         state.stm.current_cycle()
-                    //     } else {
-                    //         state.stm.current_cycle() - (1 << (seg - 1))
-                    //     }
-                    // };
+                    let seg = state.stm.current_segment();
+                    let _base = {
+                        if seg == 0 {
+                            state.stm.current_cycle()
+                        } else {
+                            state.stm.current_cycle() - (1 << (seg - 1))
+                        }
+                    };
+                    let base1: f64 = (1 + scale.trailing_zeros()) as f64
+                        / (1 + max_scale.trailing_zeros()) as f64;
+                    scale_ema.update(base1);
+                    // let base2: f64 = cdb.refer(cdb::property::TEma::Entanglement).get() * (state.c_lvl.get() - state.b_lvl.get()).max(1.0);
+                    let base2: f64 = state.b_lvl.get();
+                    slow_clvl.update(base2);
+
+                    vdr_ema.update(if base2.powf(0.25) < (scale as f64) {
+                        0.75
+                    } else {
+                        1.0
+                    });
+                    asg.update_activity_decay(vdr_ema.get());
 
                     // asg.update_activity_decay(1.0 - 1.0 / (scale as f64 + state.c_lvl.get()));
-                    asg.update_activity_decay(1.0 - 0.5 / (scale as f64 + state.c_lvl.get()));
+                    // asg.update_activity_decay(1.0 - 2.0 * (1.0 - scale_ema.get()) / vdr_base);
+                    // asg.update_activity_decay(1.0 - 1.0 / (base1 * vdr_base));
 
                     // let decay: f64 = 1.0 - 0.05 * 0.995_f64.powi(base as i32);
                     // asg.update_activity_decay(decay);
@@ -313,6 +333,7 @@ fn search(
                 }
                 if let Some(new_segment) = next_stage {
                     // a beginning of a new cycle
+                    //vdr_base = slow_clvl.get();
                     #[cfg(feature = "rephase")]
                     {
                         if cfg!(feature = "stochastic_local_search") {

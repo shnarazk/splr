@@ -77,6 +77,7 @@ pub trait AssignIF:
     /// return a reference to `level`.
     fn level_ref(&self) -> &[DecisionLevel];
     fn best_assigned(&mut self) -> Option<usize>;
+    #[cfg(feature = "rephase")]
     /// return `true` if no best_phases
     fn best_phases_invalid(&self) -> bool;
     /// inject assignments for eliminated vars.
