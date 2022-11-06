@@ -78,6 +78,7 @@ pub trait AssignIF:
     fn level_ref(&self) -> &[DecisionLevel];
     fn best_assigned(&mut self) -> Option<usize>;
     /// return `true` if no best_phases
+    #[cfg(feature = "rephase")]
     fn best_phases_invalid(&self) -> bool;
     /// inject assignments for eliminated vars.
     fn extend_model(&mut self, c: &mut impl ClauseDBIF) -> Vec<Option<bool>>;
