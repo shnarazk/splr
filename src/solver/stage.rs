@@ -15,6 +15,9 @@ pub struct StageManager {
     scale: usize,
     end_of_stage: usize,
     next_is_new_segment: bool,
+    cycle_starting_stage: usize,
+    segment_starting_stage: usize,
+    segment_starting_cycle: usize,
 }
 
 impl Instantiate for StageManager {
@@ -44,6 +47,9 @@ impl StageManager {
             scale: 1,
             end_of_stage: unit_size,
             next_is_new_segment: false,
+            cycle_starting_stage: 0,
+            segment_starting_stage: 0,
+            segment_starting_cycle: 0,
         }
     }
     pub fn initialize(&mut self, unit_size: usize) {
@@ -70,20 +76,23 @@ impl StageManager {
         let mut new_cycle = false;
         let mut new_segment = false;
         self.scale = self.luby_iter.next_unchecked();
+        self.stage += 1;
         if self.scale == 1 {
             self.cycle += 1;
+            self.cycle_starting_stage = self.stage;
             new_cycle = true;
             if self.next_is_new_segment {
-                new_segment = true;
                 self.segment += 1;
                 self.max_scale_of_segment *= 2;
                 self.next_is_new_segment = false;
+                self.segment_starting_stage = self.stage;
+                self.segment_starting_cycle = self.cycle;
+                new_segment = true;
             }
         }
         if self.max_scale_of_segment == self.scale {
             self.next_is_new_segment = true;
         }
-        self.stage += 1;
         let span = self.current_span();
         self.end_of_stage = now + span;
         new_cycle.then_some(new_segment)
@@ -123,5 +132,14 @@ impl StageManager {
     /// So the current value should be the next value, which is the double.
     pub fn max_scale(&self) -> usize {
         self.max_scale_of_segment
+    }
+    pub fn cycle_starting_stage(&self) -> usize {
+        self.cycle_starting_stage
+    }
+    pub fn segment_starting_cycle(&self) -> usize {
+        self.segment_starting_cycle
+    }
+    pub fn segment_starting_stage(&self) -> usize {
+        self.segment_starting_stage
     }
 }
