@@ -62,10 +62,10 @@ impl Default for AssignStack {
             tick: 0,
             var: Vec::new(),
 
-            activity_decay: 0.94,
+            activity_decay: 0.95,
 
             #[cfg(feature = "EVSIDS")]
-            activity_decay_default: 0.94,
+            activity_decay_default: 0.95,
 
             activity_anti_decay: 0.06,
 
@@ -110,6 +110,9 @@ impl Instantiate for AssignStack {
 
             #[cfg(feature = "EVSIDS")]
             activity_decay: config.vrw_dcy_rat * 0.6,
+            #[cfg(not(feature = "EVSIDS"))]
+            activity_decay: config.vrw_dcy_rat,
+
             #[cfg(feature = "EVSIDS")]
             activity_decay_default: config.vrw_dcy_rat,
 
