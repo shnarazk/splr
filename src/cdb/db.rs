@@ -984,6 +984,8 @@ impl ClauseDBIF for ClauseDB {
         *num_reduction += 1;
 
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
+        let threshold: usize = ((4_000_000 / self.num_clause) as f64).log2() as usize;
+        self.reduction_threshold = threshold as f64;
         for (i, c) in clause
             .iter_mut()
             .enumerate()
@@ -1008,6 +1010,9 @@ impl ClauseDBIF for ClauseDB {
             if !c.is(FlagClause::LEARNT) {
                 continue;
             }
+            if c.rank <= threshold as u16 {
+                continue;
+            }
             perm.push(OrderedProxy::new(i, c.weight(asg)));
         }
         let keep = perm.len().saturating_sub(portion + 1);
@@ -1015,7 +1020,7 @@ impl ClauseDBIF for ClauseDB {
             return;
         }
         perm.sort();
-        for i in &perm[keep..] {
+        for i in perm.iter().skip(keep) {
             self.remove_clause(ClauseId::from(i.to()));
         }
     }
