@@ -290,6 +290,8 @@ pub struct ClauseDB {
     /// Literal Block Entanglement
     /// EMA of LBD of clauses used in conflict analysis (dependency graph)
     lb_entanglement: Ema2,
+    /// cutoff value used in the last `reduce`
+    reduction_threshold: f64,
 
     //
     //## incremental solving
@@ -351,9 +353,14 @@ pub mod property {
     pub enum Tf64 {
         LiteralBlockDistance,
         LiteralBlockEntanglement,
+        ReductionThreshold,
     }
 
-    pub const F64: [Tf64; 2] = [Tf64::LiteralBlockDistance, Tf64::LiteralBlockEntanglement];
+    pub const F64: [Tf64; 3] = [
+        Tf64::LiteralBlockDistance,
+        Tf64::LiteralBlockEntanglement,
+        Tf64::ReductionThreshold,
+    ];
 
     impl PropertyDereference<Tf64, f64> for ClauseDB {
         #[inline]
@@ -361,6 +368,7 @@ pub mod property {
             match k {
                 Tf64::LiteralBlockDistance => self.lbd.get(),
                 Tf64::LiteralBlockEntanglement => self.lb_entanglement.get(),
+                Tf64::ReductionThreshold => self.reduction_threshold,
             }
         }
     }
