@@ -403,7 +403,7 @@ fn search(
 }
 
 /// display the current stats. before updating stabiliation parameters
-fn dump_stage(asg: &AssignStack, _cdb: &mut ClauseDB, state: &mut State, shift: Option<bool>) {
+fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: Option<bool>) {
     let active = true; // state.rst.enable;
     let cycle = state.stm.current_cycle();
     let scale = state.stm.current_scale();
@@ -411,6 +411,7 @@ fn dump_stage(asg: &AssignStack, _cdb: &mut ClauseDB, state: &mut State, shift: 
     let segment = state.stm.current_segment();
     let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
     let vdr = asg.derefer(assign::property::Tf64::VarDecayRate);
+    let cdt = cdb.derefer(cdb::property::Tf64::ReductionThreshold);
     let fuel = if active {
         state.restart.penetration_energy_charged
     } else {
@@ -423,8 +424,8 @@ fn dump_stage(asg: &AssignStack, _cdb: &mut ClauseDB, state: &mut State, shift: 
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
         format!(
-            "scale: {:>4}, fuel:{:>9.2}, cpr:{:>8.2}, vdr:{:<4.3}",
-            scale, fuel, cpr, vdr
+            "scale: {:>4}, fuel:{:>9.2}, cpr:{:>8.2}, vdr:{:>3.2}, cdt:{:>3.2}",
+            scale, fuel, cpr, vdr, cdt
         ),
     );
 }
