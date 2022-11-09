@@ -110,6 +110,9 @@ impl Instantiate for AssignStack {
 
             #[cfg(feature = "EVSIDS")]
             activity_decay: config.vrw_dcy_rat * 0.6,
+            #[cfg(not(feature = "EVSIDS"))]
+            activity_decay: config.vrw_dcy_rat,
+
             #[cfg(feature = "EVSIDS")]
             activity_decay_default: config.vrw_dcy_rat,
 
