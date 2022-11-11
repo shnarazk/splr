@@ -4,6 +4,8 @@
 /// And it also define the interval of clause reduction.
 use crate::types::*;
 
+const UNIT_SIZE: usize = 256;
+
 #[derive(Clone, Debug, Default)]
 pub struct StageManager {
     cycle: usize,
@@ -22,7 +24,7 @@ pub struct StageManager {
 
 impl Instantiate for StageManager {
     fn instantiate(_: &Config, cnf: &CNFDescription) -> StageManager {
-        let unit_size = (cnf.num_of_variables as f64).sqrt() as usize;
+        let unit_size = UNIT_SIZE;
         StageManager {
             unit_size,
             max_scale_of_segment: 1,
@@ -36,29 +38,32 @@ impl Instantiate for StageManager {
 }
 
 impl StageManager {
-    pub fn new(unit_size: usize) -> Self {
+    pub fn new() -> Self {
         StageManager {
             cycle: 0,
             stage: 0,
             segment: 0,
-            unit_size,
+            unit_size: UNIT_SIZE,
             luby_iter: LubySeries::default(),
             max_scale_of_segment: 1,
             scale: 1,
-            end_of_stage: unit_size,
+            end_of_stage: UNIT_SIZE,
             next_is_new_segment: false,
             cycle_starting_stage: 0,
             segment_starting_stage: 0,
             segment_starting_cycle: 0,
         }
     }
-    pub fn initialize(&mut self, unit_size: usize) {
+    pub fn initialize(&mut self) {
         self.cycle = 0;
-        self.unit_size = unit_size;
+        self.unit_size = UNIT_SIZE;
         self.scale = 1;
         self.max_scale_of_segment = 1;
-        self.end_of_stage = unit_size;
+        self.end_of_stage = UNIT_SIZE;
         self.next_is_new_segment = true;
+    }
+    pub fn unit_size(&mut self, span: usize) {
+        self.unit_size = span;
     }
     pub fn reset(&mut self) {
         self.cycle = 0;
@@ -71,8 +76,7 @@ impl StageManager {
     /// - Some(true): it's a beginning of a new cycle and a new segment, a 2nd-level group.
     /// - Some(false): a beginning of a new cycle.
     /// - None: the other case.
-    pub fn prepare_new_stage(&mut self, rescale: usize, now: usize) -> Option<bool> {
-        self.unit_size = rescale;
+    pub fn prepare_new_stage(&mut self, now: usize) -> Option<bool> {
         let mut new_cycle = false;
         let mut new_segment = false;
         self.scale = self.luby_iter.next_unchecked();
@@ -102,7 +106,8 @@ impl StageManager {
     }
     /// returns the number of conflicts in the current stage
     pub fn current_span(&self) -> usize {
-        self.scale * self.unit_size
+        let cyc = 1 + self.stage - self.cycle_starting_stage();
+        self.scale * cyc * self.unit_size
     }
     pub fn current_stage(&self) -> usize {
         self.stage
@@ -121,10 +126,7 @@ impl StageManager {
     /// returns a recommending number of redicible learnt clauses, based on
     /// the length of span.
     pub fn num_reducible(&self) -> usize {
-        let span = self.current_span();
-        let scale = (self.current_scale() as f64).sqrt();
-        let keep = scale * self.unit_size as f64;
-        span.saturating_sub(keep as usize)
+        self.current_span() - UNIT_SIZE / 2
     }
     /// returns the maximum factor so far.
     /// None: `luby_iter.max_value` holds the maximum value so far.

@@ -244,9 +244,7 @@ fn search(
     #[cfg(feature = "rephase")]
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
 
-    state.stm.initialize(
-        (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
-    );
+    state.stm.initialize();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
             let lit = asg.select_decision_literal();
@@ -276,10 +274,7 @@ fn search(
             #[cfg(feature = "trace_equivalency")]
             cdb.check_consistency(asg, "before simplify");
             dump_stage(asg, cdb, state, previous_stage);
-            let next_stage: Option<bool> = state.stm.prepare_new_stage(
-                (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt() as usize,
-                num_learnt,
-            );
+            let next_stage: Option<bool> = state.stm.prepare_new_stage(num_learnt);
             let scale = state.stm.current_scale();
             let max_scale = state.stm.max_scale();
             if cfg!(feature = "reward_annealing") {
@@ -401,7 +396,7 @@ fn search(
 fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: Option<bool>) {
     let active = true; // state.rst.enable;
     let cycle = state.stm.current_cycle();
-    let scale = state.stm.current_scale();
+    let span = state.stm.current_span();
     let stage = state.stm.current_stage();
     let segment = state.stm.current_segment();
     let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
@@ -419,8 +414,8 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: O
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
         format!(
-            "scale: {:>4}, fuel:{:>9.2}, cpr:{:>8.2}, vdr:{:>3.2}, cdt:{:>3.2}",
-            scale, fuel, cpr, vdr, cdt
+            "span:{:>6}, fuel:{:>9.2}, cpr:{:>8.2}, vdr:{:>3.2}, cdt:{:>3.2}",
+            span, fuel, cpr, vdr, cdt
         ),
     );
 }
