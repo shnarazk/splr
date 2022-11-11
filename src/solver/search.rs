@@ -414,7 +414,7 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: O
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
         format!(
-            "span:{:>6}, fuel:{:>9.2}, cpr:{:>8.2}, vdr:{:>3.2}, cdt:{:>3.2}",
+            "{:>6}, fuel:{:>9.2}, cpr:{:>8.2}, vdr:{:>3.2}, cdt:{:>3.2}",
             span, fuel, cpr, vdr, cdt
         ),
     );
