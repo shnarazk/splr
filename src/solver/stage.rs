@@ -4,7 +4,7 @@
 /// And it also define the interval of clause reduction.
 use crate::types::*;
 
-const UNIT_SIZE: usize = 256;
+const UNIT_SIZE: usize = 64;
 
 #[derive(Clone, Debug, Default)]
 pub struct StageManager {
@@ -23,7 +23,7 @@ pub struct StageManager {
 }
 
 impl Instantiate for StageManager {
-    fn instantiate(_: &Config, cnf: &CNFDescription) -> StageManager {
+    fn instantiate(_: &Config, _cnf: &CNFDescription) -> StageManager {
         let unit_size = UNIT_SIZE;
         StageManager {
             unit_size,
@@ -106,8 +106,9 @@ impl StageManager {
     }
     /// returns the number of conflicts in the current stage
     pub fn current_span(&self) -> usize {
-        let cyc = 1 + self.stage - self.cycle_starting_stage();
-        self.scale * cyc * self.unit_size
+        let base: f64 = (self.scale * self.unit_size) as f64;
+        let cyc: f64 = (2 + self.cycle) as f64;
+        (cyc.log2() * base) as usize
     }
     pub fn current_stage(&self) -> usize {
         self.stage
