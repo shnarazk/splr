@@ -98,11 +98,13 @@ impl StageManager {
         new_cycle.then_some(new_segment)
     }
     pub fn stage_ended(&self, now: usize) -> bool {
-        self.end_of_stage < now
+        self.end_of_stage == now
     }
     /// returns the number of conflicts in the current stage
+    /// Note: we need not to make a strong correlation between this value and
+    /// scale defined by Luby series. So this is fine.
     pub fn current_span(&self) -> usize {
-        self.scale * self.unit_size
+        self.cycle * self.unit_size
     }
     pub fn current_stage(&self) -> usize {
         self.stage
@@ -122,7 +124,7 @@ impl StageManager {
     /// the length of span.
     pub fn num_reducible(&self) -> usize {
         let span = self.current_span();
-        let scale = (self.current_scale() as f64).sqrt();
+        let scale = (self.current_scale() as f64).powf(0.6);
         let keep = scale * self.unit_size as f64;
         span.saturating_sub(keep as usize)
     }
