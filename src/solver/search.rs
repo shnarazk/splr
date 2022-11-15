@@ -241,12 +241,11 @@ fn search(
     let mut num_learnt = 0;
     let mut current_core: usize = 999_999;
     let mut core_was_rebuilt: Option<usize> = None;
+    let stage_size: usize = 32;
     #[cfg(feature = "rephase")]
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
 
-    state.stm.initialize(
-        (asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64).sqrt() as usize,
-    );
+    state.stm.initialize(stage_size);
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
             let lit = asg.select_decision_literal();
@@ -273,20 +272,18 @@ fn search(
             RESTART!(asg, cdb, state);
             asg.clear_asserted_literals(cdb)?;
             cdb.reduce(asg, state.stm.num_reducible());
+
             #[cfg(feature = "trace_equivalency")]
             cdb.check_consistency(asg, "before simplify");
+
             dump_stage(asg, cdb, state, previous_stage);
-            let next_stage: Option<bool> = state.stm.prepare_new_stage(
-                (asg.derefer(assign::property::Tusize::NumUnassignedVar) as f64).sqrt() as usize,
-                num_learnt,
-            );
+            let next_stage: Option<bool> = state.stm.prepare_new_stage(num_learnt);
             let scale = state.stm.current_scale();
             let max_scale = state.stm.max_scale();
             if cfg!(feature = "reward_annealing") {
-                let base = 1 + state.stm.current_stage() - state.stm.cycle_starting_stage();
-                let decay_index: f64 = (14 + 2 * base) as f64;
-                let decay = (decay_index - 0.5) / decay_index;
-                asg.update_activity_decay(decay);
+                let base = state.stm.current_stage() - state.stm.cycle_starting_stage();
+                let decay_index: f64 = (20 + 2 * base) as f64;
+                asg.update_activity_decay((decay_index - 1.0) / decay_index);
             }
             if let Some(new_segment) = next_stage {
                 // a beginning of a new cycle
@@ -348,8 +345,10 @@ fn search(
                     cdb.vivify(asg, state)?;
                 }
                 if new_segment {
-                    if !cfg!(feature = "reward_annealing") {
-                        asg.rescale_activity((max_scale - scale) as f64 / max_scale as f64);
+                    {
+                        let base = state.stm.current_segment();
+                        let decay_index: f64 = (20 + 2 * base) as f64;
+                        asg.update_activity_decay((decay_index - 1.0) / decay_index);
                     }
                     if !cfg!(feature = "no_clause_elimination") {
                         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);

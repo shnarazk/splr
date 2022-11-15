@@ -71,8 +71,7 @@ impl StageManager {
     /// - Some(true): it's a beginning of a new cycle and a new segment, a 2nd-level group.
     /// - Some(false): a beginning of a new cycle.
     /// - None: the other case.
-    pub fn prepare_new_stage(&mut self, rescale: usize, now: usize) -> Option<bool> {
-        self.unit_size = rescale;
+    pub fn prepare_new_stage(&mut self, now: usize) -> Option<bool> {
         let mut new_cycle = false;
         let mut new_segment = false;
         self.scale = self.luby_iter.next_unchecked();
