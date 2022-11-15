@@ -400,7 +400,7 @@ fn search(
 fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: Option<bool>) {
     let active = true; // state.rst.enable;
     let cycle = state.stm.current_cycle();
-    let scale = state.stm.current_scale();
+    let span = state.stm.current_span();
     let stage = state.stm.current_stage();
     let segment = state.stm.current_segment();
     let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
@@ -418,8 +418,8 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: O
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
         format!(
-            "scale: {:>4}, fuel:{:>9.2}, cpr:{:>8.2}, vdr:{:>3.2}, cdt:{:>3.2}",
-            scale, fuel, cpr, vdr, cdt
+            "{:>7}, fuel:{:>9.2}, cpr:{:>8.2}, vdr:{:>3.2}, cdt:{:>3.2}",
+            span, fuel, cpr, vdr, cdt
         ),
     );
 }
