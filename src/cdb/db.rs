@@ -1010,12 +1010,9 @@ impl ClauseDBIF for ClauseDB {
             }
             perm.push(OrderedProxy::new(i, c.weight(asg)));
         }
-        let keep = perm.len().saturating_sub(portion + 1);
-        if perm.is_empty() {
-            return;
-        }
+        let keep = perm.len().saturating_sub(portion);
         perm.sort();
-        for i in &perm[keep..] {
+        for i in perm.iter().skip(keep) {
             self.remove_clause(ClauseId::from(i.to()));
         }
     }
