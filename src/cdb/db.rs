@@ -953,7 +953,7 @@ impl ClauseDBIF for ClauseDB {
                     let sum: f64 = self.iter().map(|l| asg.activity(l.vi())).sum();
                     sum / self.len() as f64
                 };
-                self.rank as f64 * (1.0 - act_c)
+                self.rank as f64 * (1.0 - act_c).powf(0.5)
             }
             #[cfg(feature = "just_used")]
             fn weight(&mut self, asg: &mut impl AssignIF) -> f64 {
