@@ -123,8 +123,7 @@ impl StageManager {
     /// the length of span.
     pub fn num_reducible(&self) -> usize {
         let span = self.current_span();
-        let scale = (self.current_scale() as f64).powf(0.6);
-        let keep = scale * self.unit_size as f64;
+        let keep = self.scale.next_power_of_two().trailing_zeros() as usize * self.unit_size;
         span.saturating_sub(keep as usize)
     }
     /// returns the maximum factor so far.
