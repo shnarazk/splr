@@ -29,7 +29,7 @@ default = [
         "LRB_rewarding",
         "reason_side_rewarding",
         "rephase",
-        "reward_annealing",
+        # "reward_annealing",
         # "stochastic_local_search",
         # "suppress_reason_chain",
         "trail_saving",
