@@ -281,9 +281,11 @@ fn search(
             let scale = state.stm.current_scale();
             let max_scale = state.stm.max_scale();
             if cfg!(feature = "reward_annealing") {
-                let base = state.stm.current_stage() - state.stm.cycle_starting_stage();
-                let decay_index: f64 = (20 + 2 * base) as f64;
-                asg.update_activity_decay((decay_index - 1.0) / decay_index);
+                let base = state.stm.current_cycle();
+                let decay_index: f64 = (base as f64).powf(0.5);
+                let offset = 1 + state.stm.current_stage() - state.stm.cycle_starting_stage();
+                let offset_index = (1.0 / offset as f64).powf(0.75);
+                asg.update_activity_decay((decay_index - offset_index) / decay_index);
             }
             if let Some(new_segment) = next_stage {
                 // a beginning of a new cycle
@@ -345,11 +347,6 @@ fn search(
                     cdb.vivify(asg, state)?;
                 }
                 if new_segment {
-                    {
-                        let base = state.stm.current_segment();
-                        let decay_index: f64 = (20 + 2 * base) as f64;
-                        asg.update_activity_decay((decay_index - 1.0) / decay_index);
-                    }
                     if !cfg!(feature = "no_clause_elimination") {
                         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                         state.flush("clause subsumption, ");
