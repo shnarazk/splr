@@ -57,6 +57,7 @@ impl Var {
             self.reward += reward;
             self.turn_off(FlagVar::USED);
         }
+        self.reward_ema.update(self.reward);
         self.reward
     }
 }

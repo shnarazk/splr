@@ -118,6 +118,7 @@ pub struct Var {
     flags: FlagVar,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
     reward: f64,
+    reward_ema: Ema2,
 
     #[cfg(feature = "boundary_check")]
     pub propagated_at: usize,
