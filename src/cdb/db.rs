@@ -946,19 +946,20 @@ impl ClauseDBIF for ClauseDB {
     /// reduce the number of 'learnt' or *removable* clauses.
     fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
         impl Clause {
-            fn weight_by_activity(&self, asg: &impl AssignIF) -> f64 {
-                #[cfg(feature = "clause_rewarding")]
-                let act_c = self.reward;
-                #[cfg(not(feature = "clause_rewarding"))]
-                let act_c = {
-                    let sum: f64 = self.iter().map(|l| asg.activity(l.vi())).sum();
-                    sum / self.len() as f64
-                };
-                self.rank as f64 * (1.0 - act_c)
+            fn literal_weight_reversed(&self, asg: &impl AssignIF) -> f64 {
+                self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
+            }
+            #[cfg(feature = "clause_rewarding")]
+            fn weight_by_activity_reversed(&self, asg: &impl AssignIF) -> f64 {
+                self.rank as f64 * (1.0 - self.reward)
+            }
+            #[cfg(not(feature = "clause_rewarding"))]
+            fn weight_by_activity_reversed(&self, asg: &impl AssignIF) -> f64 {
+                self.rank as f64 * self.literal_weight_reversed(asg) / self.len() as f64
             }
             #[cfg(feature = "just_used")]
-            fn activity(&mut self, asg: &mut impl AssignIF) -> f64 {
-                let value = c.weight_by_activity(asg);
+            fn activity_reversed(&mut self, asg: &mut impl AssignIF) -> f64 {
+                let value = c.weight_by_activity_reversed(asg);
                 if self.is(FlagClause::USED) {
                     self.turn_off(FlagClause::USED);
                     0.8 * value
@@ -967,8 +968,8 @@ impl ClauseDBIF for ClauseDB {
                 }
             }
             #[cfg(not(feature = "just_used"))]
-            fn activity(&self, asg: &mut impl AssignIF) -> f64 {
-                self.weight_by_activity(asg)
+            fn activity_reversed(&self, asg: &mut impl AssignIF) -> f64 {
+                self.weight_by_activity_reversed(asg)
             }
         }
         let ClauseDB {
@@ -1013,19 +1014,28 @@ impl ClauseDBIF for ClauseDB {
             alives += 1;
             match setting {
                 ReductionType::ActivityIncremental(_) => {
-                    perm.push(OrderedProxy::new(i, c.activity(asg)));
+                    perm.push(OrderedProxy::new(i, c.activity_reversed(asg)));
                 }
                 ReductionType::ActivityTotal(cutoff, _) => {
-                    let value = c.activity(asg);
-                    if cutoff < f64::MIN {
+                    let value = c.activity_reversed(asg);
+                    if cutoff < value {
+                        perm.push(OrderedProxy::new(i, value));
+                    }
+                }
+                ReductionType::LiteralWeightIncremental(_) => {
+                    perm.push(OrderedProxy::new(i, c.literal_weight_reversed(asg)));
+                }
+                ReductionType::LiteralWeightTotal(cutoff, _) => {
+                    let value = c.literal_weight_reversed(asg);
+                    if cutoff < value {
                         perm.push(OrderedProxy::new(i, value));
                     }
                 }
                 ReductionType::LBDIncremental(_) => {
                     perm.push(OrderedProxy::new(i, c.rank as f64));
                 }
-                ReductionType::LBDTotal(lbd, _) => {
-                    if lbd < c.rank {
+                ReductionType::LBDTotal(cutoff, _) => {
+                    if cutoff < c.rank {
                         perm.push(OrderedProxy::new(i, c.rank as f64));
                     }
                 }
@@ -1034,10 +1044,21 @@ impl ClauseDBIF for ClauseDB {
         let keep = match setting {
             ReductionType::ActivityIncremental(size) => perm.len().saturating_sub(size),
             ReductionType::ActivityTotal(_, scale) => (perm.len() as f64).powf(scale) as usize,
+            ReductionType::LiteralWeightIncremental(size) => perm.len().saturating_sub(size),
+            ReductionType::LiteralWeightTotal(_, scale) => (perm.len() as f64).powf(scale) as usize,
             ReductionType::LBDIncremental(size) => perm.len().saturating_sub(size),
             ReductionType::LBDTotal(_, scale) => (perm.len() as f64).powf(scale) as usize,
         };
-        self.reduction_threshold = keep as f64 / alives as f64;
+        self.reduction_threshold = match setting {
+            ReductionType::ActivityIncremental(_) | ReductionType::ActivityTotal(_, _) => {
+                keep as f64 / alives as f64
+            }
+            ReductionType::LiteralWeightIncremental(_)
+            | ReductionType::LiteralWeightTotal(_, _) => keep as f64 / alives as f64,
+            ReductionType::LBDIncremental(_) | ReductionType::LBDTotal(_, _) => {
+                -(keep as f64) / alives as f64
+            }
+        };
         perm.sort();
         for i in perm.iter().skip(keep) {
             self.remove_clause(ClauseId::from(i.to()));

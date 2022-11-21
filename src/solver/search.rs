@@ -280,11 +280,12 @@ fn search(
                     if cfg!(feature = "directional_reduction") {
                         #[allow(clippy::if_same_then_else)]
                         if cutoff.trend() < 1.0 {
+                            ReductionType::ActivityIncremental(state.stm.num_reducible())
                             // cdb.reduce(
                             //     asg,
                             //     ReductionType::ActivityIncremental(state.stm.num_reducible()),
                             // );
-                            ReductionType::ActivityIncremental(state.stm.current_span() / 2)
+                            // ReductionType::ActivityIncremental(state.stm.current_span() / 2)
                         } else {
                             // cdb.reduce(
                             //     asg,
@@ -292,7 +293,8 @@ fn search(
                             // );
                             // cdb.reduce(asg, ReductionType::LSBIncremental(state.stm.current_span()));
                             // cdb.reduce(asg, ReductionType::LSBTotal(3, 0.5));
-                            ReductionType::LSBIncremental(state.stm.current_span() / 2)
+                            // ReductionType::LSBIncremental(state.stm.current_span() / 2)
+                            ReductionType::LBDIncremental(state.stm.num_reducible())
                         }
                     } else {
                         ReductionType::ActivityIncremental(state.stm.num_reducible())
@@ -445,7 +447,7 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: O
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
         format!(
-            "{:>7}, fuel:{:>9.2}, cpr:{:>8.2}, vdr:{:>3.2}, cdt:{:>3.2}",
+            "{:>7}, fuel:{:>9.2}, cpr:{:>8.2}, vdr:{:>3.2}, cdt:{:>5.2}",
             span, fuel, cpr, vdr, cdt
         ),
     );
