@@ -1021,10 +1021,10 @@ impl ClauseDBIF for ClauseDB {
                         perm.push(OrderedProxy::new(i, value));
                     }
                 }
-                ReductionType::LSBIncremental(_) => {
+                ReductionType::LBDIncremental(_) => {
                     perm.push(OrderedProxy::new(i, c.rank as f64));
                 }
-                ReductionType::LSBTotal(lbd, _) => {
+                ReductionType::LBDTotal(lbd, _) => {
                     if lbd < c.rank {
                         perm.push(OrderedProxy::new(i, c.rank as f64));
                     }
@@ -1034,8 +1034,8 @@ impl ClauseDBIF for ClauseDB {
         let keep = match setting {
             ReductionType::ActivityIncremental(size) => perm.len().saturating_sub(size),
             ReductionType::ActivityTotal(_, scale) => (perm.len() as f64).powf(scale) as usize,
-            ReductionType::LSBIncremental(size) => perm.len().saturating_sub(size),
-            ReductionType::LSBTotal(_, scale) => (perm.len() as f64).powf(scale) as usize,
+            ReductionType::LBDIncremental(size) => perm.len().saturating_sub(size),
+            ReductionType::LBDTotal(_, scale) => (perm.len() as f64).powf(scale) as usize,
         };
         self.reduction_threshold = keep as f64 / alives as f64;
         perm.sort();

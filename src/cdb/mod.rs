@@ -303,8 +303,8 @@ pub struct ClauseDB {
 pub enum ReductionType {
     ActivityIncremental(usize),
     ActivityTotal(f64, f64),
-    LSBIncremental(usize),
-    LSBTotal(u16, f64),
+    LBDIncremental(usize),
+    LBDTotal(u16, f64),
 }
 
 pub mod property {
