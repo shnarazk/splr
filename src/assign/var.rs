@@ -13,8 +13,7 @@ impl Default for Var {
         Var {
             flags: FlagVar::empty(),
             reward: 0.0,
-            reward_ema: Ema2::new(100).with_slow(1000),
-
+            // reward_ema: Ema2::new(200).with_slow(4_000),
             #[cfg(feature = "boundary_check")]
             propagated_at: 0,
             #[cfg(feature = "boundary_check")]

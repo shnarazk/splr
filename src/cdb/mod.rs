@@ -138,7 +138,7 @@ pub trait ClauseDBIF:
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize);
+    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType);
     /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.
@@ -297,6 +297,14 @@ pub struct ClauseDB {
     //## incremental solving
     //
     pub eliminated_permanent: Vec<Vec<Lit>>,
+}
+
+#[derive(Clone, Debug)]
+pub enum ReductionType {
+    ActivityIncremental(usize),
+    ActivityTotal(f64, f64),
+    LSBIncremental(usize),
+    LSBTotal(u16, f64),
 }
 
 pub mod property {

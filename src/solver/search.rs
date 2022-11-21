@@ -6,7 +6,7 @@ use {
     },
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
-        cdb::{self, ClauseDB, ClauseDBIF, VivifyIF},
+        cdb::{self, ClauseDB, ClauseDBIF, ReductionType, VivifyIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
         types::*,
@@ -244,6 +244,7 @@ fn search(
     let stage_size: usize = 32;
     #[cfg(feature = "rephase")]
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
+    let mut cutoff = Ema2::new(4).with_slow(64).with_value(10.0);
 
     state.stm.initialize(stage_size);
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -271,7 +272,33 @@ fn search(
             }
             RESTART!(asg, cdb, state);
             asg.clear_asserted_literals(cdb)?;
-            cdb.reduce(asg, state.stm.num_reducible());
+            {
+                let levels = state.c_lvl.get() - state.b_lvl.get();
+                cutoff.update(levels as f64);
+                cdb.reduce(
+                    asg,
+                    if cfg!(feature = "directional_reduction") {
+                        #[allow(clippy::if_same_then_else)]
+                        if cutoff.trend() < 1.0 {
+                            // cdb.reduce(
+                            //     asg,
+                            //     ReductionType::ActivityIncremental(state.stm.num_reducible()),
+                            // );
+                            ReductionType::ActivityIncremental(state.stm.current_span() / 2)
+                        } else {
+                            // cdb.reduce(
+                            //     asg,
+                            //     ReductionType::ActivityIncremental(state.stm.num_reducible()),
+                            // );
+                            // cdb.reduce(asg, ReductionType::LSBIncremental(state.stm.current_span()));
+                            // cdb.reduce(asg, ReductionType::LSBTotal(3, 0.5));
+                            ReductionType::LSBIncremental(state.stm.current_span() / 2)
+                        }
+                    } else {
+                        ReductionType::ActivityIncremental(state.stm.num_reducible())
+                    },
+                );
+            }
 
             #[cfg(feature = "trace_equivalency")]
             cdb.check_consistency(asg, "before simplify");

@@ -27,6 +27,7 @@ pub trait StateIF {
     fn progress<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
+            + PropertyDereference<assign::property::Tf64, f64>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
             + PropertyDereference<cdb::property::Tf64, f64>
@@ -378,6 +379,7 @@ impl StateIF for State {
     fn progress<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
+            + PropertyDereference<assign::property::Tf64, f64>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
             + PropertyDereference<cdb::property::Tf64, f64>
@@ -401,7 +403,7 @@ impl StateIF for State {
         let asg_num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
         let asg_num_decision = asg.derefer(assign::property::Tusize::NumDecision);
         let asg_num_propagation = asg.derefer(assign::property::Tusize::NumPropagation);
-
+        // let asg_cwss: f64 = asg.derefer(assign::property::Tf64::CurrentWorkingSetSize);
         let asg_dpc_ema = asg.refer(assign::property::TEma::DecisionPerConflict);
         let asg_ppc_ema = asg.refer(assign::property::TEma::PropagationPerConflict);
         let asg_cpr_ema = asg.refer(assign::property::TEma::ConflictPerRestart);

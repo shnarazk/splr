@@ -4,7 +4,8 @@ use {
         ema::ProgressLBD,
         property,
         watch_cache::*,
-        BinaryLinkDB, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId, RefClause,
+        BinaryLinkDB, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId, ReductionType,
+        RefClause,
     },
     crate::{assign::AssignIF, types::*},
     std::{
@@ -943,9 +944,9 @@ impl ClauseDBIF for ClauseDB {
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
         impl Clause {
-            fn pure_weight(&self, asg: &mut impl AssignIF) -> f64 {
+            fn weight_by_activity(&self, asg: &impl AssignIF) -> f64 {
                 #[cfg(feature = "clause_rewarding")]
                 let act_c = self.reward;
                 #[cfg(not(feature = "clause_rewarding"))]
@@ -956,18 +957,18 @@ impl ClauseDBIF for ClauseDB {
                 self.rank as f64 * (1.0 - act_c)
             }
             #[cfg(feature = "just_used")]
-            fn weight(&mut self, asg: &mut impl AssignIF) -> f64 {
-                let w = c.pure_weight(asg);
+            fn activity(&mut self, asg: &mut impl AssignIF) -> f64 {
+                let value = c.weight_by_activity(asg);
                 if self.is(FlagClause::USED) {
                     self.turn_off(FlagClause::USED);
-                    0.8 * w
+                    0.8 * value
                 } else {
-                    w
+                    value
                 }
             }
             #[cfg(not(feature = "just_used"))]
-            fn weight(&self, asg: &mut impl AssignIF) -> f64 {
-                self.pure_weight(asg)
+            fn activity(&self, asg: &mut impl AssignIF) -> f64 {
+                self.weight_by_activity(asg)
             }
         }
         let ClauseDB {
@@ -984,6 +985,7 @@ impl ClauseDBIF for ClauseDB {
         *num_reduction += 1;
 
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
+        let mut alives = 0;
         for (i, c) in clause
             .iter_mut()
             .enumerate()
@@ -1008,9 +1010,34 @@ impl ClauseDBIF for ClauseDB {
             if !c.is(FlagClause::LEARNT) {
                 continue;
             }
-            perm.push(OrderedProxy::new(i, c.weight(asg)));
+            alives += 1;
+            match setting {
+                ReductionType::ActivityIncremental(_) => {
+                    perm.push(OrderedProxy::new(i, c.activity(asg)));
+                }
+                ReductionType::ActivityTotal(cutoff, _) => {
+                    let value = c.activity(asg);
+                    if cutoff < f64::MIN {
+                        perm.push(OrderedProxy::new(i, value));
+                    }
+                }
+                ReductionType::LSBIncremental(_) => {
+                    perm.push(OrderedProxy::new(i, c.rank as f64));
+                }
+                ReductionType::LSBTotal(lbd, _) => {
+                    if lbd < c.rank {
+                        perm.push(OrderedProxy::new(i, c.rank as f64));
+                    }
+                }
+            }
         }
-        let keep = perm.len().saturating_sub(portion);
+        let keep = match setting {
+            ReductionType::ActivityIncremental(size) => perm.len().saturating_sub(size),
+            ReductionType::ActivityTotal(_, scale) => (perm.len() as f64).powf(scale) as usize,
+            ReductionType::LSBIncremental(size) => perm.len().saturating_sub(size),
+            ReductionType::LSBTotal(_, scale) => (perm.len() as f64).powf(scale) as usize,
+        };
+        self.reduction_threshold = keep as f64 / alives as f64;
         perm.sort();
         for i in perm.iter().skip(keep) {
             self.remove_clause(ClauseId::from(i.to()));
