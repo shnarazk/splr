@@ -25,7 +25,7 @@ default = [
         ### Heuristics
         # "bi_clause_completion",
         # "clause_rewarding",
-        # "directional_reduction",
+        "directional_reduction",
         "dynamic_restart_threshold",
         "LRB_rewarding",
         "reason_side_rewarding",
