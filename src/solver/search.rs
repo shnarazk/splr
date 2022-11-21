@@ -280,24 +280,17 @@ fn search(
                     if cfg!(feature = "directional_reduction") {
                         #[allow(clippy::if_same_then_else)]
                         if cutoff.trend() < 1.0 {
-                            ReductionType::ActivityIncremental(state.stm.num_reducible())
-                            // cdb.reduce(
-                            //     asg,
-                            //     ReductionType::ActivityIncremental(state.stm.num_reducible()),
-                            // );
-                            // ReductionType::ActivityIncremental(state.stm.current_span() / 2)
+                            ReductionType::RASonADD(state.stm.num_reducible())
+                            // ReductionType::RASonADD(state.stm.current_span() / 2)
                         } else {
-                            // cdb.reduce(
-                            //     asg,
-                            //     ReductionType::ActivityIncremental(state.stm.num_reducible()),
-                            // );
-                            // cdb.reduce(asg, ReductionType::LSBIncremental(state.stm.current_span()));
-                            // cdb.reduce(asg, ReductionType::LSBTotal(3, 0.5));
-                            // ReductionType::LSBIncremental(state.stm.current_span() / 2)
-                            ReductionType::LBDIncremental(state.stm.num_reducible())
+                            // ReductionType::RASonADD(state.stm.num_reducible())
+                            // ReductionType::LSBonADD(state.stm.current_span())
+                            // ReductionType::LSBonALL(3, 0.5)
+                            // ReductionType::LSBonADD(state.stm.current_span() / 2)
+                            ReductionType::LBDonADD(state.stm.num_reducible())
                         }
                     } else {
-                        ReductionType::ActivityIncremental(state.stm.num_reducible())
+                        ReductionType::RASonADD(state.stm.num_reducible())
                     },
                 );
             }

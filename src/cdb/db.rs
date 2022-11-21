@@ -946,30 +946,11 @@ impl ClauseDBIF for ClauseDB {
     /// reduce the number of 'learnt' or *removable* clauses.
     fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
         impl Clause {
-            fn literal_weight_reversed(&self, asg: &impl AssignIF) -> f64 {
+            fn reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
                 self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
             }
-            #[cfg(feature = "clause_rewarding")]
-            fn weight_by_activity_reversed(&self, asg: &impl AssignIF) -> f64 {
-                self.rank as f64 * (1.0 - self.reward)
-            }
-            #[cfg(not(feature = "clause_rewarding"))]
-            fn weight_by_activity_reversed(&self, asg: &impl AssignIF) -> f64 {
-                self.rank as f64 * self.literal_weight_reversed(asg) / self.len() as f64
-            }
-            #[cfg(feature = "just_used")]
-            fn activity_reversed(&mut self, asg: &mut impl AssignIF) -> f64 {
-                let value = c.weight_by_activity_reversed(asg);
-                if self.is(FlagClause::USED) {
-                    self.turn_off(FlagClause::USED);
-                    0.8 * value
-                } else {
-                    value
-                }
-            }
-            #[cfg(not(feature = "just_used"))]
-            fn activity_reversed(&self, asg: &mut impl AssignIF) -> f64 {
-                self.weight_by_activity_reversed(asg)
+            fn lbd(&self) -> f64 {
+                self.rank as f64
             }
         }
         let ClauseDB {
@@ -1013,49 +994,37 @@ impl ClauseDBIF for ClauseDB {
             }
             alives += 1;
             match setting {
-                ReductionType::ActivityIncremental(_) => {
-                    perm.push(OrderedProxy::new(i, c.activity_reversed(asg)));
+                ReductionType::RASonADD(_) => {
+                    perm.push(OrderedProxy::new(i, c.reverse_activity_sum(asg)));
                 }
-                ReductionType::ActivityTotal(cutoff, _) => {
-                    let value = c.activity_reversed(asg);
+                ReductionType::RASonALL(cutoff, _) => {
+                    let value = c.reverse_activity_sum(asg);
                     if cutoff < value {
                         perm.push(OrderedProxy::new(i, value));
                     }
                 }
-                ReductionType::LiteralWeightIncremental(_) => {
-                    perm.push(OrderedProxy::new(i, c.literal_weight_reversed(asg)));
+                ReductionType::LBDonADD(_) => {
+                    perm.push(OrderedProxy::new(i, c.lbd()));
                 }
-                ReductionType::LiteralWeightTotal(cutoff, _) => {
-                    let value = c.literal_weight_reversed(asg);
+                ReductionType::LBDonALL(cutoff, _) => {
+                    let value = c.lbd();
                     if cutoff < value {
                         perm.push(OrderedProxy::new(i, value));
-                    }
-                }
-                ReductionType::LBDIncremental(_) => {
-                    perm.push(OrderedProxy::new(i, c.rank as f64));
-                }
-                ReductionType::LBDTotal(cutoff, _) => {
-                    if cutoff < c.rank {
-                        perm.push(OrderedProxy::new(i, c.rank as f64));
                     }
                 }
             }
         }
         let keep = match setting {
-            ReductionType::ActivityIncremental(size) => perm.len().saturating_sub(size),
-            ReductionType::ActivityTotal(_, scale) => (perm.len() as f64).powf(scale) as usize,
-            ReductionType::LiteralWeightIncremental(size) => perm.len().saturating_sub(size),
-            ReductionType::LiteralWeightTotal(_, scale) => (perm.len() as f64).powf(scale) as usize,
-            ReductionType::LBDIncremental(size) => perm.len().saturating_sub(size),
-            ReductionType::LBDTotal(_, scale) => (perm.len() as f64).powf(scale) as usize,
+            ReductionType::RASonADD(size) => perm.len().saturating_sub(size),
+            ReductionType::RASonALL(_, scale) => (perm.len() as f64).powf(scale) as usize,
+            ReductionType::LBDonADD(size) => perm.len().saturating_sub(size),
+            ReductionType::LBDonALL(_, scale) => (perm.len() as f64).powf(scale) as usize,
         };
         self.reduction_threshold = match setting {
-            ReductionType::ActivityIncremental(_) | ReductionType::ActivityTotal(_, _) => {
+            ReductionType::RASonADD(_) | ReductionType::RASonALL(_, _) => {
                 keep as f64 / alives as f64
             }
-            ReductionType::LiteralWeightIncremental(_)
-            | ReductionType::LiteralWeightTotal(_, _) => keep as f64 / alives as f64,
-            ReductionType::LBDIncremental(_) | ReductionType::LBDTotal(_, _) => {
+            ReductionType::LBDonADD(_) | ReductionType::LBDonALL(_, _) => {
                 -(keep as f64) / alives as f64
             }
         };

@@ -301,12 +301,14 @@ pub struct ClauseDB {
 
 #[derive(Clone, Debug)]
 pub enum ReductionType {
-    ActivityIncremental(usize),
-    ActivityTotal(f64, f64),
-    LiteralWeightIncremental(usize),
-    LiteralWeightTotal(f64, f64),
-    LBDIncremental(usize),
-    LBDTotal(u16, f64),
+    /// weight by Reverse Activity Sum over the added clauses
+    RASonADD(usize),
+    /// weight by Reverse Activito Sum over all learnt clauses
+    RASonALL(f64, f64),
+    /// weight by Literal Block Distance over the added clauses
+    LBDonADD(usize),
+    /// weight by Literal Block Distance over all learnt clauses
+    LBDonALL(f64, f64),
 }
 
 pub mod property {
