@@ -108,6 +108,9 @@ pub struct State {
     pub b_lvl: Ema,
     /// EMA of conflicting levels
     pub c_lvl: Ema,
+    /// EMA of c_lbd - b_lbd, or Exploration vs. Eploitation
+    pub e_mode: Ema2,
+    pub e_mode_threshold: f64,
 
     #[cfg(feature = "support_user_assumption")]
     /// hold conflicting user-defined *assumed* literals for UNSAT problems
@@ -150,6 +153,8 @@ impl Default for State {
 
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
+            e_mode: Ema2::new(40).with_slow(4_000).with_value(10.0),
+            e_mode_threshold: 4.0,
 
             #[cfg(feature = "support_user_assumption")]
             conflicts: Vec::new(),
@@ -524,14 +529,19 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|vivC:{}, !SLS:{}, core:{}, /ppc:{}",
+            "\x1B[2K        misc|vivC:{}, /x-x:{}, core:{}, /ppc:{}",
             im!(
                 "{:>9}",
                 self,
                 LogUsizeId::VivifiedClause,
                 self[Stat::VivifiedClause]
             ),
-            im!("{:>9}", self, LogUsizeId::SLS, self.sls_index),
+            fm!(
+                "{:>9.4}",
+                self,
+                LogF64Id::ExExTrend,
+                self.e_mode.trend() - self.e_mode_threshold
+            ),
             im!(
                 "{:>9}",
                 self,
@@ -863,6 +873,7 @@ pub enum LogF64Id {
     TrendLBD,
     BLevel,
     CLevel,
+    ExExTrend,
     DecisionPerConflict,
     ConflictPerRestart,
     PropagationPerConflict,
