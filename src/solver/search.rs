@@ -244,7 +244,6 @@ fn search(
     let stage_size: usize = 32;
     #[cfg(feature = "rephase")]
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
-    let mut cutoff = Ema2::new(4).with_slow(64).with_value(10.0);
 
     state.stm.initialize(stage_size);
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -273,21 +272,13 @@ fn search(
             RESTART!(asg, cdb, state);
             asg.clear_asserted_literals(cdb)?;
             {
-                let levels = state.c_lvl.get() - state.b_lvl.get();
-                cutoff.update(levels as f64);
                 cdb.reduce(
                     asg,
-                    if cfg!(feature = "directional_reduction") {
-                        #[allow(clippy::if_same_then_else)]
-                        if cutoff.trend() < 1.0 {
+                    if cfg!(feature = "two_mode_reduction") {
+                        if state.e_mode.trend() <= state.e_mode_threshold {
                             ReductionType::RASonADD(state.stm.num_reducible())
-                            // ReductionType::RASonADD(state.stm.current_span() / 2)
                         } else {
-                            // ReductionType::RASonADD(state.stm.num_reducible())
-                            // ReductionType::LSBonADD(state.stm.current_span())
-                            // ReductionType::LSBonALL(3, 0.5)
-                            // ReductionType::LSBonADD(state.stm.current_span() / 2)
-                            ReductionType::LBDonADD(state.stm.num_reducible())
+                            ReductionType::LBDonALL(7.0, 0.75)
                         }
                     } else {
                         ReductionType::RASonADD(state.stm.num_reducible())
