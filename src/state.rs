@@ -262,6 +262,27 @@ macro_rules! im {
             }
         }
     };
+    ($format: expr, $state: expr, $key: expr, $val: expr, $threshold: expr) => {
+        match ($val, $key) {
+            (v, LogUsizeId::End) => format!($format, v),
+            (v, k) => {
+                let ptr = &mut $state.record[k];
+                if $state.config.no_color {
+                    *ptr = v;
+                    format!($format, *ptr)
+                } else if v < $threshold {
+                    *ptr = v;
+                    format!("\x1B[031m{}\x1B[000m", format!($format, *ptr))
+                } else if $threshold < v {
+                    *ptr = v;
+                    format!("\x1B[036m{}\x1B[000m", format!($format, *ptr))
+                } else {
+                    *ptr = v;
+                    format!($format, *ptr)
+                }
+            }
+        }
+    };
 }
 
 macro_rules! i {
@@ -296,6 +317,27 @@ macro_rules! fm {
                     *ptr = v;
                     format!("\x1B[001m\x1B[036m{}\x1B[000m", format!($format, *ptr))
                 } else if *ptr < v {
+                    *ptr = v;
+                    format!("\x1B[036m{}\x1B[000m", format!($format, *ptr))
+                } else {
+                    *ptr = v;
+                    format!($format, *ptr)
+                }
+            }
+        }
+    };
+    ($format: expr, $state: expr, $key: expr, $val: expr, $threshold: expr) => {
+        match ($val, $key) {
+            (v, LogF64Id::End) => format!($format, v),
+            (v, k) => {
+                let ptr = &mut $state.record[k];
+                if $state.config.no_color {
+                    *ptr = v;
+                    format!($format, *ptr)
+                } else if v < $threshold {
+                    *ptr = v;
+                    format!("\x1B[031m{}\x1B[000m", format!($format, *ptr))
+                } else if $threshold < v {
                     *ptr = v;
                     format!("\x1B[036m{}\x1B[000m", format!($format, *ptr))
                 } else {
@@ -529,7 +571,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|vivC:{}, /x-x:{}, core:{}, /ppc:{}",
+            "\x1B[2K        misc|vivC:{}, xplr:{}, core:{}, /ppc:{}",
             im!(
                 "{:>9}",
                 self,
@@ -540,7 +582,8 @@ impl StateIF for State {
                 "{:>9.4}",
                 self,
                 LogF64Id::ExExTrend,
-                self.e_mode.trend() - self.e_mode_threshold
+                self.e_mode.trend(),
+                self.e_mode_threshold
             ),
             im!(
                 "{:>9}",
