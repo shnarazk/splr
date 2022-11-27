@@ -272,16 +272,19 @@ fn search(
             RESTART!(asg, cdb, state);
             asg.clear_asserted_literals(cdb)?;
             {
+                let factor: f64 = 0.5;
                 cdb.reduce(
                     asg,
                     if cfg!(feature = "two_mode_reduction") {
                         if state.e_mode.trend() <= state.e_mode_threshold {
-                            ReductionType::RASonADD(state.stm.num_reducible())
+                            state.exploration_rate_ema.update(0.0);
+                            ReductionType::RASonADD(state.stm.num_reducible(factor))
                         } else {
-                            ReductionType::LBDonALL(7.0, 0.75)
+                            state.exploration_rate_ema.update(1.0);
+                            ReductionType::LBDonALL(7.0, 1.0 - factor.powf(2.0))
                         }
                     } else {
-                        ReductionType::RASonADD(state.stm.num_reducible())
+                        ReductionType::RASonADD(state.stm.num_reducible(factor))
                     },
                 );
             }

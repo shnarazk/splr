@@ -111,6 +111,7 @@ pub struct State {
     /// EMA of c_lbd - b_lbd, or Exploration vs. Eploitation
     pub e_mode: Ema2,
     pub e_mode_threshold: f64,
+    pub exploration_rate_ema: Ema,
 
     #[cfg(feature = "support_user_assumption")]
     /// hold conflicting user-defined *assumed* literals for UNSAT problems
@@ -154,7 +155,8 @@ impl Default for State {
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
             e_mode: Ema2::new(40).with_slow(4_000).with_value(10.0),
-            e_mode_threshold: 4.0,
+            e_mode_threshold: 1.25,
+            exploration_rate_ema: Ema::new(1000),
 
             #[cfg(feature = "support_user_assumption")]
             conflicts: Vec::new(),
@@ -582,8 +584,8 @@ impl StateIF for State {
                 "{:>9.4}",
                 self,
                 LogF64Id::ExExTrend,
-                self.e_mode.trend(),
-                self.e_mode_threshold
+                // self.e_mode.trend(),
+                self.exploration_rate_ema.get() // , self.e_mode_threshold
             ),
             im!(
                 "{:>9}",
