@@ -155,7 +155,7 @@ impl Default for State {
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
             e_mode: Ema2::new(40).with_slow(4_000).with_value(10.0),
-            e_mode_threshold: 1.25,
+            e_mode_threshold: 1.20,
             exploration_rate_ema: Ema::new(1000),
 
             #[cfg(feature = "support_user_assumption")]
