@@ -1,4 +1,4 @@
-## 0.17.0, 2022-??-??
+## 0.17.0, 2022-12-??
 
 - (Breaking change) `Certificate::try_from` returns `Ok` values even if a given vector
   contains empty clauses. All expressions corresponding to valid CNFs should be
@@ -9,6 +9,7 @@
 - Fix build errors without feature 'trial_saving' or 'rephase' (#202, #205)
 - clause reduction uses revised parameters matching a Luby series based parameter shifting
   model (#195)
+- add feature 'two_mode_reduction'
 
 ## 0.16.3, 2022-09-16
 
