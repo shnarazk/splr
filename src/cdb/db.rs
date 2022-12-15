@@ -1080,6 +1080,7 @@ impl ClauseDBIF for ClauseDB {
         }
         None
     }
+    #[allow(clippy::unnecessary_cast)]
     fn minimize_with_bi_clauses(&mut self, asg: &impl AssignIF, vec: &mut Vec<Lit>) {
         if vec.len() <= 1 {
             return;
