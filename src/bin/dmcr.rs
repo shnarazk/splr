@@ -55,7 +55,7 @@ impl TargetOpts {
                         "no-color" => self.no_color = true,
                         "help" => help = true,
                         "version" => version = true,
-                        _ => panic!("invalid flag: {}", name),
+                        _ => panic!("invalid flag: {name}"),
                     }
                 } else if options_path.contains(&name) {
                     if options_path.contains(&name) {
@@ -65,10 +65,10 @@ impl TargetOpts {
                                 _ => panic!("not"),
                             }
                         } else {
-                            panic!("no argument for {}", name);
+                            panic!("no argument for {name}");
                         }
                     } else {
-                        panic!("invalid argument: {}", name);
+                        panic!("invalid argument: {name}");
                     }
                 }
             } else if let Some(name) = arg.strip_prefix('-') {
@@ -85,18 +85,18 @@ impl TargetOpts {
                     if let Some(val) = iter.next() {
                         match name {
                             "a" => self.assign = Some(PathBuf::from(val)),
-                            _ => panic!("invalid option: {}", name),
+                            _ => panic!("invalid option: {name}"),
                         }
                     } else {
-                        panic!("no argument for {}", name);
+                        panic!("no argument for {name}");
                     }
                 }
             } else if !self.problem.exists() || self.problem.to_string_lossy() != arg {
-                panic!("invalid argument: {}", arg);
+                panic!("invalid argument: {arg}");
             }
         }
         if help {
-            println!("{}\n{}", ABOUT, HELP_MESSAGE);
+            println!("{ABOUT}\n{HELP_MESSAGE}");
             std::process::exit(0);
         }
         if version {
@@ -225,7 +225,7 @@ fn read_assignment(rs: &mut dyn BufRead, cnf: &str, assign: &Option<PathBuf>) ->
                         buf.clear();
                         continue;
                     } else if buf.starts_with("s UNSATISFIABLE") {
-                        println!("{} seems an unsatisfiable problem. I can't handle it.", cnf);
+                        println!("{cnf} seems an unsatisfiable problem. I can't handle it.");
                         return None;
                     } else if let Some(asg) = assign {
                         println!("{} seems an illegal format file.", asg.to_str().unwrap(),);
@@ -240,12 +240,12 @@ fn read_assignment(rs: &mut dyn BufRead, cnf: &str, assign: &Option<PathBuf>) ->
                         match s.parse::<i32>() {
                             Ok(0) => break,
                             Ok(x) => v.push(x),
-                            Err(e) => panic!("{} by {}", e, s),
+                            Err(e) => panic!("{e} by {s}"),
                         }
                     }
                     return Some(v);
                 }
-                panic!("Failed to parse here: {}", buf);
+                panic!("Failed to parse here: {buf}");
             }
             Err(e) => panic!("{}", e),
         }

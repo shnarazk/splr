@@ -158,7 +158,7 @@ impl Instantiate for AssignStack {
                 //     .filter(|v| v.is(FlagVar::ELIMINATED))
                 //     .count();
             }
-            e => panic!("don't call asg with {:?}", e),
+            e => panic!("don't call asg with {e:?}"),
         }
     }
 }

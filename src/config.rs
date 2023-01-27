@@ -152,7 +152,7 @@ impl Config {
                                 "log" => self.use_log = true,
                                 "help" => help = true,
                                 "version" => version = true,
-                                _ => panic!("invalid flag: {}", name),
+                                _ => panic!("invalid flag: {name}"),
                             }
                         } else if options_usize.contains(&name) {
                             if let Some(str) = iter.next() {
@@ -162,13 +162,13 @@ impl Config {
                                         "ecl" => self.elm_cls_lim = val,
                                         "evl" => self.elm_grw_lim = val,
                                         "evo" => self.elm_var_occ = val,
-                                        _ => panic!("invalid option: {}", name),
+                                        _ => panic!("invalid option: {name}"),
                                     }
                                 } else {
-                                    panic!("invalid value {}", name);
+                                    panic!("invalid value {name}");
                                 }
                             } else {
-                                panic!("no argument for {}", name);
+                                panic!("no argument for {name}");
                             }
                         } else if options_f64.contains(&name) {
                             if let Some(str) = iter.next() {
@@ -179,13 +179,13 @@ impl Config {
                                         "vdr" => self.vrw_dcy_rat = val,
                                         "vds" => self.vrw_dcy_stp = val,
 
-                                        _ => panic!("invalid option: {}", name),
+                                        _ => panic!("invalid option: {name}"),
                                     }
                                 } else {
-                                    panic!("invalid value {}", name);
+                                    panic!("invalid value {name}");
                                 }
                             } else {
-                                panic!("no argument for {}", name);
+                                panic!("no argument for {name}");
                             }
                         } else if options_path.contains(&name) {
                             if let Some(val) = iter.next() {
@@ -193,13 +193,13 @@ impl Config {
                                     "dir" => self.io_odir = PathBuf::from(val),
                                     "proof" => self.io_pfile = PathBuf::from(val),
                                     "result" => self.io_rfile = PathBuf::from(val),
-                                    _ => panic!("invalid option: {}", name),
+                                    _ => panic!("invalid option: {name}"),
                                 }
                             } else {
-                                panic!("invalid value {}", name);
+                                panic!("invalid value {name}");
                             }
                         } else {
-                            panic!("unknown option name {}", name);
+                            panic!("unknown option name {name}");
                         }
                     }
                     _ => {
@@ -218,7 +218,7 @@ impl Config {
                         "l" => self.use_log = true,
                         "h" => help = true,
                         "V" => version = true,
-                        _ => panic!("invalid flag: {}", name),
+                        _ => panic!("invalid flag: {name}"),
                     }
                 } else if options_path.contains(&name) {
                     if let Some(val) = iter.next() {
@@ -229,16 +229,16 @@ impl Config {
                             "t" => {
                                 self.c_timeout = val.parse::<f64>().expect("-t requires a number")
                             }
-                            _ => panic!("invalid option: {}", name),
+                            _ => panic!("invalid option: {name}"),
                         }
                     } else {
-                        panic!("no argument for {}", name);
+                        panic!("no argument for {name}");
                     }
                 } else {
-                    panic!("unknown option name {}", name);
+                    panic!("unknown option name {name}");
                 }
             } else if self.cnf_file.to_string_lossy() != arg {
-                panic!("invalid argument: {}", arg);
+                panic!("invalid argument: {arg}");
             }
         }
         if help {

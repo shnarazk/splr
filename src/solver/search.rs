@@ -395,7 +395,7 @@ fn search(
             }
             current_core = na;
             state.flush("");
-            state.flush(format!("unreachable core: {} ", na));
+            state.flush(format!("unreachable core: {na} "));
         }
     }
     state.log(
@@ -433,10 +433,7 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: O
             Some(false) => Some((None, Some(cycle), stage)),
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
-        format!(
-            "{:>7}, fuel:{:>9.2}, cpr:{:>8.2}, vdr:{:>3.2}, cdt:{:>5.2}",
-            span, fuel, cpr, vdr, cdt
-        ),
+        format!("{span:>7}, fuel:{fuel:>9.2}, cpr:{cpr:>8.2}, vdr:{vdr:>3.2}, cdt:{cdt:>5.2}"),
     );
 }
 

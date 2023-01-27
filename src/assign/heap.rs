@@ -188,8 +188,8 @@ impl VarOrderIF for VarIdHeap {
         let vs = self.heap[s];
         let n = self.idxs[0];
         let vn = self.heap[n as usize];
-        debug_assert!(vn != 0, "Invalid VarId for heap: vn {}, n {}", vn, n);
-        debug_assert!(vs != 0, "Invalid VarId for heap: vs {}, n {}", vs, n);
+        debug_assert!(vn != 0, "Invalid VarId for heap: vn {vn}, n {n}");
+        debug_assert!(vs != 0, "Invalid VarId for heap: vs {vs}, n {n}");
         self.heap.swap(n as usize, s);
         self.idxs.swap(vn as usize, vs as usize);
         self.idxs[0] -= 1;
@@ -251,6 +251,6 @@ impl VarIdHeap {
                 panic!("idxs {} {} {:?}", i, d[i], d);
             }
         }
-        println!(" - pass var_order test at {}", s);
+        println!(" - pass var_order test at {s}");
     }
 }

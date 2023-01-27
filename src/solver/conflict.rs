@@ -620,7 +620,7 @@ fn lit_level(
                 .unwrap()
         }
         AssignReason::BinaryLink(b) => lit_level(asg, cdb, b, bag, _mes),
-        AssignReason::None => panic!("One of root of {} isn't assigned.", lit),
+        AssignReason::None => panic!("One of root of {lit} isn't assigned."),
     }
 }
 

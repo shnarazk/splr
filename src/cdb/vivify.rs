@@ -59,8 +59,7 @@ impl VivifyIF for ClauseDB {
             if to_display <= num_check {
                 state.flush("");
                 state.flush(format!(
-                    "clause vivifying(assert:{} shorten:{}, check:{}/{})...",
-                    num_assert, num_shrink, num_check, num_target,
+                    "clause vivifying(assert:{num_assert} shorten:{num_shrink}, check:{num_check}/{num_target})..."
                 ));
                 to_display = num_check + display_step;
             }
@@ -163,8 +162,7 @@ impl VivifyIF for ClauseDB {
         debug_assert!(asg.stack_is_empty() || !asg.remains());
         state.flush("");
         state.flush(format!(
-            "vivification(assert:{} shorten:{}), ",
-            num_assert, num_shrink
+            "vivification(assert:{num_assert} shorten:{num_shrink}), "
         ));
         // state.log(
         //     asg.num_conflict,
@@ -311,15 +309,11 @@ impl AssignStack {
         // make sure the decision var is at the top of list
         debug_assert!(
             !learnt.is_empty(),
-            "empty learnt, conflict: {:?}, assumed: {:?}",
-            conflicting,
-            decisions
+            "empty learnt, conflict: {conflicting:?}, assumed: {decisions:?}"
         );
         debug_assert!(
             learnt.contains(&!*last_decision),
-            "\nThe negation of the last decision {} isn't contained in {:?}",
-            last_decision,
-            learnt,
+            "\nThe negation of the last decision {last_decision} isn't contained in {learnt:?}"
         );
         // Since we don't assign the right value of the 'reason' literal after conflict analysis,
         // we need not to swap locations.
@@ -327,10 +321,7 @@ impl AssignStack {
         // assert!(matches!(self.reason(learnt[0].vi()), AssignReason::None));
         debug_assert!(
             learnt.iter().all(|l| !learnt.contains(&!*l)),
-            "res: {:?} from: {:?} and trail: {:?}",
-            learnt,
-            decisions,
-            assumes,
+            "res: {learnt:?} from: {decisions:?} and trail: {assumes:?}"
         );
         learnt
     }

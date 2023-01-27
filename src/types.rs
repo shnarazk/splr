@@ -390,7 +390,7 @@ pub enum SolverError {
 
 impl fmt::Display for SolverError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -418,8 +418,8 @@ impl fmt::Display for CNFIndicator {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             CNFIndicator::Void => write!(f, "No CNF specified)"),
-            CNFIndicator::File(file) => write!(f, "CNF file({})", file),
-            CNFIndicator::LitVec(n) => write!(f, "A vec({} clauses)", n),
+            CNFIndicator::File(file) => write!(f, "CNF file({file})"),
+            CNFIndicator::LitVec(n) => write!(f, "A vec({n} clauses)"),
         }
     }
 }
@@ -459,7 +459,7 @@ impl fmt::Display for CNFDescription {
             num_of_clauses: nc,
             pathname: path,
         } = &self;
-        write!(f, "CNF({}, {}, {})", nv, nc, path)
+        write!(f, "CNF({nv}, {nc}, {path})")
     }
 }
 
@@ -525,7 +525,7 @@ impl TryFrom<&Path> for CNFReader {
                     continue;
                 }
                 Err(e) => {
-                    println!("{}", e);
+                    println!("{e}");
                     return Err(SolverError::IOError);
                 }
             }
@@ -625,9 +625,9 @@ impl Logger {
         use std::io::Write;
         if let Some(f) = &mut self.dest {
             f.write_all(&mes.into_bytes())
-                .unwrap_or_else(|_| panic!("fail to dump {:?}", f));
+                .unwrap_or_else(|_| panic!("fail to dump {f:?}"));
         } else {
-            println!("{}", mes);
+            println!("{mes}");
         }
     }
 }

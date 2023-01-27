@@ -385,7 +385,7 @@ impl StateIF for State {
         }
         if 0 == self.progress_cnt {
             self.progress_cnt = 1;
-            println!("{}", self);
+            println!("{self}");
 
             //## PROGRESS REPORT ROWS
             for _i in 0..PROGRESS_REPORT_ROWS - 1 {
@@ -475,21 +475,21 @@ impl StateIF for State {
         self.progress_cnt += 1;
         // print!("\x1B[9A\x1B[1G");
         print!("\x1B[");
-        print!("{}", PROGRESS_REPORT_ROWS);
+        print!("{PROGRESS_REPORT_ROWS}");
         print!("A\x1B[1G");
 
         if self.config.show_journal {
             while let Some(m) = self.log_messages.pop() {
                 if self.config.no_color {
-                    println!("{}", m);
+                    println!("{m}");
                 } else {
-                    println!("\x1B[2K\x1B[000m\x1B[034m{}\x1B[000m", m);
+                    println!("\x1B[2K\x1B[000m\x1B[034m{m}\x1B[000m");
                 }
             }
         } else {
             self.log_messages.clear();
         }
-        println!("\x1B[2K{}", self);
+        println!("\x1B[2K{self}");
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{}",
             i!("{:>11}", self, LogUsizeId::NumConflict, asg_num_conflict),
@@ -683,23 +683,16 @@ impl fmt::Display for State {
         let mut fname = match &self.target.pathname {
             CNFIndicator::Void => "(no cnf)".to_string(),
             CNFIndicator::File(f) => f.to_string(),
-            CNFIndicator::LitVec(n) => format!("(embedded {} element vector)", n),
+            CNFIndicator::LitVec(n) => format!("(embedded {n} element vector)"),
         };
         if width <= fname.len() {
             fname.truncate(58 - vclen);
         }
         let fnlen = fname.len();
         if width < vclen + fnlen + 1 {
-            write!(f, "{:<w$} |time:{:>9.2}", fname, tm, w = width)
+            write!(f, "{fname:<width$} |time:{tm:>9.2}")
         } else {
-            write!(
-                f,
-                "{}{:>w$} |time:{:>9.2}",
-                fname,
-                &vc,
-                tm,
-                w = width - fnlen,
-            )
+            write!(f, "{fname}{:>w$} |time:{tm:>9.2}", &vc, w = width - fnlen,)
         }
     }
 }
