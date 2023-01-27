@@ -198,6 +198,7 @@ impl VarOrderIF for VarIdHeap {
     fn len(&self) -> usize {
         self.idxs[0] as usize
     }
+    #[allow(clippy::unnecessary_cast)]
     fn insert(&mut self, vi: VarId) -> usize {
         if self.contains(vi) {
             return self.idxs[vi as usize] as usize;

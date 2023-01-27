@@ -6,7 +6,7 @@ use {
     },
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
-        cdb::{self, ClauseDB, ClauseDBIF, VivifyIF},
+        cdb::{self, ClauseDB, ClauseDBIF, ReductionType, VivifyIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
         types::*,
@@ -271,7 +271,23 @@ fn search(
             }
             RESTART!(asg, cdb, state);
             asg.clear_asserted_literals(cdb)?;
-            cdb.reduce(asg, state.stm.num_reducible());
+            {
+                let factor: f64 = 0.5;
+                cdb.reduce(
+                    asg,
+                    if cfg!(feature = "two_mode_reduction") {
+                        if state.e_mode.trend() <= state.e_mode_threshold {
+                            state.exploration_rate_ema.update(0.0);
+                            ReductionType::RASonADD(state.stm.num_reducible(factor))
+                        } else {
+                            state.exploration_rate_ema.update(1.0);
+                            ReductionType::LBDonALL(7.0, 1.0 - factor.powf(2.0))
+                        }
+                    } else {
+                        ReductionType::RASonADD(state.stm.num_reducible(factor))
+                    },
+                );
+            }
 
             #[cfg(feature = "trace_equivalency")]
             cdb.check_consistency(asg, "before simplify");
@@ -418,7 +434,7 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: O
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
         format!(
-            "{:>7}, fuel:{:>9.2}, cpr:{:>8.2}, vdr:{:>3.2}, cdt:{:>3.2}",
+            "{:>7}, fuel:{:>9.2}, cpr:{:>8.2}, vdr:{:>3.2}, cdt:{:>5.2}",
             span, fuel, cpr, vdr, cdt
         ),
     );

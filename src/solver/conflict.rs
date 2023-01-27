@@ -240,6 +240,9 @@ pub fn handle_conflict(
     }
     state.c_lvl.update(conflicting_level as f64);
     state.b_lvl.update(assign_level as f64);
+    state
+        .e_mode
+        .update(conflicting_level as f64 - assign_level as f64);
     state.derive20.clear();
     Ok(rank)
 }

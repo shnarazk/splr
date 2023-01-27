@@ -118,7 +118,7 @@ pub struct Var {
     flags: FlagVar,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
     reward: f64,
-
+    // reward_ema: Ema2,
     #[cfg(feature = "boundary_check")]
     pub propagated_at: usize,
     #[cfg(feature = "boundary_check")]
@@ -358,15 +358,25 @@ pub mod property {
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tf64 {
+        AverageVarActivity,
+        CurrentWorkingSetSize,
         VarDecayRate,
     }
 
-    pub const F64S: [Tf64; 1] = [Tf64::VarDecayRate];
+    pub const F64S: [Tf64; 3] = [
+        Tf64::AverageVarActivity,
+        Tf64::CurrentWorkingSetSize,
+        Tf64::VarDecayRate,
+    ];
 
     impl PropertyDereference<Tf64, f64> for AssignStack {
         #[inline]
-        fn derefer(&self, _k: Tf64) -> f64 {
-            self.activity_decay
+        fn derefer(&self, k: Tf64) -> f64 {
+            match k {
+                Tf64::AverageVarActivity => 0.0,    // self.activity_averaged,
+                Tf64::CurrentWorkingSetSize => 0.0, // self.cwss,
+                Tf64::VarDecayRate => self.activity_decay,
+            }
         }
     }
 

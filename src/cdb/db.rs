@@ -4,7 +4,8 @@ use {
         ema::ProgressLBD,
         property,
         watch_cache::*,
-        BinaryLinkDB, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId, RefClause,
+        BinaryLinkDB, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId, ReductionType,
+        RefClause,
     },
     crate::{assign::AssignIF, types::*},
     std::{
@@ -943,31 +944,13 @@ impl ClauseDBIF for ClauseDB {
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
         impl Clause {
-            fn pure_weight(&self, asg: &mut impl AssignIF) -> f64 {
-                #[cfg(feature = "clause_rewarding")]
-                let act_c = self.reward;
-                #[cfg(not(feature = "clause_rewarding"))]
-                let act_c = {
-                    let sum: f64 = self.iter().map(|l| asg.activity(l.vi())).sum();
-                    sum / self.len() as f64
-                };
-                self.rank as f64 * (1.0 - act_c)
+            fn reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
+                self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
             }
-            #[cfg(feature = "just_used")]
-            fn weight(&mut self, asg: &mut impl AssignIF) -> f64 {
-                let w = c.pure_weight(asg);
-                if self.is(FlagClause::USED) {
-                    self.turn_off(FlagClause::USED);
-                    0.8 * w
-                } else {
-                    w
-                }
-            }
-            #[cfg(not(feature = "just_used"))]
-            fn weight(&self, asg: &mut impl AssignIF) -> f64 {
-                self.pure_weight(asg)
+            fn lbd(&self) -> f64 {
+                self.rank as f64
             }
         }
         let ClauseDB {
@@ -984,6 +967,7 @@ impl ClauseDBIF for ClauseDB {
         *num_reduction += 1;
 
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
+        let mut alives = 0;
         for (i, c) in clause
             .iter_mut()
             .enumerate()
@@ -1008,9 +992,42 @@ impl ClauseDBIF for ClauseDB {
             if !c.is(FlagClause::LEARNT) {
                 continue;
             }
-            perm.push(OrderedProxy::new(i, c.weight(asg)));
+            alives += 1;
+            match setting {
+                ReductionType::RASonADD(_) => {
+                    perm.push(OrderedProxy::new(i, c.reverse_activity_sum(asg)));
+                }
+                ReductionType::RASonALL(cutoff, _) => {
+                    let value = c.reverse_activity_sum(asg);
+                    if cutoff < value {
+                        perm.push(OrderedProxy::new(i, value));
+                    }
+                }
+                ReductionType::LBDonADD(_) => {
+                    perm.push(OrderedProxy::new(i, c.lbd()));
+                }
+                ReductionType::LBDonALL(cutoff, _) => {
+                    let value = c.lbd();
+                    if cutoff < value {
+                        perm.push(OrderedProxy::new(i, value));
+                    }
+                }
+            }
         }
-        let keep = perm.len().saturating_sub(portion);
+        let keep = match setting {
+            ReductionType::RASonADD(size) => perm.len().saturating_sub(size),
+            ReductionType::RASonALL(_, scale) => (perm.len() as f64).powf(scale) as usize,
+            ReductionType::LBDonADD(size) => perm.len().saturating_sub(size),
+            ReductionType::LBDonALL(_, scale) => (perm.len() as f64).powf(scale) as usize,
+        };
+        self.reduction_threshold = match setting {
+            ReductionType::RASonADD(_) | ReductionType::RASonALL(_, _) => {
+                keep as f64 / alives as f64
+            }
+            ReductionType::LBDonADD(_) | ReductionType::LBDonALL(_, _) => {
+                -(keep as f64) / alives as f64
+            }
+        };
         perm.sort();
         for i in perm.iter().skip(keep) {
             self.remove_clause(ClauseId::from(i.to()));
@@ -1063,6 +1080,7 @@ impl ClauseDBIF for ClauseDB {
         }
         None
     }
+    #[allow(clippy::unnecessary_cast)]
     fn minimize_with_bi_clauses(&mut self, asg: &impl AssignIF, vec: &mut Vec<Lit>) {
         if vec.len() <= 1 {
             return;

@@ -27,6 +27,7 @@ pub trait StateIF {
     fn progress<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
+            + PropertyDereference<assign::property::Tf64, f64>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
             + PropertyDereference<cdb::property::Tf64, f64>
@@ -107,6 +108,10 @@ pub struct State {
     pub b_lvl: Ema,
     /// EMA of conflicting levels
     pub c_lvl: Ema,
+    /// EMA of c_lbd - b_lbd, or Exploration vs. Eploitation
+    pub e_mode: Ema2,
+    pub e_mode_threshold: f64,
+    pub exploration_rate_ema: Ema,
 
     #[cfg(feature = "support_user_assumption")]
     /// hold conflicting user-defined *assumed* literals for UNSAT problems
@@ -149,6 +154,9 @@ impl Default for State {
 
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
+            e_mode: Ema2::new(40).with_slow(4_000).with_value(10.0),
+            e_mode_threshold: 1.20,
+            exploration_rate_ema: Ema::new(1000),
 
             #[cfg(feature = "support_user_assumption")]
             conflicts: Vec::new(),
@@ -256,6 +264,27 @@ macro_rules! im {
             }
         }
     };
+    ($format: expr, $state: expr, $key: expr, $val: expr, $threshold: expr) => {
+        match ($val, $key) {
+            (v, LogUsizeId::End) => format!($format, v),
+            (v, k) => {
+                let ptr = &mut $state.record[k];
+                if $state.config.no_color {
+                    *ptr = v;
+                    format!($format, *ptr)
+                } else if v < $threshold {
+                    *ptr = v;
+                    format!("\x1B[031m{}\x1B[000m", format!($format, *ptr))
+                } else if $threshold < v {
+                    *ptr = v;
+                    format!("\x1B[036m{}\x1B[000m", format!($format, *ptr))
+                } else {
+                    *ptr = v;
+                    format!($format, *ptr)
+                }
+            }
+        }
+    };
 }
 
 macro_rules! i {
@@ -290,6 +319,27 @@ macro_rules! fm {
                     *ptr = v;
                     format!("\x1B[001m\x1B[036m{}\x1B[000m", format!($format, *ptr))
                 } else if *ptr < v {
+                    *ptr = v;
+                    format!("\x1B[036m{}\x1B[000m", format!($format, *ptr))
+                } else {
+                    *ptr = v;
+                    format!($format, *ptr)
+                }
+            }
+        }
+    };
+    ($format: expr, $state: expr, $key: expr, $val: expr, $threshold: expr) => {
+        match ($val, $key) {
+            (v, LogF64Id::End) => format!($format, v),
+            (v, k) => {
+                let ptr = &mut $state.record[k];
+                if $state.config.no_color {
+                    *ptr = v;
+                    format!($format, *ptr)
+                } else if v < $threshold {
+                    *ptr = v;
+                    format!("\x1B[031m{}\x1B[000m", format!($format, *ptr))
+                } else if $threshold < v {
                     *ptr = v;
                     format!("\x1B[036m{}\x1B[000m", format!($format, *ptr))
                 } else {
@@ -378,6 +428,7 @@ impl StateIF for State {
     fn progress<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
+            + PropertyDereference<assign::property::Tf64, f64>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
             + PropertyDereference<cdb::property::Tf64, f64>
@@ -401,7 +452,7 @@ impl StateIF for State {
         let asg_num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
         let asg_num_decision = asg.derefer(assign::property::Tusize::NumDecision);
         let asg_num_propagation = asg.derefer(assign::property::Tusize::NumPropagation);
-
+        // let asg_cwss: f64 = asg.derefer(assign::property::Tf64::CurrentWorkingSetSize);
         let asg_dpc_ema = asg.refer(assign::property::TEma::DecisionPerConflict);
         let asg_ppc_ema = asg.refer(assign::property::TEma::PropagationPerConflict);
         let asg_cpr_ema = asg.refer(assign::property::TEma::ConflictPerRestart);
@@ -522,14 +573,20 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|vivC:{}, !SLS:{}, core:{}, /ppc:{}",
+            "\x1B[2K        misc|vivC:{}, xplr:{}, core:{}, /ppc:{}",
             im!(
                 "{:>9}",
                 self,
                 LogUsizeId::VivifiedClause,
                 self[Stat::VivifiedClause]
             ),
-            im!("{:>9}", self, LogUsizeId::SLS, self.sls_index),
+            fm!(
+                "{:>9.4}",
+                self,
+                LogF64Id::ExExTrend,
+                // self.e_mode.trend(),
+                self.exploration_rate_ema.get() // , self.e_mode_threshold
+            ),
             im!(
                 "{:>9}",
                 self,
@@ -861,6 +918,7 @@ pub enum LogF64Id {
     TrendLBD,
     BLevel,
     CLevel,
+    ExExTrend,
     DecisionPerConflict,
     ConflictPerRestart,
     PropagationPerConflict,
