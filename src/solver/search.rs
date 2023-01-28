@@ -242,6 +242,7 @@ fn search(
     let mut current_core: usize = 999_999;
     let mut core_was_rebuilt: Option<usize> = None;
     let stage_size: usize = 32;
+    let reducing_factor: f64 = 0.2;
     #[cfg(feature = "rephase")]
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
 
@@ -270,24 +271,8 @@ fn search(
                 return Err(SolverError::UndescribedError);
             }
             RESTART!(asg, cdb, state);
+            asg.select_rephasing_target();
             asg.clear_asserted_literals(cdb)?;
-            {
-                let factor: f64 = 0.5;
-                cdb.reduce(
-                    asg,
-                    if cfg!(feature = "two_mode_reduction") {
-                        if state.e_mode.trend() <= state.e_mode_threshold {
-                            state.exploration_rate_ema.update(0.0);
-                            ReductionType::RASonADD(state.stm.num_reducible(factor))
-                        } else {
-                            state.exploration_rate_ema.update(1.0);
-                            ReductionType::LBDonALL(7.0, 1.0 - factor.powf(2.0))
-                        }
-                    } else {
-                        ReductionType::RASonADD(state.stm.num_reducible(factor))
-                    },
-                );
-            }
 
             #[cfg(feature = "trace_equivalency")]
             cdb.check_consistency(asg, "before simplify");
@@ -303,6 +288,12 @@ fn search(
             }
             if let Some(new_segment) = next_stage {
                 // a beginning of a new cycle
+                {
+                    state.exploration_rate_ema.update(1.0);
+                    if cfg!(feature = "two_mode_reduction") {
+                        cdb.reduce(asg, ReductionType::LBDonALL(5.0, 0.05));
+                    }
+                }
                 #[cfg(feature = "rephase")]
                 {
                     if cfg!(feature = "stochastic_local_search") {
@@ -377,6 +368,23 @@ fn search(
                     if cfg!(feature = "dynamic_restart_threshold") {
                         state.restart.set_segment_parameters(max_scale);
                     }
+                }
+            } else {
+                {
+                    if cfg!(feature = "two_mode_reduction") {
+                        cdb.reduce(
+                            asg,
+                            ReductionType::RASonADD(state.stm.num_reducible(reducing_factor)),
+                        );
+                    }
+                }
+            }
+            {
+                if !cfg!(feature = "two_mode_reduction") {
+                    cdb.reduce(
+                        asg,
+                        ReductionType::RASonADD(state.stm.num_reducible(reducing_factor)),
+                    );
                 }
             }
             state.progress(asg, cdb);

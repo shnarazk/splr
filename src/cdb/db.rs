@@ -999,7 +999,7 @@ impl ClauseDBIF for ClauseDB {
                 }
                 ReductionType::RASonALL(cutoff, _) => {
                     let value = c.reverse_activity_sum(asg);
-                    if cutoff < value {
+                    if cutoff < value.min(c.rank_old as f64) {
                         perm.push(OrderedProxy::new(i, value));
                     }
                 }
@@ -1008,7 +1008,7 @@ impl ClauseDBIF for ClauseDB {
                 }
                 ReductionType::LBDonALL(cutoff, _) => {
                     let value = c.lbd();
-                    if cutoff < value {
+                    if cutoff < value.min(c.rank_old as f64) {
                         perm.push(OrderedProxy::new(i, value));
                     }
                 }
@@ -1016,9 +1016,9 @@ impl ClauseDBIF for ClauseDB {
         }
         let keep = match setting {
             ReductionType::RASonADD(size) => perm.len().saturating_sub(size),
-            ReductionType::RASonALL(_, scale) => (perm.len() as f64).powf(scale) as usize,
+            ReductionType::RASonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
             ReductionType::LBDonADD(size) => perm.len().saturating_sub(size),
-            ReductionType::LBDonALL(_, scale) => (perm.len() as f64).powf(scale) as usize,
+            ReductionType::LBDonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
         };
         self.reduction_threshold = match setting {
             ReductionType::RASonADD(_) | ReductionType::RASonALL(_, _) => {
