@@ -23,7 +23,7 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 
 #### Version 0.17.0
 
-- [SAT Competition 2021](https://satcompetition.github.io/2021/), [Benchmarks main truck](https://satcompetition.github.io/2021/benchmarks.html) -- splr-0.17.0 solved with a 300 sec timeout (this is one of the best of splr):
+- [SAT Competition 2021](https://satcompetition.github.io/2021/), [Benchmarks main track](https://satcompetition.github.io/2021/benchmarks.html) -- splr-0.17.0 solved with a 300 sec timeout (this is one of the best of splr):
   - 49 satisfiable problems: all the solutions were correct.
   - 34 unsatisfiable problems: all certifications were verified with [Grat toolchain](https://www21.in.tum.de/~lammich/grat/) or [drat-trim](https://github.com/marijnheule/drat-trim).
 
