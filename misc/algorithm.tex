@@ -24,19 +24,19 @@
     \If{a new stage begins}{
         REDUCE()\;
         update restart conditions\;
-    }
-    \If{a new cycle begins}{
-        VIVIFY()\;
-        select var phases\;
-    }
-    \If{a new segment begins}{
-        ELIMINATE()\;
-        rescale var activities\;
+        \If{a new cycle begins}{
+            VIVIFY()\;
+            select var phases\;
+            \If{a new segment begins}{
+                ELIMINATE()\;
+                rescale var activities\;
+            }
+        }
     }
   }
 }
 \Return{SAT}\;
 }
-\caption{Main search loop in Splr-0.15 (src/solver/search.rs)}
+\caption{Main search loop in Splr-0.17 (src/solver/search.rs)}
 \end{algorithm}
 \end{document}
