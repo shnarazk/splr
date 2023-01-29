@@ -25,9 +25,7 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 
 - [SAT Competition 2021](https://satcompetition.github.io/2021/), [Benchmarks main truck](https://satcompetition.github.io/2021/benchmarks.html) -- splr-0.17.0 solved with a 300 sec timeout (this is one of the best of splr):
   - 49 satisfiable problems: all the solutions were correct.
-  - 34 unsatisfiable problems: 33 certifications were verified with [Grat toolchain](https://www21.in.tum.de/~lammich/grat/). It failed on shift1add.26949.cnf due to bus rror. 
-
-
+  - 34 unsatisfiable problems: all certifications were verified with [Grat toolchain](https://www21.in.tum.de/~lammich/grat/) or [drat-trim](https://github.com/marijnheule/drat-trim).
 
 ## Install
 
@@ -139,7 +137,7 @@ unif-k3-r4.25-v360-c1530-S1028159446-096.cnf       360,1530 |time:   204.09
 s UNSATISFIABLE: cnfs/unif-k3-r4.25-v360-c1530-S1028159446-096.cnf
 ```
 
-#### A: Verify with drat-trim
+#### A: Verify with [drat-trim](https://github.com/marijnheule/drat-trim)
 
 ```plain
 $ drat-trim cnfs/unif-k3-r4.25-v360-c1530-S1028159446-096.cnf proof.drat
