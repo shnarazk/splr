@@ -308,7 +308,7 @@ pub enum ReductionType {
     /// weight by Literal Block Distance over the added clauses
     LBDonADD(usize),
     /// weight by Literal Block Distance over all learnt clauses
-    LBDonALL(f64, f64),
+    LBDonALL(u16, f64),
 }
 
 pub mod property {

@@ -242,7 +242,6 @@ fn search(
     let mut current_core: usize = 999_999;
     let mut core_was_rebuilt: Option<usize> = None;
     let stage_size: usize = 32;
-    let reducing_factor: f64 = 0.2;
     #[cfg(feature = "rephase")]
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
 
@@ -291,7 +290,13 @@ fn search(
                 {
                     state.exploration_rate_ema.update(1.0);
                     if cfg!(feature = "two_mode_reduction") {
-                        cdb.reduce(asg, ReductionType::LBDonALL(5.0, 0.05));
+                        cdb.reduce(
+                            asg,
+                            ReductionType::LBDonALL(
+                                state.config.cls_rdc_lbd,
+                                state.config.cls_rdc_rm2,
+                            ),
+                        );
                     }
                 }
                 #[cfg(feature = "rephase")]
@@ -374,7 +379,9 @@ fn search(
                     if cfg!(feature = "two_mode_reduction") {
                         cdb.reduce(
                             asg,
-                            ReductionType::RASonADD(state.stm.num_reducible(reducing_factor)),
+                            ReductionType::RASonADD(
+                                state.stm.num_reducible(state.config.cls_rdc_rm1),
+                            ),
                         );
                     }
                 }
@@ -383,7 +390,7 @@ fn search(
                 if !cfg!(feature = "two_mode_reduction") {
                     cdb.reduce(
                         asg,
-                        ReductionType::RASonADD(state.stm.num_reducible(reducing_factor)),
+                        ReductionType::RASonADD(state.stm.num_reducible(state.config.cls_rdc_rm1)),
                     );
                 }
             }

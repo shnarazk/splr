@@ -1007,9 +1007,9 @@ impl ClauseDBIF for ClauseDB {
                     perm.push(OrderedProxy::new(i, c.lbd()));
                 }
                 ReductionType::LBDonALL(cutoff, _) => {
-                    let value = c.lbd();
-                    if cutoff < value.min(c.rank_old as f64) {
-                        perm.push(OrderedProxy::new(i, value));
+                    let value = c.rank.min(c.rank_old);
+                    if cutoff < value {
+                        perm.push(OrderedProxy::new(i, value as f64));
                     }
                 }
             }

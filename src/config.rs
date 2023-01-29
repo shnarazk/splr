@@ -52,9 +52,16 @@ pub struct Config {
     pub use_log: bool,
 
     //
-    //## clause rewarding
+    //## clause management
     //
+    // clause reward dacay rate
     pub crw_dcy_rat: f64,
+    // clause reduction LBD threshold for mode 2: exploration
+    pub cls_rdc_lbd: u16,
+    // clause reduction ratio for mode 1: exploitation
+    pub cls_rdc_rm1: f64,
+    // clause reduction ratio for mode 2: exploration
+    pub cls_rdc_rm2: f64,
 
     //
     //## eliminator
@@ -101,6 +108,9 @@ impl Default for Config {
             use_log: false,
 
             crw_dcy_rat: 0.95,
+            cls_rdc_lbd: 5,
+            cls_rdc_rm1: 0.2,
+            cls_rdc_rm2: 0.05,
 
             enable_eliminator: !cfg!(feature = "no_clause_elimination"),
             elm_cls_lim: 64,
@@ -136,8 +146,8 @@ impl Config {
                 let flags = [
                     "no-color", "quiet", "certify", "journal", "log", "help", "version",
                 ];
-                let options_usize = ["cl", "stat", "ecl", "evl", "evo"];
-                let options_f64 = ["timeout", "cdr", "vdr", "vds"];
+                let options_usize = ["cl", "crl", "stat", "ecl", "evl", "evo"];
+                let options_f64 = ["timeout", "cdr", "cr1", "cr2", "vdr", "vds"];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
                 match seg.len() {
@@ -159,6 +169,7 @@ impl Config {
                                 if let Ok(val) = str.parse::<usize>() {
                                     match name {
                                         "cl" => self.c_cls_lim = val,
+                                        "crl" => self.cls_rdc_lbd = val as u16,
                                         "ecl" => self.elm_cls_lim = val,
                                         "evl" => self.elm_grw_lim = val,
                                         "evo" => self.elm_var_occ = val,
@@ -176,6 +187,8 @@ impl Config {
                                     match name {
                                         "timeout" => self.c_timeout = val,
                                         "cdr" => self.crw_dcy_rat = val,
+                                        "cr1" => self.cls_rdc_rm1 = val,
+                                        "cr2" => self.cls_rdc_rm2 = val,
                                         "vdr" => self.vrw_dcy_rat = val,
                                         "vds" => self.vrw_dcy_stp = val,
 
@@ -271,6 +284,8 @@ impl Config {
                 "stage-based re-phasing",
                 #[cfg(feature = "suppress_reason_chain")]
                 "suppress reason chain",
+                #[cfg(feature = "two_mode_reduction")]
+                "two-mode reduction",
                 #[cfg(feature = "trail_saving")]
                 "trail saving",
                 #[cfg(feature = "unsafe_access")]
@@ -323,31 +338,46 @@ FLAGS:
   -l, --log                 Uses Glucose-like progress report
   -V, --version             Prints version information
 OPTIONS:
-{}      --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
-  -t, --timeout <timeout>   CPU time limit in sec.         {:>10}
-      --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
+      --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
+{}{}{}{}      --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
       --evo <elm-var-occ>   Max #cls for var elimination   {:>10}
   -o, --dir <io-outdir>     Output directory                {:>10}
   -p, --proof <io-pfile>    DRAT Cert. filename                 {:>10}
-  -r, --result <io-rfile>   Result filename/stdout             {:>10}
+  -r, --result <io-rfile>   Result filename/stdout              {:>10}
+  -t, --timeout <timeout>   CPU time limit in sec.         {:>10}
       --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
 {}ARGS:
   <cnf-file>    DIMACS CNF file
 ",
+        config.c_cls_lim,
         OPTION!(
             "clause_rewarding",
             config.crw_dcy_rat,
-            "       -cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}\n"
+            "      --cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}\n"
         ),
-        config.c_cls_lim,
-        config.c_timeout,
+        OPTION!(
+            "two_mode_reduction",
+            config.cls_rdc_lbd,
+            "      --crl <cls-rdc-lbd>   Clause reduction LBD threshold {:>10}\n"
+        ),
+        OPTION!(
+            "two_mode_reduction",
+            config.cls_rdc_rm1,
+            "      --cr1 <cls-rdc-rm1>   Clause reduction ratio for mode1  {:>10.2}\n"
+        ),
+        OPTION!(
+            "two_mode_reduction",
+            config.cls_rdc_rm2,
+            "      --cr2 <cls-rdc-rm2>   Clause reduction ratio for mode2  {:>10.2}\n"
+        ),
         config.elm_cls_lim,
         config.elm_grw_lim,
         config.elm_var_occ,
         config.io_odir.to_string_lossy(),
         config.io_pfile.to_string_lossy(),
         config.io_rfile.to_string_lossy(),
+        config.c_timeout,
         config.vrw_dcy_rat,
         OPTION!(
             "EVSIDS",
