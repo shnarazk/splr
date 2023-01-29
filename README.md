@@ -283,6 +283,29 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 }
 ```
 
+#### sample code from my [sudoku solver](https://github.com/shnarazk/sudoku_sat/)
+
+https://github.com/shnarazk/sudoku_sat/blob/4490b4358e5f3b72803a566323a6c8c196627f92/src/bin/sudoku400.rs#L36-L60
+
+```rust
+    let mut solver = Solver::try_from((config, rules.as_ref())).expect("panic");
+    for a in setting.iter() {
+        solver.add_assignment(*a).expect("panic");
+    }
+    for ans in solver.iter().take(1) {
+        let mut picked = ans.iter().filter(|l| 0 < **l).collect::<Vec<&i32>>();
+        for _i in 1..=range {
+            for _j in 1..=range {
+                let (_i, _j, d, _b) = Cell::decode(*picked.remove(0));
+                print!("{:>2} ", d);
+            }
+            println!();
+        }
+        println!();
+    }
+}
+```
+
 ### Mnemonics used in the progress message
 
 | mnemonic     | meaning                                                                                   |
