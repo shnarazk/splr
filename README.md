@@ -342,7 +342,7 @@ https://github.com/shnarazk/sudoku_sat/blob/4490b4358e5f3b72803a566323a6c8c19662
 
 ```plain
 A modern CDCL SAT solver in Rust
-Activated features: best phase tracking, stage-based clause elimination, stage-based clause vivification, stage-based dynamic restart threshold, Learning-Rate Based rewarding, reason-side rewarding, stage-based re-phasing, trail saving, unsafe access
+Activated features: best phase tracking, stage-based clause elimination, stage-based clause vivification, stage-based dynamic restart threshold, Learning-Rate Based rewarding, reason-side rewarding, stage-based re-phasing, two-mode reduction, trail saving, unsafe access
 
 USAGE:
   splr [FLAGS] [OPTIONS] <cnf-file>
@@ -356,13 +356,16 @@ FLAGS:
   -V, --version             Prints version information
 OPTIONS:
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB)         0
-  -t, --timeout <timeout>   CPU time limit in sec.               5000
+      --crl <cls-rdc-lbd>   Clause reduction LBD threshold          5
+      --cr1 <cls-rdc-rm1>   Clause reduction ratio for mode1        0.20
+      --cr2 <cls-rdc-rm2>   Clause reduction ratio for mode2        0.05
       --ecl <elm-cls-lim>   Max #lit for clause subsume            64
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.         0
       --evo <elm-var-occ>   Max #cls for var elimination        20000
   -o, --dir <io-outdir>     Output directory                         .
   -p, --proof <io-pfile>    DRAT Cert. filename                 proof.drat
   -r, --result <io-rfile>   Result filename/stdout
+  -t, --timeout <timeout>   CPU time limit in sec.               5000
       --vdr <vrw-dcy-rat>   Var reward decay rate                   0.96
 ARGS:
   <cnf-file>    DIMACS CNF file
