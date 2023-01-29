@@ -21,11 +21,13 @@ Please check [ChangeLog](ChangeLog.md) about recent updates.
 
 Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results.
 
-#### Version 0.15.0
+#### Version 0.17.0
 
-- [SAT Competition 2021](https://satcompetition.github.io/2021/), [Benchmarks main truck](https://satcompetition.github.io/2021/benchmarks.html) -- splr-0.15.0 solved with a 300 sec timeout:
-  - 42 satisfiable problems: all the solutions were correct.
-  - 34 unsatisfiable problems: all the certifications were verified with [Grat toolchain](https://www21.in.tum.de/~lammich/grat/).
+- [SAT Competition 2021](https://satcompetition.github.io/2021/), [Benchmarks main truck](https://satcompetition.github.io/2021/benchmarks.html) -- splr-0.17.0 solved with a 300 sec timeout:
+  - 49 satisfiable problems: all the solutions were correct.
+  - 34 unsatisfiable problems: 33 the certifications were verified with [Grat toolchain](https://www21.in.tum.de/~lammich/grat/). It failed on shift1add.26949.cnf due to bus rror. 
+
+This is one of the best of splr.
 
 ## Install
 

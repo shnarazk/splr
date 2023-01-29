@@ -1,4 +1,4 @@
-## 0.17.0, 2022-12-??
+## 0.17.0, 2023-01-30
 
 - (Breaking change) `Certificate::try_from` returns `Ok` values even if a given vector
   contains empty clauses. All expressions corresponding to valid CNFs should be
