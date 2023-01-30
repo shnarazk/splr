@@ -240,6 +240,9 @@ pub fn handle_conflict(
     }
     state.c_lvl.update(conflicting_level as f64);
     state.b_lvl.update(assign_level as f64);
+    state
+        .e_mode
+        .update(conflicting_level as f64 - assign_level as f64);
     state.derive20.clear();
     Ok(rank)
 }
@@ -503,7 +506,7 @@ impl Lit {
         clear: &mut Vec<Lit>,
         levels: &[bool],
     ) -> bool {
-        if let AssignReason::Decision(_) = asg.reason(self.vi()) {
+        if matches!(asg.reason(self.vi()), AssignReason::Decision(_)) {
             return false;
         }
         let mut stack = vec![self];
@@ -580,7 +583,7 @@ fn lit_level(
     cdb: &ClauseDB,
     lit: Lit,
     bag: &mut Vec<Lit>,
-    mes: &str,
+    _mes: &str,
 ) -> DecisionLevel {
     if bag.contains(&lit) {
         return 0;
@@ -612,12 +615,12 @@ fn lit_level(
             cdb[cid]
                 .iter()
                 .skip(1)
-                .map(|l| lit_level(asg, cdb, !*l, bag, mes))
+                .map(|l| lit_level(asg, cdb, !*l, bag, _mes))
                 .max()
                 .unwrap()
         }
-        AssignReason::BinaryLink(b) => lit_level(asg, cdb, b, bag, mes),
-        AssignReason::None => panic!("One of root of {} isn't assigned.", lit),
+        AssignReason::BinaryLink(b) => lit_level(asg, cdb, b, bag, _mes),
+        AssignReason::None => panic!("One of root of {lit} isn't assigned."),
     }
 }
 
@@ -655,27 +658,26 @@ fn tracer(asg: &AssignStack, cdb: &ClauseDB) {
         if input.is_empty() {
             break;
         }
-        if let Ok(cid) = input.trim().parse::<usize>() {
-            if cid == 0 {
-                break;
-            }
-            println!(
-                "{}",
-                cdb[ClauseId::from(cid)]
-                    .report(asg)
-                    .iter()
-                    .map(|r| format!(
-                        " {}{:?}",
-                        asg.var(Lit::from(r.lit).vi())
-                            .is(FlagVar::CA_SEEN)
-                            .then(|| "S")
-                            .unwrap_or(" "),
-                        r
-                    ))
-                    .collect::<Vec<String>>()
-                    .join("\n"),
-            );
+        let Ok(cid) = input.trim().parse::<usize>() else { continue;};
+        if cid == 0 {
+            break;
         }
+        println!(
+            "{}",
+            cdb[ClauseId::from(cid)]
+                .report(asg)
+                .iter()
+                .map(|r| format!(
+                    " {}{:?}",
+                    asg.var(Lit::from(r.lit).vi())
+                        .is(FlagVar::CA_SEEN)
+                        .then(|| "S")
+                        .unwrap_or(" "),
+                    r
+                ))
+                .collect::<Vec<String>>()
+                .join("\n"),
+        );
     }
     panic!("done");
 }

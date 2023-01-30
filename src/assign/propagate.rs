@@ -1,9 +1,12 @@
 /// implement boolean constraint propagation, backjump
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{AssignIF, AssignStack, TrailSavingIF, VarHeapIF, VarManipulateIF},
+    super::{AssignIF, AssignStack, VarHeapIF, VarManipulateIF},
     crate::{cdb::ClauseDBIF, types::*},
 };
+
+#[cfg(feature = "trail_saving")]
+use super::TrailSavingIF;
 
 /// API for Boolean Constraint Propagation like
 /// [`propagate`](`crate::assign::PropagateIF::propagate`),
@@ -639,7 +642,7 @@ impl PropagateIF for AssignStack {
                 debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
                 let mut other_watch_value = lit_assign!(self, cached);
                 let mut updated_cache: Option<Lit> = None;
-                if let Some(true) = other_watch_value {
+                if matches!(other_watch_value, Some(true)) {
                     cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
                     check_in!(cid, Propagate::SandboxCacheSatisfied(self.num_conflict));
                     continue 'next_clause;
@@ -685,7 +688,7 @@ impl PropagateIF for AssignStack {
                             cdb[cid].search_from = (k as u16).saturating_add(1);
                             debug_assert!(
                                 self.assigned(!new_watch) == Some(true)
-                                    || self.assigned(!new_watch) == None
+                                    || self.assigned(!new_watch).is_none()
                             );
                             check_in!(
                                 cid,

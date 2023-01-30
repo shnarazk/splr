@@ -1,20 +1,18 @@
 /// main struct AssignStack
-#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
-use std::collections::HashMap;
 use {
     super::{
-        ema::ProgressASG, AssignIF, AssignStack, PropagateIF, TrailSavingIF, Var, VarHeapIF,
-        VarIdHeap, VarManipulateIF,
+        ema::ProgressASG, AssignIF, AssignStack, PropagateIF, Var, VarHeapIF, VarIdHeap,
+        VarManipulateIF,
     },
     crate::{cdb::ClauseDBIF, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
 
-#[cfg(not(feature = "no_IO"))]
-use std::{
-    fs::File,
-    io::{BufWriter, Write},
-};
+#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
+use std::collections::HashMap;
+
+#[cfg(feature = "trail_saving")]
+use super::TrailSavingIF;
 
 impl Default for AssignStack {
     fn default() -> AssignStack {
@@ -112,6 +110,9 @@ impl Instantiate for AssignStack {
 
             #[cfg(feature = "EVSIDS")]
             activity_decay: config.vrw_dcy_rat * 0.6,
+            #[cfg(not(feature = "EVSIDS"))]
+            activity_decay: config.vrw_dcy_rat,
+
             #[cfg(feature = "EVSIDS")]
             activity_decay_default: config.vrw_dcy_rat,
 
@@ -149,6 +150,7 @@ impl Instantiate for AssignStack {
             SolverEvent::Reinitialize => {
                 self.cancel_until(self.root_level);
                 debug_assert_eq!(self.decision_level(), self.root_level);
+                #[cfg(feature = "trail_saving")]
                 self.clear_saved_trail();
                 // self.num_eliminated_vars = self
                 //     .var
@@ -156,7 +158,7 @@ impl Instantiate for AssignStack {
                 //     .filter(|v| v.is(FlagVar::ELIMINATED))
                 //     .count();
             }
-            e => panic!("don't call asg with {:?}", e),
+            e => panic!("don't call asg with {e:?}"),
         }
     }
 }
@@ -201,6 +203,10 @@ impl AssignIF for AssignStack {
     }
     fn best_assigned(&mut self) -> Option<usize> {
         (self.build_best_at == self.num_propagation).then_some(self.num_vars - self.num_best_assign)
+    }
+    #[cfg(feature = "rephase")]
+    fn best_phases_invalid(&self) -> bool {
+        self.best_phases.is_empty()
     }
     #[allow(unused_variables)]
     fn extend_model(&mut self, cdb: &mut impl ClauseDBIF) -> Vec<Option<bool>> {
@@ -278,40 +284,6 @@ impl AssignIF for AssignStack {
             }
         }
         false
-    }
-    /// dump all active clauses and assertions as a CNF file.
-    #[cfg(not(feature = "no_IO"))]
-    fn dump_cnf(&mut self, cdb: &impl ClauseDBIF, fname: &str) {
-        for vi in 1..self.var.len() {
-            if self.var(vi).is(FlagVar::ELIMINATED) && self.assign[vi].is_some() {
-                panic!("conflicting var {} {:?}", vi, self.assign[vi]);
-            }
-        }
-        if let Ok(out) = File::create(&fname) {
-            let mut buf = BufWriter::new(out);
-            let nv = self.num_vars;
-            let na = self.len_upto(0);
-            // let nc: usize = cdb.derefer(cdb::property::Tusize::NumClause);
-            let nc = cdb.iter().skip(1).filter(|c| !c.is_dead()).count();
-
-            buf.write_all(format!("p cnf {} {}\n", nv, nc + na).as_bytes())
-                .unwrap();
-            for c in cdb.iter().skip(1) {
-                if c.is_dead() {
-                    continue;
-                }
-                for l in c.iter() {
-                    buf.write_all(format!("{} ", i32::from(*l)).as_bytes())
-                        .unwrap();
-                }
-                buf.write_all(b"0\n").unwrap();
-            }
-            buf.write_all(b"c from trail\n").unwrap();
-            for x in self.trail.iter().take(self.len_upto(0)) {
-                buf.write_all(format!("{} 0\n", i32::from(*x)).as_bytes())
-                    .unwrap();
-            }
-        }
     }
 }
 

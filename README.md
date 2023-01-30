@@ -21,11 +21,11 @@ Please check [ChangeLog](ChangeLog.md) about recent updates.
 
 Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results.
 
-#### Version 0.15.0
+#### Version 0.17.0
 
-- [SAT Competition 2021](https://satcompetition.github.io/2021/), [Benchmarks main truck](https://satcompetition.github.io/2021/benchmarks.html) -- splr-0.15.0 solved with a 300 sec timeout:
-  - 42 satisfiable problems: all the solutions were correct.
-  - 34 unsatisfiable problems: all the certifications were verified with [Grat toolchain](https://www21.in.tum.de/~lammich/grat/).
+- [SAT Competition 2021](https://satcompetition.github.io/2021/), [Benchmarks main track](https://satcompetition.github.io/2021/benchmarks.html) -- splr-0.17.0 solved with a 300 sec timeout (this is one of the best of splr):
+  - 49 satisfiable problems: all the solutions were correct.
+  - 34 unsatisfiable problems: all certifications were verified with [Grat toolchain](https://www21.in.tum.de/~lammich/grat/) or [drat-trim](https://github.com/marijnheule/drat-trim).
 
 ## Install
 
@@ -137,7 +137,7 @@ unif-k3-r4.25-v360-c1530-S1028159446-096.cnf       360,1530 |time:   204.09
 s UNSATISFIABLE: cnfs/unif-k3-r4.25-v360-c1530-S1028159446-096.cnf
 ```
 
-#### A: Verify with drat-trim
+#### A: Verify with [drat-trim](https://github.com/marijnheule/drat-trim)
 
 ```plain
 $ drat-trim cnfs/unif-k3-r4.25-v360-c1530-S1028159446-096.cnf proof.drat
@@ -283,6 +283,29 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 }
 ```
 
+#### sample code from my [sudoku solver](https://github.com/shnarazk/sudoku_sat/)
+
+https://github.com/shnarazk/sudoku_sat/blob/4490b4358e5f3b72803a566323a6c8c196627f92/src/bin/sudoku400.rs#L36-L60
+
+```rust
+    let mut solver = Solver::try_from((config, rules.as_ref())).expect("panic");
+    for a in setting.iter() {
+        solver.add_assignment(*a).expect("panic");
+    }
+    for ans in solver.iter().take(1) {
+        let mut picked = ans.iter().filter(|l| 0 < **l).collect::<Vec<&i32>>();
+        for _i in 1..=range {
+            for _j in 1..=range {
+                let (_i, _j, d, _b) = Cell::decode(*picked.remove(0));
+                print!("{:>2} ", d);
+            }
+            println!();
+        }
+        println!();
+    }
+}
+```
+
 ### Mnemonics used in the progress message
 
 | mnemonic     | meaning                                                                                   |
@@ -319,7 +342,7 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 
 ```plain
 A modern CDCL SAT solver in Rust
-Activated features: best phase tracking, stage-based clause elimination, stage-based clause vivification, stage-based dynamic restart threshold, Learning-Rate Based rewarding, reason-side rewarding, stage-based re-phasing, trail saving, unsafe access
+Activated features: best phase tracking, stage-based clause elimination, stage-based clause vivification, stage-based dynamic restart threshold, Learning-Rate Based rewarding, reason-side rewarding, stage-based re-phasing, two-mode reduction, trail saving, unsafe access
 
 USAGE:
   splr [FLAGS] [OPTIONS] <cnf-file>
@@ -333,13 +356,16 @@ FLAGS:
   -V, --version             Prints version information
 OPTIONS:
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB)         0
-  -t, --timeout <timeout>   CPU time limit in sec.               5000
+      --crl <cls-rdc-lbd>   Clause reduction LBD threshold          5
+      --cr1 <cls-rdc-rm1>   Clause reduction ratio for mode1        0.20
+      --cr2 <cls-rdc-rm2>   Clause reduction ratio for mode2        0.05
       --ecl <elm-cls-lim>   Max #lit for clause subsume            64
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.         0
       --evo <elm-var-occ>   Max #cls for var elimination        20000
   -o, --dir <io-outdir>     Output directory                         .
   -p, --proof <io-pfile>    DRAT Cert. filename                 proof.drat
   -r, --result <io-rfile>   Result filename/stdout
+  -t, --timeout <timeout>   CPU time limit in sec.               5000
       --vdr <vrw-dcy-rat>   Var reward decay rate                   0.96
 ARGS:
   <cnf-file>    DIMACS CNF file
@@ -347,7 +373,7 @@ ARGS:
 
 ## Solver description
 
-Splr-0.15.0 adopts the following features by default:
+Splr-0.17.0 adopts the following features by default:
 
 - Learning-rate based (LRB) var rewarding and clause rewarding[4]
 - Reason-side var rewarding[4]
@@ -360,12 +386,13 @@ Splr-0.15.0 adopts the following features by default:
   - re-configuration of var phases and var activities
   - re-configuration of trail saving extended with reason refinement based on clause quality[3].
 
-Splr-0.15.0 discarded various dynamic and heuristic-based control schemes used in 0.14.0.
-The following figure shows the details.
+(Splr-0.15.0 and upper try to discard various dynamic and heuristic-based control schemes used in the previous versions.)
 
-![search algorithm in Splr 0.14](https://user-images.githubusercontent.com/997855/161426178-8264d3e2-e68a-4d64-86b4-906155a51039.png)
+The following figure explains the flow used in the latest Splr.
 
-Note: I use the following terms here:
+![search algorithm in Splr 0.17](https://user-images.githubusercontent.com/997855/215309646-1bfe3ea5-dcc3-42ee-9d76-99e1b07610c4.png)
+
+I use the following terms here:
 - _a stage_ -- a span in which solver uses the same restart parameters
 - _a cycle_ -- a group of continuos spans of which the corresponding Luby values make a non-decreasing sequence
 - _a segment_ -- a group of continuos cycles which are separated by new maximum Luby values' occurrences

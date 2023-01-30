@@ -20,12 +20,7 @@ mod trail_saving;
 /// var struct and its methods
 mod var;
 
-pub use self::{
-    propagate::PropagateIF, property::*, select::VarSelectIF, trail_saving::TrailSavingIF,
-    var::VarManipulateIF,
-};
-#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
-use std::collections::HashMap;
+pub use self::{propagate::PropagateIF, property::*, select::VarSelectIF, var::VarManipulateIF};
 use {
     self::{
         ema::ProgressASG,
@@ -34,6 +29,12 @@ use {
     crate::{cdb::ClauseDBIF, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
+
+#[cfg(feature = "trail_saving")]
+pub use self::trail_saving::TrailSavingIF;
+
+#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
+use std::collections::HashMap;
 
 /// API about assignment like
 /// [`decision_level`](`crate::assign::AssignIF::decision_level`),
@@ -76,12 +77,13 @@ pub trait AssignIF:
     /// return a reference to `level`.
     fn level_ref(&self) -> &[DecisionLevel];
     fn best_assigned(&mut self) -> Option<usize>;
+    /// return `true` if no best_phases
+    #[cfg(feature = "rephase")]
+    fn best_phases_invalid(&self) -> bool;
     /// inject assignments for eliminated vars.
     fn extend_model(&mut self, c: &mut impl ClauseDBIF) -> Vec<Option<bool>>;
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
-    /// dump the status as a CNF
-    fn dump_cnf(&mut self, cdb: &impl ClauseDBIF, fname: &str);
 }
 
 /// Reasons of assignments
@@ -102,8 +104,8 @@ impl fmt::Display for AssignReason {
         match self {
             &AssignReason::BinaryLink(_) => write!(f, "Implied by a binary clause"),
             AssignReason::Decision(0) => write!(f, "Asserted"),
-            AssignReason::Decision(lvl) => write!(f, "Decided at level {}", lvl),
-            AssignReason::Implication(cid) => write!(f, "Implied by {}", cid),
+            AssignReason::Decision(lvl) => write!(f, "Decided at level {lvl}"),
+            AssignReason::Implication(cid) => write!(f, "Implied by {cid}"),
             AssignReason::None => write!(f, "Not assigned"),
         }
     }
@@ -116,7 +118,7 @@ pub struct Var {
     flags: FlagVar,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
     reward: f64,
-
+    // reward_ema: Ema2,
     #[cfg(feature = "boundary_check")]
     pub propagated_at: usize,
     #[cfg(feature = "boundary_check")]
@@ -350,6 +352,30 @@ pub mod property {
                 }
                 Tusize::NumUnreachableVar => self.num_vars - self.num_best_assign,
                 Tusize::RootLevel => self.root_level as usize,
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub enum Tf64 {
+        AverageVarActivity,
+        CurrentWorkingSetSize,
+        VarDecayRate,
+    }
+
+    pub const F64S: [Tf64; 3] = [
+        Tf64::AverageVarActivity,
+        Tf64::CurrentWorkingSetSize,
+        Tf64::VarDecayRate,
+    ];
+
+    impl PropertyDereference<Tf64, f64> for AssignStack {
+        #[inline]
+        fn derefer(&self, k: Tf64) -> f64 {
+            match k {
+                Tf64::AverageVarActivity => 0.0,    // self.activity_averaged,
+                Tf64::CurrentWorkingSetSize => 0.0, // self.cwss,
+                Tf64::VarDecayRate => self.activity_decay,
             }
         }
     }

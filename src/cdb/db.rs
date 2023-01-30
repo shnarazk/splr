@@ -4,7 +4,8 @@ use {
         ema::ProgressLBD,
         property,
         watch_cache::*,
-        BinaryLinkDB, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId, RefClause,
+        BinaryLinkDB, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId, ReductionType,
+        RefClause,
     },
     crate::{assign::AssignIF, types::*},
     std::{
@@ -13,6 +14,9 @@ use {
         slice::{Iter, IterMut},
     },
 };
+
+#[cfg(not(feature = "no_IO"))]
+use std::{fs::File, io::Write, path::Path};
 
 impl Default for ClauseDB {
     fn default() -> ClauseDB {
@@ -45,6 +49,7 @@ impl Default for ClauseDB {
             num_reduction: 0,
             num_reregistration: 0,
             lb_entanglement: Ema2::new(1_000).with_slow(80_000).with_value(2.0),
+            reduction_threshold: 0.0,
             eliminated_permanent: Vec::new(),
         }
     }
@@ -250,7 +255,7 @@ impl ClauseDBIF for ClauseDB {
     ) -> RefClause {
         debug_assert!(!vec.is_empty());
         debug_assert!(1 < vec.len());
-        debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{:?}", vec,);
+        debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{vec:?}");
         if vec.len() == 2 {
             if let Some(&cid) = self.link_to_cid(vec[0], vec[1]) {
                 self.num_reregistration += 1;
@@ -517,7 +522,7 @@ impl ClauseDBIF for ClauseDB {
             return RefClause::UnitClause(lits[0]);
         }
 
-        (*c).search_from = 2;
+        c.search_from = 2;
         let mut new_lits: Vec<Lit> = lits
             .iter()
             .filter(|&l| *l != p)
@@ -799,7 +804,10 @@ impl ClauseDBIF for ClauseDB {
                 binary_link.add(l0, l1, cid);
                 std::mem::swap(&mut c.lits, &mut new_lits);
                 self.num_bi_clause += 1;
-                c.turn_off(FlagClause::LEARNT);
+                if c.is(FlagClause::LEARNT) {
+                    self.num_learnt -= 1;
+                    c.turn_off(FlagClause::LEARNT);
+                }
 
                 if certification_store.is_active() {
                     certification_store.add_clause(&c.lits);
@@ -936,37 +944,13 @@ impl ClauseDBIF for ClauseDB {
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
         impl Clause {
-            fn pure_weight(&self, asg: &mut impl AssignIF) -> f64 {
-                let act_v = self
-                    .iter()
-                    .fold(0.0f64, |acc, l| acc.max(asg.activity(l.vi())));
-
-                #[cfg(feature = "clause_rewarding")]
-                let act_c = self.reward;
-                #[cfg(not(feature = "clause_rewarding"))]
-                let act_c = 0.25;
-
-                self.rank as f64 / (act_c + act_v)
+            fn reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
+                self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
             }
-            #[cfg(feature = "just_used")]
-            fn weight(&mut self, asg: &mut impl AssignIF) -> f64 {
-                let w = c.pure_weight(asg);
-                if self.is(FlagClause::USED) {
-                    self.turn_off(FlagClause::USED);
-                    0.8 * w
-                } else {
-                    w
-                }
-            }
-            #[cfg(not(feature = "just_used"))]
-            fn weight(&self, asg: &mut impl AssignIF) -> f64 {
-                self.pure_weight(asg)
-            }
-            // copied from vivify.rs
-            fn is_vivify_target(&self) -> bool {
-                self.rank * 2 <= self.rank_old
+            fn lbd(&self) -> f64 {
+                self.rank as f64
             }
         }
         let ClauseDB {
@@ -983,6 +967,7 @@ impl ClauseDBIF for ClauseDB {
         *num_reduction += 1;
 
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
+        let mut alives = 0;
         for (i, c) in clause
             .iter_mut()
             .enumerate()
@@ -1007,24 +992,45 @@ impl ClauseDBIF for ClauseDB {
             if !c.is(FlagClause::LEARNT) {
                 continue;
             }
-            perm.push(OrderedProxy::new(i, c.weight(asg)));
-        }
-        // let keep = perm.len().min(nc) / portion;
-        let keep = perm.len().saturating_sub(portion + 1);
-        if perm.is_empty() {
-            return;
-        }
-        perm.sort();
-        // Worse half of `perm` should be discarded now. But many people thought
-        // there're exception. Since this is the pre-stage of clause vivification,
-        // we want keep usefull clauses as many as possible.
-        // Therefore I save the clauses which will become vivification targets.
-        let thr = (self.lb_entanglement.get_slow() + 1.0).min(self.lbd.get_fast().max(5.0)) as u16;
-        for i in &perm[keep..] {
-            let c = &self.clause[i.to()];
-            if !c.is_vivify_target() || thr < c.rank {
-                self.remove_clause(ClauseId::from(i.to()));
+            alives += 1;
+            match setting {
+                ReductionType::RASonADD(_) => {
+                    perm.push(OrderedProxy::new(i, c.reverse_activity_sum(asg)));
+                }
+                ReductionType::RASonALL(cutoff, _) => {
+                    let value = c.reverse_activity_sum(asg);
+                    if cutoff < value.min(c.rank_old as f64) {
+                        perm.push(OrderedProxy::new(i, value));
+                    }
+                }
+                ReductionType::LBDonADD(_) => {
+                    perm.push(OrderedProxy::new(i, c.lbd()));
+                }
+                ReductionType::LBDonALL(cutoff, _) => {
+                    let value = c.rank.min(c.rank_old);
+                    if cutoff < value {
+                        perm.push(OrderedProxy::new(i, value as f64));
+                    }
+                }
             }
+        }
+        let keep = match setting {
+            ReductionType::RASonADD(size) => perm.len().saturating_sub(size),
+            ReductionType::RASonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
+            ReductionType::LBDonADD(size) => perm.len().saturating_sub(size),
+            ReductionType::LBDonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
+        };
+        self.reduction_threshold = match setting {
+            ReductionType::RASonADD(_) | ReductionType::RASonALL(_, _) => {
+                keep as f64 / alives as f64
+            }
+            ReductionType::LBDonADD(_) | ReductionType::LBDonALL(_, _) => {
+                -(keep as f64) / alives as f64
+            }
+        };
+        perm.sort();
+        for i in perm.iter().skip(keep) {
+            self.remove_clause(ClauseId::from(i.to()));
         }
     }
     fn reset(&mut self) {
@@ -1074,6 +1080,7 @@ impl ClauseDBIF for ClauseDB {
         }
         None
     }
+    #[allow(clippy::unnecessary_cast)]
     fn minimize_with_bi_clauses(&mut self, asg: &impl AssignIF, vec: &mut Vec<Lit>) {
         if vec.len() <= 1 {
             return;
@@ -1187,6 +1194,37 @@ impl ClauseDBIF for ClauseDB {
     #[cfg(feature = "boundary_check")]
     fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool> {
         self[cid].is_dead().then(|| self.freelist.contains(&cid))
+    }
+    #[cfg(not(feature = "no_IO"))]
+    /// dump all active clauses and assertions as a CNF file.
+    fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path) {
+        let nv = asg.derefer(crate::assign::property::Tusize::NumVar);
+        for vi in 1..nv {
+            if asg.var(vi).is(FlagVar::ELIMINATED) && asg.assign(vi).is_some() {
+                panic!("conflicting var {} {:?}", vi, asg.assign(vi));
+            }
+        }
+        let Ok(out) = File::create(fname) else { return; };
+        let mut buf = std::io::BufWriter::new(out);
+        let na = asg.derefer(crate::assign::property::Tusize::NumAssertedVar);
+        let nc = self.iter().skip(1).filter(|c| !c.is_dead()).count();
+        buf.write_all(format!("p cnf {} {}\n", nv, nc + na).as_bytes())
+            .unwrap();
+        for c in self.iter().skip(1) {
+            if c.is_dead() {
+                continue;
+            }
+            for l in c.iter() {
+                buf.write_all(format!("{} ", i32::from(*l)).as_bytes())
+                    .unwrap();
+            }
+            buf.write_all(b"0\n").unwrap();
+        }
+        buf.write_all(b"c from trail\n").unwrap();
+        for x in asg.stack_iter().take(asg.len_upto(0)) {
+            buf.write_all(format!("{} 0\n", i32::from(*x)).as_bytes())
+                .unwrap();
+        }
     }
 }
 

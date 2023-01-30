@@ -27,6 +27,7 @@ pub trait StateIF {
     fn progress<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
+            + PropertyDereference<assign::property::Tf64, f64>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
             + PropertyDereference<cdb::property::Tf64, f64>
@@ -51,6 +52,8 @@ pub enum Stat {
     Simplify,
     /// the number of subsumed clause by processor
     SubsumedClause,
+    /// for SLS
+    SLS,
     /// don't use this dummy (sentinel at the tail).
     EndOfStatIndex,
 }
@@ -105,13 +108,19 @@ pub struct State {
     pub b_lvl: Ema,
     /// EMA of conflicting levels
     pub c_lvl: Ema,
+    /// EMA of c_lbd - b_lbd, or Exploration vs. Eploitation
+    pub e_mode: Ema2,
+    pub e_mode_threshold: f64,
+    pub exploration_rate_ema: Ema,
 
     #[cfg(feature = "support_user_assumption")]
     /// hold conflicting user-defined *assumed* literals for UNSAT problems
     pub conflicts: Vec<Lit>,
 
+    #[cfg(feature = "chronoBT")]
     /// chronoBT threshold
     pub chrono_bt_threshold: DecisionLevel,
+
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
     /// working place to build learnt clauses
@@ -122,6 +131,8 @@ pub struct State {
     pub progress_cnt: usize,
     /// keep the previous statistics values
     pub record: ProgressRecord,
+    /// progress of SLS
+    pub sls_index: usize,
     /// start clock for timeout handling
     pub start: Instant,
     /// upper limit for timeout handling
@@ -143,15 +154,22 @@ impl Default for State {
 
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
+            e_mode: Ema2::new(40).with_slow(4_000).with_value(10.0),
+            e_mode_threshold: 1.20,
+            exploration_rate_ema: Ema::new(1000),
 
             #[cfg(feature = "support_user_assumption")]
             conflicts: Vec::new(),
+
+            #[cfg(feature = "chronoBT")]
             chrono_bt_threshold: 100,
+
             last_asg: 0,
             new_learnt: Vec::new(),
             derive20: Vec::new(),
             progress_cnt: 0,
             record: ProgressRecord::default(),
+            sls_index: 0,
             start: Instant::now(),
             time_limit: 0.0,
             log_messages: Vec::new(),
@@ -246,6 +264,27 @@ macro_rules! im {
             }
         }
     };
+    ($format: expr, $state: expr, $key: expr, $val: expr, $threshold: expr) => {
+        match ($val, $key) {
+            (v, LogUsizeId::End) => format!($format, v),
+            (v, k) => {
+                let ptr = &mut $state.record[k];
+                if $state.config.no_color {
+                    *ptr = v;
+                    format!($format, *ptr)
+                } else if v < $threshold {
+                    *ptr = v;
+                    format!("\x1B[031m{}\x1B[000m", format!($format, *ptr))
+                } else if $threshold < v {
+                    *ptr = v;
+                    format!("\x1B[036m{}\x1B[000m", format!($format, *ptr))
+                } else {
+                    *ptr = v;
+                    format!($format, *ptr)
+                }
+            }
+        }
+    };
 }
 
 macro_rules! i {
@@ -280,6 +319,27 @@ macro_rules! fm {
                     *ptr = v;
                     format!("\x1B[001m\x1B[036m{}\x1B[000m", format!($format, *ptr))
                 } else if *ptr < v {
+                    *ptr = v;
+                    format!("\x1B[036m{}\x1B[000m", format!($format, *ptr))
+                } else {
+                    *ptr = v;
+                    format!($format, *ptr)
+                }
+            }
+        }
+    };
+    ($format: expr, $state: expr, $key: expr, $val: expr, $threshold: expr) => {
+        match ($val, $key) {
+            (v, LogF64Id::End) => format!($format, v),
+            (v, k) => {
+                let ptr = &mut $state.record[k];
+                if $state.config.no_color {
+                    *ptr = v;
+                    format!($format, *ptr)
+                } else if v < $threshold {
+                    *ptr = v;
+                    format!("\x1B[031m{}\x1B[000m", format!($format, *ptr))
+                } else if $threshold < v {
                     *ptr = v;
                     format!("\x1B[036m{}\x1B[000m", format!($format, *ptr))
                 } else {
@@ -325,7 +385,7 @@ impl StateIF for State {
         }
         if 0 == self.progress_cnt {
             self.progress_cnt = 1;
-            println!("{}", self);
+            println!("{self}");
 
             //## PROGRESS REPORT ROWS
             for _i in 0..PROGRESS_REPORT_ROWS - 1 {
@@ -368,6 +428,7 @@ impl StateIF for State {
     fn progress<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
+            + PropertyDereference<assign::property::Tf64, f64>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
             + PropertyDereference<cdb::property::Tf64, f64>
@@ -391,7 +452,7 @@ impl StateIF for State {
         let asg_num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
         let asg_num_decision = asg.derefer(assign::property::Tusize::NumDecision);
         let asg_num_propagation = asg.derefer(assign::property::Tusize::NumPropagation);
-
+        // let asg_cwss: f64 = asg.derefer(assign::property::Tf64::CurrentWorkingSetSize);
         let asg_dpc_ema = asg.refer(assign::property::TEma::DecisionPerConflict);
         let asg_ppc_ema = asg.refer(assign::property::TEma::PropagationPerConflict);
         let asg_cpr_ema = asg.refer(assign::property::TEma::ConflictPerRestart);
@@ -414,21 +475,21 @@ impl StateIF for State {
         self.progress_cnt += 1;
         // print!("\x1B[9A\x1B[1G");
         print!("\x1B[");
-        print!("{}", PROGRESS_REPORT_ROWS);
+        print!("{PROGRESS_REPORT_ROWS}");
         print!("A\x1B[1G");
 
         if self.config.show_journal {
             while let Some(m) = self.log_messages.pop() {
                 if self.config.no_color {
-                    println!("{}", m);
+                    println!("{m}");
                 } else {
-                    println!("\x1B[2K\x1B[000m\x1B[034m{}\x1B[000m", m);
+                    println!("\x1B[2K\x1B[000m\x1B[034m{m}\x1B[000m");
                 }
             }
         } else {
             self.log_messages.clear();
         }
-        println!("\x1B[2K{}", self);
+        println!("\x1B[2K{self}");
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{}",
             i!("{:>11}", self, LogUsizeId::NumConflict, asg_num_conflict),
@@ -512,18 +573,19 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|vivC:{}, subC:{}, core:{}, /ppc:{}",
+            "\x1B[2K        misc|vivC:{}, xplr:{}, core:{}, /ppc:{}",
             im!(
                 "{:>9}",
                 self,
                 LogUsizeId::VivifiedClause,
                 self[Stat::VivifiedClause]
             ),
-            im!(
-                "{:>9}",
+            fm!(
+                "{:>9.4}",
                 self,
-                LogUsizeId::SubsumedClause,
-                self[Stat::SubsumedClause]
+                LogF64Id::ExExTrend,
+                // self.e_mode.trend(),
+                self.exploration_rate_ema.get() // , self.e_mode_threshold
             ),
             im!(
                 "{:>9}",
@@ -621,23 +683,16 @@ impl fmt::Display for State {
         let mut fname = match &self.target.pathname {
             CNFIndicator::Void => "(no cnf)".to_string(),
             CNFIndicator::File(f) => f.to_string(),
-            CNFIndicator::LitVec(n) => format!("(embedded {} element vector)", n),
+            CNFIndicator::LitVec(n) => format!("(embedded {n} element vector)"),
         };
         if width <= fname.len() {
             fname.truncate(58 - vclen);
         }
         let fnlen = fname.len();
         if width < vclen + fnlen + 1 {
-            write!(f, "{:<w$} |time:{:>9.2}", fname, tm, w = width)
+            write!(f, "{fname:<width$} |time:{tm:>9.2}")
         } else {
-            write!(
-                f,
-                "{}{:>w$} |time:{:>9.2}",
-                fname,
-                &vc,
-                tm,
-                w = width - fnlen,
-            )
+            write!(f, "{fname}{:>w$} |time:{tm:>9.2}", &vc, w = width - fnlen,)
         }
     }
 }
@@ -835,6 +890,11 @@ pub enum LogUsizeId {
     VivifiedVar,
     Vivify,
 
+    //
+    //## Stochastic Local Search
+    //
+    SLS,
+
     // the sentinel
     End,
 }
@@ -851,11 +911,13 @@ pub enum LogF64Id {
     TrendLBD,
     BLevel,
     CLevel,
+    ExExTrend,
     DecisionPerConflict,
     ConflictPerRestart,
     PropagationPerConflict,
     LiteralBlockEntanglement,
     RestartEnergy,
+
     End,
 }
 

@@ -10,6 +10,8 @@ mod clause;
 mod db;
 /// EMA
 mod ema;
+/// methods for Stochastic Local Search
+mod sls;
 /// methods for UNSAT certification
 mod unsat_certificate;
 /// implementation of clause vivification
@@ -21,9 +23,11 @@ pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
     cid::ClauseIdIF,
     property::*,
+    sls::StochasticLocalSearchIF,
     unsat_certificate::CertificationStore,
     vivify::VivifyIF,
 };
+
 use {
     self::ema::ProgressLBD,
     crate::{assign::AssignIF, types::*},
@@ -34,6 +38,9 @@ use {
     },
     watch_cache::*,
 };
+
+#[cfg(not(feature = "no_IO"))]
+use std::path::Path;
 
 /// API for Clause, providing literal accessors.
 pub trait ClauseIF {
@@ -131,7 +138,7 @@ pub trait ClauseDBIF:
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, portion: usize);
+    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType);
     /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.
@@ -170,6 +177,9 @@ pub trait ClauseDBIF:
     fn watch_caches(&self, cid: ClauseId, message: &str) -> (Vec<Lit>, Vec<Lit>);
     #[cfg(feature = "boundary_check")]
     fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool>;
+    #[cfg(not(feature = "no_IO"))]
+    /// dump all active clauses and assertions as a CNF file.
+    fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);
 }
 
 /// Clause identifier, or clause index, starting with one.
@@ -279,12 +289,26 @@ pub struct ClauseDB {
     num_reregistration: usize,
     /// Literal Block Entanglement
     /// EMA of LBD of clauses used in conflict analysis (dependency graph)
-    pub lb_entanglement: Ema2,
+    lb_entanglement: Ema2,
+    /// cutoff value used in the last `reduce`
+    reduction_threshold: f64,
 
     //
     //## incremental solving
     //
     pub eliminated_permanent: Vec<Vec<Lit>>,
+}
+
+#[derive(Clone, Debug)]
+pub enum ReductionType {
+    /// weight by Reverse Activity Sum over the added clauses
+    RASonADD(usize),
+    /// weight by Reverse Activito Sum over all learnt clauses
+    RASonALL(f64, f64),
+    /// weight by Literal Block Distance over the added clauses
+    LBDonADD(usize),
+    /// weight by Literal Block Distance over all learnt clauses
+    LBDonALL(u16, f64),
 }
 
 pub mod property {
@@ -341,9 +365,14 @@ pub mod property {
     pub enum Tf64 {
         LiteralBlockDistance,
         LiteralBlockEntanglement,
+        ReductionThreshold,
     }
 
-    pub const F64: [Tf64; 2] = [Tf64::LiteralBlockDistance, Tf64::LiteralBlockEntanglement];
+    pub const F64: [Tf64; 3] = [
+        Tf64::LiteralBlockDistance,
+        Tf64::LiteralBlockEntanglement,
+        Tf64::ReductionThreshold,
+    ];
 
     impl PropertyDereference<Tf64, f64> for ClauseDB {
         #[inline]
@@ -351,6 +380,7 @@ pub mod property {
             match k {
                 Tf64::LiteralBlockDistance => self.lbd.get(),
                 Tf64::LiteralBlockEntanglement => self.lb_entanglement.get(),
+                Tf64::ReductionThreshold => self.reduction_threshold,
             }
         }
     }

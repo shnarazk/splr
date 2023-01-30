@@ -339,8 +339,7 @@ impl Eliminator {
             let v = &mut asg.var_mut(vi);
             debug_assert!(
                 !checked.contains(&vi),
-                "eliminator::add_cid_occur356: {:?}",
-                c,
+                "eliminator::add_cid_occur356: {c:?}"
             );
             checked.push(vi);
             let w = &mut self[l.vi()];
