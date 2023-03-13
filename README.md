@@ -419,4 +419,4 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 ---
 
-2020-2022, Narazaki Shuji
+2020-2023, Narazaki Shuji
