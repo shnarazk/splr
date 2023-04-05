@@ -233,12 +233,14 @@ splr = { version = "^0.17", features = ["incremental_solver"] }
 Under this configuration, module `splr` provides some more functions:
 
 - `splr::Solver::reset(&mut self)`
-- `splr::Solver::add_var(&mut self)`
-- `splr::Solver::add_clause(&mut self, vec: AsRef<[i32]>)`
+- `splr::Solver::add_var(&mut self)` // increments the last variable number
+- `splr::Solver::add_clause(&mut self, vec: AsRef<[i32]>) -> Result<&mut Solver, SolverError>`
 
 You have to call `reset` before calling `add_var`, `add_clause`, and `solve` again.
 By this, splr forgets everything about the previous formula, especially non-equivalent transformations by pre/inter-processors like clause subsumbtion.
 So technically splr is not an incremental solver.
+
+'add_clause' will emit an error if `vec` is invalid.
 
 ```rust
 use splr::*;
