@@ -223,7 +223,22 @@ fn main() {
 }
 ```
 
-### All solutions SAT solver
+### All solutions SAT solver as an application of 'incremental_solver' feature
+
+The following example requires 'incremental_solver' feature. You need the following dependeny:
+
+```toml
+splr = { version = "^0.17", features = ["incremental_solver"] }
+```
+Under this configuration, module `splr` provides some more functions:
+
+- `splr::Solver::reset(&mut self)`
+- `splr::Solver::add_var(&mut self)`
+- `splr::Solver::add_clause(&mut self, vec: AsRef<[i32]>)`
+
+You have to call `reset` before calling `add_var`, `add_clause`, and `solve` again.
+By this, splr forgets everything about the previous formula, especially non-equivalent transformations by pre/inter-processors like clause subsumbtion.
+So technically splr is not an incremental solver.
 
 ```rust
 use splr::*;
