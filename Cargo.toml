@@ -14,7 +14,7 @@ default-run = "splr"
 rust-version = "1.65"
 
 [dependencies]
-bitflags = "^1.3"
+bitflags = "^2.1"
 
 [features]
 default = [
