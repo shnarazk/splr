@@ -112,8 +112,8 @@ macro_rules! unset_assign {
 }
 
 enum PropagationContext {
-    Conflict(ClauseId, bool, Option<Lit>),
-    Satisfied(ClauseId),
+    Conflict(ClauseId, Lit, bool, Option<Lit>),
+    Satisfied(ClauseId, Option<Lit>),
     UnitPropagation(ClauseId, Lit, bool, Option<Lit>),
     UpdateWatch(ClauseId, Lit, usize, usize),
 }
@@ -333,10 +333,10 @@ impl PropagateIF for AssignStack {
     ///    So Eliminator should call `garbage_collect` before me.
     ///  - The order of literals in binary clauses will be modified to hold
     ///    propagation order.
-    fn propagate_p(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
+    fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
         self.propagate_parallel(cdb)
     }
-    fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
+    fn propagate_p(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
         #[cfg(feature = "boundary_check")]
         macro_rules! check_in {
             ($cid: expr, $tag :expr) => {
@@ -886,7 +886,7 @@ impl AssignStack {
             {
                 let c = &cdb[cid];
                 match self.build_propagatation_context(false_lit, cid, c, cached) {
-                    PropagationContext::Conflict(cid, flip_watches, cache) => {
+                    PropagationContext::Conflict(cid, cached, flip_watches, cache) => {
                         if flip_watches {
                             cdb.swap_watch(cid);
                         }
@@ -894,9 +894,9 @@ impl AssignStack {
                         check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, cached));
                         conflict_path!(cached, AssignReason::Implication(cid));
                     }
-                    PropagationContext::Satisfied(_cid) => {
+                    PropagationContext::Satisfied(_cid, cached) => {
                         // The following doesn't need an ID but the internal pointer in the iterator
-                        cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
+                        cdb.transform_by_restoring_watch_cache(propagating, &mut source, cached);
                         check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
                     }
                     PropagationContext::UnitPropagation(cid, cached, flip_watches, cache) => {
@@ -970,7 +970,7 @@ impl AssignStack {
             // cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
             // check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
             // continue 'next_clause;
-            return PropagationContext::Satisfied(cid);
+            return PropagationContext::Satisfied(cid, updated_cache);
         }
 
         // let c = &cdb[cid];
@@ -985,6 +985,7 @@ impl AssignStack {
         if cached != other {
             cached = other;
             other_watch_value = lit_assign!(self, other);
+            updated_cache = Some(other);
             if Some(true) == other_watch_value {
                 debug_assert!(!self.var[other.vi()].is(FlagVar::ELIMINATED));
                 // In this path, we use only `AssignStack::assign`.
@@ -993,9 +994,8 @@ impl AssignStack {
                 // cdb.transform_by_restoring_watch_cache(propagating, &mut source, Some(other));
                 // check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
                 // continue 'next_clause;
-                return PropagationContext::Satisfied(cid);
+                return PropagationContext::Satisfied(cid, updated_cache);
             }
-            updated_cache = Some(other);
         }
         // let c = &cdb[cid];
         // debug_assert!(lit0 == false_lit || lit1 == false_lit);
@@ -1035,7 +1035,7 @@ impl AssignStack {
             // FIXME:
             // check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, cached));
             // conflict_path!(cached, AssignReason::Implication(cid));
-            return PropagationContext::Conflict(cid, false_watch_pos == 0, updated_cache);
+            return PropagationContext::Conflict(cid, cached, false_watch_pos == 0, updated_cache);
         }
 
         // debug_assert_eq!(cdb[cid].lit0(), cached);
