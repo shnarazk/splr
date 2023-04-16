@@ -111,6 +111,7 @@ macro_rules! unset_assign {
     };
 }
 
+#[derive(Debug, Eq, PartialEq)]
 enum PropagationContext {
     Conflict(ClauseId, Lit, bool, Option<Lit>),
     Satisfied(ClauseId, Option<Lit>),
@@ -882,6 +883,7 @@ impl AssignStack {
                 .clone()
                 .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
                 .map(|(cid, cached)| {
+                    dbg!(cid);
                     self.build_propagatation_context(false_lit, cid, &cdb[cid], cached)
                 })
                 .collect::<Vec<PropagationContext>>();
@@ -891,10 +893,14 @@ impl AssignStack {
             //     .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
             // {
             for context in transformers.iter() {
+                let index = source.current().unwrap();
+                let x = cdb.fetch_watch_cache_entry(propagating, index).0;
+                dbg!(index, x, &context);
                 match *context {
                     // let cls = &cdb[cid];
                     // match self.build_propagatation_context(false_lit, cid, cls, cached) {
                     PropagationContext::Conflict(cid, cached, flip_watches, cache) => {
+                        assert_eq!(x, cid);
                         if flip_watches {
                             cdb.swap_watch(cid);
                         }
@@ -902,12 +908,14 @@ impl AssignStack {
                         check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, cached));
                         conflict_path!(cached, AssignReason::Implication(cid));
                     }
-                    PropagationContext::Satisfied(_cid, cached) => {
+                    PropagationContext::Satisfied(cid, cached) => {
+                        assert_eq!(x, cid);
                         // The following doesn't need an ID but the internal pointer in the iterator
                         cdb.transform_by_restoring_watch_cache(propagating, &mut source, cached);
                         check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
                     }
                     PropagationContext::UnitPropagation(cid, cached, flip_watches, cache) => {
+                        assert_eq!(x, cid);
                         if flip_watches {
                             cdb.swap_watch(cid);
                         }
@@ -919,6 +927,7 @@ impl AssignStack {
                         check_in!(cid, Propagate::BecameUnit(self.num_conflict, cached));
                     }
                     PropagationContext::UpdateWatch(cid, new_watch, k, false_watch_pos) => {
+                        assert_eq!(x, cid);
                         cdb.detach_watch_cache(propagating, &mut source);
                         cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
                         debug_assert_ne!(self.assigned(new_watch), Some(true));
