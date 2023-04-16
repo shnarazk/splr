@@ -922,7 +922,7 @@ impl ClauseDBIF for ClauseDB {
         }
 
         c.lits.swap(old, new);
-
+        c.search_from = (new + 1) as u16;
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
     }

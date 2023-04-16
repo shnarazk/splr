@@ -96,6 +96,7 @@ impl IndexMut<Lit> for Vec<WatchCache> {
 
 pub type WatchCacheProxy = usize;
 
+#[derive(Clone, Debug)]
 pub struct WatchCacheIterator {
     pub index: usize,
     end_at: usize,
@@ -109,7 +110,9 @@ impl Iterator for WatchCacheIterator {
         (self.index < self.end_at).then_some({
             // assert!(0 < self.checksum);
             // self.checksum -= 1;
-            self.index
+            let current = self.index;
+            self.index += 1;
+            current
         })
     }
 }
@@ -121,6 +124,13 @@ impl WatchCacheIterator {
             end_at: len,
             // checksum: len,
         }
+    }
+    pub fn current(&mut self) -> Option<WatchCacheProxy> {
+        (self.index < self.end_at).then_some({
+            // assert!(0 < self.checksum);
+            // self.checksum -= 1;
+            self.index
+        })
     }
     pub fn restore_entry(&mut self) {
         self.index += 1;

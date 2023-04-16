@@ -446,7 +446,7 @@ impl PropagateIF for AssignStack {
             //
             let mut source = cdb.watch_cache_iter(propagating);
             'next_clause: while let Some((cid, mut cached)) = source
-                .next()
+                .current()
                 .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
             {
                 #[cfg(feature = "boundary_check")]
@@ -522,7 +522,6 @@ impl PropagateIF for AssignStack {
                             let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
-                            cdb[cid].search_from = (k + 1) as u16;
                             debug_assert_ne!(self.assigned(new_watch), Some(true));
                             check_in!(
                                 cid,
@@ -643,7 +642,7 @@ impl PropagateIF for AssignStack {
             //
             let mut source = cdb.watch_cache_iter(propagating);
             'next_clause: while let Some((cid, mut cached)) = source
-                .next()
+                .current()
                 .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
             {
                 if cdb[cid].is_dead() {
@@ -696,7 +695,6 @@ impl PropagateIF for AssignStack {
                             let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
-                            cdb[cid].search_from = (k as u16).saturating_add(1);
                             debug_assert!(
                                 self.assigned(!new_watch) == Some(true)
                                     || self.assigned(!new_watch).is_none()
@@ -913,7 +911,6 @@ impl AssignStack {
                     PropagationContext::UpdateWatch(cid, new_watch, k, false_watch_pos) => {
                         cdb.detach_watch_cache(propagating, &mut source);
                         cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
-                        cdb[cid].search_from = (k + 1) as u16;
                         debug_assert_ne!(self.assigned(new_watch), Some(true));
                         check_in!(
                             cid,
