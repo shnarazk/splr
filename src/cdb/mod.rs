@@ -117,6 +117,24 @@ pub trait ClauseDBIF:
         iter: &mut WatchCacheIterator,
         p: Option<Lit>,
     );
+    /// FIXME:
+    fn transform2_by_updating_watch_cache(
+        &mut self,
+        propagating_lit: Lit,
+        cid: ClauseId,
+        old_watch_index: usize,
+        new_watch_index: usize,
+    );
+    /// FIXME: rayon_propagate
+    fn transform2_by_pushing_watch_cache_back(
+        &mut self,
+        l: Lit,
+        from: usize,
+        to: &mut usize,
+        op: Option<Lit>,
+    );
+    /// FIXME:
+    fn transform2_by_resizing_watch_cache_list(&mut self, l: Lit, to: usize);
     /// swap i-th watch with j-th literal then update watch caches correctly
     fn transform_by_updating_watch(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool);
     /// allocate a new clause and return its id.

@@ -483,6 +483,81 @@ impl ClauseDBIF for ClauseDB {
 
         iter.restore_entry();
     }
+    fn transform2_by_updating_watch_cache(
+        &mut self,
+        propagating_lit: Lit,
+        cid: ClauseId,
+        old_watch_index: usize,
+        new_watch_index: usize,
+    ) {
+        //
+        //## Clause transform rules
+        //
+        // There is one case under non maintain_blocker:
+        // 1. one deletion (if not removed), and one insertion of watch caches
+        //
+        // There is one case under maintain_blocker:
+        // 1. one deletion (if not removed), one insertion, and one update
+        //
+        // So the proceduce is
+        // 1. delete an old one                   [Step:1]
+        // 2. insert a new watch                  [Step:2]
+        // 3. update a blocker cach e             [Step:3]
+
+        debug_assert!(!self[cid].is_dead());
+        debug_assert!(old_watch_index < 2);
+        debug_assert!(1 < new_watch_index);
+        let ClauseDB {
+            ref mut clause,
+            ref mut watch_cache,
+            ..
+        } = self;
+        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
+
+        //## Step:1 detaching this clause from old wathes's list.
+        // But `transform2_by_resizing_watch_list` will clear it. So nothing needed here.
+
+        //## Step:2
+        // assert!(watch_cache[!c.lits[new]].iter().all(|e| e.0 != cid));
+        watch_cache[!c.lits[new_watch_index]].insert_watch(cid, propagating_lit);
+
+        #[cfg(feature = "maintain_watch_cache")]
+        {
+            //## Step:3
+            watch_cache[!c.lits[another]].update_watch(cid, c.lits[new_watch_index]);
+        }
+
+        c.lits.swap(old_watch_index, new_watch_index);
+        c.search_from = (new_watch_index + 1) as u16;
+        // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
+        // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
+    }
+    fn transform2_by_pushing_watch_cache_back(
+        &mut self,
+        l: Lit,
+        from: usize,
+        to: &mut usize,
+        op: Option<Lit>,
+    ) {
+        self.watch_cache[l][*to] = self.watch_cache[l][from];
+
+        if let Some(p) = op {
+            self.watch_cache[l][*to].1 = p;
+        }
+
+        // let cid = self.watch_cache[l][iter.index].0;
+        // let c = &self[cid];
+        // let l0 = c.lits[0];
+        // let l1 = c.lits[1];
+        // assert!(self.watch_cache[!l0].iter().any(|wc| wc.0 == cid && wc.1 == l1));
+        // assert!(self.watch_cache[!l1].iter().any(|wc| wc.0 == cid && wc.1 == l0));
+
+        *to += 1;
+    }
+    fn transform2_by_resizing_watch_cache_list(&mut self, l: Lit, to: usize) {
+        debug_assert!(to <= self.watch_cache[l].len());
+        self.watch_cache[l].resize(to, (ClauseId::default(), Lit::from(0)));
+    }
     // return a Lit if the clause becomes a unit clause.
     fn transform_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause {
         //

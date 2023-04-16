@@ -126,11 +126,7 @@ impl WatchCacheIterator {
         }
     }
     pub fn current(&mut self) -> Option<WatchCacheProxy> {
-        (self.index < self.end_at).then_some({
-            // assert!(0 < self.checksum);
-            // self.checksum -= 1;
-            self.index
-        })
+        (self.index < self.end_at).then_some(self.index)
     }
     pub fn restore_entry(&mut self) {
         self.index += 1;
