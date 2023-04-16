@@ -878,12 +878,22 @@ impl AssignStack {
             //## normal clause loop
             //
             let mut source = cdb.watch_cache_iter(propagating);
-            while let Some((cid, cached)) = source
-                .next()
+            let transformers = source
+                .clone()
                 .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
-            {
-                let c = &cdb[cid];
-                match self.build_propagatation_context(false_lit, cid, c, cached) {
+                .map(|(cid, cached)| {
+                    self.build_propagatation_context(false_lit, cid, &cdb[cid], cached)
+                })
+                .collect::<Vec<PropagationContext>>();
+            // let mut source = cdb.watch_cache_iter(propagating);
+            // while let Some((cid, cached)) = source
+            //     .current()
+            //     .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
+            // {
+            for context in transformers.iter() {
+                match *context {
+                    // let cls = &cdb[cid];
+                    // match self.build_propagatation_context(false_lit, cid, cls, cached) {
                     PropagationContext::Conflict(cid, cached, flip_watches, cache) => {
                         if flip_watches {
                             cdb.swap_watch(cid);
