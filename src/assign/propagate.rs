@@ -112,7 +112,7 @@ macro_rules! unset_assign {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-enum PropagationContext {
+enum Transformation {
     Conflict(ClauseId, Lit, bool, Option<Lit>),
     Satisfied(ClauseId, Option<Lit>),
     UnitPropagation(ClauseId, Lit, bool, Option<Lit>),
@@ -878,92 +878,115 @@ impl AssignStack {
             //
             //## normal clause loop
             //
-            let transformers = cdb
-                .watch_cache_iter(propagating)
-                .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
-                .map(|(cid, cached)| {
-                    dbg!(cid);
-                    self.build_propagatation_context(false_lit, cid, &cdb[cid], cached)
-                })
-                .collect::<Vec<PropagationContext>>();
-            // let mut source = cdb.watch_cache_iter(propagating);
-            // while let Some((cid, cached)) = source
-            //     .current()
-            //     .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
-            // {
+            let mut start = 0;
             let mut filling_index = 0;
-            for (i, context) in transformers.iter().enumerate() {
-                match *context {
-                    // let cls = &cdb[cid];
-                    // match self.build_propagatation_context(false_lit, cid, cls, cached) {
-                    PropagationContext::Conflict(cid, conflicting, flip_watches, cached) => {
-                        if flip_watches {
-                            cdb.swap_watch(cid);
+            'new_context: while start < cdb.watcher_list_len(propagating) {
+                let transformers = cdb
+                    .watch_cache_iter(propagating)
+                    .skip(start)
+                    .take(1)
+                    .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
+                    .map(|(cid, cached)| {
+                        self.build_propagatation_context(false_lit, cid, &cdb[cid], cached)
+                    })
+                    .collect::<Vec<Transformation>>();
+                // let mut source = cdb.watch_cache_iter(propagating);
+                // while let Some((cid, cached)) = source
+                //     .current()
+                //     .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
+                // {
+                for (i, context) in transformers.iter().enumerate() {
+                    match *context {
+                        // let cls = &cdb[cid];
+                        // match self.build_propagatation_context(false_lit, cid, cls, cached) {
+                        Transformation::Conflict(cid, conflicting, flip_watches, cached) => {
+                            if flip_watches {
+                                cdb.swap_watch(cid);
+                            }
+                            // cdb.transform_by_restoring_watch_cache(propagating, &mut source, cache);
+                            cdb.transform2_by_pushing_watch_cache_back(
+                                propagating,
+                                start + i,
+                                &mut filling_index,
+                                cached,
+                            );
+                            // FIXME: Now watcher_list is 'propagated ... garbage ... remain ...'.
+                            // We need to transform it to 'propagated ... remain ...'.
+                            // So here is a new function:
+                            cdb.transform2_by_folding_watch_cache_list(
+                                propagating,
+                                filling_index,
+                                start + i + 1,
+                            );
+                            check_in!(
+                                cid,
+                                Propagate::EmitConflict(self.num_conflict + 1, conflicting)
+                            );
+                            conflict_path!(conflicting, AssignReason::Implication(cid));
                         }
-                        // cdb.transform_by_restoring_watch_cache(propagating, &mut source, cache);
-                        cdb.transform2_by_pushing_watch_cache_back(
-                            propagating,
-                            i,
-                            &mut filling_index,
-                            cached,
-                        );
-                        cdb.transform2_by_resizing_watch_cache_list(propagating, filling_index);
-                        check_in!(
-                            cid,
-                            Propagate::EmitConflict(self.num_conflict + 1, conflicting)
-                        );
-                        conflict_path!(conflicting, AssignReason::Implication(cid));
-                    }
-                    PropagationContext::Satisfied(_cid, cached) => {
-                        // The following doesn't need an ID but the internal pointer in the iterator
-                        // cdb.transform_by_restoring_watch_cache(propagating, &mut source, cached);
-                        cdb.transform2_by_pushing_watch_cache_back(
-                            propagating,
-                            i,
-                            &mut filling_index,
-                            cached,
-                        );
-                        check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
-                    }
-                    PropagationContext::UnitPropagation(cid, implicated, flip_watches, cached) => {
-                        if flip_watches {
-                            cdb.swap_watch(cid);
+                        Transformation::Satisfied(_cid, cached) => {
+                            // The following doesn't need an ID but the internal pointer in the iterator
+                            // cdb.transform_by_restoring_watch_cache(propagating, &mut source, cached);
+                            cdb.transform2_by_pushing_watch_cache_back(
+                                propagating,
+                                start + i,
+                                &mut filling_index,
+                                cached,
+                            );
+                            check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
                         }
-                        // cdb.transform_by_restoring_watch_cache(propagating, &mut source, cache);
-                        cdb.transform2_by_pushing_watch_cache_back(
-                            propagating,
-                            i,
-                            &mut filling_index,
-                            cached,
-                        );
-                        debug_assert_eq!(cdb[cid].lit0(), implicated);
-                        debug_assert_eq!(self.assigned(implicated), None);
-                        // debug_assert!(other_watch_value.is_none());
-                        self.assign_by_implication(implicated, AssignReason::Implication(cid));
-                        // FIXME
-                        check_in!(cid, Propagate::BecameUnit(self.num_conflict, cached));
-                        panic!("We must purge the remains and rebuild context from here.");
-                    }
-                    PropagationContext::UpdateWatch(
-                        cid,
-                        new_watch,
-                        old_watch_pos,
-                        new_watch_pos,
-                    ) => {
-                        // cdb.transform2_by_detaching_from_watch_cache(propagating, i);
-                        cdb.transform2_by_updating_watch_cache(
-                            propagating,
+                        Transformation::UnitPropagation(cid, implicated, flip_watches, cached) => {
+                            if flip_watches {
+                                cdb.swap_watch(cid);
+                            }
+                            // cdb.transform_by_restoring_watch_cache(propagating, &mut source, cache);
+                            cdb.transform2_by_pushing_watch_cache_back(
+                                propagating,
+                                start + i,
+                                &mut filling_index,
+                                cached,
+                            );
+                            debug_assert_eq!(cdb[cid].lit0(), implicated);
+                            debug_assert_eq!(self.assigned(implicated), None);
+                            // debug_assert!(other_watch_value.is_none());
+                            self.assign_by_implication(implicated, AssignReason::Implication(cid));
+                            // FIXME
+                            check_in!(cid, Propagate::BecameUnit(self.num_conflict, cached));
+                            // panic!("We must purge the remains and rebuild context from here.");
+                            start += i + 1;
+                            continue 'new_context;
+                        }
+                        Transformation::UpdateWatch(
                             cid,
+                            new_watch,
                             old_watch_pos,
                             new_watch_pos,
-                        );
-                        debug_assert_ne!(self.assigned(new_watch), Some(true));
-                        check_in!(
-                            cid,
-                            Propagate::FindNewWatch(self.num_conflict, propagating, new_watch)
-                        );
+                        ) => {
+                            {
+                                let c = &cdb[cid];
+                                let w1 = c[0];
+                                let w2 = c[1];
+                                // let old = c[old_watch_pos];
+                                let new = c[new_watch_pos];
+                                debug_assert_ne!(w1, new);
+                                debug_assert_ne!(w2, new);
+                            }
+                            // cdb.transform2_by_detaching_from_watch_cache(propagating, i);
+                            cdb.transform2_by_updating_watch_cache(
+                                propagating,
+                                cid,
+                                old_watch_pos,
+                                new_watch_pos,
+                            );
+                            debug_assert_ne!(self.assigned(new_watch), Some(true));
+                            check_in!(
+                                cid,
+                                Propagate::FindNewWatch(self.num_conflict, propagating, new_watch)
+                            );
+                        }
                     }
                 }
+                start += transformers.len();
             }
             cdb.transform2_by_resizing_watch_cache_list(propagating, filling_index);
             from_saved_trail!();
@@ -982,7 +1005,7 @@ impl AssignStack {
         cid: ClauseId,
         c: &Clause,
         mut cached: Lit,
-    ) -> PropagationContext {
+    ) -> Transformation {
         #[cfg(feature = "boundary_check")]
         debug_assert!(
             !cdb[cid].is_dead(),
@@ -1014,7 +1037,7 @@ impl AssignStack {
             // cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
             // check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
             // continue 'next_clause;
-            return PropagationContext::Satisfied(cid, updated_cache);
+            return Transformation::Satisfied(cid, updated_cache);
         }
 
         // let c = &cdb[cid];
@@ -1038,7 +1061,7 @@ impl AssignStack {
                 // cdb.transform_by_restoring_watch_cache(propagating, &mut source, Some(other));
                 // check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
                 // continue 'next_clause;
-                return PropagationContext::Satisfied(cid, updated_cache);
+                return Transformation::Satisfied(cid, updated_cache);
             }
         }
         // let c = &cdb[cid];
@@ -1066,7 +1089,10 @@ impl AssignStack {
                 //     Propagate::FindNewWatch(self.num_conflict, propagating, new_watch)
                 // );
                 // continue 'next_clause;
-                return PropagationContext::UpdateWatch(cid, new_watch, false_watch_pos, k);
+                debug_assert!(1 < k);
+                debug_assert_ne!(new_watch, lit0);
+                debug_assert_ne!(new_watch, lit1);
+                return Transformation::UpdateWatch(cid, new_watch, false_watch_pos, k);
             }
         }
         // if false_watch_pos == 0 {
@@ -1079,7 +1105,7 @@ impl AssignStack {
             // FIXME:
             // check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, cached));
             // conflict_path!(cached, AssignReason::Implication(cid));
-            return PropagationContext::Conflict(cid, cached, false_watch_pos == 0, updated_cache);
+            return Transformation::Conflict(cid, cached, false_watch_pos == 0, updated_cache);
         }
 
         // debug_assert_eq!(cdb[cid].lit0(), cached);
@@ -1096,7 +1122,7 @@ impl AssignStack {
         // check_in!(cid, Propagate::BecameUnit(self.num_conflict, cached));
         // from_saved_trail!();
 
-        PropagationContext::UnitPropagation(cid, cached, false_watch_pos == 0, updated_cache)
+        Transformation::UnitPropagation(cid, cached, false_watch_pos == 0, updated_cache)
     }
 
     #[allow(dead_code)]

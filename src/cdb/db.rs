@@ -227,6 +227,9 @@ impl ClauseDBIF for ClauseDB {
         self.binary_link.connect_with(l)
     }
     // watch_cache_IF
+    fn watcher_list_len(&self, lit: Lit) -> usize {
+        self.watch_cache[lit].len()
+    }
     fn fetch_watch_cache_entry(&self, lit: Lit, wix: WatchCacheProxy) -> (ClauseId, Lit) {
         self.watch_cache[lit][wix]
     }
@@ -513,18 +516,20 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
+        let another_watch = c.lits[(old_watch_index == 0) as usize];
 
         //## Step:1 detaching this clause from old wathes's list.
         // But `transform2_by_resizing_watch_list` will clear it. So nothing needed here.
+        debug_assert_eq!(propagating_lit, !c.lits[old_watch_index]);
 
         //## Step:2
         // assert!(watch_cache[!c.lits[new]].iter().all(|e| e.0 != cid));
-        watch_cache[!c.lits[new_watch_index]].insert_watch(cid, propagating_lit);
+        watch_cache[!c.lits[new_watch_index]].insert_watch(cid, another_watch);
 
         #[cfg(feature = "maintain_watch_cache")]
         {
             //## Step:3
-            watch_cache[!c.lits[another]].update_watch(cid, c.lits[new_watch_index]);
+            watch_cache[!c.lits[another_watch]].update_watch(cid, c.lits[new_watch_index]);
         }
 
         c.lits.swap(old_watch_index, new_watch_index);
@@ -539,25 +544,67 @@ impl ClauseDBIF for ClauseDB {
         to: &mut usize,
         op: Option<Lit>,
     ) {
+        if let Some(p) = op {
+            assert_ne!(p, l);
+            self.watch_cache[l][from].1 = p;
+        }
         self.watch_cache[l][*to] = self.watch_cache[l][from];
 
-        if let Some(p) = op {
-            self.watch_cache[l][*to].1 = p;
+        {
+            // self.watch_cache[l][from].0 = ClauseId::default();
+            let cid = self.watch_cache[l][*to].0;
+            let c = &self[cid];
+            let l0 = c.lits[0];
+            let l1 = c.lits[1];
+            debug_assert!(self.watch_cache[!l0]
+                .iter()
+                .any(|wc| wc.0 == cid && wc.1 != l0));
+            debug_assert!(self.watch_cache[!l1]
+                .iter()
+                .any(|wc| wc.0 == cid && wc.1 != l1));
+            // if !(self.watch_cache[!l0]
+            //     .iter()
+            //     .any(|wc| wc.0 == cid && wc.1 == l1))
+            // {
+            //     println!(
+            //         "{cid}: {c:?}, {l0}, {l1}, propagating: {l}, watch on !{l0} contains {:?}, op: {op:?}",
+            //         self.watch_cache[!l0]
+            //             .iter()
+            //             .filter(|wc| wc.0 == cid)
+            //             .collect::<Vec<_>>(),
+            //     );
+            //     // panic!();
+            // }
+            // assert!(self.watch_cache[!l0]
+            //     .iter()
+            //     .any(|wc| wc.0 == cid && wc.1 == l1));
+            // assert!(self.watch_cache[!l1]
+            //     .iter()
+            //     .any(|wc| wc.0 == cid && wc.1 == l0));
         }
-
-        // let cid = self.watch_cache[l][iter.index].0;
-        // let c = &self[cid];
-        // let l0 = c.lits[0];
-        // let l1 = c.lits[1];
-        // assert!(self.watch_cache[!l0].iter().any(|wc| wc.0 == cid && wc.1 == l1));
-        // assert!(self.watch_cache[!l1].iter().any(|wc| wc.0 == cid && wc.1 == l0));
-
         *to += 1;
     }
     fn transform2_by_resizing_watch_cache_list(&mut self, l: Lit, to: usize) {
         debug_assert!(to <= self.watch_cache[l].len());
-        self.watch_cache[l].resize(to, (ClauseId::default(), Lit::from(0)));
+        self.watch_cache[l].truncate(to);
     }
+    fn transform2_by_folding_watch_cache_list(
+        &mut self,
+        propagating: Lit,
+        garbage_from: usize,
+        remain_from: usize,
+    ) {
+        let watcher = &mut self.watch_cache[propagating];
+        let len = watcher.len();
+        let mut last = garbage_from;
+        for i in remain_from..len {
+            watcher[last] = watcher[i];
+            last += 1;
+        }
+        assert!(last <= len);
+        watcher.truncate(last);
+    }
+
     // return a Lit if the clause becomes a unit clause.
     fn transform_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause {
         //

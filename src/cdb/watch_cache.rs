@@ -125,6 +125,14 @@ impl WatchCacheIterator {
             // checksum: len,
         }
     }
+    pub fn skip(mut self, start: usize) -> Self {
+        self.index = start;
+        self
+    }
+    pub fn take(mut self, count: usize) -> Self {
+        self.end_at = self.index + count;
+        self
+    }
     pub fn current(&mut self) -> Option<WatchCacheProxy> {
         (self.index < self.end_at).then_some(self.index)
     }
