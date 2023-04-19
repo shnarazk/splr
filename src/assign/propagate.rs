@@ -3,6 +3,7 @@
 use {
     super::{AssignIF, AssignStack, VarHeapIF, VarManipulateIF},
     crate::{cdb::ClauseDBIF, types::*},
+    rayon::prelude::*,
 };
 
 #[cfg(feature = "trail_saving")]
@@ -885,41 +886,58 @@ impl AssignStack {
             // let mut transformers = Vec::new();
             'new_context: while start < end {
                 let size = end.min(start + BUCKET_SIZE) - start;
+                /*
+                // * sequential version
                 let transformers = (0..size)
                     .into_iter()
                     .map(|index| {
-                        let (cid, l) = cdb.fetch_watch_cache_entry(propagating, start + index);
-                        build_propagatation_context(&self.assign, false_lit, cid, &cdb[cid], l)
+                        let (cid, l. c) = cdb.fetch_watch_cache_entry2(propagating, start + index);
+                        build_tranformer(&self.assign, false_lit, cid, c, l)
                     })
                     .collect::<Vec<_>>();
-                /* let transformers = */
+                */
 
                 // parallel version
+                let asg = &self.assign;
                 /*
-                transformers.resize(size, Transformation::Satisfied(ClauseId::default(), None));
-                (0..size)
-                    .into_par_iter()
-                    .map(|index| {
-                        let (cid, cached) = cdb.fetch_watch_cache_entry(propagating, start + index);
-                        build_propagatation_context(&self.assign, false_lit, cid, &cdb[cid], cached)
+                let buckets = [(0..size / 2), (size / 2..size)]
+                    .into_iter()
+                    .map(|v| {
+                        v.into_iter()
+                            .map(|index| cdb.fetch_watch_cache_entry2(propagating, start + index))
+                            .collect::<Vec<_>>()
                     })
-                    .collect_into_vec(&mut transformers);
+                    .collect::<Vec<_>>()
+                    .into_par_iter()
+                    .map(move |v| {
+                        v.into_iter()
+                            .map(move |(cid, l, c)| {
+                                build_transfomer(asg, false_lit, cid, c, l)
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
+                let transformers = buckets.iter().cloned().flatten().collect::<Vec<_>>();
                 */
-                // let transformers = (start..end.min(start + BUCKET_SIZE))
-                //     .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
-                //     .map(|(i, l)| (i, l, &cdb[i]))
-                //     .collect::<Vec<_>>()
+                // /*
+                // transformers.resize(size, Transformation::Satisfied(ClauseId::default(), None));
+                // (0..size)
                 //     .into_par_iter()
-                //     // .into_iter()
-                //     .map(|(cid, cached, c)| {
-                //         build_propagatation_context(&self.assign, false_lit, cid, c, cached)
+                //     .map(|index| {
+                //         let (cid, cached) = cdb.fetch_watch_cache_entry(propagating, start + index);
+                //         build_transfomer(&self.assign, false_lit, cid, &cdb[cid], cached)
                 //     })
-                //     .collect::<Vec<Transformation>>();
-                // let mut source = cdb.watch_cache_iter(propagating);
-                // while let Some((cid, cached)) = source
-                //     .current()
-                //     .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
-                // {
+                //     .collect_into_vec(&mut transformers);
+                // */
+                let cdb_ref = &*cdb;
+                let transformers = (0..size)
+                    .into_par_iter()
+                    .map(move |index| {
+                        let (cid, cached, c) =
+                            cdb_ref.fetch_watch_cache_entry2(propagating, start + index);
+                        build_transformer(asg, false_lit, cid, c, cached)
+                    })
+                    .collect::<Vec<Transformation>>();
 
                 if let Some(Transformation::Conflict(cid, conflicting, flip_watches, _)) =
                     transformers
@@ -977,12 +995,12 @@ impl AssignStack {
                             );
                             check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
                         }
-                        // Transformation::UnitPropagation(_, implicated, _, _)
-                        //     if lit_assign!(self, implicated) == Some(false) =>
-                        // {
-                        //     start += i;
-                        //     continue 'new_context;
-                        // }
+                        Transformation::UnitPropagation(_, implicated, _, _)
+                            if lit_assign!(self, implicated) == Some(false) =>
+                        {
+                            start += i;
+                            continue 'new_context;
+                        }
                         Transformation::UnitPropagation(cid, implicated, flip_watches, cached) => {
                             if flip_watches {
                                 cdb.swap_watch(cid);
@@ -1010,12 +1028,12 @@ impl AssignStack {
                             start += i + 1;
                             continue 'new_context;
                         }
-                        // Transformation::UpdateWatch(_cid, new_watch, _, _)
-                        //     if lit_assign!(self, new_watch) == Some(true) =>
-                        // {
-                        //     start += i;
-                        //     continue 'new_context;
-                        // }
+                        Transformation::UpdateWatch(_cid, new_watch, _, _)
+                            if lit_assign!(self, new_watch) == Some(true) =>
+                        {
+                            start += i;
+                            continue 'new_context;
+                        }
                         Transformation::UpdateWatch(
                             cid,
                             new_watch,
@@ -1115,7 +1133,7 @@ impl AssignStack {
         }
     }
 }
-fn build_propagatation_context(
+fn build_transformer(
     asg: &[Option<bool>],
     false_lit: Lit,
     cid: ClauseId,

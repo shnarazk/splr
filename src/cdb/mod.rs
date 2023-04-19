@@ -100,6 +100,11 @@ pub trait ClauseDBIF:
     fn watcher_list_len(&self, lit: Lit) -> usize;
     // get mutable reference to a watch_cache
     fn fetch_watch_cache_entry(&self, lit: Lit, index: WatchCacheProxy) -> (ClauseId, Lit);
+    fn fetch_watch_cache_entry2(
+        &self,
+        lit: Lit,
+        index: WatchCacheProxy,
+    ) -> (ClauseId, Lit, &Clause);
     /// replace the mutable watcher list with an empty one, and return the list
     fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator;
     /// detach the watch_cache referred by the head of a watch_cache iterator

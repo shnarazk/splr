@@ -233,6 +233,10 @@ impl ClauseDBIF for ClauseDB {
     fn fetch_watch_cache_entry(&self, lit: Lit, wix: WatchCacheProxy) -> (ClauseId, Lit) {
         self.watch_cache[lit][wix]
     }
+    fn fetch_watch_cache_entry2(&self, lit: Lit, wix: WatchCacheProxy) -> (ClauseId, Lit, &Clause) {
+        let cl = self.watch_cache[lit][wix];
+        (cl.0, cl.1, &self[cl.0])
+    }
     #[inline]
     fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator {
         // let mut empty = WatchCache::new();
