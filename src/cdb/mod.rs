@@ -74,6 +74,7 @@ pub trait ClauseDBIF:
     + IndexMut<ClauseId, Output = Clause>
     + PropertyDereference<property::Tusize, usize>
     + PropertyDereference<property::Tf64, f64>
+    + Sync
 {
     /// return the length of `clause`.
     fn len(&self) -> usize;

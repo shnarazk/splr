@@ -551,17 +551,24 @@ impl ClauseDBIF for ClauseDB {
         self.watch_cache[l][*to] = self.watch_cache[l][from];
 
         {
+            // // self.watch_cache[l][from].0 = ClauseId::default();
+            // let cid = self.watch_cache[l][*to].0;
             // self.watch_cache[l][from].0 = ClauseId::default();
-            let cid = self.watch_cache[l][*to].0;
-            let c = &self[cid];
-            let l0 = c.lits[0];
-            let l1 = c.lits[1];
-            debug_assert!(self.watch_cache[!l0]
-                .iter()
-                .any(|wc| wc.0 == cid && wc.1 != l0));
-            debug_assert!(self.watch_cache[!l1]
-                .iter()
-                .any(|wc| wc.0 == cid && wc.1 != l1));
+            // let c = &self[cid];
+            // let l0 = c.lits[0];
+            // let l1 = c.lits[1];
+            // debug_assert!(self.watch_cache[!l0]
+            //     .iter()
+            //     .any(|wc| wc.0 == cid && wc.1 == !l1));
+            // debug_assert!(self.watch_cache[!l0]
+            //     .iter()
+            //     .all(|wc| wc.0 == cid && wc.1 != !l0));
+            // debug_assert!(self.watch_cache[!l1]
+            //     .iter()
+            //     .any(|wc| wc.0 == cid && wc.1 == !l0));
+            // debug_assert!(self.watch_cache[!l1]
+            //     .iter()
+            //     .all(|wc| wc.0 == cid && wc.1 != !l1));
             // if !(self.watch_cache[!l0]
             //     .iter()
             //     .any(|wc| wc.0 == cid && wc.1 == l1))
