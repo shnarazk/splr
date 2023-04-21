@@ -3,7 +3,6 @@
 use {
     super::{AssignIF, AssignStack, VarHeapIF, VarManipulateIF},
     crate::{cdb::ClauseDBIF, types::*},
-    rayon::prelude::*,
 };
 
 #[cfg(feature = "trail_saving")]
@@ -882,10 +881,11 @@ impl AssignStack {
             let mut start: usize = 0;
             let end = cdb.watcher_list_len(propagating);
             let mut filling_index = 0;
-            const BUCKET_SIZE: usize = 1024;
+            const BUCKET_SIZE: usize = 32;
             // let mut transformers = Vec::new();
             'new_context: while start < end {
                 let size = end.min(start + BUCKET_SIZE) - start;
+                let cdb_ref = &*cdb;
                 /*
                 // * sequential version
                 let transformers = (0..size)
@@ -901,18 +901,14 @@ impl AssignStack {
                 let asg = &self.assign;
                 /*
                 let buckets = [(0..size / 2), (size / 2..size)]
-                    .into_iter()
-                    .map(|v| {
-                        v.into_iter()
-                            .map(|index| cdb.fetch_watch_cache_entry2(propagating, start + index))
-                            .collect::<Vec<_>>()
-                    })
-                    .collect::<Vec<_>>()
                     .into_par_iter()
+                    // v.into_iter()
                     .map(move |v| {
                         v.into_iter()
-                            .map(move |(cid, l, c)| {
-                                build_transfomer(asg, false_lit, cid, c, l)
+                            .map(|index| {
+                                let (cid, l, c) =
+                                    cdb_ref.fetch_watch_cache_entry2(propagating, start + index);
+                                build_transformer(asg, false_lit, cid, c, l)
                             })
                             .collect::<Vec<_>>()
                     })
@@ -929,7 +925,7 @@ impl AssignStack {
                 //     })
                 //     .collect_into_vec(&mut transformers);
                 // */
-                let cdb_ref = &*cdb;
+                /*
                 let transformers = (0..size)
                     .into_par_iter()
                     .map(move |index| {
@@ -938,22 +934,86 @@ impl AssignStack {
                         build_transformer(asg, false_lit, cid, c, cached)
                     })
                     .collect::<Vec<Transformation>>();
+                */
+                let targets = (0..size)
+                    .map(|index| cdb_ref.fetch_watch_cache_entry(propagating, start + index))
+                    .collect::<Vec<_>>();
+                let mut transformers = Vec::with_capacity(size);
+                transformers.resize(
+                    size,
+                    Transformation::Conflict(ClauseId::default(), false_lit, false, None),
+                );
+                let mut found_conflict = (None, None);
+                {
+                    fn transform(
+                        asg: &[Option<bool>],
+                        cdb: &impl ClauseDBIF,
+                        lit: Lit,
+                        input: &[(ClauseId, Lit)],
+                        output: &mut [Transformation],
+                        conflicted: &mut Option<Transformation>,
+                    ) {
+                        for (i, (cid, l)) in input.iter().enumerate() {
+                            output[i] = build_transformer(asg, cdb, lit, *cid, *l);
+                            if matches!(output[i], Transformation::Conflict(_, _, _, _)) {
+                                *conflicted = Some(output[i].clone());
+                                break;
+                            }
+                        }
+                    }
+                    if 32 == size {
+                        let (li, hi) = targets.split_at(size / 2);
+                        let (lo, ho) = transformers.split_at_mut(size / 2);
+                        let asgl = asg;
+                        let asgh = asg;
+                        let cdbl = &cdb;
+                        let cdbh = &cdb;
+                        std::thread::scope(|s| {
+                            s.spawn(|| {
+                                transform(asgl, *cdbl, false_lit, li, lo, &mut found_conflict.0)
+                            });
+                            transform(asgh, *cdbh, false_lit, hi, ho, &mut found_conflict.1);
+                        });
+                    } else {
+                        transform(
+                            asg,
+                            cdb,
+                            false_lit,
+                            &targets,
+                            &mut transformers,
+                            &mut found_conflict.0,
+                        );
+                    }
+                }
 
                 if let Some(Transformation::Conflict(cid, conflicting, flip_watches, _)) =
-                    transformers
-                        .iter()
-                        .find(|t| matches!(*t, Transformation::Conflict(_, _, _, _)))
+                    found_conflict.0.or(found_conflict.1)
                 {
-                    if *flip_watches {
-                        cdb.swap_watch(*cid);
+                    if flip_watches {
+                        cdb.swap_watch(cid);
                     }
                     cdb.transform2_by_folding_watch_cache_list(propagating, filling_index, start);
                     check_in!(
                         cid,
                         Propagate::EmitConflict(self.num_conflict + 1, conflicting)
                     );
-                    conflict_path!(*conflicting, AssignReason::Implication(*cid));
+                    conflict_path!(conflicting, AssignReason::Implication(cid));
                 }
+                // if let Some(Transformation::Conflict(cid, conflicting, flip_watches, _)) =
+                //     transformers
+                //         .iter()
+                //         .find(|t| matches!(*t, Transformation::Conflict(_, _, _, _)))
+                // {
+                //     if *flip_watches {
+                //         cdb.swap_watch(*cid);
+                //     }
+                //     cdb.transform2_by_folding_watch_cache_list(propagating, filling_index, start);
+                //     check_in!(
+                //         cid,
+                //         Propagate::EmitConflict(self.num_conflict + 1, conflicting)
+                //     );
+                //     conflict_path!(*conflicting, AssignReason::Implication(*cid));
+                // }
 
                 for (i, context) in transformers.iter().enumerate() {
                     match *context {
@@ -1135,9 +1195,9 @@ impl AssignStack {
 }
 fn build_transformer(
     asg: &[Option<bool>],
+    cdb: &impl ClauseDBIF,
     false_lit: Lit,
     cid: ClauseId,
-    c: &Clause,
     mut cached: Lit,
 ) -> Transformation {
     macro_rules! assign {
@@ -1155,6 +1215,7 @@ fn build_transformer(
     if Some(true) == other_watch_value {
         return Transformation::Satisfied(cid, updated_cache);
     }
+    let c = &cdb[cid];
     let lit0 = c.lit0();
     let lit1 = c.lit1();
     let (false_watch_pos, other) = if false_lit == lit1 {
