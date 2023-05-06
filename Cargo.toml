@@ -14,6 +14,7 @@ default-run = "splr"
 rust-version = "1.65"
 
 [dependencies]
+async-trait = "^0.1.68"
 bitflags = "^2.2"
 tokio = { version = "^1.0", features = ["full"] }
 

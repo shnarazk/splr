@@ -113,15 +113,16 @@ pub struct Solver {
 ///```
 impl<V: AsRef<[i32]>> TryFrom<Vec<V>> for Certificate {
     type Error = SolverError;
-    fn try_from(vec: Vec<V>) -> SolverResult {
-        Solver::try_from((Config::default(), vec.as_ref())).map_or_else(
-            |e: SolverResult| match e {
-                Ok(cert) => Ok(cert),
-                Err(SolverError::EmptyClause) => Ok(Certificate::UNSAT),
-                Err(e) => Err(e),
-            },
-            |mut solver| solver.solve(),
-        )
+    fn try_from(_vec: Vec<V>) -> SolverResult {
+        // Solver::try_from((Config::default(), vec.as_ref())).map_or_else(
+        //     |e: SolverResult| match e {
+        //         Ok(cert) => Ok(cert),
+        //         Err(SolverError::EmptyClause) => Ok(Certificate::UNSAT),
+        //         Err(e) => Err(e),
+        //     },
+        //     |mut solver| async { solver.solve().await },
+        // )
+        todo!()
     }
 }
 

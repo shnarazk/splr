@@ -3,6 +3,7 @@
 use {
     super::{AssignIF, AssignStack, VarHeapIF, VarManipulateIF},
     crate::{cdb::ClauseDBIF, types::*},
+    async_trait::async_trait,
 };
 
 use {std::sync::Arc, tokio::sync::Mutex};
@@ -14,6 +15,7 @@ use super::TrailSavingIF;
 /// [`propagate`](`crate::assign::PropagateIF::propagate`),
 /// [`assign_by_decision`](`crate::assign::PropagateIF::assign_by_decision`),
 /// [`cancel_until`](`crate::assign::PropagateIF::cancel_until`), and so on.
+#[async_trait]
 pub trait PropagateIF {
     /// add an assignment at root level as a precondition.
     ///
@@ -40,7 +42,10 @@ pub trait PropagateIF {
     /// execute backjump in vivification sandbox
     fn backtrack_sandbox(&mut self);
     /// execute *boolean constraint propagation* or *unit propagation*.
-    fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
+    async fn propagate<'a>(
+        &'a mut self,
+        cdb: &'a mut (impl ClauseDBIF + 'a + 'static),
+    ) -> PropagationResult;
     fn propagate_p(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
     /// `propagate` for vivification, which allows dead clauses.
     fn propagate_sandbox(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
@@ -121,6 +126,7 @@ enum Transformation {
     UpdateWatch(ClauseId, Lit, usize, usize),
 }
 
+#[async_trait]
 impl PropagateIF for AssignStack {
     fn assign_at_root_level(&mut self, l: Lit) -> MaybeInconsistent {
         self.cancel_until(self.root_level);
@@ -336,8 +342,12 @@ impl PropagateIF for AssignStack {
     ///    So Eliminator should call `garbage_collect` before me.
     ///  - The order of literals in binary clauses will be modified to hold
     ///    propagation order.
-    fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
-        self.propagate_parallel(cdb)
+    async fn propagate<'a>(
+        &'a mut self,
+        cdb: &'a mut (impl ClauseDBIF + 'a + 'static),
+    ) -> PropagationResult {
+        // async fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
+        self.propagate_parallel(cdb).await
     }
     fn propagate_p(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
         #[cfg(feature = "boundary_check")]
@@ -772,7 +782,10 @@ impl PropagateIF for AssignStack {
 }
 
 impl AssignStack {
-    async fn propagate_parallel(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
+    async fn propagate_parallel(
+        &mut self,
+        cdb: &mut (impl ClauseDBIF + 'static),
+    ) -> PropagationResult {
         #[cfg(feature = "boundary_check")]
         macro_rules! check_in {
             ($cid: expr, $tag :expr) => {
@@ -949,7 +962,7 @@ impl AssignStack {
                 let mut found_conflict = (None, None);
                 {
                     async fn transform(
-                        _offset: usize,
+                        offset: usize,
                         asg: Vec<Option<bool>>,
                         cdb: impl ClauseDBIF,
                         lit: Lit,
@@ -958,9 +971,10 @@ impl AssignStack {
                         conflicted: Arc<Mutex<Option<Transformation>>>,
                     ) -> bool {
                         for (i, (cid, l)) in input.iter().enumerate() {
-                            output[i] = build_transformer(&asg, &cdb, lit, *cid, *l);
-                            if matches!(output[i], Transformation::Conflict(_, _, _, _)) {
-                                *conflicted.lock().await = Some(output[i].clone());
+                            let trans = build_transformer(&asg, &cdb, lit, *cid, *l);
+                            output.lock().await[i + offset] = trans.clone();
+                            if matches!(trans, Transformation::Conflict(_, _, _, _)) {
+                                *conflicted.lock().await = Some(trans.clone());
                                 break;
                             }
                         }
@@ -974,12 +988,12 @@ impl AssignStack {
                         output: &mut [Transformation],
                         conflicted: &mut Option<Transformation>,
                     ) {
-                        let asg = &*asg;
-                        let cdb = &*cdb;
+                        let asg = asg;
+                        let cdb = cdb;
                         for (i, (cid, l)) in input.iter().enumerate() {
-                            output[i] = build_transformer(&asg, cdb, lit, *cid, *l);
+                            output[i] = build_transformer(asg, cdb, lit, *cid, *l);
                             if matches!(output[i], Transformation::Conflict(_, _, _, _)) {
-                                // *conflicted = Some(output[i].clone());
+                                *conflicted = Some(output[i].clone());
                                 break;
                             }
                         }
@@ -994,16 +1008,18 @@ impl AssignStack {
                         let cdbl = cdb.clone();
                         let cdbh = cdb.clone();
                         let found = Arc::new(Mutex::new(None));
-                        async {
+                        let found1 = found.clone();
+                        let found2 = found.clone();
+                        let _h = async {
                             let handler1 = tokio::spawn(async move {
-                                transform(0, asgl, cdbl, false_lit, li, lo, found)
+                                transform(0, asgl, cdbl, false_lit, li, lo, found1).await
                             });
                             let handler2 = tokio::spawn(async move {
-                                transform(size / 2, asgh, cdbh, false_lit, hi, ho, found);
+                                transform(size / 2, asgh, cdbh, false_lit, hi, ho, found2).await
                             });
                             // transform(asgh, *cdbh, false_lit, hi, ho, &mut found_conflict.1);
-                            handler1.await;
-                            handler2.await;
+                            debug_assert!(handler1.await.is_ok());
+                            debug_assert!(handler2.await.is_ok());
                         };
                     } else {
                         transform_ref(
@@ -1016,6 +1032,7 @@ impl AssignStack {
                         );
                     }
                 }
+                let transformers = transformers.lock().await;
 
                 if let Some(Transformation::Conflict(cid, conflicting, flip_watches, _)) =
                     found_conflict.0.or(found_conflict.1)
@@ -1046,7 +1063,7 @@ impl AssignStack {
                 //     conflict_path!(*conflicting, AssignReason::Implication(*cid));
                 // }
 
-                for (i, context) in transformers.lock().await.iter().enumerate() {
+                for (i, context) in transformers.iter().enumerate() {
                     match *context {
                         // let cls = &cdb[cid];
                         // match self.build_propagatation_context(false_lit, cid, cls, cached) {

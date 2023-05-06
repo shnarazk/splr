@@ -95,7 +95,7 @@ async fn main() {
         }
         Ok(solver) => solver,
     };
-    let res = s.solve();
+    let res = s.solve().await;
     save_result(&mut s, &res, &cnf_file, ans_file);
     std::process::exit(match res {
         Ok(Certificate::SAT(_)) => 10,
