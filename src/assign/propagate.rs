@@ -5,6 +5,8 @@ use {
     crate::{cdb::ClauseDBIF, types::*},
 };
 
+use {std::sync::Arc, tokio::sync::Mutex};
+
 #[cfg(feature = "trail_saving")]
 use super::TrailSavingIF;
 
@@ -770,7 +772,7 @@ impl PropagateIF for AssignStack {
 }
 
 impl AssignStack {
-    fn propagate_parallel(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
+    async fn propagate_parallel(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
         #[cfg(feature = "boundary_check")]
         macro_rules! check_in {
             ($cid: expr, $tag :expr) => {
@@ -943,44 +945,73 @@ impl AssignStack {
                     size,
                     Transformation::Conflict(ClauseId::default(), false_lit, false, None),
                 );
+                let transformers = Arc::new(Mutex::new(transformers));
                 let mut found_conflict = (None, None);
                 {
-                    fn transform(
+                    async fn transform(
+                        _offset: usize,
+                        asg: Vec<Option<bool>>,
+                        cdb: impl ClauseDBIF,
+                        lit: Lit,
+                        input: Vec<(ClauseId, Lit)>,
+                        output: Arc<Mutex<Vec<Transformation>>>,
+                        conflicted: Arc<Mutex<Option<Transformation>>>,
+                    ) -> bool {
+                        for (i, (cid, l)) in input.iter().enumerate() {
+                            output[i] = build_transformer(&asg, &cdb, lit, *cid, *l);
+                            if matches!(output[i], Transformation::Conflict(_, _, _, _)) {
+                                *conflicted.lock().await = Some(output[i].clone());
+                                break;
+                            }
+                        }
+                        true
+                    }
+                    fn transform_ref(
                         asg: &[Option<bool>],
                         cdb: &impl ClauseDBIF,
                         lit: Lit,
-                        input: &[(ClauseId, Lit)],
+                        input: Vec<(ClauseId, Lit)>,
                         output: &mut [Transformation],
                         conflicted: &mut Option<Transformation>,
                     ) {
+                        let asg = &*asg;
+                        let cdb = &*cdb;
                         for (i, (cid, l)) in input.iter().enumerate() {
-                            output[i] = build_transformer(asg, cdb, lit, *cid, *l);
+                            output[i] = build_transformer(&asg, cdb, lit, *cid, *l);
                             if matches!(output[i], Transformation::Conflict(_, _, _, _)) {
-                                *conflicted = Some(output[i].clone());
+                                // *conflicted = Some(output[i].clone());
                                 break;
                             }
                         }
                     }
                     if 32 == size {
-                        let (li, hi) = targets.split_at(size / 2);
-                        let (lo, ho) = transformers.split_at_mut(size / 2);
-                        let asgl = asg;
-                        let asgh = asg;
-                        let cdbl = &cdb;
-                        let cdbh = &cdb;
-                        std::thread::scope(|s| {
-                            s.spawn(|| {
-                                transform(asgl, *cdbl, false_lit, li, lo, &mut found_conflict.0)
+                        let li = targets.clone();
+                        let hi = targets.clone();
+                        let lo = transformers.clone();
+                        let ho = transformers.clone();
+                        let asgl = asg.clone();
+                        let asgh = asg.clone();
+                        let cdbl = cdb.clone();
+                        let cdbh = cdb.clone();
+                        let found = Arc::new(Mutex::new(None));
+                        async {
+                            let handler1 = tokio::spawn(async move {
+                                transform(0, asgl, cdbl, false_lit, li, lo, found)
                             });
-                            transform(asgh, *cdbh, false_lit, hi, ho, &mut found_conflict.1);
-                        });
+                            let handler2 = tokio::spawn(async move {
+                                transform(size / 2, asgh, cdbh, false_lit, hi, ho, found);
+                            });
+                            // transform(asgh, *cdbh, false_lit, hi, ho, &mut found_conflict.1);
+                            handler1.await;
+                            handler2.await;
+                        };
                     } else {
-                        transform(
+                        transform_ref(
                             asg,
                             cdb,
                             false_lit,
-                            &targets,
-                            &mut transformers,
+                            targets,
+                            &mut transformers.lock().await,
                             &mut found_conflict.0,
                         );
                     }
@@ -1015,7 +1046,7 @@ impl AssignStack {
                 //     conflict_path!(*conflicting, AssignReason::Implication(*cid));
                 // }
 
-                for (i, context) in transformers.iter().enumerate() {
+                for (i, context) in transformers.lock().await.iter().enumerate() {
                     match *context {
                         // let cls = &cdb[cid];
                         // match self.build_propagatation_context(false_lit, cid, cls, cached) {

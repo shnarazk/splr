@@ -39,7 +39,8 @@ fn colored(v: Result<bool, &SolverError>, no_color: bool) -> Cow<'static, str> {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let mut config = Config::default();
     config.inject_from_args();
     config.splr_interface = true;
