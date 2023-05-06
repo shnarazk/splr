@@ -5,6 +5,8 @@ use {
     crate::{cdb::ClauseDBIF, types::*},
 };
 
+use rayon::prelude::*;
+
 #[cfg(feature = "trail_saving")]
 use super::TrailSavingIF;
 
@@ -38,7 +40,11 @@ pub trait PropagateIF {
     /// execute backjump in vivification sandbox
     fn backtrack_sandbox(&mut self);
     /// execute *boolean constraint propagation* or *unit propagation*.
-    fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
+    fn propagate(
+        &mut self,
+        cdb: &mut impl ClauseDBIF,
+        pool: &mut rayon::ThreadPool,
+    ) -> PropagationResult;
     fn propagate_p(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
     /// `propagate` for vivification, which allows dead clauses.
     fn propagate_sandbox(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
@@ -334,8 +340,12 @@ impl PropagateIF for AssignStack {
     ///    So Eliminator should call `garbage_collect` before me.
     ///  - The order of literals in binary clauses will be modified to hold
     ///    propagation order.
-    fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
-        self.propagate_parallel(cdb)
+    fn propagate(
+        &mut self,
+        cdb: &mut impl ClauseDBIF,
+        pool: &mut rayon::ThreadPool,
+    ) -> PropagationResult {
+        self.propagate_parallel(cdb, pool)
     }
     fn propagate_p(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
         #[cfg(feature = "boundary_check")]
@@ -770,7 +780,12 @@ impl PropagateIF for AssignStack {
 }
 
 impl AssignStack {
-    fn propagate_parallel(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
+    fn propagate_parallel(
+        &mut self,
+        cdb: &mut impl ClauseDBIF,
+        pool: &mut rayon::ThreadPool,
+    ) -> PropagationResult {
+        // let pool = futures::exector::ThreadPool::new().unwrap();
         #[cfg(feature = "boundary_check")]
         macro_rules! check_in {
             ($cid: expr, $tag :expr) => {
@@ -881,10 +896,16 @@ impl AssignStack {
             let mut start: usize = 0;
             let end = cdb.watcher_list_len(propagating);
             let mut filling_index = 0;
-            const BUCKET_SIZE: usize = 32;
+            const BUCKET_SIZE: usize = 64;
+            const BOOST_FACTOR: usize = 8;
+            let bucket_size = if BOOST_FACTOR * BUCKET_SIZE <= end - start {
+                BOOST_FACTOR * BUCKET_SIZE
+            } else {
+                BUCKET_SIZE
+            };
             // let mut transformers = Vec::new();
             'new_context: while start < end {
-                let size = end.min(start + BUCKET_SIZE) - start;
+                let size = end.min(start + bucket_size) - start;
                 let cdb_ref = &*cdb;
                 /*
                 // * sequential version
@@ -943,62 +964,151 @@ impl AssignStack {
                     size,
                     Transformation::Conflict(ClauseId::default(), false_lit, false, None),
                 );
-                let mut found_conflict = (None, None);
+                let mut found_conflict: (Option<Transformation>, Option<Transformation>) =
+                    (None, None);
                 {
+                    #[allow(dead_code)]
                     fn transform(
                         asg: &[Option<bool>],
                         cdb: &impl ClauseDBIF,
+                        // asg: std::sync::Arc<&Vec<Option<bool>>>,
+                        // cdb: std::sync::Arc<&impl ClauseDBIF>,
                         lit: Lit,
                         input: &[(ClauseId, Lit)],
                         output: &mut [Transformation],
                         conflicted: &mut Option<Transformation>,
-                    ) {
+                    ) -> bool {
                         for (i, (cid, l)) in input.iter().enumerate() {
                             output[i] = build_transformer(asg, cdb, lit, *cid, *l);
                             if matches!(output[i], Transformation::Conflict(_, _, _, _)) {
                                 *conflicted = Some(output[i].clone());
+                                return true;
+                            }
+                        }
+                        false
+                    }
+                    if BUCKET_SIZE < size {
+                        // let (li, hi) = targets.split_at(size / 2);
+                        // let (lo, ho) = transformers.split_at_mut(size / 2);
+                        // let asgl = asg;
+                        // let asgh = asg;
+                        // let cdbl = &*cdb;
+                        // let cdbh = &*cdb;
+                        fn dispatcher(
+                            asg: &[Option<bool>],
+                            cdb: &impl ClauseDBIF,
+                            input: &[(ClauseId, Lit)],
+                            output: &mut Vec<Transformation>,
+                            size: usize,
+                            lit: Lit,
+                            // _flag: &mut (Option<Transformation>, Option<Transformation>),
+                        ) {
+                            // let (li, hi) = input.split_at(size / 2);
+                            // let (lo, ho) = output.split_at_mut(size / 2);
+                            // let asgl = asg;
+                            // let asgh = asg;
+                            // let cdbl = &cdb;
+                            // let cdbh = &cdb;
+                            // rayon::join(
+                            //     || transform(asgl, *cdbl, lit, li, lo, &mut flag.0),
+                            //     || transform(asgh, *cdbh, lit, hi, ho, &mut flag.1),
+                            // );
+                            *output = (0..size)
+                                .into_par_iter()
+                                .map(move |index| {
+                                    let (cid, cached) = input[index];
+                                    build_transformer(asg, cdb, lit, cid, cached)
+                                })
+                                .collect::<Vec<Transformation>>();
+                        }
+                        pool.install(|| {
+                            dispatcher(
+                                asg,
+                                cdb,
+                                &targets,
+                                &mut transformers,
+                                size,
+                                false_lit,
+                                // &mut found_conflict,
+                            )
+                        });
+                        // std::thread::scope(|s| {
+                        //     s.spawn(|| {
+                        //         transform(asgl, *cdbl, false_lit, li, lo, &mut found_conflict.0)
+                        //     });
+                        //     transform(asgh, *cdbh, false_lit, hi, ho, &mut found_conflict.1);
+                        // futures::executor::block_on(async {
+                        //     futures::join!(
+                        //         async {
+                        //             transform(asgl, *cdbl, false_lit, li, lo, &mut found_conflict.0)
+                        //         },
+                        //         async {
+                        //             transform(asgh, *cdbh, false_lit, hi, ho, &mut found_conflict.1)
+                        //         }
+                        //     );
+                        // });
+                        // let mut tasks = tokio::task::JoinSet::new();
+                        // tasks.spawn(async move {
+                        //     transform(
+                        //         std::sync::Arc::clone(asg),
+                        //         std::sync::Arc::clone(cdb),
+                        //         false_lit,
+                        //         li,
+                        //         lo,
+                        //         &mut found_conflict.0,
+                        //     )
+                        // });
+                        // tasks.spawn(async move {
+                        //     transform(
+                        //         std::sync::Arc::clone(asg),
+                        //         std::sync::Arc::clone(cdb),
+                        //         false_lit,
+                        //         hi,
+                        //         ho,
+                        //         &mut found_conflict.1,
+                        //     )
+                        // });
+                        // tasks.join_next();
+                        // tasks.join_next();
+                    } else {
+                        for (i, (cid, l)) in targets.iter().enumerate() {
+                            transformers[i] = build_transformer(asg, cdb, false_lit, *cid, *l);
+                            if matches!(transformers[i], Transformation::Conflict(_, _, _, _)) {
+                                found_conflict.0 = Some(transformers[i].clone());
                                 break;
                             }
                         }
                     }
-                    if 32 == size {
-                        let (li, hi) = targets.split_at(size / 2);
-                        let (lo, ho) = transformers.split_at_mut(size / 2);
-                        let asgl = asg;
-                        let asgh = asg;
-                        let cdbl = &cdb;
-                        let cdbh = &cdb;
-                        std::thread::scope(|s| {
-                            s.spawn(|| {
-                                transform(asgl, *cdbl, false_lit, li, lo, &mut found_conflict.0)
-                            });
-                            transform(asgh, *cdbh, false_lit, hi, ho, &mut found_conflict.1);
-                        });
-                    } else {
-                        transform(
-                            asg,
-                            cdb,
-                            false_lit,
-                            &targets,
-                            &mut transformers,
-                            &mut found_conflict.0,
-                        );
-                    }
                 }
 
                 if let Some(Transformation::Conflict(cid, conflicting, flip_watches, _)) =
-                    found_conflict.0.or(found_conflict.1)
+                    transformers
+                        .iter()
+                        .find(|t| matches!(*t, Transformation::Conflict(_, _, _, _)))
                 {
-                    if flip_watches {
-                        cdb.swap_watch(cid);
+                    if *flip_watches {
+                        cdb.swap_watch(*cid);
                     }
                     cdb.transform2_by_folding_watch_cache_list(propagating, filling_index, start);
                     check_in!(
                         cid,
                         Propagate::EmitConflict(self.num_conflict + 1, conflicting)
                     );
-                    conflict_path!(conflicting, AssignReason::Implication(cid));
+                    conflict_path!(*conflicting, AssignReason::Implication(*cid));
                 }
+                // if let Some(Transformation::Conflict(cid, conflicting, flip_watches, _)) =
+                //     found_conflict.0.or(found_conflict.1)
+                // {
+                //     if flip_watches {
+                //         cdb.swap_watch(cid);
+                //     }
+                //     cdb.transform2_by_folding_watch_cache_list(propagating, filling_index, start);
+                //     check_in!(
+                //         cid,
+                //         Propagate::EmitConflict(self.num_conflict + 1, conflicting)
+                //     );
+                //     conflict_path!(conflicting, AssignReason::Implication(cid));
+                // }
                 // if let Some(Transformation::Conflict(cid, conflicting, flip_watches, _)) =
                 //     transformers
                 //         .iter()
@@ -1193,6 +1303,7 @@ impl AssignStack {
         }
     }
 }
+#[inline]
 fn build_transformer(
     asg: &[Option<bool>],
     cdb: &impl ClauseDBIF,
