@@ -914,42 +914,6 @@ impl AssignStack {
 
                 // parallel version
                 let asg = &self.assign;
-                /*
-                let buckets = [(0..size / 2), (size / 2..size)]
-                    .into_par_iter()
-                    // v.into_iter()
-                    .map(move |v| {
-                        v.into_iter()
-                            .map(|index| {
-                                let (cid, l, c) =
-                                    cdb_ref.fetch_watch_cache_entry2(propagating, start + index);
-                                build_transformer(asg, false_lit, cid, c, l)
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                    .collect::<Vec<_>>();
-                let transformers = buckets.iter().cloned().flatten().collect::<Vec<_>>();
-                */
-                // /*
-                // transformers.resize(size, Transformation::Satisfied(ClauseId::default(), None));
-                // (0..size)
-                //     .into_par_iter()
-                //     .map(|index| {
-                //         let (cid, cached) = cdb.fetch_watch_cache_entry(propagating, start + index);
-                //         build_transfomer(&self.assign, false_lit, cid, &cdb[cid], cached)
-                //     })
-                //     .collect_into_vec(&mut transformers);
-                // */
-                /*
-                let transformers = (0..size)
-                    .into_par_iter()
-                    .map(move |index| {
-                        let (cid, cached, c) =
-                            cdb_ref.fetch_watch_cache_entry2(propagating, start + index);
-                        build_transformer(asg, false_lit, cid, c, cached)
-                    })
-                    .collect::<Vec<Transformation>>();
-                */
                 let targets = (0..size)
                     .map(|index| cdb_ref.fetch_watch_cache_entry(propagating, start + index))
                     .collect::<Vec<_>>();
@@ -959,10 +923,10 @@ impl AssignStack {
                     Transformation::Conflict(ClauseId::default(), false_lit, false, None),
                 );
                 let transformers = Arc::new(Mutex::new(transformers));
-                let mut found_conflict = (None, None);
+                let found_conflict = Arc::new(Mutex::new(None));
                 {
                     async fn transform(
-                        offset: usize,
+                        range: (usize, usize),
                         asg: Vec<Option<bool>>,
                         cdb: impl ClauseDBIF,
                         lit: Lit,
@@ -970,33 +934,15 @@ impl AssignStack {
                         output: Arc<Mutex<Vec<Transformation>>>,
                         conflicted: Arc<Mutex<Option<Transformation>>>,
                     ) -> bool {
-                        for (i, (cid, l)) in input.iter().enumerate() {
+                        for (i, (cid, l)) in input.iter().enumerate().take(range.1).skip(range.0) {
                             let trans = build_transformer(&asg, &cdb, lit, *cid, *l);
-                            output.lock().await[i + offset] = trans.clone();
+                            output.lock().await[i] = trans.clone();
                             if matches!(trans, Transformation::Conflict(_, _, _, _)) {
                                 *conflicted.lock().await = Some(trans.clone());
                                 break;
                             }
                         }
                         true
-                    }
-                    fn transform_ref(
-                        asg: &[Option<bool>],
-                        cdb: &impl ClauseDBIF,
-                        lit: Lit,
-                        input: Vec<(ClauseId, Lit)>,
-                        output: &mut [Transformation],
-                        conflicted: &mut Option<Transformation>,
-                    ) {
-                        let asg = asg;
-                        let cdb = cdb;
-                        for (i, (cid, l)) in input.iter().enumerate() {
-                            output[i] = build_transformer(asg, cdb, lit, *cid, *l);
-                            if matches!(output[i], Transformation::Conflict(_, _, _, _)) {
-                                *conflicted = Some(output[i].clone());
-                                break;
-                            }
-                        }
                     }
                     if 32 == size {
                         let li = targets.clone();
@@ -1007,35 +953,35 @@ impl AssignStack {
                         let asgh = asg.clone();
                         let cdbl = cdb.clone();
                         let cdbh = cdb.clone();
-                        let found = Arc::new(Mutex::new(None));
-                        let found1 = found.clone();
-                        let found2 = found.clone();
-                        let _h = async {
-                            let handler1 = tokio::spawn(async move {
-                                transform(0, asgl, cdbl, false_lit, li, lo, found1).await
-                            });
-                            let handler2 = tokio::spawn(async move {
-                                transform(size / 2, asgh, cdbh, false_lit, hi, ho, found2).await
-                            });
-                            // transform(asgh, *cdbh, false_lit, hi, ho, &mut found_conflict.1);
-                            debug_assert!(handler1.await.is_ok());
-                            debug_assert!(handler2.await.is_ok());
-                        };
+                        let found1 = found_conflict.clone();
+                        let found2 = found_conflict.clone();
+                        let handler1 = tokio::spawn(async move {
+                            transform((0, size / 2), asgl, cdbl, false_lit, li, lo, found1).await
+                        });
+                        let handler2 = tokio::spawn(async move {
+                            transform((size / 2, size), asgh, cdbh, false_lit, hi, ho, found2).await
+                        });
+                        assert!(handler1.await.is_ok());
+                        assert!(handler2.await.is_ok());
                     } else {
-                        transform_ref(
-                            asg,
-                            cdb,
-                            false_lit,
-                            targets,
-                            &mut transformers.lock().await,
-                            &mut found_conflict.0,
-                        );
+                        let asg = asg.clone();
+                        let cdb = cdb.clone();
+                        let targets = targets.clone();
+                        let transformers = transformers.clone();
+                        let found = Arc::new(Mutex::new(None));
+                        let handler = tokio::spawn(async move {
+                            transform((0, size), asg, cdb, false_lit, targets, transformers, found)
+                                .await
+                        });
+                        // transform(asgh, *cdbh, false_lit, hi, ho, &mut found_conflict.1);
+                        assert!(handler.await.is_ok());
                     }
                 }
                 let transformers = transformers.lock().await;
+                let found_conflict = found_conflict.lock().await;
 
                 if let Some(Transformation::Conflict(cid, conflicting, flip_watches, _)) =
-                    found_conflict.0.or(found_conflict.1)
+                    *found_conflict
                 {
                     if flip_watches {
                         cdb.swap_watch(cid);
