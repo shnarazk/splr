@@ -1,31 +1,43 @@
 {
   description = "A modern SAT solver in Rust";
-  inputs.nixpkgs.url = github:NixOS/nixpkgs;
-  outputs = { self, nixpkgs }:
-  {
-    packages = builtins.listToAttrs
-      (map
-        (system:
-          with import nixpkgs { system = "${system}"; };
-          {
-            name = system;
-            value = {
-              default =
-                stdenv.mkDerivation rec {
-                  name = "splr-${version}";
-                  pname = "splr";
-                  version = "0.17.0-20230130";
-                  src = self;
-                  buildInputs = [ cargo libiconv rustc binutils ];
-                  buildPhase = "cargo build --release";
-                  installPhase = ''
-                    mkdir -p $out/bin
-                    install -t $out/bin target/release/splr target/release/dmcr
-                  '';
-                };
-            };
-          })
-      [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ]
-    );
+
+  inputs = {
+    nixpkgs.url = github:NixOS/nixpkgs;
+    flake-utils.url = "github:numtide/flake-utils";
   };
+
+  outputs = {
+    self,
+    nixpkgs,
+    flake-utils,
+  }:
+    flake-utils.lib.eachDefaultSystem (system: let
+      pkgs = nixpkgs.legacyPackages."${system}";
+    in {
+      devShell = pkgs.mkShell {
+        nativeBuildInputs = with pkgs; [rustup];
+      };
+      packages = let
+        callPackage = pkgs.callPackage;
+      in {
+        default = callPackage ({
+          rustPlatform,
+          lib,
+        }:
+          rustPlatform.buildRustPackage {
+            pname = "splr";
+            version = "0.17.0-git";
+
+            src = lib.cleanSource self;
+
+            cargoSha256 = "sha256-tz5ow4p07RV5P0I/w5s2zKOYzV+YHsnVNCchMZSLLGE=";
+
+            meta = {
+              description = "A modern SAT solver in Rust";
+              homepage = "https://github.com/shnarazk/splr";
+              license = with lib.licenses; [mpl20];
+            };
+          }) {};
+      };
+    });
 }
