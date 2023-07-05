@@ -37,6 +37,13 @@ Two executables will be installed:
 
 Alternatively, Nix users can use `nix build`.
 
+### About `no_std` environment and feature `no_IO`
+
+If you want to build a library for `no_std` environment,
+or if you want to compile with feature `no_IO`,
+you have to run `cargo build --lib --features no_IO`.
+They are incompatible with `cargo install`.
+
 ## Usage
 
 Splr is a standalone program, taking a CNF file. The result will be saved to a file, which format is
