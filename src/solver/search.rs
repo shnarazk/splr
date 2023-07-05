@@ -244,6 +244,10 @@ fn search(
     let stage_size: usize = 32;
     #[cfg(feature = "rephase")]
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
+    let mut pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(8)
+        .build()
+        .unwrap();
 
     state.stm.initialize(stage_size);
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -251,7 +255,7 @@ fn search(
             let lit = asg.select_decision_literal();
             asg.assign_by_decision(lit);
         }
-        let Err(cc) = asg.propagate(cdb) else { continue; };
+        let Err(cc) = asg.propagate(cdb, &mut pool) else { continue; };
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }

@@ -74,6 +74,7 @@ pub trait ClauseDBIF:
     + IndexMut<ClauseId, Output = Clause>
     + PropertyDereference<property::Tusize, usize>
     + PropertyDereference<property::Tf64, f64>
+    + Sync
 {
     /// return the length of `clause`.
     fn len(&self) -> usize;
@@ -95,8 +96,15 @@ pub trait ClauseDBIF:
     //## abstraction to watch_cache
     //
 
+    // return the number of clause watching `lit`
+    fn watcher_list_len(&self, lit: Lit) -> usize;
     // get mutable reference to a watch_cache
     fn fetch_watch_cache_entry(&self, lit: Lit, index: WatchCacheProxy) -> (ClauseId, Lit);
+    fn fetch_watch_cache_entry2(
+        &self,
+        lit: Lit,
+        index: WatchCacheProxy,
+    ) -> (ClauseId, Lit, &Clause);
     /// replace the mutable watcher list with an empty one, and return the list
     fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator;
     /// detach the watch_cache referred by the head of a watch_cache iterator
@@ -117,6 +125,32 @@ pub trait ClauseDBIF:
         iter: &mut WatchCacheIterator,
         p: Option<Lit>,
     );
+    /// FIXME:
+    fn transform2_by_updating_watch_cache(
+        &mut self,
+        propagating_lit: Lit,
+        cid: ClauseId,
+        old_watch_index: usize,
+        new_watch_index: usize,
+    );
+    /// FIXME: rayon_propagate
+    fn transform2_by_pushing_watch_cache_back(
+        &mut self,
+        l: Lit,
+        from: usize,
+        to: &mut usize,
+        op: Option<Lit>,
+    );
+    /// FIXME:
+    fn transform2_by_resizing_watch_cache_list(&mut self, l: Lit, to: usize);
+    /// FIXME:
+    fn transform2_by_folding_watch_cache_list(
+        &mut self,
+        propagating: Lit,
+        garbage_from: usize,
+        remain_from: usize,
+    );
+
     /// swap i-th watch with j-th literal then update watch caches correctly
     fn transform_by_updating_watch(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool);
     /// allocate a new clause and return its id.
