@@ -3,7 +3,10 @@
 use {
     super::{AssignIF, AssignStack, VarHeapIF, VarManipulateIF},
     crate::{cdb::ClauseDBIF, types::*},
+    async_trait::async_trait,
 };
+
+use {std::sync::Arc, tokio::sync::Mutex};
 
 #[cfg(feature = "trail_saving")]
 use super::TrailSavingIF;
@@ -12,6 +15,7 @@ use super::TrailSavingIF;
 /// [`propagate`](`crate::assign::PropagateIF::propagate`),
 /// [`assign_by_decision`](`crate::assign::PropagateIF::assign_by_decision`),
 /// [`cancel_until`](`crate::assign::PropagateIF::cancel_until`), and so on.
+#[async_trait]
 pub trait PropagateIF {
     /// add an assignment at root level as a precondition.
     ///
@@ -38,7 +42,11 @@ pub trait PropagateIF {
     /// execute backjump in vivification sandbox
     fn backtrack_sandbox(&mut self);
     /// execute *boolean constraint propagation* or *unit propagation*.
-    fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
+    async fn propagate<'a>(
+        &'a mut self,
+        cdb: &'a mut (impl ClauseDBIF + 'a + 'static),
+    ) -> PropagationResult;
+    fn propagate_p(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
     /// `propagate` for vivification, which allows dead clauses.
     fn propagate_sandbox(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
     /// propagate then clear asserted literals
@@ -110,6 +118,15 @@ macro_rules! unset_assign {
     };
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum Transformation {
+    Conflict(ClauseId, Lit, bool, Option<Lit>),
+    Satisfied(ClauseId, Option<Lit>),
+    UnitPropagation(ClauseId, Lit, bool, Option<Lit>),
+    UpdateWatch(ClauseId, Lit, usize, usize),
+}
+
+#[async_trait]
 impl PropagateIF for AssignStack {
     fn assign_at_root_level(&mut self, l: Lit) -> MaybeInconsistent {
         self.cancel_until(self.root_level);
@@ -325,7 +342,14 @@ impl PropagateIF for AssignStack {
     ///    So Eliminator should call `garbage_collect` before me.
     ///  - The order of literals in binary clauses will be modified to hold
     ///    propagation order.
-    fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
+    async fn propagate<'a>(
+        &'a mut self,
+        cdb: &'a mut (impl ClauseDBIF + 'a + 'static),
+    ) -> PropagationResult {
+        // async fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
+        self.propagate_parallel(cdb).await
+    }
+    fn propagate_p(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
         #[cfg(feature = "boundary_check")]
         macro_rules! check_in {
             ($cid: expr, $tag :expr) => {
@@ -435,7 +459,7 @@ impl PropagateIF for AssignStack {
             //
             let mut source = cdb.watch_cache_iter(propagating);
             'next_clause: while let Some((cid, mut cached)) = source
-                .next()
+                .current()
                 .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
             {
                 #[cfg(feature = "boundary_check")]
@@ -511,7 +535,6 @@ impl PropagateIF for AssignStack {
                             let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
-                            cdb[cid].search_from = (k + 1) as u16;
                             debug_assert_ne!(self.assigned(new_watch), Some(true));
                             check_in!(
                                 cid,
@@ -632,7 +655,7 @@ impl PropagateIF for AssignStack {
             //
             let mut source = cdb.watch_cache_iter(propagating);
             'next_clause: while let Some((cid, mut cached)) = source
-                .next()
+                .current()
                 .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
             {
                 if cdb[cid].is_dead() {
@@ -685,7 +708,6 @@ impl PropagateIF for AssignStack {
                             let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
-                            cdb[cid].search_from = (k as u16).saturating_add(1);
                             debug_assert!(
                                 self.assigned(!new_watch) == Some(true)
                                     || self.assigned(!new_watch).is_none()
@@ -760,6 +782,355 @@ impl PropagateIF for AssignStack {
 }
 
 impl AssignStack {
+    async fn propagate_parallel(
+        &mut self,
+        cdb: &mut (impl ClauseDBIF + 'static),
+    ) -> PropagationResult {
+        #[cfg(feature = "boundary_check")]
+        macro_rules! check_in {
+            ($cid: expr, $tag :expr) => {
+                cdb[$cid].moved_at = $tag;
+            };
+        }
+        #[cfg(not(feature = "boundary_check"))]
+        macro_rules! check_in {
+            ($cid: expr, $tag :expr) => {};
+        }
+
+        macro_rules! conflict_path {
+            ($lit: expr, $reason: expr) => {
+                self.dpc_ema.update(self.num_decision);
+                self.ppc_ema.update(self.num_propagation);
+                self.num_conflict += 1;
+                return Err(($lit, $reason));
+            };
+        }
+
+        #[cfg(feature = "suppress_reason_chain")]
+        macro_rules! minimized_reason {
+            ($lit: expr) => {
+                if let r @ AssignReason::BinaryLink(_) = self.reason[$lit.vi()] {
+                    r
+                } else {
+                    AssignReason::BinaryLink($lit)
+                }
+            };
+        }
+        #[cfg(not(feature = "suppress_reason_chain"))]
+        macro_rules! minimized_reason {
+            ($lit: expr) => {
+                AssignReason::BinaryLink($lit)
+            };
+        }
+
+        #[cfg(feature = "trail_saving")]
+        macro_rules! from_saved_trail {
+            () => {
+                if let cc @ Err(_) = self.reuse_saved_trail(cdb) {
+                    self.num_propagation += 1;
+                    self.num_conflict += 1;
+                    self.num_reconflict += 1;
+                    self.dpc_ema.update(self.num_decision);
+                    self.ppc_ema.update(self.num_propagation);
+                    return cc;
+                }
+            };
+        }
+        #[cfg(not(feature = "trail_saving"))]
+        macro_rules! from_saved_trail {
+            () => {};
+        }
+
+        let dl = self.decision_level();
+        from_saved_trail!();
+        while let Some(p) = self.trail.get(self.q_head) {
+            self.num_propagation += 1;
+            self.q_head += 1;
+            #[cfg(feature = "debug_propagation")]
+            {
+                assert!(!self.var[p.vi()].is(FlagVar::PROPAGATED));
+                self.var[p.vi()].turn_on(FlagVar::PROPAGATED);
+            }
+            let propagating = Lit::from(usize::from(*p));
+            let false_lit = !*p;
+
+            #[cfg(feature = "boundary_check")]
+            {
+                self.var[p.vi()].propagated_at = self.num_conflict;
+                self.var[p.vi()].state = VarState::Propagated(self.num_conflict);
+            }
+            // we have to drop `p` here to use self as a mutable reference again later.
+
+            //
+            //## binary loop
+            //
+            // Note: bi_clause_map contains clauses themselves,
+            // while the key of watch_cache is watching literals.
+            // Therefore keys to access appropriate targets have the opposite phases.
+            //
+            for (blocker, cid) in cdb.binary_links(false_lit).iter().copied() {
+                debug_assert!(!cdb[cid].is_dead());
+                debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
+                debug_assert_ne!(blocker, false_lit);
+                debug_assert_eq!(cdb[cid].len(), 2);
+                match lit_assign!(self, blocker) {
+                    Some(true) => (),
+                    Some(false) => {
+                        check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, blocker));
+                        conflict_path!(blocker, minimized_reason!(propagating));
+                    }
+                    None => {
+                        debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
+                        self.assign_by_implication(
+                            blocker,
+                            minimized_reason!(propagating),
+                            #[cfg(feature = "chrono_BT")]
+                            self.level[propagating.vi()],
+                        );
+                    }
+                }
+            }
+            //
+            //## normal clause loop
+            //
+            let mut start: usize = 0;
+            let end = cdb.watcher_list_len(propagating);
+            let mut filling_index = 0;
+            const BUCKET_SIZE: usize = 32;
+            // let mut transformers = Vec::new();
+            'new_context: while start < end {
+                let size = end.min(start + BUCKET_SIZE) - start;
+                let cdb_ref = &*cdb;
+                /*
+                // * sequential version
+                let transformers = (0..size)
+                    .into_iter()
+                    .map(|index| {
+                        let (cid, l. c) = cdb.fetch_watch_cache_entry2(propagating, start + index);
+                        build_tranformer(&self.assign, false_lit, cid, c, l)
+                    })
+                    .collect::<Vec<_>>();
+                */
+
+                // parallel version
+                let asg = &self.assign;
+                let targets = (0..size)
+                    .map(|index| cdb_ref.fetch_watch_cache_entry(propagating, start + index))
+                    .collect::<Vec<_>>();
+                let mut transformers = Vec::with_capacity(size);
+                transformers.resize(
+                    size,
+                    Transformation::Conflict(ClauseId::default(), false_lit, false, None),
+                );
+                let transformers = Arc::new(Mutex::new(transformers));
+                let found_conflict = Arc::new(Mutex::new(None));
+                {
+                    async fn transform(
+                        range: (usize, usize),
+                        asg: Vec<Option<bool>>,
+                        cdb: impl ClauseDBIF,
+                        lit: Lit,
+                        input: Vec<(ClauseId, Lit)>,
+                        output: Arc<Mutex<Vec<Transformation>>>,
+                        conflicted: Arc<Mutex<Option<Transformation>>>,
+                    ) -> bool {
+                        for (i, (cid, l)) in input.iter().enumerate().take(range.1).skip(range.0) {
+                            let trans = build_transformer(&asg, &cdb, lit, *cid, *l);
+                            output.lock().await[i] = trans.clone();
+                            if matches!(trans, Transformation::Conflict(_, _, _, _)) {
+                                *conflicted.lock().await = Some(trans.clone());
+                                break;
+                            }
+                        }
+                        true
+                    }
+                    if 32 == size {
+                        let li = targets.clone();
+                        let hi = targets.clone();
+                        let lo = transformers.clone();
+                        let ho = transformers.clone();
+                        let asgl = asg.clone();
+                        let asgh = asg.clone();
+                        let cdbl = cdb.clone();
+                        let cdbh = cdb.clone();
+                        let found1 = found_conflict.clone();
+                        let found2 = found_conflict.clone();
+                        let handler1 = tokio::spawn(async move {
+                            transform((0, size / 2), asgl, cdbl, false_lit, li, lo, found1).await
+                        });
+                        let handler2 = tokio::spawn(async move {
+                            transform((size / 2, size), asgh, cdbh, false_lit, hi, ho, found2).await
+                        });
+                        assert!(handler1.await.is_ok());
+                        assert!(handler2.await.is_ok());
+                    } else {
+                        let asg = asg.clone();
+                        let cdb = cdb.clone();
+                        let targets = targets.clone();
+                        let transformers = transformers.clone();
+                        let found = Arc::new(Mutex::new(None));
+                        let handler = tokio::spawn(async move {
+                            transform((0, size), asg, cdb, false_lit, targets, transformers, found)
+                                .await
+                        });
+                        // transform(asgh, *cdbh, false_lit, hi, ho, &mut found_conflict.1);
+                        assert!(handler.await.is_ok());
+                    }
+                }
+                let transformers = transformers.lock().await;
+                let found_conflict = found_conflict.lock().await;
+
+                if let Some(Transformation::Conflict(cid, conflicting, flip_watches, _)) =
+                    *found_conflict
+                {
+                    if flip_watches {
+                        cdb.swap_watch(cid);
+                    }
+                    cdb.transform2_by_folding_watch_cache_list(propagating, filling_index, start);
+                    check_in!(
+                        cid,
+                        Propagate::EmitConflict(self.num_conflict + 1, conflicting)
+                    );
+                    conflict_path!(conflicting, AssignReason::Implication(cid));
+                }
+                // if let Some(Transformation::Conflict(cid, conflicting, flip_watches, _)) =
+                //     transformers
+                //         .iter()
+                //         .find(|t| matches!(*t, Transformation::Conflict(_, _, _, _)))
+                // {
+                //     if *flip_watches {
+                //         cdb.swap_watch(*cid);
+                //     }
+                //     cdb.transform2_by_folding_watch_cache_list(propagating, filling_index, start);
+                //     check_in!(
+                //         cid,
+                //         Propagate::EmitConflict(self.num_conflict + 1, conflicting)
+                //     );
+                //     conflict_path!(*conflicting, AssignReason::Implication(*cid));
+                // }
+
+                for (i, context) in transformers.iter().enumerate() {
+                    match *context {
+                        // let cls = &cdb[cid];
+                        // match self.build_propagatation_context(false_lit, cid, cls, cached) {
+                        Transformation::Conflict(cid, conflicting, flip_watches, cached) => {
+                            if flip_watches {
+                                cdb.swap_watch(cid);
+                            }
+                            // cdb.transform_by_restoring_watch_cache(propagating, &mut source, cache);
+                            cdb.transform2_by_pushing_watch_cache_back(
+                                propagating,
+                                start + i,
+                                &mut filling_index,
+                                cached,
+                            );
+                            // FIXME: Now watcher_list is 'propagated ... garbage ... remain ...'.
+                            // We need to transform it to 'propagated ... remain ...'.
+                            // So here is a new function:
+                            cdb.transform2_by_folding_watch_cache_list(
+                                propagating,
+                                filling_index,
+                                start + i + 1,
+                            );
+                            check_in!(
+                                cid,
+                                Propagate::EmitConflict(self.num_conflict + 1, conflicting)
+                            );
+                            conflict_path!(conflicting, AssignReason::Implication(cid));
+                        }
+                        Transformation::Satisfied(_cid, cached) => {
+                            // The following doesn't need an ID but the internal pointer in the iterator
+                            // cdb.transform_by_restoring_watch_cache(propagating, &mut source, cached);
+                            cdb.transform2_by_pushing_watch_cache_back(
+                                propagating,
+                                start + i,
+                                &mut filling_index,
+                                cached,
+                            );
+                            check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
+                        }
+                        Transformation::UnitPropagation(_, implicated, _, _)
+                            if lit_assign!(self, implicated) == Some(false) =>
+                        {
+                            start += i;
+                            continue 'new_context;
+                        }
+                        Transformation::UnitPropagation(cid, implicated, flip_watches, cached) => {
+                            if flip_watches {
+                                cdb.swap_watch(cid);
+                            }
+                            // cdb.transform_by_restoring_watch_cache(propagating, &mut source, cache);
+                            cdb.transform2_by_pushing_watch_cache_back(
+                                propagating,
+                                start + i,
+                                &mut filling_index,
+                                cached,
+                            );
+                            debug_assert_eq!(cdb[cid].lit0(), implicated);
+                            // debug_assert!(other_watch_value.is_none());
+                            if lit_assign!(self, implicated) != Some(true) {
+                                debug_assert_eq!(self.assigned(implicated), None);
+                                self.assign_by_implication(
+                                    implicated,
+                                    AssignReason::Implication(cid),
+                                );
+                            }
+                            // FIXME
+                            check_in!(cid, Propagate::BecameUnit(self.num_conflict, cached));
+                            // panic!("We must purge the remains and rebuild context from here.");
+
+                            start += i + 1;
+                            continue 'new_context;
+                        }
+                        Transformation::UpdateWatch(_cid, new_watch, _, _)
+                            if lit_assign!(self, new_watch) == Some(true) =>
+                        {
+                            start += i;
+                            continue 'new_context;
+                        }
+                        Transformation::UpdateWatch(
+                            cid,
+                            new_watch,
+                            old_watch_pos,
+                            new_watch_pos,
+                        ) => {
+                            {
+                                let c = &cdb[cid];
+                                let w1 = c[0];
+                                let w2 = c[1];
+                                // let old = c[old_watch_pos];
+                                let new = c[new_watch_pos];
+                                debug_assert_ne!(w1, new);
+                                debug_assert_ne!(w2, new);
+                            }
+                            debug_assert_ne!(self.assigned(new_watch), Some(true));
+                            // cdb.transform2_by_detaching_from_watch_cache(propagating, i);
+                            cdb.transform2_by_updating_watch_cache(
+                                propagating,
+                                cid,
+                                old_watch_pos,
+                                new_watch_pos,
+                            );
+                            check_in!(
+                                cid,
+                                Propagate::FindNewWatch(self.num_conflict, propagating, new_watch)
+                            );
+                        }
+                    }
+                }
+                start += transformers.len();
+            }
+            cdb.transform2_by_resizing_watch_cache_list(propagating, filling_index);
+            from_saved_trail!();
+        }
+        let na = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
+        if self.num_best_assign <= na && 0 < dl {
+            self.best_assign = true;
+            self.num_best_assign = na;
+        }
+        Ok(())
+    }
+    // NOTE: doesn't support chronoBT
     #[allow(dead_code)]
     fn check(&self, (b0, b1): (Lit, Lit)) {
         assert_ne!(self.assigned(b0), Some(false));
@@ -815,4 +1186,59 @@ impl AssignStack {
             self.phase_age = 0;
         }
     }
+}
+fn build_transformer(
+    asg: &[Option<bool>],
+    cdb: &impl ClauseDBIF,
+    false_lit: Lit,
+    cid: ClauseId,
+    mut cached: Lit,
+) -> Transformation {
+    macro_rules! assign {
+        ($lit: expr) => {
+            match $lit {
+                l => match unsafe { *asg.get_unchecked(l.vi()) } {
+                    Some(x) if !bool::from(l) => Some(!x),
+                    x => x,
+                },
+            }
+        };
+    }
+    let mut other_watch_value = assign!(cached);
+    let mut updated_cache: Option<Lit> = None;
+    if Some(true) == other_watch_value {
+        return Transformation::Satisfied(cid, updated_cache);
+    }
+    let c = &cdb[cid];
+    let lit0 = c.lit0();
+    let lit1 = c.lit1();
+    let (false_watch_pos, other) = if false_lit == lit1 {
+        (1, lit0)
+    } else {
+        (0, lit1)
+    };
+
+    if cached != other {
+        cached = other;
+        other_watch_value = assign!(other);
+        updated_cache = Some(other);
+        if Some(true) == other_watch_value {
+            return Transformation::Satisfied(cid, updated_cache);
+        }
+    }
+    let start = c.search_from;
+    for (k, lk) in c
+        .iter()
+        .enumerate()
+        .skip(start as usize)
+        .chain(c.iter().enumerate().skip(2).take(start as usize - 2))
+    {
+        if assign!(*lk) != Some(false) {
+            return Transformation::UpdateWatch(cid, !*lk, false_watch_pos, k);
+        }
+    }
+    if other_watch_value == Some(false) {
+        return Transformation::Conflict(cid, cached, false_watch_pos == 0, updated_cache);
+    }
+    Transformation::UnitPropagation(cid, cached, false_watch_pos == 0, updated_cache)
 }

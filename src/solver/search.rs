@@ -11,16 +11,18 @@ use {
         state::{Stat, State, StateIF},
         types::*,
     },
+    async_trait::async_trait,
 };
 
 /// API to [`solve`](`crate::solver::SolveIF::solve`) SAT problems.
+#[async_trait]
 pub trait SolveIF {
     /// search an assignment.
     ///
     /// # Errors
     ///
     /// if solver becomes inconsistent by an internal error.
-    fn solve(&mut self) -> SolverResult;
+    async fn solve(&mut self) -> SolverResult;
 }
 
 macro_rules! RESTART {
@@ -31,6 +33,7 @@ macro_rules! RESTART {
     };
 }
 
+#[async_trait]
 impl SolveIF for Solver {
     /// # Examples
     ///
@@ -44,7 +47,7 @@ impl SolveIF for Solver {
     ///     assert_ne!(res.unwrap(), Certificate::UNSAT);
     /// }
     ///```
-    fn solve(&mut self) -> SolverResult {
+    async fn solve(&mut self) -> SolverResult {
         let Solver {
             ref mut asg,
             ref mut cdb,
@@ -173,7 +176,7 @@ impl SolveIF for Solver {
         //## Search
         //
         state.progress(asg, cdb);
-        let answer = search(asg, cdb, state);
+        let answer = search(asg, cdb, state).await;
         state.progress(asg, cdb);
         match answer {
             Ok(true) => {
@@ -232,7 +235,7 @@ impl SolveIF for Solver {
 }
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
-fn search(
+async fn search(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
     state: &mut State,
@@ -251,7 +254,7 @@ fn search(
             let lit = asg.select_decision_literal();
             asg.assign_by_decision(lit);
         }
-        let Err(cc) = asg.propagate(cdb) else { continue; };
+        let Err(cc) = asg.propagate(cdb).await else { continue; };
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }

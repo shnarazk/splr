@@ -39,7 +39,8 @@ fn colored(v: Result<bool, &SolverError>, no_color: bool) -> Cow<'static, str> {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let mut config = Config::default();
     config.inject_from_args();
     config.splr_interface = true;
@@ -94,7 +95,7 @@ fn main() {
         }
         Ok(solver) => solver,
     };
-    let res = s.solve();
+    let res = s.solve().await;
     save_result(&mut s, &res, &cnf_file, ans_file);
     std::process::exit(match res {
         Ok(Certificate::SAT(_)) => 10,
