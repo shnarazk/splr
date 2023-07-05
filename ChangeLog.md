@@ -1,3 +1,7 @@
+## 0.17.1, 2023-07-xx
+
+- fix compilation errors with feature 'no_IO'
+
 ## 0.17.0, 2023-01-30
 
 - (Breaking change) `Certificate::try_from` returns `Ok` values even if a given vector
