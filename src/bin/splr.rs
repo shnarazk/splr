@@ -1,4 +1,5 @@
-// SAT solver for Propositional Logic in Rust
+#![cfg(not(feature = "no_IO"))]
+/// SAT solver for Propositional Logic in Rust, which can't be compiled with feature 'no_IO'
 use {
     splr::{
         assign, cdb,
