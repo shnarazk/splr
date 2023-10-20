@@ -654,13 +654,7 @@ impl<T: Clone + Default + Sized + Ord> Eq for OrderedProxy<T> {}
 
 impl<T: Clone + Default + PartialEq + Ord> PartialOrd for OrderedProxy<T> {
     fn partial_cmp(&self, other: &OrderedProxy<T>) -> Option<Ordering> {
-        if (self.index - other.index).abs() < f64::EPSILON {
-            self.body.partial_cmp(&other.body)
-        } else if self.index < other.index {
-            Some(Ordering::Less)
-        } else {
-            Some(Ordering::Greater)
-        }
+        Some(self.cmp(other))
     }
 }
 

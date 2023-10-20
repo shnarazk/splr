@@ -658,7 +658,9 @@ fn tracer(asg: &AssignStack, cdb: &ClauseDB) {
         if input.is_empty() {
             break;
         }
-        let Ok(cid) = input.trim().parse::<usize>() else { continue;};
+        let Ok(cid) = input.trim().parse::<usize>() else {
+            continue;
+        };
         if cid == 0 {
             break;
         }
