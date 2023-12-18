@@ -251,7 +251,9 @@ fn search(
             let lit = asg.select_decision_literal();
             asg.assign_by_decision(lit);
         }
-        let Err(cc) = asg.propagate(cdb) else { continue; };
+        let Err(cc) = asg.propagate(cdb) else {
+            continue;
+        };
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }

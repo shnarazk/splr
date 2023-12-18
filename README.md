@@ -37,6 +37,13 @@ Two executables will be installed:
 
 Alternatively, Nix users can use `nix build`.
 
+### About `no_std` environment and feature `no_IO`
+
+If you want to build a library for `no_std` environment,
+or if you want to compile with feature `no_IO`,
+you have to run `cargo build --lib --features no_IO`.
+They are incompatible with `cargo install`.
+
 ## Usage
 
 Splr is a standalone program, taking a CNF file. The result will be saved to a file, which format is
@@ -223,7 +230,24 @@ fn main() {
 }
 ```
 
-### All solutions SAT solver
+### All solutions SAT solver as an application of 'incremental_solver' feature
+
+The following example requires 'incremental_solver' feature. You need the following dependeny:
+
+```toml
+splr = { version = "^0.17", features = ["incremental_solver"] }
+```
+Under this configuration, module `splr` provides some more functions:
+
+- `splr::Solver::reset(&mut self)`
+- `splr::Solver::add_var(&mut self)` // increments the last variable number
+- `splr::Solver::add_clause(&mut self, vec: AsRef<[i32]>) -> Result<&mut Solver, SolverError>`
+
+You have to call `reset` before calling `add_var`, `add_clause`, and `solve` again.
+By this, splr forgets everything about the previous formula, especially non-equivalent transformations by pre/inter-processors like clause subsumbtion.
+So technically splr is not an incremental solver.
+
+'add_clause' will emit an error if `vec` is invalid.
 
 ```rust
 use splr::*;
@@ -419,4 +443,4 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 ---
 
-2020-2022, Narazaki Shuji
+2020-2023, Narazaki Shuji

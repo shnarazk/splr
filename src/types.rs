@@ -398,20 +398,15 @@ impl fmt::Display for SolverError {
 pub type MaybeInconsistent = Result<(), SolverError>;
 
 /// CNF locator
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum CNFIndicator {
     /// not specified
+    #[default]
     Void,
     /// from a file
     File(String),
     /// embedded directly
     LitVec(usize),
-}
-
-impl Default for CNFIndicator {
-    fn default() -> Self {
-        CNFIndicator::Void
-    }
 }
 
 impl fmt::Display for CNFIndicator {
@@ -570,6 +565,7 @@ pub trait FlagIF {
 
 bitflags! {
     /// Misc flags used by [`Clause`](`crate::cdb::Clause`).
+    #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
     pub struct FlagClause: u8 {
         /// a clause is a generated clause by conflict analysis and is removable.
         const LEARNT       = 0b0000_0001;
@@ -586,6 +582,7 @@ bitflags! {
 
 bitflags! {
     /// Misc flags used by [`Var`](`crate::assign::Var`).
+    #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
     pub struct FlagVar: u8 {
         /// * the previous assigned value of a Var.
         const PHASE        = 0b0000_0001;
@@ -657,13 +654,7 @@ impl<T: Clone + Default + Sized + Ord> Eq for OrderedProxy<T> {}
 
 impl<T: Clone + Default + PartialEq + Ord> PartialOrd for OrderedProxy<T> {
     fn partial_cmp(&self, other: &OrderedProxy<T>) -> Option<Ordering> {
-        if (self.index - other.index).abs() < f64::EPSILON {
-            self.body.partial_cmp(&other.body)
-        } else if self.index < other.index {
-            Some(Ordering::Less)
-        } else {
-            Some(Ordering::Greater)
-        }
+        Some(self.cmp(other))
     }
 }
 

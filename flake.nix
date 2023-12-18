@@ -1,6 +1,5 @@
 {
   description = "A modern SAT solver in Rust";
-
   inputs = {
     nixpkgs.url = github:NixOS/nixpkgs;
     flake-utils.url = "github:numtide/flake-utils";

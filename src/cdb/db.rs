@@ -1204,7 +1204,9 @@ impl ClauseDBIF for ClauseDB {
                 panic!("conflicting var {} {:?}", vi, asg.assign(vi));
             }
         }
-        let Ok(out) = File::create(fname) else { return; };
+        let Ok(out) = File::create(fname) else {
+            return;
+        };
         let mut buf = std::io::BufWriter::new(out);
         let na = asg.derefer(crate::assign::property::Tusize::NumAssertedVar);
         let nc = self.iter().skip(1).filter(|c| !c.is_dead()).count();

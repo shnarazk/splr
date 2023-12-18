@@ -1,16 +1,37 @@
+use crate::types::*;
 #[cfg(not(feature = "no_IO"))]
-use {
-    crate::types::*,
-    std::{
-        fs::File,
-        io::{BufWriter, Write},
-        ops::Neg,
-        path::PathBuf,
-    },
+use std::{
+    fs::File,
+    io::{BufWriter, Write},
+    ops::Neg,
+    path::PathBuf,
 };
 
+#[cfg(feature = "no_IO")]
+#[derive(Debug, Default)]
+pub struct CertificationStore();
+
+#[cfg(feature = "no_IO")]
+impl Instantiate for CertificationStore {
+    fn instantiate(_config: &Config, _cnf: &CNFDescription) -> Self {
+        CertificationStore()
+    }
+}
+
+#[cfg(feature = "no_IO")]
+impl CertificationStore {
+    pub fn is_active(&self) -> bool {
+        false
+    }
+    pub fn add_clause(&mut self, _clause: &[Lit]) {}
+    pub fn delete_clause(&mut self, _vec: &[Lit]) {}
+    pub fn close(&mut self) {}
+}
+
+#[cfg(not(feature = "no_IO"))]
 const DUMP_INTERVAL: usize = 4096 * 16;
 
+#[cfg(not(feature = "no_IO"))]
 /// Struct for saving UNSAT certification
 #[derive(Debug, Default)]
 pub struct CertificationStore {
@@ -26,6 +47,7 @@ impl Clone for CertificationStore {
     }
 }
 
+#[cfg(not(feature = "no_IO"))]
 impl Instantiate for CertificationStore {
     fn instantiate(config: &Config, _cnf: &CNFDescription) -> Self {
         #[cfg(not(feature = "no_IO"))]
@@ -43,13 +65,11 @@ impl Instantiate for CertificationStore {
     }
 }
 
+#[cfg(not(feature = "no_IO"))]
 impl CertificationStore {
     pub fn is_active(&self) -> bool {
         self.buffer.is_some()
     }
-    #[cfg(feature = "no_IO")]
-    pub fn add_clause(&mut self, _clause: &[Lit]) {}
-    #[cfg(not(feature = "no_IO"))]
     pub fn add_clause(&mut self, clause: &[Lit]) {
         self.queue.push(clause.len() as i32);
         for l in clause.iter() {
@@ -59,9 +79,6 @@ impl CertificationStore {
             self.dump_to_file();
         }
     }
-    #[cfg(feature = "no_IO")]
-    pub fn delete_clause(&mut self, _vec: &[Lit]) {}
-    #[cfg(not(feature = "no_IO"))]
     pub fn delete_clause(&mut self, clause: &[Lit]) {
         self.queue.push((clause.len() as i32).neg());
         for l in clause.iter() {
@@ -71,9 +88,6 @@ impl CertificationStore {
             self.dump_to_file();
         }
     }
-    #[cfg(feature = "no_IO")]
-    pub fn close(&mut self) {}
-    #[cfg(not(feature = "no_IO"))]
     pub fn close(&mut self) {
         if self.buffer.is_none() {
             return;
@@ -87,6 +101,7 @@ impl CertificationStore {
     }
 }
 
+#[cfg(not(feature = "no_IO"))]
 impl CertificationStore {
     fn dump_to_file(&mut self) {
         let mut index = 0;

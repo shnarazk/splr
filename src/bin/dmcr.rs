@@ -1,4 +1,5 @@
-// DIMACS Model Checker in Rust
+#![cfg(not(feature = "no_IO"))]
+// A simple DIMACS Model Checker in Rust, which can't be compiled with feature 'no_IO'
 #![allow(unused_imports)]
 use {
     splr::{Config, SatSolverIF, Solver, ValidateIF},
