@@ -1,4 +1,4 @@
-## 0.17.1, 2023-07-xx
+## 0.17.1, 2023-07-07
 
 - fix compilation errors with feature 'no_IO'
 

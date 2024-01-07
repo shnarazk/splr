@@ -1,30 +1,40 @@
 {
   description = "A modern SAT solver in Rust";
-  inputs.nixpkgs.url = github:NixOS/nixpkgs;
-  outputs = { self, nixpkgs }:
+  inputs = {
+    crane = {
+      url = "github:ipetkov/crane";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    nixpkgs.url = github:NixOS/nixpkgs;
+  };
+  outputs = { self, nixpkgs, crane }:
   {
     packages = builtins.listToAttrs
       (map
         (system:
           with import nixpkgs { system = "${system}"; };
-          {
-            name = system;
-            value = {
-              default =
-                stdenv.mkDerivation rec {
-                  name = "splr-${version}";
-                  pname = "splr";
-                  version = "0.17.1-20230707";
-                  src = self;
-                  buildInputs = [ cargo libiconv rustc binutils ];
-                  buildPhase = "cargo build --release";
-                  installPhase = ''
-                    mkdir -p $out/bin
-                    install -t $out/bin target/release/splr target/release/dmcr
-                  '';
+          let
+            craneLib = crane.lib.${system};
+          in
+            {
+              name = system;
+              value = {
+                default = craneLib.buildPackage {
+                  # name = "splr-${version}";
+                  # pname = "splr";
+                  # version = "0.17.1-20240106";
+                  src = craneLib.cleanCargoSource (craneLib.path ./.);
+                  buildInputs = [cargo rustc binutils ]
+                   ++ lib.optional stdenv.isDarwin [ libiconv ];
+                  doCheck = false;
                 };
-            };
-          })
+                devShell = mkShell {
+                  inputsFrom = buildins.attrValues self.packages.${system};
+                  nativeBuildInputs = [ clippy rust-analyzer rustfmt ];
+                };
+              };
+            }
+        )
       [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ]
     );
   };
