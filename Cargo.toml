@@ -46,7 +46,7 @@ default = [
 
         ### platform dependency
         # "platform_wasm"
-        ]
+]
 assign_rate = []                # for debug and study
 best_phases_tracking = []       # save the best-so-far assignment, used by 'rephase'
 bi_clause_completion = []       # this will increase memory pressure
