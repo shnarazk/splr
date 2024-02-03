@@ -28,7 +28,7 @@
                    ++ lib.optional stdenv.isDarwin [ libiconv ];
                   doCheck = false;
                 };
-                devShell = mkShell {
+                devShells.default = craneLib.devShell {
                   inputsFrom = buildins.attrValues self.packages.${system};
                   nativeBuildInputs = [ clippy rust-analyzer rustfmt ];
                 };

@@ -44,6 +44,8 @@ or if you want to compile with feature `no_IO`,
 you have to run `cargo build --lib --features no_IO`.
 They are incompatible with `cargo install`.
 
+- [2024-02-03] Feature `platform_wasm` was added.
+
 ## Usage
 
 Splr is a standalone program, taking a CNF file. The result will be saved to a file, which format is

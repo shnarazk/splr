@@ -1,3 +1,7 @@
+## 0.1X.X, 2024-0X-0X
+
+- Add feature `platform_wasm`
+
 ## 0.17.1, 2023-07-07
 
 - fix compilation errors with feature 'no_IO'
