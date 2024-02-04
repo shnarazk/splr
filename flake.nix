@@ -22,7 +22,7 @@
                 default = craneLib.buildPackage {
                   # name = "splr-${version}";
                   # pname = "splr";
-                  # version = "0.17.1-20240106";
+                  # version = "0.17.2-20240204";
                   src = craneLib.cleanCargoSource (craneLib.path ./.);
                   buildInputs = [cargo rustc binutils ]
                    ++ lib.optional stdenv.isDarwin [ libiconv ];

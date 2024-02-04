@@ -1,4 +1,4 @@
-## 0.1X.X, 2024-0X-0X
+## 0.17.2, 2024-02-04
 
 - Add feature `platform_wasm`
 
