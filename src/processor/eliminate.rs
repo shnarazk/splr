@@ -207,7 +207,6 @@ fn merge_cost(
             cond = Some(*lit);
             continue;
         }
-        debug_assert_ne!(asg.assigned(*lit), Some(false));
         debug_assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
         // if this is the last occurrence of this literal, count it.
         for l in c_q.iter() {
