@@ -15,14 +15,14 @@
           with import nixpkgs { system = "${system}"; };
           let
             craneLib = crane.lib.${system};
+            version = "0.17.2-20240204";
           in
             {
               name = system;
               value = {
                 default = craneLib.buildPackage {
-                  # name = "splr-${version}";
-                  # pname = "splr";
-                  # version = "0.17.2-20240204";
+                  name = "splr-${version}";
+                  pname = "splr";
                   src = craneLib.cleanCargoSource (craneLib.path ./.);
                   buildInputs = [cargo rustc binutils ]
                    ++ lib.optional stdenv.isDarwin [ libiconv ];
