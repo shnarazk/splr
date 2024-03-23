@@ -96,6 +96,7 @@ pub trait ClauseDBIF:
     //
 
     // return the number of clause watching `lit`
+    fn watcher_list(&self, lit: Lit) -> Vec<(ClauseId, Vec<Lit>, Lit)>;
     fn watcher_list_len(&self, lit: Lit) -> usize;
     // get mutable reference to a watch_cache
     fn fetch_watch_cache_entry(&self, lit: Lit, index: WatchCacheProxy) -> (ClauseId, Lit);

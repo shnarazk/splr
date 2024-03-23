@@ -3,6 +3,7 @@
 use {
     super::{AssignIF, AssignStack, VarHeapIF, VarManipulateIF},
     crate::{cdb::ClauseDBIF, types::*},
+    rayon::prelude::*,
 };
 
 #[cfg(feature = "trail_saving")]
@@ -881,15 +882,29 @@ impl AssignStack {
             let mut start = 0;
             let mut filling_index = 0;
             'new_context: while start < cdb.watcher_list_len(propagating) {
+                // let transformers = cdb
+                //     .watcher_list(propagating)
+                //     .iter()
+                //     .map(|(cid, clause, cached)| {
+                //         self.build_propagatation_context(false_lit, *cid, clause, *cached)
+                //     })
+                //     .collect::<Vec<Transformation>>();
+
                 let transformers = cdb
                     .watch_cache_iter(propagating)
                     .skip(start)
                     .take(1)
                     .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
                     .map(|(cid, cached)| {
-                        self.build_propagatation_context(false_lit, cid, &cdb[cid], cached)
+                        self.build_propagatation_context(
+                            false_lit,
+                            cid,
+                            &cdb[cid].iter().cloned().collect::<Vec<Lit>>(),
+                            cached,
+                        )
                     })
                     .collect::<Vec<Transformation>>();
+
                 // let mut source = cdb.watch_cache_iter(propagating);
                 // while let Some((cid, cached)) = source
                 //     .current()
@@ -1003,32 +1018,31 @@ impl AssignStack {
         &self,
         false_lit: Lit,
         cid: ClauseId,
-        c: &Clause,
+        c: &[Lit],
         mut cached: Lit,
     ) -> Transformation {
-        #[cfg(feature = "boundary_check")]
-        debug_assert!(
-            !cdb[cid].is_dead(),
-            "dead clause in propagation: {:?}",
-            cdb.is_garbage_collected(cid),
-        );
+        // #[cfg(feature = "boundary_check")]
+        // debug_assert!(
+        //     !cdb[cid].is_dead(),
+        //     "dead clause in propagation: {:?}",
+        //     cdb.is_garbage_collected(cid),
+        // );
         debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
-        #[cfg(feature = "maintain_watch_cache")]
-        debug_assert!(
-            cached == cdb[cid].lit0() || cached == cdb[cid].lit1(),
-            "mismatch watch literal and its cache {}: l0 {}  l1 {}, timestamp: {:?}",
-            cached,
-            cdb[cid].lit0(),
-            cdb[cid].lit1(),
-            cdb[cid].timestamp(),
-        );
+        // #[cfg(feature = "maintain_watch_cache")]
+        // debug_assert!(
+        //     cached == cdb[cid].lit0() || cached == cdb[cid].lit1(),
+        //     "mismatch watch literal and its cache {}: l0 {}  l1 {}, timestamp: ?",
+        //     cached,
+        //     c[0],
+        //     c[1],
+        // );
         // assert_ne!(other_watch.vi(), false_lit.vi());
         // assert!(other_watch == cdb[cid].lit0() || other_watch == cdb[cid].lit1());
         let mut other_watch_value = lit_assign!(self, cached);
         let mut updated_cache: Option<Lit> = None;
         if Some(true) == other_watch_value {
             #[cfg(feature = "maintain_watch_cache")]
-            debug_assert!(cdb[cid].lit0() == cached || cdb[cid].lit1() == cached);
+            // debug_assert!(cdb[cid].lit0() == cached || cdb[cid].lit1() == cached);
 
             // In this path, we use only `AssignStack::assign`.
             // assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
@@ -1041,8 +1055,8 @@ impl AssignStack {
         }
 
         // let c = &cdb[cid];
-        let lit0 = c.lit0();
-        let lit1 = c.lit1();
+        let lit0 = c[0];
+        let lit1 = c[1];
         let (false_watch_pos, other) = if false_lit == lit1 {
             (1, lit0)
         } else {
@@ -1070,7 +1084,7 @@ impl AssignStack {
         //## Search an un-falsified literal
         //
         // Gathering good literals at the beginning of lits.
-        let start = c.search_from;
+        let start = 2;
         for (k, lk) in c
             .iter()
             .enumerate()

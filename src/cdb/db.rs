@@ -227,6 +227,12 @@ impl ClauseDBIF for ClauseDB {
         self.binary_link.connect_with(l)
     }
     // watch_cache_IF
+    fn watcher_list(&self, lit: Lit) -> Vec<(ClauseId, Vec<Lit>, Lit)> {
+        self.watch_cache[lit]
+            .iter()
+            .map(|(cid, lit)| (*cid, self[cid].lits.clone(), *lit))
+            .collect::<Vec<_>>()
+    }
     fn watcher_list_len(&self, lit: Lit) -> usize {
         self.watch_cache[lit].len()
     }
@@ -1326,7 +1332,9 @@ impl ClauseDBIF for ClauseDB {
                 panic!("conflicting var {} {:?}", vi, asg.assign(vi));
             }
         }
-        let Ok(out) = File::create(fname) else { return; };
+        let Ok(out) = File::create(fname) else {
+            return;
+        };
         let mut buf = std::io::BufWriter::new(out);
         let na = asg.derefer(crate::assign::property::Tusize::NumAssertedVar);
         let nc = self.iter().skip(1).filter(|c| !c.is_dead()).count();
