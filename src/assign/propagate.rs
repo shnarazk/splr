@@ -892,6 +892,8 @@ impl AssignStack {
 
                 let transformers = cdb
                     .watch_cache_iter(propagating)
+                    // .watcher_list(propagating)
+                    // .iter()
                     .skip(start)
                     .take(1)
                     .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
@@ -904,7 +906,6 @@ impl AssignStack {
                         )
                     })
                     .collect::<Vec<Transformation>>();
-
                 // let mut source = cdb.watch_cache_iter(propagating);
                 // while let Some((cid, cached)) = source
                 //     .current()
@@ -1021,28 +1022,29 @@ impl AssignStack {
         c: &[Lit],
         mut cached: Lit,
     ) -> Transformation {
-        // #[cfg(feature = "boundary_check")]
-        // debug_assert!(
-        //     !cdb[cid].is_dead(),
-        //     "dead clause in propagation: {:?}",
-        //     cdb.is_garbage_collected(cid),
-        // );
+        #[cfg(feature = "boundary_check")]
+        debug_assert!(
+            !cdb[cid].is_dead(),
+            "dead clause in propagation: {:?}",
+            cdb.is_garbage_collected(cid),
+        );
         debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
-        // #[cfg(feature = "maintain_watch_cache")]
-        // debug_assert!(
-        //     cached == cdb[cid].lit0() || cached == cdb[cid].lit1(),
-        //     "mismatch watch literal and its cache {}: l0 {}  l1 {}, timestamp: ?",
-        //     cached,
-        //     c[0],
-        //     c[1],
-        // );
+        #[cfg(feature = "maintain_watch_cache")]
+        debug_assert!(
+            cached == cdb[cid].lit0() || cached == cdb[cid].lit1(),
+            "mismatch watch literal and its cache {}: l0 {}  l1 {}, timestamp: ?",
+            cached,
+            cdb[cid].lit0(),
+            cdb[cid].lit1(),
+            cdb[cid].timestamp(),
+        );
         // assert_ne!(other_watch.vi(), false_lit.vi());
         // assert!(other_watch == cdb[cid].lit0() || other_watch == cdb[cid].lit1());
         let mut other_watch_value = lit_assign!(self, cached);
         let mut updated_cache: Option<Lit> = None;
         if Some(true) == other_watch_value {
             #[cfg(feature = "maintain_watch_cache")]
-            // debug_assert!(cdb[cid].lit0() == cached || cdb[cid].lit1() == cached);
+            debug_assert!(cdb[cid].lit0() == cached || cdb[cid].lit1() == cached);
 
             // In this path, we use only `AssignStack::assign`.
             // assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
