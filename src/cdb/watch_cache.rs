@@ -130,7 +130,7 @@ impl WatchCacheIterator {
         self
     }
     pub fn take(mut self, count: usize) -> Self {
-        self.end_at = self.index + count;
+        self.end_at = self.end_at.min(self.index + count);
         self
     }
     pub fn current(&mut self) -> Option<WatchCacheProxy> {
