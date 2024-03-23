@@ -895,7 +895,7 @@ impl AssignStack {
                     // .watcher_list(propagating)
                     // .iter()
                     .skip(start)
-                    .take(1)
+                    // .take(40)
                     .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
                     .map(|(cid, cached)| {
                         self.build_propagatation_context(
