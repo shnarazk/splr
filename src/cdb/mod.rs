@@ -96,16 +96,16 @@ pub trait ClauseDBIF:
     //
 
     // return the number of clause watching `lit`
-    fn watcher_list(&self, lit: Lit) -> Vec<(ClauseId, Vec<Lit>, Lit)>;
+    fn watcher_list(&self, lit: Lit, start: usize, len: usize) -> Vec<(ClauseId, Vec<Lit>, Lit)>;
     fn watcher_list_len(&self, lit: Lit) -> usize;
     // get mutable reference to a watch_cache
     fn fetch_watch_cache_entry(&self, lit: Lit, index: WatchCacheProxy) -> (ClauseId, Lit);
     /// replace the mutable watcher list with an empty one, and return the list
-    fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator;
+    fn watch_cache_iter(&mut self, lit: Lit) -> WatchCacheIterator;
     /// detach the watch_cache referred by the head of a watch_cache iterator
-    fn detach_watch_cache(&mut self, l: Lit, iter: &mut WatchCacheIterator);
+    fn detach_watch_cache(&mut self, lit: Lit, iter: &mut WatchCacheIterator);
     /// Merge two watch cache
-    fn merge_watch_cache(&mut self, l: Lit, wc: WatchCache);
+    fn merge_watch_cache(&mut self, lit: Lit, wc: WatchCache);
     /// swap the first two literals in a clause.
     fn swap_watch(&mut self, cid: ClauseId);
 

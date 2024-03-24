@@ -227,10 +227,12 @@ impl ClauseDBIF for ClauseDB {
         self.binary_link.connect_with(l)
     }
     // watch_cache_IF
-    fn watcher_list(&self, lit: Lit) -> Vec<(ClauseId, Vec<Lit>, Lit)> {
+    fn watcher_list(&self, lit: Lit, start: usize, len: usize) -> Vec<(ClauseId, Vec<Lit>, Lit)> {
         self.watch_cache[lit]
             .iter()
-            .map(|(cid, lit)| (*cid, self[cid].lits.clone(), *lit))
+            .skip(start)
+            .take(len)
+            .map(|(cid, l)| (*cid, self[*cid].lits.clone(), *l))
             .collect::<Vec<_>>()
     }
     fn watcher_list_len(&self, lit: Lit) -> usize {
@@ -240,14 +242,14 @@ impl ClauseDBIF for ClauseDB {
         self.watch_cache[lit][wix]
     }
     #[inline]
-    fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator {
+    fn watch_cache_iter(&mut self, lit: Lit) -> WatchCacheIterator {
         // let mut empty = WatchCache::new();
-        // std::mem::swap(&mut self.watch_cache[l], &mut empty);
+        // std::mem::swap(&mut self.watch_cache[lit], &mut empty);
         // empty
-        WatchCacheIterator::new(self.watch_cache[l].len())
+        WatchCacheIterator::new(self.watch_cache[lit].len())
     }
-    fn detach_watch_cache(&mut self, l: Lit, iter: &mut WatchCacheIterator) {
-        self.watch_cache[l].swap_remove(iter.index);
+    fn detach_watch_cache(&mut self, lit: Lit, iter: &mut WatchCacheIterator) {
+        self.watch_cache[lit].swap_remove(iter.index);
         iter.detach_entry();
     }
     fn merge_watch_cache(&mut self, p: Lit, wc: WatchCache) {
