@@ -3,8 +3,10 @@
 use {
     super::{AssignIF, AssignStack, VarHeapIF, VarManipulateIF},
     crate::{cdb::ClauseDBIF, types::*},
-    // rayon::prelude::*,
 };
+
+#[allow(unused_imports)]
+use rayon::prelude::*;
 
 #[cfg(feature = "trail_saving")]
 use super::TrailSavingIF;
@@ -883,31 +885,81 @@ impl AssignStack {
             let mut filling_index = 0;
             'new_context: while start < cdb.watcher_list_len(propagating) {
                 // We need to build transformers several times if new unit propagation occur.
-                let transformers = cdb
-                    .watcher_list(propagating, start, 20)
-                    .iter()
-                    .map(|(cid, clause, cached)| {
-                        self.build_propagatation_context(false_lit, *cid, clause, *cached)
-                    })
-                    .collect::<Vec<Transformation>>();
+                const CHUNK_SIZE: usize = 8;
 
-                // let transformers_ = cdb
-                //     .watch_cache_iter(propagating)
-                //     .skip(start)
-                //     // .take(40)
-                //     .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
-                //     .map(|(cid, cached)| {
-                //         self.build_propagatation_context(
-                //             false_lit,
-                //             cid,
-                //             &cdb[cid].iter().cloned().collect::<Vec<Lit>>(),
-                //             cached,
-                //         )
-                //     })
-                //     .collect::<Vec<Transformation>>();
-
+                let transformers = if CHUNK_SIZE * 4 < cdb.watcher_list_len(propagating) - start {
+                    cdb.watcher_list(propagating, start, 0)
+                        .par_iter()
+                        .chunks(CHUNK_SIZE)
+                        .map(|v /* (cid, clause, cached)*/| {
+                            v.iter()
+                                .map(|(cid, clause, cached)| {
+                                    build_propagatation_context(
+                                        &self.assign,
+                                        false_lit,
+                                        *cid,
+                                        clause,
+                                        *cached,
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                        .flatten()
+                        .collect::<Vec<_>>()
+                } else {
+                    cdb.watcher_list(propagating, start, 1)
+                        // cdb.watch_cache_iter(propagating)
+                        .iter()
+                        // .skip(start)
+                        // .take(1)
+                        // .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
+                        .map(|(cid, clause, cached)| {
+                            build_propagatation_context(
+                                &self.assign,
+                                false_lit,
+                                *cid,
+                                // &cdb[cid].iter().cloned().collect::<Vec<Lit>>(),
+                                clause,
+                                *cached,
+                            )
+                        })
+                        .collect::<Vec<Transformation>>()
+                };
                 // assert_eq!(transformers.len(), cdb.watcher_list_len(propagating));
                 // assert_eq!(transformers, transformers2);
+
+                // if let Some((i, Transformation::Conflict(cid, conflicting, flip_watches, cached))) =
+                //     transformers
+                //         .iter()
+                //         .enumerate()
+                //         .find(|(_, e)| matches!(**e, Transformation::Conflict(_, _, _, _)))
+                // {
+                //     // transformers.swap(start, i);
+                //     cdb.watcher_list_swap(propagating, 0, start + i);
+                //     if *flip_watches {
+                //         cdb.swap_watch(*cid);
+                //     }
+                //     // // cdb.transform_by_restoring_watch_cache(propagating, &mut source, cache);
+                //     cdb.transform2_by_pushing_watch_cache_back(
+                //         propagating,
+                //         start + i,
+                //         &mut filling_index,
+                //         *cached,
+                //     );
+                //     // FIXME: Now watcher_list is 'propagated ... garbage ... remain ...'.
+                //     // We need to transform it to 'propagated ... remain ...'.
+                //     // So here is a new function:
+                //     cdb.transform2_by_folding_watch_cache_list(
+                //         propagating,
+                //         filling_index,
+                //         start + i + 1,
+                //     );
+                //     check_in!(
+                //         cid,
+                //         Propagate::EmitConflict(self.num_conflict + 1, conflicting)
+                //     );
+                //     conflict_path!(*conflicting, AssignReason::Implication(*cid));
+                // }
 
                 // let mut source = cdb.watch_cache_iter(propagating);
                 // while let Some((cid, cached)) = source
@@ -916,8 +968,6 @@ impl AssignStack {
                 // {
                 for (i, context) in transformers.iter().enumerate() {
                     match *context {
-                        // let cls = &cdb[cid];
-                        // match self.build_propagatation_context(false_lit, cid, cls, cached) {
                         Transformation::Conflict(cid, conflicting, flip_watches, cached) => {
                             if flip_watches {
                                 cdb.swap_watch(cid);
@@ -1002,7 +1052,9 @@ impl AssignStack {
                                 cid,
                                 Propagate::FindNewWatch(self.num_conflict, propagating, new_watch)
                             );
-                        }
+                        } // Transformation::Conflict(_, _, _, _) => {
+                          //     unreachable!()
+                          // }
                     }
                 }
                 start += transformers.len();
@@ -1016,52 +1068,6 @@ impl AssignStack {
             self.num_best_assign = na;
         }
         Ok(())
-    }
-    // NOTE: doesn't support chronoBT
-    fn build_propagatation_context(
-        &self,
-        false_lit: Lit,
-        cid: ClauseId,
-        c: &[Lit],
-        mut cached: Lit,
-    ) -> Transformation {
-        let mut other_watch_value = lit_assign!(self, cached);
-        let mut updated_cache: Option<Lit> = None;
-        if Some(true) == other_watch_value {
-            return Transformation::Satisfied(cid, updated_cache);
-        }
-        let lit0 = c[0];
-        let lit1 = c[1];
-        let (false_watch_pos, other) = if false_lit == lit1 {
-            (1, lit0)
-        } else {
-            (0, lit1)
-        };
-
-        if cached != other {
-            cached = other;
-            other_watch_value = lit_assign!(self, other);
-            updated_cache = Some(other);
-            if Some(true) == other_watch_value {
-                return Transformation::Satisfied(cid, updated_cache);
-            }
-        }
-        let start = 2;
-        for (k, lk) in c
-            .iter()
-            .enumerate()
-            .skip(start as usize)
-            .chain(c.iter().enumerate().skip(2).take(start as usize - 2))
-        {
-            if lit_assign!(self, *lk) != Some(false) {
-                let new_watch = !*lk;
-                return Transformation::UpdateWatch(cid, new_watch, false_watch_pos, k);
-            }
-        }
-        if other_watch_value == Some(false) {
-            return Transformation::Conflict(cid, cached, false_watch_pos == 0, updated_cache);
-        }
-        Transformation::UnitPropagation(cid, cached, false_watch_pos == 0, updated_cache)
     }
 
     #[allow(dead_code)]
@@ -1119,4 +1125,61 @@ impl AssignStack {
             self.phase_age = 0;
         }
     }
+}
+
+// NOTE: doesn't support chronoBT
+fn build_propagatation_context(
+    assign: &[Option<bool>],
+    false_lit: Lit,
+    cid: ClauseId,
+    c: &[Lit],
+    mut cached: Lit,
+) -> Transformation {
+    macro_rules! l_assign {
+        ($asg: expr, $lit: expr) => {
+            match $lit {
+                l => match unsafe { *$asg.get_unchecked(l.vi()) } {
+                    Some(x) if !bool::from(l) => Some(!x),
+                    x => x,
+                },
+            }
+        };
+    }
+    let mut other_watch_value = l_assign!(assign, cached);
+    let mut updated_cache: Option<Lit> = None;
+    if Some(true) == other_watch_value {
+        return Transformation::Satisfied(cid, updated_cache);
+    }
+    let lit0 = c[0];
+    let lit1 = c[1];
+    let (false_watch_pos, other) = if false_lit == lit1 {
+        (1, lit0)
+    } else {
+        (0, lit1)
+    };
+
+    if cached != other {
+        cached = other;
+        other_watch_value = l_assign!(assign, other);
+        updated_cache = Some(other);
+        if Some(true) == other_watch_value {
+            return Transformation::Satisfied(cid, updated_cache);
+        }
+    }
+    let start = 2;
+    for (k, lk) in c
+        .iter()
+        .enumerate()
+        .skip(start as usize)
+        .chain(c.iter().enumerate().skip(2).take(start as usize - 2))
+    {
+        if l_assign!(assign, *lk) != Some(false) {
+            let new_watch = !*lk;
+            return Transformation::UpdateWatch(cid, new_watch, false_watch_pos, k);
+        }
+    }
+    if other_watch_value == Some(false) {
+        return Transformation::Conflict(cid, cached, false_watch_pos == 0, updated_cache);
+    }
+    Transformation::UnitPropagation(cid, cached, false_watch_pos == 0, updated_cache)
 }

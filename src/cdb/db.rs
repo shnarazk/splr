@@ -227,13 +227,24 @@ impl ClauseDBIF for ClauseDB {
         self.binary_link.connect_with(l)
     }
     // watch_cache_IF
-    fn watcher_list(&self, lit: Lit, start: usize, len: usize) -> Vec<(ClauseId, Vec<Lit>, Lit)> {
-        self.watch_cache[lit]
-            .iter()
-            .skip(start)
-            .take(len)
-            .map(|(cid, l)| (*cid, self[*cid].lits.clone(), *l))
-            .collect::<Vec<_>>()
+    fn watcher_list(&self, lit: Lit, start: usize, len: usize) -> Vec<(ClauseId, &Vec<Lit>, Lit)> {
+        if len == 0 {
+            self.watch_cache[lit]
+                .iter()
+                .skip(start)
+                .map(|(cid, l)| (*cid, &self[*cid].lits, *l))
+                .collect::<Vec<_>>()
+        } else {
+            self.watch_cache[lit]
+                .iter()
+                .skip(start)
+                .take(len)
+                .map(|(cid, l)| (*cid, &self[*cid].lits, *l))
+                .collect::<Vec<_>>()
+        }
+    }
+    fn watcher_list_swap(&mut self, lit: Lit, index_a: usize, index_b: usize) {
+        self.watch_cache[lit].swap(index_a, index_b);
     }
     fn watcher_list_len(&self, lit: Lit) -> usize {
         self.watch_cache[lit].len()
