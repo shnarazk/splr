@@ -887,44 +887,41 @@ impl AssignStack {
                 // We need to build transformers several times if new unit propagation occur.
                 const CHUNK_SIZE: usize = 8;
 
-                let transformers = if CHUNK_SIZE * 4 < cdb.watcher_list_len(propagating) - start {
-                    cdb.watcher_list(propagating, start, 0)
-                        .par_iter()
-                        .chunks(CHUNK_SIZE)
-                        .map(|v /* (cid, clause, cached)*/| {
-                            v.iter()
-                                .map(|(cid, clause, cached)| {
-                                    build_propagatation_context(
-                                        &self.assign,
-                                        false_lit,
-                                        *cid,
-                                        clause,
-                                        *cached,
-                                    )
-                                })
-                                .collect::<Vec<_>>()
-                        })
-                        .flatten()
-                        .collect::<Vec<_>>()
-                } else {
-                    cdb.watcher_list(propagating, start, 1)
-                        // cdb.watch_cache_iter(propagating)
-                        .iter()
-                        // .skip(start)
-                        // .take(1)
-                        // .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
-                        .map(|(cid, clause, cached)| {
-                            build_propagatation_context(
-                                &self.assign,
-                                false_lit,
-                                *cid,
-                                // &cdb[cid].iter().cloned().collect::<Vec<Lit>>(),
-                                clause,
-                                *cached,
-                            )
-                        })
-                        .collect::<Vec<Transformation>>()
-                };
+                let transformers =
+                    if CHUNK_SIZE * 400000000 < cdb.watcher_list_len(propagating) - start {
+                        cdb.watcher_list(propagating, start, 0)
+                            .par_iter()
+                            .chunks(CHUNK_SIZE)
+                            .map(|v /* (cid, clause, cached)*/| {
+                                v.iter()
+                                    .map(|(cid, lits, cached)| {
+                                        build_propagatation_context(
+                                            &self.assign,
+                                            false_lit,
+                                            *cid,
+                                            lits,
+                                            *cached,
+                                        )
+                                    })
+                                    .collect::<Vec<_>>()
+                            })
+                            .flatten()
+                            .collect::<Vec<_>>()
+                    } else {
+                        cdb.watcher_list(propagating, start, 1)
+                            .iter()
+                            .map(|(cid, lits, cached)| {
+                                build_propagatation_context(
+                                    &self.assign,
+                                    false_lit,
+                                    *cid,
+                                    // &cdb[cid].iter().cloned().collect::<Vec<Lit>>(),
+                                    lits,
+                                    *cached,
+                                )
+                            })
+                            .collect::<Vec<Transformation>>()
+                    };
                 // assert_eq!(transformers.len(), cdb.watcher_list_len(propagating));
                 // assert_eq!(transformers, transformers2);
 
