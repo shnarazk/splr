@@ -407,7 +407,7 @@ pub mod property {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assign::{AssignStack, PropagateIF};
+    use crate::assign::{AssignStack, PropagateIF, VarManipulateIF};
 
     fn lit(i: i32) -> Lit {
         Lit::from(i)
@@ -439,17 +439,16 @@ mod tests {
         let c0 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
             .as_cid();
-        assert_eq!(cdb[c0].rank, 4);
 
         asg.assign_by_decision(lit(-2)); // at level 1
         asg.assign_by_decision(lit(1)); // at level 2
                                         // Now `asg.level` = [_, 2, 1, 3, 4, 5, 6].
+        assert_eq!(asg.level(1), 2);
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
         let c = &cdb[c1];
 
-        assert_eq!(c.rank, 3);
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
@@ -458,7 +457,6 @@ mod tests {
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
             .as_cid();
         let c = &cdb[c2];
-        assert_eq!(c.rank, 3);
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]

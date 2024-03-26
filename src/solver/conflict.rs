@@ -32,9 +32,8 @@ pub fn handle_conflict(
     // at higher level due to the incoherence between the current level and conflicting
     // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
     {
-        let level = asg.level_ref();
         if let AssignReason::Implication(cid) = cc.1 {
-            if cdb[cid].iter().all(|l| level[l.vi()] == 0) {
+            if cdb[cid].iter().all(|l| asg.level(l.vi()) == 0) {
                 return Err(SolverError::RootLevelConflict(*cc));
             }
         }
@@ -407,7 +406,7 @@ fn conflict_analyze(
         //
         // set the index of the next literal to trail_index
         //
-        #[allow(clippy::blocks_in_if_conditions)]
+        #[allow(clippy::blocks_in_conditions)]
         while {
             let vi = asg.stack(trail_index).vi();
             boundary_check!(
@@ -464,10 +463,9 @@ fn minimize_learnt(
 ) -> DecisionLevel {
     let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
     let mut levels = vec![false; asg.decision_level() as usize + 1];
-    let level = asg.level_ref();
     for l in &new_learnt[1..] {
         to_clear.push(*l);
-        levels[level[l.vi()] as usize] = true;
+        levels[asg.level(l.vi()) as usize] = true;
     }
     let l0 = new_learnt[0];
     new_learnt.retain(|l| *l == l0 || !l.is_redundant(asg, cdb, &mut to_clear, &levels));
@@ -477,12 +475,11 @@ fn minimize_learnt(
     }
     // find correct backtrack level from remaining literals
     let mut level_to_return = 0;
-    let level = asg.level_ref();
     if 1 < new_learnt.len() {
         let mut max_i = 1;
-        level_to_return = level[new_learnt[max_i].vi()];
+        level_to_return = asg.level(new_learnt[max_i].vi());
         for (i, l) in new_learnt.iter().enumerate().skip(2) {
-            let lv = level[l.vi()];
+            let lv = asg.level(l.vi());
             if level_to_return < lv {
                 level_to_return = lv;
                 max_i = i;

@@ -73,7 +73,7 @@ dependencies = [
 
 [[package]]
 name = "splr"
-version = "0.17.3"
+version = "0.18.0-dev0"
 dependencies = [
  "bitflags",
  "instant",
