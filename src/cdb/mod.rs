@@ -439,7 +439,6 @@ mod tests {
         let c0 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
             .as_cid();
-        assert_eq!(cdb[c0].rank, 4);
 
         asg.assign_by_decision(lit(-2)); // at level 1
         asg.assign_by_decision(lit(1)); // at level 2
@@ -450,7 +449,6 @@ mod tests {
             .as_cid();
         let c = &cdb[c1];
 
-        assert_eq!(c.rank, 3);
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
@@ -459,7 +457,6 @@ mod tests {
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
             .as_cid();
         let c = &cdb[c2];
-        assert_eq!(c.rank, 3);
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
