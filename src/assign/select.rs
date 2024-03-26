@@ -9,22 +9,6 @@ use {
     std::collections::HashMap,
 };
 
-/// ```ignore
-/// let x: Option<bool> = var_assign!(self, lit.vi());
-/// ```
-#[cfg(feature = "unsafe_access")]
-macro_rules! var_assign {
-    ($asg: expr, $var: expr) => {
-        unsafe { *$asg.assign.get_unchecked($var) }
-    };
-}
-#[cfg(not(feature = "unsafe_access"))]
-macro_rules! var_assign {
-    ($asg: expr, $var: expr) => {
-        $asg.assign[$var]
-    };
-}
-
 /// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
     #[cfg(feature = "rephase")]
@@ -56,13 +40,14 @@ impl VarSelectIF for AssignStack {
             .iter()
             .enumerate()
             .filter_map(|(vi, v)| {
-                if self.level[vi] == self.root_level || self.var[vi].is(FlagVar::ELIMINATED) {
+                let var = &self.var[vi];
+                if var.level == self.root_level || var.is(FlagVar::ELIMINATED) {
                     default_value.map(|b| (vi, b))
                 } else {
                     Some((
                         vi,
                         self.best_phases.get(&vi).map_or(
-                            self.assign[vi].unwrap_or_else(|| v.is(FlagVar::PHASE)),
+                            var.assign.unwrap_or_else(|| v.is(FlagVar::PHASE)),
                             |(b, _)| *b,
                         ),
                     ))
@@ -108,7 +93,7 @@ impl VarSelectIF for AssignStack {
         debug_assert!(self
             .best_phases
             .iter()
-            .all(|(vi, b)| self.assign[*vi] != Some(!b.0)));
+            .all(|(vi, b)| self.var[*vi].assign != Some(!b.0)));
         self.num_rephase += 1;
         for (vi, (b, _)) in self.best_phases.iter() {
             let v = &mut self.var[*vi];
@@ -120,7 +105,7 @@ impl VarSelectIF for AssignStack {
         if self
             .best_phases
             .iter()
-            .any(|(vi, b)| self.assign[*vi] == Some(!b.0))
+            .any(|(vi, b)| self.var[*vi].assign == Some(!b.0))
         {
             self.best_phases.clear();
             self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
@@ -136,7 +121,7 @@ impl VarSelectIF for AssignStack {
     fn rebuild_order(&mut self) {
         self.clear_heap();
         for vi in 1..self.var.len() {
-            if var_assign!(self, vi).is_none() && !self.var[vi].is(FlagVar::ELIMINATED) {
+            if self.var[vi].assign.is_none() && !self.var[vi].is(FlagVar::ELIMINATED) {
                 self.insert_heap(vi);
             }
         }
@@ -148,7 +133,7 @@ impl AssignStack {
     fn select_var(&mut self) -> VarId {
         loop {
             let vi = self.get_heap_root();
-            if var_assign!(self, vi).is_none() && !self.var[vi].is(FlagVar::ELIMINATED) {
+            if self.var[vi].assign.is_none() && !self.var[vi].is(FlagVar::ELIMINATED) {
                 return vi;
             }
         }

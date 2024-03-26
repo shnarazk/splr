@@ -73,9 +73,10 @@ pub trait AssignIF:
     /// return `true` if there are un-propagated assignments.
     fn remains(&self) -> bool;
     /// return a reference to `assign`.
-    fn assign_ref(&self) -> &[Option<bool>];
+    // fn assign_ref(&self) -> &[Option<bool>];
+    fn assign_ref(&self) -> impl Iterator<Item = Option<bool>>;
     /// return a reference to `level`.
-    fn level_ref(&self) -> &[DecisionLevel];
+    fn level_ref(&self) -> impl Iterator<Item = DecisionLevel>;
     fn best_assigned(&mut self) -> Option<usize>;
     /// return `true` if no best_phases
     #[cfg(feature = "rephase")]
@@ -114,6 +115,13 @@ impl fmt::Display for AssignReason {
 /// Object representing a variable.
 #[derive(Clone, Debug)]
 pub struct Var {
+    /// assigns of vars
+    assign: Option<bool>,
+    /// levels of vars
+    level: DecisionLevel,
+    /// reason of assignment
+    reason: AssignReason,
+
     /// the `Flag`s (8 bits)
     flags: FlagVar,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
@@ -130,12 +138,6 @@ pub struct Var {
 /// A record of assignment. It's called 'trail' in Glucose.
 #[derive(Clone, Debug)]
 pub struct AssignStack {
-    /// assigns of vars
-    assign: Vec<Option<bool>>,
-    /// levels of vars
-    level: Vec<DecisionLevel>,
-    /// reason of assignment
-    reason: Vec<AssignReason>,
     /// record of assignment
     trail: Vec<Lit>,
     trail_lim: Vec<usize>,

@@ -239,12 +239,11 @@ impl Clause {
             self.rank = u16::MAX;
             return u16::MAX as usize;
         }
-        let level = asg.level_ref();
         let key: usize = lbd_temp[0] + 1;
         lbd_temp[0] = key;
         let mut cnt = 0;
         for l in &self.lits {
-            let lv = level[l.vi()];
+            let lv = asg.level(l.vi());
             if lv == 0 {
                 continue;
             }

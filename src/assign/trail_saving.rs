@@ -39,7 +39,7 @@ impl TrailSavingIF for AssignStack {
                 // }
 
                 self.trail_saved.push(l);
-                self.reason_saved[vi] = self.reason[vi];
+                self.reason_saved[vi] = self.var[vi].reason;
                 self.reward_at_unassign(vi);
                 if activity_threshold <= self.var[vi].reward {
                     self.insert_heap(vi);

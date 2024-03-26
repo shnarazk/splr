@@ -17,9 +17,6 @@ use super::TrailSavingIF;
 impl Default for AssignStack {
     fn default() -> AssignStack {
         AssignStack {
-            assign: Vec::new(),
-            level: Vec::new(),
-            reason: Vec::new(),
             trail: Vec::new(),
             trail_lim: Vec::new(),
             q_head: 0,
@@ -93,9 +90,6 @@ impl Instantiate for AssignStack {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
-            assign: vec![None; 1 + nv],
-            level: (0..nv as u32 + 1).collect::<Vec<_>>(), // each literal occupies a single level.
-            reason: vec![AssignReason::None; nv + 1],
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv),
 
@@ -138,9 +132,6 @@ impl Instantiate for AssignStack {
                 self.clear_saved_trail();
             }
             SolverEvent::NewVar => {
-                self.assign.push(None);
-                self.level.push(DecisionLevel::default());
-                self.reason.push(AssignReason::None);
                 self.expand_heap();
                 self.num_vars += 1;
                 self.var.push(Var::default());
@@ -195,11 +186,11 @@ impl AssignIF for AssignStack {
     fn remains(&self) -> bool {
         self.q_head < self.trail.len()
     }
-    fn assign_ref(&self) -> &[Option<bool>] {
-        &self.assign
+    fn assign_ref(&self) -> impl Iterator<Item = Option<bool>> {
+        self.var.iter().map(|v| v.assign)
     }
-    fn level_ref(&self) -> &[DecisionLevel] {
-        &self.level
+    fn level_ref(&self) -> impl Iterator<Item = DecisionLevel> {
+        self.var.iter().map(|v| v.level)
     }
     fn best_assigned(&mut self) -> Option<usize> {
         (self.build_best_at == self.num_propagation).then_some(self.num_vars - self.num_best_assign)
@@ -227,7 +218,12 @@ impl AssignIF for AssignStack {
                 })
                 .collect::<Vec<_>>(),
         );
-        let mut extended_model: Vec<Option<bool>> = self.assign.clone();
+        let mut extended_model: Vec<Option<bool>> = self
+            .var
+            .iter()
+            .map(|v| v.assign)
+            .clone()
+            .collect::<Vec<_>>();
         if lits.is_empty() {
             return extended_model;
         }
@@ -395,7 +391,7 @@ mod tests {
         // [1, 2, 3] => [1, 2, 3, 4]
         asg.assign_by_decision(lit(4));
         assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
-        assert_eq!(asg.level[lit(4).vi()], 2);
+        assert_eq!(asg.var[lit(4).vi()].level, 2);
         assert_eq!(asg.trail_lim, vec![2, 3]);
 
         // [1, 2, 3, 4] => [1, 2, -4]
