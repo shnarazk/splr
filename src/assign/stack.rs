@@ -100,7 +100,15 @@ impl Instantiate for AssignStack {
 
             num_vars: cnf.num_of_variables,
             assign_rate: ProgressASG::instantiate(config, cnf),
-            var: Var::new_vars(nv),
+            var: Var::new_vars(nv)
+                .into_iter()
+                .enumerate()
+                // each literal occupyes a single level.
+                .map(|(i, mut v)| {
+                    v.level = i as u32;
+                    v
+                })
+                .collect::<Vec<_>>(),
 
             #[cfg(feature = "EVSIDS")]
             activity_decay: config.vrw_dcy_rat * 0.6,
