@@ -12,7 +12,7 @@
             value = {
                default =
                  rustPlatform.buildRustPackage rec {
-                   version = "0.17.2-20240312";
+                   version = "0.17.3-20240326";
                    name = "splr-${version}";
                    pname = "splr";
                    src = self;
