@@ -32,9 +32,9 @@ use {
     self::ema::ProgressLBD,
     crate::{assign::AssignIF, types::*},
     std::{
-        num::NonZeroU32,
         ops::IndexMut,
         slice::{Iter, IterMut},
+        sync::RwLock,
     },
     watch_cache::*,
 };
@@ -184,10 +184,9 @@ pub trait ClauseDBIF:
 
 /// Clause identifier, or clause index, starting with one.
 /// Note: ids are re-used after 'garbage collection'.
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct ClauseId {
-    /// a sequence number.
-    pub ordinal: NonZeroU32,
+#[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ClauseRef {
+    c: RwLock<Box<Clause>>,
 }
 
 /// A representation of 'clause'
@@ -415,7 +414,7 @@ mod tests {
 
     #[allow(dead_code)]
     fn check_watches(cdb: &ClauseDB, cid: ClauseId) {
-        let c = &cdb.clause[NonZeroU32::get(cid.ordinal) as usize];
+        let c = &cdb.clause[0];
         if c.lits.is_empty() {
             println!("skip checking watches of an empty clause");
             return;
