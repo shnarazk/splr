@@ -1,5 +1,4 @@
 use {
-    super::ClauseId,
     crate::types::*,
     std::{
         collections::HashMap,
