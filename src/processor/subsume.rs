@@ -16,8 +16,8 @@ impl Eliminator {
         &mut self,
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
-        cid: ClauseId,
-        did: ClauseId,
+        cid: ClauseRef,
+        did: ClauseRef,
     ) -> MaybeInconsistent {
         match have_subsuming_lit(cdb, cid, did) {
             Subsumable::Success => {
@@ -49,7 +49,7 @@ impl Eliminator {
 }
 
 /// returns a literal if these clauses can be merged by the literal.
-fn have_subsuming_lit(cdb: &mut impl ClauseDBIF, cid: ClauseId, other: ClauseId) -> Subsumable {
+fn have_subsuming_lit(cdb: &mut impl ClauseDBIF, cid: ClauseRef, other: ClauseRef) -> Subsumable {
     debug_assert!(!other.is_lifted_lit());
     if cid.is_lifted_lit() {
         let l = Lit::from(cid);
@@ -89,7 +89,7 @@ fn strengthen_clause(
     asg: &mut impl AssignIF,
     cdb: &mut impl ClauseDBIF,
     elim: &mut Eliminator,
-    cid: ClauseId,
+    cid: ClauseRef,
     l: Lit,
 ) -> MaybeInconsistent {
     debug_assert!(!cdb[cid].is_dead());

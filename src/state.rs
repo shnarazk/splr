@@ -129,7 +129,7 @@ pub struct State {
     /// working place to build learnt clauses
     pub new_learnt: Vec<Lit>,
     /// working place to store given clauses' ids which is used to derive a good learnt
-    pub derive20: Vec<ClauseId>,
+    pub derive20: Vec<ClauseRef>,
     /// `progress` invocation counter
     pub progress_cnt: usize,
     /// keep the previous statistics values

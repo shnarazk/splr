@@ -88,7 +88,7 @@ enum EliminatorMode {
 pub struct Eliminator {
     enable: bool,
     mode: EliminatorMode,
-    clause_queue: Vec<ClauseId>,
+    clause_queue: Vec<ClauseRef>,
     var_queue: VarOccHeap,
     bwdsub_assigns: usize,
     /// constraints on eliminated var. It is used by `extend_model`.

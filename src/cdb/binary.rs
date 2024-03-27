@@ -7,7 +7,7 @@ use {
 };
 
 /// storage of binary links
-pub type BinaryLinkList = Vec<(Lit, ClauseId)>;
+pub type BinaryLinkList = Vec<(Lit, ClauseRef)>;
 
 impl Index<Lit> for Vec<BinaryLinkList> {
     type Output = BinaryLinkList;
@@ -34,10 +34,10 @@ impl IndexMut<Lit> for Vec<BinaryLinkList> {
     }
 }
 
-/// storage with mapper to `ClauseId` of binary links
+/// storage with mapper to `ClauseRef` of binary links
 #[derive(Clone, Debug, Default)]
 pub struct BinaryLinkDB {
-    hash: HashMap<(Lit, Lit), ClauseId>,
+    hash: HashMap<(Lit, Lit), ClauseRef>,
     list: Vec<BinaryLinkList>,
 }
 
@@ -53,12 +53,12 @@ impl Instantiate for BinaryLinkDB {
 }
 
 pub trait BinaryLinkIF {
-    /// add a mapping from a pair of Lit to a `ClauseId`
-    fn add(&mut self, lit0: Lit, lit1: Lit, cid: ClauseId);
+    /// add a mapping from a pair of Lit to a `ClauseRef`
+    fn add(&mut self, lit0: Lit, lit1: Lit, cid: ClauseRef);
     /// remove a pair of `Lit`s
     fn remove(&mut self, lit0: Lit, lit1: Lit) -> MaybeInconsistent;
-    /// return 'ClauseId` linked from a pair of `Lit`s
-    fn search(&self, lit0: Lit, lit1: Lit) -> Option<&ClauseId>;
+    /// return 'ClauseRef` linked from a pair of `Lit`s
+    fn search(&self, lit0: Lit, lit1: Lit) -> Option<&ClauseRef>;
     /// return the all links that include `Lit`.
     /// Note this is not a `watch_list`. The other literal has an opposite phase.
     fn connect_with(&self, lit: Lit) -> &BinaryLinkList;
@@ -69,7 +69,7 @@ pub trait BinaryLinkIF {
 }
 
 impl BinaryLinkIF for BinaryLinkDB {
-    fn add(&mut self, lit0: Lit, lit1: Lit, cid: ClauseId) {
+    fn add(&mut self, lit0: Lit, lit1: Lit, cid: ClauseRef) {
         let l0 = lit0.min(lit1);
         let l1 = lit0.max(lit1);
         self.hash.insert((l0, l1), cid);
@@ -84,7 +84,7 @@ impl BinaryLinkIF for BinaryLinkDB {
         self.list[lit1].delete_unstable(|p| p.0 == lit0);
         Ok(())
     }
-    fn search(&self, lit0: Lit, lit1: Lit) -> Option<&ClauseId> {
+    fn search(&self, lit0: Lit, lit1: Lit) -> Option<&ClauseRef> {
         let l0 = lit0.min(lit1);
         let l1 = lit0.max(lit1);
         self.hash.get(&(l0, l1))

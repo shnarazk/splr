@@ -17,8 +17,8 @@ pub trait VarOrderIF {
 #[derive(Clone, Debug, Default)]
 pub struct LitOccurs {
     pub aborted: bool,
-    pub pos_occurs: Vec<ClauseId>,
-    pub neg_occurs: Vec<ClauseId>,
+    pub pos_occurs: Vec<ClauseRef>,
+    pub neg_occurs: Vec<ClauseRef>,
 }
 
 impl LitOccurs {

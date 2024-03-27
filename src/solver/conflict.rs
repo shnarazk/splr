@@ -336,7 +336,7 @@ fn conflict_analyze(
     }
     let mut trail_index = asg.stack_len() - 1;
     let mut max_lbd: u16 = 0;
-    let mut cid_with_max_lbd: Option<ClauseId> = None;
+    let mut cid_with_max_lbd: Option<ClauseRef> = None;
     loop {
         match reason {
             AssignReason::BinaryLink(l) => {
@@ -663,7 +663,7 @@ fn tracer(asg: &AssignStack, cdb: &ClauseDB) {
         }
         println!(
             "{}",
-            cdb[ClauseId::from(cid)]
+            cdb[ClauseRef::from(cid)]
                 .report(asg)
                 .iter()
                 .map(|r| format!(

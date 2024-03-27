@@ -2,7 +2,7 @@
 /// some common traits.
 pub use crate::{
     assign::AssignReason,
-    cdb::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
+    cdb::{Clause, ClauseDB, ClauseIF, ClauseRef, ClauseRefIF},
     config::Config,
     primitive::{ema::*, luby::*},
     solver::SolverEvent,
@@ -183,9 +183,9 @@ impl From<i32> for Lit {
     }
 }
 
-impl From<ClauseId> for Lit {
+impl From<ClauseRef> for Lit {
     #[inline]
-    fn from(cid: ClauseId) -> Self {
+    fn from(cid: ClauseRef) -> Self {
         Lit {
             ordinal: unsafe {
                 NonZeroU32::new_unchecked(NonZeroU32::get(cid.ordinal) & 0x7FFF_FFFF)
@@ -203,10 +203,10 @@ impl From<Lit> for bool {
     }
 }
 
-impl From<Lit> for ClauseId {
+impl From<Lit> for ClauseRef {
     #[inline]
-    fn from(l: Lit) -> ClauseId {
-        ClauseId {
+    fn from(l: Lit) -> ClauseRef {
+        ClauseRef {
             ordinal: unsafe { NonZeroU32::new_unchecked(NonZeroU32::get(l.ordinal) | 0x8000_0000) },
         }
     }
@@ -338,22 +338,22 @@ pub type PropagationResult = Result<(), ConflictContext>;
 // while EmptyClause can be used for simply UNSAT form.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RefClause {
-    Clause(ClauseId),
+    Clause(ClauseRef),
     Dead,
     EmptyClause,
-    RegisteredClause(ClauseId),
+    RegisteredClause(ClauseRef),
     UnitClause(Lit),
 }
 
 impl RefClause {
-    pub fn as_cid(&self) -> ClauseId {
+    pub fn as_cid(&self) -> ClauseRef {
         match self {
             RefClause::Clause(cid) => *cid,
             RefClause::RegisteredClause(cid) => *cid,
             _ => panic!("invalid reference to clause"),
         }
     }
-    pub fn is_new(&self) -> Option<ClauseId> {
+    pub fn is_new(&self) -> Option<ClauseRef> {
         match self {
             RefClause::Clause(cid) => Some(*cid),
             RefClause::RegisteredClause(_) => None,
@@ -630,7 +630,7 @@ impl Logger {
 }
 
 #[derive(Clone, Debug)]
-pub struct OrderedProxy<T: Clone + Default + Sized + Ord> {
+pub struct OrderedProxy<T: Clone + Sized + Ord> {
     index: f64,
     body: T,
 }
