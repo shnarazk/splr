@@ -88,7 +88,7 @@ pub trait AssignIF:
 }
 
 /// Reasons of assignments
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AssignReason {
     /// Implication by binary clause
     BinaryLink(Lit),

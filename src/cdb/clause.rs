@@ -127,6 +127,15 @@ impl From<&Clause> for Vec<i32> {
     }
 }
 
+impl From<Vec<Lit>> for Clause {
+    fn from(lits: Vec<Lit>) -> Clause {
+        Clause {
+            lits,
+            ..Default::default()
+        }
+    }
+}
+
 // impl PartialOrd for Clause {
 //     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
 //         Some(self.cmp(other))

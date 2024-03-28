@@ -185,12 +185,10 @@ impl From<i32> for Lit {
 
 impl From<ClauseRef> for Lit {
     #[inline]
-    fn from(cid: ClauseRef) -> Self {
-        Lit {
-            ordinal: unsafe {
-                NonZeroU32::new_unchecked(NonZeroU32::get(cid.ordinal) & 0x7FFF_FFFF)
-            },
-        }
+    fn from(cr: ClauseRef) -> Self {
+        let c = cr.get();
+        assert!(c.is(FlagClause::LIT_CLAUSE));
+        c.lit0()
     }
 }
 
@@ -206,9 +204,10 @@ impl From<Lit> for bool {
 impl From<Lit> for ClauseRef {
     #[inline]
     fn from(l: Lit) -> ClauseRef {
-        ClauseRef {
-            ordinal: unsafe { NonZeroU32::new_unchecked(NonZeroU32::get(l.ordinal) | 0x8000_0000) },
-        }
+        ClauseRef::new(Clause::from(vec![l]))
+        // ClauseRef {
+        //     ordinal: unsafe { NonZeroU32::new_unchecked(NonZeroU32::get(l.ordinal) | 0x8000_0000) },
+        // }
     }
 }
 
@@ -577,6 +576,8 @@ bitflags! {
         const OCCUR_LINKED = 0b0000_1000;
         /// a given clause derived a learnt which LBD is smaller than 20.
         const DERIVE20     = 0b0001_0000;
+        /// a given clause derived a learnt which LBD is smaller than 20.
+        const LIT_CLAUSE   = 0b0010_0000;
     }
 }
 

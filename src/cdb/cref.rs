@@ -1,11 +1,14 @@
 use {
-    super::ClauseRef,
-    std::fmt,
+    super::{Clause, ClauseRef},
+    std::{fmt, rc::Rc},
     // std::{fmt, sync::RwLock},
 };
 
 /// API for Clause Id.
 pub trait ClauseRefIF {
+    fn new(c: Clause) -> Self;
+    fn get(&self) -> &Clause;
+    fn get_mut(&mut self) -> &mut Clause;
     /// return `true` if a given clause id is made from a `Lit`.
     fn is_lifted_lit(&self) -> bool;
 }
@@ -38,23 +41,31 @@ pub trait ClauseRefIF {
 
 impl fmt::Debug for ClauseRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let c = self.c.read().unwrap();
-        write!(f, "{}C", c.ordinal)
+        write!(f, "{:?}C", self.c.lits)
     }
 }
 
 impl fmt::Display for ClauseRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let c = self.crread().unwrap();
-        write!(f, "{}C", self.ordinal)
+        write!(f, "{:?}C", self.c.lits)
     }
 }
 
 impl ClauseRefIF for ClauseRef {
+    fn new(c: Clause) -> Self {
+        ClauseRef {
+            c: Rc::new(Box::new(c)),
+        }
+    }
+    fn get(&self) -> &Clause {
+        &**self.c
+    }
+    fn get_mut(&mut self) -> &mut Clause {
+        Rc::get_mut(&mut self.c).unwrap()
+    }
     /// return `true` if the clause is generated from a literal by Eliminator.
     fn is_lifted_lit(&self) -> bool {
-        let c = self.crread().unwrap();
-        c.is_lifted_lit()
+        unimplemented!("(**self.c).is_lifted_lit()")
         // 0 != 0x8000_0000 & NonZeroU32::get(self.ordinal)
     }
 }

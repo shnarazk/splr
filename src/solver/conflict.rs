@@ -32,8 +32,8 @@ pub fn handle_conflict(
     // at higher level due to the incoherence between the current level and conflicting
     // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
     {
-        if let AssignReason::Implication(cid) = cc.1 {
-            if cdb[cid].iter().all(|l| asg.level(l.vi()) == 0) {
+        if let AssignReason::Implication(cr) = cc.1 {
+            if cr.get().iter().all(|l| asg.level(l.vi()) == 0) {
                 return Err(SolverError::RootLevelConflict(*cc));
             }
         }
@@ -589,15 +589,15 @@ fn lit_level(
     match asg.reason(lit.vi()) {
         AssignReason::Decision(0) => asg.root_level(),
         AssignReason::Decision(lvl) => lvl,
-        AssignReason::Implication(cid) => {
+        AssignReason::Implication(cr) => {
             assert_eq!(
-                cdb[cid].lit0(),
+                cr.get().lit0(),
                 lit,
-                "lit0 {} != lit{}, cid {}, {}",
-                cdb[cid].lit0(),
+                "lit0 {} != lit{}, cr {}, {}",
+                cr.get().lit0(),
                 lit,
-                cid,
-                &cdb[cid]
+                cr,
+                cr.get()
             );
             // assert!(
             //     !bag.contains(&lit),
@@ -609,7 +609,7 @@ fn lit_level(
             //     dumper(asg, cdb, bag),
             // );
             // bag.push(lit);
-            cdb[cid]
+            cr.get()
                 .iter()
                 .skip(1)
                 .map(|l| lit_level(asg, cdb, !*l, bag, _mes))
