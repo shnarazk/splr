@@ -235,7 +235,7 @@ impl EliminateIF for Eliminator {
             }
             let vec = c.iter().copied().collect::<Vec<_>>();
             debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
-            self.add_cid_occur(asg, ClauseId::from(cid), c, false);
+            self.add_cid_occur(asg, ClauseRef::from(cid), c, false);
         }
         if force {
             for vi in 1..=asg.derefer(assign::property::Tusize::NumVar) {
@@ -325,7 +325,7 @@ impl Eliminator {
     pub fn add_cid_occur(
         &mut self,
         asg: &mut impl AssignIF,
-        cid: ClauseId,
+        cid: ClauseRef,
         c: &mut Clause,
         enqueue: bool,
     ) {
@@ -380,7 +380,7 @@ impl Eliminator {
         }
     }
     /// remove a clause id from all corresponding occur lists.
-    pub fn remove_cid_occur(&mut self, asg: &mut impl AssignIF, cid: ClauseId, c: &mut Clause) {
+    pub fn remove_cid_occur(&mut self, asg: &mut impl AssignIF, cid: ClauseRef, c: &mut Clause) {
         debug_assert!(self.mode == EliminatorMode::Running);
         debug_assert!(!cid.is_lifted_lit());
         debug_assert!(!c.is_dead());
@@ -423,7 +423,7 @@ impl Eliminator {
             // Check top-level assignments by creating a dummy clause
             // and placing it in the queue:
             if self.clause_queue.is_empty() && self.bwdsub_assigns < asg.stack_len() {
-                let c = ClauseId::from(asg.stack(self.bwdsub_assigns));
+                let c = ClauseRef::from(asg.stack(self.bwdsub_assigns));
                 self.clause_queue.push(c);
                 self.bwdsub_assigns += 1;
             }
@@ -577,7 +577,7 @@ impl Eliminator {
         Ok(())
     }
     /// remove a clause id from literal's occur list.
-    pub fn remove_lit_occur(&mut self, asg: &mut impl AssignIF, l: Lit, cid: ClauseId) {
+    pub fn remove_lit_occur(&mut self, asg: &mut impl AssignIF, l: Lit, cid: ClauseRef) {
         let w = &mut self[l.vi()];
         if w.aborted {
             return;
@@ -599,7 +599,7 @@ impl Eliminator {
     ///
 
     /// enqueue a clause into eliminator's clause queue.
-    pub fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause) {
+    pub fn enqueue_clause(&mut self, cid: ClauseRef, c: &mut Clause) {
         if self.mode != EliminatorMode::Running
             || c.is(FlagClause::ENQUEUED)
             || self.subsume_literal_limit < c.len()
@@ -654,18 +654,19 @@ fn check_eliminator(cdb: &impl ClauseDBIF, elim: &Eliminator) -> bool {
     //     }
     // }
     // all clauses are registered in corresponding occur_lists
-    for (cid, c) in cdb.iter().enumerate().skip(1) {
+    for cr in cdb.iter() {
+        let c = cr.read().unwrap();
         if c.is_dead() {
             continue;
         }
         for l in c.iter() {
             let v = l.vi();
             if bool::from(*l) {
-                if !elim[v].pos_occurs.contains(&(ClauseId::from(cid))) {
-                    panic!("failed to check {} {:#}", (ClauseId::from(cid)), c);
+                if !elim[v].pos_occurs.contains(&cr) {
+                    panic!("failed to check {}", cr);
                 }
-            } else if !elim[v].neg_occurs.contains(&(ClauseId::from(cid))) {
-                panic!("failed to check {} {:#}", (ClauseId::from(cid)), c);
+            } else if !elim[v].neg_occurs.contains(&cr) {
+                panic!("failed to check {}", cr);
             }
         }
     }

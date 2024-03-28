@@ -127,6 +127,27 @@ impl From<&Clause> for Vec<i32> {
     }
 }
 
+impl From<Vec<Lit>> for Clause {
+    fn from(lits: Vec<Lit>) -> Clause {
+        Clause {
+            lits,
+            ..Default::default()
+        }
+    }
+}
+
+// impl PartialOrd for Clause {
+//     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+//         Some(self.cmp(other))
+//     }
+// }
+
+// impl Ord for Clause {
+//     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+//         self.rank.cmp(&other.rank)
+//     }
+// }
+
 impl ClauseIF for Clause {
     fn is_empty(&self) -> bool {
         self.lits.is_empty()

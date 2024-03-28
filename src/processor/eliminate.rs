@@ -151,8 +151,8 @@ pub fn eliminate_var(
 fn skip_var_elimination(
     asg: &impl AssignIF,
     cdb: &impl ClauseDBIF,
-    pos: &[ClauseId],
-    neg: &[ClauseId],
+    pos: &[ClauseRef],
+    neg: &[ClauseRef],
     v: VarId,
     grow_limit: usize,
 ) -> bool {
@@ -192,8 +192,8 @@ fn skip_var_elimination(
 fn merge_cost(
     asg: &impl AssignIF,
     cdb: &impl ClauseDBIF,
-    cp: ClauseId,
-    cq: ClauseId,
+    cp: ClauseRef,
+    cq: ClauseRef,
     vi: VarId,
 ) -> Option<usize> {
     let c_p = &cdb[cp];
@@ -239,8 +239,8 @@ fn merge_cost(
 fn merge(
     asg: &mut impl AssignIF,
     cdb: &mut impl ClauseDBIF,
-    cip: ClauseId,
-    ciq: ClauseId,
+    cip: ClauseRef,
+    ciq: ClauseRef,
     vi: VarId,
     vec: &mut Vec<Lit>,
 ) -> usize {
@@ -277,8 +277,8 @@ fn make_eliminated_clauses(
     cdb: &mut impl ClauseDBIF,
     store: &mut Vec<Lit>,
     v: VarId,
-    pos: &[ClauseId],
-    neg: &[ClauseId],
+    pos: &[ClauseRef],
+    neg: &[ClauseRef],
 ) {
     if neg.len() < pos.len() {
         for cid in neg {
@@ -306,7 +306,7 @@ fn make_eliminated_clause(
     cdb: &mut impl ClauseDBIF,
     store: &mut Vec<Lit>,
     vi: VarId,
-    cid: ClauseId,
+    cid: ClauseRef,
 ) {
     let first = store.len();
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:

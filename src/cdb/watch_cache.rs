@@ -1,5 +1,5 @@
 use {
-    super::ClauseId,
+    super::ClauseRef,
     crate::types::*,
     std::{
         collections::HashMap,
@@ -7,34 +7,34 @@ use {
     },
 };
 
-pub type WatchCacheList = Vec<(ClauseId, Lit)>;
+pub type WatchCacheList = Vec<(ClauseRef, Lit)>;
 pub type WatchCache = WatchCacheList;
 
 pub trait WatchCacheIF {
-    fn get_watch(&self, cid: &ClauseId) -> Option<&Lit>;
-    fn remove_watch(&mut self, cid: &ClauseId);
-    fn insert_watch(&mut self, cid: ClauseId, l: Lit);
+    fn get_watch(&self, cid: &ClauseRef) -> Option<&Lit>;
+    fn remove_watch(&mut self, cid: &ClauseRef);
+    fn insert_watch(&mut self, cid: ClauseRef, l: Lit);
     fn append_watch(&mut self, appendant: Self);
-    fn update_watch(&mut self, cid: ClauseId, l: Lit);
+    fn update_watch(&mut self, cid: ClauseRef, l: Lit);
 }
 
 impl WatchCacheIF for WatchCacheList {
-    fn get_watch(&self, cid: &ClauseId) -> Option<&Lit> {
+    fn get_watch(&self, cid: &ClauseRef) -> Option<&Lit> {
         self.iter().find_map(|e| (e.0 == *cid).then_some(&e.1))
     }
-    fn remove_watch(&mut self, cid: &ClauseId) {
+    fn remove_watch(&mut self, cid: &ClauseRef) {
         if let Some(i) = self.iter().position(|e| e.0 == *cid) {
             self.swap_remove(i);
         }
     }
-    fn insert_watch(&mut self, cid: ClauseId, l: Lit) {
+    fn insert_watch(&mut self, cid: ClauseRef, l: Lit) {
         debug_assert!(self.iter().all(|e| e.0 != cid));
         self.push((cid, l));
     }
     fn append_watch(&mut self, mut appendant: Self) {
         self.append(&mut appendant);
     }
-    fn update_watch(&mut self, cid: ClauseId, l: Lit) {
+    fn update_watch(&mut self, cid: ClauseRef, l: Lit) {
         for e in self.iter_mut() {
             if e.0 == cid {
                 e.1 = l;
@@ -44,8 +44,8 @@ impl WatchCacheIF for WatchCacheList {
     }
 }
 
-impl Index<Lit> for Vec<HashMap<Lit, ClauseId>> {
-    type Output = HashMap<Lit, ClauseId>;
+impl Index<Lit> for Vec<HashMap<Lit, ClauseRef>> {
+    type Output = HashMap<Lit, ClauseRef>;
     #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
         #[cfg(feature = "unsafe_access")]
@@ -57,7 +57,7 @@ impl Index<Lit> for Vec<HashMap<Lit, ClauseId>> {
     }
 }
 
-impl IndexMut<Lit> for Vec<HashMap<Lit, ClauseId>> {
+impl IndexMut<Lit> for Vec<HashMap<Lit, ClauseRef>> {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
         #[cfg(feature = "unsafe_access")]

@@ -715,7 +715,7 @@ impl AssignStack {
         while num_propagated < self.trail.len() {
             num_propagated = self.trail.len();
             for ci in 1..cdb.len() {
-                let cid = ClauseId::from(ci);
+                let cid = ClauseRef::from(ci);
                 if cdb[cid].is_dead() {
                     continue;
                 }
