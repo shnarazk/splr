@@ -565,7 +565,7 @@ pub trait FlagIF {
 
 bitflags! {
     /// Misc flags used by [`Clause`](`crate::cdb::Clause`).
-    #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
     pub struct FlagClause: u8 {
         /// a clause is a generated clause by conflict analysis and is removable.
         const LEARNT       = 0b0000_0001;
@@ -582,7 +582,7 @@ bitflags! {
 
 bitflags! {
     /// Misc flags used by [`Var`](`crate::assign::Var`).
-    #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
     pub struct FlagVar: u8 {
         /// * the previous assigned value of a Var.
         const PHASE        = 0b0000_0001;

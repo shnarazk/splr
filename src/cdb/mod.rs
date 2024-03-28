@@ -31,7 +31,7 @@ pub use self::{
 use {
     self::ema::ProgressLBD,
     crate::{assign::AssignIF, types::*},
-    std::{collections::HashSet, ops::Index, slice::Iter, sync::RwLock},
+    std::{collections::HashSet, rc::Rc, slice::Iter},
     watch_cache::*,
 };
 
@@ -185,13 +185,13 @@ pub trait ClauseDBIF:
 
 /// Clause identifier, or clause index, starting with one.
 /// Note: ids are re-used after 'garbage collection'.
-#[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Eq, PartialEq, PartialOrd)]
 pub struct ClauseRef {
-    c: RwLock<Box<Clause>>,
+    c: Rc<Box<Clause>>,
 }
 
 /// A representation of 'clause'
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Clause {
     /// The literals in a clause.
     lits: Vec<Lit>,

@@ -185,7 +185,7 @@ fn select_targets(
     cdb: &mut ClauseDB,
     initial_stage: bool,
     len: Option<usize>,
-) -> Vec<OrderedProxy<ClauseRef>> {
+) -> Vec<OrderedProxy<Clause>> {
     if initial_stage {
         let mut seen: Vec<Option<OrderedProxy<ClauseRef>>> = vec![None; 2 * (asg.num_vars + 1)];
         for (i, c) in cdb.iter().enumerate().skip(1) {
