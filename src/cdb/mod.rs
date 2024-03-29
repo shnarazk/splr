@@ -126,13 +126,13 @@ pub trait ClauseDBIF:
     fn new_clause(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
     fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>) -> RefClause;
     /// un-register a clause `cid` from clause database and make the clause dead.
-    fn remove_clause(&mut self, cid: ClauseRef);
+    fn remove_clause(&mut self, cr: ClauseRef);
     /// un-register a clause `cid` from clause database and make the clause dead.
-    fn remove_clause_sandbox(&mut self, cid: ClauseRef);
+    fn remove_clause_sandbox(&mut self, cr: ClauseRef);
     /// update watches of the clause
-    fn transform_by_elimination(&mut self, cid: ClauseRef, p: Lit) -> RefClause;
+    fn transform_by_elimination(&mut self, cr: ClauseRef, p: Lit) -> RefClause;
     /// generic clause transformer (not in use)
-    fn transform_by_replacement(&mut self, cid: ClauseRef, vec: &mut Vec<Lit>) -> RefClause;
+    fn transform_by_replacement(&mut self, cr: ClauseRef, vec: &mut Vec<Lit>) -> RefClause;
     /// check satisfied and nullified literals in a clause
     fn transform_by_simplification(&mut self, asg: &mut impl AssignIF, cid: ClauseRef)
         -> RefClause;

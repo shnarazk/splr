@@ -79,13 +79,14 @@ impl TrailSavingIF for AssignStack {
                     );
                 }
                 // reason refinement by ignoring this dependecy
-                (None, AssignReason::Implication(c)) if q < cdb[c].rank => {
+                (None, AssignReason::Implication(cr)) if q < cr.get().rank => {
                     self.insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
-                (None, AssignReason::Implication(cid)) => {
-                    debug_assert_eq!(cdb[cid].lit0(), lit);
-                    debug_assert!(cdb[cid]
+                (None, AssignReason::Implication(cr)) => {
+                    debug_assert_eq!(cr.get().lit0(), lit);
+                    debug_assert!(cr
+                        .get()
                         .iter()
                         .skip(1)
                         .all(|l| self.assigned(*l) == Some(false)));
@@ -105,11 +106,12 @@ impl TrailSavingIF for AssignStack {
                     self.clear_saved_trail();
                     return Err((lit, old_reason));
                 }
-                (Some(false), AssignReason::Implication(cid)) => {
-                    debug_assert!(cdb[cid].iter().all(|l| self.assigned(*l) == Some(false)));
+                (Some(false), AssignReason::Implication(cr)) => {
+                    let c = cr.get();
+                    debug_assert!(c.iter().all(|l| self.assigned(*l) == Some(false)));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_saved_trail();
-                    return Err((cdb[cid].lit0(), AssignReason::Implication(cid)));
+                    return Err((c.lit0(), AssignReason::Implication(cr)));
                 }
                 (_, AssignReason::Decision(lvl)) => {
                     debug_assert_ne!(0, lvl);

@@ -173,12 +173,13 @@ pub fn handle_conflict(
     );
     let rank: u16;
     match cdb.new_clause(asg, new_learnt, true) {
-        RefClause::Clause(cid) if learnt_len == 2 => {
+        RefClause::Clause(cr) if learnt_len == 2 => {
+            let c = cr.get();
             #[cfg(feature = "boundary_check")]
-            cdb[cid].set_birth(asg.num_conflict);
+            cdb[cr].set_birth(asg.num_conflict);
 
-            debug_assert_eq!(l0, cdb[cid].lit0());
-            debug_assert_eq!(l1, cdb[cid].lit1());
+            debug_assert_eq!(l0, c.lit0());
+            debug_assert_eq!(l1, c.lit1());
             debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
 
@@ -189,39 +190,38 @@ pub fn handle_conflict(
                 assign_level,
             );
             // || check_graph(asg, cdb, l0, "biclause");
-            for cid in &state.derive20 {
-                cdb[cid].turn_on(FlagClause::DERIVE20);
+            for cr in &state.derive20 {
+                cr.get_mut().turn_on(FlagClause::DERIVE20);
             }
             rank = 1;
             #[cfg(feature = "bi_clause_completion")]
             cdb.complete_bi_clauses(asg);
         }
-        RefClause::Clause(cid) => {
+        RefClause::Clause(cr) => {
+            let c = cr.get();
             #[cfg(feature = "boundary_check")]
-            cdb[cid].set_birth(asg.num_conflict);
+            c.set_birth(asg.num_conflict);
 
-            debug_assert_eq!(cdb[cid].lit0(), l0);
+            debug_assert_eq!(c.lit0(), l0);
             debug_assert_eq!(asg.assigned(l0), None);
             asg.assign_by_implication(
                 l0,
-                AssignReason::Implication(cid),
+                AssignReason::Implication(cr),
                 #[cfg(feature = "chrono_BT")]
                 assign_level,
             );
             // || check_graph(asg, cdb, l0, "clause");
-            rank = cdb[cid].rank;
+            rank = c.rank;
             if rank <= 20 {
-                for cid in &state.derive20 {
-                    cdb[cid].turn_on(FlagClause::DERIVE20);
+                for cr in &state.derive20 {
+                    cdb[cr].turn_on(FlagClause::DERIVE20);
                 }
             }
         }
-        RefClause::RegisteredClause(cid) => {
+        RefClause::RegisteredClause(cr) => {
+            let c = cr.get();
             debug_assert_eq!(learnt_len, 2);
-            debug_assert!(
-                (l0 == cdb[cid].lit0() && l1 == cdb[cid].lit1())
-                    || (l0 == cdb[cid].lit1() && l1 == cdb[cid].lit0())
-            );
+            debug_assert!((l0 == c.lit0() && l1 == c.lit1()) || (l0 == c.lit1() && l1 == c.lit0()));
             debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
             rank = 1;
@@ -350,23 +350,24 @@ fn conflict_analyze(
                     conflict_level!(vi);
                 }
             }
-            AssignReason::Implication(cid) => {
+            AssignReason::Implication(cr) => {
                 trace!(
                     "analyze clause {}(first literal: {}) for {}",
-                    cid,
-                    i32::from(cdb[cid].lit0()),
+                    cr,
+                    i32::from(cdb[cr].lit0()),
                     p
                 );
-                debug_assert!(!cdb[cid].is_dead() && 2 < cdb[cid].len());
-                // if !cdb.update_at_analysis(asg, cid) {
-                if !cdb[cid].is(FlagClause::LEARNT) {
-                    state.derive20.push(cid);
+                let c = cr.get();
+                debug_assert!(!c.is_dead() && 2 < c.len());
+                // if !cdb.update_at_analysis(asg, cr) {
+                if !c.is(FlagClause::LEARNT) {
+                    state.derive20.push(cr);
                 }
-                if max_lbd < cdb[cid].rank {
-                    max_lbd = cdb[cid].rank;
-                    cid_with_max_lbd = Some(cid);
+                if max_lbd < c.rank {
+                    max_lbd = c.rank;
+                    cid_with_max_lbd = Some(cr);
                 }
-                for q in cdb[cid].iter().skip(1) {
+                for q in c.iter().skip(1) {
                     let vi = q.vi();
                     validate_vi!(vi);
                     if !asg.var(vi).is(FlagVar::CA_SEEN) {
@@ -533,8 +534,8 @@ impl Lit {
                         }
                     }
                 }
-                AssignReason::Implication(cid) => {
-                    let c = &cdb[cid];
+                AssignReason::Implication(cr) => {
+                    let c = cr.get();
                     for q in &(*c)[1..] {
                         let vi = q.vi();
                         let lv = asg.level(vi);
@@ -635,7 +636,7 @@ fn dumper(asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
             match asg.reason(l.vi()) {
                 AssignReason::Decision(_) => vec![],
                 AssignReason::BinaryLink(lit) => vec![*l, !lit],
-                AssignReason::Implication(cid) => cdb[cid].iter().copied().collect::<Vec<Lit>>(),
+                AssignReason::Implication(cr) => cr.get().iter().copied().collect::<Vec<Lit>>(),
                 AssignReason::None => vec![],
             },
         )
