@@ -386,6 +386,7 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(!c.is_dead());
         debug_assert!(1 < c.lits.len());
         remove_clause_fn(
+            &mut self.clause,
             &mut self.certification_store,
             &mut self.binary_link,
             &mut self.watch_cache,
@@ -393,7 +394,6 @@ impl ClauseDBIF for ClauseDB {
             &mut self.num_clause,
             &mut self.num_learnt,
             cr,
-            c,
         );
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
     }
@@ -407,6 +407,7 @@ impl ClauseDBIF for ClauseDB {
         let mut dummy2 = 1;
         let mut dummy3 = 1;
         remove_clause_fn(
+            &mut self.clause,
             &mut store,
             &mut self.binary_link,
             &mut self.watch_cache,
@@ -414,7 +415,6 @@ impl ClauseDBIF for ClauseDB {
             &mut dummy2,
             &mut dummy3,
             cr,
-            c,
         );
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
     }
@@ -889,8 +889,8 @@ impl ClauseDBIF for ClauseDB {
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cr && wc.1 == c.lits[1]));
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cr && wc.1 == c.lits[0]));
     }
-    fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseRef) -> bool {
-        let c = &mut self.clause[NonZeroU32::get(cid.ordinal) as usize];
+    fn update_at_analysis(&mut self, asg: &impl AssignIF, cr: ClauseRef) -> bool {
+        let c = cr.get();
         // Updating LBD at every analysis seems redundant.
         // But it's crucial. Don't remove the below.
         let rank = c.update_lbd(asg, &mut self.lbd_temp);
@@ -899,7 +899,7 @@ impl ClauseDBIF for ClauseDB {
             #[cfg(feature = "just_used")]
             c.turn_on(FlagClause::USED);
             #[cfg(feature = "clause_rewading")]
-            self.reward_at_analysis(cid);
+            self.reward_at_analysis(cr);
         }
         if 1 < rank {
             self.lb_entanglement.update(rank as f64);
@@ -929,7 +929,7 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         *num_reduction += 1;
 
-        let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
+        let mut perm: Vec<OrderedProxy<&ClauseRef>> = Vec::with_capacity(clause.len());
         let mut alives = 0;
         for mut cr in clause.iter() {
             let mut c = cr.get_mut();
@@ -954,21 +954,21 @@ impl ClauseDBIF for ClauseDB {
             alives += 1;
             match setting {
                 ReductionType::RASonADD(_) => {
-                    perm.push(OrderedProxy::new(i, c.reverse_activity_sum(asg)));
+                    perm.push(OrderedProxy::new(cr, c.reverse_activity_sum(asg)));
                 }
                 ReductionType::RASonALL(cutoff, _) => {
                     let value = c.reverse_activity_sum(asg);
                     if cutoff < value.min(c.rank_old as f64) {
-                        perm.push(OrderedProxy::new(i, value));
+                        perm.push(OrderedProxy::new(cr, value));
                     }
                 }
                 ReductionType::LBDonADD(_) => {
-                    perm.push(OrderedProxy::new(i, c.lbd()));
+                    perm.push(OrderedProxy::new(cr, c.lbd()));
                 }
                 ReductionType::LBDonALL(cutoff, _) => {
                     let value = c.rank.min(c.rank_old);
                     if cutoff < value {
-                        perm.push(OrderedProxy::new(i, value as f64));
+                        perm.push(OrderedProxy::new(cr, value as f64));
                     }
                 }
             }
@@ -988,26 +988,27 @@ impl ClauseDBIF for ClauseDB {
             }
         };
         perm.sort();
-        for i in perm.iter().skip(keep) {
-            self.remove_clause(ClauseRef::from(i.to()));
+        for op in perm.iter().skip(keep) {
+            self.remove_clause(*op.to());
         }
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
-        for (i, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
+        for cr in &mut self.clause.iter() {
+            let c = cr.get();
             if c.is(FlagClause::LEARNT)
                 && !c.is_dead()
                 && (self.co_lbd_bound as usize) < c.lits.len()
             {
                 remove_clause_fn(
+                    &mut self.clause,
                     &mut self.certification_store,
                     &mut self.binary_link,
                     &mut self.watch_cache,
                     &mut self.num_bi_clause,
                     &mut self.num_clause,
                     &mut self.num_learnt,
-                    ClauseRef::from(i),
-                    c,
+                    *cr,
                 );
             }
         }
@@ -1027,13 +1028,14 @@ impl ClauseDBIF for ClauseDB {
         }
     }
     fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseRef> {
-        for (i, c) in self.clause.iter().enumerate().skip(1) {
+        for (i, cr) in self.clause.iter().enumerate() {
+            let c = cr.get();
             if c.is_dead() || (strict && c.is(FlagClause::LEARNT)) {
                 continue;
             }
             match c.evaluate(model) {
-                Some(false) => return Some(ClauseRef::from(i)),
-                None if strict => return Some(ClauseRef::from(i)),
+                Some(false) => return Some(*cr),
+                None if strict => return Some(*cr),
                 _ => (),
             }
         }
@@ -1051,8 +1053,8 @@ impl ClauseDBIF for ClauseDB {
         }
         let l0 = vec[0];
         let mut num_sat = 0;
-        for (_, cid) in self.binary_link.connect_with(l0).iter() {
-            let c = &self.clause[NonZeroU32::get(cid.ordinal) as usize];
+        for (_, cr) in self.binary_link.connect_with(l0).iter() {
+            let c = cr.get();
             debug_assert!(c[0] == l0 || c[1] == l0);
             let other = c[(c[0] == l0) as usize];
             let vi = other.vi();
@@ -1168,10 +1170,11 @@ impl ClauseDBIF for ClauseDB {
         };
         let mut buf = std::io::BufWriter::new(out);
         let na = asg.derefer(crate::assign::property::Tusize::NumAssertedVar);
-        let nc = self.iter().skip(1).filter(|c| !c.is_dead()).count();
+        let nc = self.iter().filter(|cr| !cr.get().is_dead()).count();
         buf.write_all(format!("p cnf {} {}\n", nv, nc + na).as_bytes())
             .unwrap();
-        for c in self.iter().skip(1) {
+        for cr in self.iter() {
+            let c = cr.get();
             if c.is_dead() {
                 continue;
             }
@@ -1246,15 +1249,16 @@ impl ClauseDB {
 #[inline]
 #[allow(clippy::too_many_arguments)]
 fn remove_clause_fn(
+    clause_pool: &mut HashSet<ClauseRef>,
     certification_store: &mut CertificationStore,
     binary_link: &mut BinaryLinkDB,
     watcher: &mut [WatchCache],
     num_bi_clause: &mut usize,
     num_clause: &mut usize,
     num_learnt: &mut usize,
-    cid: ClauseRef,
-    c: &mut Clause,
+    cr: ClauseRef,
 ) {
+    let c = cr.get();
     debug_assert!(!c.is_dead());
     let l0 = c.lits[0];
     let l1 = c.lits[1];
@@ -1264,8 +1268,8 @@ fn remove_clause_fn(
             .expect("Eror (remove_clause_fn#01)");
         *num_bi_clause -= 1;
     } else {
-        watcher[usize::from(!l0)].remove_watch(&cid); // .expect("db1076");
-        watcher[usize::from(!l1)].remove_watch(&cid); // .expect("db1077");
+        watcher[usize::from(!l0)].remove_watch(&cr); // .expect("db1076");
+        watcher[usize::from(!l1)].remove_watch(&cr); // .expect("db1077");
     }
     if c.is(FlagClause::LEARNT) {
         *num_learnt -= 1;
@@ -1273,6 +1277,7 @@ fn remove_clause_fn(
     *num_clause -= 1;
     certification_store.delete_clause(&c.lits);
     c.lits.clear();
+    clause_pool.remove(&cr);
 }
 
 impl Clause {

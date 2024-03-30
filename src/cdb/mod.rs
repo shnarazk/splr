@@ -185,7 +185,7 @@ pub trait ClauseDBIF:
 
 /// Clause identifier, or clause index, starting with one.
 /// Note: ids are re-used after 'garbage collection'.
-#[derive(Clone, Eq, Hash, PartialEq, PartialOrd)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct ClauseRef {
     c: Rc<Box<Clause>>,
 }

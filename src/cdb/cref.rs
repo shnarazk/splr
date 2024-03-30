@@ -13,6 +13,18 @@ pub trait ClauseRefIF {
     fn is_lifted_lit(&self) -> bool;
 }
 
+impl Ord for ClauseRef {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.get().rank.cmp(&other.get().rank)
+    }
+}
+
+impl PartialOrd for ClauseRef {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(&other))
+    }
+}
+
 // impl Default for ClauseRef {
 //     #[inline]
 //     /// return the default empty clause, used in a reason slot or no conflict path.

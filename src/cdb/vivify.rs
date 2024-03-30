@@ -185,18 +185,19 @@ fn select_targets(
     cdb: &mut ClauseDB,
     initial_stage: bool,
     len: Option<usize>,
-) -> Vec<OrderedProxy<Clause>> {
+) -> Vec<OrderedProxy<ClauseRef>> {
     if initial_stage {
         let mut seen: Vec<Option<OrderedProxy<ClauseRef>>> = vec![None; 2 * (asg.num_vars + 1)];
-        for (i, c) in cdb.iter().enumerate().skip(1) {
+        for cr in cdb.iter() {
+            let c = cr.get();
             if let Some(rank) = c.to_vivify(true) {
                 let p = &mut seen[usize::from(c.lit0())];
                 if p.as_ref().map_or(0.0, |r| r.value()) < rank {
-                    *p = Some(OrderedProxy::new(ClauseRef::from(i), rank));
+                    *p = Some(OrderedProxy::new(*cr, rank));
                 }
             }
         }
-        let mut clauses = seen.iter().filter_map(|p| p.clone()).collect::<Vec<_>>();
+        let mut clauses = seen.iter().filter_map(|p| *p).collect::<Vec<_>>();
         if let Some(max_len) = len {
             if 10 * max_len < clauses.len() {
                 clauses.sort();
@@ -209,9 +210,10 @@ fn select_targets(
             .iter()
             .enumerate()
             .skip(1)
-            .filter_map(|(i, c)| {
-                c.to_vivify(false)
-                    .map(|r| OrderedProxy::new_invert(ClauseRef::from(i), r))
+            .filter_map(|(i, cr)| {
+                cr.get()
+                    .to_vivify(false)
+                    .map(|r| OrderedProxy::new_invert(*cr, r))
             })
             .collect::<Vec<_>>();
         if let Some(max_len) = len {
@@ -278,8 +280,8 @@ impl AssignStack {
                 AssignReason::BinaryLink(bil) => {
                     seen[bil.vi()] = key;
                 }
-                AssignReason::Implication(cid) => {
-                    for r in cdb[cid].iter().skip(1) {
+                AssignReason::Implication(cr) => {
+                    for r in cr.get().iter().skip(1) {
                         seen[r.vi()] = key;
                     }
                 }

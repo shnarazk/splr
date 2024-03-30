@@ -325,7 +325,8 @@ impl Eliminator {
     pub fn add_cid_occur(
         &mut self,
         asg: &mut impl AssignIF,
-        cid: ClauseRef,
+        cr: ClauseRef,
+        // FIXME: no need to pass
         c: &mut Clause,
         enqueue: bool,
     ) {
@@ -352,31 +353,31 @@ impl Eliminator {
             if !v.is(FlagVar::ELIMINATED) {
                 if bool::from(*l) {
                     debug_assert!(
-                        !w.pos_occurs.contains(&cid),
+                        !w.pos_occurs.contains(&cr),
                         "elim.add_cid_occur for {:?} found a strange positive clause{}{}, {:?}",
                         v,
-                        cid,
+                        cr,
                         c,
                         w.pos_occurs,
                     );
-                    w.pos_occurs.push(cid);
+                    w.pos_occurs.push(cr);
                 } else {
                     debug_assert!(
-                        !w.neg_occurs.contains(&cid),
+                        !w.neg_occurs.contains(&cr),
                         "elim.add_cid_occur for {:?} found a strange negative clause{}{}, {:?}",
                         v,
-                        cid,
+                        cr,
                         c,
                         w.pos_occurs,
                     );
-                    w.neg_occurs.push(cid);
+                    w.neg_occurs.push(cr);
                 }
                 self.enqueue_var(asg, l.vi(), false);
             }
         }
         c.turn_on(FlagClause::OCCUR_LINKED);
         if enqueue {
-            self.enqueue_clause(cid, c);
+            self.enqueue_clause(cr, c);
         }
     }
     /// remove a clause id from all corresponding occur lists.
@@ -427,19 +428,19 @@ impl Eliminator {
                 self.clause_queue.push(c);
                 self.bwdsub_assigns += 1;
             }
-            if let Some(cid) = self.clause_queue.pop() {
+            if let Some(cr) = self.clause_queue.pop() {
+                let mut c = cr.get_mut();
                 if *timedout == 0 {
                     self.clear_clause_queue(cdb);
                     self.clear_var_queue(asg);
                     return Ok(());
                 }
-                let best: VarId = if cid.is_lifted_lit() {
-                    let vi = Lit::from(cid).vi();
+                let best: VarId = if cr.is_lifted_lit() {
+                    let vi = Lit::from(cr).vi();
                     debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
                     vi
                 } else {
                     let mut tmp = cdb.derefer(cdb::property::Tusize::NumClause);
-                    let c = &mut cdb[cid];
                     c.turn_off(FlagClause::ENQUEUED);
                     if c.is_dead() || self.subsume_literal_limit < c.len() {
                         continue;
@@ -469,14 +470,15 @@ impl Eliminator {
                 if best == 0 || asg.var(best).is(FlagVar::ELIMINATED) {
                     continue;
                 }
-                self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
-                self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
+                // TODO: why there are identitcal codes below?
+                self[best].pos_occurs.retain(|cr| !c.is_dead());
+                self[best].neg_occurs.retain(|cr| !c.is_dead());
                 for cls in [self[best].pos_occurs.clone(), self[best].neg_occurs.clone()].iter() {
-                    for did in cls.iter() {
-                        if *did == cid {
+                    for dr in cls.iter() {
+                        let d = dr.get_mut();
+                        if *dr == cr {
                             continue;
                         }
-                        let d = &cdb[*did];
                         if d.len() <= *timedout {
                             *timedout -= d.len();
                         } else {
@@ -488,12 +490,12 @@ impl Eliminator {
                                 d.contains(Lit::from((best, false)))
                                     || d.contains(Lit::from((best, true)))
                             );
-                            self.try_subsume(asg, cdb, cid, *did)?;
+                            self.try_subsume(asg, cdb, cr, *dr)?;
                         }
                     }
                 }
-                self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
-                self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
+                self[best].pos_occurs.retain(|cr| !c.is_dead());
+                self[best].neg_occurs.retain(|cr| !c.is_dead());
             }
         }
         if asg.remains() {

@@ -25,10 +25,10 @@ pub fn eliminate_var(
     // Note: it may contain the target literal somehow. So the following may be failed.
     // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, true)))));
     w.pos_occurs
-        .retain(|&c| cdb[c].contains(Lit::from((vi, true))));
+        .retain(|cr| cr.get().contains(Lit::from((vi, true))));
     // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, false)))));
     w.neg_occurs
-        .retain(|&c| cdb[c].contains(Lit::from((vi, false))));
+        .retain(|cr| cr.get().contains(Lit::from((vi, false))));
 
     let num_combination = w.pos_occurs.len() * w.neg_occurs.len();
 
@@ -56,7 +56,7 @@ pub fn eliminate_var(
     // println!("eliminate_var {}: |p|: {} and |n|: {}", vi, (*pos).len(), (*neg).len());
     // Produce clauses in cross product:
     for p in pos.iter() {
-        let learnt_p = cdb[*p].is(FlagClause::LEARNT);
+        let learnt_p = p.get().is(FlagClause::LEARNT);
         for n in neg.iter() {
             match merge(asg, cdb, *p, *n, vi, vec) {
                 0 => {
@@ -90,10 +90,10 @@ pub fn eliminate_var(
                 }
                 _ => {
                     debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
-                    match cdb.new_clause(asg, vec, learnt_p && cdb[*n].is(FlagClause::LEARNT)) {
-                        RefClause::Clause(ci) => {
+                    match cdb.new_clause(asg, vec, learnt_p && n.get().is(FlagClause::LEARNT)) {
+                        RefClause::Clause(mut ci) => {
                             // the merged clause might be a duplicated clause.
-                            elim.add_cid_occur(asg, ci, &mut cdb[ci], true);
+                            elim.add_cid_occur(asg, ci, &mut ci.get_mut(), true);
 
                             #[cfg(feature = "trace_elimination")]
                             println!(
@@ -113,33 +113,33 @@ pub fn eliminate_var(
     //
     //## VAR ELIMINATION
     //
-    debug_assert!(pos.iter().all(|cid| !cdb[*cid].is_dead()));
-    debug_assert!(neg.iter().all(|cid| !cdb[*cid].is_dead()));
-    for cid in pos.iter() {
-        if cdb[*cid].is_dead() {
+    debug_assert!(pos.iter().all(|cr| !cr.get().is_dead()));
+    debug_assert!(neg.iter().all(|cr| !cr.get().is_dead()));
+    for cr in pos.iter() {
+        if cr.get().is_dead() {
             continue;
         }
         #[cfg(feature = "incremental_solver")]
         {
-            if !cdb[*cid].is(FlagClause::LEARNT) {
-                cdb.make_permanent_immortal(*cid);
+            if !cdb[*cr].is(FlagClause::LEARNT) {
+                cdb.make_permanent_immortal(*cr);
             }
         }
-        elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
-        cdb.remove_clause(*cid);
+        elim.remove_cid_occur(asg, *cr, &mut cr.get_mut());
+        cdb.remove_clause(*cr);
     }
-    for cid in neg.iter() {
-        if cdb[*cid].is_dead() {
+    for cr in neg.iter() {
+        if cr.get().is_dead() {
             continue;
         }
         #[cfg(feature = "incremental_solver")]
         {
-            if !cdb[*cid].is(FlagClause::LEARNT) {
-                cdb.make_permanent_immortal(*cid);
+            if !cdb[*cr].is(FlagClause::LEARNT) {
+                cdb.make_permanent_immortal(*cr);
             }
         }
-        elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
-        cdb.remove_clause(*cid);
+        elim.remove_cid_occur(asg, *cr, &mut cr.get_mut());
+        cdb.remove_clause(*cr);
     }
     elim[vi].clear();
     asg.handle(SolverEvent::Eliminate(vi));
@@ -196,8 +196,8 @@ fn merge_cost(
     cq: ClauseRef,
     vi: VarId,
 ) -> Option<usize> {
-    let c_p = &cdb[cp];
-    let c_q = &cdb[cq];
+    let c_p = cp.get();
+    let c_q = cq.get();
     let mut cond: Option<Lit> = None;
     let mut cond2: Option<Lit> = None;
     let mut count = 0;
@@ -245,8 +245,8 @@ fn merge(
     vec: &mut Vec<Lit>,
 ) -> usize {
     vec.clear();
-    let pqb = &cdb[cip];
-    let qpb = &cdb[ciq];
+    let pqb = cip.get();
+    let qpb = ciq.get();
     let ps_smallest = pqb.len() < qpb.len();
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
     #[cfg(feature = "trace_elimination")]
@@ -281,15 +281,15 @@ fn make_eliminated_clauses(
     neg: &[ClauseRef],
 ) {
     if neg.len() < pos.len() {
-        for cid in neg {
-            debug_assert!(!cdb[*cid].is_dead());
-            make_eliminated_clause(cdb, store, v, *cid);
+        for cr in neg {
+            debug_assert!(!cr.get().is_dead());
+            make_eliminated_clause(cdb, store, v, *cr);
         }
         make_eliminating_unit_clause(store, Lit::from((v, true)));
     } else {
-        for cid in pos {
-            debug_assert!(!cdb[*cid].is_dead());
-            make_eliminated_clause(cdb, store, v, *cid);
+        for dr in pos {
+            debug_assert!(!dr.get().is_dead());
+            make_eliminated_clause(cdb, store, v, *dr);
         }
         make_eliminating_unit_clause(store, Lit::from((v, false)));
     }
@@ -306,11 +306,11 @@ fn make_eliminated_clause(
     cdb: &mut impl ClauseDBIF,
     store: &mut Vec<Lit>,
     vi: VarId,
-    cid: ClauseRef,
+    cr: ClauseRef,
 ) {
     let first = store.len();
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:
-    let c = &cdb[cid];
+    let c = cr.get();
     debug_assert!(!c.is_empty());
     for l in c.iter() {
         store.push(*l);
@@ -351,8 +351,8 @@ mod tests {
         fn as_vec(&self) -> Vec<Vec<i32>> {
             self.iter()
                 .skip(1)
-                .filter(|c| !c.is_dead())
-                .map(|c| c.as_vec())
+                .filter(|cr| !cr.get().is_dead())
+                .map(|cr| cr.get().as_vec())
                 .collect::<Vec<_>>()
         }
     }
@@ -377,13 +377,11 @@ mod tests {
         assert!(asg.var(vi).is(FlagVar::ELIMINATED));
         assert!(cdb
             .iter()
-            .skip(1)
-            .filter(|c| c.is_dead())
-            .all(|c| c.is_empty()));
+            .filter(|cr| cr.get().is_dead())
+            .all(|cr| cr.get().is_empty()));
         assert!(cdb
             .iter()
-            .skip(1)
-            .all(|c| c.iter().all(|l| *l != Lit::from((vi, false)))
-                && c.iter().all(|l| *l != Lit::from((vi, false)))));
+            .all(|cr| cr.get().iter().all(|l| *l != Lit::from((vi, false)))
+                && cr.get().iter().all(|l| *l != Lit::from((vi, false)))));
     }
 }

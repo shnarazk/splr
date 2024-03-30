@@ -33,8 +33,9 @@ impl StochasticLocalSearchIF for ClauseDB {
             // CONSIDER: counting only given (permanent) clauses.
             let mut flip_target: HashMap<VarId, usize> = HashMap::new();
             let mut target_clause: Option<&Clause> = None;
-            for c in self.clause.iter().skip(1).filter(|c| !c.is_dead()) {
+            for cr in self.clause.iter().filter(|c| !c.get().is_dead()) {
                 // let mut cls_lvl: DecisionLevel = 0;
+                let c = cr.get();
                 if c.is_falsified(assignment, &mut flip_target) {
                     unsat_clauses += 1;
                     // for l in c.lits.iter() {
