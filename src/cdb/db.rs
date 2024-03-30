@@ -8,7 +8,7 @@ use {
         RefClause,
     },
     crate::{assign::AssignIF, types::*},
-    std::{collections::HashSet, num::NonZeroU32, slice::Iter},
+    std::collections::{hash_set::Iter, HashSet},
 };
 
 #[cfg(not(feature = "no_IO"))]

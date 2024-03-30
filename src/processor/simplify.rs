@@ -229,13 +229,14 @@ impl EliminateIF for Eliminator {
         for w in &mut self[1..] {
             w.clear();
         }
-        for (cid, c) in &mut cdb.iter_mut().enumerate().skip(1) {
+        for cr in &mut cdb.iter() {
+            let c = cr.get_mut();
             if c.is_dead() || c.is(FlagClause::OCCUR_LINKED) {
                 continue;
             }
             let vec = c.iter().copied().collect::<Vec<_>>();
             debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
-            self.add_cid_occur(asg, ClauseRef::from(cid), c, false);
+            self.add_cid_occur(asg, *cr, c, false);
         }
         if force {
             for vi in 1..=asg.derefer(assign::property::Tusize::NumVar) {
@@ -402,8 +403,8 @@ impl Eliminator {
         self.clear_clause_queue(cdb);
         self.clear_var_queue(asg);
         if force {
-            for c in &mut cdb.iter_mut().skip(1) {
-                c.turn_off(FlagClause::OCCUR_LINKED);
+            for cr in &mut cdb.iter().skip(1) {
+                cr.get_mut().turn_off(FlagClause::OCCUR_LINKED);
             }
             for w in &mut self[1..] {
                 w.clear();
@@ -428,7 +429,7 @@ impl Eliminator {
                 self.clause_queue.push(c);
                 self.bwdsub_assigns += 1;
             }
-            if let Some(cr) = self.clause_queue.pop() {
+            if let Some(mut cr) = self.clause_queue.pop() {
                 let mut c = cr.get_mut();
                 if *timedout == 0 {
                     self.clear_clause_queue(cdb);
@@ -613,8 +614,8 @@ impl Eliminator {
     }
     /// clear eliminator's clause queue.
     fn clear_clause_queue(&mut self, cdb: &mut impl ClauseDBIF) {
-        for cid in &self.clause_queue {
-            cdb[*cid].turn_off(FlagClause::ENQUEUED);
+        for cr in &mut self.clause_queue {
+            cr.get_mut().turn_off(FlagClause::ENQUEUED);
         }
         self.clause_queue.clear();
     }
@@ -657,7 +658,7 @@ fn check_eliminator(cdb: &impl ClauseDBIF, elim: &Eliminator) -> bool {
     // }
     // all clauses are registered in corresponding occur_lists
     for cr in cdb.iter() {
-        let c = cr.read().unwrap();
+        let c = cr.get();
         if c.is_dead() {
             continue;
         }

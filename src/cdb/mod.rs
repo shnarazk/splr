@@ -31,7 +31,11 @@ pub use self::{
 use {
     self::ema::ProgressLBD,
     crate::{assign::AssignIF, types::*},
-    std::{collections::HashSet, rc::Rc, slice::Iter},
+    std::{
+        collections::{hash_set::Iter as HashSetIter, HashSet},
+        rc::Rc,
+        slice::Iter as SliceIter,
+    },
     watch_cache::*,
 };
 
@@ -53,7 +57,7 @@ pub trait ClauseIF {
     /// check clause satisfiability
     fn is_satisfied_under(&self, asg: &impl AssignIF) -> bool;
     /// return an iterator over its literals.
-    fn iter(&self) -> Iter<'_, Lit>;
+    fn iter(&self) -> SliceIter<'_, Lit>;
     /// return the number of literals.
     fn len(&self) -> usize;
 
@@ -76,7 +80,7 @@ pub trait ClauseDBIF:
     /// return true if it's empty.
     fn is_empty(&self) -> bool;
     /// return an iterator.
-    fn iter(&self) -> Iter<'_, ClauseRef>;
+    fn iter(&self) -> HashSetIter<'_, ClauseRef>;
 
     //
     //## interface to binary links
@@ -415,19 +419,6 @@ mod tests {
         Lit::from(i)
     }
 
-    #[allow(dead_code)]
-    fn check_watches(cdb: &ClauseDB, cid: ClauseRef) {
-        let c = &cdb.clause[0];
-        if c.lits.is_empty() {
-            println!("skip checking watches of an empty clause");
-            return;
-        }
-        assert!(c.lits[0..2]
-            .iter()
-            .all(|l| cdb.watch_cache[!*l].iter().any(|(c, _)| *c == cid)));
-        println!("pass to check watches");
-    }
-
     #[test]
     fn test_clause_instantiation() {
         let config = Config::default();
@@ -449,7 +440,7 @@ mod tests {
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
-        let c = &cdb[c1];
+        let c = c1.get();
 
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
@@ -458,7 +449,7 @@ mod tests {
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
             .as_cid();
-        let c = &cdb[c2];
+        let c = c2.get();
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
@@ -497,8 +488,8 @@ mod tests {
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
-        assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
-        let mut iter = cdb[c1][0..].iter();
+        assert_eq!(c1.get()[0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
+        let mut iter = c1.get()[0..].iter();
         assert_eq!(iter.next(), Some(&lit(1)));
         assert_eq!(iter.next(), Some(&lit(2)));
         assert_eq!(iter.next(), Some(&lit(3)));

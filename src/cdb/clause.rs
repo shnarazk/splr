@@ -3,7 +3,7 @@ use {
     std::{
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
-        slice::Iter,
+        slice::Iter as SliceIter,
     },
 };
 
@@ -107,7 +107,7 @@ impl IndexMut<RangeFrom<usize>> for Clause {
 
 impl<'a> IntoIterator for &'a Clause {
     type Item = &'a Lit;
-    type IntoIter = Iter<'a, Lit>;
+    type IntoIter = SliceIter<'a, Lit>;
     fn into_iter(self) -> Self::IntoIter {
         self.lits.iter()
     }
@@ -115,7 +115,7 @@ impl<'a> IntoIterator for &'a Clause {
 
 impl<'a> IntoIterator for &'a mut Clause {
     type Item = &'a Lit;
-    type IntoIter = Iter<'a, Lit>;
+    type IntoIter = SliceIter<'a, Lit>;
     fn into_iter(self) -> Self::IntoIter {
         self.lits.iter()
     }
@@ -155,7 +155,7 @@ impl ClauseIF for Clause {
     fn is_dead(&self) -> bool {
         self.lits.is_empty()
     }
-    fn iter(&self) -> Iter<'_, Lit> {
+    fn iter(&self) -> SliceIter<'_, Lit> {
         self.lits.iter()
     }
     #[inline]

@@ -48,8 +48,8 @@ impl VivifyIF for ClauseDB {
 
             debug_assert!(asg.stack_is_empty() || !asg.remains());
             debug_assert_eq!(asg.root_level(), asg.decision_level());
-            let cid = cp.to();
-            let c = &mut self[cid];
+            let mut cr = cp.to();
+            let c = &mut cr.get_mut();
             if c.is_dead() {
                 continue;
             }
@@ -100,12 +100,12 @@ impl VivifyIF for ClauseDB {
                                     }
                                 }
                                 AssignReason::Implication(ci) => {
-                                    if ci == cid && clits.len() == decisions.len() {
+                                    if ci == cr && clits.len() == decisions.len() {
                                         asg.backtrack_sandbox();
                                         continue 'next_clause;
                                     } else {
                                         let cnfl_lits =
-                                            &self[ci].iter().copied().collect::<Vec<Lit>>();
+                                            &ci.get().iter().copied().collect::<Vec<Lit>>();
                                         seen[0] = num_check;
                                         vec = asg.analyze_sandbox(
                                             self, &decisions, cnfl_lits, &mut seen,
@@ -139,7 +139,7 @@ impl VivifyIF for ClauseDB {
                                     }
                                     #[cfg(not(feature = "clause_rewarding"))]
                                     self.new_clause(asg, &mut vec, is_learnt);
-                                    self.remove_clause(cid);
+                                    self.remove_clause(cr);
                                     num_shrink += 1;
                                 }
                             }

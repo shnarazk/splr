@@ -149,7 +149,7 @@ pub fn handle_conflict(
                 }
             }
             AssignReason::Implication(r) => {
-                for l in cdb[r].iter() {
+                for l in r.get().iter() {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
                         asg.reward_at_analysis(vi);
@@ -214,7 +214,7 @@ pub fn handle_conflict(
             rank = c.rank;
             if rank <= 20 {
                 for cr in &state.derive20 {
-                    cdb[cr].turn_on(FlagClause::DERIVE20);
+                    cr.get_mut().turn_on(FlagClause::DERIVE20);
                 }
             }
         }
