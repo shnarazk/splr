@@ -21,7 +21,7 @@ impl Ord for ClauseRef {
 
 impl PartialOrd for ClauseRef {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 
@@ -65,12 +65,10 @@ impl fmt::Display for ClauseRef {
 
 impl ClauseRefIF for ClauseRef {
     fn new(c: Clause) -> Self {
-        ClauseRef {
-            c: Rc::new(Box::new(c)),
-        }
+        ClauseRef { c: Rc::new(c) }
     }
     fn get(&self) -> &Clause {
-        &**self.c
+        &self.c
     }
     fn get_mut(&mut self) -> &mut Clause {
         Rc::get_mut(&mut self.c).unwrap()

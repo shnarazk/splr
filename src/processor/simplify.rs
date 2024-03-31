@@ -588,11 +588,11 @@ impl Eliminator {
         if bool::from(l) {
             debug_assert_eq!(w.pos_occurs.iter().filter(|&c| *c == *cr).count(), 1);
             w.pos_occurs.delete_unstable(|c| c == cr);
-            debug_assert!(!w.pos_occurs.contains(&cr));
+            debug_assert!(!w.pos_occurs.contains(cr));
         } else {
             debug_assert_eq!(w.neg_occurs.iter().filter(|&c| *c == *cr).count(), 1);
             w.neg_occurs.delete_unstable(|c| c == cr);
-            debug_assert!(!w.neg_occurs.contains(&cr));
+            debug_assert!(!w.neg_occurs.contains(cr));
         }
         self.enqueue_var(asg, l.vi(), true);
     }
@@ -666,10 +666,10 @@ fn check_eliminator(cdb: &impl ClauseDBIF, elim: &Eliminator) -> bool {
         for l in c.iter() {
             let v = l.vi();
             if bool::from(*l) {
-                if !elim[v].pos_occurs.contains(&cr) {
+                if !elim[v].pos_occurs.contains(cr) {
                     panic!("failed to check {}", cr);
                 }
-            } else if !elim[v].neg_occurs.contains(&cr) {
+            } else if !elim[v].neg_occurs.contains(cr) {
                 panic!("failed to check {}", cr);
             }
         }

@@ -191,7 +191,7 @@ pub trait ClauseDBIF:
 /// Note: ids are re-used after 'garbage collection'.
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct ClauseRef {
-    c: Rc<Box<Clause>>,
+    c: Rc<Clause>,
 }
 
 /// A representation of 'clause'

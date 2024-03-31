@@ -1001,7 +1001,6 @@ impl ClauseDBIF for ClauseDB {
                 && !c.is_dead()
                 && (self.co_lbd_bound as usize) < c.lits.len()
             {
-                drop(c);
                 remove_clause_fn(
                     &mut self.clause,
                     &mut self.certification_store,
