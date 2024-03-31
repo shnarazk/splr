@@ -94,7 +94,7 @@ pub trait ClauseDBIF:
     //
 
     // get mutable reference to a watch_cache
-    fn fetch_watch_cache_entry(&self, lit: Lit, index: WatchCacheProxy) -> (ClauseRef, Lit);
+    fn fetch_watch_cache_entry(&self, lit: Lit, index: WatchCacheProxy) -> &(ClauseRef, Lit);
     /// replace the mutable watcher list with an empty one, and return the list
     fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator;
     /// detach the watch_cache referred by the head of a watch_cache iterator

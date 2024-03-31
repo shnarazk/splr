@@ -12,31 +12,31 @@ pub type WatchCache = WatchCacheList;
 
 pub trait WatchCacheIF {
     fn get_watch(&self, cid: &ClauseRef) -> Option<&Lit>;
-    fn remove_watch(&mut self, cid: &ClauseRef);
-    fn insert_watch(&mut self, cid: ClauseRef, l: Lit);
+    fn remove_watch(&mut self, cr: &ClauseRef);
+    fn insert_watch(&mut self, cr: ClauseRef, l: Lit);
     fn append_watch(&mut self, appendant: Self);
-    fn update_watch(&mut self, cid: ClauseRef, l: Lit);
+    fn update_watch(&mut self, cr: ClauseRef, l: Lit);
 }
 
 impl WatchCacheIF for WatchCacheList {
-    fn get_watch(&self, cid: &ClauseRef) -> Option<&Lit> {
-        self.iter().find_map(|e| (e.0 == *cid).then_some(&e.1))
+    fn get_watch(&self, cr: &ClauseRef) -> Option<&Lit> {
+        self.iter().find_map(|e| (e.0 == *cr).then_some(&e.1))
     }
-    fn remove_watch(&mut self, cid: &ClauseRef) {
-        if let Some(i) = self.iter().position(|e| e.0 == *cid) {
+    fn remove_watch(&mut self, cr: &ClauseRef) {
+        if let Some(i) = self.iter().position(|e| e.0 == *cr) {
             self.swap_remove(i);
         }
     }
-    fn insert_watch(&mut self, cid: ClauseRef, l: Lit) {
-        debug_assert!(self.iter().all(|e| e.0 != cid));
-        self.push((cid, l));
+    fn insert_watch(&mut self, cr: ClauseRef, l: Lit) {
+        debug_assert!(self.iter().all(|e| e.0 != cr));
+        self.push((cr, l));
     }
     fn append_watch(&mut self, mut appendant: Self) {
         self.append(&mut appendant);
     }
-    fn update_watch(&mut self, cid: ClauseRef, l: Lit) {
+    fn update_watch(&mut self, cr: ClauseRef, l: Lit) {
         for e in self.iter_mut() {
-            if e.0 == cid {
+            if e.0 == cr {
                 e.1 = l;
                 break;
             }

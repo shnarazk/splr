@@ -58,7 +58,7 @@ pub fn eliminate_var(
     for p in pos.iter() {
         let learnt_p = p.get().is(FlagClause::LEARNT);
         for n in neg.iter() {
-            match merge(asg, cdb, *p, *n, vi, vec) {
+            match merge(asg, cdb, p.clone(), n.clone(), vi, vec) {
                 0 => {
                     #[cfg(feature = "trace_elimination")]
                     println!(
@@ -91,9 +91,9 @@ pub fn eliminate_var(
                 _ => {
                     debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
                     match cdb.new_clause(asg, vec, learnt_p && n.get().is(FlagClause::LEARNT)) {
-                        RefClause::Clause(mut ci) => {
+                        RefClause::Clause(ci) => {
                             // the merged clause might be a duplicated clause.
-                            elim.add_cid_occur(asg, ci, &mut ci.get_mut(), true);
+                            elim.add_cid_occur(asg, ci.clone(), true);
 
                             #[cfg(feature = "trace_elimination")]
                             println!(
@@ -125,8 +125,8 @@ pub fn eliminate_var(
                 cdb.make_permanent_immortal(*cr);
             }
         }
-        elim.remove_cid_occur(asg, *cr, &mut cr.get_mut());
-        cdb.remove_clause(*cr);
+        elim.remove_cid_occur(asg, cr.clone());
+        cdb.remove_clause(cr.clone());
     }
     for cr in neg.iter() {
         if cr.get().is_dead() {
@@ -138,8 +138,8 @@ pub fn eliminate_var(
                 cdb.make_permanent_immortal(*cr);
             }
         }
-        elim.remove_cid_occur(asg, *cr, &mut cr.get_mut());
-        cdb.remove_clause(*cr);
+        elim.remove_cid_occur(asg, cr.clone());
+        cdb.remove_clause(cr.clone());
     }
     elim[vi].clear();
     asg.handle(SolverEvent::Eliminate(vi));
@@ -168,7 +168,7 @@ fn skip_var_elimination(
     let mut average_len: f64 = 0.0;
     for c_pos in pos {
         for c_neg in neg {
-            if let Some(clause_size) = merge_cost(asg, cdb, *c_pos, *c_neg, v) {
+            if let Some(clause_size) = merge_cost(asg, cdb, c_pos.clone(), c_neg.clone(), v) {
                 if clause_size == 0 {
                     continue;
                 }
@@ -191,7 +191,7 @@ fn skip_var_elimination(
 /// - `(true, n)` if they are merge-able to a n-literal clause.
 fn merge_cost(
     asg: &impl AssignIF,
-    cdb: &impl ClauseDBIF,
+    _cdb: &impl ClauseDBIF,
     cp: ClauseRef,
     cq: ClauseRef,
     vi: VarId,
@@ -238,7 +238,7 @@ fn merge_cost(
 /// Return **zero** if one of the clauses is always satisfied. (merge_vec should not be used.)
 fn merge(
     asg: &mut impl AssignIF,
-    cdb: &mut impl ClauseDBIF,
+    _cdb: &mut impl ClauseDBIF,
     cip: ClauseRef,
     ciq: ClauseRef,
     vi: VarId,
@@ -283,13 +283,13 @@ fn make_eliminated_clauses(
     if neg.len() < pos.len() {
         for cr in neg {
             debug_assert!(!cr.get().is_dead());
-            make_eliminated_clause(cdb, store, v, *cr);
+            make_eliminated_clause(cdb, store, v, cr.clone());
         }
         make_eliminating_unit_clause(store, Lit::from((v, true)));
     } else {
         for dr in pos {
             debug_assert!(!dr.get().is_dead());
-            make_eliminated_clause(cdb, store, v, *dr);
+            make_eliminated_clause(cdb, store, v, dr.clone());
         }
         make_eliminating_unit_clause(store, Lit::from((v, false)));
     }
@@ -303,7 +303,7 @@ fn make_eliminating_unit_clause(store: &mut Vec<Lit>, x: Lit) {
 }
 
 fn make_eliminated_clause(
-    cdb: &mut impl ClauseDBIF,
+    _cdb: &mut impl ClauseDBIF,
     store: &mut Vec<Lit>,
     vi: VarId,
     cr: ClauseRef,

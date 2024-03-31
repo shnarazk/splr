@@ -54,7 +54,7 @@ impl Instantiate for BinaryLinkDB {
 
 pub trait BinaryLinkIF {
     /// add a mapping from a pair of Lit to a `ClauseRef`
-    fn add(&mut self, lit0: Lit, lit1: Lit, cid: ClauseRef);
+    fn add(&mut self, lit0: Lit, lit1: Lit, cr: ClauseRef);
     /// remove a pair of `Lit`s
     fn remove(&mut self, lit0: Lit, lit1: Lit) -> MaybeInconsistent;
     /// return 'ClauseRef` linked from a pair of `Lit`s
@@ -69,12 +69,12 @@ pub trait BinaryLinkIF {
 }
 
 impl BinaryLinkIF for BinaryLinkDB {
-    fn add(&mut self, lit0: Lit, lit1: Lit, cid: ClauseRef) {
+    fn add(&mut self, lit0: Lit, lit1: Lit, cr: ClauseRef) {
         let l0 = lit0.min(lit1);
         let l1 = lit0.max(lit1);
-        self.hash.insert((l0, l1), cid);
-        self.list[lit0].push((lit1, cid));
-        self.list[lit1].push((lit0, cid));
+        self.hash.insert((l0, l1), cr.clone());
+        self.list[lit0].push((lit1, cr.clone()));
+        self.list[lit1].push((lit0, cr.clone()));
     }
     fn remove(&mut self, lit0: Lit, lit1: Lit) -> MaybeInconsistent {
         let l0 = lit0.min(lit1);

@@ -193,11 +193,11 @@ fn select_targets(
             if let Some(rank) = c.to_vivify(true) {
                 let p = &mut seen[usize::from(c.lit0())];
                 if p.as_ref().map_or(0.0, |r| r.value()) < rank {
-                    *p = Some(OrderedProxy::new(*cr, rank));
+                    *p = Some(OrderedProxy::new(cr.clone(), rank));
                 }
             }
         }
-        let mut clauses = seen.iter().filter_map(|p| *p).collect::<Vec<_>>();
+        let mut clauses = seen.iter().filter_map(|p| p.clone()).collect::<Vec<_>>();
         if let Some(max_len) = len {
             if 10 * max_len < clauses.len() {
                 clauses.sort();
@@ -208,12 +208,10 @@ fn select_targets(
     } else {
         let mut clauses: Vec<OrderedProxy<ClauseRef>> = cdb
             .iter()
-            .enumerate()
-            .skip(1)
-            .filter_map(|(i, cr)| {
+            .filter_map(|cr| {
                 cr.get()
                     .to_vivify(false)
-                    .map(|r| OrderedProxy::new_invert(*cr, r))
+                    .map(|r| OrderedProxy::new_invert(cr.clone(), r))
             })
             .collect::<Vec<_>>();
         if let Some(max_len) = len {
@@ -231,7 +229,7 @@ impl AssignStack {
     /// negated literals of `lits`
     fn analyze_sandbox(
         &self,
-        cdb: &ClauseDB,
+        _cdb: &ClauseDB,
         decisions: &[Lit],
         conflicting: &[Lit],
         seen: &mut [usize],

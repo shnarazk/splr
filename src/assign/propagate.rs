@@ -454,7 +454,7 @@ impl PropagateIF for AssignStack {
                         if lit_assign!(self.var[lk.vi()], *lk) != Some(false) {
                             let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
-                            cdb.transform_by_updating_watch(cr, false_watch_pos, k, true);
+                            cdb.transform_by_updating_watch(cr.clone(), false_watch_pos, k, true);
                             c.search_from = (k + 1) as u16;
                             debug_assert_ne!(self.assigned(new_watch), Some(true));
                             check_in!(
@@ -465,14 +465,14 @@ impl PropagateIF for AssignStack {
                         }
                     }
                     if false_watch_pos == 0 {
-                        cdb.swap_watch(cr);
+                        cdb.swap_watch(cr.clone());
                     }
                 }
                 let c = cr.get();
                 cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
                 if other_watch_value == Some(false) {
                     check_in!(cr, Propagate::EmitConflict(self.num_conflict + 1, cached));
-                    conflict_path!(cached, AssignReason::Implication(cr));
+                    conflict_path!(cached, AssignReason::Implication(cr.clone()));
                 }
 
                 #[cfg(feature = "chrono_BT")]
@@ -488,7 +488,7 @@ impl PropagateIF for AssignStack {
                 debug_assert!(other_watch_value.is_none());
                 self.assign_by_implication(
                     cached,
-                    AssignReason::Implication(cr),
+                    AssignReason::Implication(cr.clone()),
                     #[cfg(feature = "chrono_BT")]
                     dl,
                 );
@@ -629,7 +629,7 @@ impl PropagateIF for AssignStack {
                         if lit_assign!(self.var[lk.vi()], *lk) != Some(false) {
                             let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
-                            cdb.transform_by_updating_watch(cr, false_watch_pos, k, true);
+                            cdb.transform_by_updating_watch(cr.clone(), false_watch_pos, k, true);
                             c.search_from = (k as u16).saturating_add(1);
                             debug_assert!(
                                 self.assigned(!new_watch) == Some(true)
@@ -647,7 +647,7 @@ impl PropagateIF for AssignStack {
                         }
                     }
                     if false_watch_pos == 0 {
-                        cdb.swap_watch(cr);
+                        cdb.swap_watch(cr.clone());
                     }
                 }
                 cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
@@ -656,7 +656,7 @@ impl PropagateIF for AssignStack {
                         cr,
                         Propagate::SandboxEmitConflict(self.num_conflict, propagating)
                     );
-                    return Err((cached, AssignReason::Implication(cr)));
+                    return Err((cached, AssignReason::Implication(cr.clone())));
                 }
 
                 #[cfg(feature = "chrono_BT")]
@@ -672,7 +672,7 @@ impl PropagateIF for AssignStack {
 
                 self.assign_by_implication(
                     cached,
-                    AssignReason::Implication(cr),
+                    AssignReason::Implication(cr.clone()),
                     #[cfg(feature = "chrono_BT")]
                     dl,
                 );
@@ -715,13 +715,15 @@ impl AssignStack {
         let mut num_propagated = 0;
         while num_propagated < self.trail.len() {
             num_propagated = self.trail.len();
-            for cr in cdb.iter() {
-                let c = cr.get();
+            let copied = cdb.iter().cloned().collect::<Vec<_>>();
+            for cr in copied.iter() {
+                let writer = cr.clone();
+                let c = writer.get();
                 if c.is_dead() {
                     continue;
                 }
                 debug_assert!(c.iter().all(|l| !self.var[l.vi()].is(FlagVar::ELIMINATED)));
-                match cdb.transform_by_simplification(self, *cr) {
+                match cdb.transform_by_simplification(self, writer.clone()) {
                     RefClause::Clause(_) => (),
                     RefClause::Dead => (), // was a satisfied clause
                     RefClause::EmptyClause => return Err(SolverError::EmptyClause),
@@ -730,7 +732,7 @@ impl AssignStack {
                         debug_assert!(self.assigned(lit).is_none());
                         cdb.certificate_add_assertion(lit);
                         self.assign_at_root_level(lit)?;
-                        cdb.remove_clause(*cr);
+                        cdb.remove_clause(writer);
                     }
                 }
             }
@@ -749,7 +751,7 @@ impl AssignStack {
                 let vi = l.vi();
                 let var = &self.var[vi];
                 if let Some(b) = var.assign {
-                    self.best_phases.insert(vi, (b, var.reason));
+                    self.best_phases.insert(vi, (b, var.reason.clone()));
                 }
             }
         }

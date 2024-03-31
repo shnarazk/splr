@@ -17,9 +17,9 @@ impl Eliminator {
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
         mut cr: ClauseRef,
-        mut dr: ClauseRef,
+        dr: ClauseRef,
     ) -> MaybeInconsistent {
-        match have_subsuming_lit(cdb, cr, dr) {
+        match have_subsuming_lit(cdb, cr.clone(), dr.clone()) {
             Subsumable::Success => {
                 #[cfg(feature = "trace_elimination")]
                 println!(
@@ -28,9 +28,9 @@ impl Eliminator {
                 );
                 debug_assert!(!dr.get().is_dead());
                 if !dr.get().is(FlagClause::LEARNT) {
-                    cr.get().turn_off(FlagClause::LEARNT);
+                    cr.get_mut().turn_off(FlagClause::LEARNT);
                 }
-                self.remove_cid_occur(asg, dr, &mut dr.get_mut());
+                self.remove_cid_occur(asg, dr.clone());
                 cdb.remove_clause(dr);
                 self.num_subsumed += 1;
             }
@@ -49,7 +49,7 @@ impl Eliminator {
 }
 
 /// returns a literal if these clauses can be merged by the literal.
-fn have_subsuming_lit(cdb: &mut impl ClauseDBIF, cr: ClauseRef, other: ClauseRef) -> Subsumable {
+fn have_subsuming_lit(_cdb: &mut impl ClauseDBIF, cr: ClauseRef, other: ClauseRef) -> Subsumable {
     debug_assert!(!other.is_lifted_lit());
     if cr.is_lifted_lit() {
         let l = Lit::from(cr);
@@ -89,29 +89,29 @@ fn strengthen_clause(
     asg: &mut impl AssignIF,
     cdb: &mut impl ClauseDBIF,
     elim: &mut Eliminator,
-    mut cr: ClauseRef,
+    cr: ClauseRef,
     l: Lit,
 ) -> MaybeInconsistent {
-    let mut c = cr.get_mut();
-    debug_assert!(!c.is_dead());
-    debug_assert!(1 < c.len());
-    match cdb.transform_by_elimination(cr, l) {
+    // let mut c = cr.get_mut();
+    // debug_assert!(!c.is_dead());
+    // debug_assert!(1 < c.len());
+    match cdb.transform_by_elimination(cr.clone(), l) {
         RefClause::Clause(_ci) => {
             #[cfg(feature = "trace_elimination")]
             println!("cr {} drops literal {}", cr, l);
 
-            elim.enqueue_clause(cr, &mut c);
-            elim.remove_lit_occur(asg, l, cr);
+            elim.enqueue_clause(cr.clone());
+            elim.remove_lit_occur(asg, l, &cr);
             Ok(())
         }
         RefClause::RegisteredClause(_) => {
-            elim.remove_cid_occur(asg, cr, &mut c);
+            elim.remove_cid_occur(asg, cr.clone());
             cdb.remove_clause(cr);
             Ok(())
         }
         RefClause::UnitClause(l0) => {
             cdb.certificate_add_assertion(l0);
-            elim.remove_cid_occur(asg, cr, &mut c);
+            elim.remove_cid_occur(asg, cr.clone());
             cdb.remove_clause(cr);
             match asg.assigned(l0) {
                 None => asg.assign_at_root_level(l0),

@@ -39,7 +39,7 @@ impl TrailSavingIF for AssignStack {
                 // }
 
                 self.trail_saved.push(l);
-                self.reason_saved[vi] = self.var[vi].reason;
+                self.reason_saved[vi] = self.var[vi].reason.clone();
                 self.reward_at_unassign(vi);
                 if activity_threshold <= self.var[vi].reward {
                     self.insert_heap(vi);
@@ -63,12 +63,12 @@ impl TrailSavingIF for AssignStack {
         for i in (0..self.trail_saved.len()).rev() {
             let lit = self.trail_saved[i];
             let vi = lit.vi();
-            let old_reason = self.reason_saved[vi];
-            match (self.assigned(lit), old_reason) {
+            let old_reason = self.reason_saved[vi].clone();
+            match (self.assigned(lit), &old_reason) {
                 (Some(true), _) => (),
                 (None, AssignReason::BinaryLink(link)) => {
                     debug_assert_ne!(link.vi(), lit.vi());
-                    debug_assert_eq!(self.assigned(link), Some(true));
+                    debug_assert_eq!(self.assigned(*link), Some(true));
                     self.num_repropagation += 1;
 
                     self.assign_by_implication(
@@ -101,7 +101,7 @@ impl TrailSavingIF for AssignStack {
                 }
                 (Some(false), AssignReason::BinaryLink(link)) => {
                     debug_assert_ne!(link.vi(), lit.vi());
-                    debug_assert_eq!(self.assigned(link), Some(true));
+                    debug_assert_eq!(self.assigned(*link), Some(true));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_saved_trail();
                     return Err((lit, old_reason));
@@ -111,10 +111,10 @@ impl TrailSavingIF for AssignStack {
                     debug_assert!(c.iter().all(|l| self.assigned(*l) == Some(false)));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_saved_trail();
-                    return Err((c.lit0(), AssignReason::Implication(cr)));
+                    return Err((c.lit0(), AssignReason::Implication(cr.clone())));
                 }
                 (_, AssignReason::Decision(lvl)) => {
-                    debug_assert_ne!(0, lvl);
+                    debug_assert_ne!(0, *lvl);
                     self.insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
                 }

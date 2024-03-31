@@ -345,16 +345,16 @@ pub enum RefClause {
 }
 
 impl RefClause {
-    pub fn as_cid(&self) -> ClauseRef {
-        match self {
-            RefClause::Clause(cid) => *cid,
-            RefClause::RegisteredClause(cid) => *cid,
-            _ => panic!("invalid reference to clause"),
-        }
-    }
+    // pub fn as_cid(&self) -> ClauseRef {
+    //     match self {
+    //         RefClause::Clause(cr) => *cr,
+    //         RefClause::RegisteredClause(cr) => *cr,
+    //         _ => panic!("invalid reference to clause"),
+    //     }
+    // }
     pub fn is_new(&self) -> Option<ClauseRef> {
         match self {
-            RefClause::Clause(cid) => Some(*cid),
+            RefClause::Clause(cr) => Some(cr.clone()),
             RefClause::RegisteredClause(_) => None,
             RefClause::EmptyClause => None,
             RefClause::Dead => None,

@@ -32,9 +32,9 @@ pub fn handle_conflict(
     // at higher level due to the incoherence between the current level and conflicting
     // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
     {
-        if let AssignReason::Implication(cr) = cc.1 {
+        if let AssignReason::Implication(cr) = cc.1.clone() {
             if cr.get().iter().all(|l| asg.level(l.vi()) == 0) {
-                return Err(SolverError::RootLevelConflict(*cc));
+                return Err(SolverError::RootLevelConflict(cc.clone()));
             }
         }
     }
@@ -190,7 +190,7 @@ pub fn handle_conflict(
                 assign_level,
             );
             // || check_graph(asg, cdb, l0, "biclause");
-            for cr in &state.derive20 {
+            for cr in &mut state.derive20 {
                 cr.get_mut().turn_on(FlagClause::DERIVE20);
             }
             rank = 1;
@@ -206,14 +206,14 @@ pub fn handle_conflict(
             debug_assert_eq!(asg.assigned(l0), None);
             asg.assign_by_implication(
                 l0,
-                AssignReason::Implication(cr),
+                AssignReason::Implication(cr.clone()),
                 #[cfg(feature = "chrono_BT")]
                 assign_level,
             );
             // || check_graph(asg, cdb, l0, "clause");
             rank = c.rank;
             if rank <= 20 {
-                for cr in &state.derive20 {
+                for cr in &mut state.derive20 {
                     cr.get_mut().turn_on(FlagClause::DERIVE20);
                 }
             }
@@ -261,7 +261,8 @@ fn conflict_analyze(
     let root_level = asg.root_level();
     let dl = asg.decision_level();
     let mut path_cnt = 0;
-    let (mut p, mut reason) = cc;
+    let mut p = cc.0;
+    let mut reason = cc.1.clone();
 
     macro_rules! conflict_level {
         ($vi: expr) => {
@@ -361,11 +362,11 @@ fn conflict_analyze(
                 debug_assert!(!c.is_dead() && 2 < c.len());
                 // if !cdb.update_at_analysis(asg, cr) {
                 if !c.is(FlagClause::LEARNT) {
-                    state.derive20.push(cr);
+                    state.derive20.push(cr.clone());
                 }
                 if max_lbd < c.rank {
                     max_lbd = c.rank;
-                    cid_with_max_lbd = Some(cr);
+                    cid_with_max_lbd = Some(cr.clone());
                 }
                 for q in c.iter().skip(1) {
                     let vi = q.vi();
@@ -500,7 +501,7 @@ impl Lit {
     fn is_redundant(
         self,
         asg: &mut AssignStack,
-        cdb: &ClauseDB,
+        _cdb: &ClauseDB,
         clear: &mut Vec<Lit>,
         levels: &[bool],
     ) -> bool {
@@ -623,7 +624,7 @@ fn lit_level(
 }
 
 #[allow(dead_code)]
-fn dumper(asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
+fn dumper(asg: &AssignStack, _cdb: &ClauseDB, bag: &[Lit]) -> String {
     use std::fmt::Write as _;
     let mut s = String::new();
     for l in bag {
