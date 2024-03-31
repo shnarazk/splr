@@ -77,7 +77,7 @@ pub trait VarManipulateIF {
     /// return the assign level of var.
     fn level(&self, vi: VarId) -> DecisionLevel;
     /// return the reason of assignment.
-    fn reason(&self, vi: VarId) -> AssignReason;
+    fn reason(&self, vi: VarId) -> &AssignReason;
     /// return the var.
     fn var(&self, vi: VarId) -> &Var;
     /// return the var.
@@ -118,10 +118,10 @@ impl VarManipulateIF for AssignStack {
         self.level[vi]
     }
     #[inline]
-    fn reason(&self, vi: VarId) -> AssignReason {
+    fn reason(&self, vi: VarId) -> &AssignReason {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            self.var.get_unchecked(vi).reason
+            &self.var.get_unchecked(vi).reason
         }
         #[cfg(not(feature = "unsafe_access"))]
         self.reason[vi]

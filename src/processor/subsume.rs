@@ -116,7 +116,10 @@ fn strengthen_clause(
             match asg.assigned(l0) {
                 None => asg.assign_at_root_level(l0),
                 Some(true) => Ok(()),
-                Some(false) => Err(SolverError::RootLevelConflict((l0, asg.reason(l0.vi())))),
+                Some(false) => Err(SolverError::RootLevelConflict((
+                    l0,
+                    asg.reason(l0.vi()).clone(),
+                ))),
             }
         }
         RefClause::Dead | RefClause::EmptyClause => unreachable!("strengthen_clause"),

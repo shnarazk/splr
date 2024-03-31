@@ -104,7 +104,7 @@ pub fn handle_conflict(
                 // asg.lift_to_asserted(l0.vi());
             }
             Some(false) if asg.level(l0.vi()) == asg.root_level() => {
-                return Err(SolverError::RootLevelConflict((l0, asg.reason(l0.vi()))));
+                return Err(SolverError::RootLevelConflict((l0, *asg.reason(l0.vi()))));
             }
             _ => {
                 // dump to certified even if it's a literal.
@@ -442,7 +442,7 @@ fn conflict_analyze(
         }
         debug_assert!(0 < trail_index);
         trail_index -= 1;
-        reason = asg.reason(p.vi());
+        reason = *asg.reason(p.vi());
     }
     if let Some(cid) = cid_with_max_lbd {
         cdb.update_at_analysis(asg, cid);
@@ -523,8 +523,8 @@ impl Lit {
                         ) && levels[lv as usize]
                         {
                             asg.var_mut(vi).turn_on(FlagVar::CA_SEEN);
-                            stack.push(l);
-                            clear.push(l);
+                            stack.push(*l);
+                            clear.push(*l);
                         } else {
                             // one of the roots is a decision var at an unchecked level.
                             for l in &clear[top..] {
@@ -590,7 +590,7 @@ fn lit_level(
     bag.push(lit);
     match asg.reason(lit.vi()) {
         AssignReason::Decision(0) => asg.root_level(),
-        AssignReason::Decision(lvl) => lvl,
+        AssignReason::Decision(lvl) => *lvl,
         AssignReason::Implication(cr) => {
             assert_eq!(
                 cr.get().lit0(),
@@ -618,7 +618,7 @@ fn lit_level(
                 .max()
                 .unwrap()
         }
-        AssignReason::BinaryLink(b) => lit_level(asg, cdb, b, bag, _mes),
+        AssignReason::BinaryLink(b) => lit_level(asg, cdb, *b, bag, _mes),
         AssignReason::None => panic!("One of root of {lit} isn't assigned."),
     }
 }
@@ -636,7 +636,7 @@ fn dumper(asg: &AssignStack, _cdb: &ClauseDB, bag: &[Lit]) -> String {
             asg.reason(l.vi()),
             match asg.reason(l.vi()) {
                 AssignReason::Decision(_) => vec![],
-                AssignReason::BinaryLink(lit) => vec![*l, !lit],
+                AssignReason::BinaryLink(lit) => vec![*l, !*lit],
                 AssignReason::Implication(cr) => cr.get().iter().copied().collect::<Vec<Lit>>(),
                 AssignReason::None => vec![],
             },

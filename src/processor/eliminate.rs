@@ -78,7 +78,7 @@ pub fn eliminate_var(
                         Some(false) => {
                             return Err(SolverError::RootLevelConflict((
                                 lit,
-                                asg.reason(lit.vi()),
+                                asg.reason(lit.vi()).clone(),
                             )));
                         }
                         None => {

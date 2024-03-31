@@ -941,7 +941,7 @@ impl ClauseDBIF for ClauseDB {
             // There's no clause stored in `reason` because the decision level is 'zero.'
             debug_assert_ne!(
                 asg.reason(c.lit0().vi()),
-                AssignReason::Implication(cr.clone()),
+                &AssignReason::Implication(cr.clone()),
                 "Lit {} {:?} level {}, dl: {}",
                 i32::from(c.lit0()),
                 asg.assigned(c.lit0()),
