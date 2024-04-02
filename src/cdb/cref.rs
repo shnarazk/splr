@@ -1,6 +1,12 @@
 use {
     super::Clause,
-    std::{fmt, ops::Deref, rc::Rc, sync::RwLock},
+    std::{
+        borrow::{Borrow, BorrowMut},
+        cell::{Ref, RefCell, RefMut},
+        fmt,
+        rc::Rc,
+        // sync::{LockResult, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    },
 };
 
 /// Clause identifier, or clause index, starting with one.
@@ -8,7 +14,7 @@ use {
 #[derive(Clone)]
 pub struct ClauseRef {
     id: usize,
-    c: Rc<RwLock<Clause>>,
+    c: Rc<RefCell<Clause>>,
 }
 
 impl PartialEq for ClauseRef {
@@ -27,7 +33,7 @@ impl std::hash::Hash for ClauseRef {
 
 impl Ord for ClauseRef {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.get().rank.cmp(&other.get().rank)
+        self.get().unwrap().rank.cmp(&other.get().unwrap().rank)
     }
 }
 
@@ -40,9 +46,9 @@ impl PartialOrd for ClauseRef {
 /// API for Clause Id.
 pub trait ClauseRefIF {
     fn new(id: usize, c: Clause) -> Self;
-    fn get(&self) -> Clause;
+    fn get(&self) -> &RefCell<Clause>;
     // fn get(&self) -> RwLock<Clause>;
-    fn get_mut(&mut self) -> &mut Clause;
+    fn get_mut(&mut self) -> &mut RefCell<Clause>;
     /// return `true` if a given clause id is made from a `Lit`.
     fn is_lifted_lit(&self) -> bool;
 }
@@ -89,14 +95,18 @@ impl ClauseRefIF for ClauseRef {
     fn new(id: usize, c: Clause) -> Self {
         ClauseRef {
             id,
-            c: Rc::new(RwLock::new(c)),
+            c: Rc::new(RefCell::new(c)),
         }
     }
-    fn get(&self) -> Clause {
-        *self.c.read().unwrap().deref()
+    fn get(&self) -> &RefCell<Clause> {
+        let r = Rc::new(RefCell::new(1usize));
+        let r1: &RefCell<usize> = r.borrow();
+        let r2 = r1.borrow();
+        let x = *r2;
+        self.c.borrow()
     }
-    fn get_mut(&mut self) -> &mut Clause {
-        &mut self.c.write().unwrap()
+    fn get_mut(&mut self) -> &mut RefCell<Clause> {
+        self.c.borrow_mut()
     }
     /// return `true` if the clause is generated from a literal by Eliminator.
     fn is_lifted_lit(&self) -> bool {
