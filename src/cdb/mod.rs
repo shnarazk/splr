@@ -21,7 +21,7 @@ mod watch_cache;
 
 pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
-    cref::ClauseRefIF,
+    cref::{ClauseRef, ClauseRefIF},
     property::*,
     sls::StochasticLocalSearchIF,
     unsat_certificate::CertificationStore,
@@ -33,7 +33,6 @@ use {
     crate::{assign::AssignIF, types::*},
     std::{
         collections::{hash_set::Iter as HashSetIter, HashSet},
-        rc::Rc,
         slice::Iter as SliceIter,
     },
     watch_cache::*,
@@ -187,13 +186,6 @@ pub trait ClauseDBIF:
     fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);
 }
 
-/// Clause identifier, or clause index, starting with one.
-/// Note: ids are re-used after 'garbage collection'.
-#[derive(Clone, Eq, Hash, PartialEq)]
-pub struct ClauseRef {
-    c: Rc<Clause>,
-}
-
 /// A representation of 'clause'
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Clause {
@@ -232,6 +224,8 @@ pub struct Clause {
 ///```
 #[derive(Clone, Debug)]
 pub struct ClauseDB {
+    /// clause id factory
+    next_clause_id: usize,
     /// container of clauses
     // clause: Vec<Clause>,
     clause: HashSet<ClauseRef>,
@@ -429,9 +423,7 @@ mod tests {
         let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         // Now `asg.level` = [_, 1, 2, 3, 4, 5, 6].
-        let c0 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
-            .as_cid();
+        let c0 = cdb.new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false);
 
         asg.assign_by_decision(lit(-2)); // at level 1
         asg.assign_by_decision(lit(1)); // at level 2
@@ -439,7 +431,7 @@ mod tests {
         assert_eq!(asg.level(1), 2);
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cid();
+            .as_cref();
         let c = c1.get();
 
         assert!(!c.is_dead());
@@ -448,7 +440,7 @@ mod tests {
         assert!(!c.is(Flag::USED));
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
-            .as_cid();
+            .as_cref();
         let c = c2.get();
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
@@ -466,10 +458,10 @@ mod tests {
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cid();
+            .as_cref();
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false)
-            .as_cid();
+            .as_cref();
         // cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_ne!(c1, c2);
@@ -487,7 +479,7 @@ mod tests {
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cid();
+            .as_cref();
         assert_eq!(c1.get()[0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
         let mut iter = c1.get()[0..].iter();
         assert_eq!(iter.next(), Some(&lit(1)));

@@ -1,16 +1,28 @@
 use {
-    super::{Clause, ClauseRef},
-    std::{fmt, rc::Rc},
-    // std::{fmt, sync::RwLock},
+    super::Clause,
+    std::{fmt, ops::Deref, rc::Rc, sync::RwLock},
 };
 
-/// API for Clause Id.
-pub trait ClauseRefIF {
-    fn new(c: Clause) -> Self;
-    fn get(&self) -> &Clause;
-    fn get_mut(&mut self) -> &mut Clause;
-    /// return `true` if a given clause id is made from a `Lit`.
-    fn is_lifted_lit(&self) -> bool;
+/// Clause identifier, or clause index, starting with one.
+/// Note: ids are re-used after 'garbage collection'.
+#[derive(Clone)]
+pub struct ClauseRef {
+    id: usize,
+    c: Rc<RwLock<Clause>>,
+}
+
+impl PartialEq for ClauseRef {
+    fn eq(&self, other: &Self) -> bool {
+        self.id.eq(&other.id)
+    }
+}
+
+impl Eq for ClauseRef {}
+
+impl std::hash::Hash for ClauseRef {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state)
+    }
 }
 
 impl Ord for ClauseRef {
@@ -23,6 +35,16 @@ impl PartialOrd for ClauseRef {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
+}
+
+/// API for Clause Id.
+pub trait ClauseRefIF {
+    fn new(id: usize, c: Clause) -> Self;
+    fn get(&self) -> Clause;
+    // fn get(&self) -> RwLock<Clause>;
+    fn get_mut(&mut self) -> &mut Clause;
+    /// return `true` if a given clause id is made from a `Lit`.
+    fn is_lifted_lit(&self) -> bool;
 }
 
 // impl Default for ClauseRef {
@@ -53,25 +75,28 @@ impl PartialOrd for ClauseRef {
 
 impl fmt::Debug for ClauseRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}C", self.c.lits)
+        write!(f, "{:?}C", self.c.read().unwrap().lits)
     }
 }
 
 impl fmt::Display for ClauseRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}C", self.c.lits)
+        write!(f, "{:?}C", self.c.read().unwrap().lits)
     }
 }
 
 impl ClauseRefIF for ClauseRef {
-    fn new(c: Clause) -> Self {
-        ClauseRef { c: Rc::new(c) }
+    fn new(id: usize, c: Clause) -> Self {
+        ClauseRef {
+            id,
+            c: Rc::new(RwLock::new(c)),
+        }
     }
-    fn get(&self) -> &Clause {
-        &self.c
+    fn get(&self) -> Clause {
+        *self.c.read().unwrap().deref()
     }
     fn get_mut(&mut self) -> &mut Clause {
-        Rc::get_mut(&mut self.c).unwrap()
+        &mut self.c.write().unwrap()
     }
     /// return `true` if the clause is generated from a literal by Eliminator.
     fn is_lifted_lit(&self) -> bool {

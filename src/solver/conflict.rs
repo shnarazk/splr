@@ -541,7 +541,7 @@ impl Lit {
                 }
                 AssignReason::Implication(cr) => {
                     let c = cr.get();
-                    for q in &(*c)[1..] {
+                    for q in &(c)[1..] {
                         let vi = q.vi();
                         let lv = asg.level(vi);
                         if 0 < lv && !asg.var(vi).is(FlagVar::CA_SEEN) {

@@ -204,7 +204,7 @@ impl From<Lit> for bool {
 impl From<Lit> for ClauseRef {
     #[inline]
     fn from(l: Lit) -> ClauseRef {
-        ClauseRef::new(Clause::from(vec![l]))
+        ClauseRef::new(0, Clause::from(vec![l]))
         // ClauseRef {
         //     ordinal: unsafe { NonZeroU32::new_unchecked(NonZeroU32::get(l.ordinal) | 0x8000_0000) },
         // }
@@ -345,13 +345,13 @@ pub enum RefClause {
 }
 
 impl RefClause {
-    // pub fn as_cid(&self) -> ClauseRef {
-    //     match self {
-    //         RefClause::Clause(cr) => *cr,
-    //         RefClause::RegisteredClause(cr) => *cr,
-    //         _ => panic!("invalid reference to clause"),
-    //     }
-    // }
+    pub fn as_cref(&self) -> ClauseRef {
+        match self {
+            RefClause::Clause(cr) => cr.clone(),
+            RefClause::RegisteredClause(cr) => cr.clone(),
+            _ => panic!("invalid reference to clause"),
+        }
+    }
     pub fn is_new(&self) -> Option<ClauseRef> {
         match self {
             RefClause::Clause(cr) => Some(cr.clone()),

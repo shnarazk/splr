@@ -43,7 +43,7 @@ impl StochasticLocalSearchIF for ClauseDB {
                     // }
                     // level = level.max(cls_lvl);
                     if target_clause.is_none() || unsat_clauses == step {
-                        target_clause = Some(c);
+                        target_clause = Some(&c);
                         for l in c.lits.iter() {
                             flip_target.entry(l.vi()).or_insert(0);
                         }

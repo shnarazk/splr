@@ -1,11 +1,11 @@
 use {
     super::{
         binary::{BinaryLinkIF, BinaryLinkList},
+        cref::ClauseRef,
         ema::ProgressLBD,
         property,
         watch_cache::*,
-        BinaryLinkDB, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseRef, ReductionType,
-        RefClause,
+        BinaryLinkDB, CertificationStore, Clause, ClauseDB, ClauseDBIF, ReductionType, RefClause,
     },
     crate::{assign::AssignIF, types::*},
     std::collections::{hash_set::Iter, HashSet},
@@ -17,6 +17,7 @@ use std::{fs::File, io::Write, path::Path};
 impl Default for ClauseDB {
     fn default() -> ClauseDB {
         ClauseDB {
+            next_clause_id: 1, // id 0 is used by lifted clauses from a literal
             clause: HashSet::new(),
             binary_link: BinaryLinkDB::default(),
             watch_cache: Vec::new(),
@@ -317,7 +318,8 @@ impl ClauseDBIF for ClauseDB {
         }
         let l0 = c.lits[0];
         let l1 = c.lits[1];
-        let cr = ClauseRef::new(c);
+        let cr = ClauseRef::new(self.next_clause_id, c);
+        self.next_clause_id += 1;
         self.clause.insert(cr.clone());
         if len2 {
             *num_bi_clause += 1;
@@ -367,7 +369,8 @@ impl ClauseDBIF for ClauseDB {
         }
         let l0 = c.lits[0];
         let l1 = c.lits[1];
-        let cr = ClauseRef::new(c);
+        let cr = ClauseRef::new(self.next_clause_id, c);
+        self.next_clause_id += 1;
         self.clause.insert(cr.clone());
         if len2 {
             binary_link.add(l0, l1, cr.clone());
