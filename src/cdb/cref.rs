@@ -2,7 +2,8 @@ use {
     super::Clause,
     std::{
         borrow::{Borrow, BorrowMut},
-        cell::{Ref, RefCell, RefMut},
+        cell::{Ref, RefCell},
+        // cell::{Ref, RefCell, RefMut},
         fmt,
         rc::Rc,
         // sync::{LockResult, RwLock, RwLockReadGuard, RwLockWriteGuard},
@@ -33,7 +34,9 @@ impl std::hash::Hash for ClauseRef {
 
 impl Ord for ClauseRef {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.get().unwrap().rank.cmp(&other.get().unwrap().rank)
+        let c = self.get();
+        let d = other.get();
+        c.borrow().rank.cmp(&d.borrow().rank)
     }
 }
 
@@ -46,11 +49,34 @@ impl PartialOrd for ClauseRef {
 /// API for Clause Id.
 pub trait ClauseRefIF {
     fn new(id: usize, c: Clause) -> Self;
+    // return shared reference
     fn get(&self) -> &RefCell<Clause>;
-    // fn get(&self) -> RwLock<Clause>;
+    // return mutable reference
     fn get_mut(&mut self) -> &mut RefCell<Clause>;
-    /// return `true` if a given clause id is made from a `Lit`.
+    /// return `true` if the clause is generated from a literal by Eliminator.
     fn is_lifted_lit(&self) -> bool;
+}
+
+impl ClauseRefIF for ClauseRef {
+    fn new(id: usize, c: Clause) -> Self {
+        ClauseRef {
+            id,
+            c: Rc::new(RefCell::new(c)),
+        }
+    }
+    fn get(&self) -> &RefCell<Clause> {
+        let r: Rc<RefCell<Clause>> = Rc::new(RefCell::new(1usize));
+        let i: usize = *Borrow::<RefCell<usize>>::borrow(&r).borrow();
+        self.c.borrow()
+    }
+    fn get_mut(&mut self) -> &mut RefCell<Clause> {
+        self.c.borrow_mut()
+    }
+    /// return `true` if the clause is generated from a literal by Eliminator.
+    fn is_lifted_lit(&self) -> bool {
+        unimplemented!("(**self.c).is_lifted_lit()")
+        // 0 != 0x8000_0000 & NonZeroU32::get(self.ordinal)
+    }
 }
 
 // impl Default for ClauseRef {
@@ -81,36 +107,20 @@ pub trait ClauseRefIF {
 
 impl fmt::Debug for ClauseRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}C", self.c.read().unwrap().lits)
+        if let c = self.get() {
+            write!(f, "{:?}C", c.borrow().lits)
+        } else {
+            write!(f, "?C")
+        }
     }
 }
 
 impl fmt::Display for ClauseRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}C", self.c.read().unwrap().lits)
-    }
-}
-
-impl ClauseRefIF for ClauseRef {
-    fn new(id: usize, c: Clause) -> Self {
-        ClauseRef {
-            id,
-            c: Rc::new(RefCell::new(c)),
+        if let c = self.get() {
+            write!(f, "{:?}C", c.borrow().lits)
+        } else {
+            write!(f, "?C")
         }
-    }
-    fn get(&self) -> &RefCell<Clause> {
-        let r = Rc::new(RefCell::new(1usize));
-        let r1: &RefCell<usize> = r.borrow();
-        let r2 = r1.borrow();
-        let x = *r2;
-        self.c.borrow()
-    }
-    fn get_mut(&mut self) -> &mut RefCell<Clause> {
-        self.c.borrow_mut()
-    }
-    /// return `true` if the clause is generated from a literal by Eliminator.
-    fn is_lifted_lit(&self) -> bool {
-        unimplemented!("(**self.c).is_lifted_lit()")
-        // 0 != 0x8000_0000 & NonZeroU32::get(self.ordinal)
     }
 }
