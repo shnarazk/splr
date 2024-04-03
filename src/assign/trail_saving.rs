@@ -79,25 +79,24 @@ impl TrailSavingIF for AssignStack {
                     );
                 }
                 // reason refinement by ignoring this dependecy
-                (None, AssignReason::Implication(cr)) if q < cr.get().rank => {
-                    self.insert_heap(vi);
-                    return self.truncate_trail_saved(i + 1);
-                }
                 (None, AssignReason::Implication(cr)) => {
-                    debug_assert_eq!(cr.get().lit0(), lit);
-                    debug_assert!(cr
-                        .get()
-                        .iter()
-                        .skip(1)
-                        .all(|l| self.assigned(*l) == Some(false)));
-                    self.num_repropagation += 1;
+                    let rcc = cr.get();
+                    let c = rcc.borrow();
+                    if q < c.rank {
+                        self.insert_heap(vi);
+                        return self.truncate_trail_saved(i + 1);
+                    } else {
+                        debug_assert_eq!(c.lit0(), lit);
+                        debug_assert!(c.iter().skip(1).all(|l| self.assigned(*l) == Some(false)));
+                        self.num_repropagation += 1;
 
-                    self.assign_by_implication(
-                        lit,
-                        old_reason,
-                        #[cfg(feature = "chrono_BT")]
-                        dl,
-                    );
+                        self.assign_by_implication(
+                            lit,
+                            old_reason,
+                            #[cfg(feature = "chrono_BT")]
+                            dl,
+                        );
+                    }
                 }
                 (Some(false), AssignReason::BinaryLink(link)) => {
                     debug_assert_ne!(link.vi(), lit.vi());
@@ -107,7 +106,8 @@ impl TrailSavingIF for AssignStack {
                     return Err((lit, old_reason));
                 }
                 (Some(false), AssignReason::Implication(cr)) => {
-                    let c = cr.get();
+                    let rcc = cr.get();
+                    let c = rcc.borrow();
                     debug_assert!(c.iter().all(|l| self.assigned(*l) == Some(false)));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_saved_trail();

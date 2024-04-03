@@ -24,11 +24,17 @@ pub fn eliminate_var(
     // count only alive clauses
     // Note: it may contain the target literal somehow. So the following may be failed.
     // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, true)))));
-    w.pos_occurs
-        .retain(|cr| cr.get().contains(Lit::from((vi, true))));
+    w.pos_occurs.retain(|cr| {
+        let rcc = cr.get();
+        let c = rcc.borrow();
+        c.contains(Lit::from((vi, true)))
+    });
     // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, false)))));
-    w.neg_occurs
-        .retain(|cr| cr.get().contains(Lit::from((vi, false))));
+    w.neg_occurs.retain(|cr| {
+        let rcc = cr.get();
+        let c = rcc.borrow();
+        c.contains(Lit::from((vi, false)))
+    });
 
     let num_combination = w.pos_occurs.len() * w.neg_occurs.len();
 
@@ -55,10 +61,14 @@ pub fn eliminate_var(
     let vec = &mut state.new_learnt;
     // println!("eliminate_var {}: |p|: {} and |n|: {}", vi, (*pos).len(), (*neg).len());
     // Produce clauses in cross product:
-    for p in pos.iter() {
-        let learnt_p = p.get().is(FlagClause::LEARNT);
-        for n in neg.iter() {
-            match merge(asg, cdb, p.clone(), n.clone(), vi, vec) {
+    for pr in pos.iter() {
+        let rcp = pr.get();
+        let p = rcp.borrow();
+        let learnt_p = p.is(FlagClause::LEARNT);
+        for nr in neg.iter() {
+            let rcn = nr.get();
+            let n = rcn.borrow();
+            match merge(asg, cdb, pr.clone(), nr.clone(), vi, vec) {
                 0 => {
                     #[cfg(feature = "trace_elimination")]
                     println!(
@@ -90,7 +100,7 @@ pub fn eliminate_var(
                 }
                 _ => {
                     debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
-                    match cdb.new_clause(asg, vec, learnt_p && n.get().is(FlagClause::LEARNT)) {
+                    match cdb.new_clause(asg, vec, learnt_p && n.is(FlagClause::LEARNT)) {
                         RefClause::Clause(ci) => {
                             // the merged clause might be a duplicated clause.
                             elim.add_cid_occur(asg, ci.clone(), true);
@@ -113,10 +123,20 @@ pub fn eliminate_var(
     //
     //## VAR ELIMINATION
     //
-    debug_assert!(pos.iter().all(|cr| !cr.get().is_dead()));
-    debug_assert!(neg.iter().all(|cr| !cr.get().is_dead()));
+    debug_assert!(pos.iter().all(|cr| {
+        let rcc = cr.get();
+        let c = rcc.borrow();
+        !c.is_dead()
+    }));
+    debug_assert!(neg.iter().all(|cr| {
+        let rcc = cr.get();
+        let c = rcc.borrow();
+        !c.is_dead()
+    }));
     for cr in pos.iter() {
-        if cr.get().is_dead() {
+        let rcc = cr.get();
+        let c = rcc.borrow();
+        if c.is_dead() {
             continue;
         }
         #[cfg(feature = "incremental_solver")]
@@ -129,7 +149,9 @@ pub fn eliminate_var(
         cdb.remove_clause(cr.clone());
     }
     for cr in neg.iter() {
-        if cr.get().is_dead() {
+        let rcc = cr.get();
+        let c = rcc.borrow();
+        if c.is_dead() {
             continue;
         }
         #[cfg(feature = "incremental_solver")]
@@ -196,8 +218,10 @@ fn merge_cost(
     cq: ClauseRef,
     vi: VarId,
 ) -> Option<usize> {
-    let c_p = cp.get();
-    let c_q = cq.get();
+    let rcp = cp.get();
+    let c_p = rcp.borrow();
+    let rcq = cq.get();
+    let c_q = rcq.borrow();
     let mut cond: Option<Lit> = None;
     let mut cond2: Option<Lit> = None;
     let mut count = 0;
@@ -245,8 +269,10 @@ fn merge(
     vec: &mut Vec<Lit>,
 ) -> usize {
     vec.clear();
-    let pqb = cip.get();
-    let qpb = ciq.get();
+    let rcp = cip.get();
+    let pqb = rcp.borrow();
+    let rcq = ciq.get();
+    let qpb = rcq.borrow();
     let ps_smallest = pqb.len() < qpb.len();
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
     #[cfg(feature = "trace_elimination")]
@@ -282,13 +308,17 @@ fn make_eliminated_clauses(
 ) {
     if neg.len() < pos.len() {
         for cr in neg {
-            debug_assert!(!cr.get().is_dead());
+            let rcc = cr.get();
+            let c = rcc.borrow();
+            debug_assert!(!c.is_dead());
             make_eliminated_clause(cdb, store, v, cr.clone());
         }
         make_eliminating_unit_clause(store, Lit::from((v, true)));
     } else {
         for dr in pos {
-            debug_assert!(!dr.get().is_dead());
+            let rcd = dr.get();
+            let d = rcd.borrow();
+            debug_assert!(!d.is_dead());
             make_eliminated_clause(cdb, store, v, dr.clone());
         }
         make_eliminating_unit_clause(store, Lit::from((v, false)));
@@ -310,7 +340,8 @@ fn make_eliminated_clause(
 ) {
     let first = store.len();
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:
-    let c = cr.get();
+    let rcc = cr.get();
+    let c = rcc.borrow();
     debug_assert!(!c.is_empty());
     for l in c.iter() {
         store.push(*l);
@@ -351,8 +382,16 @@ mod tests {
         fn as_vec(&self) -> Vec<Vec<i32>> {
             self.iter()
                 .skip(1)
-                .filter(|cr| !cr.get().is_dead())
-                .map(|cr| cr.get().as_vec())
+                .filter(|cr| {
+                    let rcc = cr.get();
+                    let c = rcc.borrow();
+                    !c.is_dead()
+                })
+                .map(|cr| {
+                    let rcc = cr.get();
+                    let c = rcc.borrow();
+                    c.as_vec()
+                })
                 .collect::<Vec<_>>()
         }
     }
@@ -377,11 +416,21 @@ mod tests {
         assert!(asg.var(vi).is(FlagVar::ELIMINATED));
         assert!(cdb
             .iter()
-            .filter(|cr| cr.get().is_dead())
-            .all(|cr| cr.get().is_empty()));
-        assert!(cdb
-            .iter()
-            .all(|cr| cr.get().iter().all(|l| *l != Lit::from((vi, false)))
-                && cr.get().iter().all(|l| *l != Lit::from((vi, false)))));
+            .filter(|cr| {
+                let rcc = cr.get();
+                let c = rcc.borrow();
+                c.is_dead()
+            })
+            .all(|cr| {
+                let rcc = cr.get();
+                let c = rcc.borrow();
+                c.is_empty()
+            }));
+        assert!(cdb.iter().all(|cr| {
+            let rcc = cr.get();
+            let c = rcc.borrow();
+            c.iter().all(|l| *l != Lit::from((vi, false)))
+                && c.iter().all(|l| *l != Lit::from((vi, false)))
+        }));
     }
 }

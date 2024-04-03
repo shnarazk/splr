@@ -16,19 +16,24 @@ impl Eliminator {
         &mut self,
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
-        mut cr: ClauseRef,
+        cr: ClauseRef,
         dr: ClauseRef,
     ) -> MaybeInconsistent {
+        let rcc = cr.get();
+        let mut c = rcc.borrow_mut();
+        let dr_copy = dr.clone();
+        let rcd = dr_copy.get();
+        let d = rcd.borrow();
         match have_subsuming_lit(cdb, cr.clone(), dr.clone()) {
             Subsumable::Success => {
                 #[cfg(feature = "trace_elimination")]
                 println!(
                     "BackSubsC    => {} {} subsumed completely by {} {:#}",
-                    dr, cdb[dr], cr, cdb[cr],
+                    dr, d, cr, c,
                 );
-                debug_assert!(!dr.get().is_dead());
-                if !dr.get().is(FlagClause::LEARNT) {
-                    cr.get_mut().turn_off(FlagClause::LEARNT);
+                debug_assert!(!d.is_dead());
+                if !d.is(FlagClause::LEARNT) {
+                    c.turn_off(FlagClause::LEARNT);
                 }
                 self.remove_cid_occur(asg, dr.clone());
                 cdb.remove_clause(dr);
@@ -53,8 +58,9 @@ fn have_subsuming_lit(_cdb: &mut impl ClauseDBIF, cr: ClauseRef, other: ClauseRe
     debug_assert!(!other.is_lifted_lit());
     if cr.is_lifted_lit() {
         let l = Lit::from(cr);
-        let oh = other.get();
-        for lo in oh.iter() {
+        let rco = other.get();
+        let o = rco.borrow();
+        for lo in o.iter() {
             if l == !*lo {
                 return Subsumable::By(l);
             }
@@ -62,14 +68,16 @@ fn have_subsuming_lit(_cdb: &mut impl ClauseDBIF, cr: ClauseRef, other: ClauseRe
         return Subsumable::None;
     }
     // let mut ret: Subsumable = Subsumable::Success;
-    let ch = cr.get();
+    let rcc = cr.get();
+    let ch = rcc.borrow();
     debug_assert!(1 < ch.len());
-    let ob = other.get();
-    debug_assert!(1 < ob.len());
-    debug_assert!(ob.contains(ob[0]));
-    debug_assert!(ob.contains(ob[1]));
+    let rco = other.get();
+    let o = rco.borrow();
+    debug_assert!(1 < o.len());
+    debug_assert!(o.contains(o[0]));
+    debug_assert!(o.contains(o[1]));
     'next: for l in ch.iter() {
-        for lo in ob.iter() {
+        for lo in o.iter() {
             if *l == *lo {
                 continue 'next;
                 // } else if ret == Subsumable::Success && *l == !*lo {

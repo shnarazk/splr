@@ -1,8 +1,8 @@
 use {
     super::Clause,
     std::{
-        borrow::{Borrow, BorrowMut},
-        cell::{Ref, RefCell},
+        borrow::Borrow,
+        cell::RefCell,
         // cell::{Ref, RefCell, RefMut},
         fmt,
         rc::Rc,
@@ -52,7 +52,7 @@ pub trait ClauseRefIF {
     // return shared reference
     fn get(&self) -> &RefCell<Clause>;
     // return mutable reference
-    fn get_mut(&mut self) -> &mut RefCell<Clause>;
+    fn get_mut(&self) -> RefCell<Clause>;
     /// return `true` if the clause is generated from a literal by Eliminator.
     fn is_lifted_lit(&self) -> bool;
 }
@@ -65,12 +65,14 @@ impl ClauseRefIF for ClauseRef {
         }
     }
     fn get(&self) -> &RefCell<Clause> {
-        let r: Rc<RefCell<Clause>> = Rc::new(RefCell::new(1usize));
-        let i: usize = *Borrow::<RefCell<usize>>::borrow(&r).borrow();
-        self.c.borrow()
+        // let r: Rc<RefCell<usize>> = Rc::new(RefCell::new(1usize));
+        // let i: usize = *Borrow::<RefCell<usize>>::borrow(&r).borrow();
+        Borrow::<RefCell<Clause>>::borrow(&self.c)
     }
-    fn get_mut(&mut self) -> &mut RefCell<Clause> {
-        self.c.borrow_mut()
+    fn get_mut(&self) -> RefCell<Clause> {
+        // let m = BorrowMut::<RefCell<Clause>>::borrow_mut(&mut self.c);
+        // self.c.get_mut()
+        Rc::into_inner(self.c).unwrap()
     }
     /// return `true` if the clause is generated from a literal by Eliminator.
     fn is_lifted_lit(&self) -> bool {
@@ -107,20 +109,16 @@ impl ClauseRefIF for ClauseRef {
 
 impl fmt::Debug for ClauseRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let c = self.get() {
-            write!(f, "{:?}C", c.borrow().lits)
-        } else {
-            write!(f, "?C")
-        }
+        let rcc = self.get();
+        let c = rcc.borrow();
+        write!(f, "{:?}C", c.lits)
     }
 }
 
 impl fmt::Display for ClauseRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let c = self.get() {
-            write!(f, "{:?}C", c.borrow().lits)
-        } else {
-            write!(f, "?C")
-        }
+        let rcc = self.get();
+        let c = rcc.borrow();
+        write!(f, "{:?}C", c.lits)
     }
 }

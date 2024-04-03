@@ -352,7 +352,9 @@ impl PropagateIF for AssignStack {
             // Therefore keys to access appropriate targets have the opposite phases.
             //
             for (blocker, cr) in cdb.binary_links(false_lit).iter() {
-                let b = cr.get();
+                let rcc = cr.get();
+                let b = rcc.borrow();
+                // let b = cr.get();
                 let var = &self.var[blocker.vi()];
                 debug_assert!(!b.is_dead());
                 debug_assert!(!var.is(FlagVar::ELIMINATED));
@@ -415,8 +417,10 @@ impl PropagateIF for AssignStack {
                     continue 'next_clause;
                 }
                 {
-                    let mut writer = cr.clone();
-                    let c = writer.get_mut();
+                    // let mut writer = cr.clone();
+                    // let c = writer.get_mut();
+                    let rcc = cr.get();
+                    let mut c = rcc.borrow_mut();
                     let lit0 = c.lit0();
                     let lit1 = c.lit1();
                     let (false_watch_pos, other) = if false_lit == lit1 {
@@ -470,7 +474,9 @@ impl PropagateIF for AssignStack {
                         cdb.swap_watch(cr.clone());
                     }
                 }
-                let c = cr.get();
+                let rcc = cr.get();
+                let c = rcc.borrow();
+                // let c = cr.get();
                 cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
                 if other_watch_value == Some(false) {
                     check_in!(cr, Propagate::EmitConflict(self.num_conflict + 1, cached));
@@ -552,7 +558,9 @@ impl PropagateIF for AssignStack {
             //## binary loop
             //
             for (blocker, cr) in cdb.binary_links(false_lit).iter() {
-                let c = cr.get();
+                let rcc = cr.get();
+                let c = rcc.borrow();
+                // let c = cr.get();
                 debug_assert!(!c.is_dead());
                 debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
                 debug_assert_ne!(*blocker, false_lit);
@@ -584,8 +592,10 @@ impl PropagateIF for AssignStack {
                 .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
             {
                 let cr1 = cr0.clone();
-                let mut cr = cr0.clone();
-                let c = cr.get_mut();
+                let cr = cr0.clone();
+                // let c = cr.get_mut();
+                let rcc = cr.get();
+                let mut c = rcc.borrow_mut();
                 if c.is_dead() {
                     cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
                     continue;
@@ -721,13 +731,15 @@ impl AssignStack {
             num_propagated = self.trail.len();
             let copied = cdb.iter().cloned().collect::<Vec<_>>();
             for cr in copied.iter() {
-                let writer = cr.clone();
-                let c = writer.get();
+                let rcc = cr.get();
+                let c = rcc.borrow();
+                // let writer = cr.clone();
+                // let c = writer.get();
                 if c.is_dead() {
                     continue;
                 }
                 debug_assert!(c.iter().all(|l| !self.var[l.vi()].is(FlagVar::ELIMINATED)));
-                match cdb.transform_by_simplification(self, writer.clone()) {
+                match cdb.transform_by_simplification(self, cr.clone()) {
                     RefClause::Clause(_) => (),
                     RefClause::Dead => (), // was a satisfied clause
                     RefClause::EmptyClause => return Err(SolverError::EmptyClause),
@@ -736,7 +748,7 @@ impl AssignStack {
                         debug_assert!(self.assigned(lit).is_none());
                         cdb.certificate_add_assertion(lit);
                         self.assign_at_root_level(lit)?;
-                        cdb.remove_clause(writer);
+                        cdb.remove_clause(cr.clone());
                     }
                 }
             }

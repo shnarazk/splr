@@ -32,10 +32,15 @@ impl StochasticLocalSearchIF for ClauseDB {
             // let mut level: DecisionLevel = 0;
             // CONSIDER: counting only given (permanent) clauses.
             let mut flip_target: HashMap<VarId, usize> = HashMap::new();
-            let mut target_clause: Option<&Clause> = None;
-            for cr in self.clause.iter().filter(|c| !c.get().is_dead()) {
+            let mut target_clause: Option<ClauseRef> = None;
+            for cr in self.clause.iter() {
+                // let c = cr.get();
+                let rcc = cr.get();
+                let c = rcc.borrow();
+                if c.is_dead() {
+                    continue;
+                }
                 // let mut cls_lvl: DecisionLevel = 0;
-                let c = cr.get();
                 if c.is_falsified(assignment, &mut flip_target) {
                     unsat_clauses += 1;
                     // for l in c.lits.iter() {
@@ -43,7 +48,8 @@ impl StochasticLocalSearchIF for ClauseDB {
                     // }
                     // level = level.max(cls_lvl);
                     if target_clause.is_none() || unsat_clauses == step {
-                        target_clause = Some(&c);
+                        // target_clause = Some(&c);
+                        target_clause = Some(cr.clone());
                         for l in c.lits.iter() {
                             flip_target.entry(l.vi()).or_insert(0);
                         }
@@ -62,7 +68,9 @@ impl StochasticLocalSearchIF for ClauseDB {
             seed = ((((!seed & 0x0000_0000_ffff_ffff) * 1_304_003) % 2_003_819)
                 ^ ((!last_flip & 0x0000_0000_ffff_ffff) * seed))
                 % 3_754_873;
-            if let Some(c) = target_clause {
+            if let Some(cr) = target_clause {
+                let rcc = &mut cr.get();
+                let c = rcc.borrow_mut();
                 let beta: f64 = 3.2 - 2.1 / (1.0 + unsat_clauses as f64).log(2.0);
                 // let beta: f64 = if unsat_clauses <= 3 { 1.0 } else { 3.0 };
                 let factor = |vi| beta.powf(-(*flip_target.get(vi).unwrap() as f64));

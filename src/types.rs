@@ -186,7 +186,9 @@ impl From<i32> for Lit {
 impl From<ClauseRef> for Lit {
     #[inline]
     fn from(cr: ClauseRef) -> Self {
-        let c = cr.get();
+        // let c = cr.get();
+        let rcc = cr.get();
+        let c = rcc.borrow();
         assert!(c.is(FlagClause::LIT_CLAUSE));
         c.lit0()
     }
