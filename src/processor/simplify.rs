@@ -239,6 +239,7 @@ impl EliminateIF for Eliminator {
             }
             let vec = c.iter().copied().collect::<Vec<_>>();
             debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
+            drop(c);
             self.add_cid_occur(asg, cr.clone(), false);
         }
         if force {

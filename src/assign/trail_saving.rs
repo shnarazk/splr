@@ -92,7 +92,7 @@ impl TrailSavingIF for AssignStack {
 
                         self.assign_by_implication(
                             lit,
-                            old_reason,
+                            old_reason.clone(),
                             #[cfg(feature = "chrono_BT")]
                             dl,
                         );

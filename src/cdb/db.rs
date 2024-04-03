@@ -238,8 +238,9 @@ impl ClauseDBIF for ClauseDB {
     fn merge_watch_cache(&mut self, p: Lit, wc: WatchCache) {
         self.watch_cache[p].append_watch(wc);
     }
-    fn swap_watch(&mut self, mut cr: ClauseRef) {
-        let c = cr.get_mut();
+    fn swap_watch(&mut self, c: &mut Clause) {
+        // let rcc = cr.get();
+        // let mut c = rcc.borrow_mut();
         c.lits.swap(0, 1);
     }
     fn new_clause(
@@ -387,10 +388,12 @@ impl ClauseDBIF for ClauseDB {
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
         // if !self.clause[NonZeroU32::get(cr.ordinal) as usize].is_dead() {
         // }
-        let mut cr1 = cr.clone();
-        let c = cr1.get_mut();
+        let cr1 = cr.clone();
+        let rcc = cr1.get();
+        let c = rcc.borrow();
         debug_assert!(!c.is_dead());
         debug_assert!(1 < c.lits.len());
+        drop(c);
         remove_clause_fn(
             &mut self.clause,
             &mut self.certification_store,
@@ -406,14 +409,16 @@ impl ClauseDBIF for ClauseDB {
     fn remove_clause_sandbox(&mut self, cr: ClauseRef) {
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
         // let c = &mut cr.get_mut();
-        let mut cr1 = cr.clone();
-        let c = cr1.get_mut();
+        let cr1 = cr.clone();
+        let rcc = cr1.get();
+        let c = rcc.borrow();
         debug_assert!(!c.is_dead());
         debug_assert!(1 < c.lits.len());
         let mut store = CertificationStore::default();
         let mut dummy1 = 1;
         let mut dummy2 = 1;
         let mut dummy3 = 1;
+        drop(c);
         remove_clause_fn(
             &mut self.clause,
             &mut store,
@@ -1023,6 +1028,7 @@ impl ClauseDBIF for ClauseDB {
                 && !c.is_dead()
                 && (self.co_lbd_bound as usize) < c.lits.len()
             {
+                drop(c);
                 remove_clause_fn(
                     &mut self.clause,
                     &mut self.certification_store,

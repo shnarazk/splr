@@ -101,7 +101,7 @@ pub trait ClauseDBIF:
     /// Merge two watch cache
     fn merge_watch_cache(&mut self, l: Lit, wc: WatchCache);
     /// swap the first two literals in a clause.
-    fn swap_watch(&mut self, cid: ClauseRef);
+    fn swap_watch(&mut self, c: &mut Clause);
 
     //
     //## clause transformation

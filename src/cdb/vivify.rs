@@ -58,6 +58,7 @@ impl VivifyIF for ClauseDB {
             let is_learnt = c.is(FlagClause::LEARNT);
             c.vivified();
             let clits = c.iter().copied().collect::<Vec<Lit>>();
+            drop(c);
             if to_display <= num_check {
                 state.flush("");
                 state.flush(format!(
@@ -103,12 +104,13 @@ impl VivifyIF for ClauseDB {
                                 }
                                 AssignReason::Implication(ci) => {
                                     let rci = ci.get();
-                                    let c = rci.borrow();
                                     if ci == cr && clits.len() == decisions.len() {
                                         asg.backtrack_sandbox();
                                         continue 'next_clause;
                                     } else {
+                                        let c = rci.borrow();
                                         let cnfl_lits = &c.iter().copied().collect::<Vec<Lit>>();
+                                        drop(c);
                                         seen[0] = num_check;
                                         vec = asg.analyze_sandbox(
                                             self, &decisions, cnfl_lits, &mut seen,

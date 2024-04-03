@@ -51,8 +51,8 @@ pub trait ClauseRefIF {
     fn new(id: usize, c: Clause) -> Self;
     // return shared reference
     fn get(&self) -> &RefCell<Clause>;
-    // return mutable reference
-    fn get_mut(&self) -> RefCell<Clause>;
+    // // return mutable reference
+    // fn get_mut(&self) -> RefCell<Clause>;
     /// return `true` if the clause is generated from a literal by Eliminator.
     fn is_lifted_lit(&self) -> bool;
 }
@@ -69,11 +69,11 @@ impl ClauseRefIF for ClauseRef {
         // let i: usize = *Borrow::<RefCell<usize>>::borrow(&r).borrow();
         Borrow::<RefCell<Clause>>::borrow(&self.c)
     }
-    fn get_mut(&self) -> RefCell<Clause> {
-        // let m = BorrowMut::<RefCell<Clause>>::borrow_mut(&mut self.c);
-        // self.c.get_mut()
-        Rc::into_inner(self.c).unwrap()
-    }
+    // fn get_mut(&self) -> RefCell<Clause> {
+    //     // let m = BorrowMut::<RefCell<Clause>>::borrow_mut(&mut self.c);
+    //     // self.c.get_mut()
+    //     Rc::into_inner(&self.c).unwrap()
+    // }
     /// return `true` if the clause is generated from a literal by Eliminator.
     fn is_lifted_lit(&self) -> bool {
         unimplemented!("(**self.c).is_lifted_lit()")

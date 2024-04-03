@@ -460,8 +460,9 @@ impl PropagateIF for AssignStack {
                         if lit_assign!(self.var[lk.vi()], *lk) != Some(false) {
                             let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
-                            cdb.transform_by_updating_watch(cr.clone(), false_watch_pos, k, true);
                             c.search_from = (k + 1) as u16;
+                            drop(c);
+                            cdb.transform_by_updating_watch(cr.clone(), false_watch_pos, k, true);
                             debug_assert_ne!(self.assigned(new_watch), Some(true));
                             check_in!(
                                 cr,
@@ -471,7 +472,7 @@ impl PropagateIF for AssignStack {
                         }
                     }
                     if false_watch_pos == 0 {
-                        cdb.swap_watch(cr.clone());
+                        cdb.swap_watch(&mut c);
                     }
                 }
                 let rcc = cr.get();
@@ -596,10 +597,10 @@ impl PropagateIF for AssignStack {
                 // let c = cr.get_mut();
                 let rcc = cr.get();
                 let mut c = rcc.borrow_mut();
-                if c.is_dead() {
-                    cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
-                    continue;
-                }
+                // if c.is_dead() {
+                //     cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
+                //     continue;
+                // }
                 debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
                 let mut other_watch_value = lit_assign!(self.var[cached.vi()], cached);
                 let mut updated_cache: Option<Lit> = None;
@@ -643,8 +644,9 @@ impl PropagateIF for AssignStack {
                         if lit_assign!(self.var[lk.vi()], *lk) != Some(false) {
                             let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
-                            cdb.transform_by_updating_watch(cr1.clone(), false_watch_pos, k, true);
                             c.search_from = (k as u16).saturating_add(1);
+                            drop(c);
+                            cdb.transform_by_updating_watch(cr1.clone(), false_watch_pos, k, true);
                             debug_assert!(
                                 self.assigned(!new_watch) == Some(true)
                                     || self.assigned(!new_watch).is_none()
@@ -661,7 +663,7 @@ impl PropagateIF for AssignStack {
                         }
                     }
                     if false_watch_pos == 0 {
-                        cdb.swap_watch(cr1.clone());
+                        cdb.swap_watch(&mut c);
                     }
                 }
                 cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
@@ -739,6 +741,7 @@ impl AssignStack {
                     continue;
                 }
                 debug_assert!(c.iter().all(|l| !self.var[l.vi()].is(FlagVar::ELIMINATED)));
+                drop(c);
                 match cdb.transform_by_simplification(self, cr.clone()) {
                     RefClause::Clause(_) => (),
                     RefClause::Dead => (), // was a satisfied clause
