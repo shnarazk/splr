@@ -46,6 +46,7 @@ impl Eliminator {
                 debug_assert!(c.is_lifted_lit());
                 #[cfg(feature = "trace_elimination")]
                 println!("BackSubC subsumes {} from {} and {}", l, cr, dr);
+                drop(d);
                 strengthen_clause(asg, cdb, self, dr, !l)?;
                 self.enqueue_var(asg, l.vi(), true);
             }

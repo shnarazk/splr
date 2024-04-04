@@ -20,7 +20,11 @@ pub struct ClauseRef {
 
 impl PartialEq for ClauseRef {
     fn eq(&self, other: &Self) -> bool {
-        self.id.eq(&other.id)
+        // self.id.eq(&other.id)
+        // let c = self.get();
+        // let d = other.get();
+        // c.eq(&d)
+        Rc::ptr_eq(&self.c, &other.c)
     }
 }
 
@@ -29,6 +33,9 @@ impl Eq for ClauseRef {}
 impl std::hash::Hash for ClauseRef {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id.hash(state)
+        // let rcc = self.get();
+        // let c = rcc.borrow();
+        // c.hash(state)
     }
 }
 

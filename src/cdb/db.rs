@@ -1320,9 +1320,11 @@ fn remove_clause_fn(
     if c.is(FlagClause::LEARNT) {
         *num_learnt -= 1;
     }
-    *num_clause -= 1;
     certification_store.delete_clause(&c.lits);
-    clause_pool.remove(&cr);
+    drop(c);
+    if clause_pool.remove(&cr) {
+        *num_clause -= 1;
+    };
     // c.lits.clear();
 }
 
