@@ -190,6 +190,9 @@ impl ClauseIF for Clause {
     fn len(&self) -> usize {
         self.lits.len()
     }
+    fn is_lifted_lit(&self) -> bool {
+        self.is(FlagClause::LIT_CLAUSE)
+    }
 
     #[cfg(feature = "boundary_check")]
     /// return timestamp.

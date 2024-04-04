@@ -135,7 +135,7 @@ pub fn eliminate_var(
     }));
     for cr in pos.iter() {
         let rcc = cr.get();
-        let c = rcc.borrow();
+        let mut c = rcc.borrow_mut();
         if c.is_dead() {
             continue;
         }
@@ -145,12 +145,13 @@ pub fn eliminate_var(
                 cdb.make_permanent_immortal(*cr);
             }
         }
-        elim.remove_cid_occur(asg, cr.clone());
+        elim.remove_cid_occur(asg, cr.clone(), &mut c);
+        drop(c);
         cdb.remove_clause(cr.clone());
     }
     for cr in neg.iter() {
         let rcc = cr.get();
-        let c = rcc.borrow();
+        let mut c = rcc.borrow_mut();
         if c.is_dead() {
             continue;
         }
@@ -160,7 +161,8 @@ pub fn eliminate_var(
                 cdb.make_permanent_immortal(*cr);
             }
         }
-        elim.remove_cid_occur(asg, cr.clone());
+        elim.remove_cid_occur(asg, cr.clone(), &mut c);
+        drop(c);
         cdb.remove_clause(cr.clone());
     }
     elim[vi].clear();

@@ -59,6 +59,8 @@ pub trait ClauseIF {
     fn iter(&self) -> SliceIter<'_, Lit>;
     /// return the number of literals.
     fn len(&self) -> usize;
+    /// return true if it is a lifted clause from a Lit
+    fn is_lifted_lit(&self) -> bool;
 
     #[cfg(feature = "boundary_check")]
     /// return timestamp.

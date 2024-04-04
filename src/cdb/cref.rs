@@ -53,8 +53,6 @@ pub trait ClauseRefIF {
     fn get(&self) -> &RefCell<Clause>;
     // // return mutable reference
     // fn get_mut(&self) -> RefCell<Clause>;
-    /// return `true` if the clause is generated from a literal by Eliminator.
-    fn is_lifted_lit(&self) -> bool;
 }
 
 impl ClauseRefIF for ClauseRef {
@@ -74,11 +72,6 @@ impl ClauseRefIF for ClauseRef {
     //     // self.c.get_mut()
     //     Rc::into_inner(&self.c).unwrap()
     // }
-    /// return `true` if the clause is generated from a literal by Eliminator.
-    fn is_lifted_lit(&self) -> bool {
-        unimplemented!("(**self.c).is_lifted_lit()")
-        // 0 != 0x8000_0000 & NonZeroU32::get(self.ordinal)
-    }
 }
 
 // impl Default for ClauseRef {

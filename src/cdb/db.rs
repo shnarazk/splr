@@ -728,6 +728,7 @@ impl ClauseDBIF for ClauseDB {
             debug_assert!(!asg.var(l.vi()).is(FlagVar::ELIMINATED));
             match asg.assigned(*l) {
                 Some(true) => {
+                    drop(c);
                     self.remove_clause(cr.clone());
                     return RefClause::Dead;
                 }
@@ -772,6 +773,7 @@ impl ClauseDBIF for ClauseDB {
                     //## Case:3-0
                     //
                     let br2 = br.clone();
+                    drop(c);
                     self.remove_clause(cr.clone());
                     return RefClause::RegisteredClause(br2);
                 }

@@ -9,6 +9,7 @@ pub use crate::{
 };
 
 use std::{
+    cell::{Ref, RefMut},
     cmp::Ordering,
     fmt,
     fs::File,
@@ -183,16 +184,37 @@ impl From<i32> for Lit {
     }
 }
 
-impl From<ClauseRef> for Lit {
+/// literal from a lifted-caluse
+impl From<&Ref<'_, Clause>> for Lit {
     #[inline]
-    fn from(cr: ClauseRef) -> Self {
-        // let c = cr.get();
-        let rcc = cr.get();
-        let c = rcc.borrow();
-        assert!(c.is(FlagClause::LIT_CLAUSE));
+    fn from(c: &Ref<'_, Clause>) -> Self {
         c.lit0()
     }
 }
+
+impl From<&Clause> for Lit {
+    #[inline]
+    fn from(c: &Clause) -> Self {
+        c.lit0()
+    }
+}
+
+impl From<&RefMut<'_, Clause>> for Lit {
+    #[inline]
+    fn from(c: &RefMut<'_, Clause>) -> Self {
+        c.lit0()
+    }
+}
+
+// impl From<ClauseRef> for Lit {
+//     #[inline]
+//     fn from(cr: ClauseRef) -> Self {
+//         // let c = cr.get();
+//         let rcc = cr.get();
+//         let c = rcc.borrow();
+//         c.lit0()
+//     }
+// }
 
 impl From<Lit> for bool {
     /// - positive Lit (= even u32) => Some(true)
@@ -203,10 +225,13 @@ impl From<Lit> for bool {
     }
 }
 
+/// create a new lifted-clause
 impl From<Lit> for ClauseRef {
     #[inline]
     fn from(l: Lit) -> ClauseRef {
-        ClauseRef::new(0, Clause::from(vec![l]))
+        let mut c = Clause::from(vec![l]);
+        c.turn_on(FlagClause::LIT_CLAUSE);
+        ClauseRef::new(0, c)
         // ClauseRef {
         //     ordinal: unsafe { NonZeroU32::new_unchecked(NonZeroU32::get(l.ordinal) | 0x8000_0000) },
         // }

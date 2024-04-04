@@ -380,16 +380,16 @@ impl Eliminator {
         }
         c.turn_on(FlagClause::OCCUR_LINKED);
         if enqueue {
-            self.enqueue_clause(cr);
+            self.enqueue_clause(cr, &mut c);
         }
     }
     /// remove a clause id from all corresponding occur lists.
-    pub fn remove_cid_occur(&mut self, asg: &mut impl AssignIF, cr: ClauseRef) {
-        debug_assert!(!cr.is_lifted_lit());
+    pub fn remove_cid_occur(&mut self, asg: &mut impl AssignIF, cr: ClauseRef, c: &mut Clause) {
         // let mut writer = cr.clone();
         // let c = writer.get_mut();
-        let rcc = cr.get();
-        let mut c = rcc.borrow_mut();
+        // let rcc = cr.get();
+        // let mut c = rcc.borrow_mut();
+        debug_assert!(!c.is_lifted_lit());
         debug_assert!(self.mode == EliminatorMode::Running);
         debug_assert!(!c.is_dead());
         c.turn_off(FlagClause::OCCUR_LINKED);
@@ -448,8 +448,8 @@ impl Eliminator {
                     self.clear_var_queue(asg);
                     return Ok(());
                 }
-                let best: VarId = if cr.is_lifted_lit() {
-                    let vi = Lit::from(cr.clone()).vi();
+                let best: VarId = if c.is_lifted_lit() {
+                    let vi = Lit::from(&c).vi();
                     debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
                     vi
                 } else {
@@ -484,6 +484,7 @@ impl Eliminator {
                     continue;
                 }
                 // TODO: why there are identitcal codes below?
+                drop(c);
                 self[best].pos_occurs.retain(|r| {
                     let rcc = r.get();
                     let c = rcc.borrow();
@@ -513,6 +514,7 @@ impl Eliminator {
                                 d.contains(Lit::from((best, false)))
                                     || d.contains(Lit::from((best, true)))
                             );
+                            drop(d);
                             self.try_subsume(asg, cdb, cr.clone(), dr.clone())?;
                         }
                     }
@@ -634,10 +636,10 @@ impl Eliminator {
     ///
 
     /// enqueue a clause into eliminator's clause queue.
-    pub fn enqueue_clause(&mut self, cr: ClauseRef) {
-        let cr1 = cr.clone();
-        let rcc = cr1.get();
-        let mut c = rcc.borrow_mut();
+    pub fn enqueue_clause(&mut self, cr: ClauseRef, c: &mut Clause) {
+        // let cr1 = cr.clone();
+        // let rcc = cr1.get();
+        // let mut c = rcc.borrow_mut();
         // let c = cr.get_mut();
         if self.mode != EliminatorMode::Running
             || c.is(FlagClause::ENQUEUED)

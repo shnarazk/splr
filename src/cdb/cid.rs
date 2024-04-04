@@ -5,7 +5,7 @@ use {
 
 /// API for Clause Id.
 pub trait ClauseRefIF {
-    /// return `true` if a given clause id is made from a `Lit`.
+    /// return `true` if the clause is generated from a literal by Eliminator.
     fn is_lifted_lit(&self) -> bool;
 }
 
@@ -44,12 +44,5 @@ impl fmt::Debug for ClauseRef {
 impl fmt::Display for ClauseRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}C", self.ordinal)
-    }
-}
-
-impl ClauseRefIF for ClauseRef {
-    /// return `true` if the clause is generated from a literal by Eliminator.
-    fn is_lifted_lit(&self) -> bool {
-        0 != 0x8000_0000 & NonZeroU32::get(self.ordinal)
     }
 }
