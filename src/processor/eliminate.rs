@@ -383,7 +383,6 @@ mod tests {
         #[allow(dead_code)]
         fn as_vec(&self) -> Vec<Vec<i32>> {
             self.iter()
-                .skip(1)
                 .filter(|cr| {
                     let rcc = cr.get();
                     let c = rcc.borrow();

@@ -1,5 +1,6 @@
 use {
-    super::Clause,
+    super::{Clause, Lit},
+    crate::types::{FlagClause, FlagIF},
     std::{
         borrow::Borrow,
         cell::RefCell,
@@ -60,6 +61,11 @@ pub trait ClauseRefIF {
     fn get(&self) -> &RefCell<Clause>;
     // // return mutable reference
     // fn get_mut(&self) -> RefCell<Clause>;
+    /// return true if it is a lifted clause from a Lit
+    fn is_lifted_lit(&self) -> bool;
+    /// create a new lifted-clause
+    fn lifted_clause_ref(l: Lit) -> Self;
+    fn from_lifted_clause(&self, c: &Clause) -> Lit;
 }
 
 impl ClauseRefIF for ClauseRef {
@@ -79,6 +85,19 @@ impl ClauseRefIF for ClauseRef {
     //     // self.c.get_mut()
     //     Rc::into_inner(&self.c).unwrap()
     // }
+
+    fn is_lifted_lit(&self) -> bool {
+        self.id == 0
+    }
+    fn lifted_clause_ref(l: Lit) -> Self {
+        let mut c = Clause::from(vec![l]);
+        c.turn_on(FlagClause::LIT_CLAUSE);
+        ClauseRef::new(0, c)
+    }
+    fn from_lifted_clause(&self, c: &Clause) -> Lit {
+        assert_eq!(self.id, 0);
+        c.lits[0]
+    }
 }
 
 // impl Default for ClauseRef {

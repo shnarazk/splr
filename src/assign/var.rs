@@ -151,6 +151,7 @@ impl VarManipulateIF for AssignStack {
         self.var.iter_mut()
     }
     fn make_var_asserted(&mut self, vi: VarId) {
+        assert_ne!(self.var[vi].reason, AssignReason::Decision(0));
         self.var[vi].reason = AssignReason::Decision(0);
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
@@ -164,6 +165,7 @@ impl VarManipulateIF for AssignStack {
         self.check_best_phase(vi);
     }
     fn make_var_eliminated(&mut self, vi: VarId) {
+        assert!(!self.var[vi].is(FlagVar::ELIMINATED));
         if !self.var[vi].is(FlagVar::ELIMINATED) {
             self.var[vi].turn_on(FlagVar::ELIMINATED);
             self.set_activity(vi, 0.0);

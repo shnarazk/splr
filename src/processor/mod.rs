@@ -146,8 +146,16 @@ mod tests {
         assert_eq!(
             0,
             cdb.iter()
-                .filter(|c| !c.get().is_dead())
-                .filter(|c| c.get().iter().any(|l| elim_vars.contains(&l.vi())))
+                .filter(|cr| {
+                    let rcc = cr.get();
+                    let c = rcc.borrow();
+                    !c.is_dead()
+                })
+                .filter(|cr| {
+                    let rcc = cr.get();
+                    let c = rcc.borrow();
+                    c.iter().any(|l| elim_vars.contains(&l.vi()))
+                })
                 .count()
         );
     }

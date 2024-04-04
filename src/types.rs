@@ -225,19 +225,6 @@ impl From<Lit> for bool {
     }
 }
 
-/// create a new lifted-clause
-impl From<Lit> for ClauseRef {
-    #[inline]
-    fn from(l: Lit) -> ClauseRef {
-        let mut c = Clause::from(vec![l]);
-        c.turn_on(FlagClause::LIT_CLAUSE);
-        ClauseRef::new(0, c)
-        // ClauseRef {
-        //     ordinal: unsafe { NonZeroU32::new_unchecked(NonZeroU32::get(l.ordinal) | 0x8000_0000) },
-        // }
-    }
-}
-
 impl From<Lit> for usize {
     #[inline]
     fn from(l: Lit) -> usize {

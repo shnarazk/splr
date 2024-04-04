@@ -22,10 +22,9 @@ impl Eliminator {
         assert_ne!(cr, dr);
         let rcc = cr.get();
         let mut c = rcc.borrow_mut();
-        let dr_copy = dr.clone();
-        let rcd = dr_copy.get();
+        let rcd = dr.get();
         let mut d = rcd.borrow_mut();
-        match have_subsuming_lit(cdb, &c, &d) {
+        match have_subsuming_lit(cdb, &cr, &c, &dr, &d) {
             Subsumable::Success => {
                 #[cfg(feature = "trace_elimination")]
                 println!(
@@ -43,7 +42,7 @@ impl Eliminator {
             }
             // To avoid making a big clause, we have to add a condition for combining them.
             Subsumable::By(l) => {
-                debug_assert!(c.is_lifted_lit());
+                debug_assert!(dr.is_lifted_lit());
                 #[cfg(feature = "trace_elimination")]
                 println!("BackSubC subsumes {} from {} and {}", l, cr, dr);
                 drop(d);
@@ -57,14 +56,16 @@ impl Eliminator {
 }
 
 /// returns a literal if these clauses can be merged by the literal.
-fn have_subsuming_lit(_cdb: &mut impl ClauseDBIF, ch: &Clause, o: &Clause) -> Subsumable {
-    // let rcc = cr.get();
-    // let ch = rcc.borrow();
-    // let rco = other.get();
-    // let o = rco.borrow();
-    debug_assert!(!o.is_lifted_lit());
-    if ch.is_lifted_lit() {
-        let l = Lit::from(ch);
+fn have_subsuming_lit(
+    _cdb: &mut impl ClauseDBIF,
+    cr: &ClauseRef,
+    c: &Clause,
+    other: &ClauseRef,
+    o: &Clause,
+) -> Subsumable {
+    debug_assert!(!other.is_lifted_lit());
+    if cr.is_lifted_lit() {
+        let l = cr.from_lifted_clause(c);
         for lo in o.iter() {
             if l == !*lo {
                 return Subsumable::By(l);
@@ -73,11 +74,11 @@ fn have_subsuming_lit(_cdb: &mut impl ClauseDBIF, ch: &Clause, o: &Clause) -> Su
         return Subsumable::None;
     }
     // let mut ret: Subsumable = Subsumable::Success;
-    debug_assert!(1 < ch.len());
+    debug_assert!(1 < c.len());
     debug_assert!(1 < o.len());
-    debug_assert!(o.contains(o[0]));
-    debug_assert!(o.contains(o[1]));
-    'next: for l in ch.iter() {
+    // debug_assert!(o.contains(o[0]));
+    // debug_assert!(o.contains(o[1]));
+    'next: for l in c.iter() {
         for lo in o.iter() {
             if *l == *lo {
                 continue 'next;
@@ -105,18 +106,18 @@ fn strengthen_clause(
     // debug_assert!(!c.is_dead());
     // debug_assert!(1 < c.len());
     match cdb.transform_by_elimination(cr.clone(), l) {
-        RefClause::Clause(_ci) => {
+        RefClause::Clause(ci) => {
             #[cfg(feature = "trace_elimination")]
             println!("cr {} drops literal {}", cr, l);
 
-            let rcc = cr.get();
+            let rcc = ci.get();
             let mut c = rcc.borrow_mut();
             elim.enqueue_clause(cr.clone(), &mut c);
             elim.remove_lit_occur(asg, l, &cr);
             Ok(())
         }
-        RefClause::RegisteredClause(_) => {
-            let rcc = cr.get();
+        RefClause::RegisteredClause(ci) => {
+            let rcc = ci.get();
             let mut c = rcc.borrow_mut();
             elim.remove_cid_occur(asg, cr.clone(), &mut c);
             drop(c);

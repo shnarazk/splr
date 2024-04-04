@@ -389,7 +389,7 @@ impl Eliminator {
         // let c = writer.get_mut();
         // let rcc = cr.get();
         // let mut c = rcc.borrow_mut();
-        debug_assert!(!c.is_lifted_lit());
+        debug_assert!(!cr.is_lifted_lit());
         debug_assert!(self.mode == EliminatorMode::Running);
         debug_assert!(!c.is_dead());
         c.turn_off(FlagClause::OCCUR_LINKED);
@@ -434,7 +434,7 @@ impl Eliminator {
             // Check top-level assignments by creating a dummy clause
             // and placing it in the queue:
             if self.clause_queue.is_empty() && self.bwdsub_assigns < asg.stack_len() {
-                let c = ClauseRef::from(asg.stack(self.bwdsub_assigns));
+                let c = ClauseRef::lifted_clause_ref(asg.stack(self.bwdsub_assigns));
                 self.clause_queue.push(c);
                 self.bwdsub_assigns += 1;
             }
@@ -448,7 +448,7 @@ impl Eliminator {
                     self.clear_var_queue(asg);
                     return Ok(());
                 }
-                let best: VarId = if c.is_lifted_lit() {
+                let best: VarId = if cr.is_lifted_lit() {
                     let vi = Lit::from(&c).vi();
                     debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
                     vi

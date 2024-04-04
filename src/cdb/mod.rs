@@ -59,8 +59,6 @@ pub trait ClauseIF {
     fn iter(&self) -> SliceIter<'_, Lit>;
     /// return the number of literals.
     fn len(&self) -> usize;
-    /// return true if it is a lifted clause from a Lit
-    fn is_lifted_lit(&self) -> bool;
 
     #[cfg(feature = "boundary_check")]
     /// return timestamp.
@@ -425,7 +423,7 @@ mod tests {
         let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         // Now `asg.level` = [_, 1, 2, 3, 4, 5, 6].
-        let c0 = cdb.new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false);
+        let _c0 = cdb.new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false);
 
         asg.assign_by_decision(lit(-2)); // at level 1
         asg.assign_by_decision(lit(1)); // at level 2
@@ -434,7 +432,8 @@ mod tests {
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_cref();
-        let c = c1.get();
+        let rcc1 = c1.get();
+        let c = rcc1.borrow();
 
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
@@ -443,7 +442,8 @@ mod tests {
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
             .as_cref();
-        let c = c2.get();
+        let rcc2 = c2.get();
+        let c = rcc2.borrow();
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
@@ -482,8 +482,10 @@ mod tests {
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_cref();
-        assert_eq!(c1.get()[0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
-        let mut iter = c1.get()[0..].iter();
+        let rcc1 = c1.get();
+        let c1_c = rcc1.borrow();
+        assert_eq!(c1_c[0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
+        let mut iter = c1_c[0..].iter();
         assert_eq!(iter.next(), Some(&lit(1)));
         assert_eq!(iter.next(), Some(&lit(2)));
         assert_eq!(iter.next(), Some(&lit(3)));
