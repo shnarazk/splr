@@ -9,7 +9,6 @@ pub use crate::{
 };
 
 use std::{
-    cell::{Ref, RefMut},
     cmp::Ordering,
     fmt,
     fs::File,
@@ -183,38 +182,6 @@ impl From<i32> for Lit {
         }
     }
 }
-
-/// literal from a lifted-caluse
-impl From<&Ref<'_, Clause>> for Lit {
-    #[inline]
-    fn from(c: &Ref<'_, Clause>) -> Self {
-        c.lit0()
-    }
-}
-
-impl From<&Clause> for Lit {
-    #[inline]
-    fn from(c: &Clause) -> Self {
-        c.lit0()
-    }
-}
-
-impl From<&RefMut<'_, Clause>> for Lit {
-    #[inline]
-    fn from(c: &RefMut<'_, Clause>) -> Self {
-        c.lit0()
-    }
-}
-
-// impl From<ClauseRef> for Lit {
-//     #[inline]
-//     fn from(cr: ClauseRef) -> Self {
-//         // let c = cr.get();
-//         let rcc = cr.get();
-//         let c = rcc.borrow();
-//         c.lit0()
-//     }
-// }
 
 impl From<Lit> for bool {
     /// - positive Lit (= even u32) => Some(true)
