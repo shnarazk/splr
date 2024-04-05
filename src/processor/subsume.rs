@@ -42,7 +42,7 @@ impl Eliminator {
             }
             // To avoid making a big clause, we have to add a condition for combining them.
             Subsumable::By(l) => {
-                debug_assert!(cr.is_lifted_lit());
+                debug_assert!(cr.is_lifted());
                 #[cfg(feature = "trace_elimination")]
                 println!("BackSubC subsumes {} from {} and {}", l, cr, dr);
                 drop(d);
@@ -63,8 +63,8 @@ fn have_subsuming_lit(
     other: &ClauseRef,
     o: &Clause,
 ) -> Subsumable {
-    debug_assert!(!other.is_lifted_lit());
-    if cr.is_lifted_lit() {
+    debug_assert!(!other.is_lifted());
+    if cr.is_lifted() {
         let l = cr.unlift(c);
         for lo in o.iter() {
             if l == !*lo {

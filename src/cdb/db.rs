@@ -260,10 +260,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         self.certification_store.add_clause(vec);
-        let mut c = Clause {
-            flags: FlagClause::empty(),
-            ..Clause::default()
-        };
+        let mut c = Clause::default();
         std::mem::swap(&mut c.lits, vec);
 
         let ClauseDB {
@@ -339,10 +336,7 @@ impl ClauseDBIF for ClauseDB {
                 return RefClause::RegisteredClause(cr.clone());
             }
         }
-        let mut c = Clause {
-            flags: FlagClause::empty(),
-            ..Clause::default()
-        };
+        let mut c = Clause::default();
         std::mem::swap(&mut c.lits, vec);
 
         let ClauseDB {
@@ -1288,9 +1282,8 @@ fn remove_clause_fn(
     num_learnt: &mut usize,
     cr: ClauseRef,
 ) {
-    // let c = cr.get();
-    let rcc = &mut cr.get();
-    let c = rcc.borrow_mut();
+    let rcc = cr.get();
+    let c = rcc.borrow();
     debug_assert!(!c.is_dead());
     let l0 = c.lits[0];
     let l1 = c.lits[1];
@@ -1307,7 +1300,6 @@ fn remove_clause_fn(
         *num_learnt -= 1;
     }
     certification_store.delete_clause(&c.lits);
-    drop(c);
     if clause_pool.remove(&cr) {
         *num_clause -= 1;
     };

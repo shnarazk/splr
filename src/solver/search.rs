@@ -78,13 +78,13 @@ impl SolveIF for Solver {
         {
             debug_assert_eq!(asg.decision_level(), asg.root_level());
             let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-            if elim.simplify(asg, cdb, state, true).is_err() {
-                if cdb.check_size().is_err() {
-                    return Err(SolverError::OutOfMemory);
-                }
-                state.log(None, "By eliminator");
-                return Ok(Certificate::UNSAT);
-            }
+            // if elim.simplify(asg, cdb, state, true).is_err() {
+            //     if cdb.check_size().is_err() {
+            //         return Err(SolverError::OutOfMemory);
+            //     }
+            //     state.log(None, "By eliminator");
+            //     return Ok(Certificate::UNSAT);
+            // }
 
             #[cfg(not(feature = "no_clause_elimination"))]
             {
@@ -190,6 +190,17 @@ impl SolveIF for Solver {
 
                 #[cfg(feature = "boundary_check")]
                 check(asg, cdb, true, "After extending the model");
+
+                if !asg
+                    .var_iter()
+                    .enumerate()
+                    .skip(1)
+                    .all(|(vi, _)| model[vi].is_some())
+                {
+                    state.log(None, "failed to assign the all vars");
+                    state.progress(asg, cdb);
+                    return Err(SolverError::SolverBug);
+                }
 
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
