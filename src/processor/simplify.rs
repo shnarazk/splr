@@ -439,7 +439,7 @@ impl Eliminator {
                     return Ok(());
                 }
                 let best: VarId = if cr.is_lifted_lit() {
-                    let vi = cr.from_lifted_clause(&c).vi();
+                    let vi = cr.unlift(&c).vi();
                     debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
                     vi
                 } else {

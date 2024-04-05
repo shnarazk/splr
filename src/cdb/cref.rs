@@ -65,7 +65,7 @@ pub trait ClauseRefIF {
     fn is_lifted_lit(&self) -> bool;
     /// create a new lifted-clause
     fn lifted_clause_ref(l: Lit) -> Self;
-    fn from_lifted_clause(&self, c: &Clause) -> Lit;
+    fn unlift(&self, c: &Clause) -> Lit;
 }
 
 impl ClauseRefIF for ClauseRef {
@@ -94,7 +94,7 @@ impl ClauseRefIF for ClauseRef {
         c.turn_on(FlagClause::LIT_CLAUSE);
         ClauseRef::new(0, c)
     }
-    fn from_lifted_clause(&self, c: &Clause) -> Lit {
+    fn unlift(&self, c: &Clause) -> Lit {
         assert_eq!(self.id, 0);
         c.lits[0]
     }

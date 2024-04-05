@@ -65,7 +65,7 @@ fn have_subsuming_lit(
 ) -> Subsumable {
     debug_assert!(!other.is_lifted_lit());
     if cr.is_lifted_lit() {
-        let l = cr.from_lifted_clause(c);
+        let l = cr.unlift(c);
         for lo in o.iter() {
             if l == !*lo {
                 return Subsumable::By(l);
