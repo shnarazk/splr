@@ -88,7 +88,7 @@ pub trait AssignIF:
 }
 
 /// Reasons of assignments
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum AssignReason {
     /// Implication by binary clause
     BinaryLink(Lit),
@@ -252,7 +252,7 @@ fn make_lit_report(asg: &AssignStack, lit: &Lit) -> Assign {
         val: asg.assigned(*lit),
         pos: asg.trail.iter().position(|l| vi == l.vi()),
         lvl: asg.level(vi),
-        by: asg.reason(vi),
+        by: asg.reason(vi).clone(),
         at: asg.var(vi).propagated_at,
         state: asg.var[vi].state,
     }

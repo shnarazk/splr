@@ -182,9 +182,9 @@ pub fn handle_conflict(
     match cdb.new_clause(asg, new_learnt, true) {
         RefClause::Clause(cr) if learnt_len == 2 => {
             let rcc = cr.get();
-            let c = rcc.borrow();
+            let c = rcc.borrow_mut();
             #[cfg(feature = "boundary_check")]
-            cdb[cr].set_birth(asg.num_conflict);
+            c.set_birth(asg.num_conflict);
 
             debug_assert_eq!(l0, c.lit0());
             debug_assert_eq!(l1, c.lit1());
@@ -427,7 +427,7 @@ fn conflict_analyze(
         while {
             let vi = asg.stack(trail_index).vi();
             boundary_check!(
-                0 < vi && vi < asg.level_ref().len(),
+                0 < vi && vi < asg.level_ref().count(),
                 "trail[{}] has an invalid var index {}",
                 trail_index,
                 asg.stack(trail_index)
@@ -662,7 +662,7 @@ fn dumper(asg: &AssignStack, _cdb: &ClauseDB, bag: &[Lit]) -> String {
 }
 
 #[cfg(feature = "boundary_check")]
-fn tracer(asg: &AssignStack, cdb: &ClauseDB) {
+fn tracer(_asg: &AssignStack, _cdb: &ClauseDB) {
     use std::io::{self, Write};
     loop {
         let mut input = String::new();
@@ -678,22 +678,22 @@ fn tracer(asg: &AssignStack, cdb: &ClauseDB) {
         if cid == 0 {
             break;
         }
-        println!(
-            "{}",
-            cdb[ClauseRef::from(cid)]
-                .report(asg)
-                .iter()
-                .map(|r| format!(
-                    " {}{:?}",
-                    asg.var(Lit::from(r.lit).vi())
-                        .is(FlagVar::CA_SEEN)
-                        .then(|| "S")
-                        .unwrap_or(" "),
-                    r
-                ))
-                .collect::<Vec<String>>()
-                .join("\n"),
-        );
+        // println!(
+        //     "{}",
+        //     cdb.cluse[cid]
+        //         .report(asg)
+        //         .iter()
+        //         .map(|r| format!(
+        //             " {}{:?}",
+        //             asg.var(Lit::from(r.lit).vi())
+        //                 .is(FlagVar::CA_SEEN)
+        //                 .then(|| "S")
+        //                 .unwrap_or(" "),
+        //             r
+        //         ))
+        //         .collect::<Vec<String>>()
+        //         .join("\n"),
+        // );
     }
     panic!("done");
 }

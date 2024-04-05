@@ -457,29 +457,28 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: O
 #[cfg(feature = "boundary_check")]
 #[allow(dead_code)]
 fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
-    if let Some(cid) = cdb.validate(asg.assign_ref(), all) {
+    if let Some(cr) = cdb.validate(&asg.assign_ref().collect::<Vec<_>>(), all) {
+        let rcc = cr.get();
+        let c = rcc.borrow();
         println!("{}", message);
         println!(
             "falsifies by {} at level {}, NumConf {}",
-            cid,
+            cr,
             asg.decision_level(),
             asg.derefer(assign::property::Tusize::NumConflict),
         );
         assert!(asg.stack_iter().all(|l| asg.assigned(*l) == Some(true)));
-        let (c0, c1) = cdb.watch_caches(cid, "check (search 441)");
+        let (c0, c1) = cdb.watch_caches(cr.clone(), "check (search 441)");
         println!(
             " which was born at {}, and used in conflict analysis at {}",
-            cdb[cid].birth,
-            cdb[cid].timestamp(),
+            c.birth,
+            c.timestamp(),
         );
-        println!(
-            " which was moved among watch caches at {:?}",
-            cdb[cid].moved_at
-        );
-        println!("Its literals: {}", &cdb[cid]);
+        println!(" which was moved among watch caches at {:?}", c.moved_at);
+        println!("Its literals: {}", &c);
         println!(" |   pos |   time | level |   literal  |  assignment |               reason |");
-        let l0 = i32::from(cdb[cid].lit0());
-        let l1 = i32::from(cdb[cid].lit1());
+        let l0 = i32::from(c.lit0());
+        let l1 = i32::from(c.lit1());
         use crate::assign::DebugReportIF;
 
         for assign::Assign {
@@ -490,7 +489,7 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
             by: reason,
             at,
             state,
-        } in cdb[cid].report(asg).iter()
+        } in c.report(asg).iter()
         {
             println!(
                 " |{:>6} | {:>6} |{:>6} | {:9}{} | {:11} | {:20} | {:?}",
@@ -504,16 +503,8 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
                 state,
             );
         }
-        println!(
-            " - L0 {} has complements {:?} in its cache",
-            cdb[cid].lit0(),
-            c0
-        );
-        println!(
-            " - L1 {} has complements {:?} in its cache",
-            cdb[cid].lit1(),
-            c1
-        );
+        println!(" - L0 {} has complements {:?} in its cache", c.lit0(), c0);
+        println!(" - L1 {} has complements {:?} in its cache", c.lit1(), c1);
         println!("The last assigned literal in stack:");
         let last_lit = asg.stack(asg.stack_len() - 1);
         println!(

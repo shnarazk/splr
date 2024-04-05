@@ -704,7 +704,7 @@ impl<T: Clone + Sized + Ord> OrderedProxy<T> {
 }
 
 #[cfg(feature = "boundary_check")]
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Propagate {
     None,
     CacheSatisfied(usize),

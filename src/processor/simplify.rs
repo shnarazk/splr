@@ -274,7 +274,7 @@ impl EliminateIF for Eliminator {
         #[cfg(feature = "boundary_check")]
         {
             for (i, _) in asg.var_iter().enumerate().skip(1) {
-                if asg.reason(i) != AssignReason::None {
+                if *asg.reason(i) != AssignReason::None {
                     assert_eq!(
                         asg.level(i),
                         asg.derefer(assign::property::Tusize::RootLevel) as DecisionLevel

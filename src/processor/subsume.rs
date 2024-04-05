@@ -42,7 +42,7 @@ impl Eliminator {
             }
             // To avoid making a big clause, we have to add a condition for combining them.
             Subsumable::By(l) => {
-                debug_assert!(dr.is_lifted_lit());
+                debug_assert!(cr.is_lifted_lit());
                 #[cfg(feature = "trace_elimination")]
                 println!("BackSubC subsumes {} from {} and {}", l, cr, dr);
                 drop(d);
