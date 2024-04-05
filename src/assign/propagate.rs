@@ -738,8 +738,6 @@ impl AssignStack {
             for cr in copied.iter() {
                 let rcc = cr.get();
                 let c = rcc.borrow();
-                // let writer = cr.clone();
-                // let c = writer.get();
                 if c.is_dead() {
                     continue;
                 }

@@ -464,9 +464,6 @@ impl ClauseDBIF for ClauseDB {
         //
 
         // self.watches(cr, "before strengthen_by_elimination");
-        // let mut writer = cr.clone();
-        // let c = writer.get_mut();
-        // let rcc = &mut cr.get_mut();
         let rcc = &mut cr.get();
         let mut c = rcc.borrow_mut();
         debug_assert!(!c.is_dead());
@@ -717,8 +714,6 @@ impl ClauseDBIF for ClauseDB {
         // 5. a normal clause becomes a new bi-clause.             [Case:3-2]
         // 5. a normal clause becomes a shorter normal clause.     [Case:3-3]
         //
-        // let mut writer = cr.clone();
-        // let c = writer.get_mut();
         let rcc = &mut cr.get();
         let mut c = rcc.borrow_mut();
         debug_assert!(!c.is_dead());
@@ -883,8 +878,6 @@ impl ClauseDBIF for ClauseDB {
             ref mut watch_cache,
             ..
         } = self;
-        // let mut writer = cr.clone();
-        // let c = writer.get_mut();
         let rcc = &mut cr.get();
         let mut c = rcc.borrow_mut();
         debug_assert!(!c.is_dead());
@@ -911,8 +904,6 @@ impl ClauseDBIF for ClauseDB {
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cr && wc.1 == c.lits[0]));
     }
     fn update_at_analysis(&mut self, asg: &impl AssignIF, cr: ClauseRef) -> bool {
-        // let mut writer = cr.clone();
-        // let c = writer.get_mut();
         let rcc = &mut cr.get();
         let mut c = rcc.borrow_mut();
         // Updating LBD at every analysis seems redundant.
@@ -956,8 +947,6 @@ impl ClauseDBIF for ClauseDB {
         let mut perm: Vec<OrderedProxy<ClauseRef>> = Vec::with_capacity(clause.len());
         let mut alives = 0;
         for cr in clause.iter() {
-            // let mut writer = cr.clone();
-            // let c = writer.get_mut();
             let rcc = &mut cr.get();
             let mut c = rcc.borrow_mut();
             c.update_lbd(asg, lbd_temp);

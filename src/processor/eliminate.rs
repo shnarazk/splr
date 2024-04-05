@@ -57,7 +57,7 @@ pub fn eliminate_var(
     #[cfg(feature = "trace_elimination")]
     println!("# eliminate_var {}", vi);
     // OK, eliminate the literal and build constraints on it.
-    make_eliminated_clauses(cdb, &mut elim.elim_lits, vi, &pos, &neg);
+    make_eliminated_clauses(&mut elim.elim_lits, vi, &pos, &neg);
     let vec = &mut state.new_learnt;
     // println!("eliminate_var {}: |p|: {} and |n|: {}", vi, (*pos).len(), (*neg).len());
     // Produce clauses in cross product:
@@ -265,15 +265,15 @@ fn merge_cost(
 fn merge(
     asg: &mut impl AssignIF,
     _cdb: &mut impl ClauseDBIF,
-    cip: ClauseRef,
-    ciq: ClauseRef,
+    cp: ClauseRef,
+    cq: ClauseRef,
     vi: VarId,
     vec: &mut Vec<Lit>,
 ) -> usize {
     vec.clear();
-    let rcp = cip.get();
+    let rcp = cp.get();
     let pqb = rcp.borrow();
-    let rcq = ciq.get();
+    let rcq = cq.get();
     let qpb = rcq.borrow();
     let ps_smallest = pqb.len() < qpb.len();
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
@@ -301,19 +301,13 @@ fn merge(
     vec.len()
 }
 
-fn make_eliminated_clauses(
-    cdb: &mut impl ClauseDBIF,
-    store: &mut Vec<Lit>,
-    v: VarId,
-    pos: &[ClauseRef],
-    neg: &[ClauseRef],
-) {
+fn make_eliminated_clauses(store: &mut Vec<Lit>, v: VarId, pos: &[ClauseRef], neg: &[ClauseRef]) {
     if neg.len() < pos.len() {
         for cr in neg {
             let rcc = cr.get();
             let c = rcc.borrow();
             debug_assert!(!c.is_dead());
-            make_eliminated_clause(cdb, store, v, cr.clone());
+            make_eliminated_clause(store, v, cr.clone());
         }
         make_eliminating_unit_clause(store, Lit::from((v, true)));
     } else {
@@ -321,7 +315,7 @@ fn make_eliminated_clauses(
             let rcd = dr.get();
             let d = rcd.borrow();
             debug_assert!(!d.is_dead());
-            make_eliminated_clause(cdb, store, v, dr.clone());
+            make_eliminated_clause(store, v, dr.clone());
         }
         make_eliminating_unit_clause(store, Lit::from((v, false)));
     }
@@ -334,12 +328,7 @@ fn make_eliminating_unit_clause(store: &mut Vec<Lit>, x: Lit) {
     store.push(Lit::from(1usize));
 }
 
-fn make_eliminated_clause(
-    _cdb: &mut impl ClauseDBIF,
-    store: &mut Vec<Lit>,
-    vi: VarId,
-    cr: ClauseRef,
-) {
+fn make_eliminated_clause(store: &mut Vec<Lit>, vi: VarId, cr: ClauseRef) {
     let first = store.len();
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:
     let rcc = cr.get();

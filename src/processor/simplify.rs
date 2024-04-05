@@ -6,7 +6,7 @@ use {
     },
     crate::{
         assign::{self, AssignIF},
-        cdb::{self, ClauseDBIF},
+        cdb::{self, ClauseDBIF, ClauseRefIF},
         state::{self, State, StateIF},
         types::*,
     },
@@ -230,8 +230,6 @@ impl EliminateIF for Eliminator {
             w.clear();
         }
         for cr in &mut cdb.iter() {
-            // let mut writer = cr.clone();
-            // let c = writer.get_mut();
             let rcc = cr.get();
             let c = rcc.borrow();
             if c.is_dead() || c.is(FlagClause::OCCUR_LINKED) {
@@ -328,8 +326,6 @@ impl EliminateIF for Eliminator {
 impl Eliminator {
     /// register a clause id to all corresponding occur lists.
     pub fn add_cid_occur(&mut self, asg: &mut impl AssignIF, cr: ClauseRef, enqueue: bool) {
-        // let mut writer = cr.clone();
-        // let c = writer.get_mut();
         let cr1 = cr.clone();
         let rcc = cr1.get();
         let mut c = rcc.borrow_mut();
@@ -385,10 +381,6 @@ impl Eliminator {
     }
     /// remove a clause id from all corresponding occur lists.
     pub fn remove_cid_occur(&mut self, asg: &mut impl AssignIF, cr: ClauseRef, c: &mut Clause) {
-        // let mut writer = cr.clone();
-        // let c = writer.get_mut();
-        // let rcc = cr.get();
-        // let mut c = rcc.borrow_mut();
         debug_assert!(!cr.is_lifted_lit());
         debug_assert!(self.mode == EliminatorMode::Running);
         debug_assert!(!c.is_dead());
@@ -406,7 +398,7 @@ impl Eliminator {
     // 'stop' should purge all occur lists to purge any dead clauses for now.
     fn stop(&mut self, asg: &mut impl AssignIF, cdb: &mut impl ClauseDBIF) {
         let force: bool = true;
-        self.clear_clause_queue(cdb);
+        self.clear_clause_queue();
         self.clear_var_queue(asg);
         if force {
             for cr in &mut cdb.iter() {
@@ -434,22 +426,20 @@ impl Eliminator {
             // Check top-level assignments by creating a dummy clause
             // and placing it in the queue:
             if self.clause_queue.is_empty() && self.bwdsub_assigns < asg.stack_len() {
-                let c = ClauseRef::lifted_clause_ref(asg.stack(self.bwdsub_assigns));
-                self.clause_queue.push(c);
+                self.clause_queue
+                    .push(ClauseRef::lifted_clause_ref(asg.stack(self.bwdsub_assigns)));
                 self.bwdsub_assigns += 1;
             }
             if let Some(cr) = self.clause_queue.pop() {
-                // let mut cr_tmp = cr.clone();
-                // let c = cr_tmp.get_mut();
                 let rcc = cr.get();
                 let mut c = rcc.borrow_mut();
                 if *timedout == 0 {
-                    self.clear_clause_queue(cdb);
+                    self.clear_clause_queue();
                     self.clear_var_queue(asg);
                     return Ok(());
                 }
                 let best: VarId = if cr.is_lifted_lit() {
-                    let vi = Lit::from(&c).vi();
+                    let vi = cr.from_lifted_clause(&c).vi();
                     debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
                     vi
                 } else {
@@ -499,7 +489,6 @@ impl Eliminator {
                     for dr in cls.iter() {
                         let rcd = dr.get();
                         let d = rcd.borrow();
-                        // let d = dr.get();
                         if *dr == cr {
                             continue;
                         }
@@ -516,6 +505,8 @@ impl Eliminator {
                             );
                             drop(d);
                             self.try_subsume(asg, cdb, cr.clone(), dr.clone())?;
+                        } else {
+                            drop(d);
                         }
                     }
                 }
@@ -563,7 +554,7 @@ impl Eliminator {
                 break;
             }
             if 0.1 <= state.elapsed().unwrap_or(1.0) - start {
-                self.clear_clause_queue(cdb);
+                self.clear_clause_queue();
                 self.clear_var_queue(asg);
                 break;
             }
@@ -605,7 +596,7 @@ impl Eliminator {
             asg.propagate_sandbox(cdb)
                 .map_err(SolverError::RootLevelConflict)?;
             if timedout == 0 {
-                self.clear_clause_queue(cdb);
+                self.clear_clause_queue();
                 self.clear_var_queue(asg);
             } else {
                 timedout -= 1;
@@ -637,10 +628,6 @@ impl Eliminator {
 
     /// enqueue a clause into eliminator's clause queue.
     pub fn enqueue_clause(&mut self, cr: ClauseRef, c: &mut Clause) {
-        // let cr1 = cr.clone();
-        // let rcc = cr1.get();
-        // let mut c = rcc.borrow_mut();
-        // let c = cr.get_mut();
         if self.mode != EliminatorMode::Running
             || c.is(FlagClause::ENQUEUED)
             || self.subsume_literal_limit < c.len()
@@ -651,7 +638,7 @@ impl Eliminator {
         self.clause_queue.push(cr);
     }
     /// clear eliminator's clause queue.
-    fn clear_clause_queue(&mut self, _cdb: &mut impl ClauseDBIF) {
+    fn clear_clause_queue(&mut self) {
         for cr in &mut self.clause_queue {
             let rcc = cr.get();
             let mut c = rcc.borrow_mut();

@@ -459,8 +459,8 @@ fn conflict_analyze(
         trail_index -= 1;
         reason = asg.reason(p.vi()).clone();
     }
-    if let Some(cid) = cid_with_max_lbd {
-        cdb.update_at_analysis(asg, cid);
+    if let Some(r) = cid_with_max_lbd {
+        cdb.update_at_analysis(asg, r);
     }
     debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);
