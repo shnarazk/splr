@@ -473,18 +473,17 @@ impl Eliminator {
                 if best == 0 || asg.var(best).is(FlagVar::ELIMINATED) {
                     continue;
                 }
-                // TODO: why there are identitcal codes below?
                 drop(c);
-                self[best].pos_occurs.retain(|r| {
-                    let rcc = r.get();
-                    let c = rcc.borrow();
-                    !c.is_dead()
-                });
-                self[best].neg_occurs.retain(|r| {
-                    let rcc = r.get();
-                    let c = rcc.borrow();
-                    !c.is_dead()
-                });
+                // self[best].pos_occurs.retain(|r| {
+                //     let rcc = r.get();
+                //     let c = rcc.borrow();
+                //     !c.is_dead()
+                // });
+                // self[best].neg_occurs.retain(|r| {
+                //     let rcc = r.get();
+                //     let c = rcc.borrow();
+                //     !c.is_dead()
+                // });
                 for cls in [self[best].pos_occurs.clone(), self[best].neg_occurs.clone()].iter() {
                     for dr in cls.iter() {
                         let rcd = dr.get();

@@ -24,6 +24,9 @@ impl Eliminator {
         let mut c = rcc.borrow_mut();
         let rcd = dr.get();
         let mut d = rcd.borrow_mut();
+        // if !c.is(FlagClause::LEARNT) || !d.is(FlagClause::LEARNT) {
+        //     return Ok(());
+        // }
         match have_subsuming_lit(cdb, &cr, &c, &dr, &d) {
             Subsumable::Success => {
                 #[cfg(feature = "trace_elimination")]
