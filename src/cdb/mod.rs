@@ -6,6 +6,8 @@ mod binary;
 mod cid;
 /// methods on `Clause`
 mod clause;
+/// methods on `ClauseRef`
+mod cref;
 /// methods on `ClauseDB`
 mod db;
 /// EMA
