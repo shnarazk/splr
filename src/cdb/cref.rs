@@ -5,7 +5,7 @@ use {
 
 #[derive(Clone)]
 pub struct ClauseRef {
-    // id: usize,
+    dead: bool,
     c: Rc<RefCell<Clause>>,
 }
 
@@ -37,19 +37,30 @@ impl PartialOrd for ClauseRef {
 pub trait ClauseRefIF {
     /// return a new ClauseRef
     fn new(c: Clause) -> Self;
-    // return shared reference
+    /// return shared reference
     fn get(&self) -> &RefCell<Clause>;
+    // return true if the clause, or clauseId is not used now
+    fn is_dead(&self) -> bool;
+    // set dead flag
+    fn set_deat(&mut self, dead: bool) -> &mut Self;
 }
 
 impl ClauseRefIF for ClauseRef {
     fn new(c: Clause) -> Self {
         ClauseRef {
-            // id,
+            dead: false,
             c: Rc::new(RefCell::new(c)),
         }
     }
     fn get(&self) -> &RefCell<Clause> {
         Borrow::<RefCell<Clause>>::borrow(&self.c)
+    }
+    fn is_dead(&self) -> bool {
+        self.dead
+    }
+    fn set_deat(&mut self, dead: bool) -> &mut Self {
+        self.dead = dead;
+        self
     }
 }
 
