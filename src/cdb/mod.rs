@@ -24,6 +24,7 @@ mod watch_cache;
 pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
     cid::ClauseIdIF,
+    cref::*,
     property::*,
     sls::StochasticLocalSearchIF,
     unsat_certificate::CertificationStore,
@@ -231,7 +232,7 @@ pub struct Clause {
 #[derive(Clone, Debug)]
 pub struct ClauseDB {
     /// container of clauses
-    clause: Vec<Clause>,
+    clause: Vec<ClauseRef>,
     /// hashed representation of binary clauses.
     ///## Note
     /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
