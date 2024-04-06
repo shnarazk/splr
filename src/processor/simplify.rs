@@ -6,7 +6,7 @@ use {
     },
     crate::{
         assign::{self, AssignIF},
-        cdb::{self, ClauseDBIF},
+        cdb::{self, ClauseDBIF, LiftedClauseIdIF},
         state::{self, State, StateIF},
         types::*,
     },
@@ -382,7 +382,7 @@ impl Eliminator {
     /// remove a clause id from all corresponding occur lists.
     pub fn remove_cid_occur(&mut self, asg: &mut impl AssignIF, cid: ClauseId, c: &mut Clause) {
         debug_assert!(self.mode == EliminatorMode::Running);
-        debug_assert!(!cid.is_lifted_lit());
+        debug_assert!(!cid.is_lifted());
         debug_assert!(!c.is_dead());
         c.turn_off(FlagClause::OCCUR_LINKED);
         for l in c.iter() {
@@ -423,7 +423,7 @@ impl Eliminator {
             // Check top-level assignments by creating a dummy clause
             // and placing it in the queue:
             if self.clause_queue.is_empty() && self.bwdsub_assigns < asg.stack_len() {
-                let c = ClauseId::from(asg.stack(self.bwdsub_assigns));
+                let c = ClauseId::lift(&asg.stack(self.bwdsub_assigns));
                 self.clause_queue.push(c);
                 self.bwdsub_assigns += 1;
             }
@@ -433,8 +433,8 @@ impl Eliminator {
                     self.clear_var_queue(asg);
                     return Ok(());
                 }
-                let best: VarId = if cid.is_lifted_lit() {
-                    let vi = Lit::from(cid).vi();
+                let best: VarId = if cid.is_lifted() {
+                    let vi = cid.unlift().vi();
                     debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
                     vi
                 } else {

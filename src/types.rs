@@ -13,7 +13,7 @@ use std::{
     fmt,
     fs::File,
     io::{BufRead, BufReader},
-    num::NonZeroU32,
+    num::{NonZeroI128, NonZeroU32},
     ops::{Index, IndexMut, Not},
     path::Path,
 };
@@ -172,23 +172,19 @@ impl From<u32> for Lit {
     }
 }
 
+impl From<NonZeroU32> for Lit {
+    #[inline]
+    fn from(l: NonZeroU32) -> Self {
+        Lit { ordinal: l }
+    }
+}
+
 impl From<i32> for Lit {
     #[inline]
     fn from(x: i32) -> Self {
         Lit {
             ordinal: unsafe {
                 NonZeroU32::new_unchecked((if x < 0 { -2 * x } else { 2 * x + 1 }) as u32)
-            },
-        }
-    }
-}
-
-impl From<ClauseId> for Lit {
-    #[inline]
-    fn from(cid: ClauseId) -> Self {
-        Lit {
-            ordinal: unsafe {
-                NonZeroU32::new_unchecked(NonZeroU32::get(cid.ordinal) & 0x7FFF_FFFF)
             },
         }
     }
@@ -203,19 +199,17 @@ impl From<Lit> for bool {
     }
 }
 
-impl From<Lit> for ClauseId {
-    #[inline]
-    fn from(l: Lit) -> ClauseId {
-        ClauseId {
-            ordinal: unsafe { NonZeroU32::new_unchecked(NonZeroU32::get(l.ordinal) | 0x8000_0000) },
-        }
-    }
-}
-
 impl From<Lit> for usize {
     #[inline]
     fn from(l: Lit) -> usize {
         NonZeroU32::get(l.ordinal) as usize
+    }
+}
+
+impl From<&Lit> for NonZeroU32 {
+    #[inline]
+    fn from(l: &Lit) -> NonZeroU32 {
+        l.ordinal
     }
 }
 

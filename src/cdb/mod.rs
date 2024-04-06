@@ -23,7 +23,7 @@ mod watch_cache;
 
 pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
-    cid::ClauseIdIF,
+    cid::LiftedClauseIdIF,
     cref::*,
     property::*,
     sls::StochasticLocalSearchIF,
