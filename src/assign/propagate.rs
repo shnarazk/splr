@@ -353,10 +353,12 @@ impl PropagateIF for AssignStack {
             //
             for (blocker, cid) in cdb.binary_links(false_lit).iter().copied() {
                 let var = &self.var[blocker.vi()];
-                debug_assert!(!cdb[cid].is_dead());
+                let rcc = cdb[cid];
+                let c = rcc.borrow();
+                debug_assert!(!c.is_dead());
                 debug_assert!(!var.is(FlagVar::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
-                debug_assert_eq!(cdb[cid].len(), 2);
+                debug_assert_eq!(c.len(), 2);
                 match lit_assign!(var, blocker) {
                     Some(true) => (),
                     Some(false) => {
@@ -364,7 +366,7 @@ impl PropagateIF for AssignStack {
                         conflict_path!(blocker, minimized_reason!(propagating));
                     }
                     None => {
-                        debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
+                        debug_assert!(c.lit0() == false_lit || c.lit1() == false_lit);
                         self.assign_by_implication(
                             blocker,
                             minimized_reason!(propagating),
@@ -413,7 +415,8 @@ impl PropagateIF for AssignStack {
                     continue 'next_clause;
                 }
                 {
-                    let c = &cdb[cid];
+                    let rcc = &cdb[cid];
+                    let mut c = rcc.borrow_mut();
                     let lit0 = c.lit0();
                     let lit1 = c.lit1();
                     let (false_watch_pos, other) = if false_lit == lit1 {
@@ -438,7 +441,7 @@ impl PropagateIF for AssignStack {
                         }
                         updated_cache = Some(other);
                     }
-                    let c = &cdb[cid];
+                    // let c = &cdb[cid];
                     debug_assert!(lit0 == false_lit || lit1 == false_lit);
                     //
                     //## Search an un-falsified literal
@@ -455,7 +458,7 @@ impl PropagateIF for AssignStack {
                             let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
-                            cdb[cid].search_from = (k + 1) as u16;
+                            c.search_from = (k + 1) as u16;
                             debug_assert_ne!(self.assigned(new_watch), Some(true));
                             check_in!(
                                 cid,
@@ -482,7 +485,7 @@ impl PropagateIF for AssignStack {
                     .max()
                     .unwrap_or(self.root_level);
 
-                debug_assert_eq!(cdb[cid].lit0(), cached);
+                // debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
                 self.assign_by_implication(
@@ -549,7 +552,9 @@ impl PropagateIF for AssignStack {
             //## binary loop
             //
             for (blocker, cid) in cdb.binary_links(false_lit).iter().copied() {
-                debug_assert!(!cdb[cid].is_dead());
+                let rcc = cdb[cid];
+                let c = rcc.borrow();
+                debug_assert!(!c.is_dead());
                 debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
 
@@ -560,7 +565,7 @@ impl PropagateIF for AssignStack {
                     Some(true) => (),
                     Some(false) => conflict_path!(blocker, AssignReason::BinaryLink(propagating)),
                     None => {
-                        debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
+                        debug_assert!(c.lit0() == false_lit || c.lit1() == false_lit);
 
                         self.assign_by_implication(
                             blocker,
@@ -579,7 +584,9 @@ impl PropagateIF for AssignStack {
                 .next()
                 .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
             {
-                if cdb[cid].is_dead() {
+                let rcc = &cdb[cid];
+                let mut c = rcc.borrow_mut();
+                if c.is_dead() {
                     cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
                     continue;
                 }
@@ -592,7 +599,6 @@ impl PropagateIF for AssignStack {
                     continue 'next_clause;
                 }
                 {
-                    let c = &cdb[cid];
                     let lit0 = c.lit0();
                     let lit1 = c.lit1();
                     let (false_watch_pos, other) = if false_lit == lit1 {
@@ -616,7 +622,7 @@ impl PropagateIF for AssignStack {
                         }
                         updated_cache = Some(other);
                     }
-                    let c = &cdb[cid];
+                    // let c = &cdb[cid];
                     debug_assert!(lit0 == false_lit || lit1 == false_lit);
                     let start = c.search_from;
                     for (k, lk) in c
@@ -629,7 +635,7 @@ impl PropagateIF for AssignStack {
                             let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
-                            cdb[cid].search_from = (k as u16).saturating_add(1);
+                            c.search_from = (k as u16).saturating_add(1);
                             debug_assert!(
                                 self.assigned(!new_watch) == Some(true)
                                     || self.assigned(!new_watch).is_none()
@@ -665,7 +671,7 @@ impl PropagateIF for AssignStack {
                     .map(|l| self.level[l.vi()])
                     .max()
                     .unwrap_or(self.root_level);
-                debug_assert_eq!(cdb[cid].lit0(), cached);
+                // debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
 
@@ -716,12 +722,12 @@ impl AssignStack {
             num_propagated = self.trail.len();
             for ci in 1..cdb.len() {
                 let cid = ClauseId::from(ci);
-                if cdb[cid].is_dead() {
+                let rcc = cdb[cid];
+                let c = rcc.borrow();
+                if c.is_dead() {
                     continue;
                 }
-                debug_assert!(cdb[cid]
-                    .iter()
-                    .all(|l| !self.var[l.vi()].is(FlagVar::ELIMINATED)));
+                debug_assert!(c.iter().all(|l| !self.var[l.vi()].is(FlagVar::ELIMINATED)));
                 match cdb.transform_by_simplification(self, cid) {
                     RefClause::Clause(_) => (),
                     RefClause::Dead => (), // was a satisfied clause

@@ -33,7 +33,9 @@ pub fn handle_conflict(
     // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
     {
         if let AssignReason::Implication(cid) = cc.1 {
-            if cdb[cid].iter().all(|l| asg.level(l.vi()) == 0) {
+            let rcc = cdb[cid];
+            let c = rcc.borrow();
+            if c.iter().all(|l| asg.level(l.vi()) == 0) {
                 return Err(SolverError::RootLevelConflict(*cc));
             }
         }
@@ -149,7 +151,9 @@ pub fn handle_conflict(
                 }
             }
             AssignReason::Implication(r) => {
-                for l in cdb[r].iter() {
+                let rcc = cdb[r];
+                let c = rcc.borrow();
+                for l in c.iter() {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
                         asg.reward_at_analysis(vi);
@@ -174,11 +178,12 @@ pub fn handle_conflict(
     let rank: u16;
     match cdb.new_clause(asg, new_learnt, true) {
         RefClause::Clause(cid) if learnt_len == 2 => {
+            let rcc = cdb[cid];
+            let c = rcc.borrow();
             #[cfg(feature = "boundary_check")]
-            cdb[cid].set_birth(asg.num_conflict);
-
-            debug_assert_eq!(l0, cdb[cid].lit0());
-            debug_assert_eq!(l1, cdb[cid].lit1());
+            c.set_birth(asg.num_conflict);
+            debug_assert_eq!(l0, c.lit0());
+            debug_assert_eq!(l1, c.lit1());
             debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
 
@@ -197,10 +202,12 @@ pub fn handle_conflict(
             cdb.complete_bi_clauses(asg);
         }
         RefClause::Clause(cid) => {
+            let rcc = cdb[cid];
+            let c = rcc.borrow();
             #[cfg(feature = "boundary_check")]
-            cdb[cid].set_birth(asg.num_conflict);
+            c.set_birth(asg.num_conflict);
 
-            debug_assert_eq!(cdb[cid].lit0(), l0);
+            debug_assert_eq!(c.lit0(), l0);
             debug_assert_eq!(asg.assigned(l0), None);
             asg.assign_by_implication(
                 l0,
@@ -209,7 +216,7 @@ pub fn handle_conflict(
                 assign_level,
             );
             // || check_graph(asg, cdb, l0, "clause");
-            rank = cdb[cid].rank;
+            rank = c.rank;
             if rank <= 20 {
                 for cid in &state.derive20 {
                     cdb[cid].turn_on(FlagClause::DERIVE20);
@@ -217,11 +224,10 @@ pub fn handle_conflict(
             }
         }
         RefClause::RegisteredClause(cid) => {
+            let rcc = cdb[cid];
+            let c = rcc.borrow();
             debug_assert_eq!(learnt_len, 2);
-            debug_assert!(
-                (l0 == cdb[cid].lit0() && l1 == cdb[cid].lit1())
-                    || (l0 == cdb[cid].lit1() && l1 == cdb[cid].lit0())
-            );
+            debug_assert!((l0 == c.lit0() && l1 == c.lit1()) || (l0 == c.lit1() && l1 == c.lit0()));
             debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
             rank = 1;
@@ -351,22 +357,24 @@ fn conflict_analyze(
                 }
             }
             AssignReason::Implication(cid) => {
+                let rcc = cdb[cid];
+                let c = rcc.borrow();
                 trace!(
                     "analyze clause {}(first literal: {}) for {}",
                     cid,
                     i32::from(cdb[cid].lit0()),
                     p
                 );
-                debug_assert!(!cdb[cid].is_dead() && 2 < cdb[cid].len());
+                debug_assert!(!c.is_dead() && 2 < c.len());
                 // if !cdb.update_at_analysis(asg, cid) {
-                if !cdb[cid].is(FlagClause::LEARNT) {
+                if !c.is(FlagClause::LEARNT) {
                     state.derive20.push(cid);
                 }
-                if max_lbd < cdb[cid].rank {
-                    max_lbd = cdb[cid].rank;
+                if max_lbd < c.rank {
+                    max_lbd = c.rank;
                     cid_with_max_lbd = Some(cid);
                 }
-                for q in cdb[cid].iter().skip(1) {
+                for q in c.iter().skip(1) {
                     let vi = q.vi();
                     validate_vi!(vi);
                     if !asg.var(vi).is(FlagVar::CA_SEEN) {
@@ -534,7 +542,8 @@ impl Lit {
                     }
                 }
                 AssignReason::Implication(cid) => {
-                    let c = &cdb[cid];
+                    let rcc = cdb[cid];
+                    let c = rcc.borrow();
                     for q in &(*c)[1..] {
                         let vi = q.vi();
                         let lv = asg.level(vi);
@@ -590,14 +599,16 @@ fn lit_level(
         AssignReason::Decision(0) => asg.root_level(),
         AssignReason::Decision(lvl) => lvl,
         AssignReason::Implication(cid) => {
+            let rcc = cdb[cid];
+            let c = rcc.borrow();
             assert_eq!(
-                cdb[cid].lit0(),
+                c.lit0(),
                 lit,
                 "lit0 {} != lit{}, cid {}, {}",
-                cdb[cid].lit0(),
+                c.lit0(),
                 lit,
                 cid,
-                &cdb[cid]
+                &c
             );
             // assert!(
             //     !bag.contains(&lit),
@@ -609,8 +620,7 @@ fn lit_level(
             //     dumper(asg, cdb, bag),
             // );
             // bag.push(lit);
-            cdb[cid]
-                .iter()
+            c.iter()
                 .skip(1)
                 .map(|l| lit_level(asg, cdb, !*l, bag, _mes))
                 .max()
@@ -635,7 +645,11 @@ fn dumper(asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
             match asg.reason(l.vi()) {
                 AssignReason::Decision(_) => vec![],
                 AssignReason::BinaryLink(lit) => vec![*l, !lit],
-                AssignReason::Implication(cid) => cdb[cid].iter().copied().collect::<Vec<Lit>>(),
+                AssignReason::Implication(cid) => {
+                    let rcc = cdb[cid];
+                    let c = rcc.borrow();
+                    c.iter().copied().collect::<Vec<Lit>>()
+                }
                 AssignReason::None => vec![],
             },
         )

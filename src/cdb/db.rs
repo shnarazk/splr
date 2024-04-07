@@ -18,7 +18,7 @@ use {
     },
 };
 
-use std::borrow::BorrowMut;
+use std::{borrow::BorrowMut, cell::RefCell};
 #[cfg(not(feature = "no_IO"))]
 use std::{fs::File, io::Write, path::Path};
 
@@ -60,29 +60,29 @@ impl Default for ClauseDB {
 }
 
 impl Index<ClauseId> for ClauseDB {
-    type Output = ClauseRef;
+    type Output = RefCell<Clause>;
     #[inline]
-    fn index(&self, cid: ClauseId) -> &ClauseRef {
+    fn index(&self, cid: ClauseId) -> &RefCell<Clause> {
         let i = NonZeroU32::get(cid.ordinal) as usize;
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            self.clause.get_unchecked(i)
+            self.clause.get_unchecked(i).get()
         }
         #[cfg(not(feature = "unsafe_access"))]
-        &self.clause[i]
+        &self.clause[i].get()
     }
 }
 
 impl IndexMut<ClauseId> for ClauseDB {
     #[inline]
-    fn index_mut(&mut self, cid: ClauseId) -> &mut ClauseRef {
+    fn index_mut(&mut self, cid: ClauseId) -> &mut RefCell<Clause> {
         let i = NonZeroU32::get(cid.ordinal) as usize;
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            self.clause.get_unchecked_mut(i)
+            &mut self.clause.get_unchecked_mut(i).get()
         }
         #[cfg(not(feature = "unsafe_access"))]
-        &mut self.clause[i]
+        &mut self.clause[i].get()
     }
 }
 
@@ -220,8 +220,11 @@ impl ClauseDBIF for ClauseDB {
     fn is_empty(&self) -> bool {
         self.clause.is_empty()
     }
-    fn iter(&self) -> impl Iterator<Item = &ClauseRef> {
-        self.clause.iter().filter(|cr| !cr.is_dead())
+    fn iter(&self) -> impl Iterator<Item = &RefCell<Clause>> {
+        self.clause
+            .iter()
+            .filter(|cr| !cr.is_dead())
+            .map(|cr| cr.get())
     }
     // fn iter_mut(&mut self) -> IterMut<'_, Clause> {
     //     self.clause.iter_mut()
