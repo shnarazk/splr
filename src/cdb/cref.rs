@@ -42,7 +42,7 @@ pub trait ClauseRefIF {
     // return true if the clause, or clauseId is not used now
     fn is_dead(&self) -> bool;
     // set dead flag
-    fn set_deat(&mut self, dead: bool) -> &mut Self;
+    fn set_dead(&mut self, dead: bool) -> &mut Self;
 }
 
 impl ClauseRefIF for ClauseRef {
@@ -58,7 +58,7 @@ impl ClauseRefIF for ClauseRef {
     fn is_dead(&self) -> bool {
         self.dead
     }
-    fn set_deat(&mut self, dead: bool) -> &mut Self {
+    fn set_dead(&mut self, dead: bool) -> &mut Self {
         self.dead = dead;
         self
     }

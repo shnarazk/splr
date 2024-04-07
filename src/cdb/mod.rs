@@ -74,7 +74,7 @@ pub trait ClauseIF {
 /// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`remove_clause`](`crate::cdb::ClauseDBIF::remove_clause`), and so on.
 pub trait ClauseDBIF:
     Instantiate
-    + IndexMut<ClauseId, Output = Clause>
+    + IndexMut<ClauseId, Output = ClauseRef>
     + PropertyDereference<property::Tusize, usize>
     + PropertyDereference<property::Tf64, f64>
 {
@@ -83,9 +83,9 @@ pub trait ClauseDBIF:
     /// return true if it's empty.
     fn is_empty(&self) -> bool;
     /// return an iterator.
-    fn iter(&self) -> Iter<'_, Clause>;
-    /// return a mutable iterator.
-    fn iter_mut(&mut self) -> IterMut<'_, Clause>;
+    fn iter(&self) -> impl Iterator<Item = &ClauseRef>;
+    // /// return a mutable iterator.
+    // fn iter_mut(&mut self) -> impl Iterator<Item = &mut ClauseRef>;
 
     //
     //## interface to binary links
