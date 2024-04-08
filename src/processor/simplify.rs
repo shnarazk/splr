@@ -472,14 +472,23 @@ impl Eliminator {
                 if best == 0 || asg.var(best).is(FlagVar::ELIMINATED) {
                     continue;
                 }
-                self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
-                self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
+                self[best].pos_occurs.retain(|cid| {
+                    let rcc = cdb[*cid];
+                    let c = rcc.borrow();
+                    !c.is_dead()
+                });
+                self[best].neg_occurs.retain(|cid| {
+                    let rcc = cdb[*cid];
+                    let c = rcc.borrow();
+                    !c.is_dead()
+                });
                 for cls in [self[best].pos_occurs.clone(), self[best].neg_occurs.clone()].iter() {
                     for did in cls.iter() {
                         if *did == cid {
                             continue;
                         }
-                        let d = &cdb[*did];
+                        let rcd = cdb[*did];
+                        let d = rcd.borrow();
                         if d.len() <= *timedout {
                             *timedout -= d.len();
                         } else {
@@ -495,8 +504,16 @@ impl Eliminator {
                         }
                     }
                 }
-                self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
-                self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
+                self[best].pos_occurs.retain(|cid| {
+                    let rcc = cdb[*cid];
+                    let c = rcc.borrow();
+                    !c.is_dead()
+                });
+                self[best].neg_occurs.retain(|cid| {
+                    let rcc = cdb[*cid];
+                    let c = rcc.borrow();
+                    !c.is_dead()
+                });
             }
         }
         if asg.remains() {

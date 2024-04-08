@@ -24,11 +24,17 @@ pub fn eliminate_var(
     // count only alive clauses
     // Note: it may contain the target literal somehow. So the following may be failed.
     // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, true)))));
-    w.pos_occurs
-        .retain(|&c| cdb[c].contains(Lit::from((vi, true))));
+    w.pos_occurs.retain(|&cid| {
+        let rcc = cdb[cid];
+        let c = rcc.borrow();
+        c.contains(Lit::from((vi, true)))
+    });
     // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, false)))));
-    w.neg_occurs
-        .retain(|&c| cdb[c].contains(Lit::from((vi, false))));
+    w.neg_occurs.retain(|&cid| {
+        let rcc = cdb[cid];
+        let c = rcc.borrow();
+        c.contains(Lit::from((vi, false)))
+    });
 
     let num_combination = w.pos_occurs.len() * w.neg_occurs.len();
 
@@ -55,10 +61,14 @@ pub fn eliminate_var(
     let vec = &mut state.new_learnt;
     // println!("eliminate_var {}: |p|: {} and |n|: {}", vi, (*pos).len(), (*neg).len());
     // Produce clauses in cross product:
-    for p in pos.iter() {
-        let learnt_p = cdb[*p].is(FlagClause::LEARNT);
-        for n in neg.iter() {
-            match merge(asg, cdb, *p, *n, vi, vec) {
+    for pid in pos.iter() {
+        let rcp = cdb[*pid];
+        let p = rcp.borrow();
+        let learnt_p = p.is(FlagClause::LEARNT);
+        for nid in neg.iter() {
+            let rcn = cdb[*nid];
+            let n = rcn.borrow();
+            match merge(asg, cdb, &mut p, &mut n, vi, vec) {
                 0 => {
                     #[cfg(feature = "trace_elimination")]
                     println!(
@@ -90,10 +100,12 @@ pub fn eliminate_var(
                 }
                 _ => {
                     debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
-                    match cdb.new_clause(asg, vec, learnt_p && cdb[*n].is(FlagClause::LEARNT)) {
+                    match cdb.new_clause(asg, vec, learnt_p && n.is(FlagClause::LEARNT)) {
                         RefClause::Clause(ci) => {
+                            let rcc = cdb[ci];
+                            let c = rcc.borrow();
                             // the merged clause might be a duplicated clause.
-                            elim.add_cid_occur(asg, ci, &mut cdb[ci], true);
+                            elim.add_cid_occur(asg, ci, &mut c, true);
 
                             #[cfg(feature = "trace_elimination")]
                             println!(
@@ -310,7 +322,8 @@ fn make_eliminated_clause(
 ) {
     let first = store.len();
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:
-    let c = &cdb[cid];
+    let rcc = cdb[cid];
+    let c = rcc.borrow();
     debug_assert!(!c.is_empty());
     for l in c.iter() {
         store.push(*l);
@@ -351,8 +364,14 @@ mod tests {
         fn as_vec(&self) -> Vec<Vec<i32>> {
             self.iter()
                 .skip(1)
-                .filter(|c| !c.is_dead())
-                .map(|c| c.as_vec())
+                .filter(|rcc| {
+                    let c = rcc.borrow();
+                    !c.is_dead()
+                })
+                .map(|rcc| {
+                    let c = rcc.borrow();
+                    c.as_vec()
+                })
                 .collect::<Vec<_>>()
         }
     }
@@ -378,12 +397,18 @@ mod tests {
         assert!(cdb
             .iter()
             .skip(1)
-            .filter(|c| c.is_dead())
-            .all(|c| c.is_empty()));
-        assert!(cdb
-            .iter()
-            .skip(1)
-            .all(|c| c.iter().all(|l| *l != Lit::from((vi, false)))
-                && c.iter().all(|l| *l != Lit::from((vi, false)))));
+            .filter(|rcc| {
+                let c = rcc.borrow();
+                c.is_dead()
+            })
+            .all(|rcc| {
+                let c = rcc.borrow();
+                c.is_empty()
+            }));
+        assert!(cdb.iter().skip(1).all(|rcc| {
+            let c = rcc.borrow();
+            c.iter().all(|l| *l != Lit::from((vi, false)))
+                && c.iter().all(|l| *l != Lit::from((vi, false)))
+        }));
     }
 }
