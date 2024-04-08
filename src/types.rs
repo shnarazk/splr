@@ -2,7 +2,7 @@
 /// some common traits.
 pub use crate::{
     assign::AssignReason,
-    cdb::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
+    cdb::{Clause, ClauseDB, ClauseIF, ClauseId, LiftedClauseIdIF},
     config::Config,
     primitive::{ema::*, luby::*},
     solver::SolverEvent,
@@ -13,7 +13,7 @@ use std::{
     fmt,
     fs::File,
     io::{BufRead, BufReader},
-    num::{NonZeroI128, NonZeroU32},
+    num::NonZeroU32,
     ops::{Index, IndexMut, Not},
     path::Path,
 };

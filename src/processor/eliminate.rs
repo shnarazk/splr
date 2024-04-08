@@ -68,7 +68,7 @@ pub fn eliminate_var(
         for nid in neg.iter() {
             let rcn = cdb[*nid];
             let n = rcn.borrow();
-            match merge(asg, cdb, &mut p, &mut n, vi, vec) {
+            match merge(asg, cdb, &*p, &*n, vi, vec) {
                 0 => {
                     #[cfg(feature = "trace_elimination")]
                     println!(
@@ -103,7 +103,7 @@ pub fn eliminate_var(
                     match cdb.new_clause(asg, vec, learnt_p && n.is(FlagClause::LEARNT)) {
                         RefClause::Clause(ci) => {
                             let rcc = cdb[ci];
-                            let c = rcc.borrow();
+                            let mut c = rcc.borrow_mut();
                             // the merged clause might be a duplicated clause.
                             elim.add_cid_occur(asg, ci, &mut c, true);
 
@@ -125,32 +125,44 @@ pub fn eliminate_var(
     //
     //## VAR ELIMINATION
     //
-    debug_assert!(pos.iter().all(|cid| !cdb[*cid].is_dead()));
-    debug_assert!(neg.iter().all(|cid| !cdb[*cid].is_dead()));
+    debug_assert!(pos.iter().all(|cid| {
+        let rcc = cdb[*cid];
+        let c = rcc.borrow();
+        !c.is_dead()
+    }));
+    debug_assert!(neg.iter().all(|cid| {
+        let rcc = cdb[*cid];
+        let c = rcc.borrow();
+        !c.is_dead()
+    }));
     for cid in pos.iter() {
-        if cdb[*cid].is_dead() {
+        let rcc = cdb[*cid];
+        let mut c = rcc.borrow_mut();
+        if c.is_dead() {
             continue;
         }
         #[cfg(feature = "incremental_solver")]
         {
-            if !cdb[*cid].is(FlagClause::LEARNT) {
+            if !c.is(FlagClause::LEARNT) {
                 cdb.make_permanent_immortal(*cid);
             }
         }
-        elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
+        elim.remove_cid_occur(asg, *cid, &mut c);
         cdb.remove_clause(*cid);
     }
     for cid in neg.iter() {
-        if cdb[*cid].is_dead() {
+        let crn = cdb[*cid];
+        let mut c = crn.borrow_mut();
+        if c.is_dead() {
             continue;
         }
         #[cfg(feature = "incremental_solver")]
         {
-            if !cdb[*cid].is(FlagClause::LEARNT) {
+            if !n.is(FlagClause::LEARNT) {
                 cdb.make_permanent_immortal(*cid);
             }
         }
-        elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
+        elim.remove_cid_occur(asg, *cid, &mut c);
         cdb.remove_clause(*cid);
     }
     elim[vi].clear();
@@ -208,8 +220,10 @@ fn merge_cost(
     cq: ClauseId,
     vi: VarId,
 ) -> Option<usize> {
-    let c_p = &cdb[cp];
-    let c_q = &cdb[cq];
+    let rcp = cdb[cp];
+    let c_p = rcp.borrow();
+    let rcq = cdb[cq];
+    let c_q = rcq.borrow();
     let mut cond: Option<Lit> = None;
     let mut cond2: Option<Lit> = None;
     let mut count = 0;
@@ -251,14 +265,18 @@ fn merge_cost(
 fn merge(
     asg: &mut impl AssignIF,
     cdb: &mut impl ClauseDBIF,
-    cip: ClauseId,
-    ciq: ClauseId,
+    // cip: ClauseId,
+    // ciq: ClauseId,
+    pqb: &Clause,
+    qpb: &Clause,
     vi: VarId,
     vec: &mut Vec<Lit>,
 ) -> usize {
     vec.clear();
-    let pqb = &cdb[cip];
-    let qpb = &cdb[ciq];
+    // let rcp = cdb[cip];
+    // let pqb = rcp.borrow();
+    // let rcq = cdb[ciq];
+    // let qpb = rcq.borrow();
     let ps_smallest = pqb.len() < qpb.len();
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
     #[cfg(feature = "trace_elimination")]
@@ -294,14 +312,18 @@ fn make_eliminated_clauses(
 ) {
     if neg.len() < pos.len() {
         for cid in neg {
-            debug_assert!(!cdb[*cid].is_dead());
-            make_eliminated_clause(cdb, store, v, *cid);
+            let rcc = cdb[*cid];
+            let c = rcc.borrow();
+            debug_assert!(!c.is_dead());
+            make_eliminated_clause(cdb, store, v, &*c);
         }
         make_eliminating_unit_clause(store, Lit::from((v, true)));
     } else {
         for cid in pos {
-            debug_assert!(!cdb[*cid].is_dead());
-            make_eliminated_clause(cdb, store, v, *cid);
+            let rcc = cdb[*cid];
+            let c = rcc.borrow();
+            debug_assert!(!c.is_dead());
+            make_eliminated_clause(cdb, store, v, &*c);
         }
         make_eliminating_unit_clause(store, Lit::from((v, false)));
     }
@@ -314,16 +336,9 @@ fn make_eliminating_unit_clause(store: &mut Vec<Lit>, x: Lit) {
     store.push(Lit::from(1usize));
 }
 
-fn make_eliminated_clause(
-    cdb: &mut impl ClauseDBIF,
-    store: &mut Vec<Lit>,
-    vi: VarId,
-    cid: ClauseId,
-) {
+fn make_eliminated_clause(cdb: &mut impl ClauseDBIF, store: &mut Vec<Lit>, vi: VarId, c: &Clause) {
     let first = store.len();
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:
-    let rcc = cdb[cid];
-    let c = rcc.borrow();
     debug_assert!(!c.is_empty());
     for l in c.iter() {
         store.push(*l);

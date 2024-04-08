@@ -79,24 +79,28 @@ impl TrailSavingIF for AssignStack {
                     );
                 }
                 // reason refinement by ignoring this dependecy
-                (None, AssignReason::Implication(c)) if q < cdb[c].rank => {
-                    self.insert_heap(vi);
-                    return self.truncate_trail_saved(i + 1);
-                }
+                // (None, AssignReason::Implication(c)) if q < cdb[c].rank => {
+                //     self.insert_heap(vi);
+                //     return self.truncate_trail_saved(i + 1);
+                // }
                 (None, AssignReason::Implication(cid)) => {
-                    debug_assert_eq!(cdb[cid].lit0(), lit);
-                    debug_assert!(cdb[cid]
-                        .iter()
-                        .skip(1)
-                        .all(|l| self.assigned(*l) == Some(false)));
-                    self.num_repropagation += 1;
+                    let rcc = cdb[cid];
+                    let c = rcc.borrow();
+                    if q < c.rank {
+                        self.insert_heap(vi);
+                        return self.truncate_trail_saved(i + 1);
+                    } else {
+                        debug_assert_eq!(c.lit0(), lit);
+                        debug_assert!(c.iter().skip(1).all(|l| self.assigned(*l) == Some(false)));
+                        self.num_repropagation += 1;
 
-                    self.assign_by_implication(
-                        lit,
-                        old_reason,
-                        #[cfg(feature = "chrono_BT")]
-                        dl,
-                    );
+                        self.assign_by_implication(
+                            lit,
+                            old_reason,
+                            #[cfg(feature = "chrono_BT")]
+                            dl,
+                        );
+                    }
                 }
                 (Some(false), AssignReason::BinaryLink(link)) => {
                     debug_assert_ne!(link.vi(), lit.vi());
@@ -106,10 +110,12 @@ impl TrailSavingIF for AssignStack {
                     return Err((lit, old_reason));
                 }
                 (Some(false), AssignReason::Implication(cid)) => {
-                    debug_assert!(cdb[cid].iter().all(|l| self.assigned(*l) == Some(false)));
+                    let rcc = cdb[cid];
+                    let c = rcc.borrow();
+                    debug_assert!(c.iter().all(|l| self.assigned(*l) == Some(false)));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_saved_trail();
-                    return Err((cdb[cid].lit0(), AssignReason::Implication(cid)));
+                    return Err((c.lit0(), AssignReason::Implication(cid)));
                 }
                 (_, AssignReason::Decision(lvl)) => {
                     debug_assert_ne!(0, lvl);
