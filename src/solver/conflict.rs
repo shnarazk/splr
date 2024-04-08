@@ -179,7 +179,7 @@ pub fn handle_conflict(
     match cdb.new_clause(asg, new_learnt, true) {
         RefClause::Clause(cid) if learnt_len == 2 => {
             let rcc = cdb[cid];
-            let c = rcc.borrow();
+            let mut c = rcc.borrow_mut();
             #[cfg(feature = "boundary_check")]
             c.set_birth(asg.num_conflict);
             debug_assert_eq!(l0, c.lit0());
@@ -195,7 +195,7 @@ pub fn handle_conflict(
             );
             // || check_graph(asg, cdb, l0, "biclause");
             for cid in &state.derive20 {
-                cdb[cid].turn_on(FlagClause::DERIVE20);
+                c.turn_on(FlagClause::DERIVE20);
             }
             rank = 1;
             #[cfg(feature = "bi_clause_completion")]
@@ -203,7 +203,7 @@ pub fn handle_conflict(
         }
         RefClause::Clause(cid) => {
             let rcc = cdb[cid];
-            let c = rcc.borrow();
+            let mut c = rcc.borrow_mut();
             #[cfg(feature = "boundary_check")]
             c.set_birth(asg.num_conflict);
 
@@ -219,7 +219,7 @@ pub fn handle_conflict(
             rank = c.rank;
             if rank <= 20 {
                 for cid in &state.derive20 {
-                    cdb[cid].turn_on(FlagClause::DERIVE20);
+                    c.turn_on(FlagClause::DERIVE20);
                 }
             }
         }
