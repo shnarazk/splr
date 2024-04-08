@@ -229,13 +229,14 @@ impl EliminateIF for Eliminator {
         for w in &mut self[1..] {
             w.clear();
         }
-        for (cid, c) in &mut cdb.iter_mut().enumerate().skip(1) {
+        for (cid, rcc) in &mut cdb.iter().enumerate().skip(1) {
+            let mut c = rcc.borrow_mut();
             if c.is_dead() || c.is(FlagClause::OCCUR_LINKED) {
                 continue;
             }
             let vec = c.iter().copied().collect::<Vec<_>>();
             debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
-            self.add_cid_occur(asg, ClauseId::from(cid), c, false);
+            self.add_cid_occur(asg, ClauseId::from(cid), &mut c, false);
         }
         if force {
             for vi in 1..=asg.derefer(assign::property::Tusize::NumVar) {
@@ -401,7 +402,8 @@ impl Eliminator {
         self.clear_clause_queue(cdb);
         self.clear_var_queue(asg);
         if force {
-            for c in &mut cdb.iter_mut().skip(1) {
+            for rcc in &mut cdb.iter().skip(1) {
+                let mut c = rcc.borrow_mut();
                 c.turn_off(FlagClause::OCCUR_LINKED);
             }
             for w in &mut self[1..] {
@@ -439,7 +441,8 @@ impl Eliminator {
                     vi
                 } else {
                     let mut tmp = cdb.derefer(cdb::property::Tusize::NumClause);
-                    let c = &mut cdb[cid];
+                    let rcc = &mut cdb[cid];
+                    let mut c = rcc.borrow_mut();
                     c.turn_off(FlagClause::ENQUEUED);
                     if c.is_dead() || self.subsume_literal_limit < c.len() {
                         continue;
@@ -612,7 +615,9 @@ impl Eliminator {
     /// clear eliminator's clause queue.
     fn clear_clause_queue(&mut self, cdb: &mut impl ClauseDBIF) {
         for cid in &self.clause_queue {
-            cdb[*cid].turn_off(FlagClause::ENQUEUED);
+            let rcc = cdb[*cid];
+            let mut c = rcc.borrow_mut();
+            c.turn_off(FlagClause::ENQUEUED);
         }
         self.clause_queue.clear();
     }
@@ -654,7 +659,8 @@ fn check_eliminator(cdb: &impl ClauseDBIF, elim: &Eliminator) -> bool {
     //     }
     // }
     // all clauses are registered in corresponding occur_lists
-    for (cid, c) in cdb.iter().enumerate().skip(1) {
+    for (cid, rcc) in cdb.iter().enumerate().skip(1) {
+        let c = rcc.borrow();
         if c.is_dead() {
             continue;
         }

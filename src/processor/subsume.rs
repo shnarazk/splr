@@ -23,6 +23,8 @@ impl Eliminator {
         cid: ClauseId,
         did: ClauseId,
     ) -> MaybeInconsistent {
+        let rcc = cdb[cid];
+        let mut c = rcc.borrow_mut();
         match have_subsuming_lit(cdb, cid, did) {
             Subsumable::Success => {
                 #[cfg(feature = "trace_elimination")]
@@ -30,11 +32,13 @@ impl Eliminator {
                     "BackSubsC    => {} {} subsumed completely by {} {:#}",
                     did, cdb[did], cid, cdb[cid],
                 );
-                debug_assert!(!cdb[did].is_dead());
-                if !cdb[did].is(FlagClause::LEARNT) {
-                    cdb[cid].turn_off(FlagClause::LEARNT);
+                let rcd = cdb[did];
+                let mut d = rcd.borrow_mut();
+                debug_assert!(!d.is_dead());
+                if !d.is(FlagClause::LEARNT) {
+                    c.turn_off(FlagClause::LEARNT);
                 }
-                self.remove_cid_occur(asg, did, &mut cdb[did]);
+                self.remove_cid_occur(asg, did, &mut d);
                 cdb.remove_clause(did);
                 self.num_subsumed += 1;
             }
@@ -57,7 +61,8 @@ fn have_subsuming_lit(cdb: &mut impl ClauseDBIF, cid: ClauseId, other: ClauseId)
     debug_assert!(!other.is_lifted());
     if cid.is_lifted() {
         let l = cid.unlift();
-        let oh = &cdb[other];
+        let roh = &cdb[other];
+        let oh = roh.borrow();
         for lo in oh.iter() {
             if l == !*lo {
                 return Subsumable::By(l);
@@ -66,9 +71,11 @@ fn have_subsuming_lit(cdb: &mut impl ClauseDBIF, cid: ClauseId, other: ClauseId)
         return Subsumable::None;
     }
     // let mut ret: Subsumable = Subsumable::Success;
-    let ch = &cdb[cid];
+    let rch = cdb[cid];
+    let ch = rch.borrow();
     debug_assert!(1 < ch.len());
-    let ob = &cdb[other];
+    let rob = &cdb[other];
+    let ob = rob.borrow();
     debug_assert!(1 < ob.len());
     debug_assert!(ob.contains(ob[0]));
     debug_assert!(ob.contains(ob[1]));
@@ -96,25 +103,29 @@ fn strengthen_clause(
     cid: ClauseId,
     l: Lit,
 ) -> MaybeInconsistent {
-    debug_assert!(!cdb[cid].is_dead());
-    debug_assert!(1 < cdb[cid].len());
+    let rcc = cdb[cid];
+    let mut c = rcc.borrow_mut();
+    debug_assert!(!c.is_dead());
+    debug_assert!(1 < c.len());
     match cdb.transform_by_elimination(cid, l) {
         RefClause::Clause(_ci) => {
             #[cfg(feature = "trace_elimination")]
             println!("cid {} drops literal {}", cid, l);
 
-            elim.enqueue_clause(cid, &mut cdb[cid]);
+            elim.enqueue_clause(cid, &mut c);
             elim.remove_lit_occur(asg, l, cid);
             Ok(())
         }
         RefClause::RegisteredClause(_) => {
-            elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
+            elim.remove_cid_occur(asg, cid, &mut c);
             cdb.remove_clause(cid);
             Ok(())
         }
         RefClause::UnitClause(l0) => {
             cdb.certificate_add_assertion(l0);
-            elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
+            let rcc = cdb[cid];
+            let mut c = rcc.borrow_mut();
+            elim.remove_cid_occur(asg, cid, &mut c);
             cdb.remove_clause(cid);
             match asg.assigned(l0) {
                 None => asg.assign_at_root_level(l0),
