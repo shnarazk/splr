@@ -441,7 +441,7 @@ impl Eliminator {
                     vi
                 } else {
                     let mut tmp = cdb.derefer(cdb::property::Tusize::NumClause);
-                    let rcc = &mut cdb[cid];
+                    let rcc = &cdb[cid];
                     let mut c = rcc.borrow_mut();
                     c.turn_off(FlagClause::ENQUEUED);
                     if c.is_dead() || self.subsume_literal_limit < c.len() {
@@ -473,12 +473,12 @@ impl Eliminator {
                     continue;
                 }
                 self[best].pos_occurs.retain(|cid| {
-                    let rcc = cdb[*cid];
+                    let rcc = &cdb[*cid];
                     let c = rcc.borrow();
                     !c.is_dead()
                 });
                 self[best].neg_occurs.retain(|cid| {
-                    let rcc = cdb[*cid];
+                    let rcc = &cdb[*cid];
                     let c = rcc.borrow();
                     !c.is_dead()
                 });
@@ -487,7 +487,7 @@ impl Eliminator {
                         if *did == cid {
                             continue;
                         }
-                        let rcd = cdb[*did];
+                        let rcd = &cdb[*did];
                         let d = rcd.borrow();
                         if d.len() <= *timedout {
                             *timedout -= d.len();
@@ -500,17 +500,18 @@ impl Eliminator {
                                 d.contains(Lit::from((best, false)))
                                     || d.contains(Lit::from((best, true)))
                             );
+                            drop(d);
                             self.try_subsume(asg, cdb, cid, *did)?;
                         }
                     }
                 }
                 self[best].pos_occurs.retain(|cid| {
-                    let rcc = cdb[*cid];
+                    let rcc = &cdb[*cid];
                     let c = rcc.borrow();
                     !c.is_dead()
                 });
                 self[best].neg_occurs.retain(|cid| {
-                    let rcc = cdb[*cid];
+                    let rcc = &cdb[*cid];
                     let c = rcc.borrow();
                     !c.is_dead()
                 });
@@ -632,7 +633,7 @@ impl Eliminator {
     /// clear eliminator's clause queue.
     fn clear_clause_queue(&mut self, cdb: &mut impl ClauseDBIF) {
         for cid in &self.clause_queue {
-            let rcc = cdb[*cid];
+            let rcc = &cdb[*cid];
             let mut c = rcc.borrow_mut();
             c.turn_off(FlagClause::ENQUEUED);
         }

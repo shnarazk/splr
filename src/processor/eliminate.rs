@@ -25,13 +25,13 @@ pub fn eliminate_var(
     // Note: it may contain the target literal somehow. So the following may be failed.
     // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, true)))));
     w.pos_occurs.retain(|&cid| {
-        let rcc = cdb[cid];
+        let rcc = &cdb[cid];
         let c = rcc.borrow();
         c.contains(Lit::from((vi, true)))
     });
     // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, false)))));
     w.neg_occurs.retain(|&cid| {
-        let rcc = cdb[cid];
+        let rcc = &cdb[cid];
         let c = rcc.borrow();
         c.contains(Lit::from((vi, false)))
     });
@@ -62,11 +62,11 @@ pub fn eliminate_var(
     // println!("eliminate_var {}: |p|: {} and |n|: {}", vi, (*pos).len(), (*neg).len());
     // Produce clauses in cross product:
     for pid in pos.iter() {
-        let rcp = cdb[*pid];
+        let rcp = &cdb[*pid];
         let p = rcp.borrow();
         let learnt_p = p.is(FlagClause::LEARNT);
         for nid in neg.iter() {
-            let rcn = cdb[*nid];
+            let rcn = &cdb[*nid];
             let n = rcn.borrow();
             match merge(asg, cdb, &*p, &*n, vi, vec) {
                 0 => {
@@ -126,17 +126,17 @@ pub fn eliminate_var(
     //## VAR ELIMINATION
     //
     debug_assert!(pos.iter().all(|cid| {
-        let rcc = cdb[*cid];
+        let rcc = &cdb[*cid];
         let c = rcc.borrow();
         !c.is_dead()
     }));
     debug_assert!(neg.iter().all(|cid| {
-        let rcc = cdb[*cid];
+        let rcc = &cdb[*cid];
         let c = rcc.borrow();
         !c.is_dead()
     }));
     for cid in pos.iter() {
-        let rcc = cdb[*cid];
+        let rcc = &cdb[*cid];
         let mut c = rcc.borrow_mut();
         if c.is_dead() {
             continue;
@@ -151,7 +151,7 @@ pub fn eliminate_var(
         cdb.remove_clause(*cid);
     }
     for cid in neg.iter() {
-        let crn = cdb[*cid];
+        let crn = &cdb[*cid];
         let mut c = crn.borrow_mut();
         if c.is_dead() {
             continue;
@@ -220,9 +220,9 @@ fn merge_cost(
     cq: ClauseId,
     vi: VarId,
 ) -> Option<usize> {
-    let rcp = cdb[cp];
+    let rcp = &cdb[cp];
     let c_p = rcp.borrow();
-    let rcq = cdb[cq];
+    let rcq = &cdb[cq];
     let c_q = rcq.borrow();
     let mut cond: Option<Lit> = None;
     let mut cond2: Option<Lit> = None;
@@ -312,18 +312,12 @@ fn make_eliminated_clauses(
 ) {
     if neg.len() < pos.len() {
         for cid in neg {
-            let rcc = cdb[*cid];
-            let c = rcc.borrow();
-            debug_assert!(!c.is_dead());
-            make_eliminated_clause(cdb, store, v, &*c);
+            make_eliminated_clause(cdb, store, v, *cid);
         }
         make_eliminating_unit_clause(store, Lit::from((v, true)));
     } else {
         for cid in pos {
-            let rcc = cdb[*cid];
-            let c = rcc.borrow();
-            debug_assert!(!c.is_dead());
-            make_eliminated_clause(cdb, store, v, &*c);
+            make_eliminated_clause(cdb, store, v, *cid);
         }
         make_eliminating_unit_clause(store, Lit::from((v, false)));
     }
@@ -336,7 +330,15 @@ fn make_eliminating_unit_clause(store: &mut Vec<Lit>, x: Lit) {
     store.push(Lit::from(1usize));
 }
 
-fn make_eliminated_clause(cdb: &mut impl ClauseDBIF, store: &mut Vec<Lit>, vi: VarId, c: &Clause) {
+fn make_eliminated_clause(
+    cdb: &mut impl ClauseDBIF,
+    store: &mut Vec<Lit>,
+    vi: VarId,
+    cid: ClauseId,
+) {
+    let rcc = &cdb[cid];
+    let c = rcc.borrow();
+    debug_assert!(!c.is_dead());
     let first = store.len();
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:
     debug_assert!(!c.is_empty());

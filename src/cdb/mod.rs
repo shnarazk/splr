@@ -34,11 +34,10 @@ pub use self::{
 use {
     self::ema::ProgressLBD,
     crate::{assign::AssignIF, types::*},
-    std::{num::NonZeroU32, slice::Iter},
+    std::{cell::RefCell, num::NonZeroU32, ops::Index, slice::Iter},
     watch_cache::*,
 };
 
-use std::cell::RefCell;
 #[cfg(not(feature = "no_IO"))]
 use std::path::Path;
 
@@ -71,7 +70,7 @@ pub trait ClauseIF {
 /// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`remove_clause`](`crate::cdb::ClauseDBIF::remove_clause`), and so on.
 pub trait ClauseDBIF:
     Instantiate
-    // + IndexMut<ClauseId, Output = RefCell<Clause>>
+    + Index<ClauseId, Output = RefCell<Clause>>
     + PropertyDereference<property::Tusize, usize>
     + PropertyDereference<property::Tf64, f64>
 {

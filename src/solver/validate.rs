@@ -67,7 +67,7 @@ impl ValidateIF for Solver {
         self.cdb
             .validate(&self.asg.assign_ref().collect::<Vec<_>>(), true)
             .map(|cid| {
-                let rcc = self.cdb[cid];
+                let rcc = &self.cdb[cid];
                 let c = rcc.borrow();
                 Vec::<i32>::from(&*c)
             })
