@@ -1351,7 +1351,7 @@ fn remove_clause_fn(
     cr: &mut ClauseRef,
 ) -> ClauseId {
     let rcc = cr.get();
-    let c = rcc.borrow();
+    let mut c = rcc.borrow_mut();
     debug_assert!(!c.is_dead());
     let l0 = c.lits[0];
     let l1 = c.lits[1];
@@ -1370,7 +1370,7 @@ fn remove_clause_fn(
     *num_clause -= 1;
     certification_store.delete_clause(&c.lits);
     // c.lits.clear();
-    c.set_dead(true);
+    c.turn_on(FlagClause::DEAD);
     cid
 }
 

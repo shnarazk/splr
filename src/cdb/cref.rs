@@ -5,7 +5,6 @@ use {
 
 #[derive(Clone)]
 pub struct ClauseRef {
-    dead: bool,
     c: Rc<RefCell<Clause>>,
 }
 
@@ -39,16 +38,11 @@ pub trait ClauseRefIF {
     fn new(c: Clause) -> Self;
     /// return shared reference
     fn get(&self) -> &RefCell<Clause>;
-    // return true if the clause, or clauseId is not used now
-    fn is_dead(&self) -> bool;
-    // set dead flag
-    fn set_dead(&mut self, dead: bool) -> &mut Self;
 }
 
 impl ClauseRefIF for ClauseRef {
     fn new(c: Clause) -> Self {
         ClauseRef {
-            dead: false,
             c: Rc::new(RefCell::new(c)),
         }
     }
