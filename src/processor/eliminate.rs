@@ -102,7 +102,7 @@ pub fn eliminate_var(
                     debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
                     match cdb.new_clause(asg, vec, learnt_p && n.is(FlagClause::LEARNT)) {
                         RefClause::Clause(ci) => {
-                            let rcc = cdb[ci];
+                            let rcc = &cdb[ci];
                             let mut c = rcc.borrow_mut();
                             // the merged clause might be a duplicated clause.
                             elim.add_cid_occur(asg, ci, &mut c, true);

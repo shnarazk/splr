@@ -49,7 +49,7 @@ impl VivifyIF for ClauseDB {
             debug_assert!(asg.stack_is_empty() || !asg.remains());
             debug_assert_eq!(asg.root_level(), asg.decision_level());
             let cid = cp.to();
-            let rcc = self[cid];
+            let rcc = &self[cid];
             let mut c = rcc.borrow_mut();
             // let c = &mut self[cid];
             if c.is_dead() {
@@ -106,7 +106,7 @@ impl VivifyIF for ClauseDB {
                                         asg.backtrack_sandbox();
                                         continue 'next_clause;
                                     } else {
-                                        let rci = self[ci];
+                                        let rci = &self[ci];
                                         let cic = rci.borrow();
                                         let cnfl_lits = cic.iter().copied().collect::<Vec<Lit>>();
                                         seen[0] = num_check;
@@ -284,7 +284,7 @@ impl AssignStack {
                     seen[bil.vi()] = key;
                 }
                 AssignReason::Implication(cid) => {
-                    let rcc = cdb[cid];
+                    let rcc = &cdb[cid];
                     let c = rcc.borrow();
                     for r in c.iter().skip(1) {
                         seen[r.vi()] = key;
