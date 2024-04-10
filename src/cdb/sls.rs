@@ -1,7 +1,8 @@
 /// Implementation of Stochastic Local Search
 use {
+    super::ClauseRefIF,
     crate::{assign::AssignIF, types::*},
-    std::collections::HashMap,
+    std::{cell::Ref, collections::HashMap},
 };
 
 pub trait StochasticLocalSearchIF {
@@ -32,8 +33,14 @@ impl StochasticLocalSearchIF for ClauseDB {
             // let mut level: DecisionLevel = 0;
             // CONSIDER: counting only given (permanent) clauses.
             let mut flip_target: HashMap<VarId, usize> = HashMap::new();
-            let mut target_clause: Option<&Clause> = None;
-            for c in self.clause.iter().skip(1).filter(|c| !c.is_dead()) {
+            let mut target_clause: Option<Ref<Clause>> = None;
+            for cr in self.clause.iter().skip(1).filter(|cr| {
+                let rcc = cr.get();
+                let c = rcc.borrow();
+                !c.is_dead()
+            }) {
+                let rcc = cr.get();
+                let c = rcc.borrow();
                 // let mut cls_lvl: DecisionLevel = 0;
                 if c.is_falsified(assignment, &mut flip_target) {
                     unsat_clauses += 1;
@@ -42,10 +49,10 @@ impl StochasticLocalSearchIF for ClauseDB {
                     // }
                     // level = level.max(cls_lvl);
                     if target_clause.is_none() || unsat_clauses == step {
-                        target_clause = Some(c);
                         for l in c.lits.iter() {
                             flip_target.entry(l.vi()).or_insert(0);
                         }
+                        target_clause = Some(c);
                     }
                 }
             }

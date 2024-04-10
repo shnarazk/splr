@@ -2,7 +2,7 @@
 /// some common traits.
 pub use crate::{
     assign::AssignReason,
-    cdb::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
+    cdb::{Clause, ClauseDB, ClauseIF, ClauseId, LiftedClauseIdIF},
     config::Config,
     primitive::{ema::*, luby::*},
     solver::SolverEvent,
@@ -172,23 +172,19 @@ impl From<u32> for Lit {
     }
 }
 
+impl From<NonZeroU32> for Lit {
+    #[inline]
+    fn from(l: NonZeroU32) -> Self {
+        Lit { ordinal: l }
+    }
+}
+
 impl From<i32> for Lit {
     #[inline]
     fn from(x: i32) -> Self {
         Lit {
             ordinal: unsafe {
                 NonZeroU32::new_unchecked((if x < 0 { -2 * x } else { 2 * x + 1 }) as u32)
-            },
-        }
-    }
-}
-
-impl From<ClauseId> for Lit {
-    #[inline]
-    fn from(cid: ClauseId) -> Self {
-        Lit {
-            ordinal: unsafe {
-                NonZeroU32::new_unchecked(NonZeroU32::get(cid.ordinal) & 0x7FFF_FFFF)
             },
         }
     }
@@ -203,19 +199,17 @@ impl From<Lit> for bool {
     }
 }
 
-impl From<Lit> for ClauseId {
-    #[inline]
-    fn from(l: Lit) -> ClauseId {
-        ClauseId {
-            ordinal: unsafe { NonZeroU32::new_unchecked(NonZeroU32::get(l.ordinal) | 0x8000_0000) },
-        }
-    }
-}
-
 impl From<Lit> for usize {
     #[inline]
     fn from(l: Lit) -> usize {
         NonZeroU32::get(l.ordinal) as usize
+    }
+}
+
+impl From<&Lit> for NonZeroU32 {
+    #[inline]
+    fn from(l: &Lit) -> NonZeroU32 {
+        l.ordinal
     }
 }
 
@@ -567,16 +561,18 @@ bitflags! {
     /// Misc flags used by [`Clause`](`crate::cdb::Clause`).
     #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
     pub struct FlagClause: u8 {
+        /// a clause is dead
+        const DEAD         = 0b0000_0001;
         /// a clause is a generated clause by conflict analysis and is removable.
-        const LEARNT       = 0b0000_0001;
+        const LEARNT       = 0b0000_0010;
         /// used in conflict analyze
-        const USED         = 0b0000_0010;
+        const USED         = 0b0000_0100;
         /// a clause or var is enqueued for eliminator.
-        const ENQUEUED     = 0b0000_0100;
+        const ENQUEUED     = 0b0000_1000;
         /// a clause is registered in vars' occurrence list.
-        const OCCUR_LINKED = 0b0000_1000;
+        const OCCUR_LINKED = 0b0001_0000;
         /// a given clause derived a learnt which LBD is smaller than 20.
-        const DERIVE20     = 0b0001_0000;
+        const DERIVE20     = 0b0010_0000;
     }
 }
 

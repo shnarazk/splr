@@ -6,6 +6,8 @@ mod binary;
 mod cid;
 /// methods on `Clause`
 mod clause;
+/// methods on `ClauseRef`
+mod cref;
 /// methods on `ClauseDB`
 mod db;
 /// EMA
@@ -21,7 +23,8 @@ mod watch_cache;
 
 pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
-    cid::ClauseIdIF,
+    cid::LiftedClauseIdIF,
+    cref::*,
     property::*,
     sls::StochasticLocalSearchIF,
     unsat_certificate::CertificationStore,
@@ -31,11 +34,7 @@ pub use self::{
 use {
     self::ema::ProgressLBD,
     crate::{assign::AssignIF, types::*},
-    std::{
-        num::NonZeroU32,
-        ops::IndexMut,
-        slice::{Iter, IterMut},
-    },
+    std::{cell::RefCell, num::NonZeroU32, ops::Index, slice::Iter},
     watch_cache::*,
 };
 
@@ -71,7 +70,7 @@ pub trait ClauseIF {
 /// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`remove_clause`](`crate::cdb::ClauseDBIF::remove_clause`), and so on.
 pub trait ClauseDBIF:
     Instantiate
-    + IndexMut<ClauseId, Output = Clause>
+    + Index<ClauseId, Output = RefCell<Clause>>
     + PropertyDereference<property::Tusize, usize>
     + PropertyDereference<property::Tf64, f64>
 {
@@ -80,9 +79,9 @@ pub trait ClauseDBIF:
     /// return true if it's empty.
     fn is_empty(&self) -> bool;
     /// return an iterator.
-    fn iter(&self) -> Iter<'_, Clause>;
-    /// return a mutable iterator.
-    fn iter_mut(&mut self) -> IterMut<'_, Clause>;
+    fn iter(&self) -> impl Iterator<Item = &RefCell<Clause>>;
+    // /// return a mutable iterator.
+    // fn iter_mut(&mut self) -> impl Iterator<Item = &mut ClauseRef>;
 
     //
     //## interface to binary links
@@ -229,7 +228,7 @@ pub struct Clause {
 #[derive(Clone, Debug)]
 pub struct ClauseDB {
     /// container of clauses
-    clause: Vec<Clause>,
+    clause: Vec<ClauseRef>,
     /// hashed representation of binary clauses.
     ///## Note
     /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
@@ -266,8 +265,6 @@ pub struct ClauseDB {
     //
     //## LBD
     //
-    /// a working buffer for LBD calculation
-    lbd_temp: Vec<usize>,
     lbd: ProgressLBD,
 
     //
@@ -415,7 +412,8 @@ mod tests {
 
     #[allow(dead_code)]
     fn check_watches(cdb: &ClauseDB, cid: ClauseId) {
-        let c = &cdb.clause[NonZeroU32::get(cid.ordinal) as usize];
+        let cr = cdb.clause[NonZeroU32::get(cid.ordinal) as usize].get();
+        let c = cr.borrow();
         if c.lits.is_empty() {
             println!("skip checking watches of an empty clause");
             return;
@@ -447,7 +445,8 @@ mod tests {
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
-        let c = &cdb[c1];
+        let rcc = &cdb[c1];
+        let c = rcc.borrow();
 
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
@@ -456,7 +455,9 @@ mod tests {
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
             .as_cid();
-        let c = &cdb[c2];
+        let rcc = &cdb[c2];
+        let c = rcc.borrow();
+
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
@@ -495,8 +496,10 @@ mod tests {
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
-        assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
-        let mut iter = cdb[c1][0..].iter();
+        let rcc = cdb[c1];
+        let c = rcc.borrow();
+        assert_eq!(c[0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
+        let mut iter = c[0..].iter();
         assert_eq!(iter.next(), Some(&lit(1)));
         assert_eq!(iter.next(), Some(&lit(2)));
         assert_eq!(iter.next(), Some(&lit(3)));

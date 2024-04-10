@@ -6,7 +6,7 @@ use {
     },
     crate::{
         assign::{self, AssignIF},
-        cdb::{self, ClauseDBIF},
+        cdb::{self, ClauseDBIF, LiftedClauseIdIF},
         state::{self, State, StateIF},
         types::*,
     },
@@ -229,13 +229,14 @@ impl EliminateIF for Eliminator {
         for w in &mut self[1..] {
             w.clear();
         }
-        for (cid, c) in &mut cdb.iter_mut().enumerate().skip(1) {
+        for (cid, rcc) in &mut cdb.iter().enumerate().skip(1) {
+            let mut c = rcc.borrow_mut();
             if c.is_dead() || c.is(FlagClause::OCCUR_LINKED) {
                 continue;
             }
             let vec = c.iter().copied().collect::<Vec<_>>();
             debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
-            self.add_cid_occur(asg, ClauseId::from(cid), c, false);
+            self.add_cid_occur(asg, ClauseId::from(cid), &mut c, false);
         }
         if force {
             for vi in 1..=asg.derefer(assign::property::Tusize::NumVar) {
@@ -382,7 +383,7 @@ impl Eliminator {
     /// remove a clause id from all corresponding occur lists.
     pub fn remove_cid_occur(&mut self, asg: &mut impl AssignIF, cid: ClauseId, c: &mut Clause) {
         debug_assert!(self.mode == EliminatorMode::Running);
-        debug_assert!(!cid.is_lifted_lit());
+        debug_assert!(!cid.is_lifted());
         debug_assert!(!c.is_dead());
         c.turn_off(FlagClause::OCCUR_LINKED);
         for l in c.iter() {
@@ -401,7 +402,8 @@ impl Eliminator {
         self.clear_clause_queue(cdb);
         self.clear_var_queue(asg);
         if force {
-            for c in &mut cdb.iter_mut().skip(1) {
+            for rcc in &mut cdb.iter().skip(1) {
+                let mut c = rcc.borrow_mut();
                 c.turn_off(FlagClause::OCCUR_LINKED);
             }
             for w in &mut self[1..] {
@@ -423,7 +425,7 @@ impl Eliminator {
             // Check top-level assignments by creating a dummy clause
             // and placing it in the queue:
             if self.clause_queue.is_empty() && self.bwdsub_assigns < asg.stack_len() {
-                let c = ClauseId::from(asg.stack(self.bwdsub_assigns));
+                let c = ClauseId::lift(&asg.stack(self.bwdsub_assigns));
                 self.clause_queue.push(c);
                 self.bwdsub_assigns += 1;
             }
@@ -433,13 +435,14 @@ impl Eliminator {
                     self.clear_var_queue(asg);
                     return Ok(());
                 }
-                let best: VarId = if cid.is_lifted_lit() {
-                    let vi = Lit::from(cid).vi();
+                let best: VarId = if cid.is_lifted() {
+                    let vi = cid.unlift().vi();
                     debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
                     vi
                 } else {
                     let mut tmp = cdb.derefer(cdb::property::Tusize::NumClause);
-                    let c = &mut cdb[cid];
+                    let rcc = &cdb[cid];
+                    let mut c = rcc.borrow_mut();
                     c.turn_off(FlagClause::ENQUEUED);
                     if c.is_dead() || self.subsume_literal_limit < c.len() {
                         continue;
@@ -469,14 +472,23 @@ impl Eliminator {
                 if best == 0 || asg.var(best).is(FlagVar::ELIMINATED) {
                     continue;
                 }
-                self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
-                self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
+                self[best].pos_occurs.retain(|cid| {
+                    let rcc = &cdb[*cid];
+                    let c = rcc.borrow();
+                    !c.is_dead()
+                });
+                self[best].neg_occurs.retain(|cid| {
+                    let rcc = &cdb[*cid];
+                    let c = rcc.borrow();
+                    !c.is_dead()
+                });
                 for cls in [self[best].pos_occurs.clone(), self[best].neg_occurs.clone()].iter() {
                     for did in cls.iter() {
                         if *did == cid {
                             continue;
                         }
-                        let d = &cdb[*did];
+                        let rcd = &cdb[*did];
+                        let d = rcd.borrow();
                         if d.len() <= *timedout {
                             *timedout -= d.len();
                         } else {
@@ -488,12 +500,21 @@ impl Eliminator {
                                 d.contains(Lit::from((best, false)))
                                     || d.contains(Lit::from((best, true)))
                             );
+                            drop(d);
                             self.try_subsume(asg, cdb, cid, *did)?;
                         }
                     }
                 }
-                self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
-                self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
+                self[best].pos_occurs.retain(|cid| {
+                    let rcc = &cdb[*cid];
+                    let c = rcc.borrow();
+                    !c.is_dead()
+                });
+                self[best].neg_occurs.retain(|cid| {
+                    let rcc = &cdb[*cid];
+                    let c = rcc.borrow();
+                    !c.is_dead()
+                });
             }
         }
         if asg.remains() {
@@ -612,7 +633,9 @@ impl Eliminator {
     /// clear eliminator's clause queue.
     fn clear_clause_queue(&mut self, cdb: &mut impl ClauseDBIF) {
         for cid in &self.clause_queue {
-            cdb[*cid].turn_off(FlagClause::ENQUEUED);
+            let rcc = &cdb[*cid];
+            let mut c = rcc.borrow_mut();
+            c.turn_off(FlagClause::ENQUEUED);
         }
         self.clause_queue.clear();
     }
@@ -654,7 +677,8 @@ fn check_eliminator(cdb: &impl ClauseDBIF, elim: &Eliminator) -> bool {
     //     }
     // }
     // all clauses are registered in corresponding occur_lists
-    for (cid, c) in cdb.iter().enumerate().skip(1) {
+    for (cid, rcc) in cdb.iter().enumerate().skip(1) {
+        let c = rcc.borrow();
         if c.is_dead() {
             continue;
         }

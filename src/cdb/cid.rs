@@ -1,13 +1,7 @@
 use {
-    super::ClauseId,
+    super::{ClauseId, Lit},
     std::{fmt, num::NonZeroU32},
 };
-
-/// API for Clause Id.
-pub trait ClauseIdIF {
-    /// return `true` if a given clause id is made from a `Lit`.
-    fn is_lifted_lit(&self) -> bool;
-}
 
 impl Default for ClauseId {
     #[inline]
@@ -47,9 +41,24 @@ impl fmt::Display for ClauseId {
     }
 }
 
-impl ClauseIdIF for ClauseId {
+pub trait LiftedClauseIdIF {
     /// return `true` if the clause is generated from a literal by Eliminator.
-    fn is_lifted_lit(&self) -> bool {
+    fn is_lifted(&self) -> bool;
+    fn lift(lit: &Lit) -> Self;
+    fn unlift(&self) -> Lit;
+}
+
+impl LiftedClauseIdIF for ClauseId {
+    /// return `true` if the clause is generated from a literal by Eliminator.
+    fn is_lifted(&self) -> bool {
         0 != 0x8000_0000 & NonZeroU32::get(self.ordinal)
+    }
+    fn lift(l: &Lit) -> Self {
+        ClauseId {
+            ordinal: NonZeroU32::from(l) | 0x8000_0000,
+        }
+    }
+    fn unlift(&self) -> Lit {
+        Lit::from(unsafe { NonZeroU32::new_unchecked(NonZeroU32::get(self.ordinal) & 0x7FFF_FFFF) })
     }
 }
