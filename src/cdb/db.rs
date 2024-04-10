@@ -394,7 +394,6 @@ impl ClauseDBIF for ClauseDB {
             c.flags = FlagClause::empty();
             std::mem::swap(&mut c.lits, vec);
             c.search_from = 2;
-            drop(rcc);
             drop(c);
             (cid_used, cr)
         } else {

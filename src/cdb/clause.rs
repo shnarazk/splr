@@ -261,6 +261,6 @@ impl Clause {
         //     }
         // }
         self.rank = cnt as u16;
-        cnt as usize
+        cnt
     }
 }

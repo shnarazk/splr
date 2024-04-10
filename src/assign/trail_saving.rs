@@ -84,7 +84,7 @@ impl TrailSavingIF for AssignStack {
                 //     return self.truncate_trail_saved(i + 1);
                 // }
                 (None, AssignReason::Implication(cid)) => {
-                    let rcc = cdb[cid];
+                    let rcc = &cdb[cid];
                     let c = rcc.borrow();
                     if q < c.rank {
                         self.insert_heap(vi);
@@ -110,7 +110,7 @@ impl TrailSavingIF for AssignStack {
                     return Err((lit, old_reason));
                 }
                 (Some(false), AssignReason::Implication(cid)) => {
-                    let rcc = cdb[cid];
+                    let rcc = &cdb[cid];
                     let c = rcc.borrow();
                     debug_assert!(c.iter().all(|l| self.assigned(*l) == Some(false)));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.

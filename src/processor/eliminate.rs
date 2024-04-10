@@ -68,7 +68,7 @@ pub fn eliminate_var(
         for nid in neg.iter() {
             let rcn = cdb[*nid].clone();
             let n = rcn.borrow();
-            match merge(asg, cdb, &*p, &*n, vi, vec) {
+            match merge(asg, cdb, &p, &n, vi, vec) {
                 0 => {
                     #[cfg(feature = "trace_elimination")]
                     println!(
