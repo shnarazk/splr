@@ -265,8 +265,6 @@ pub struct ClauseDB {
     //
     //## LBD
     //
-    /// a working buffer for LBD calculation
-    lbd_temp: Vec<usize>,
     lbd: ProgressLBD,
 
     //

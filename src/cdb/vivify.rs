@@ -49,7 +49,7 @@ impl VivifyIF for ClauseDB {
             debug_assert!(asg.stack_is_empty() || !asg.remains());
             debug_assert_eq!(asg.root_level(), asg.decision_level());
             let cid = cp.to();
-            let rcc = &self[cid];
+            let rcc = self[cid].clone();
             let mut c = rcc.borrow_mut();
             // let c = &mut self[cid];
             if c.is_dead() {

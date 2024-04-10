@@ -49,13 +49,6 @@ impl ClauseRefIF for ClauseRef {
     fn get(&self) -> &RefCell<Clause> {
         Borrow::<RefCell<Clause>>::borrow(&self.c)
     }
-    fn is_dead(&self) -> bool {
-        self.dead
-    }
-    fn set_dead(&mut self, dead: bool) -> &mut Self {
-        self.dead = dead;
-        self
-    }
 }
 
 impl fmt::Debug for ClauseRef {

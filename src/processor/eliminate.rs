@@ -62,11 +62,11 @@ pub fn eliminate_var(
     // println!("eliminate_var {}: |p|: {} and |n|: {}", vi, (*pos).len(), (*neg).len());
     // Produce clauses in cross product:
     for pid in pos.iter() {
-        let rcp = &cdb[*pid];
+        let rcp = cdb[*pid].clone();
         let p = rcp.borrow();
         let learnt_p = p.is(FlagClause::LEARNT);
         for nid in neg.iter() {
-            let rcn = &cdb[*nid];
+            let rcn = cdb[*nid].clone();
             let n = rcn.borrow();
             match merge(asg, cdb, &*p, &*n, vi, vec) {
                 0 => {
@@ -148,6 +148,7 @@ pub fn eliminate_var(
             }
         }
         elim.remove_cid_occur(asg, *cid, &mut c);
+        drop(c);
         cdb.remove_clause(*cid);
     }
     for cid in neg.iter() {
@@ -163,6 +164,7 @@ pub fn eliminate_var(
             }
         }
         elim.remove_cid_occur(asg, *cid, &mut c);
+        drop(c);
         cdb.remove_clause(*cid);
     }
     elim[vi].clear();
@@ -264,7 +266,7 @@ fn merge_cost(
 /// Return **zero** if one of the clauses is always satisfied. (merge_vec should not be used.)
 fn merge(
     asg: &mut impl AssignIF,
-    cdb: &mut impl ClauseDBIF,
+    _cdb: &mut impl ClauseDBIF,
     // cip: ClauseId,
     // ciq: ClauseId,
     pqb: &Clause,
