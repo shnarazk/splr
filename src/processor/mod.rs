@@ -146,7 +146,6 @@ mod tests {
         assert_eq!(
             0,
             cdb.iter()
-                .skip(1)
                 .filter(|c| !c.is_dead())
                 .filter(|c| c.iter().any(|l| elim_vars.contains(&l.vi())))
                 .count()

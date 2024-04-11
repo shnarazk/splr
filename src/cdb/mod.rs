@@ -32,9 +32,13 @@ use {
     self::ema::ProgressLBD,
     crate::{assign::AssignIF, types::*},
     std::{
+        collections::{
+            hash_map::{Iter as HashIter, IterMut as HashIterMut},
+            HashMap,
+        },
         num::NonZeroU32,
         ops::IndexMut,
-        slice::{Iter, IterMut},
+        slice::Iter as SliceIter,
     },
     watch_cache::*,
 };
@@ -44,8 +48,6 @@ use std::path::Path;
 
 /// API for Clause, providing literal accessors.
 pub trait ClauseIF {
-    /// return true if it contains no literals; a clause after unit propagation.
-    fn is_empty(&self) -> bool;
     /// return true if it contains no literals; a clause after unit propagation.
     fn is_dead(&self) -> bool;
     /// return 1st watch
@@ -57,7 +59,7 @@ pub trait ClauseIF {
     /// check clause satisfiability
     fn is_satisfied_under(&self, asg: &impl AssignIF) -> bool;
     /// return an iterator over its literals.
-    fn iter(&self) -> Iter<'_, Lit>;
+    fn iter(&self) -> SliceIter<'_, Lit>;
     /// return the number of literals.
     fn len(&self) -> usize;
 
@@ -75,14 +77,18 @@ pub trait ClauseDBIF:
     + PropertyDereference<property::Tusize, usize>
     + PropertyDereference<property::Tf64, f64>
 {
+    //n return Option<&Clause>
+    fn clause(&self, cid: &ClauseId) -> Option<&Clause>;
+    //n return Option<&mut Clause>
+    fn clause_mut(&mut self, cid: &ClauseId) -> Option<&mut Clause>;
     /// return the length of `clause`.
     fn len(&self) -> usize;
     /// return true if it's empty.
     fn is_empty(&self) -> bool;
     /// return an iterator.
-    fn iter(&self) -> Iter<'_, Clause>;
+    fn iter(&self) -> HashIter<'_, ClauseId, Clause>;
     /// return a mutable iterator.
-    fn iter_mut(&mut self) -> IterMut<'_, Clause>;
+    fn iter_mut(&mut self) -> HashIterMut<'_, ClauseId, Clause>;
 
     //
     //## interface to binary links
@@ -228,8 +234,10 @@ pub struct Clause {
 ///```
 #[derive(Clone, Debug)]
 pub struct ClauseDB {
+    /// clause factory
+    next_cid: usize,
     /// container of clauses
-    clause: Vec<Clause>,
+    clause: HashMap<ClauseId, Clause>,
     /// hashed representation of binary clauses.
     ///## Note
     /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
@@ -237,8 +245,6 @@ pub struct ClauseDB {
     binary_link: BinaryLinkDB,
     /// container of watch literals
     watch_cache: Vec<WatchCache>,
-    /// collected free clause ids.
-    freelist: Vec<ClauseId>,
     /// see unsat_certificate.rs
     certification_store: CertificationStore,
     /// a number of clauses to emit out-of-memory exception
@@ -415,7 +421,7 @@ mod tests {
 
     #[allow(dead_code)]
     fn check_watches(cdb: &ClauseDB, cid: ClauseId) {
-        let c = &cdb.clause[NonZeroU32::get(cid.ordinal) as usize];
+        let c = &cdb.clause[&cid];
         if c.lits.is_empty() {
             println!("skip checking watches of an empty clause");
             return;

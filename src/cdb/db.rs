@@ -9,9 +9,11 @@ use {
     },
     crate::{assign::AssignIF, types::*},
     std::{
-        num::NonZeroU32,
-        ops::{Index, IndexMut, Range, RangeFrom},
-        slice::{Iter, IterMut},
+        collections::{
+            hash_map::{Iter as HashIter, IterMut as HashIterMut},
+            HashMap,
+        },
+        ops::{Index, IndexMut},
     },
 };
 
@@ -21,10 +23,10 @@ use std::{fs::File, io::Write, path::Path};
 impl Default for ClauseDB {
     fn default() -> ClauseDB {
         ClauseDB {
-            clause: Vec::new(),
+            next_cid: 0,
+            clause: HashMap::new(),
             binary_link: BinaryLinkDB::default(),
             watch_cache: Vec::new(),
-            freelist: Vec::new(),
             certification_store: CertificationStore::default(),
             soft_limit: 0, // 248_000_000
             co_lbd_bound: 4,
@@ -59,26 +61,14 @@ impl Index<ClauseId> for ClauseDB {
     type Output = Clause;
     #[inline]
     fn index(&self, cid: ClauseId) -> &Clause {
-        let i = NonZeroU32::get(cid.ordinal) as usize;
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.clause.get_unchecked(i)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self.clause[i]
+        &self.clause[&cid]
     }
 }
 
 impl IndexMut<ClauseId> for ClauseDB {
     #[inline]
     fn index_mut(&mut self, cid: ClauseId) -> &mut Clause {
-        let i = NonZeroU32::get(cid.ordinal) as usize;
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.clause.get_unchecked_mut(i)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self.clause[i]
+        self.clause.get_mut(&cid).unwrap()
     }
 }
 
@@ -86,91 +76,27 @@ impl Index<&ClauseId> for ClauseDB {
     type Output = Clause;
     #[inline]
     fn index(&self, cid: &ClauseId) -> &Clause {
-        let i = NonZeroU32::get(cid.ordinal) as usize;
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.clause.get_unchecked(i)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self.clause[i]
+        &self.clause[cid]
     }
 }
 
 impl IndexMut<&ClauseId> for ClauseDB {
     #[inline]
     fn index_mut(&mut self, cid: &ClauseId) -> &mut Clause {
-        let i = NonZeroU32::get(cid.ordinal) as usize;
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.clause.get_unchecked_mut(i)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self.clause[i]
-    }
-}
-
-impl Index<Range<usize>> for ClauseDB {
-    type Output = [Clause];
-    #[inline]
-    fn index(&self, r: Range<usize>) -> &[Clause] {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.clause.get_unchecked(r)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self.clause[r]
-    }
-}
-
-impl Index<RangeFrom<usize>> for ClauseDB {
-    type Output = [Clause];
-    #[inline]
-    fn index(&self, r: RangeFrom<usize>) -> &[Clause] {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.clause.get_unchecked(r)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self.clause[r]
-    }
-}
-
-impl IndexMut<Range<usize>> for ClauseDB {
-    #[inline]
-    fn index_mut(&mut self, r: Range<usize>) -> &mut [Clause] {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.clause.get_unchecked_mut(r)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self.clause[r]
-    }
-}
-
-impl IndexMut<RangeFrom<usize>> for ClauseDB {
-    #[inline]
-    fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Clause] {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.clause.get_unchecked_mut(r)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self.clause[r]
+        self.clause.get_mut(cid).unwrap()
     }
 }
 
 impl Instantiate for ClauseDB {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> ClauseDB {
         let nv = cnf.num_of_variables;
-        let nc = cnf.num_of_clauses;
-        let mut clause = Vec::with_capacity(1 + nc);
-        clause.push(Clause::default());
+        // let nc = cnf.num_of_clauses;
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
         for _ in 0..2 * (nv + 1) {
             watcher.push(WatchCache::new());
         }
         ClauseDB {
-            clause,
+            clause: HashMap::new(),
             binary_link: BinaryLinkDB::instantiate(config, cnf),
             watch_cache: watcher,
             certification_store: CertificationStore::instantiate(config, cnf),
@@ -210,16 +136,22 @@ impl Instantiate for ClauseDB {
 }
 
 impl ClauseDBIF for ClauseDB {
+    fn clause(&self, cid: &ClauseId) -> Option<&Clause> {
+        self.clause.get(cid)
+    }
+    fn clause_mut(&mut self, cid: &ClauseId) -> Option<&mut Clause> {
+        self.clause.get_mut(cid)
+    }
     fn len(&self) -> usize {
         self.clause.len()
     }
     fn is_empty(&self) -> bool {
         self.clause.is_empty()
     }
-    fn iter(&self) -> Iter<'_, Clause> {
+    fn iter(&self) -> HashIter<'_, ClauseId, Clause> {
         self.clause.iter()
     }
-    fn iter_mut(&mut self) -> IterMut<'_, Clause> {
+    fn iter_mut(&mut self) -> HashIterMut<'_, ClauseId, Clause> {
         self.clause.iter_mut()
     }
     #[inline]
@@ -263,40 +195,14 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         self.certification_store.add_clause(vec);
-        let cid;
-        if let Some(cid_used) = self.freelist.pop() {
-            cid = cid_used;
-            let c = &mut self[cid];
-            // if !c.is_dead() {
-            //     println!("{} {:?}", cid.format(), vec2int(&c.lits));
-            //     println!("len {}", self.watcher[NULL_LIT.negate() as usize].len());
-            //     for w in &self.watcher[NULL_LIT.negate() as usize][..10] {
-            //         if !self.clause[w.c].is_dead() {
-            //             println!("{}", w.c.format());
-            //         }
-            //     }
-            //     panic!("done");
-            // }
-            // assert!(c.is_dead());
-            c.flags = FlagClause::empty();
-
-            #[cfg(feature = "clause_rewarding")]
-            {
-                c.reward = 0.0;
-            }
-
-            debug_assert!(c.lits.is_empty()); // c.lits.clear();
-            std::mem::swap(&mut c.lits, vec);
-            c.search_from = 2;
-        } else {
-            cid = ClauseId::from(self.clause.len());
-            let mut c = Clause {
-                flags: FlagClause::empty(),
-                ..Clause::default()
-            };
-            std::mem::swap(&mut c.lits, vec);
-            self.clause.push(c);
+        let cid = ClauseId::from(self.next_cid);
+        self.next_cid += 1;
+        let mut c = Clause {
+            flags: FlagClause::empty(),
+            ..Clause::default()
         };
+        std::mem::swap(&mut c.lits, vec);
+        self.clause.insert(cid, c);
 
         let ClauseDB {
             #[cfg(feature = "bi_clause_completion")]
@@ -316,7 +222,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut watch_cache,
             ..
         } = self;
-        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
+        let c = clause.get_mut(&cid).unwrap();
         #[cfg(feature = "clause_rewarding")]
         {
             c.timestamp = *tick;
@@ -369,22 +275,14 @@ impl ClauseDBIF for ClauseDB {
                 return RefClause::RegisteredClause(cid);
             }
         }
-        let cid;
-        if let Some(cid_used) = self.freelist.pop() {
-            cid = cid_used;
-            let c = &mut self[cid];
-            c.flags = FlagClause::empty();
-            std::mem::swap(&mut c.lits, vec);
-            c.search_from = 2;
-        } else {
-            cid = ClauseId::from(self.clause.len());
-            let mut c = Clause {
-                flags: FlagClause::empty(),
-                ..Clause::default()
-            };
-            std::mem::swap(&mut c.lits, vec);
-            self.clause.push(c);
+        let cid = ClauseId::from(self.next_cid);
+        self.next_cid += 1;
+        let mut c = Clause {
+            flags: FlagClause::empty(),
+            ..Clause::default()
         };
+        std::mem::swap(&mut c.lits, vec);
+        self.clause.insert(cid, c);
 
         let ClauseDB {
             ref mut clause,
@@ -395,7 +293,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut watch_cache,
             ..
         } = self;
-        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
+        let c = clause.get_mut(&cid).unwrap();
 
         #[cfg(feature = "clause_rewarding")]
         {
@@ -427,7 +325,7 @@ impl ClauseDBIF for ClauseDB {
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
         // if !self.clause[NonZeroU32::get(cid.ordinal) as usize].is_dead() {
         // }
-        let c = &mut self.clause[NonZeroU32::get(cid.ordinal) as usize];
+        let c = self.clause.get_mut(&cid).unwrap();
         debug_assert!(!c.is_dead());
         debug_assert!(1 < c.lits.len());
         remove_clause_fn(
@@ -444,23 +342,23 @@ impl ClauseDBIF for ClauseDB {
     }
     fn remove_clause_sandbox(&mut self, cid: ClauseId) {
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
-        let c = &mut self.clause[NonZeroU32::get(cid.ordinal) as usize];
-        debug_assert!(!c.is_dead());
-        debug_assert!(1 < c.lits.len());
-        let mut store = CertificationStore::default();
-        let mut dummy1 = 1;
-        let mut dummy2 = 1;
-        let mut dummy3 = 1;
-        remove_clause_fn(
-            &mut store,
-            &mut self.binary_link,
-            &mut self.watch_cache,
-            &mut dummy1,
-            &mut dummy2,
-            &mut dummy3,
-            cid,
-            c,
-        );
+        if let Some(mut c) = self.clause.remove(&cid) {
+            debug_assert!(1 < c.lits.len());
+            let mut store = CertificationStore::default();
+            let mut dummy1 = 1;
+            let mut dummy2 = 1;
+            let mut dummy3 = 1;
+            remove_clause_fn(
+                &mut store,
+                &mut self.binary_link,
+                &mut self.watch_cache,
+                &mut dummy1,
+                &mut dummy2,
+                &mut dummy3,
+                cid,
+                &mut c,
+            );
+        }
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
     }
     //
@@ -506,7 +404,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut num_bi_clause,
             ..
         } = self;
-        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
+        let c = clause.get_mut(&cid).unwrap();
         // debug_assert!((*ch).lits.contains(&p));
         // debug_assert!(1 < (*ch).len());
         debug_assert!(1 < usize::from(!p));
@@ -642,7 +540,7 @@ impl ClauseDBIF for ClauseDB {
             certification_store,
             ..
         } = self;
-        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
+        let c = clause.get_mut(&cid).unwrap();
         debug_assert!(new_lits.len() < c.len());
         if new_lits.len() == 2 {
             if let Some(&did) = binary_link.search(new_lits[0], new_lits[1]) {
@@ -774,7 +672,7 @@ impl ClauseDBIF for ClauseDB {
             certification_store,
             ..
         } = self;
-        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
+        let c = clause.get_mut(&cid).unwrap();
         let mut new_lits = c
             .lits
             .iter()
@@ -903,7 +801,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut watch_cache,
             ..
         } = self;
-        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
+        let c = clause.get_mut(&cid).unwrap();
         let other = (old == 0) as usize;
         if removed {
             debug_assert!(watch_cache[!c.lits[old]].get_watch(&cid).is_none());
@@ -927,7 +825,7 @@ impl ClauseDBIF for ClauseDB {
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
     }
     fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool {
-        let c = &mut self.clause[NonZeroU32::get(cid.ordinal) as usize];
+        let c = self.clause.get_mut(&cid).unwrap();
         // Updating LBD at every analysis seems redundant.
         // But it's crucial. Don't remove the below.
         let rank = c.update_lbd(asg, &mut self.lbd_temp);
@@ -966,14 +864,9 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         *num_reduction += 1;
 
-        let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
+        let mut perm: Vec<OrderedProxy<ClauseId>> = Vec::with_capacity(clause.len());
         let mut alives = 0;
-        for (i, c) in clause
-            .iter_mut()
-            .enumerate()
-            .skip(1)
-            .filter(|(_, c)| !c.is_dead())
-        {
+        for (cid, c) in clause.iter_mut() {
             c.update_lbd(asg, lbd_temp);
 
             #[cfg(feature = "clause_rewarding")]
@@ -982,7 +875,7 @@ impl ClauseDBIF for ClauseDB {
             // There's no clause stored in `reason` because the decision level is 'zero.'
             debug_assert_ne!(
                 asg.reason(c.lit0().vi()),
-                AssignReason::Implication(ClauseId::from(i)),
+                AssignReason::Implication(*cid),
                 "Lit {} {:?} level {}, dl: {}",
                 i32::from(c.lit0()),
                 asg.assigned(c.lit0()),
@@ -995,21 +888,21 @@ impl ClauseDBIF for ClauseDB {
             alives += 1;
             match setting {
                 ReductionType::RASonADD(_) => {
-                    perm.push(OrderedProxy::new(i, c.reverse_activity_sum(asg)));
+                    perm.push(OrderedProxy::new(*cid, c.reverse_activity_sum(asg)));
                 }
                 ReductionType::RASonALL(cutoff, _) => {
                     let value = c.reverse_activity_sum(asg);
                     if cutoff < value.min(c.rank_old as f64) {
-                        perm.push(OrderedProxy::new(i, value));
+                        perm.push(OrderedProxy::new(*cid, value));
                     }
                 }
                 ReductionType::LBDonADD(_) => {
-                    perm.push(OrderedProxy::new(i, c.lbd()));
+                    perm.push(OrderedProxy::new(*cid, c.lbd()));
                 }
                 ReductionType::LBDonALL(cutoff, _) => {
                     let value = c.rank.min(c.rank_old);
                     if cutoff < value {
-                        perm.push(OrderedProxy::new(i, value as f64));
+                        perm.push(OrderedProxy::new(*cid, value as f64));
                     }
                 }
             }
@@ -1030,12 +923,12 @@ impl ClauseDBIF for ClauseDB {
         };
         perm.sort();
         for i in perm.iter().skip(keep) {
-            self.remove_clause(ClauseId::from(i.to()));
+            self.remove_clause(i.to());
         }
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
-        for (i, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
+        for (cid, c) in &mut self.clause.iter_mut() {
             if c.is(FlagClause::LEARNT)
                 && !c.is_dead()
                 && (self.co_lbd_bound as usize) < c.lits.len()
@@ -1047,11 +940,12 @@ impl ClauseDBIF for ClauseDB {
                     &mut self.num_bi_clause,
                     &mut self.num_clause,
                     &mut self.num_learnt,
-                    ClauseId::from(i),
+                    *cid,
                     c,
                 );
             }
         }
+        self.clause.clear();
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);
@@ -1068,13 +962,13 @@ impl ClauseDBIF for ClauseDB {
         }
     }
     fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId> {
-        for (i, c) in self.clause.iter().enumerate().skip(1) {
-            if c.is_dead() || (strict && c.is(FlagClause::LEARNT)) {
+        for (cid, c) in self.clause.iter() {
+            if strict && c.is(FlagClause::LEARNT) {
                 continue;
             }
             match c.evaluate(model) {
-                Some(false) => return Some(ClauseId::from(i)),
-                None if strict => return Some(ClauseId::from(i)),
+                Some(false) => return Some(*cid),
+                None if strict => return Some(*cid),
                 _ => (),
             }
         }
@@ -1093,7 +987,7 @@ impl ClauseDBIF for ClauseDB {
         let l0 = vec[0];
         let mut num_sat = 0;
         for (_, cid) in self.binary_link.connect_with(l0).iter() {
-            let c = &self.clause[NonZeroU32::get(cid.ordinal) as usize];
+            let c = &self.clause[&cid];
             debug_assert!(c[0] == l0 || c[1] == l0);
             let other = c[(c[0] == l0) as usize];
             let vi = other.vi();
@@ -1209,10 +1103,10 @@ impl ClauseDBIF for ClauseDB {
         };
         let mut buf = std::io::BufWriter::new(out);
         let na = asg.derefer(crate::assign::property::Tusize::NumAssertedVar);
-        let nc = self.iter().skip(1).filter(|c| !c.is_dead()).count();
+        let nc = self.iter().count();
         buf.write_all(format!("p cnf {} {}\n", nv, nc + na).as_bytes())
             .unwrap();
-        for c in self.iter().skip(1) {
+        for (_, c) in self.iter() {
             if c.is_dead() {
                 continue;
             }
@@ -1313,7 +1207,7 @@ fn remove_clause_fn(
     }
     *num_clause -= 1;
     certification_store.delete_clause(&c.lits);
-    c.lits.clear();
+    // c.lits.clear();
 }
 
 impl Clause {

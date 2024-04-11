@@ -413,7 +413,10 @@ impl PropagateIF for AssignStack {
                     continue 'next_clause;
                 }
                 {
-                    let c = &cdb[cid];
+                    let Some(c) = cdb.clause(&cid) else {
+                        cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
+                        continue 'next_clause;
+                    };
                     let lit0 = c.lit0();
                     let lit1 = c.lit1();
                     let (false_watch_pos, other) = if false_lit == lit1 {
@@ -438,7 +441,6 @@ impl PropagateIF for AssignStack {
                         }
                         updated_cache = Some(other);
                     }
-                    let c = &cdb[cid];
                     debug_assert!(lit0 == false_lit || lit1 == false_lit);
                     //
                     //## Search an un-falsified literal
@@ -592,7 +594,11 @@ impl PropagateIF for AssignStack {
                     continue 'next_clause;
                 }
                 {
-                    let c = &cdb[cid];
+                    // let c = &cdb[cid];
+                    let Some(c) = cdb.clause(&cid) else {
+                        cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
+                        continue 'next_clause;
+                    };
                     let lit0 = c.lit0();
                     let lit1 = c.lit1();
                     let (false_watch_pos, other) = if false_lit == lit1 {
@@ -616,7 +622,7 @@ impl PropagateIF for AssignStack {
                         }
                         updated_cache = Some(other);
                     }
-                    let c = &cdb[cid];
+                    // let c = &cdb[cid];
                     debug_assert!(lit0 == false_lit || lit1 == false_lit);
                     let start = c.search_from;
                     for (k, lk) in c

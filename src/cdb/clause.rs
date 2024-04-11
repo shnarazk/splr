@@ -128,9 +128,6 @@ impl From<&Clause> for Vec<i32> {
 }
 
 impl ClauseIF for Clause {
-    fn is_empty(&self) -> bool {
-        self.lits.is_empty()
-    }
     fn is_dead(&self) -> bool {
         self.lits.is_empty()
     }

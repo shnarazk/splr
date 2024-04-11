@@ -229,13 +229,13 @@ impl EliminateIF for Eliminator {
         for w in &mut self[1..] {
             w.clear();
         }
-        for (cid, c) in &mut cdb.iter_mut().enumerate().skip(1) {
+        for (cid, c) in &mut cdb.iter_mut() {
             if c.is_dead() || c.is(FlagClause::OCCUR_LINKED) {
                 continue;
             }
             let vec = c.iter().copied().collect::<Vec<_>>();
             debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
-            self.add_cid_occur(asg, ClauseId::from(cid), c, false);
+            self.add_cid_occur(asg, *cid, c, false);
         }
         if force {
             for vi in 1..=asg.derefer(assign::property::Tusize::NumVar) {
@@ -401,7 +401,7 @@ impl Eliminator {
         self.clear_clause_queue(cdb);
         self.clear_var_queue(asg);
         if force {
-            for c in &mut cdb.iter_mut().skip(1) {
+            for (_, c) in &mut cdb.iter_mut() {
                 c.turn_off(FlagClause::OCCUR_LINKED);
             }
             for w in &mut self[1..] {
@@ -654,18 +654,18 @@ fn check_eliminator(cdb: &impl ClauseDBIF, elim: &Eliminator) -> bool {
     //     }
     // }
     // all clauses are registered in corresponding occur_lists
-    for (cid, c) in cdb.iter().enumerate().skip(1) {
+    for (cid, c) in cdb.iter() {
         if c.is_dead() {
             continue;
         }
         for l in c.iter() {
             let v = l.vi();
             if bool::from(*l) {
-                if !elim[v].pos_occurs.contains(&(ClauseId::from(cid))) {
-                    panic!("failed to check {} {:#}", (ClauseId::from(cid)), c);
+                if !elim[v].pos_occurs.contains(cid) {
+                    panic!("failed to check {} {:#}", cid, c);
                 }
-            } else if !elim[v].neg_occurs.contains(&(ClauseId::from(cid))) {
-                panic!("failed to check {} {:#}", (ClauseId::from(cid)), c);
+            } else if !elim[v].neg_occurs.contains(cid) {
+                panic!("failed to check {} {:#}", cid, c);
             }
         }
     }

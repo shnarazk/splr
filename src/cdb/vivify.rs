@@ -188,11 +188,11 @@ fn select_targets(
 ) -> Vec<OrderedProxy<ClauseId>> {
     if initial_stage {
         let mut seen: Vec<Option<OrderedProxy<ClauseId>>> = vec![None; 2 * (asg.num_vars + 1)];
-        for (i, c) in cdb.iter().enumerate().skip(1) {
+        for (cid, c) in cdb.iter() {
             if let Some(rank) = c.to_vivify(true) {
                 let p = &mut seen[usize::from(c.lit0())];
                 if p.as_ref().map_or(0.0, |r| r.value()) < rank {
-                    *p = Some(OrderedProxy::new(ClauseId::from(i), rank));
+                    *p = Some(OrderedProxy::new(*cid, rank));
                 }
             }
         }
@@ -207,11 +207,9 @@ fn select_targets(
     } else {
         let mut clauses: Vec<OrderedProxy<ClauseId>> = cdb
             .iter()
-            .enumerate()
-            .skip(1)
-            .filter_map(|(i, c)| {
+            .filter_map(|(cid, c)| {
                 c.to_vivify(false)
-                    .map(|r| OrderedProxy::new_invert(ClauseId::from(i), r))
+                    .map(|r| OrderedProxy::new_invert(*cid, r))
             })
             .collect::<Vec<_>>();
         if let Some(max_len) = len {
