@@ -77,7 +77,7 @@ pub trait VarManipulateIF {
     /// return the assign level of var.
     fn level(&self, vi: VarId) -> DecisionLevel;
     /// return the reason of assignment.
-    fn reason(&self, vi: VarId) -> AssignReason;
+    fn reason(&self, vi: VarId) -> &AssignReason;
     /// return the var.
     fn var(&self, vi: VarId) -> &Var;
     /// return the var.
@@ -118,10 +118,10 @@ impl VarManipulateIF for AssignStack {
         self.level[vi]
     }
     #[inline]
-    fn reason(&self, vi: VarId) -> AssignReason {
+    fn reason(&self, vi: VarId) -> &AssignReason {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            self.var.get_unchecked(vi).reason
+            &self.var.get_unchecked(vi).reason
         }
         #[cfg(not(feature = "unsafe_access"))]
         self.reason[vi]
@@ -151,6 +151,7 @@ impl VarManipulateIF for AssignStack {
         self.var.iter_mut()
     }
     fn make_var_asserted(&mut self, vi: VarId) {
+        assert_ne!(self.var[vi].reason, AssignReason::Decision(0));
         self.var[vi].reason = AssignReason::Decision(0);
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
@@ -164,6 +165,7 @@ impl VarManipulateIF for AssignStack {
         self.check_best_phase(vi);
     }
     fn make_var_eliminated(&mut self, vi: VarId) {
+        assert!(!self.var[vi].is(FlagVar::ELIMINATED));
         if !self.var[vi].is(FlagVar::ELIMINATED) {
             self.var[vi].turn_on(FlagVar::ELIMINATED);
             self.set_activity(vi, 0.0);
@@ -179,21 +181,20 @@ impl VarManipulateIF for AssignStack {
 
             #[cfg(feature = "trace_elimination")]
             {
-                let lv = self.level[vi];
-                if self.root_level == self.level[vi] && self.assign[vi].is_some() {
+                let v = &self.var[vi];
+                if self.root_level == v.level && v.assign.is_some() {
                     panic!("v:{}, dl:{}", self.var[vi], self.decision_level());
                 }
-                if !(self.root_level < self.level[vi] || self.assign[vi].is_none()) {
+                if !(self.root_level < v.level || v.assign.is_none()) {
                     panic!(
-                        "v:{}, lvl:{} => {}, dl:{}, assign:{:?} ",
-                        self.var[vi],
-                        lv,
-                        self.level[vi],
+                        "v:{}, lvl:{}, dl:{}, assign:{:?} ",
+                        vi,
+                        v.level,
                         self.decision_level(),
-                        self.assign[vi],
+                        v.assign,
                     );
                 }
-                debug_assert!(self.root_level < self.level[vi] || self.assign[vi].is_none());
+                debug_assert!(self.root_level < v.level || v.assign.is_none());
             }
         } else {
             #[cfg(feature = "boundary_check")]

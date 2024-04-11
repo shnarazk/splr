@@ -32,9 +32,11 @@ pub fn handle_conflict(
     // at higher level due to the incoherence between the current level and conflicting
     // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
     {
-        if let AssignReason::Implication(cid) = cc.1 {
-            if cdb[cid].iter().all(|l| asg.level(l.vi()) == 0) {
-                return Err(SolverError::RootLevelConflict(*cc));
+        if let AssignReason::Implication(cr) = cc.1.clone() {
+            let rcc = cr.get();
+            let c = rcc.borrow();
+            if c.iter().all(|l| asg.level(l.vi()) == 0) {
+                return Err(SolverError::RootLevelConflict(cc.clone()));
             }
         }
     }
@@ -48,7 +50,7 @@ pub fn handle_conflict(
     #[cfg(feature = "chrono_BT")]
     {
         let c = match cc.1 {
-            AssignReason::Implication(cid) => &cdb[cid],
+            AssignReason::Implication(cr) => &cdb[cr],
             _ => panic!(),
         };
         let level = asg.level_ref();
@@ -104,7 +106,10 @@ pub fn handle_conflict(
                 // asg.lift_to_asserted(l0.vi());
             }
             Some(false) if asg.level(l0.vi()) == asg.root_level() => {
-                return Err(SolverError::RootLevelConflict((l0, asg.reason(l0.vi()))));
+                return Err(SolverError::RootLevelConflict((
+                    l0,
+                    asg.reason(l0.vi()).clone(),
+                )));
             }
             _ => {
                 // dump to certified even if it's a literal.
@@ -140,7 +145,7 @@ pub fn handle_conflict(
         //## Reason-Side Rewarding
         //
         #[cfg(feature = "reason_side_rewarding")]
-        match asg.reason(lit.vi()) {
+        match asg.reason(lit.vi()).clone() {
             AssignReason::BinaryLink(from) => {
                 let vi = from.vi();
                 if !bumped.contains(&vi) {
@@ -148,8 +153,10 @@ pub fn handle_conflict(
                     bumped.push(vi);
                 }
             }
-            AssignReason::Implication(r) => {
-                for l in cdb[r].iter() {
+            AssignReason::Implication(cr) => {
+                let rcc = cr.get();
+                let c = rcc.borrow();
+                for l in c.iter() {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
                         asg.reward_at_analysis(vi);
@@ -173,12 +180,14 @@ pub fn handle_conflict(
     );
     let rank: u16;
     match cdb.new_clause(asg, new_learnt, true) {
-        RefClause::Clause(cid) if learnt_len == 2 => {
+        RefClause::Clause(cr) if learnt_len == 2 => {
+            let rcc = cr.get();
+            let c = rcc.borrow_mut();
             #[cfg(feature = "boundary_check")]
-            cdb[cid].set_birth(asg.num_conflict);
+            c.set_birth(asg.num_conflict);
 
-            debug_assert_eq!(l0, cdb[cid].lit0());
-            debug_assert_eq!(l1, cdb[cid].lit1());
+            debug_assert_eq!(l0, c.lit0());
+            debug_assert_eq!(l1, c.lit1());
             debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
 
@@ -189,39 +198,44 @@ pub fn handle_conflict(
                 assign_level,
             );
             // || check_graph(asg, cdb, l0, "biclause");
-            for cid in &state.derive20 {
-                cdb[cid].turn_on(FlagClause::DERIVE20);
+            for cr in &mut state.derive20 {
+                let rcc = cr.get();
+                let mut c = rcc.borrow_mut();
+                c.turn_on(FlagClause::DERIVE20);
             }
             rank = 1;
             #[cfg(feature = "bi_clause_completion")]
             cdb.complete_bi_clauses(asg);
         }
-        RefClause::Clause(cid) => {
+        RefClause::Clause(cr) => {
+            let rcc = cr.get();
+            let c = rcc.borrow_mut();
             #[cfg(feature = "boundary_check")]
-            cdb[cid].set_birth(asg.num_conflict);
+            c.set_birth(asg.num_conflict);
 
-            debug_assert_eq!(cdb[cid].lit0(), l0);
+            debug_assert_eq!(c.lit0(), l0);
             debug_assert_eq!(asg.assigned(l0), None);
             asg.assign_by_implication(
                 l0,
-                AssignReason::Implication(cid),
+                AssignReason::Implication(cr.clone()),
                 #[cfg(feature = "chrono_BT")]
                 assign_level,
             );
             // || check_graph(asg, cdb, l0, "clause");
-            rank = cdb[cid].rank;
+            rank = c.rank;
             if rank <= 20 {
-                for cid in &state.derive20 {
-                    cdb[cid].turn_on(FlagClause::DERIVE20);
+                for cr in &mut state.derive20 {
+                    let rcc = cr.get();
+                    let mut c = rcc.borrow_mut();
+                    c.turn_on(FlagClause::DERIVE20);
                 }
             }
         }
-        RefClause::RegisteredClause(cid) => {
+        RefClause::RegisteredClause(cr) => {
+            let rcc = cr.get();
+            let c = rcc.borrow_mut();
             debug_assert_eq!(learnt_len, 2);
-            debug_assert!(
-                (l0 == cdb[cid].lit0() && l1 == cdb[cid].lit1())
-                    || (l0 == cdb[cid].lit1() && l1 == cdb[cid].lit0())
-            );
+            debug_assert!((l0 == c.lit0() && l1 == c.lit1()) || (l0 == c.lit1() && l1 == c.lit0()));
             debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
             rank = 1;
@@ -261,7 +275,8 @@ fn conflict_analyze(
     let root_level = asg.root_level();
     let dl = asg.decision_level();
     let mut path_cnt = 0;
-    let (mut p, mut reason) = cc;
+    let mut p = cc.0;
+    let mut reason = cc.1.clone();
 
     macro_rules! conflict_level {
         ($vi: expr) => {
@@ -336,7 +351,7 @@ fn conflict_analyze(
     }
     let mut trail_index = asg.stack_len() - 1;
     let mut max_lbd: u16 = 0;
-    let mut cid_with_max_lbd: Option<ClauseId> = None;
+    let mut cid_with_max_lbd: Option<ClauseRef> = None;
     loop {
         match reason {
             AssignReason::BinaryLink(l) => {
@@ -350,23 +365,25 @@ fn conflict_analyze(
                     conflict_level!(vi);
                 }
             }
-            AssignReason::Implication(cid) => {
+            AssignReason::Implication(cr) => {
                 trace!(
                     "analyze clause {}(first literal: {}) for {}",
-                    cid,
-                    i32::from(cdb[cid].lit0()),
+                    cr,
+                    i32::from(cdb[cr].lit0()),
                     p
                 );
-                debug_assert!(!cdb[cid].is_dead() && 2 < cdb[cid].len());
-                // if !cdb.update_at_analysis(asg, cid) {
-                if !cdb[cid].is(FlagClause::LEARNT) {
-                    state.derive20.push(cid);
+                let rcc = cr.get();
+                let c = rcc.borrow();
+                debug_assert!(!c.is_dead() && 2 < c.len());
+                // if !cdb.update_at_analysis(asg, cr) {
+                if !c.is(FlagClause::LEARNT) {
+                    state.derive20.push(cr.clone());
                 }
-                if max_lbd < cdb[cid].rank {
-                    max_lbd = cdb[cid].rank;
-                    cid_with_max_lbd = Some(cid);
+                if max_lbd < c.rank {
+                    max_lbd = c.rank;
+                    cid_with_max_lbd = Some(cr.clone());
                 }
-                for q in cdb[cid].iter().skip(1) {
+                for q in c.iter().skip(1) {
                     let vi = q.vi();
                     validate_vi!(vi);
                     if !asg.var(vi).is(FlagVar::CA_SEEN) {
@@ -410,7 +427,7 @@ fn conflict_analyze(
         while {
             let vi = asg.stack(trail_index).vi();
             boundary_check!(
-                0 < vi && vi < asg.level_ref().len(),
+                0 < vi && vi < asg.level_ref().count(),
                 "trail[{}] has an invalid var index {}",
                 trail_index,
                 asg.stack(trail_index)
@@ -440,10 +457,10 @@ fn conflict_analyze(
         }
         debug_assert!(0 < trail_index);
         trail_index -= 1;
-        reason = asg.reason(p.vi());
+        reason = asg.reason(p.vi()).clone();
     }
-    if let Some(cid) = cid_with_max_lbd {
-        cdb.update_at_analysis(asg, cid);
+    if let Some(r) = cid_with_max_lbd {
+        cdb.update_at_analysis(asg, r);
     }
     debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);
@@ -499,7 +516,7 @@ impl Lit {
     fn is_redundant(
         self,
         asg: &mut AssignStack,
-        cdb: &ClauseDB,
+        _cdb: &ClauseDB,
         clear: &mut Vec<Lit>,
         levels: &[bool],
     ) -> bool {
@@ -509,7 +526,7 @@ impl Lit {
         let mut stack = vec![self];
         let top = clear.len();
         while let Some(sl) = stack.pop() {
-            match asg.reason(sl.vi()) {
+            match asg.reason(sl.vi()).clone() {
                 AssignReason::BinaryLink(l) => {
                     let vi = l.vi();
                     let lv = asg.level(vi);
@@ -533,9 +550,10 @@ impl Lit {
                         }
                     }
                 }
-                AssignReason::Implication(cid) => {
-                    let c = &cdb[cid];
-                    for q in &(*c)[1..] {
+                AssignReason::Implication(cr) => {
+                    let rcc = cr.get();
+                    let c = rcc.borrow();
+                    for q in &(c)[1..] {
                         let vi = q.vi();
                         let lv = asg.level(vi);
                         if 0 < lv && !asg.var(vi).is(FlagVar::CA_SEEN) {
@@ -567,37 +585,33 @@ impl Lit {
 }
 
 #[allow(dead_code)]
-fn check_graph(asg: &AssignStack, cdb: &ClauseDB, lit: Lit, mes: &str) {
+fn check_graph(asg: &AssignStack, lit: Lit, mes: &str) {
     let its_level = asg.level(lit.vi());
     let mut children = Vec::new();
-    let precedents = lit_level(asg, cdb, lit, &mut children, mes);
+    let precedents = lit_level(asg, lit, &mut children, mes);
     assert!(precedents <= its_level);
 }
 
 #[allow(dead_code)]
-fn lit_level(
-    asg: &AssignStack,
-    cdb: &ClauseDB,
-    lit: Lit,
-    bag: &mut Vec<Lit>,
-    _mes: &str,
-) -> DecisionLevel {
+fn lit_level(asg: &AssignStack, lit: Lit, bag: &mut Vec<Lit>, _mes: &str) -> DecisionLevel {
     if bag.contains(&lit) {
         return 0;
     }
     bag.push(lit);
     match asg.reason(lit.vi()) {
         AssignReason::Decision(0) => asg.root_level(),
-        AssignReason::Decision(lvl) => lvl,
-        AssignReason::Implication(cid) => {
+        AssignReason::Decision(lvl) => *lvl,
+        AssignReason::Implication(cr) => {
+            let rcc = cr.get();
+            let c = rcc.borrow();
             assert_eq!(
-                cdb[cid].lit0(),
+                c.lit0(),
                 lit,
-                "lit0 {} != lit{}, cid {}, {}",
-                cdb[cid].lit0(),
+                "lit0 {} != lit{}, cr {}, {}",
+                c.lit0(),
                 lit,
-                cid,
-                &cdb[cid]
+                cr,
+                c
             );
             // assert!(
             //     !bag.contains(&lit),
@@ -609,20 +623,19 @@ fn lit_level(
             //     dumper(asg, cdb, bag),
             // );
             // bag.push(lit);
-            cdb[cid]
-                .iter()
+            c.iter()
                 .skip(1)
-                .map(|l| lit_level(asg, cdb, !*l, bag, _mes))
+                .map(|l| lit_level(asg, !*l, bag, _mes))
                 .max()
                 .unwrap()
         }
-        AssignReason::BinaryLink(b) => lit_level(asg, cdb, b, bag, _mes),
+        AssignReason::BinaryLink(b) => lit_level(asg, *b, bag, _mes),
         AssignReason::None => panic!("One of root of {lit} isn't assigned."),
     }
 }
 
 #[allow(dead_code)]
-fn dumper(asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
+fn dumper(asg: &AssignStack, _cdb: &ClauseDB, bag: &[Lit]) -> String {
     use std::fmt::Write as _;
     let mut s = String::new();
     for l in bag {
@@ -634,8 +647,12 @@ fn dumper(asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
             asg.reason(l.vi()),
             match asg.reason(l.vi()) {
                 AssignReason::Decision(_) => vec![],
-                AssignReason::BinaryLink(lit) => vec![*l, !lit],
-                AssignReason::Implication(cid) => cdb[cid].iter().copied().collect::<Vec<Lit>>(),
+                AssignReason::BinaryLink(lit) => vec![*l, !*lit],
+                AssignReason::Implication(cr) => {
+                    let rcc = cr.get();
+                    let c = rcc.borrow();
+                    c.iter().copied().collect::<Vec<Lit>>()
+                }
                 AssignReason::None => vec![],
             },
         )
@@ -645,7 +662,7 @@ fn dumper(asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
 }
 
 #[cfg(feature = "boundary_check")]
-fn tracer(asg: &AssignStack, cdb: &ClauseDB) {
+fn tracer(_asg: &AssignStack, _cdb: &ClauseDB) {
     use std::io::{self, Write};
     loop {
         let mut input = String::new();
@@ -661,22 +678,22 @@ fn tracer(asg: &AssignStack, cdb: &ClauseDB) {
         if cid == 0 {
             break;
         }
-        println!(
-            "{}",
-            cdb[ClauseId::from(cid)]
-                .report(asg)
-                .iter()
-                .map(|r| format!(
-                    " {}{:?}",
-                    asg.var(Lit::from(r.lit).vi())
-                        .is(FlagVar::CA_SEEN)
-                        .then(|| "S")
-                        .unwrap_or(" "),
-                    r
-                ))
-                .collect::<Vec<String>>()
-                .join("\n"),
-        );
+        // println!(
+        //     "{}",
+        //     cdb.cluse[cid]
+        //         .report(asg)
+        //         .iter()
+        //         .map(|r| format!(
+        //             " {}{:?}",
+        //             asg.var(Lit::from(r.lit).vi())
+        //                 .is(FlagVar::CA_SEEN)
+        //                 .then(|| "S")
+        //                 .unwrap_or(" "),
+        //             r
+        //         ))
+        //         .collect::<Vec<String>>()
+        //         .join("\n"),
+        // );
     }
     panic!("done");
 }

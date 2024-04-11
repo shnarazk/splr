@@ -6,7 +6,7 @@ use {
     },
     crate::{
         assign::{self, AssignIF},
-        cdb::{self, ClauseDBIF},
+        cdb::{self, ClauseDBIF, ClauseRefIF},
         state::{self, State, StateIF},
         types::*,
     },
@@ -229,13 +229,16 @@ impl EliminateIF for Eliminator {
         for w in &mut self[1..] {
             w.clear();
         }
-        for (cid, c) in &mut cdb.iter_mut().enumerate().skip(1) {
+        for cr in &mut cdb.iter() {
+            let rcc = cr.get();
+            let c = rcc.borrow();
             if c.is_dead() || c.is(FlagClause::OCCUR_LINKED) {
                 continue;
             }
             let vec = c.iter().copied().collect::<Vec<_>>();
             debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
-            self.add_cid_occur(asg, ClauseId::from(cid), c, false);
+            drop(c);
+            self.add_cid_occur(asg, cr.clone(), false);
         }
         if force {
             for vi in 1..=asg.derefer(assign::property::Tusize::NumVar) {
@@ -269,7 +272,7 @@ impl EliminateIF for Eliminator {
         #[cfg(feature = "boundary_check")]
         {
             for (i, _) in asg.var_iter().enumerate().skip(1) {
-                if asg.reason(i) != AssignReason::None {
+                if *asg.reason(i) != AssignReason::None {
                     assert_eq!(
                         asg.level(i),
                         asg.derefer(assign::property::Tusize::RootLevel) as DecisionLevel
@@ -322,13 +325,10 @@ impl EliminateIF for Eliminator {
 
 impl Eliminator {
     /// register a clause id to all corresponding occur lists.
-    pub fn add_cid_occur(
-        &mut self,
-        asg: &mut impl AssignIF,
-        cid: ClauseId,
-        c: &mut Clause,
-        enqueue: bool,
-    ) {
+    pub fn add_cid_occur(&mut self, asg: &mut impl AssignIF, cr: ClauseRef, enqueue: bool) {
+        let cr1 = cr.clone();
+        let rcc = cr1.get();
+        let mut c = rcc.borrow_mut();
         if self.mode != EliminatorMode::Running || c.is(FlagClause::OCCUR_LINKED) {
             return;
         }
@@ -352,42 +352,42 @@ impl Eliminator {
             if !v.is(FlagVar::ELIMINATED) {
                 if bool::from(*l) {
                     debug_assert!(
-                        !w.pos_occurs.contains(&cid),
+                        !w.pos_occurs.contains(&cr),
                         "elim.add_cid_occur for {:?} found a strange positive clause{}{}, {:?}",
                         v,
-                        cid,
+                        cr,
                         c,
                         w.pos_occurs,
                     );
-                    w.pos_occurs.push(cid);
+                    w.pos_occurs.push(cr.clone());
                 } else {
                     debug_assert!(
-                        !w.neg_occurs.contains(&cid),
+                        !w.neg_occurs.contains(&cr),
                         "elim.add_cid_occur for {:?} found a strange negative clause{}{}, {:?}",
                         v,
-                        cid,
+                        cr,
                         c,
                         w.pos_occurs,
                     );
-                    w.neg_occurs.push(cid);
+                    w.neg_occurs.push(cr.clone());
                 }
                 self.enqueue_var(asg, l.vi(), false);
             }
         }
         c.turn_on(FlagClause::OCCUR_LINKED);
         if enqueue {
-            self.enqueue_clause(cid, c);
+            self.enqueue_clause(cr, &mut c);
         }
     }
     /// remove a clause id from all corresponding occur lists.
-    pub fn remove_cid_occur(&mut self, asg: &mut impl AssignIF, cid: ClauseId, c: &mut Clause) {
+    pub fn remove_cid_occur(&mut self, asg: &mut impl AssignIF, cr: ClauseRef, c: &mut Clause) {
+        debug_assert!(!c.is_lifted());
         debug_assert!(self.mode == EliminatorMode::Running);
-        debug_assert!(!cid.is_lifted_lit());
         debug_assert!(!c.is_dead());
         c.turn_off(FlagClause::OCCUR_LINKED);
         for l in c.iter() {
             if asg.assign(l.vi()).is_none() {
-                self.remove_lit_occur(asg, *l, cid);
+                self.remove_lit_occur(asg, *l, &cr);
                 self.enqueue_var(asg, l.vi(), true);
             }
         }
@@ -398,10 +398,16 @@ impl Eliminator {
     // 'stop' should purge all occur lists to purge any dead clauses for now.
     fn stop(&mut self, asg: &mut impl AssignIF, cdb: &mut impl ClauseDBIF) {
         let force: bool = true;
-        self.clear_clause_queue(cdb);
+        self.clear_clause_queue();
         self.clear_var_queue(asg);
         if force {
-            for c in &mut cdb.iter_mut().skip(1) {
+            for cr in &mut cdb.iter() {
+                let rcc = cr.get();
+                let mut c = rcc.borrow_mut();
+                // let mut cr_tmp = cr.clone();
+                if c.is_dead() {
+                    continue;
+                }
                 c.turn_off(FlagClause::OCCUR_LINKED);
             }
             for w in &mut self[1..] {
@@ -423,23 +429,24 @@ impl Eliminator {
             // Check top-level assignments by creating a dummy clause
             // and placing it in the queue:
             if self.clause_queue.is_empty() && self.bwdsub_assigns < asg.stack_len() {
-                let c = ClauseId::from(asg.stack(self.bwdsub_assigns));
-                self.clause_queue.push(c);
+                let c = Clause::lift(asg.stack(self.bwdsub_assigns));
+                self.clause_queue.push(ClauseRef::new(c));
                 self.bwdsub_assigns += 1;
             }
-            if let Some(cid) = self.clause_queue.pop() {
+            if let Some(cr) = self.clause_queue.pop() {
+                let rcc = cr.get();
+                let mut c = rcc.borrow_mut();
                 if *timedout == 0 {
-                    self.clear_clause_queue(cdb);
+                    self.clear_clause_queue();
                     self.clear_var_queue(asg);
                     return Ok(());
                 }
-                let best: VarId = if cid.is_lifted_lit() {
-                    let vi = Lit::from(cid).vi();
+                let best: VarId = if c.is_lifted() {
+                    let vi = c.unlift().vi();
                     debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
                     vi
                 } else {
                     let mut tmp = cdb.derefer(cdb::property::Tusize::NumClause);
-                    let c = &mut cdb[cid];
                     c.turn_off(FlagClause::ENQUEUED);
                     if c.is_dead() || self.subsume_literal_limit < c.len() {
                         continue;
@@ -469,14 +476,24 @@ impl Eliminator {
                 if best == 0 || asg.var(best).is(FlagVar::ELIMINATED) {
                     continue;
                 }
-                self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
-                self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
+                drop(c);
+                // self[best].pos_occurs.retain(|r| {
+                //     let rcc = r.get();
+                //     let c = rcc.borrow();
+                //     !c.is_dead()
+                // });
+                // self[best].neg_occurs.retain(|r| {
+                //     let rcc = r.get();
+                //     let c = rcc.borrow();
+                //     !c.is_dead()
+                // });
                 for cls in [self[best].pos_occurs.clone(), self[best].neg_occurs.clone()].iter() {
-                    for did in cls.iter() {
-                        if *did == cid {
+                    for dr in cls.iter() {
+                        let rcd = dr.get();
+                        let d = rcd.borrow();
+                        if *dr == cr {
                             continue;
                         }
-                        let d = &cdb[*did];
                         if d.len() <= *timedout {
                             *timedout -= d.len();
                         } else {
@@ -488,12 +505,25 @@ impl Eliminator {
                                 d.contains(Lit::from((best, false)))
                                     || d.contains(Lit::from((best, true)))
                             );
-                            self.try_subsume(asg, cdb, cid, *did)?;
+                            drop(d);
+                            self.try_subsume(asg, cdb, cr.clone(), dr.clone())?;
+                        } else {
+                            drop(d);
                         }
                     }
                 }
-                self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
-                self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
+                self[best].pos_occurs.retain(|r| {
+                    let rcc = r.get();
+                    let c = rcc.borrow();
+                    !c.is_dead()
+                });
+                self[best].neg_occurs.retain(|r| {
+                    let rcc = r.get();
+                    let c = rcc.borrow();
+                    !c.is_dead()
+                });
+                // self[best].pos_occurs.retain(|r| !r.get().is_dead());
+                // self[best].neg_occurs.retain(|r| !r.get().is_dead());
             }
         }
         if asg.remains() {
@@ -526,7 +556,7 @@ impl Eliminator {
                 break;
             }
             if 0.1 <= state.elapsed().unwrap_or(1.0) - start {
-                self.clear_clause_queue(cdb);
+                self.clear_clause_queue();
                 self.clear_var_queue(asg);
                 break;
             }
@@ -556,6 +586,7 @@ impl Eliminator {
             if !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.stack_len() {
                 self.backward_subsumption_check(asg, cdb, &mut timedout)?;
             }
+            // assert!(0 < asg.derefer(assign::property::Tusize::NumUnassignedVar));
             while let Some(vi) = self.var_queue.select_var(&self.var, asg) {
                 let v = asg.var_mut(vi);
                 v.turn_off(FlagVar::ENQUEUED);
@@ -568,7 +599,7 @@ impl Eliminator {
             asg.propagate_sandbox(cdb)
                 .map_err(SolverError::RootLevelConflict)?;
             if timedout == 0 {
-                self.clear_clause_queue(cdb);
+                self.clear_clause_queue();
                 self.clear_var_queue(asg);
             } else {
                 timedout -= 1;
@@ -577,19 +608,19 @@ impl Eliminator {
         Ok(())
     }
     /// remove a clause id from literal's occur list.
-    pub fn remove_lit_occur(&mut self, asg: &mut impl AssignIF, l: Lit, cid: ClauseId) {
+    pub fn remove_lit_occur(&mut self, asg: &mut impl AssignIF, l: Lit, cr: &ClauseRef) {
         let w = &mut self[l.vi()];
         if w.aborted {
             return;
         }
         if bool::from(l) {
-            debug_assert_eq!(w.pos_occurs.iter().filter(|&c| *c == cid).count(), 1);
-            w.pos_occurs.delete_unstable(|&c| c == cid);
-            debug_assert!(!w.pos_occurs.contains(&cid));
+            debug_assert_eq!(w.pos_occurs.iter().filter(|&c| *c == *cr).count(), 1);
+            w.pos_occurs.delete_unstable(|c| c == cr);
+            debug_assert!(!w.pos_occurs.contains(cr));
         } else {
-            debug_assert_eq!(w.neg_occurs.iter().filter(|&c| *c == cid).count(), 1);
-            w.neg_occurs.delete_unstable(|&c| c == cid);
-            debug_assert!(!w.neg_occurs.contains(&cid));
+            debug_assert_eq!(w.neg_occurs.iter().filter(|&c| *c == *cr).count(), 1);
+            w.neg_occurs.delete_unstable(|c| c == cr);
+            debug_assert!(!w.neg_occurs.contains(cr));
         }
         self.enqueue_var(asg, l.vi(), true);
     }
@@ -599,20 +630,22 @@ impl Eliminator {
     ///
 
     /// enqueue a clause into eliminator's clause queue.
-    pub fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause) {
+    pub fn enqueue_clause(&mut self, cr: ClauseRef, c: &mut Clause) {
         if self.mode != EliminatorMode::Running
             || c.is(FlagClause::ENQUEUED)
             || self.subsume_literal_limit < c.len()
         {
             return;
         }
-        self.clause_queue.push(cid);
         c.turn_on(FlagClause::ENQUEUED);
+        self.clause_queue.push(cr);
     }
     /// clear eliminator's clause queue.
-    fn clear_clause_queue(&mut self, cdb: &mut impl ClauseDBIF) {
-        for cid in &self.clause_queue {
-            cdb[*cid].turn_off(FlagClause::ENQUEUED);
+    fn clear_clause_queue(&mut self) {
+        for cr in &mut self.clause_queue {
+            let rcc = cr.get();
+            let mut c = rcc.borrow_mut();
+            c.turn_off(FlagClause::ENQUEUED);
         }
         self.clause_queue.clear();
     }
@@ -654,18 +687,21 @@ fn check_eliminator(cdb: &impl ClauseDBIF, elim: &Eliminator) -> bool {
     //     }
     // }
     // all clauses are registered in corresponding occur_lists
-    for (cid, c) in cdb.iter().enumerate().skip(1) {
+    for cr in cdb.iter() {
+        let rcc = cr.get();
+        let c = rcc.borrow();
+        // let c = cr.get();
         if c.is_dead() {
             continue;
         }
         for l in c.iter() {
             let v = l.vi();
             if bool::from(*l) {
-                if !elim[v].pos_occurs.contains(&(ClauseId::from(cid))) {
-                    panic!("failed to check {} {:#}", (ClauseId::from(cid)), c);
+                if !elim[v].pos_occurs.contains(cr) {
+                    panic!("failed to check {}", cr);
                 }
-            } else if !elim[v].neg_occurs.contains(&(ClauseId::from(cid))) {
-                panic!("failed to check {} {:#}", (ClauseId::from(cid)), c);
+            } else if !elim[v].neg_occurs.contains(cr) {
+                panic!("failed to check {}", cr);
             }
         }
     }

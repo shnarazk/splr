@@ -186,7 +186,7 @@ impl SatSolverIF for Solver {
             Some(true) => Ok(self),
             Some(false) => Err(SolverError::RootLevelConflict((
                 lit,
-                self.asg.reason(lit.vi()),
+                self.asg.reason(lit.vi()).clone(),
             ))),
         }
     }

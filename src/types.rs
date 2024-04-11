@@ -2,7 +2,7 @@
 /// some common traits.
 pub use crate::{
     assign::AssignReason,
-    cdb::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
+    cdb::{Clause, ClauseDB, ClauseIF, ClauseRef, ClauseRefIF},
     config::Config,
     primitive::{ema::*, luby::*},
     solver::SolverEvent,
@@ -183,32 +183,12 @@ impl From<i32> for Lit {
     }
 }
 
-impl From<ClauseId> for Lit {
-    #[inline]
-    fn from(cid: ClauseId) -> Self {
-        Lit {
-            ordinal: unsafe {
-                NonZeroU32::new_unchecked(NonZeroU32::get(cid.ordinal) & 0x7FFF_FFFF)
-            },
-        }
-    }
-}
-
 impl From<Lit> for bool {
     /// - positive Lit (= even u32) => Some(true)
     /// - negative Lit (= odd u32)  => Some(false)
     #[inline]
     fn from(l: Lit) -> bool {
         (NonZeroU32::get(l.ordinal) & 1) != 0
-    }
-}
-
-impl From<Lit> for ClauseId {
-    #[inline]
-    fn from(l: Lit) -> ClauseId {
-        ClauseId {
-            ordinal: unsafe { NonZeroU32::new_unchecked(NonZeroU32::get(l.ordinal) | 0x8000_0000) },
-        }
     }
 }
 
@@ -338,24 +318,24 @@ pub type PropagationResult = Result<(), ConflictContext>;
 // while EmptyClause can be used for simply UNSAT form.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RefClause {
-    Clause(ClauseId),
+    Clause(ClauseRef),
     Dead,
     EmptyClause,
-    RegisteredClause(ClauseId),
+    RegisteredClause(ClauseRef),
     UnitClause(Lit),
 }
 
 impl RefClause {
-    pub fn as_cid(&self) -> ClauseId {
+    pub fn as_cref(&self) -> &ClauseRef {
         match self {
-            RefClause::Clause(cid) => *cid,
-            RefClause::RegisteredClause(cid) => *cid,
+            RefClause::Clause(cr) => cr,
+            RefClause::RegisteredClause(cr) => cr,
             _ => panic!("invalid reference to clause"),
         }
     }
-    pub fn is_new(&self) -> Option<ClauseId> {
+    pub fn is_new(&self) -> Option<ClauseRef> {
         match self {
-            RefClause::Clause(cid) => Some(*cid),
+            RefClause::Clause(cr) => Some(cr.clone()),
             RefClause::RegisteredClause(_) => None,
             RefClause::EmptyClause => None,
             RefClause::Dead => None,
@@ -565,24 +545,28 @@ pub trait FlagIF {
 
 bitflags! {
     /// Misc flags used by [`Clause`](`crate::cdb::Clause`).
-    #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
     pub struct FlagClause: u8 {
+        /// a clause is not available.
+        const DEAD        = 0b0000_0001;
         /// a clause is a generated clause by conflict analysis and is removable.
-        const LEARNT       = 0b0000_0001;
+        const LEARNT       = 0b0000_0010;
         /// used in conflict analyze
-        const USED         = 0b0000_0010;
+        const USED         = 0b0000_0100;
         /// a clause or var is enqueued for eliminator.
-        const ENQUEUED     = 0b0000_0100;
+        const ENQUEUED     = 0b0000_1000;
         /// a clause is registered in vars' occurrence list.
-        const OCCUR_LINKED = 0b0000_1000;
+        const OCCUR_LINKED = 0b0001_0000;
         /// a given clause derived a learnt which LBD is smaller than 20.
-        const DERIVE20     = 0b0001_0000;
+        const DERIVE20     = 0b0010_0000;
+        /// a clause is generated from a literal
+        const LIT_CLAUSE   = 0b0100_0000;
     }
 }
 
 bitflags! {
     /// Misc flags used by [`Var`](`crate::assign::Var`).
-    #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
     pub struct FlagVar: u8 {
         /// * the previous assigned value of a Var.
         const PHASE        = 0b0000_0001;
@@ -630,7 +614,7 @@ impl Logger {
 }
 
 #[derive(Clone, Debug)]
-pub struct OrderedProxy<T: Clone + Default + Sized + Ord> {
+pub struct OrderedProxy<T: Clone + Sized + Ord> {
     index: f64,
     body: T,
 }
@@ -644,21 +628,21 @@ impl<T: Clone + Default + Sized + Ord> Default for OrderedProxy<T> {
     }
 }
 
-impl<T: Clone + Default + Sized + Ord> PartialEq for OrderedProxy<T> {
+impl<T: Clone + Sized + Ord> PartialEq for OrderedProxy<T> {
     fn eq(&self, other: &OrderedProxy<T>) -> bool {
         self.index == other.index && self.body == other.body
     }
 }
 
-impl<T: Clone + Default + Sized + Ord> Eq for OrderedProxy<T> {}
+impl<T: Clone + Sized + Ord> Eq for OrderedProxy<T> {}
 
-impl<T: Clone + Default + PartialEq + Ord> PartialOrd for OrderedProxy<T> {
+impl<T: Clone + PartialEq + Ord> PartialOrd for OrderedProxy<T> {
     fn partial_cmp(&self, other: &OrderedProxy<T>) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<T: Clone + Default + PartialEq + Ord> Ord for OrderedProxy<T> {
+impl<T: Clone + PartialEq + Ord> Ord for OrderedProxy<T> {
     fn cmp(&self, other: &OrderedProxy<T>) -> Ordering {
         if (self.index - other.index).abs() < f64::EPSILON {
             self.body.cmp(&other.body)
@@ -670,7 +654,7 @@ impl<T: Clone + Default + PartialEq + Ord> Ord for OrderedProxy<T> {
     }
 }
 
-impl<T: Clone + Default + Sized + Ord> OrderedProxy<T> {
+impl<T: Clone + Sized + Ord> OrderedProxy<T> {
     pub fn new(body: T, index: f64) -> Self {
         OrderedProxy { index, body }
     }
@@ -689,7 +673,7 @@ impl<T: Clone + Default + Sized + Ord> OrderedProxy<T> {
 }
 
 #[cfg(feature = "boundary_check")]
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Propagate {
     None,
     CacheSatisfied(usize),

@@ -3,7 +3,7 @@ use {
     std::{
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
-        slice::Iter,
+        slice::Iter as SliceIter,
     },
 };
 
@@ -107,7 +107,7 @@ impl IndexMut<RangeFrom<usize>> for Clause {
 
 impl<'a> IntoIterator for &'a Clause {
     type Item = &'a Lit;
-    type IntoIter = Iter<'a, Lit>;
+    type IntoIter = SliceIter<'a, Lit>;
     fn into_iter(self) -> Self::IntoIter {
         self.lits.iter()
     }
@@ -115,7 +115,7 @@ impl<'a> IntoIterator for &'a Clause {
 
 impl<'a> IntoIterator for &'a mut Clause {
     type Item = &'a Lit;
-    type IntoIter = Iter<'a, Lit>;
+    type IntoIter = SliceIter<'a, Lit>;
     fn into_iter(self) -> Self::IntoIter {
         self.lits.iter()
     }
@@ -127,14 +127,35 @@ impl From<&Clause> for Vec<i32> {
     }
 }
 
+impl From<Vec<Lit>> for Clause {
+    fn from(lits: Vec<Lit>) -> Clause {
+        Clause {
+            lits,
+            ..Default::default()
+        }
+    }
+}
+
+// impl PartialOrd for Clause {
+//     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+//         Some(self.cmp(other))
+//     }
+// }
+
+// impl Ord for Clause {
+//     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+//         self.rank.cmp(&other.rank)
+//     }
+// }
+
 impl ClauseIF for Clause {
     fn is_empty(&self) -> bool {
         self.lits.is_empty()
     }
     fn is_dead(&self) -> bool {
-        self.lits.is_empty()
+        self.is(FlagClause::DEAD)
     }
-    fn iter(&self) -> Iter<'_, Lit> {
+    fn iter(&self) -> SliceIter<'_, Lit> {
         self.lits.iter()
     }
     #[inline]
@@ -178,6 +199,18 @@ impl ClauseIF for Clause {
     #[cfg(feature = "boundary_check")]
     fn set_birth(&mut self, time: usize) {
         self.birth = time;
+    }
+    fn is_lifted(&self) -> bool {
+        self.is(FlagClause::LIT_CLAUSE)
+    }
+    fn lift(l: Lit) -> Self {
+        let mut c = Clause::from(vec![l]);
+        c.turn_on(FlagClause::LIT_CLAUSE);
+        c
+    }
+    fn unlift(&self) -> Lit {
+        assert!(self.is(FlagClause::LIT_CLAUSE));
+        self.lits[0]
     }
 }
 

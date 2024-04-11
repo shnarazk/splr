@@ -88,7 +88,7 @@ enum EliminatorMode {
 pub struct Eliminator {
     enable: bool,
     mode: EliminatorMode,
-    clause_queue: Vec<ClauseId>,
+    clause_queue: Vec<ClauseRef>,
     var_queue: VarOccHeap,
     bwdsub_assigns: usize,
     /// constraints on eliminated var. It is used by `extend_model`.
@@ -146,9 +146,16 @@ mod tests {
         assert_eq!(
             0,
             cdb.iter()
-                .skip(1)
-                .filter(|c| !c.is_dead())
-                .filter(|c| c.iter().any(|l| elim_vars.contains(&l.vi())))
+                .filter(|cr| {
+                    let rcc = cr.get();
+                    let c = rcc.borrow();
+                    !c.is_dead()
+                })
+                .filter(|cr| {
+                    let rcc = cr.get();
+                    let c = rcc.borrow();
+                    c.iter().any(|l| elim_vars.contains(&l.vi()))
+                })
                 .count()
         );
     }

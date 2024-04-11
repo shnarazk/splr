@@ -2,10 +2,10 @@
 mod activity;
 /// methods on binary link, namely binary clause
 mod binary;
-/// methods on `ClauseId`
-mod cid;
 /// methods on `Clause`
 mod clause;
+/// methods on `ClauseRef`
+mod cref;
 /// methods on `ClauseDB`
 mod db;
 /// EMA
@@ -21,7 +21,7 @@ mod watch_cache;
 
 pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
-    cid::ClauseIdIF,
+    cref::{ClauseRef, ClauseRefIF},
     property::*,
     sls::StochasticLocalSearchIF,
     unsat_certificate::CertificationStore,
@@ -31,11 +31,7 @@ pub use self::{
 use {
     self::ema::ProgressLBD,
     crate::{assign::AssignIF, types::*},
-    std::{
-        num::NonZeroU32,
-        ops::IndexMut,
-        slice::{Iter, IterMut},
-    },
+    std::slice::Iter as SliceIter,
     watch_cache::*,
 };
 
@@ -57,7 +53,7 @@ pub trait ClauseIF {
     /// check clause satisfiability
     fn is_satisfied_under(&self, asg: &impl AssignIF) -> bool;
     /// return an iterator over its literals.
-    fn iter(&self) -> Iter<'_, Lit>;
+    fn iter(&self) -> SliceIter<'_, Lit>;
     /// return the number of literals.
     fn len(&self) -> usize;
 
@@ -66,12 +62,19 @@ pub trait ClauseIF {
     fn timestamp(&self) -> usize;
     #[cfg(feature = "boundary_check")]
     fn set_birth(&mut self, time: usize);
+
+    /// return true if it is a lifted clause from a Lit
+    fn is_lifted(&self) -> bool;
+    /// create a new lifted-clause
+    fn lift(l: Lit) -> Self;
+    /// return the literal from a lifted clause
+    fn unlift(&self) -> Lit;
 }
 
 /// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`remove_clause`](`crate::cdb::ClauseDBIF::remove_clause`), and so on.
 pub trait ClauseDBIF:
     Instantiate
-    + IndexMut<ClauseId, Output = Clause>
+    // + Index<ClauseRef, Output = ClauseRef>
     + PropertyDereference<property::Tusize, usize>
     + PropertyDereference<property::Tf64, f64>
 {
@@ -80,9 +83,9 @@ pub trait ClauseDBIF:
     /// return true if it's empty.
     fn is_empty(&self) -> bool;
     /// return an iterator.
-    fn iter(&self) -> Iter<'_, Clause>;
-    /// return a mutable iterator.
-    fn iter_mut(&mut self) -> IterMut<'_, Clause>;
+    fn iter(&self) -> SliceIter<'_, ClauseRef>;
+    /// remove all dead clauses
+    fn gc(&mut self);
 
     //
     //## interface to binary links
@@ -96,7 +99,7 @@ pub trait ClauseDBIF:
     //
 
     // get mutable reference to a watch_cache
-    fn fetch_watch_cache_entry(&self, lit: Lit, index: WatchCacheProxy) -> (ClauseId, Lit);
+    fn fetch_watch_cache_entry(&self, lit: Lit, index: WatchCacheProxy) -> &(ClauseRef, Lit);
     /// replace the mutable watcher list with an empty one, and return the list
     fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator;
     /// detach the watch_cache referred by the head of a watch_cache iterator
@@ -104,7 +107,7 @@ pub trait ClauseDBIF:
     /// Merge two watch cache
     fn merge_watch_cache(&mut self, l: Lit, wc: WatchCache);
     /// swap the first two literals in a clause.
-    fn swap_watch(&mut self, cid: ClauseId);
+    fn swap_watch(&mut self, c: &mut Clause);
 
     //
     //## clause transformation
@@ -118,7 +121,13 @@ pub trait ClauseDBIF:
         p: Option<Lit>,
     );
     /// swap i-th watch with j-th literal then update watch caches correctly
-    fn transform_by_updating_watch(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool);
+    fn transform_by_updating_watch(
+        &mut self,
+        cid: &ClauseRef,
+        old: usize,
+        new: usize,
+        removed: bool,
+    );
     /// allocate a new clause and return its id.
     /// Note this removes an eliminated Lit `p` from a clause. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
@@ -126,15 +135,16 @@ pub trait ClauseDBIF:
     fn new_clause(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
     fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>) -> RefClause;
     /// un-register a clause `cid` from clause database and make the clause dead.
-    fn remove_clause(&mut self, cid: ClauseId);
+    fn remove_clause(&mut self, cr: ClauseRef);
     /// un-register a clause `cid` from clause database and make the clause dead.
-    fn remove_clause_sandbox(&mut self, cid: ClauseId);
+    fn remove_clause_sandbox(&mut self, cr: ClauseRef);
     /// update watches of the clause
-    fn transform_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause;
+    fn transform_by_elimination(&mut self, cr: ClauseRef, p: Lit) -> RefClause;
     /// generic clause transformer (not in use)
-    fn transform_by_replacement(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause;
+    fn transform_by_replacement(&mut self, cr: ClauseRef, vec: &mut Vec<Lit>) -> RefClause;
     /// check satisfied and nullified literals in a clause
-    fn transform_by_simplification(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> RefClause;
+    fn transform_by_simplification(&mut self, asg: &mut impl AssignIF, cid: ClauseRef)
+        -> RefClause;
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
@@ -143,7 +153,7 @@ pub trait ClauseDBIF:
     fn reset(&mut self);
     /// update flags.
     /// return `true` if it's learnt.
-    fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool;
+    fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseRef) -> bool;
     /// record an asserted literal to unsat certification.
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.
@@ -156,7 +166,7 @@ pub trait ClauseDBIF:
     /// returns None if the given assignment is a model of a problem.
     /// Otherwise returns a clause which is not satisfiable under a given assignment.
     /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
-    fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId>;
+    fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseRef>;
     /// minimize a clause.
     fn minimize_with_bi_clauses(&mut self, asg: &impl AssignIF, vec: &mut Vec<Lit>);
     /// complete bi-clause network
@@ -164,34 +174,24 @@ pub trait ClauseDBIF:
 
     #[cfg(feature = "incremental_solver")]
     /// save an eliminated permanent clause to an extra space for incremental solving.
-    fn make_permanent_immortal(&mut self, cid: ClauseId);
+    fn make_permanent_immortal(&mut self, cid: ClauseRef);
 
     //
     //## for debug
     //
     #[cfg(feature = "boundary_check")]
     /// return true if cid is included in watching literals
-    fn watch_cache_contains(&self, lit: Lit, cid: ClauseId) -> bool;
+    fn watch_cache_contains(&self, lit: Lit, cid: ClauseRef) -> bool;
     #[cfg(feature = "boundary_check")]
     /// return a clause's watches
-    fn watch_caches(&self, cid: ClauseId, message: &str) -> (Vec<Lit>, Vec<Lit>);
-    #[cfg(feature = "boundary_check")]
-    fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool>;
+    fn watch_caches(&self, cid: ClauseRef, message: &str) -> (Vec<Lit>, Vec<Lit>);
     #[cfg(not(feature = "no_IO"))]
     /// dump all active clauses and assertions as a CNF file.
     fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);
 }
 
-/// Clause identifier, or clause index, starting with one.
-/// Note: ids are re-used after 'garbage collection'.
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct ClauseId {
-    /// a sequence number.
-    pub ordinal: NonZeroU32,
-}
-
 /// A representation of 'clause'
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Clause {
     /// The literals in a clause.
     lits: Vec<Lit>,
@@ -229,7 +229,8 @@ pub struct Clause {
 #[derive(Clone, Debug)]
 pub struct ClauseDB {
     /// container of clauses
-    clause: Vec<Clause>,
+    // clause: Vec<Clause>,
+    clause: Vec<ClauseRef>,
     /// hashed representation of binary clauses.
     ///## Note
     /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
@@ -237,8 +238,7 @@ pub struct ClauseDB {
     binary_link: BinaryLinkDB,
     /// container of watch literals
     watch_cache: Vec<WatchCache>,
-    /// collected free clause ids.
-    freelist: Vec<ClauseId>,
+
     /// see unsat_certificate.rs
     certification_store: CertificationStore,
     /// a number of clauses to emit out-of-memory exception
@@ -413,19 +413,6 @@ mod tests {
         Lit::from(i)
     }
 
-    #[allow(dead_code)]
-    fn check_watches(cdb: &ClauseDB, cid: ClauseId) {
-        let c = &cdb.clause[NonZeroU32::get(cid.ordinal) as usize];
-        if c.lits.is_empty() {
-            println!("skip checking watches of an empty clause");
-            return;
-        }
-        assert!(c.lits[0..2]
-            .iter()
-            .all(|l| cdb.watch_cache[!*l].iter().any(|(c, _)| *c == cid)));
-        println!("pass to check watches");
-    }
-
     #[test]
     fn test_clause_instantiation() {
         let config = Config::default();
@@ -436,9 +423,7 @@ mod tests {
         let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         // Now `asg.level` = [_, 1, 2, 3, 4, 5, 6].
-        let c0 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
-            .as_cid();
+        let _c0 = cdb.new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false);
 
         asg.assign_by_decision(lit(-2)); // at level 1
         asg.assign_by_decision(lit(1)); // at level 2
@@ -446,8 +431,10 @@ mod tests {
         assert_eq!(asg.level(1), 2);
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cid();
-        let c = &cdb[c1];
+            .as_cref()
+            .clone();
+        let rcc1 = c1.get();
+        let c = rcc1.borrow();
 
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
@@ -455,8 +442,10 @@ mod tests {
         assert!(!c.is(Flag::USED));
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
-            .as_cid();
-        let c = &cdb[c2];
+            .as_cref()
+            .clone();
+        let rcc2 = c2.get();
+        let c = rcc2.borrow();
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
@@ -473,10 +462,12 @@ mod tests {
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cid();
+            .as_cref()
+            .clone();
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false)
-            .as_cid();
+            .as_cref()
+            .clone();
         // cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_ne!(c1, c2);
@@ -494,9 +485,12 @@ mod tests {
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cid();
-        assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
-        let mut iter = cdb[c1][0..].iter();
+            .as_cref()
+            .clone();
+        let rcc1 = c1.get();
+        let c1_c = rcc1.borrow();
+        assert_eq!(c1_c[0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
+        let mut iter = c1_c[0..].iter();
         assert_eq!(iter.next(), Some(&lit(1)));
         assert_eq!(iter.next(), Some(&lit(2)));
         assert_eq!(iter.next(), Some(&lit(3)));

@@ -43,6 +43,7 @@ default = [
         ### For DEBUG
         # "boundary_check",
         # "maintain_watch_cache",
+        # "trace_elimination",
 
         ### platform dependency
         # "platform_wasm"

@@ -88,14 +88,14 @@ pub trait AssignIF:
 }
 
 /// Reasons of assignments
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum AssignReason {
     /// Implication by binary clause
     BinaryLink(Lit),
     /// Assigned by decision
     Decision(DecisionLevel),
     /// Assigned by a non-binary clause.
-    Implication(ClauseId),
+    Implication(ClauseRef),
     /// None of the above.
     None,
 }
@@ -106,7 +106,7 @@ impl fmt::Display for AssignReason {
             &AssignReason::BinaryLink(_) => write!(f, "Implied by a binary clause"),
             AssignReason::Decision(0) => write!(f, "Asserted"),
             AssignReason::Decision(lvl) => write!(f, "Decided at level {lvl}"),
-            AssignReason::Implication(cid) => write!(f, "Implied by {cid}"),
+            AssignReason::Implication(cr) => write!(f, "Implied by {cr}"),
             AssignReason::None => write!(f, "Not assigned"),
         }
     }
@@ -252,7 +252,7 @@ fn make_lit_report(asg: &AssignStack, lit: &Lit) -> Assign {
         val: asg.assigned(*lit),
         pos: asg.trail.iter().position(|l| vi == l.vi()),
         lvl: asg.level(vi),
-        by: asg.reason(vi),
+        by: asg.reason(vi).clone(),
         at: asg.var(vi).propagated_at,
         state: asg.var[vi].state,
     }

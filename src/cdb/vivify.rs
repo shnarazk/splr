@@ -23,7 +23,7 @@ impl VivifyIF for ClauseDB {
                 SolverError::RootLevelConflict(cc)
             })?;
         }
-        let mut clauses: Vec<OrderedProxy<ClauseId>> =
+        let mut clauses: Vec<OrderedProxy<ClauseRef>> =
             select_targets(asg, self, state[Stat::Restart] == 0, NUM_TARGETS);
         if clauses.is_empty() {
             return Ok(());
@@ -48,14 +48,17 @@ impl VivifyIF for ClauseDB {
 
             debug_assert!(asg.stack_is_empty() || !asg.remains());
             debug_assert_eq!(asg.root_level(), asg.decision_level());
-            let cid = cp.to();
-            let c = &mut self[cid];
+            let cr = cp.to();
+            let cr1 = cr.clone();
+            let rcc = cr1.get();
+            let mut c = rcc.borrow_mut();
             if c.is_dead() {
                 continue;
             }
             let is_learnt = c.is(FlagClause::LEARNT);
             c.vivified();
             let clits = c.iter().copied().collect::<Vec<Lit>>();
+            drop(c);
             if to_display <= num_check {
                 state.flush("");
                 state.flush(format!(
@@ -100,12 +103,14 @@ impl VivifyIF for ClauseDB {
                                     }
                                 }
                                 AssignReason::Implication(ci) => {
-                                    if ci == cid && clits.len() == decisions.len() {
+                                    let rci = ci.get();
+                                    if ci == cr && clits.len() == decisions.len() {
                                         asg.backtrack_sandbox();
                                         continue 'next_clause;
                                     } else {
-                                        let cnfl_lits =
-                                            &self[ci].iter().copied().collect::<Vec<Lit>>();
+                                        let c = rci.borrow();
+                                        let cnfl_lits = &c.iter().copied().collect::<Vec<Lit>>();
+                                        drop(c);
                                         seen[0] = num_check;
                                         vec = asg.analyze_sandbox(
                                             self, &decisions, cnfl_lits, &mut seen,
@@ -139,7 +144,7 @@ impl VivifyIF for ClauseDB {
                                     }
                                     #[cfg(not(feature = "clause_rewarding"))]
                                     self.new_clause(asg, &mut vec, is_learnt);
-                                    self.remove_clause(cid);
+                                    self.remove_clause(cr);
                                     num_shrink += 1;
                                 }
                             }
@@ -185,14 +190,19 @@ fn select_targets(
     cdb: &mut ClauseDB,
     initial_stage: bool,
     len: Option<usize>,
-) -> Vec<OrderedProxy<ClauseId>> {
+) -> Vec<OrderedProxy<ClauseRef>> {
     if initial_stage {
-        let mut seen: Vec<Option<OrderedProxy<ClauseId>>> = vec![None; 2 * (asg.num_vars + 1)];
-        for (i, c) in cdb.iter().enumerate().skip(1) {
+        let mut seen: Vec<Option<OrderedProxy<ClauseRef>>> = vec![None; 2 * (asg.num_vars + 1)];
+        for cr in cdb.iter() {
+            let rcc = cr.get();
+            let c = rcc.borrow();
+            if c.is_dead() {
+                continue;
+            }
             if let Some(rank) = c.to_vivify(true) {
                 let p = &mut seen[usize::from(c.lit0())];
                 if p.as_ref().map_or(0.0, |r| r.value()) < rank {
-                    *p = Some(OrderedProxy::new(ClauseId::from(i), rank));
+                    *p = Some(OrderedProxy::new(cr.clone(), rank));
                 }
             }
         }
@@ -205,13 +215,13 @@ fn select_targets(
         }
         clauses
     } else {
-        let mut clauses: Vec<OrderedProxy<ClauseId>> = cdb
+        let mut clauses: Vec<OrderedProxy<ClauseRef>> = cdb
             .iter()
-            .enumerate()
-            .skip(1)
-            .filter_map(|(i, c)| {
+            .filter_map(|cr| {
+                let rcc = cr.get();
+                let c = rcc.borrow();
                 c.to_vivify(false)
-                    .map(|r| OrderedProxy::new_invert(ClauseId::from(i), r))
+                    .map(|r| OrderedProxy::new_invert(cr.clone(), r))
             })
             .collect::<Vec<_>>();
         if let Some(max_len) = len {
@@ -229,7 +239,7 @@ impl AssignStack {
     /// negated literals of `lits`
     fn analyze_sandbox(
         &self,
-        cdb: &ClauseDB,
+        _cdb: &ClauseDB,
         decisions: &[Lit],
         conflicting: &[Lit],
         seen: &mut [usize],
@@ -278,8 +288,10 @@ impl AssignStack {
                 AssignReason::BinaryLink(bil) => {
                     seen[bil.vi()] = key;
                 }
-                AssignReason::Implication(cid) => {
-                    for r in cdb[cid].iter().skip(1) {
+                AssignReason::Implication(cr) => {
+                    let rcc = cr.get();
+                    let c = rcc.borrow();
+                    for r in c.iter().skip(1) {
                         seen[r.vi()] = key;
                     }
                 }

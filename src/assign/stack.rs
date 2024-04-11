@@ -203,21 +203,21 @@ impl AssignIF for AssignStack {
     fn extend_model(&mut self, cdb: &mut impl ClauseDBIF) -> Vec<Option<bool>> {
         let lits = &self.eliminated;
 
-        #[cfg(feature = "trace_elimination")]
-        println!(
-            "# extend_model\n - as i32: {:?}\n - as raw: {:?}",
-            i32s(lits),
-            lits.iter()
-                .map(|l| {
-                    let i = i32::from(l);
-                    if i < 0 {
-                        -2 * i
-                    } else {
-                        2 * i + 1
-                    }
-                })
-                .collect::<Vec<_>>(),
-        );
+        // #[cfg(feature = "trace_elimination")]
+        // println!(
+        //     "# extend_model\n - as i32: {:?}\n - as raw: {:?}",
+        //     i32s(lits),
+        //     lits.iter()
+        //         .map(|l| {
+        //             let i = i32::from(l);
+        //             if i < 0 {
+        //                 -2 * i
+        //             } else {
+        //                 2 * i + 1
+        //             }
+        //         })
+        //         .collect::<Vec<_>>(),
+        // );
         let mut extended_model: Vec<Option<bool>> = self
             .var
             .iter()
