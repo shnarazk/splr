@@ -50,7 +50,7 @@ pub fn handle_conflict(
     #[cfg(feature = "chrono_BT")]
     {
         let c = match cc.1 {
-            AssignReason::Implication(cid) => &cdb[cid],
+            AssignReason::Implication(cr) => &cdb[cr],
             _ => panic!(),
         };
         let level = asg.level_ref();

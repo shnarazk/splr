@@ -103,22 +103,6 @@ impl ClauseRefIF for ClauseRef {
 //     }
 // }
 
-// impl From<usize> for ClauseRef {
-//     #[inline]
-//     fn from(u: usize) -> ClauseRef {
-//         ClauseRef {
-//             ordinal: unsafe { NonZeroU32::new_unchecked(u as u32) },
-//         }
-//     }
-// }
-
-// impl From<ClauseRef> for usize {
-//     #[inline]
-//     fn from(cid: ClauseRef) -> usize {
-//         NonZeroU32::get(cid.ordinal) as usize
-//     }
-// }
-
 impl fmt::Debug for ClauseRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let rcc = self.get();
@@ -158,5 +142,15 @@ mod tests {
         assert!(c1 == c10);
         assert!(c1 != c11);
         assert!(c1 != c2);
+    }
+    #[test]
+    fn list_unlift() {
+        for i in [1_i32, -1, 2, -2] {
+            let l = Lit::from(i);
+            let cr = ClauseRef::lift(l);
+            let rcc = cr.get();
+            let c = rcc.borrow();
+            assert_eq!(cr.unlift(&c), l);
+        }
     }
 }

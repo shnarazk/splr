@@ -135,6 +135,9 @@ impl SolveIF for Solver {
                 //
                 if USE_PRE_PROCESSING_ELIMINATOR {
                     state.flush("simplifying...");
+                    // for vi in 1..=asg.num_vars {
+                    //     assert!(!matches!(asg.reason(vi), AssignReason::Implication(_)));
+                    // }
                     if elim.simplify(asg, cdb, state, false).is_err() {
                         // Why inconsistent? Because the CNF contains a conflict, not an error!
                         // Or out of memory.

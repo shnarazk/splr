@@ -71,17 +71,14 @@ pub fn eliminate_var(
             match merge(asg, cdb, pr.clone(), nr.clone(), vi, vec) {
                 0 => {
                     #[cfg(feature = "trace_elimination")]
-                    println!(
-                        " - eliminate_var {}: fusion {}{} and {}{}",
-                        vi, p, cdb[*p], n, cdb[*n],
-                    );
+                    println!(" - eliminate_var {}: fusion {} and {}", vi, p, n);
                 }
                 1 => {
                     let lit = vec[0];
                     #[cfg(feature = "trace_elimination")]
                     println!(
-                        " - eliminate_var {}: found assign {} from {}{} and {}{}",
-                        vi, lit, p, cdb[*p], n, cdb[*n],
+                        " - eliminate_var {}: found assign {} from {} and {}",
+                        vi, lit, p, n,
                     );
                     match asg.assigned(lit) {
                         Some(true) => (),
@@ -108,7 +105,13 @@ pub fn eliminate_var(
                             #[cfg(feature = "trace_elimination")]
                             println!(
                                 " - eliminate_var {}: X {} from {} and {}",
-                                vi, cdb[ci], cdb[*p], cdb[*n],
+                                vi,
+                                {
+                                    let rcc = ci.get();
+                                    rcc.borrow()
+                                },
+                                p,
+                                n,
                             );
                         }
                         RefClause::Dead => (),

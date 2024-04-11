@@ -583,6 +583,7 @@ impl Eliminator {
             if !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.stack_len() {
                 self.backward_subsumption_check(asg, cdb, &mut timedout)?;
             }
+            // assert!(0 < asg.derefer(assign::property::Tusize::NumUnassignedVar));
             while let Some(vi) = self.var_queue.select_var(&self.var, asg) {
                 let v = asg.var_mut(vi);
                 v.turn_off(FlagVar::ENQUEUED);

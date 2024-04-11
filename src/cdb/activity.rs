@@ -12,12 +12,10 @@ impl ActivityIF<ClauseRef> for ClauseDB {
         self[cid].reward = val;
     }
     #[inline]
-    fn reward_at_analysis(&mut self, cid: ClauseRef) {
-        self.clause[NonZeroU32::get(cid.ordinal) as usize].update_activity(
-            self.tick,
-            self.activity_decay,
-            self.activity_anti_decay,
-        );
+    fn reward_at_analysis(&mut self, cr: ClauseRef) {
+        let rcc = cr.get();
+        let mut c = rcc.borrow_mut();
+        c.update_activity(self.tick, self.activity_decay, self.activity_anti_decay);
     }
     fn update_activity_tick(&mut self) {
         self.tick += 1;

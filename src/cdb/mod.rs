@@ -31,10 +31,7 @@ pub use self::{
 use {
     self::ema::ProgressLBD,
     crate::{assign::AssignIF, types::*},
-    std::{
-        collections::{hash_set::Iter as HashSetIter, HashSet},
-        slice::Iter as SliceIter,
-    },
+    std::slice::Iter as SliceIter,
     watch_cache::*,
 };
 
@@ -79,7 +76,7 @@ pub trait ClauseDBIF:
     /// return true if it's empty.
     fn is_empty(&self) -> bool;
     /// return an iterator.
-    fn iter(&self) -> HashSetIter<'_, ClauseRef>;
+    fn iter(&self) -> SliceIter<'_, ClauseRef>;
 
     //
     //## interface to binary links
@@ -226,7 +223,7 @@ pub struct ClauseDB {
     next_clause_id: usize,
     /// container of clauses
     // clause: Vec<Clause>,
-    clause: HashSet<ClauseRef>,
+    clause: Vec<ClauseRef>,
     /// hashed representation of binary clauses.
     ///## Note
     /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].

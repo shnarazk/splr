@@ -354,6 +354,9 @@ impl PropagateIF for AssignStack {
             for (blocker, cr) in cdb.binary_links(false_lit).iter() {
                 let rcc = cr.get();
                 let b = rcc.borrow_mut();
+                if b.is_dead() {
+                    continue;
+                }
                 // let b = cr.get();
                 let var = &self.var[blocker.vi()];
                 debug_assert!(!b.is_dead());
@@ -391,7 +394,7 @@ impl PropagateIF for AssignStack {
                 //     "dead clause in propagation: {:?}",
                 //     cr,
                 // );
-                debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
+                // debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
                 // #[cfg(feature = "maintain_watch_cache")]
                 // debug_assert!(
                 //     cached == cdb[cr].lit0() || cached == cdb[cr].lit1(),
@@ -404,6 +407,13 @@ impl PropagateIF for AssignStack {
                 // assert_ne!(other_watch.vi(), false_lit.vi());
                 // assert!(other_watch == cdb[cr].lit0() || other_watch == cdb[cr].lit1());
                 let cr = cr.clone();
+                let rcc = cr.get();
+                let mut c = rcc.borrow_mut();
+                if c.is_dead() {
+                    cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
+                    continue 'next_clause;
+                }
+                debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
                 let mut other_watch_value = lit_assign!(self.var[cached.vi()], cached);
                 let mut updated_cache: Option<Lit> = None;
                 if Some(true) == other_watch_value {
@@ -422,8 +432,8 @@ impl PropagateIF for AssignStack {
                     continue 'next_clause;
                 }
                 {
-                    let rcc = cr.get();
-                    let mut c = rcc.borrow_mut();
+                    // let rcc = cr.get();
+                    // let mut c = rcc.borrow_mut();
                     let lit0 = c.lit0();
                     let lit1 = c.lit1();
                     let (false_watch_pos, other) = if false_lit == lit1 {
@@ -478,8 +488,6 @@ impl PropagateIF for AssignStack {
                         cdb.swap_watch(&mut c);
                     }
                 }
-                let rcc = cr.get();
-                let c = rcc.borrow();
                 // let c = cr.get();
                 cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
                 if other_watch_value == Some(false) {
@@ -565,7 +573,10 @@ impl PropagateIF for AssignStack {
                 let rcc = cr.get();
                 let c = rcc.borrow();
                 // let c = cr.get();
-                debug_assert!(!c.is_dead());
+                if c.is_dead() {
+                    continue;
+                }
+                // debug_assert!(!c.is_dead());
                 debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
                 debug_assert_ne!(*blocker, false_lit);
 
@@ -591,23 +602,23 @@ impl PropagateIF for AssignStack {
             //## normal clause loop
             //
             let mut source = cdb.watch_cache_iter(propagating);
-            'next_clause: while let Some((cr0, mut cached)) = source
+            'next_clause: while let Some((cr, mut cached)) = source
                 .next()
                 .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
             {
-                let cr1 = cr0.clone();
-                let cr = cr0.clone();
                 // let c = cr.get_mut();
+                let cr = cr.clone();
                 let rcc = cr.get();
                 let mut c = rcc.borrow_mut();
-                // if c.is_dead() {
-                //     cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
-                //     continue;
-                // }
+                if c.is_dead() {
+                    cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
+                    continue;
+                }
                 debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
                 let mut other_watch_value = lit_assign!(self.var[cached.vi()], cached);
                 let mut updated_cache: Option<Lit> = None;
                 if matches!(other_watch_value, Some(true)) {
+                    drop(c);
                     cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
                     check_in!(c, Propagate::SandboxCacheSatisfied(self.num_conflict));
                     continue 'next_clause;
@@ -626,12 +637,13 @@ impl PropagateIF for AssignStack {
                         other_watch_value = lit_assign!(self.var[other.vi()], other);
                         if Some(true) == other_watch_value {
                             debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
+                            check_in!(c, Propagate::SandboxCacheSatisfied(self.num_conflict));
+                            drop(c);
                             cdb.transform_by_restoring_watch_cache(
                                 propagating,
                                 &mut source,
                                 Some(other),
                             );
-                            check_in!(c, Propagate::SandboxCacheSatisfied(self.num_conflict));
                             continue 'next_clause;
                         }
                         updated_cache = Some(other);
@@ -646,10 +658,11 @@ impl PropagateIF for AssignStack {
                     {
                         if lit_assign!(self.var[lk.vi()], *lk) != Some(false) {
                             let new_watch = !*lk;
-                            cdb.detach_watch_cache(propagating, &mut source);
+                            let cr1 = cr.clone();
                             c.search_from = (k as u16).saturating_add(1);
                             drop(c);
-                            cdb.transform_by_updating_watch(cr1.clone(), false_watch_pos, k, true);
+                            cdb.detach_watch_cache(propagating, &mut source);
+                            cdb.transform_by_updating_watch(cr1, false_watch_pos, k, true);
                             debug_assert!(
                                 self.assigned(!new_watch) == Some(true)
                                     || self.assigned(!new_watch).is_none()

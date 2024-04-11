@@ -153,7 +153,7 @@ impl ClauseIF for Clause {
         self.lits.is_empty()
     }
     fn is_dead(&self) -> bool {
-        self.lits.is_empty()
+        self.is(FlagClause::DEAD)
     }
     fn iter(&self) -> SliceIter<'_, Lit> {
         self.lits.iter()

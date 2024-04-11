@@ -8,7 +8,7 @@ use {
         BinaryLinkDB, CertificationStore, Clause, ClauseDB, ClauseDBIF, ReductionType, RefClause,
     },
     crate::{assign::AssignIF, types::*},
-    std::collections::{hash_set::Iter, HashSet},
+    std::slice::Iter as SliceIter,
 };
 
 #[cfg(not(feature = "no_IO"))]
@@ -18,7 +18,7 @@ impl Default for ClauseDB {
     fn default() -> ClauseDB {
         ClauseDB {
             next_clause_id: 1, // id 0 is used by lifted clauses from a literal
-            clause: HashSet::new(),
+            clause: Vec::new(),
             binary_link: BinaryLinkDB::default(),
             watch_cache: Vec::new(),
             certification_store: CertificationStore::default(),
@@ -51,111 +51,6 @@ impl Default for ClauseDB {
     }
 }
 
-// impl Index<ClauseRef> for ClauseDB {
-//     type Output = ClauseRef;
-//     #[inline]
-//     fn index(&self, cid: ClauseRef) -> &ClauseRef {
-//         self.clause[cid]
-//         let i = NonZeroU32::get(cid.ordinal) as usize;
-//         #[cfg(feature = "unsafe_access")]
-//         unsafe {
-//             self.clause.get_unchecked(i)
-//         }
-//         #[cfg(not(feature = "unsafe_access"))]
-//         &self.clause[i]
-//     }
-// }
-
-// impl IndexMut<ClauseRef> for ClauseDB {
-//     #[inline]
-//     fn index_mut(&mut self, cid: ClauseRef) -> &mut Clause {
-//         let i = NonZeroU32::get(cid.ordinal) as usize;
-//         #[cfg(feature = "unsafe_access")]
-//         unsafe {
-//             self.clause.get_unchecked_mut(i)
-//         }
-//         #[cfg(not(feature = "unsafe_access"))]
-//         &mut self.clause[i]
-//     }
-// }
-
-// impl Index<&ClauseRef> for ClauseDB {
-//     type Output = Clause;
-//     #[inline]
-//     fn index(&self, cid: &ClauseRef) -> &Clause {
-//         let i = NonZeroU32::get(cid.ordinal) as usize;
-//         #[cfg(feature = "unsafe_access")]
-//         unsafe {
-//             self.clause.get_unchecked(i)
-//         }
-//         #[cfg(not(feature = "unsafe_access"))]
-//         &self.clause[i]
-//     }
-// }
-
-// impl IndexMut<&ClauseRef> for ClauseDB {
-//     #[inline]
-//     fn index_mut(&mut self, cid: &ClauseRef) -> &mut Clause {
-//         let i = NonZeroU32::get(cid.ordinal) as usize;
-//         #[cfg(feature = "unsafe_access")]
-//         unsafe {
-//             self.clause.get_unchecked_mut(i)
-//         }
-//         #[cfg(not(feature = "unsafe_access"))]
-//         &mut self.clause[i]
-//     }
-// }
-
-// impl Index<Range<usize>> for ClauseDB {
-//     type Output = [Clause];
-//     #[inline]
-//     fn index(&self, r: Range<usize>) -> &[Clause] {
-//         #[cfg(feature = "unsafe_access")]
-//         unsafe {
-//             self.clause.get_unchecked(r)
-//         }
-//         #[cfg(not(feature = "unsafe_access"))]
-//         &self.clause[r]
-//     }
-// }
-
-// impl Index<RangeFrom<usize>> for ClauseDB {
-//     type Output = [Clause];
-//     #[inline]
-//     fn index(&self, r: RangeFrom<usize>) -> &[Clause] {
-//         #[cfg(feature = "unsafe_access")]
-//         unsafe {
-//             self.clause.get_unchecked(r)
-//         }
-//         #[cfg(not(feature = "unsafe_access"))]
-//         &self.clause[r]
-//     }
-// }
-
-// impl IndexMut<Range<usize>> for ClauseDB {
-//     #[inline]
-//     fn index_mut(&mut self, r: Range<usize>) -> &mut [Clause] {
-//         #[cfg(feature = "unsafe_access")]
-//         unsafe {
-//             self.clause.get_unchecked_mut(r)
-//         }
-//         #[cfg(not(feature = "unsafe_access"))]
-//         &mut self.clause[r]
-//     }
-// }
-
-// impl IndexMut<RangeFrom<usize>> for ClauseDB {
-//     #[inline]
-//     fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Clause] {
-//         #[cfg(feature = "unsafe_access")]
-//         unsafe {
-//             self.clause.get_unchecked_mut(r)
-//         }
-//         #[cfg(not(feature = "unsafe_access"))]
-//         &mut self.clause[r]
-//     }
-// }
-
 impl Instantiate for ClauseDB {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> ClauseDB {
         let nv = cnf.num_of_variables;
@@ -167,7 +62,7 @@ impl Instantiate for ClauseDB {
             watcher.push(WatchCache::new());
         }
         ClauseDB {
-            clause: HashSet::new(),
+            clause: Vec::new(),
             binary_link: BinaryLinkDB::instantiate(config, cnf),
             watch_cache: watcher,
             certification_store: CertificationStore::instantiate(config, cnf),
@@ -213,7 +108,7 @@ impl ClauseDBIF for ClauseDB {
     fn is_empty(&self) -> bool {
         self.clause.is_empty()
     }
-    fn iter(&self) -> Iter<'_, ClauseRef> {
+    fn iter(&self) -> SliceIter<'_, ClauseRef> {
         self.clause.iter()
     }
     #[inline]
@@ -317,9 +212,13 @@ impl ClauseDBIF for ClauseDB {
         }
         let l0 = c.lits[0];
         let l1 = c.lits[1];
+        // assert!(!c.is(FlagClause::ENQUEUED));
+        // assert!(!c.is(FlagClause::OCCUR_LINKED));
+        // assert!(!c.is(FlagClause::DERIVE20));
+        // assert!(!c.is(FlagClause::LIT_CLAUSE));
         let cr = ClauseRef::new(self.next_clause_id, c);
         self.next_clause_id += 1;
-        self.clause.insert(cr.clone());
+        self.clause.push(cr.clone());
         if len2 {
             *num_bi_clause += 1;
             binary_link.add(l0, l1, cr.clone());
@@ -365,9 +264,13 @@ impl ClauseDBIF for ClauseDB {
         }
         let l0 = c.lits[0];
         let l1 = c.lits[1];
+        // assert!(!c.is(FlagClause::ENQUEUED));
+        // assert!(!c.is(FlagClause::OCCUR_LINKED));
+        // assert!(!c.is(FlagClause::DERIVE20));
+        // assert!(!c.is(FlagClause::LIT_CLAUSE));
         let cr = ClauseRef::new(self.next_clause_id, c);
         self.next_clause_id += 1;
-        self.clause.insert(cr.clone());
+        self.clause.push(cr.clone());
         if len2 {
             binary_link.add(l0, l1, cr.clone());
         } else {
@@ -1273,37 +1176,36 @@ impl ClauseDB {
 #[inline]
 #[allow(clippy::too_many_arguments)]
 fn remove_clause_fn(
-    clause_pool: &mut HashSet<ClauseRef>,
+    _clause_pool: &mut [ClauseRef],
     certification_store: &mut CertificationStore,
-    binary_link: &mut BinaryLinkDB,
-    watcher: &mut [WatchCache],
+    _binary_link: &mut BinaryLinkDB,
+    _watcher: &mut [WatchCache],
     num_bi_clause: &mut usize,
     num_clause: &mut usize,
     num_learnt: &mut usize,
     cr: ClauseRef,
 ) {
     let rcc = cr.get();
-    let c = rcc.borrow();
+    let mut c = rcc.borrow_mut();
     debug_assert!(!c.is_dead());
-    let l0 = c.lits[0];
-    let l1 = c.lits[1];
+    c.turn_on(FlagClause::DEAD);
+    // let l0 = c.lits[0];
+    // let l1 = c.lits[1];
     if c.len() == 2 {
-        binary_link
-            .remove(l0, l1)
-            .expect("Eror (remove_clause_fn#01)");
+        // binary_link
+        //     .remove(l0, l1)
+        //     .expect("Eror (remove_clause_fn#01)");
         *num_bi_clause -= 1;
     } else {
-        watcher[usize::from(!l0)].remove_watch(&cr); // .expect("db1076");
-        watcher[usize::from(!l1)].remove_watch(&cr); // .expect("db1077");
+        // watcher[usize::from(!l0)].remove_watch(&cr); // .expect("db1076");
+        // watcher[usize::from(!l1)].remove_watch(&cr); // .expect("db1077");
     }
     if c.is(FlagClause::LEARNT) {
         *num_learnt -= 1;
     }
     certification_store.delete_clause(&c.lits);
-    if clause_pool.remove(&cr) {
-        *num_clause -= 1;
-    };
-    // c.lits.clear();
+    *num_clause -= 1;
+    c.lits.clear();
 }
 
 impl Clause {

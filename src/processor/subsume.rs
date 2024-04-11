@@ -22,18 +22,20 @@ impl Eliminator {
         assert_ne!(cr, dr);
         let rcc = cr.get();
         let mut c = rcc.borrow_mut();
+        // assert!(!c.is_dead());
         let rcd = dr.get();
         let mut d = rcd.borrow_mut();
+        // assert!(!d.is_dead());
         // if !c.is(FlagClause::LEARNT) || !d.is(FlagClause::LEARNT) {
         //     return Ok(());
         // }
-        match have_subsuming_lit(cdb, &cr, &c, &dr, &d) {
+        // if !c.is(FlagClause::LEARNT) && !d.is(FlagClause::LEARNT) {
+        //     return Ok(());
+        // }
+        match have_subsuming_lit(&cr, &c, &dr, &d) {
             Subsumable::Success => {
                 #[cfg(feature = "trace_elimination")]
-                println!(
-                    "BackSubsC    => {} {} subsumed completely by {} {:#}",
-                    dr, d, cr, c,
-                );
+                println!("BackSubsC    => {:#} subsumed completely by {:#}", d, c);
                 debug_assert!(!d.is_dead());
                 if !d.is(FlagClause::LEARNT) {
                     c.turn_off(FlagClause::LEARNT);
@@ -47,7 +49,7 @@ impl Eliminator {
             Subsumable::By(l) => {
                 debug_assert!(cr.is_lifted());
                 #[cfg(feature = "trace_elimination")]
-                println!("BackSubC subsumes {} from {} and {}", l, cr, dr);
+                println!("BackSubC subsumes {} from {:#} and {:#}", l, c, d);
                 drop(d);
                 strengthen_clause(asg, cdb, self, dr, !l)?;
                 self.enqueue_var(asg, l.vi(), true);
@@ -59,13 +61,7 @@ impl Eliminator {
 }
 
 /// returns a literal if these clauses can be merged by the literal.
-fn have_subsuming_lit(
-    _cdb: &mut impl ClauseDBIF,
-    cr: &ClauseRef,
-    c: &Clause,
-    other: &ClauseRef,
-    o: &Clause,
-) -> Subsumable {
+fn have_subsuming_lit(cr: &ClauseRef, c: &Clause, other: &ClauseRef, o: &Clause) -> Subsumable {
     debug_assert!(!other.is_lifted());
     if cr.is_lifted() {
         let l = cr.unlift(c);
@@ -79,8 +75,6 @@ fn have_subsuming_lit(
     // let mut ret: Subsumable = Subsumable::Success;
     debug_assert!(1 < c.len());
     debug_assert!(1 < o.len());
-    // debug_assert!(o.contains(o[0]));
-    // debug_assert!(o.contains(o[1]));
     'next: for l in c.iter() {
         for lo in o.iter() {
             if *l == *lo {

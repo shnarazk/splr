@@ -181,21 +181,20 @@ impl VarManipulateIF for AssignStack {
 
             #[cfg(feature = "trace_elimination")]
             {
-                let lv = self.level[vi];
-                if self.root_level == self.level[vi] && self.assign[vi].is_some() {
+                let v = &self.var[vi];
+                if self.root_level == v.level && v.assign.is_some() {
                     panic!("v:{}, dl:{}", self.var[vi], self.decision_level());
                 }
-                if !(self.root_level < self.level[vi] || self.assign[vi].is_none()) {
+                if !(self.root_level < v.level || v.assign.is_none()) {
                     panic!(
-                        "v:{}, lvl:{} => {}, dl:{}, assign:{:?} ",
-                        self.var[vi],
-                        lv,
-                        self.level[vi],
+                        "v:{}, lvl:{}, dl:{}, assign:{:?} ",
+                        vi,
+                        v.level,
                         self.decision_level(),
-                        self.assign[vi],
+                        v.assign,
                     );
                 }
-                debug_assert!(self.root_level < self.level[vi] || self.assign[vi].is_none());
+                debug_assert!(self.root_level < v.level || v.assign.is_none());
             }
         } else {
             #[cfg(feature = "boundary_check")]
