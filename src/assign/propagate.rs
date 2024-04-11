@@ -475,7 +475,7 @@ impl PropagateIF for AssignStack {
                             cdb.detach_watch_cache(propagating, &mut source);
                             c.search_from = (k + 1) as u16;
                             drop(c);
-                            cdb.transform_by_updating_watch(cr.clone(), false_watch_pos, k, true);
+                            cdb.transform_by_updating_watch(&cr, false_watch_pos, k, true);
                             debug_assert_ne!(self.assigned(new_watch), Some(true));
                             check_in!(
                                 c,
@@ -658,11 +658,10 @@ impl PropagateIF for AssignStack {
                     {
                         if lit_assign!(self.var[lk.vi()], *lk) != Some(false) {
                             let new_watch = !*lk;
-                            let cr1 = cr.clone();
                             c.search_from = (k as u16).saturating_add(1);
                             drop(c);
                             cdb.detach_watch_cache(propagating, &mut source);
-                            cdb.transform_by_updating_watch(cr1, false_watch_pos, k, true);
+                            cdb.transform_by_updating_watch(&cr, false_watch_pos, k, true);
                             debug_assert!(
                                 self.assigned(!new_watch) == Some(true)
                                     || self.assigned(!new_watch).is_none()

@@ -326,10 +326,10 @@ pub enum RefClause {
 }
 
 impl RefClause {
-    pub fn as_cref(&self) -> ClauseRef {
+    pub fn as_cref(&self) -> &ClauseRef {
         match self {
-            RefClause::Clause(cr) => cr.clone(),
-            RefClause::RegisteredClause(cr) => cr.clone(),
+            RefClause::Clause(cr) => cr,
+            RefClause::RegisteredClause(cr) => cr,
             _ => panic!("invalid reference to clause"),
         }
     }
@@ -559,7 +559,7 @@ bitflags! {
         const OCCUR_LINKED = 0b0001_0000;
         /// a given clause derived a learnt which LBD is smaller than 20.
         const DERIVE20     = 0b0010_0000;
-        /// a given clause derived a learnt which LBD is smaller than 20.
+        /// a clause is generated from a literal
         const LIT_CLAUSE   = 0b0100_0000;
     }
 }

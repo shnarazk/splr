@@ -168,6 +168,7 @@ impl SolveIF for Solver {
                     asg.rebuild_order();
                 }
             }
+            cdb.gc();
             asg.eliminated.append(elim.eliminated_lits());
             state[Stat::Simplify] += 1;
             state[Stat::SubsumedClause] = elim.num_subsumed;

@@ -17,7 +17,6 @@ use std::{fs::File, io::Write, path::Path};
 impl Default for ClauseDB {
     fn default() -> ClauseDB {
         ClauseDB {
-            next_clause_id: 1, // id 0 is used by lifted clauses from a literal
             clause: Vec::new(),
             binary_link: BinaryLinkDB::default(),
             watch_cache: Vec::new(),
@@ -110,6 +109,13 @@ impl ClauseDBIF for ClauseDB {
     }
     fn iter(&self) -> SliceIter<'_, ClauseRef> {
         self.clause.iter()
+    }
+    fn gc(&mut self) {
+        self.clause.retain(|cr| {
+            let rcc = cr.get();
+            let c = rcc.borrow();
+            !c.is_dead()
+        })
     }
     #[inline]
     fn binary_links(&self, l: Lit) -> &BinaryLinkList {
@@ -216,8 +222,7 @@ impl ClauseDBIF for ClauseDB {
         // assert!(!c.is(FlagClause::OCCUR_LINKED));
         // assert!(!c.is(FlagClause::DERIVE20));
         // assert!(!c.is(FlagClause::LIT_CLAUSE));
-        let cr = ClauseRef::new(self.next_clause_id, c);
-        self.next_clause_id += 1;
+        let cr = ClauseRef::new(c);
         self.clause.push(cr.clone());
         if len2 {
             *num_bi_clause += 1;
@@ -268,8 +273,7 @@ impl ClauseDBIF for ClauseDB {
         // assert!(!c.is(FlagClause::OCCUR_LINKED));
         // assert!(!c.is(FlagClause::DERIVE20));
         // assert!(!c.is(FlagClause::LIT_CLAUSE));
-        let cr = ClauseRef::new(self.next_clause_id, c);
-        self.next_clause_id += 1;
+        let cr = ClauseRef::new(c);
         self.clause.push(cr.clone());
         if len2 {
             binary_link.add(l0, l1, cr.clone());
@@ -749,7 +753,7 @@ impl ClauseDBIF for ClauseDB {
     // used in `propagate`, `propagate_sandbox`, and `handle_conflict` for chronoBT
     fn transform_by_updating_watch(
         &mut self,
-        cr: ClauseRef,
+        cr: &ClauseRef,
         old: usize,
         new: usize,
         removed: bool,
@@ -780,10 +784,10 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(!c.is_dead());
         let other = (old == 0) as usize;
         if removed {
-            debug_assert!(watch_cache[!c.lits[old]].get_watch(&cr).is_none());
+            debug_assert!(watch_cache[!c.lits[old]].get_watch(cr).is_none());
         } else {
             //## Step:1
-            watch_cache[!c.lits[old]].remove_watch(&cr);
+            watch_cache[!c.lits[old]].remove_watch(cr);
         }
         //## Step:2
         // assert!(watch_cache[!c.lits[new]].iter().all(|e| e.0 != cr));

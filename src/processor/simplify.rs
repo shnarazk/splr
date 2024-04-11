@@ -381,7 +381,7 @@ impl Eliminator {
     }
     /// remove a clause id from all corresponding occur lists.
     pub fn remove_cid_occur(&mut self, asg: &mut impl AssignIF, cr: ClauseRef, c: &mut Clause) {
-        debug_assert!(!cr.is_lifted());
+        debug_assert!(!c.is_lifted());
         debug_assert!(self.mode == EliminatorMode::Running);
         debug_assert!(!c.is_dead());
         c.turn_off(FlagClause::OCCUR_LINKED);
@@ -405,6 +405,9 @@ impl Eliminator {
                 let rcc = cr.get();
                 let mut c = rcc.borrow_mut();
                 // let mut cr_tmp = cr.clone();
+                if c.is_dead() {
+                    continue;
+                }
                 c.turn_off(FlagClause::OCCUR_LINKED);
             }
             for w in &mut self[1..] {
@@ -426,8 +429,8 @@ impl Eliminator {
             // Check top-level assignments by creating a dummy clause
             // and placing it in the queue:
             if self.clause_queue.is_empty() && self.bwdsub_assigns < asg.stack_len() {
-                self.clause_queue
-                    .push(ClauseRef::lift(asg.stack(self.bwdsub_assigns)));
+                let c = Clause::lift(asg.stack(self.bwdsub_assigns));
+                self.clause_queue.push(ClauseRef::new(c));
                 self.bwdsub_assigns += 1;
             }
             if let Some(cr) = self.clause_queue.pop() {
@@ -438,8 +441,8 @@ impl Eliminator {
                     self.clear_var_queue(asg);
                     return Ok(());
                 }
-                let best: VarId = if cr.is_lifted() {
-                    let vi = cr.unlift(&c).vi();
+                let best: VarId = if c.is_lifted() {
+                    let vi = c.unlift().vi();
                     debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
                     vi
                 } else {

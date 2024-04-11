@@ -196,6 +196,9 @@ fn select_targets(
         for cr in cdb.iter() {
             let rcc = cr.get();
             let c = rcc.borrow();
+            if c.is_dead() {
+                continue;
+            }
             if let Some(rank) = c.to_vivify(true) {
                 let p = &mut seen[usize::from(c.lit0())];
                 if p.as_ref().map_or(0.0, |r| r.value()) < rank {

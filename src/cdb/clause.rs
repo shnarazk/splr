@@ -200,6 +200,18 @@ impl ClauseIF for Clause {
     fn set_birth(&mut self, time: usize) {
         self.birth = time;
     }
+    fn is_lifted(&self) -> bool {
+        self.is(FlagClause::LIT_CLAUSE)
+    }
+    fn lift(l: Lit) -> Self {
+        let mut c = Clause::from(vec![l]);
+        c.turn_on(FlagClause::LIT_CLAUSE);
+        c
+    }
+    fn unlift(&self) -> Lit {
+        assert!(self.is(FlagClause::LIT_CLAUSE));
+        self.lits[0]
+    }
 }
 
 impl FlagIF for Clause {

@@ -1,6 +1,5 @@
 use {
-    super::{Clause, Lit},
-    crate::types::{FlagClause, FlagIF},
+    super::Clause,
     std::{
         borrow::Borrow,
         cell::RefCell,
@@ -15,7 +14,6 @@ use {
 /// Note: ids are re-used after 'garbage collection'.
 #[derive(Clone)]
 pub struct ClauseRef {
-    id: usize,
     c: Rc<RefCell<Clause>>,
 }
 
@@ -26,12 +24,6 @@ impl PartialEq for ClauseRef {
 }
 
 impl Eq for ClauseRef {}
-
-impl std::hash::Hash for ClauseRef {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state)
-    }
-}
 
 impl Ord for ClauseRef {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
@@ -49,21 +41,14 @@ impl PartialOrd for ClauseRef {
 
 /// API for Clause Id.
 pub trait ClauseRefIF {
-    fn new(id: usize, c: Clause) -> Self;
+    fn new(c: Clause) -> Self;
     // return shared reference
     fn get(&self) -> &RefCell<Clause>;
-    /// return true if it is a lifted clause from a Lit
-    fn is_lifted(&self) -> bool;
-    /// create a new lifted-clause
-    fn lift(l: Lit) -> Self;
-    /// return the literal from a lifted clause
-    fn unlift(&self, c: &Clause) -> Lit;
 }
 
 impl ClauseRefIF for ClauseRef {
-    fn new(id: usize, c: Clause) -> Self {
+    fn new(c: Clause) -> Self {
         ClauseRef {
-            id,
             c: Rc::new(RefCell::new(c)),
         }
     }
@@ -77,31 +62,7 @@ impl ClauseRefIF for ClauseRef {
     //     // self.c.get_mut()
     //     Rc::into_inner(&self.c).unwrap()
     // }
-
-    fn is_lifted(&self) -> bool {
-        self.id == 0
-    }
-    fn lift(l: Lit) -> Self {
-        let mut c = Clause::from(vec![l]);
-        c.turn_on(FlagClause::LIT_CLAUSE);
-        ClauseRef::new(0, c)
-    }
-    fn unlift(&self, c: &Clause) -> Lit {
-        assert_eq!(self.id, 0);
-        assert!(c.is(FlagClause::LIT_CLAUSE));
-        c.lits[0]
-    }
 }
-
-// impl Default for ClauseRef {
-//     #[inline]
-//     /// return the default empty clause, used in a reason slot or no conflict path.
-//     fn default() -> Self {
-//         ClauseRef {
-//             ordinal: unsafe { NonZeroU32::new_unchecked(0x7FFF_FFFF) },
-//         }
-//     }
-// }
 
 impl fmt::Debug for ClauseRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -134,10 +95,10 @@ mod tests {
         let mut _asg = AssignStack::instantiate(&config, &cnf);
         let mut _cdb = ClauseDB::instantiate(&config, &cnf);
         let c = Clause::from(vec![Lit::from(1i32), Lit::from(2)]);
-        let c1 = ClauseRef::new(1, c.clone());
+        let c1 = ClauseRef::new(c.clone());
         let c10 = c1.clone();
-        let c11 = ClauseRef::new(1, c.clone());
-        let c2 = ClauseRef::new(2, c.clone());
+        let c11 = ClauseRef::new(c.clone());
+        let c2 = ClauseRef::new(c.clone());
         assert!(c1 == c1);
         assert!(c1 == c10);
         assert!(c1 != c11);
@@ -147,10 +108,11 @@ mod tests {
     fn list_unlift() {
         for i in [1_i32, -1, 2, -2] {
             let l = Lit::from(i);
-            let cr = ClauseRef::lift(l);
+            let c = Clause::lift(l);
+            let cr = ClauseRef::new(c);
             let rcc = cr.get();
             let c = rcc.borrow();
-            assert_eq!(cr.unlift(&c), l);
+            assert_eq!(c.unlift(), l);
         }
     }
 }

@@ -62,6 +62,13 @@ pub trait ClauseIF {
     fn timestamp(&self) -> usize;
     #[cfg(feature = "boundary_check")]
     fn set_birth(&mut self, time: usize);
+
+    /// return true if it is a lifted clause from a Lit
+    fn is_lifted(&self) -> bool;
+    /// create a new lifted-clause
+    fn lift(l: Lit) -> Self;
+    /// return the literal from a lifted clause
+    fn unlift(&self) -> Lit;
 }
 
 /// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`remove_clause`](`crate::cdb::ClauseDBIF::remove_clause`), and so on.
@@ -77,6 +84,8 @@ pub trait ClauseDBIF:
     fn is_empty(&self) -> bool;
     /// return an iterator.
     fn iter(&self) -> SliceIter<'_, ClauseRef>;
+    /// remove all dead clauses
+    fn gc(&mut self);
 
     //
     //## interface to binary links
@@ -114,7 +123,7 @@ pub trait ClauseDBIF:
     /// swap i-th watch with j-th literal then update watch caches correctly
     fn transform_by_updating_watch(
         &mut self,
-        cid: ClauseRef,
+        cid: &ClauseRef,
         old: usize,
         new: usize,
         removed: bool,
@@ -219,8 +228,6 @@ pub struct Clause {
 ///```
 #[derive(Clone, Debug)]
 pub struct ClauseDB {
-    /// clause id factory
-    next_clause_id: usize,
     /// container of clauses
     // clause: Vec<Clause>,
     clause: Vec<ClauseRef>,
@@ -426,7 +433,8 @@ mod tests {
         assert_eq!(asg.level(1), 2);
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cref();
+            .as_cref()
+            .clone();
         let rcc1 = c1.get();
         let c = rcc1.borrow();
 
@@ -436,7 +444,8 @@ mod tests {
         assert!(!c.is(Flag::USED));
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
-            .as_cref();
+            .as_cref()
+            .clone();
         let rcc2 = c2.get();
         let c = rcc2.borrow();
         assert!(!c.is_dead());
@@ -455,10 +464,12 @@ mod tests {
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cref();
+            .as_cref()
+            .clone();
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false)
-            .as_cref();
+            .as_cref()
+            .clone();
         // cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_ne!(c1, c2);
@@ -476,7 +487,8 @@ mod tests {
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cref();
+            .as_cref()
+            .clone();
         let rcc1 = c1.get();
         let c1_c = rcc1.borrow();
         assert_eq!(c1_c[0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);

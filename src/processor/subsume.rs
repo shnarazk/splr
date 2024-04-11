@@ -32,7 +32,7 @@ impl Eliminator {
         // if !c.is(FlagClause::LEARNT) && !d.is(FlagClause::LEARNT) {
         //     return Ok(());
         // }
-        match have_subsuming_lit(&cr, &c, &dr, &d) {
+        match have_subsuming_lit(&c, &d) {
             Subsumable::Success => {
                 #[cfg(feature = "trace_elimination")]
                 println!("BackSubsC    => {:#} subsumed completely by {:#}", d, c);
@@ -47,7 +47,7 @@ impl Eliminator {
             }
             // To avoid making a big clause, we have to add a condition for combining them.
             Subsumable::By(l) => {
-                debug_assert!(cr.is_lifted());
+                debug_assert!(c.is_lifted());
                 #[cfg(feature = "trace_elimination")]
                 println!("BackSubC subsumes {} from {:#} and {:#}", l, c, d);
                 drop(d);
@@ -61,10 +61,10 @@ impl Eliminator {
 }
 
 /// returns a literal if these clauses can be merged by the literal.
-fn have_subsuming_lit(cr: &ClauseRef, c: &Clause, other: &ClauseRef, o: &Clause) -> Subsumable {
-    debug_assert!(!other.is_lifted());
-    if cr.is_lifted() {
-        let l = cr.unlift(c);
+fn have_subsuming_lit(c: &Clause, o: &Clause) -> Subsumable {
+    debug_assert!(!o.is_lifted());
+    if c.is_lifted() {
+        let l = c.unlift();
         for lo in o.iter() {
             if l == !*lo {
                 return Subsumable::By(l);
