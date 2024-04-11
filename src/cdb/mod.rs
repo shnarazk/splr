@@ -190,9 +190,18 @@ pub struct ClauseId {
     pub ordinal: NonZeroU32,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct DoubleLink {
+    pub prev: usize,
+    pub next: usize,
+}
+
 /// A representation of 'clause'
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct Clause {
+    /// links. Note: watch0 is also used as freelist
+    watch0: DoubleLink,
+    watch1: DoubleLink,
     /// The literals in a clause.
     lits: Vec<Lit>,
     /// Flags (8 bits)

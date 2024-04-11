@@ -1,5 +1,5 @@
 use {
-    crate::{assign::AssignIF, types::*},
+    crate::{assign::AssignIF, cdb::DoubleLink, types::*},
     std::{
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -10,6 +10,8 @@ use {
 impl Default for Clause {
     fn default() -> Clause {
         Clause {
+            watch0: DoubleLink::default(),
+            watch1: DoubleLink::default(),
             lits: vec![],
             flags: FlagClause::empty(),
             rank: 0,
