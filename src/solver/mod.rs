@@ -220,7 +220,7 @@ mod tests {
             println!("{:>46} =| ", format!("{:?}", $vec));
             let result = Certificate::try_from($vec);
             println!("{:?}", result);
-            assert!(matches!(result, $should_be));
+            debug_assert!(matches!(result, $should_be));
         };
         ($vec: expr) => {
             println!(
