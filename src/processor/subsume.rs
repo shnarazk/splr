@@ -5,10 +5,10 @@ use {
 };
 
 #[derive(Clone, Eq, Debug, Ord, PartialEq, PartialOrd)]
-enum Subsumable {
+enum Pairing {
     None,
-    By(Lit),
-    Success,
+    Mergable(Lit),
+    Subsumable,
 }
 
 impl Eliminator {
@@ -33,7 +33,7 @@ impl Eliminator {
         //     return Ok(());
         // }
         match have_subsuming_lit(&c, &d) {
-            Subsumable::Success => {
+            Pairing::Subsumable => {
                 #[cfg(feature = "trace_elimination")]
                 println!("BackSubsC    => {:#} subsumed completely by {:#}", d, c);
                 debug_assert!(!d.is_dead());
@@ -46,7 +46,7 @@ impl Eliminator {
                 self.num_subsumed += 1;
             }
             // To avoid making a big clause, we have to add a condition for combining them.
-            Subsumable::By(l) => {
+            Pairing::Mergable(l) => {
                 debug_assert!(c.is_lifted());
                 #[cfg(feature = "trace_elimination")]
                 println!("BackSubC subsumes {} from {:#} and {:#}", l, c, d);
@@ -54,23 +54,23 @@ impl Eliminator {
                 strengthen_clause(asg, cdb, self, dr, !l)?;
                 self.enqueue_var(asg, l.vi(), true);
             }
-            Subsumable::None => (),
+            Pairing::None => (),
         }
         Ok(())
     }
 }
 
 /// returns a literal if these clauses can be merged by the literal.
-fn have_subsuming_lit(c: &Clause, o: &Clause) -> Subsumable {
+fn have_subsuming_lit(c: &Clause, o: &Clause) -> Pairing {
     debug_assert!(!o.is_lifted());
     if c.is_lifted() {
         let l = c.unlift();
         for lo in o.iter() {
             if l == !*lo {
-                return Subsumable::By(l);
+                return Pairing::Mergable(l);
             }
         }
-        return Subsumable::None;
+        return Pairing::None;
     }
     // let mut ret: Subsumable = Subsumable::Success;
     debug_assert!(1 < c.len());
@@ -84,9 +84,9 @@ fn have_subsuming_lit(c: &Clause, o: &Clause) -> Subsumable {
                 //     continue 'next;
             }
         }
-        return Subsumable::None;
+        return Pairing::None;
     }
-    Subsumable::Success
+    Pairing::Subsumable
 }
 
 /// removes `l` from clause `cid`
