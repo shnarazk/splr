@@ -8,6 +8,8 @@ mod cid;
 mod clause;
 /// methods on `ClauseDB`
 mod db;
+/// methods on Watchers
+mod dlink;
 /// EMA
 mod ema;
 /// methods for Stochastic Local Search
@@ -185,12 +187,6 @@ pub trait ClauseDBIF:
 pub struct ClauseId {
     /// a sequence number.
     pub ordinal: NonZeroU32,
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct DoubleLink {
-    pub prev: usize,
-    pub next: usize,
 }
 
 /// A representation of 'clause'
