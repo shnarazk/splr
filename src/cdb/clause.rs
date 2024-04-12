@@ -233,6 +233,14 @@ impl fmt::Display for Clause {
     }
 }
 
+pub trait DancingLink {
+    type Element;
+    type Index;
+    fn insert(&mut self, nth: usize);
+    fn remove(&mut self, nth: usize);
+    fn switch(&mut self, nth: usize, lit: Self::Index, new_lit: Self::Index);
+}
+
 impl Clause {
     /// update rank field with the present LBD.
     // If it's big enough, skip the loop.

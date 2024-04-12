@@ -16,8 +16,6 @@ mod sls;
 mod unsat_certificate;
 /// implementation of clause vivification
 mod vivify;
-/// types about watching literal
-mod watch_cache;
 
 pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
@@ -36,7 +34,6 @@ use {
         ops::IndexMut,
         slice::{Iter, IterMut},
     },
-    watch_cache::*,
 };
 
 #[cfg(not(feature = "no_IO"))]
