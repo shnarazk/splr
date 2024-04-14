@@ -23,6 +23,8 @@ pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
     cid::ClauseIdIF,
     clause::*,
+    db::ClauseDB,
+    dlink::DancingIndexIF,
     property::*,
     sls::StochasticLocalSearchIF,
     unsat_certificate::CertificationStore,
@@ -32,7 +34,6 @@ pub use self::{
 use {
     crate::{assign::AssignIF, types::*},
     std::{
-        num::NonZeroU32,
         ops::IndexMut,
         slice::{Iter, IterMut},
     },
@@ -63,21 +64,6 @@ pub trait ClauseDBIF:
 
     /// return binary links: `BinaryLinkList` connected with a `Lit`.
     fn binary_links(&self, l: Lit) -> &BinaryLinkList;
-
-    //
-    //## abstraction to watch_cache
-    //
-
-    // get mutable reference to a watch_cache
-    fn fetch_watch_cache_entry(&self, lit: Lit, index: WatchCacheProxy) -> (ClauseId, Lit);
-    /// replace the mutable watcher list with an empty one, and return the list
-    fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator;
-    /// detach the watch_cache referred by the head of a watch_cache iterator
-    fn detach_watch_cache(&mut self, l: Lit, iter: &mut WatchCacheIterator);
-    /// Merge two watch cache
-    fn merge_watch_cache(&mut self, l: Lit, wc: WatchCache);
-    /// swap the first two literals in a clause.
-    fn swap_watch(&mut self, cid: ClauseId);
 
     //
     //## clause transformation
@@ -155,12 +141,54 @@ pub trait ClauseDBIF:
     fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);
 }
 
-/// Clause identifier, or clause index, starting with one.
-/// Note: ids are re-used after 'garbage collection'.
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct ClauseId {
-    /// a sequence number.
-    pub ordinal: NonZeroU32,
+impl DancingIndexIF for ClauseDB {
+    type Element = Clause;
+    fn next_for_lit(clause: &Self::Element, lit: Lit) -> ClauseIndex {
+        if clause.lits[0] == lit {
+            clause.link0.next;
+        }
+        if clause.lits[1] == lit {
+            clause.link1.next;
+        }
+        panic!("ilegal chain")
+    }
+    fn next_for_lit_mut(clause: &mut Self::Element, lit: Lit) -> &mut ClauseIndex {
+        if clause.lits[0] == lit {
+            &mut clause.link0.next;
+        }
+        if clause.lits[1] == lit {
+            &mut clause.link1.next;
+        }
+        panic!("ilegal chain")
+    }
+    fn prev_for_lit(clause: &Self::Element, lit: Lit) -> ClauseIndex {
+        if clause.lits[0] == lit {
+            clause.link0.prev;
+        }
+        if clause.lits[1] == lit {
+            clause.link1.prev;
+        }
+        panic!("ilegal chain")
+    }
+    fn prev_for_lit_mut(clause: &mut Self::Element, lit: Lit) -> &mut ClauseIndex {
+        if clause.lits[0] == lit {
+            &mut clause.link0.prev;
+        }
+        if clause.lits[1] == lit {
+            &mut clause.link1.prev;
+        }
+        panic!("ilegal chain")
+    }
+    fn erase_links(&mut self) {
+        self.link0.prev = 0;
+        self.link0.next = 0;
+        self.link1.prev = 0;
+        self.link1.next = 0;
+    }
+    fn get_watcher_link(&mut self, lit: Lit) -> ClauseIndex {}
+    fn get_free_watcher(&mut self) -> ClauseIndex {}
+    fn insert_watcher(&mut self, lit: Lit, index: ClauseIndex) {}
+    fn remove_watcher(&mut self, lit: Lit, index: ClauseIndex) {}
 }
 
 #[derive(Clone, Debug)]

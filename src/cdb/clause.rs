@@ -291,51 +291,6 @@ impl fmt::Display for Clause {
     }
 }
 
-impl DancingIndexIF for Clause {
-    fn next_for_lit(&self, lit: Lit) -> ClauseIndex {
-        if self.lits[0] == lit {
-            self.link0.next;
-        }
-        if self.lits[1] == lit {
-            self.link1.next;
-        }
-        panic!("ilegal chain")
-    }
-    fn next_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex {
-        if self.lits[0] == lit {
-            &mut self.link0.next;
-        }
-        if self.lits[1] == lit {
-            &mut self.link1.next;
-        }
-        panic!("ilegal chain")
-    }
-    fn prev_for_lit(&self, lit: Lit) -> ClauseIndex {
-        if self.lits[0] == lit {
-            self.link0.prev;
-        }
-        if self.lits[1] == lit {
-            self.link1.prev;
-        }
-        panic!("ilegal chain")
-    }
-    fn prev_for_lit_mut(&self, lit: Lit) -> &mut ClauseIndex {
-        if self.lits[0] == lit {
-            &mut self.link0.prev;
-        }
-        if self.lits[1] == lit {
-            &mut self.link1.prev;
-        }
-        panic!("ilegal chain")
-    }
-    fn erase_links(&mut self) {
-        self.link0.prev = 0;
-        self.link0.next = 0;
-        self.link1.prev = 0;
-        self.link1.next = 0;
-    }
-}
-
 impl Clause {
     /// update rank field with the present LBD.
     // If it's big enough, skip the loop.
