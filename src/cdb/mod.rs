@@ -178,50 +178,6 @@ impl Default for ClauseDB {
     }
 }
 
-impl Instantiate for ClauseDB {
-    fn instantiate(config: &Config, cnf: &CNFDescription) -> ClauseDB {
-        let nv = cnf.num_of_variables;
-        let nc = cnf.num_of_clauses;
-        ClauseDB {
-            clause: vec![Clause::default(); 1 + nc],
-            binary_link: BinaryLinkDB::instantiate(config, cnf),
-            watch: vec![LinkHead::default(); 2 * (nv + 1)],
-            certification_store: CertificationStore::instantiate(config, cnf),
-            soft_limit: config.c_cls_lim,
-            lbd: ProgressLBD::instantiate(config, cnf),
-
-            #[cfg(feature = "clause_rewarding")]
-            activity_decay: config.crw_dcy_rat,
-            #[cfg(feature = "clause_rewarding")]
-            activity_anti_decay: 1.0 - config.crw_dcy_rat,
-
-            lbd_temp: vec![0; nv + 1],
-            ..ClauseDB::default()
-        }
-    }
-    fn handle(&mut self, e: SolverEvent) {
-        #[allow(clippy::single_match)]
-        match e {
-            SolverEvent::Assert(_) => {
-                self.lbd.update(0);
-            }
-            SolverEvent::NewVar => {
-                self.binary_link.add_new_var();
-                // for negated literal
-                self.watch.push(LinkHead::new());
-                // for positive literal
-                self.watch.push(LinkHead::new());
-                self.lbd_temp.push(0);
-            }
-            SolverEvent::Restart => {
-                // self.lbd.reset_to(self.lb_entanglement.get());
-                // self.lbd.reset_to(0.0);
-            }
-            _ => (),
-        }
-    }
-}
-
 impl ClauseDBIF for ClauseDB {
     fn len(&self) -> usize {
         self.clause.len()
@@ -255,40 +211,12 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         self.certification_store.add_clause(vec);
-        let ci;
-        if let Some(ci_used) = self.freelist.pop() {
-            ci = ci_used;
-            let c = &mut self[ci];
-            // if !c.is_dead() {
-            //     println!("{} {:?}", cid.format(), vec2int(&c.lits));
-            //     println!("len {}", self.watcher[NULL_LIT.negate() as usize].len());
-            //     for w in &self.watcher[NULL_LIT.negate() as usize][..10] {
-            //         if !self.clause[w.c].is_dead() {
-            //             println!("{}", w.c.format());
-            //         }
-            //     }
-            //     panic!("done");
-            // }
-            // assert!(c.is_dead());
-            c.flags = FlagClause::empty();
+        let ci = self.get_free_watcher();
+        let c = &mut self[ci];
+        c.flags = FlagClause::empty();
 
-            #[cfg(feature = "clause_rewarding")]
-            {
-                c.reward = 0.0;
-            }
-
-            debug_assert!(c.lits.is_empty()); // c.lits.clear();
-            std::mem::swap(&mut c.lits, vec);
-            c.search_from = 2;
-        } else {
-            ci = ClauseId::from(self.clause.len());
-            let mut c = Clause {
-                flags: FlagClause::empty(),
-                ..Clause::default()
-            };
-            std::mem::swap(&mut c.lits, vec);
-            self.clause.push(c);
-        };
+        debug_assert!(c.lits.is_empty()); // c.lits.clear();
+        std::mem::swap(&mut c.lits, vec);
 
         let ClauseDB {
             #[cfg(feature = "bi_clause_completion")]
@@ -304,19 +232,18 @@ impl ClauseDBIF for ClauseDB {
 
             #[cfg(feature = "clause_rewarding")]
             ref tick,
-
-            ref mut watch_cache,
             ..
         } = self;
-        let c = &mut clause[ci];
+
         #[cfg(feature = "clause_rewarding")]
         {
+            c.reward = 0.0;
             c.timestamp = *tick;
         }
+
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
-            c.rank_old = 1;
 
             #[cfg(feature = "bi_clause_completion")]
             if learnt {
@@ -327,9 +254,10 @@ impl ClauseDBIF for ClauseDB {
                 }
             }
         } else {
+            c.search_from = 2;
             c.update_lbd(asg, lbd_temp);
-            c.rank_old = c.rank;
         }
+        c.rank_old = c.rank;
         self.lbd.update(c.rank);
         *num_clause += 1;
         if learnt {
@@ -347,47 +275,35 @@ impl ClauseDBIF for ClauseDB {
         let l1 = c.lits[1];
         if len2 {
             *num_bi_clause += 1;
+            // FIXME: DancingLinks
             binary_link.add(l0, l1, ci);
         } else {
+            // FIXME: DancingLinks
             watch_cache[!l0].insert_watch(ci, l1);
             watch_cache[!l1].insert_watch(ci, l0);
         }
         RefClause::Clause(ci)
     }
+
     fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, vec: &mut Vec<Lit>) -> RefClause {
         debug_assert!(1 < vec.len());
         if vec.len() == 2 {
-            if let Some(&cid) = self.link_to_cid(vec[0], vec[1]) {
-                return RefClause::RegisteredClause(cid);
+            if let Some(&ci) = self.link_to_cid(vec[0], vec[1]) {
+                return RefClause::RegisteredClause(ci);
             }
         }
-        let ci;
-        if let Some(ci_used) = self.freelist.pop() {
-            ci = ci_used;
-            let c = &mut self[ci];
-            c.flags = FlagClause::empty();
-            std::mem::swap(&mut c.lits, vec);
-            c.search_from = 2;
-        } else {
-            ci = ClauseId::from(self.clause.len());
-            let mut c = Clause {
-                flags: FlagClause::empty(),
-                ..Clause::default()
-            };
-            std::mem::swap(&mut c.lits, vec);
-            self.clause.push(c);
-        };
-
+        let ci = self.get_free_watcher();
+        let c = &mut self[ci];
+        c.flags = FlagClause::empty();
+        std::mem::swap(&mut c.lits, vec);
         let ClauseDB {
             ref mut clause,
             ref mut lbd_temp,
             ref mut binary_link,
             #[cfg(feature = "clause_rewarding")]
             ref tick,
-            ref mut watch_cache,
             ..
         } = self;
-        let c = &mut clause[ci];
 
         #[cfg(feature = "clause_rewarding")]
         {
@@ -397,12 +313,12 @@ impl ClauseDBIF for ClauseDB {
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
-            c.rank_old = 1;
         } else {
+            c.search_from = 2;
             c.update_lbd(asg, lbd_temp);
-            c.rank_old = c.rank;
             c.turn_on(FlagClause::LEARNT);
         }
+        c.rank_old = c.rank;
         let l0 = c.lits[0];
         let l1 = c.lits[1];
         if len2 {
@@ -413,6 +329,7 @@ impl ClauseDBIF for ClauseDB {
         }
         RefClause::Clause(ci)
     }
+
     /// ## Warning
     /// this function is the only function that makes dead clauses
     fn remove_clause(&mut self, ci: ClauseIndex) {
@@ -1522,7 +1439,7 @@ mod tests {
         // Now `asg.level` = [_, 1, 2, 3, 4, 5, 6].
         let c0 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
-            .as_cid();
+            .as_ci();
 
         asg.assign_by_decision(lit(-2)); // at level 1
         asg.assign_by_decision(lit(1)); // at level 2
@@ -1530,7 +1447,7 @@ mod tests {
         assert_eq!(asg.level(1), 2);
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cid();
+            .as_ci();
         let c = &cdb[c1];
 
         assert!(!c.is_dead());
@@ -1539,7 +1456,7 @@ mod tests {
         assert!(!c.is(Flag::USED));
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
-            .as_cid();
+            .as_ci();
         let c = &cdb[c2];
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
@@ -1557,10 +1474,10 @@ mod tests {
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cid();
+            .as_ci();
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false)
-            .as_cid();
+            .as_ci();
         // cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_ne!(c1, c2);
@@ -1578,7 +1495,7 @@ mod tests {
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cid();
+            .as_ci();
         assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
         let mut iter = cdb[c1][0..].iter();
         assert_eq!(iter.next(), Some(&lit(1)));

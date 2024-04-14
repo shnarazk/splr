@@ -22,8 +22,6 @@ pub struct ClauseDB {
     pub(super) binary_link: BinaryLinkDB,
     /// container of watch literals
     pub(super) watch: Vec<LinkHead>,
-    /// collected free clause ids.
-    pub(super) freelist: Vec<ClauseId>,
     /// see unsat_certificate.rs
     pub(super) certification_store: CertificationStore,
     /// a number of clauses to emit out-of-memory exception
@@ -194,3 +192,47 @@ impl IndexMut<Lit> for ClauseDB {
 //         }
 //     }
 // }
+
+impl Instantiate for ClauseDB {
+    fn instantiate(config: &Config, cnf: &CNFDescription) -> ClauseDB {
+        let nv = cnf.num_of_variables;
+        let nc = cnf.num_of_clauses;
+        ClauseDB {
+            clause: vec![Clause::default(); 1 + nc], // ci 0 must refer to the header
+            binary_link: BinaryLinkDB::instantiate(config, cnf),
+            watch: vec![LinkHead::default(); 2 * (nv + 1)],
+            certification_store: CertificationStore::instantiate(config, cnf),
+            soft_limit: config.c_cls_lim,
+            lbd: ProgressLBD::instantiate(config, cnf),
+
+            #[cfg(feature = "clause_rewarding")]
+            activity_decay: config.crw_dcy_rat,
+            #[cfg(feature = "clause_rewarding")]
+            activity_anti_decay: 1.0 - config.crw_dcy_rat,
+
+            lbd_temp: vec![0; nv + 1],
+            ..ClauseDB::default()
+        }
+    }
+    fn handle(&mut self, e: SolverEvent) {
+        #[allow(clippy::single_match)]
+        match e {
+            SolverEvent::Assert(_) => {
+                self.lbd.update(0);
+            }
+            SolverEvent::NewVar => {
+                self.binary_link.add_new_var();
+                // for negated literal
+                self.watch.push(LinkHead::new());
+                // for positive literal
+                self.watch.push(LinkHead::new());
+                self.lbd_temp.push(0);
+            }
+            SolverEvent::Restart => {
+                // self.lbd.reset_to(self.lb_entanglement.get());
+                // self.lbd.reset_to(0.0);
+            }
+            _ => (),
+        }
+    }
+}

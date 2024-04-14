@@ -715,14 +715,13 @@ impl AssignStack {
         while num_propagated < self.trail.len() {
             num_propagated = self.trail.len();
             for ci in 1..cdb.len() {
-                let cid = ClauseId::from(ci);
-                if cdb[cid].is_dead() {
+                if cdb[ci].is_dead() {
                     continue;
                 }
-                debug_assert!(cdb[cid]
+                debug_assert!(cdb[ci]
                     .iter()
                     .all(|l| !self.var[l.vi()].is(FlagVar::ELIMINATED)));
-                match cdb.transform_by_simplification(self, cid) {
+                match cdb.transform_by_simplification(self, ci) {
                     RefClause::Clause(_) => (),
                     RefClause::Dead => (), // was a satisfied clause
                     RefClause::EmptyClause => return Err(SolverError::EmptyClause),
@@ -731,7 +730,7 @@ impl AssignStack {
                         debug_assert!(self.assigned(lit).is_none());
                         cdb.certificate_add_assertion(lit);
                         self.assign_at_root_level(lit)?;
-                        cdb.remove_clause(cid);
+                        cdb.remove_clause(ci);
                     }
                 }
             }
