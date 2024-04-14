@@ -1,10 +1,9 @@
 use {
     super::{
         binary::{BinaryLinkIF, BinaryLinkList},
+        dlink::LinkHead,
         ema::ProgressLBD,
-        property,
-        watch_cache::*,
-        BinaryLinkDB, CertificationStore, Clause, ClauseDB, ClauseDBIF, ClauseId, ReductionType,
+        property, BinaryLinkDB, CertificationStore, Clause, ClauseDBIF, ClauseId, ReductionType,
         RefClause,
     },
     crate::{assign::AssignIF, types::*},
@@ -17,6 +16,86 @@ use {
 
 #[cfg(not(feature = "no_IO"))]
 use std::{fs::File, io::Write, path::Path};
+
+/// Clause database
+///
+///```
+/// use crate::{splr::config::Config, splr::types::*};
+/// use crate::splr::cdb::ClauseDB;
+/// let cdb = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
+///```
+#[derive(Clone, Debug)]
+pub struct ClauseDB {
+    /// container of clauses
+    clause: Vec<Clause>,
+    /// hashed representation of binary clauses.
+    ///## Note
+    /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
+    ///
+    binary_link: BinaryLinkDB,
+    /// container of watch literals
+    watch: Vec<LinkHead>,
+    /// collected free clause ids.
+    freelist: Vec<ClauseId>,
+    /// see unsat_certificate.rs
+    certification_store: CertificationStore,
+    /// a number of clauses to emit out-of-memory exception
+    soft_limit: usize,
+    /// 'small' clause threshold
+    co_lbd_bound: u16,
+    // not in use
+    // lbd_frozen_clause: usize,
+
+    // bi-clause completion
+    bi_clause_completion_queue: Vec<Lit>,
+    num_bi_clause_completion: usize,
+
+    //
+    //## clause rewarding
+    //
+    /// an index for counting elapsed time
+    #[cfg(feature = "clause_rewarding")]
+    tick: usize,
+    #[cfg(feature = "clause_rewarding")]
+    activity_decay: f64,
+    #[cfg(feature = "clause_rewarding")]
+    activity_anti_decay: f64,
+
+    //
+    //## LBD
+    //
+    /// a working buffer for LBD calculation
+    lbd_temp: Vec<usize>,
+    lbd: ProgressLBD,
+
+    //
+    //## statistics
+    //
+    /// the number of active (not DEAD) clauses.
+    num_clause: usize,
+    /// the number of binary clauses.
+    num_bi_clause: usize,
+    /// the number of binary learnt clauses.
+    num_bi_learnt: usize,
+    /// the number of clauses which LBDs are 2.
+    num_lbd2: usize,
+    /// the present number of learnt clauses.
+    num_learnt: usize,
+    /// the number of reductions.
+    num_reduction: usize,
+    /// the number of reregistration of a bi-clause
+    num_reregistration: usize,
+    /// Literal Block Entanglement
+    /// EMA of LBD of clauses used in conflict analysis (dependency graph)
+    lb_entanglement: Ema2,
+    /// cutoff value used in the last `reduce`
+    reduction_threshold: f64,
+
+    //
+    //## incremental solving
+    //
+    pub eliminated_permanent: Vec<Vec<Lit>>,
+}
 
 impl Default for ClauseDB {
     fn default() -> ClauseDB {

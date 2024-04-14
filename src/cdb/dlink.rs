@@ -1,9 +1,7 @@
 use {
-    crate::types::*,
+    crate::{cdb::clause::*, types::*},
     std::ops::{Index, IndexMut},
 };
-
-type ClauseIndex = usize;
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DoubleLink {
@@ -11,55 +9,17 @@ pub struct DoubleLink {
     pub next: ClauseIndex,
 }
 
-pub struct Clause {
-    pub link0: DoubleLink,
-    pub link1: DoubleLink,
-    pub lits: Vec<Lit>,
-}
-
-impl Clause {
-    fn next_for_lit(&self, lit: Lit) -> ClauseIndex {
-        if self.lits[0] == lit {
-            self.link0.next;
-        }
-        if self.lits[1] == lit {
-            self.link1.next;
-        }
-        panic!("ilegal chain")
-    }
-    fn next_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex {
-        if self.lits[0] == lit {
-            &mut self.link0.next;
-        }
-        if self.lits[1] == lit {
-            &mut self.link1.next;
-        }
-        panic!("ilegal chain")
-    }
-    fn prev_for_lit(&self, lit: Lit) -> ClauseIndex {
-        if self.lits[0] == lit {
-            self.link0.prev;
-        }
-        if self.lits[1] == lit {
-            self.link1.prev;
-        }
-        panic!("ilegal chain")
-    }
-    fn prev_for_lit_mut(&self, lit: Lit) -> &mut ClauseIndex {
-        if self.lits[0] == lit {
-            &mut self.link0.prev;
-        }
-        if self.lits[1] == lit {
-            &mut self.link1.prev;
-        }
-        panic!("ilegal chain")
-    }
-    fn erase_links(&mut self) {
-        self.link0.prev = 0;
-        self.link0.next = 0;
-        self.link1.prev = 0;
-        self.link1.next = 0;
-    }
+pub trait DancingIndexIF {
+    type Element;
+    fn next_for_lit(clause: &Self::Element, lit: Lit) -> ClauseIndex;
+    fn next_for_lit_mut(clause: &mut Self::Element, lit: Lit) -> &mut ClauseIndex;
+    fn prev_for_lit(clause: &Self::Element, lit: Lit) -> ClauseIndex;
+    fn prev_for_lit_mut(clause: &Self::Element, lit: Lit) -> &mut ClauseIndex;
+    fn erase_links(clause: &mut Self::Element);
+    fn get_watcher_link(&mut self, lit: Lit) -> ClauseIndex;
+    fn get_free_watcher(&mut self) -> ClauseIndex;
+    fn insert_watcher(&mut self, lit: Lit, index: ClauseIndex);
+    fn remove_watcher(&mut self, lit: Lit, index: ClauseIndex);
 }
 
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -90,17 +50,10 @@ impl IndexMut<Lit> for ClauseDB {
     }
 }
 
-pub trait DancingIndexIF {
-    fn get_watcher_link(&mut self, lit: Lit) -> ClauseIndex;
-    fn get_free_watcher(&mut self) -> ClauseIndex;
-    fn insert_watcher(&mut self, lit: Lit, index: ClauseIndex);
-    fn remove_watcher(&mut self, lit: Lit, index: ClauseIndex);
-}
-
 const HEAD_INDEX: ClauseIndex = 0;
 const FREE_INDEX: ClauseIndex = 1;
 
-impl DancingIndexIF for ClauseDB {
+impl DancingIndexHeaderIF for ClauseDB {
     fn get_watcher_link(&mut self, lit: Lit) -> ClauseIndex {
         self.clause[ClauseIndex::from(lit)].next_for_lit(lit)
     }

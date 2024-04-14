@@ -1,5 +1,5 @@
 use {
-    crate::{assign::AssignIF, cdb::DoubleLink, types::*},
+    crate::{assign::AssignIF, cdb::dlink::*, types::*},
     std::{
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -7,11 +7,69 @@ use {
     },
 };
 
+/// API for Clause, providing literal accessors.
+pub trait ClauseIF {
+    /// return true if it contains no literals; a clause after unit propagation.
+    fn is_empty(&self) -> bool;
+    /// return true if it contains no literals; a clause after unit propagation.
+    fn is_dead(&self) -> bool;
+    /// return 1st watch
+    fn lit0(&self) -> Lit;
+    /// return 2nd watch
+    fn lit1(&self) -> Lit;
+    /// return `true` if the clause contains the literal
+    fn contains(&self, lit: Lit) -> bool;
+    /// check clause satisfiability
+    fn is_satisfied_under(&self, asg: &impl AssignIF) -> bool;
+    /// return an iterator over its literals.
+    fn iter(&self) -> Iter<'_, Lit>;
+    /// return the number of literals.
+    fn len(&self) -> usize;
+
+    #[cfg(feature = "boundary_check")]
+    /// return timestamp.
+    fn timestamp(&self) -> usize;
+    #[cfg(feature = "boundary_check")]
+    fn set_birth(&mut self, time: usize);
+}
+
+/// A representation of 'clause'
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
+pub struct Clause {
+    /// links. Note: watch0 is also used as freelist
+    pub(super) link0: DoubleLink,
+    pub(super) link1: DoubleLink,
+    /// The literals in a clause.
+    pub(super) lits: Vec<Lit>,
+    /// Flags (8 bits)
+    flags: FlagClause,
+    /// A static clause evaluation criterion like LBD, NDD, or something.
+    pub rank: u16,
+    /// A record of the rank at previos stage.
+    pub rank_old: u16,
+    /// the index from which `propagate` starts searching an un-falsified literal.
+    /// Since it's just a hint, we don't need u32 or usize.
+    pub search_from: u16,
+
+    #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
+    /// the number of conflicts at which this clause was used in `conflict_analyze`
+    timestamp: usize,
+
+    #[cfg(feature = "clause_rewarding")]
+    /// A dynamic clause evaluation criterion based on the number of references.
+    reward: f64,
+
+    #[cfg(feature = "boundary_check")]
+    pub birth: usize,
+    #[cfg(feature = "boundary_check")]
+    pub moved_at: Propagate,
+}
+
 impl Default for Clause {
     fn default() -> Clause {
         Clause {
-            watch0: DoubleLink::default(),
-            watch1: DoubleLink::default(),
+            link0: DoubleLink::default(),
+            link1: DoubleLink::default(),
             lits: vec![],
             flags: FlagClause::empty(),
             rank: 0,
@@ -233,12 +291,49 @@ impl fmt::Display for Clause {
     }
 }
 
-pub trait DancingLink {
-    type Element;
-    type Index;
-    fn insert(&mut self, nth: usize);
-    fn remove(&mut self, nth: usize);
-    fn switch(&mut self, nth: usize, lit: Self::Index, new_lit: Self::Index);
+impl DancingIndexIF for Clause {
+    fn next_for_lit(&self, lit: Lit) -> ClauseIndex {
+        if self.lits[0] == lit {
+            self.link0.next;
+        }
+        if self.lits[1] == lit {
+            self.link1.next;
+        }
+        panic!("ilegal chain")
+    }
+    fn next_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex {
+        if self.lits[0] == lit {
+            &mut self.link0.next;
+        }
+        if self.lits[1] == lit {
+            &mut self.link1.next;
+        }
+        panic!("ilegal chain")
+    }
+    fn prev_for_lit(&self, lit: Lit) -> ClauseIndex {
+        if self.lits[0] == lit {
+            self.link0.prev;
+        }
+        if self.lits[1] == lit {
+            self.link1.prev;
+        }
+        panic!("ilegal chain")
+    }
+    fn prev_for_lit_mut(&self, lit: Lit) -> &mut ClauseIndex {
+        if self.lits[0] == lit {
+            &mut self.link0.prev;
+        }
+        if self.lits[1] == lit {
+            &mut self.link1.prev;
+        }
+        panic!("ilegal chain")
+    }
+    fn erase_links(&mut self) {
+        self.link0.prev = 0;
+        self.link0.next = 0;
+        self.link1.prev = 0;
+        self.link1.next = 0;
+    }
 }
 
 impl Clause {

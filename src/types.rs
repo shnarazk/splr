@@ -327,6 +327,12 @@ impl LitIF for Lit {
     }
 }
 
+//
+// Clause
+//
+
+pub type ClauseIndex = usize;
+
 /// Capture a conflict
 pub type ConflictContext = (Lit, AssignReason);
 
