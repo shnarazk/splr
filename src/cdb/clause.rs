@@ -42,7 +42,7 @@ pub struct Clause {
     /// The literals in a clause.
     pub(super) lits: Vec<Lit>,
     /// Flags (8 bits)
-    flags: FlagClause,
+    pub(super) flags: FlagClause,
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: u16,
     /// A record of the rank at previos stage.
@@ -94,12 +94,11 @@ impl Index<usize> for Clause {
     type Output = Lit;
     #[inline]
     fn index(&self, i: usize) -> &Lit {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.lits.get_unchecked(i)
+        if cfg!(feature = "unsafe_access") {
+            unsafe { self.lits.get_unchecked(i) }
+        } else {
+            &self.lits[i]
         }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self.lits[i]
     }
 }
 
@@ -132,36 +131,33 @@ impl Index<RangeFrom<usize>> for Clause {
     type Output = [Lit];
     #[inline]
     fn index(&self, r: RangeFrom<usize>) -> &[Lit] {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.lits.get_unchecked(r)
+        if cfg!(feature = "unsafe_access") {
+            unsafe { self.lits.get_unchecked(r) }
+        } else {
+            &self.lits[r]
         }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self.lits[r]
     }
 }
 
 impl IndexMut<Range<usize>> for Clause {
     #[inline]
     fn index_mut(&mut self, r: Range<usize>) -> &mut [Lit] {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.lits.get_unchecked_mut(r)
+        if cfg!(feature = "unsafe_access") {
+            unsafe { self.lits.get_unchecked_mut(r) }
+        } else {
+            &mut self.lits[r]
         }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self.lits[r]
     }
 }
 
 impl IndexMut<RangeFrom<usize>> for Clause {
     #[inline]
     fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Lit] {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.lits.get_unchecked_mut(r)
+        if cfg!(feature = "unsafe_access") {
+            unsafe { self.lits.get_unchecked_mut(r) }
+        } else {
+            &mut self.lits[r]
         }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self.lits[r]
     }
 }
 
@@ -266,28 +262,27 @@ impl FlagIF for Clause {
 }
 
 impl fmt::Display for Clause {
-    #[cfg(feature = "boundary_check")]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let st = |flag, mes| if self.is(flag) { mes } else { "" };
-        write!(
-            f,
-            "{{{:?}b{}{}{}}}",
-            i32s(&self.lits),
-            self.birth,
-            st(FlagClause::LEARNT, ", learnt"),
-            st(FlagClause::ENQUEUED, ", enqueued"),
-        )
-    }
-    #[cfg(not(feature = "boundary_check"))]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let st = |flag, mes| if self.is(flag) { mes } else { "" };
-        write!(
-            f,
-            "{{{:?}{}{}}}",
-            i32s(&self.lits),
-            st(FlagClause::LEARNT, ", learnt"),
-            st(FlagClause::ENQUEUED, ", enqueued"),
-        )
+        if cfg!(feature = "boundary_check") {
+            let st = |flag, mes| if self.is(flag) { mes } else { "" };
+            write!(
+                f,
+                "{{{:?}b{}{}{}}}",
+                i32s(&self.lits),
+                self.birth,
+                st(FlagClause::LEARNT, ", learnt"),
+                st(FlagClause::ENQUEUED, ", enqueued"),
+            )
+        } else {
+            let st = |flag, mes| if self.is(flag) { mes } else { "" };
+            write!(
+                f,
+                "{{{:?}{}{}}}",
+                i32s(&self.lits),
+                st(FlagClause::LEARNT, ", learnt"),
+                st(FlagClause::ENQUEUED, ", enqueued"),
+            )
+        }
     }
 }
 

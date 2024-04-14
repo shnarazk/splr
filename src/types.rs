@@ -2,7 +2,7 @@
 /// some common traits.
 pub use crate::{
     assign::AssignReason,
-    cdb::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
+    cdb::{Clause, ClauseDB, ClauseIF, ClauseIdIF},
     config::Config,
     primitive::{ema::*, luby::*},
     solver::SolverEvent,
@@ -183,32 +183,12 @@ impl From<i32> for Lit {
     }
 }
 
-impl From<ClauseId> for Lit {
-    #[inline]
-    fn from(cid: ClauseId) -> Self {
-        Lit {
-            ordinal: unsafe {
-                NonZeroU32::new_unchecked(NonZeroU32::get(cid.ordinal) & 0x7FFF_FFFF)
-            },
-        }
-    }
-}
-
 impl From<Lit> for bool {
     /// - positive Lit (= even u32) => Some(true)
     /// - negative Lit (= odd u32)  => Some(false)
     #[inline]
     fn from(l: Lit) -> bool {
         (NonZeroU32::get(l.ordinal) & 1) != 0
-    }
-}
-
-impl From<Lit> for ClauseId {
-    #[inline]
-    fn from(l: Lit) -> ClauseId {
-        ClauseId {
-            ordinal: unsafe { NonZeroU32::new_unchecked(NonZeroU32::get(l.ordinal) | 0x8000_0000) },
-        }
     }
 }
 
@@ -344,10 +324,10 @@ pub type PropagationResult = Result<(), ConflictContext>;
 // while EmptyClause can be used for simply UNSAT form.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RefClause {
-    Clause(ClauseId),
+    Clause(ClauseIndex),
     Dead,
     EmptyClause,
-    RegisteredClause(ClauseId),
+    RegisteredClause(ClauseIndex),
     UnitClause(Lit),
 }
 

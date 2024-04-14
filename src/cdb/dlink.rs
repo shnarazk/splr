@@ -30,7 +30,7 @@ pub struct LinkHead {
     pub timestamp: ClauseIndex,
 }
 
-pub struct ClauseDB {
+struct ClauseDB {
     pub header: Vec<LinkHead>,
     pub clause: Vec<Clause>,
 }
