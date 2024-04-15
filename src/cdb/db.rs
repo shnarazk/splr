@@ -1,5 +1,8 @@
 use {
-    super::{dlink::LinkHead, ema::ProgressLBD, BinaryLinkDB, CertificationStore, Clause},
+    super::{
+        binary::BinaryLinkIF, dlink::LinkHead, ema::ProgressLBD, BinaryLinkDB, CertificationStore,
+        Clause,
+    },
     crate::types::*,
     std::ops::{Index, IndexMut},
 };
@@ -221,9 +224,9 @@ impl Instantiate for ClauseDB {
             SolverEvent::NewVar => {
                 self.binary_link.add_new_var();
                 // for negated literal
-                self.watch.push(LinkHead::new());
+                self.watch.push(LinkHead::default());
                 // for positive literal
-                self.watch.push(LinkHead::new());
+                self.watch.push(LinkHead::default());
                 self.lbd_temp.push(0);
             }
             SolverEvent::Restart => {

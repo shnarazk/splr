@@ -190,7 +190,7 @@ pub fn handle_conflict(
             );
             // || check_graph(asg, cdb, l0, "biclause");
             for cid in &state.derive20 {
-                cdb[cid].turn_on(FlagClause::DERIVE20);
+                cdb[*cid].turn_on(FlagClause::DERIVE20);
             }
             rank = 1;
             #[cfg(feature = "bi_clause_completion")]
@@ -212,7 +212,7 @@ pub fn handle_conflict(
             rank = cdb[cid].rank;
             if rank <= 20 {
                 for cid in &state.derive20 {
-                    cdb[cid].turn_on(FlagClause::DERIVE20);
+                    cdb[*cid].turn_on(FlagClause::DERIVE20);
                 }
             }
         }

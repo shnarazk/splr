@@ -1,7 +1,11 @@
 /// Module `eliminator` implements clause subsumption and var elimination.
 use {
     super::{EliminateIF, Eliminator},
-    crate::{assign::AssignIF, cdb::ClauseDBIF, types::*},
+    crate::{
+        assign::AssignIF,
+        cdb::{ClauseDBIF, LiftedClauseIF},
+        types::*,
+    },
 };
 
 #[derive(Clone, Eq, Debug, Ord, PartialEq, PartialOrd)]
@@ -36,7 +40,7 @@ impl Eliminator {
             }
             // To avoid making a big clause, we have to add a condition for combining them.
             Subsumable::By(l) => {
-                debug_assert!(ci.is_lifted_lit());
+                debug_assert!(ci.is_lifted());
                 #[cfg(feature = "trace_elimination")]
                 println!("BackSubC subsumes {} from {} and {}", l, cid, did);
                 strengthen_clause(asg, cdb, self, di, !l)?;
@@ -54,8 +58,8 @@ fn have_subsuming_lit(
     ci: ClauseIndex,
     other: ClauseIndex,
 ) -> Subsumable {
-    debug_assert!(!other.is_lifted_lit());
-    if ci.is_lifted_lit() {
+    debug_assert!(!other.is_lifted());
+    if ci.is_lifted() {
         let l = Lit::from(ci);
         let oh = &cdb[other];
         for lo in oh.iter() {

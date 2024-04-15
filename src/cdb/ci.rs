@@ -13,9 +13,9 @@ impl LiftedClauseIF for ClauseIndex {
         0 != self & MASK
     }
     fn lift(lit: Lit) -> Self {
-        lit | MASK
+        usize::from(lit) | MASK
     }
     fn unlift(&self) -> Lit {
-        *self & !MASK
+        Lit::from(*self & !MASK)
     }
 }

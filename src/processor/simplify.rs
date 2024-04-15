@@ -6,7 +6,7 @@ use {
     },
     crate::{
         assign::{self, AssignIF},
-        cdb::{self, ClauseDBIF},
+        cdb::{self, ClauseDBIF, LiftedClauseIF},
         state::{self, State, StateIF},
         types::*,
     },
@@ -382,7 +382,7 @@ impl Eliminator {
     /// remove a clause id from all corresponding occur lists.
     pub fn remove_cid_occur(&mut self, asg: &mut impl AssignIF, ci: ClauseIndex, c: &mut Clause) {
         debug_assert!(self.mode == EliminatorMode::Running);
-        debug_assert!(!ci.is_lifted_lit());
+        debug_assert!(!ci.is_lifted());
         debug_assert!(!c.is_dead());
         c.turn_off(FlagClause::OCCUR_LINKED);
         for l in c.iter() {
@@ -434,7 +434,7 @@ impl Eliminator {
                     self.clear_var_queue(asg);
                     return Ok(());
                 }
-                let best: VarId = if cid.is_lifted_lit() {
+                let best: VarId = if cid.is_lifted() {
                     let vi = Lit::from(cid).vi();
                     debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
                     vi

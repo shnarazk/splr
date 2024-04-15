@@ -21,9 +21,10 @@ mod vivify;
 
 pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
+    ci::LiftedClauseIF,
     clause::*,
     db::ClauseDB,
-    dlink::{DancingIndexIF, LinkHead},
+    dlink::{DancingIndexIF, DancingIndexManagerIF, LinkHead},
     property::*,
     sls::StochasticLocalSearchIF,
     unsat_certificate::CertificationStore,
@@ -31,6 +32,7 @@ pub use self::{
 };
 
 use {
+    self::binary::BinaryLinkIF,
     crate::{assign::AssignIF, types::*},
     ema::ProgressLBD,
     std::{
@@ -1262,59 +1264,16 @@ impl Clause {
 const HEAD_INDEX: ClauseIndex = 0;
 const FREE_INDEX: ClauseIndex = 1;
 
-impl DancingIndexIF for ClauseDB {
-    type Element = Clause;
-    fn next_for_lit(clause: &Self::Element, lit: Lit) -> ClauseIndex {
-        if clause.lits[0] == lit {
-            clause.link0.next;
-        }
-        if clause.lits[1] == lit {
-            clause.link1.next;
-        }
-        panic!("ilegal chain")
-    }
-    fn next_for_lit_mut(clause: &mut Self::Element, lit: Lit) -> &mut ClauseIndex {
-        if clause.lits[0] == lit {
-            &mut clause.link0.next;
-        }
-        if clause.lits[1] == lit {
-            &mut clause.link1.next;
-        }
-        panic!("ilegal chain")
-    }
-    fn prev_for_lit(clause: &Self::Element, lit: Lit) -> ClauseIndex {
-        if clause.lits[0] == lit {
-            clause.link0.prev;
-        }
-        if clause.lits[1] == lit {
-            clause.link1.prev;
-        }
-        panic!("ilegal chain")
-    }
-    fn prev_for_lit_mut(clause: &mut Self::Element, lit: Lit) -> &mut ClauseIndex {
-        if clause.lits[0] == lit {
-            &mut clause.link0.prev;
-        }
-        if clause.lits[1] == lit {
-            &mut clause.link1.prev;
-        }
-        panic!("ilegal chain")
-    }
-    // fn erase_links(&mut self) {
-    //     self.link0.prev = 0;
-    //     self.link0.next = 0;
-    //     self.link1.prev = 0;
-    //     self.link1.next = 0;
-    // }
+impl DancingIndexManagerIF for ClauseDB {
     fn get_watcher_link(&mut self, lit: Lit) -> ClauseIndex {
         self.clause[ClauseIndex::from(lit)].next_for_lit(lit)
     }
     fn get_free_watcher(&mut self) -> ClauseIndex {
-        let index = self.header[FREE_INDEX].next;
+        let index = self.watch[FREE_INDEX].next;
         if index != 0 {
             let next = self.clause[FREE_INDEX].link0.next;
-            self.header[FREE_INDEX].next = next;
-            self.clause[index].erase_links();
+            self.watch[FREE_INDEX].next = next;
+            self.clause[index].clear_links();
             index
         } else {
             self.clause.push(Clause::default());
@@ -1322,18 +1281,18 @@ impl DancingIndexIF for ClauseDB {
         }
     }
     fn insert_watcher(&mut self, lit: Lit, index: ClauseIndex) {
-        let last = self.header[ClauseIndex::from(lit)].prev;
+        let last = self.watch[ClauseIndex::from(lit)].prev;
         *self.clause[last].next_for_lit_mut(lit) = index;
         *self.clause[index].prev_for_lit_mut(lit) = last;
         *self.clause[index].next_for_lit_mut(lit) = HEAD_INDEX;
-        self.header[ClauseIndex::from(lit)].prev = index;
+        self.watch[ClauseIndex::from(lit)].prev = index;
     }
     fn remove_watcher(&mut self, lit: Lit, index: ClauseIndex) {
         let next = self.clause[ClauseIndex::from(lit)].next_for_lit(lit);
         let prev = self.clause[ClauseIndex::from(lit)].prev_for_lit(lit);
         *self.clause[prev].next_for_lit_mut(lit) = next;
         *self.clause[next].prev_for_lit_mut(lit) = prev;
-        let p = self.header[FREE_INDEX].prev;
+        let p = self.watch[FREE_INDEX].prev;
         self.clause[p].link0.next = index;
         self.clause[index].link0.prev = p;
         self.clause[index].link0.next = HEAD_INDEX;

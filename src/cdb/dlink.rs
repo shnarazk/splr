@@ -10,11 +10,14 @@ pub struct DoubleLink {
 }
 
 pub trait DancingIndexIF {
-    type Element;
-    fn next_for_lit(clause: &Self::Element, lit: Lit) -> ClauseIndex;
-    fn next_for_lit_mut(clause: &mut Self::Element, lit: Lit) -> &mut ClauseIndex;
-    fn prev_for_lit(clause: &Self::Element, lit: Lit) -> ClauseIndex;
-    fn prev_for_lit_mut(clause: &mut Self::Element, lit: Lit) -> &mut ClauseIndex;
+    fn next_for_lit(&self, lit: Lit) -> ClauseIndex;
+    fn next_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex;
+    fn prev_for_lit(&self, lit: Lit) -> ClauseIndex;
+    fn prev_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex;
+    fn clear_links(&mut self);
+}
+
+pub trait DancingIndexManagerIF {
     // fn erase_links(clause: &mut Self::Element);
     fn get_watcher_link(&mut self, lit: Lit) -> ClauseIndex;
     fn get_free_watcher(&mut self) -> ClauseIndex;
