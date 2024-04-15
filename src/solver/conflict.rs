@@ -336,7 +336,7 @@ fn conflict_analyze(
     }
     let mut trail_index = asg.stack_len() - 1;
     let mut max_lbd: u16 = 0;
-    let mut cid_with_max_lbd: Option<ClauseId> = None;
+    let mut ci_with_max_lbd: Option<ClauseIndex> = None;
     loop {
         match reason {
             AssignReason::BinaryLink(l) => {
@@ -364,7 +364,7 @@ fn conflict_analyze(
                 }
                 if max_lbd < cdb[cid].rank {
                     max_lbd = cdb[cid].rank;
-                    cid_with_max_lbd = Some(cid);
+                    ci_with_max_lbd = Some(cid);
                 }
                 for q in cdb[cid].iter().skip(1) {
                     let vi = q.vi();
@@ -442,7 +442,7 @@ fn conflict_analyze(
         trail_index -= 1;
         reason = asg.reason(p.vi());
     }
-    if let Some(cid) = cid_with_max_lbd {
+    if let Some(cid) = ci_with_max_lbd {
         cdb.update_at_analysis(asg, cid);
     }
     debug_assert!(learnt.iter().all(|l| *l != !p));

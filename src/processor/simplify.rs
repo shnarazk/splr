@@ -229,13 +229,13 @@ impl EliminateIF for Eliminator {
         for w in &mut self[1..] {
             w.clear();
         }
-        for (cid, c) in &mut cdb.iter_mut().enumerate().skip(1) {
+        for (ci, c) in &mut cdb.iter_mut().enumerate().skip(1) {
             if c.is_dead() || c.is(FlagClause::OCCUR_LINKED) {
                 continue;
             }
             let vec = c.iter().copied().collect::<Vec<_>>();
             debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
-            self.add_cid_occur(asg, ClauseId::from(cid), c, false);
+            self.add_cid_occur(asg, ci, c, false);
         }
         if force {
             for vi in 1..=asg.derefer(assign::property::Tusize::NumVar) {
@@ -325,7 +325,7 @@ impl Eliminator {
     pub fn add_cid_occur(
         &mut self,
         asg: &mut impl AssignIF,
-        cid: ClauseId,
+        ci: ClauseIndex,
         c: &mut Clause,
         enqueue: bool,
     ) {
@@ -352,42 +352,42 @@ impl Eliminator {
             if !v.is(FlagVar::ELIMINATED) {
                 if bool::from(*l) {
                     debug_assert!(
-                        !w.pos_occurs.contains(&cid),
+                        !w.pos_occurs.contains(&ci),
                         "elim.add_cid_occur for {:?} found a strange positive clause{}{}, {:?}",
                         v,
-                        cid,
+                        ci,
                         c,
                         w.pos_occurs,
                     );
-                    w.pos_occurs.push(cid);
+                    w.pos_occurs.push(ci);
                 } else {
                     debug_assert!(
-                        !w.neg_occurs.contains(&cid),
+                        !w.neg_occurs.contains(&ci),
                         "elim.add_cid_occur for {:?} found a strange negative clause{}{}, {:?}",
                         v,
-                        cid,
+                        ci,
                         c,
                         w.pos_occurs,
                     );
-                    w.neg_occurs.push(cid);
+                    w.neg_occurs.push(ci);
                 }
                 self.enqueue_var(asg, l.vi(), false);
             }
         }
         c.turn_on(FlagClause::OCCUR_LINKED);
         if enqueue {
-            self.enqueue_clause(cid, c);
+            self.enqueue_clause(ci, c);
         }
     }
     /// remove a clause id from all corresponding occur lists.
-    pub fn remove_cid_occur(&mut self, asg: &mut impl AssignIF, cid: ClauseId, c: &mut Clause) {
+    pub fn remove_cid_occur(&mut self, asg: &mut impl AssignIF, ci: ClauseIndex, c: &mut Clause) {
         debug_assert!(self.mode == EliminatorMode::Running);
-        debug_assert!(!cid.is_lifted_lit());
+        debug_assert!(!ci.is_lifted_lit());
         debug_assert!(!c.is_dead());
         c.turn_off(FlagClause::OCCUR_LINKED);
         for l in c.iter() {
             if asg.assign(l.vi()).is_none() {
-                self.remove_lit_occur(asg, *l, cid);
+                self.remove_lit_occur(asg, *l, ci);
                 self.enqueue_var(asg, l.vi(), true);
             }
         }
@@ -423,7 +423,8 @@ impl Eliminator {
             // Check top-level assignments by creating a dummy clause
             // and placing it in the queue:
             if self.clause_queue.is_empty() && self.bwdsub_assigns < asg.stack_len() {
-                let c = ClauseId::from(asg.stack(self.bwdsub_assigns));
+                let c = ClauseIndex::lift(asg.stack(self.bwdsub_assigns));
+                // let c = ClauseId::from(asg.stack(self.bwdsub_assigns));
                 self.clause_queue.push(c);
                 self.bwdsub_assigns += 1;
             }
@@ -577,19 +578,19 @@ impl Eliminator {
         Ok(())
     }
     /// remove a clause id from literal's occur list.
-    pub fn remove_lit_occur(&mut self, asg: &mut impl AssignIF, l: Lit, cid: ClauseId) {
+    pub fn remove_lit_occur(&mut self, asg: &mut impl AssignIF, l: Lit, ci: ClauseIndex) {
         let w = &mut self[l.vi()];
         if w.aborted {
             return;
         }
         if bool::from(l) {
-            debug_assert_eq!(w.pos_occurs.iter().filter(|&c| *c == cid).count(), 1);
-            w.pos_occurs.delete_unstable(|&c| c == cid);
-            debug_assert!(!w.pos_occurs.contains(&cid));
+            debug_assert_eq!(w.pos_occurs.iter().filter(|&c| *c == ci).count(), 1);
+            w.pos_occurs.delete_unstable(|&c| c == ci);
+            debug_assert!(!w.pos_occurs.contains(&ci));
         } else {
-            debug_assert_eq!(w.neg_occurs.iter().filter(|&c| *c == cid).count(), 1);
-            w.neg_occurs.delete_unstable(|&c| c == cid);
-            debug_assert!(!w.neg_occurs.contains(&cid));
+            debug_assert_eq!(w.neg_occurs.iter().filter(|&c| *c == ci).count(), 1);
+            w.neg_occurs.delete_unstable(|&c| c == ci);
+            debug_assert!(!w.neg_occurs.contains(&ci));
         }
         self.enqueue_var(asg, l.vi(), true);
     }
@@ -599,14 +600,14 @@ impl Eliminator {
     ///
 
     /// enqueue a clause into eliminator's clause queue.
-    pub fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause) {
+    pub fn enqueue_clause(&mut self, ci: ClauseIndex, c: &mut Clause) {
         if self.mode != EliminatorMode::Running
             || c.is(FlagClause::ENQUEUED)
             || self.subsume_literal_limit < c.len()
         {
             return;
         }
-        self.clause_queue.push(cid);
+        self.clause_queue.push(ci);
         c.turn_on(FlagClause::ENQUEUED);
     }
     /// clear eliminator's clause queue.
@@ -661,11 +662,11 @@ fn check_eliminator(cdb: &impl ClauseDBIF, elim: &Eliminator) -> bool {
         for l in c.iter() {
             let v = l.vi();
             if bool::from(*l) {
-                if !elim[v].pos_occurs.contains(&(ClauseId::from(cid))) {
-                    panic!("failed to check {} {:#}", (ClauseId::from(cid)), c);
+                if !elim[v].pos_occurs.contains(&cid) {
+                    panic!("failed to check {} {:#}", cid, c);
                 }
-            } else if !elim[v].neg_occurs.contains(&(ClauseId::from(cid))) {
-                panic!("failed to check {} {:#}", (ClauseId::from(cid)), c);
+            } else if !elim[v].neg_occurs.contains(&cid) {
+                panic!("failed to check {} {:#}", cid, c);
             }
         }
     }

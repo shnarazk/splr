@@ -16,30 +16,30 @@ impl Eliminator {
         &mut self,
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
-        cid: ClauseId,
-        did: ClauseId,
+        ci: ClauseIndex,
+        di: ClauseIndex,
     ) -> MaybeInconsistent {
-        match have_subsuming_lit(cdb, cid, did) {
+        match have_subsuming_lit(cdb, ci, di) {
             Subsumable::Success => {
                 #[cfg(feature = "trace_elimination")]
                 println!(
                     "BackSubsC    => {} {} subsumed completely by {} {:#}",
                     did, cdb[did], cid, cdb[cid],
                 );
-                debug_assert!(!cdb[did].is_dead());
-                if !cdb[did].is(FlagClause::LEARNT) {
-                    cdb[cid].turn_off(FlagClause::LEARNT);
+                debug_assert!(!cdb[di].is_dead());
+                if !cdb[di].is(FlagClause::LEARNT) {
+                    cdb[ci].turn_off(FlagClause::LEARNT);
                 }
-                self.remove_cid_occur(asg, did, &mut cdb[did]);
-                cdb.remove_clause(did);
+                self.remove_cid_occur(asg, di, &mut cdb[di]);
+                cdb.remove_clause(di);
                 self.num_subsumed += 1;
             }
             // To avoid making a big clause, we have to add a condition for combining them.
             Subsumable::By(l) => {
-                debug_assert!(cid.is_lifted_lit());
+                debug_assert!(ci.is_lifted_lit());
                 #[cfg(feature = "trace_elimination")]
                 println!("BackSubC subsumes {} from {} and {}", l, cid, did);
-                strengthen_clause(asg, cdb, self, did, !l)?;
+                strengthen_clause(asg, cdb, self, di, !l)?;
                 self.enqueue_var(asg, l.vi(), true);
             }
             Subsumable::None => (),
@@ -49,10 +49,14 @@ impl Eliminator {
 }
 
 /// returns a literal if these clauses can be merged by the literal.
-fn have_subsuming_lit(cdb: &mut impl ClauseDBIF, cid: ClauseId, other: ClauseId) -> Subsumable {
+fn have_subsuming_lit(
+    cdb: &mut impl ClauseDBIF,
+    ci: ClauseIndex,
+    other: ClauseIndex,
+) -> Subsumable {
     debug_assert!(!other.is_lifted_lit());
-    if cid.is_lifted_lit() {
-        let l = Lit::from(cid);
+    if ci.is_lifted_lit() {
+        let l = Lit::from(ci);
         let oh = &cdb[other];
         for lo in oh.iter() {
             if l == !*lo {
@@ -62,7 +66,7 @@ fn have_subsuming_lit(cdb: &mut impl ClauseDBIF, cid: ClauseId, other: ClauseId)
         return Subsumable::None;
     }
     // let mut ret: Subsumable = Subsumable::Success;
-    let ch = &cdb[cid];
+    let ch = &cdb[ci];
     debug_assert!(1 < ch.len());
     let ob = &cdb[other];
     debug_assert!(1 < ob.len());
@@ -89,29 +93,29 @@ fn strengthen_clause(
     asg: &mut impl AssignIF,
     cdb: &mut impl ClauseDBIF,
     elim: &mut Eliminator,
-    cid: ClauseId,
+    ci: ClauseIndex,
     l: Lit,
 ) -> MaybeInconsistent {
-    debug_assert!(!cdb[cid].is_dead());
-    debug_assert!(1 < cdb[cid].len());
-    match cdb.transform_by_elimination(cid, l) {
+    debug_assert!(!cdb[ci].is_dead());
+    debug_assert!(1 < cdb[ci].len());
+    match cdb.transform_by_elimination(ci, l) {
         RefClause::Clause(_ci) => {
             #[cfg(feature = "trace_elimination")]
             println!("cid {} drops literal {}", cid, l);
 
-            elim.enqueue_clause(cid, &mut cdb[cid]);
-            elim.remove_lit_occur(asg, l, cid);
+            elim.enqueue_clause(ci, &mut cdb[ci]);
+            elim.remove_lit_occur(asg, l, ci);
             Ok(())
         }
         RefClause::RegisteredClause(_) => {
-            elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
-            cdb.remove_clause(cid);
+            elim.remove_cid_occur(asg, ci, &mut cdb[ci]);
+            cdb.remove_clause(ci);
             Ok(())
         }
         RefClause::UnitClause(l0) => {
             cdb.certificate_add_assertion(l0);
-            elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
-            cdb.remove_clause(cid);
+            elim.remove_cid_occur(asg, ci, &mut cdb[ci]);
+            cdb.remove_clause(ci);
             match asg.assigned(l0) {
                 None => asg.assign_at_root_level(l0),
                 Some(true) => Ok(()),

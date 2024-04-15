@@ -880,9 +880,9 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         *num_reduction += 1;
 
-        let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
+        let mut perm: Vec<OrderedProxy<ClauseIndex>> = Vec::with_capacity(clause.len());
         let mut alives = 0;
-        for (i, c) in clause
+        for (ci, c) in clause
             .iter_mut()
             .enumerate()
             .skip(1)
@@ -896,7 +896,7 @@ impl ClauseDBIF for ClauseDB {
             // There's no clause stored in `reason` because the decision level is 'zero.'
             debug_assert_ne!(
                 asg.reason(c.lit0().vi()),
-                AssignReason::Implication(ClauseId::from(i)),
+                AssignReason::Implication(ci),
                 "Lit {} {:?} level {}, dl: {}",
                 i32::from(c.lit0()),
                 asg.assigned(c.lit0()),
@@ -909,21 +909,21 @@ impl ClauseDBIF for ClauseDB {
             alives += 1;
             match setting {
                 ReductionType::RASonADD(_) => {
-                    perm.push(OrderedProxy::new(i, c.reverse_activity_sum(asg)));
+                    perm.push(OrderedProxy::new(ci, c.reverse_activity_sum(asg)));
                 }
                 ReductionType::RASonALL(cutoff, _) => {
                     let value = c.reverse_activity_sum(asg);
                     if cutoff < value.min(c.rank_old as f64) {
-                        perm.push(OrderedProxy::new(i, value));
+                        perm.push(OrderedProxy::new(ci, value));
                     }
                 }
                 ReductionType::LBDonADD(_) => {
-                    perm.push(OrderedProxy::new(i, c.lbd()));
+                    perm.push(OrderedProxy::new(ci, c.lbd()));
                 }
                 ReductionType::LBDonALL(cutoff, _) => {
                     let value = c.rank.min(c.rank_old);
                     if cutoff < value {
-                        perm.push(OrderedProxy::new(i, value as f64));
+                        perm.push(OrderedProxy::new(ci, value as f64));
                     }
                 }
             }
@@ -944,12 +944,12 @@ impl ClauseDBIF for ClauseDB {
         };
         perm.sort();
         for i in perm.iter().skip(keep) {
-            self.remove_clause(ClauseId::from(i.to()));
+            self.remove_clause(i.to());
         }
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
-        for (i, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
+        for (ci, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
             if c.is(FlagClause::LEARNT)
                 && !c.is_dead()
                 && (self.co_lbd_bound as usize) < c.lits.len()
@@ -961,7 +961,7 @@ impl ClauseDBIF for ClauseDB {
                     &mut self.num_bi_clause,
                     &mut self.num_clause,
                     &mut self.num_learnt,
-                    ClauseId::from(i),
+                    ci,
                     c,
                 );
             }
@@ -981,14 +981,14 @@ impl ClauseDBIF for ClauseDB {
             Err(SolverError::OutOfMemory)
         }
     }
-    fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId> {
+    fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseIndex> {
         for (i, c) in self.clause.iter().enumerate().skip(1) {
             if c.is_dead() || (strict && c.is(FlagClause::LEARNT)) {
                 continue;
             }
             match c.evaluate(model) {
-                Some(false) => return Some(ClauseId::from(i)),
-                None if strict => return Some(ClauseId::from(i)),
+                Some(false) => return Some(i),
+                None if strict => return Some(i),
                 _ => (),
             }
         }
@@ -1195,7 +1195,7 @@ impl ClauseDB {
     ///```ignore
     /// bi_clause[l0].get(&l1).is_some()
     ///```
-    fn link_to_cid(&self, l0: Lit, l1: Lit) -> Option<&ClauseId> {
+    fn link_to_cid(&self, l0: Lit, l1: Lit) -> Option<&ClauseIndex> {
         self.binary_link.search(l0, l1)
     }
 }
@@ -1209,7 +1209,7 @@ fn remove_clause_fn(
     num_bi_clause: &mut usize,
     num_clause: &mut usize,
     num_learnt: &mut usize,
-    cid: ClauseId,
+    ci: ClauseIndex,
     c: &mut Clause,
 ) {
     debug_assert!(!c.is_dead());
@@ -1221,8 +1221,8 @@ fn remove_clause_fn(
             .expect("Eror (remove_clause_fn#01)");
         *num_bi_clause -= 1;
     } else {
-        watcher[usize::from(!l0)].remove_watch(&cid); // .expect("db1076");
-        watcher[usize::from(!l1)].remove_watch(&cid); // .expect("db1077");
+        watcher[usize::from(!l0)].remove_watch(&ci); // .expect("db1076");
+        watcher[usize::from(!l1)].remove_watch(&ci); // .expect("db1077");
     }
     if c.is(FlagClause::LEARNT) {
         *num_learnt -= 1;
