@@ -95,7 +95,7 @@ pub enum AssignReason {
     /// Assigned by decision
     Decision(DecisionLevel),
     /// Assigned by a non-binary clause.
-    Implication(ClauseId),
+    Implication(ClauseIndex),
     /// None of the above.
     None,
 }

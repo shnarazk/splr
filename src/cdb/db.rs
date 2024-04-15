@@ -82,45 +82,43 @@ pub struct ClauseDB {
     pub(super) eliminated_permanent: Vec<Vec<Lit>>,
 }
 
-impl Index<Lit> for ClauseDB {
-    type Output = Clause;
-    #[inline]
-    fn index(&self, lit: Lit) -> &Self::Output {
-        &self.clause[ClauseIndex::from(lit)]
-    }
-}
-
-impl IndexMut<Lit> for ClauseDB {
-    #[inline]
-    fn index_mut(&mut self, lit: Lit) -> &mut Self::Output {
-        &mut self.clause[ClauseIndex::from(lit)]
-    }
-}
-
-// impl Index<ClauseId> for ClauseDB {
+// impl Index<Lit> for ClauseDB {
 //     type Output = Clause;
 //     #[inline]
-//     fn index(&self, cid: ClauseId) -> &Clause {
-//         let i = NonZeroU32::get(cid.ordinal) as usize;
-//         if cfg!(feature = "unsafe_access") {
-//             unsafe { self.clause.get_unchecked(i) }
-//         } else {
-//             &self.clause[i]
-//         }
+//     fn index(&self, lit: Lit) -> &Self::Output {
+//         &self.clause[ClauseIndex::from(lit)]
 //     }
 // }
 
-// impl IndexMut<ClauseId> for ClauseDB {
+// impl IndexMut<Lit> for ClauseDB {
 //     #[inline]
-//     fn index_mut(&mut self, cid: ClauseId) -> &mut Clause {
-//         let i = NonZeroU32::get(cid.ordinal) as usize;
-//         if cfg!(feature = "unsafe_access") {
-//             unsafe { self.clause.get_unchecked_mut(i) }
-//         } else {
-//             &mut self.clause[i]
-//         }
+//     fn index_mut(&mut self, lit: Lit) -> &mut Self::Output {
+//         &mut self.clause[ClauseIndex::from(lit)]
 //     }
 // }
+
+impl Index<ClauseIndex> for ClauseDB {
+    type Output = Clause;
+    #[inline]
+    fn index(&self, ci: ClauseIndex) -> &Clause {
+        if cfg!(feature = "unsafe_access") {
+            unsafe { self.clause.get_unchecked(ci) }
+        } else {
+            &self.clause[ci]
+        }
+    }
+}
+
+impl IndexMut<ClauseIndex> for ClauseDB {
+    #[inline]
+    fn index_mut(&mut self, ci: ClauseIndex) -> &mut Clause {
+        if cfg!(feature = "unsafe_access") {
+            unsafe { self.clause.get_unchecked_mut(ci) }
+        } else {
+            &mut self.clause[ci]
+        }
+    }
+}
 
 // impl Index<&ClauseId> for ClauseDB {
 //     type Output = Clause;
