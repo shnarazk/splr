@@ -263,7 +263,8 @@ impl FlagIF for Clause {
 
 impl fmt::Display for Clause {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if cfg!(feature = "boundary_check") {
+        #[cfg(feature = "boundary_check")]
+        {
             let st = |flag, mes| if self.is(flag) { mes } else { "" };
             write!(
                 f,
@@ -273,7 +274,9 @@ impl fmt::Display for Clause {
                 st(FlagClause::LEARNT, ", learnt"),
                 st(FlagClause::ENQUEUED, ", enqueued"),
             )
-        } else {
+        }
+        #[cfg(not(feature = "boundary_check"))]
+        {
             let st = |flag, mes| if self.is(flag) { mes } else { "" };
             write!(
                 f,
