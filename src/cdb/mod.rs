@@ -226,23 +226,6 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(c.lits.is_empty()); // c.lits.clear();
         std::mem::swap(&mut c.lits, vec);
 
-        let ClauseDB {
-            #[cfg(feature = "bi_clause_completion")]
-            ref mut bi_clause_completion_queue,
-            ref mut clause,
-            ref mut lbd_temp,
-            ref mut num_clause,
-            ref mut num_bi_clause,
-            ref mut num_bi_learnt,
-            ref mut num_lbd2,
-            ref mut num_learnt,
-            ref mut binary_link,
-
-            #[cfg(feature = "clause_rewarding")]
-            ref tick,
-            ..
-        } = self;
-
         #[cfg(feature = "clause_rewarding")]
         {
             c.reward = 0.0;
@@ -263,28 +246,28 @@ impl ClauseDBIF for ClauseDB {
             }
         } else {
             c.search_from = 2;
-            c.update_lbd(asg, lbd_temp);
+            c.update_lbd(asg, &mut self.lbd_temp);
         }
         c.rank_old = c.rank;
         self.lbd.update(c.rank);
-        *num_clause += 1;
+        self.num_clause += 1;
         if learnt {
             if len2 {
-                *num_bi_learnt += 1;
+                self.num_bi_learnt += 1;
             } else {
                 c.turn_on(FlagClause::LEARNT);
-                *num_learnt += 1;
+                self.num_learnt += 1;
                 if c.rank <= 2 {
-                    *num_lbd2 += 1;
+                    self.num_lbd2 += 1;
                 }
             }
         }
         let l0 = c.lits[0];
         let l1 = c.lits[1];
         if len2 {
-            *num_bi_clause += 1;
+            self.num_bi_clause += 1;
             // FIXME: DancingLinks
-            binary_link.add(l0, l1, ci);
+            self.binary_link.add(l0, l1, ci);
         } else {
             // FIXME: DancingLinks
             self.insert_watcher(!l0, ci);
@@ -544,60 +527,51 @@ impl ClauseDBIF for ClauseDB {
         // 2. a normal clause becomes a new bi-clause.             [Case:2]
         // 3. a normal clause becomes a shorter normal clause.     [Case:3]
         //
-        debug_assert!(!self[ci].is_dead());
-        let ClauseDB {
-            clause,
-            binary_link,
-            // watch_cache,
-            certification_store,
-            ..
-        } = self;
-        let c = &mut clause[ci];
-        debug_assert!(new_lits.len() < c.len());
+        // debug_assert!(new_lits.len() < c.len());
         if new_lits.len() == 2 {
-            if let Some(&did) = binary_link.search(new_lits[0], new_lits[1]) {
+            if let Some(&did) = self.binary_link.search(new_lits[0], new_lits[1]) {
                 //
                 //## Case:0
                 //
-                if certification_store.is_active() {
-                    certification_store.delete_clause(new_lits);
+                if self.certification_store.is_active() {
+                    self.certification_store.delete_clause(new_lits);
                 }
                 return RefClause::RegisteredClause(did);
             }
             //
             //## Case:2
             //
-            let old_l0 = c.lit0();
-            let old_l1 = c.lit0();
-            std::mem::swap(&mut c.lits, new_lits);
-            let l0 = c.lit0();
-            let l1 = c.lit0();
+            let old_l0 = self[ci].lit0();
+            let old_l1 = self[ci].lit0();
+            std::mem::swap(&mut self[ci].lits, new_lits);
+            let l0 = self[ci].lit0();
+            let l1 = self[ci].lit0();
             // watch_cache[!old_l0].remove_watch(&ci);
             self.remove_watcher(!old_l0, ci);
             // watch_cache[!old_l1].remove_watch(&ci);
             self.remove_watcher(!old_l1, ci);
-            binary_link.add(l0, l1, ci);
+            self.binary_link.add(l0, l1, ci);
 
-            if certification_store.is_active() {
-                certification_store.add_clause(new_lits);
-                certification_store.delete_clause(&c.lits);
+            if self.certification_store.is_active() {
+                self.certification_store.add_clause(new_lits);
+                self.certification_store.delete_clause(&self[ci].lits);
             }
-            c.turn_off(FlagClause::LEARNT);
+            self[ci].turn_off(FlagClause::LEARNT);
             self.num_bi_clause += 1;
 
-            if certification_store.is_active() {
-                certification_store.add_clause(&c.lits);
-                certification_store.delete_clause(new_lits);
+            if self.certification_store.is_active() {
+                self.certification_store.add_clause(&self[ci].lits);
+                self.certification_store.delete_clause(new_lits);
             }
         } else {
             //
             //## Case:3
             //
-            let old_l0 = c.lit0();
-            let old_l1 = c.lit0();
-            std::mem::swap(&mut c.lits, new_lits);
-            let l0 = c.lit0();
-            let l1 = c.lit0();
+            let old_l0 = self[ci].lit0();
+            let old_l1 = self[ci].lit0();
+            std::mem::swap(&mut self[ci].lits, new_lits);
+            let l0 = self[ci].lit0();
+            let l1 = self[ci].lit0();
 
             if (l0 == old_l0 && l1 == old_l1) || (l0 == old_l1 && l1 == old_l0) {
             } else if l0 == old_l0 {
@@ -647,9 +621,10 @@ impl ClauseDBIF for ClauseDB {
             // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
             // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
 
-            if certification_store.is_active() {
-                certification_store.add_clause(new_lits);
-                certification_store.delete_clause(&c.lits);
+            if self.certification_store.is_active() {
+                self.certification_store.add_clause(new_lits);
+                self.certification_store
+                    .delete_clause(&self[ci].lits.clone());
             }
         }
         RefClause::Clause(ci)
