@@ -48,6 +48,7 @@ use std::{io::Write, path::Path};
 pub trait ClauseDBIF:
     Instantiate
     + IndexMut<ClauseIndex, Output = Clause>
+    + DancingIndexManagerIF
     + PropertyDereference<property::Tusize, usize>
     + PropertyDereference<property::Tf64, f64>
 {
@@ -71,13 +72,9 @@ pub trait ClauseDBIF:
     //## clause transformation
     //
 
-    /// push back a watch literal cache by adjusting the iterator for `lit`
-    fn transform_by_restoring_watch_cache(
-        &mut self,
-        l: Lit,
-        iter: &mut WatchCacheIterator,
-        p: Option<Lit>,
-    );
+    /// swap the first twy literals in a clause
+    fn swap_watch(&mut self, ci: ClauseIndex);
+
     /// swap i-th watch with j-th literal then update watch caches correctly
     fn transform_by_updating_watch(
         &mut self,
@@ -290,8 +287,8 @@ impl ClauseDBIF for ClauseDB {
             binary_link.add(l0, l1, ci);
         } else {
             // FIXME: DancingLinks
-            watch_cache[!l0].insert_watch(ci, l1);
-            watch_cache[!l1].insert_watch(ci, l0);
+            self.insert_watcher(!l0, ci);
+            self.insert_watcher(!l1, ci);
         }
         RefClause::Clause(ci)
     }
@@ -335,8 +332,10 @@ impl ClauseDBIF for ClauseDB {
         if len2 {
             binary_link.add(l0, l1, ci);
         } else {
-            watch_cache[!l0].insert_watch(ci, l1);
-            watch_cache[!l1].insert_watch(ci, l0);
+            // watch_cache[!l0].insert_watch(ci, l1);
+            self.insert_watcher(!l0, ci);
+            // watch_cache[!l1].insert_watch(ci, l0);
+            self.insert_watcher(!l1, ci);
         }
         RefClause::Clause(ci)
     }
@@ -387,25 +386,6 @@ impl ClauseDBIF for ClauseDB {
         }
     }
     //
-    fn transform_by_restoring_watch_cache(
-        &mut self,
-        l: Lit,
-        iter: &mut WatchCacheIterator,
-        op: Option<Lit>,
-    ) {
-        if let Some(p) = op {
-            self.watch_cache[l][iter.index].1 = p;
-        }
-
-        // let cid = self.watch_cache[l][iter.index].0;
-        // let c = &self[cid];
-        // let l0 = c.lits[0];
-        // let l1 = c.lits[1];
-        // assert!(self.watch_cache[!l0].iter().any(|wc| wc.0 == cid && wc.1 == l1));
-        // assert!(self.watch_cache[!l1].iter().any(|wc| wc.0 == cid && wc.1 == l0));
-
-        iter.restore_entry();
-    }
     // return a Lit if the clause becomes a unit clause.
     fn transform_by_elimination(&mut self, ci: ClauseIndex, p: Lit) -> RefClause {
         //
@@ -821,6 +801,10 @@ impl ClauseDBIF for ClauseDB {
                 RefClause::Clause(ci)
             }
         }
+    }
+    /// swap the first twy literals in a clause
+    fn swap_watch(&mut self, ci: ClauseIndex) {
+        self[ci].lits.swap(0, 1);
     }
     // used in `propagate`, `propagate_sandbox`, and `handle_conflict` for chronoBT
     fn transform_by_updating_watch(

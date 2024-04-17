@@ -377,101 +377,54 @@ impl PropagateIF for AssignStack {
             //
             //## normal clause loop
             //
-            let mut source = cdb.watch_cache_iter(propagating);
-            'next_clause: while let Some((cid, mut cached)) = source
-                .next()
-                .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
-            {
-                #[cfg(feature = "boundary_check")]
-                debug_assert!(
-                    !cdb[cid].is_dead(),
-                    "dead clause in propagation: {:?}",
-                    cdb.is_garbage_collected(cid),
-                );
-                debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
-                #[cfg(feature = "maintain_watch_cache")]
-                debug_assert!(
-                    cached == cdb[cid].lit0() || cached == cdb[cid].lit1(),
-                    "mismatch watch literal and its cache {}: l0 {}  l1 {}, timestamp: {:?}",
-                    cached,
-                    cdb[cid].lit0(),
-                    cdb[cid].lit1(),
-                    cdb[cid].timestamp(),
-                );
-                // assert_ne!(other_watch.vi(), false_lit.vi());
-                // assert!(other_watch == cdb[cid].lit0() || other_watch == cdb[cid].lit1());
-                let mut other_watch_value = lit_assign!(self.var[cached.vi()], cached);
+            // let mut source = cdb.watch_cache_iter(propagating);
+            let mut ci = cdb.get_watcher_link(propagating);
+            // 'next_clause: while let Some((cid, mut cached)) = source
+            //     .next()
+            //     .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
+            'next_clause: while ci != 0 {
                 let mut updated_cache: Option<Lit> = None;
-                if Some(true) == other_watch_value {
-                    #[cfg(feature = "maintain_watch_cache")]
-                    debug_assert!(cdb[cid].lit0() == cached || cdb[cid].lit1() == cached);
-
-                    // In this path, we use only `AssignStack::assign`.
-                    // assert!(w.blocker == cdb[w.c].lits[0] || w.blocker == cdb[w.c].lits[1]);
-                    cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
-                    check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
-                    continue 'next_clause;
-                }
+                let c = &cdb[ci];
+                let lit0 = c.lit0();
+                let lit1 = c.lit1();
+                let (false_watch_pos, other) = if false_lit == lit1 {
+                    (1, lit0)
+                } else {
+                    (0, lit1)
+                };
+                //
+                //## Search an un-falsified literal
+                //
+                // Gathering good literals at the beginning of lits.
+                let start = c.search_from;
+                for (k, lk) in c
+                    .iter()
+                    .enumerate()
+                    .skip(start as usize)
+                    .chain(c.iter().enumerate().skip(2).take(start as usize - 2))
                 {
-                    let c = &cdb[cid];
-                    let lit0 = c.lit0();
-                    let lit1 = c.lit1();
-                    let (false_watch_pos, other) = if false_lit == lit1 {
-                        (1, lit0)
-                    } else {
-                        (0, lit1)
-                    };
-
-                    if cached != other {
-                        cached = other;
-                        other_watch_value = lit_assign!(self.var[other.vi()], other);
-                        if Some(true) == other_watch_value {
-                            debug_assert!(!self.var[other.vi()].is(FlagVar::ELIMINATED));
-                            // In this path, we use only `AssignStack::assign`.
-                            cdb.transform_by_restoring_watch_cache(
-                                propagating,
-                                &mut source,
-                                Some(other),
-                            );
-                            check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
-                            continue 'next_clause;
-                        }
-                        updated_cache = Some(other);
-                    }
-                    let c = &cdb[cid];
-                    debug_assert!(lit0 == false_lit || lit1 == false_lit);
-                    //
-                    //## Search an un-falsified literal
-                    //
-                    // Gathering good literals at the beginning of lits.
-                    let start = c.search_from;
-                    for (k, lk) in c
-                        .iter()
-                        .enumerate()
-                        .skip(start as usize)
-                        .chain(c.iter().enumerate().skip(2).take(start as usize - 2))
-                    {
-                        if lit_assign!(self.var[lk.vi()], *lk) != Some(false) {
-                            let new_watch = !*lk;
-                            cdb.detach_watch_cache(propagating, &mut source);
-                            cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
-                            cdb[cid].search_from = (k + 1) as u16;
-                            debug_assert_ne!(self.assigned(new_watch), Some(true));
-                            check_in!(
-                                cid,
-                                Propagate::FindNewWatch(self.num_conflict, propagating, new_watch)
-                            );
-                            continue 'next_clause;
-                        }
-                    }
-                    if false_watch_pos == 0 {
-                        cdb.swap_watch(cid);
+                    if lit_assign!(self.var[lk.vi()], *lk) != Some(false) {
+                        let new_watch = !*lk;
+                        // cdb.detach_watch_cache(propagating, &mut source);
+                        cdb.remove_watcher(propagating, ci);
+                        cdb.transform_by_updating_watch(ci, false_watch_pos, k, true);
+                        cdb[ci].search_from = (k + 1) as u16;
+                        debug_assert_ne!(self.assigned(new_watch), Some(true));
+                        check_in!(
+                            ci,
+                            Propagate::FindNewWatch(self.num_conflict, propagating, new_watch)
+                        );
+                        continue 'next_clause;
                     }
                 }
-                cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
+                if false_watch_pos == 0 {
+                    cdb.swap_watch(ci);
+                }
+                // cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
+                let other_watch_value = lit_assign!(self.var[other.vi()], other);
                 if other_watch_value == Some(false) {
-                    check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, cached));
-                    conflict_path!(cached, AssignReason::Implication(cid));
+                    check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
+                    conflict_path!(other, AssignReason::Implication(ci));
                 }
 
                 #[cfg(feature = "chrono_BT")]
@@ -482,12 +435,11 @@ impl PropagateIF for AssignStack {
                     .max()
                     .unwrap_or(self.root_level);
 
-                debug_assert_eq!(cdb[cid].lit0(), cached);
-                debug_assert_eq!(self.assigned(cached), None);
+                debug_assert_eq!(self.assigned(other), None);
                 debug_assert!(other_watch_value.is_none());
                 self.assign_by_implication(
-                    cached,
-                    AssignReason::Implication(cid),
+                    other,
+                    AssignReason::Implication(ci),
                     #[cfg(feature = "chrono_BT")]
                     dl,
                 );
