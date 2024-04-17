@@ -699,7 +699,6 @@ impl ClauseDBIF for ClauseDB {
         let ClauseDB {
             clause,
             binary_link,
-            watch_cache,
             certification_store,
             ..
         } = self;
@@ -728,8 +727,10 @@ impl ClauseDBIF for ClauseDB {
                 //
                 //## Case:3-2
                 //
-                watch_cache[!c.lits[0]].remove_watch(&ci);
-                watch_cache[!c.lits[1]].remove_watch(&ci);
+                // watch_cache[!c.lits[0]].remove_watch(&ci);
+                self.remove_watcher(!c.lits[0], ci);
+                // watch_cache[!c.lits[1]].remove_watch(&ci);
+                self.remove_watcher(!c.lits[1], ci);
                 binary_link.add(l0, l1, ci);
                 std::mem::swap(&mut c.lits, &mut new_lits);
                 self.num_bi_clause += 1;
@@ -762,33 +763,45 @@ impl ClauseDBIF for ClauseDB {
                     }
                 } else if old_l0 == l0 {
                     // assert_ne!(old_l1, l1);
-                    watch_cache[!old_l1].remove_watch(&ci);
-                    watch_cache[!l0].update_watch(ci, l1);
+                    // watch_cache[!old_l1].remove_watch(&ci);
+                    self.remove_watcher(!old_l1, ci);
+                    // watch_cache[!l0].update_watch(ci, l1);
                     // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
-                    watch_cache[!l1].insert_watch(ci, l0);
+                    // watch_cache[!l1].insert_watch(ci, l0);
+                    self.insert_watcher(!l1, ci);
                 } else if old_l0 == l1 {
                     // assert_ne!(old_l1, l0);
-                    watch_cache[!old_l1].remove_watch(&ci);
+                    // watch_cache[!old_l1].remove_watch(&ci);
+                    self.remove_watcher(!old_l1, ci);
                     // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
-                    watch_cache[!l0].insert_watch(ci, l1);
-                    watch_cache[!l1].update_watch(ci, l0);
+                    // watch_cache[!l0].insert_watch(ci, l1);
+                    self.insert_watcher(!l0, ci);
+                    // watch_cache[!l1].update_watch(ci, l0);
                 } else if old_l1 == l0 {
                     // assert_ne!(old_l0, l1);
-                    watch_cache[!old_l0].remove_watch(&ci);
-                    watch_cache[!l0].update_watch(ci, l1);
-                    watch_cache[!l1].insert_watch(ci, l0);
+                    // watch_cache[!old_l0].remove_watch(&ci);
+                    self.remove_watcher(!old_l0, ci);
+                    // watch_cache[!l0].update_watch(ci, l1);
+                    // watch_cache[!l1].insert_watch(ci, l0);
+                    self.insert_watcher(!l1, ci);
                 } else if old_l1 == l1 {
                     // assert_ne!(old_l0, l0);
-                    watch_cache[!old_l0].remove_watch(&ci);
-                    watch_cache[!l0].insert_watch(ci, l1);
-                    watch_cache[!l1].update_watch(ci, l0);
+                    // watch_cache[!old_l0].remove_watch(&ci);
+                    self.remove_watcher(!old_l0, ci);
+                    // watch_cache[!l0].insert_watch(ci, l1);
+                    self.insert_watcher(!l0, ci);
+                    // watch_cache[!l1].update_watch(ci, l0);
                 } else {
-                    watch_cache[!old_l0].remove_watch(&ci);
-                    watch_cache[!old_l1].remove_watch(&ci);
+                    // watch_cache[!old_l0].remove_watch(&ci);
+                    self.remove_watcher(!old_l0, ci);
+                    // watch_cache[!old_l1].remove_watch(&ci);
+                    self.remove_watcher(!old_l1, ci);
                     // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
-                    watch_cache[!l0].insert_watch(ci, l1);
+                    // watch_cache[!l0].insert_watch(ci, l1);
+                    self.insert_watcher(!l0, ci);
                     // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
-                    watch_cache[!l1].insert_watch(ci, l0);
+                    // watch_cache[!l1].insert_watch(ci, l0);
+                    self.insert_watcher(!l1, ci);
                 }
 
                 // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
@@ -1372,19 +1385,6 @@ mod tests {
 
     fn lit(i: i32) -> Lit {
         Lit::from(i)
-    }
-
-    #[allow(dead_code)]
-    fn check_watches(cdb: &ClauseDB, ci: ClauseIndex) {
-        let c = &cdb.clause[ci];
-        if c.lits.is_empty() {
-            println!("skip checking watches of an empty clause");
-            return;
-        }
-        assert!(c.lits[0..2]
-            .iter()
-            .all(|l| cdb.watch_cache[!*l].iter().any(|(c, _)| *c == ci)));
-        println!("pass to check watches");
     }
 
     #[test]

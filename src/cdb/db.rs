@@ -82,7 +82,7 @@ pub struct ClauseDB {
     //
     //## incremental solving
     //
-    pub(super) eliminated_permanent: Vec<Vec<Lit>>,
+    pub(crate) eliminated_permanent: Vec<Vec<Lit>>,
 }
 
 // impl Index<Lit> for ClauseDB {
