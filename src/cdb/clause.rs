@@ -291,43 +291,43 @@ impl fmt::Display for Clause {
 
 impl DancingIndexIF for Clause {
     fn next_for_lit(&self, lit: Lit) -> ClauseIndex {
-        let l = lit.negate();
+        let l = !lit;
         if self.lits[0] == l {
             self.link0.next
         } else if self.lits[1] == l {
             self.link1.next
         } else {
-            panic!("next: ilegal chain; clause:{:?}, lit:{:?}", self, lit);
+            panic!("#### next: ilegal chain for {}: {:?}", lit, self);
         }
     }
     fn next_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex {
-        let l = lit.negate();
+        let l = !lit;
         if self.lits[0] == l {
             &mut self.link0.next
         } else if self.lits[1] == l {
             &mut self.link1.next
         } else {
-            panic!("&mut next: ilegal chain; clause:{:?}, lit:{:?}", self, lit);
+            panic!("#### &mut next: ilegal chain for {}: {:?}", lit, self);
         }
     }
     fn prev_for_lit(&self, lit: Lit) -> ClauseIndex {
-        let l = lit.negate();
+        let l = !lit;
         if self.lits[0] == l {
             self.link0.prev
         } else if self.lits[1] == l {
             self.link1.prev
         } else {
-            panic!("prev: ilegal chain; clause:{:?}, lit:{:?}", self, lit);
+            panic!("#### prev: ilegal chain for {}: {:?}", lit, self);
         }
     }
     fn prev_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex {
-        let l = lit.negate();
+        let l = !lit;
         if self.lits[0] == l {
             &mut self.link0.prev
         } else if self.lits[1] == l {
             &mut self.link1.prev
         } else {
-            panic!("&mut prev: ilegal chain; clause:{:?}, lit:{:?}", self, lit);
+            panic!("#### &mut prev: ilegal chain for {}: {:?}", lit, self);
         }
     }
     fn clear_links(&mut self) {

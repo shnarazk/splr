@@ -354,6 +354,7 @@ impl PropagateIF for AssignStack {
             // while the key of watch_cache is watching literals.
             // Therefore keys to access appropriate targets have the opposite phases.
             //
+            /*
             for (blocker, cid) in cdb.binary_links(false_lit).iter().copied() {
                 let var = &self.var[blocker.vi()];
                 debug_assert!(!cdb[cid].is_dead());
@@ -377,6 +378,7 @@ impl PropagateIF for AssignStack {
                     }
                 }
             }
+            */
             //
             //## normal clause loop
             //
@@ -386,7 +388,9 @@ impl PropagateIF for AssignStack {
             //     .next()
             //     .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
             'next_clause: while ci != 0 {
+                dbg!(propagating, ci, &cdb[ci]);
                 let mut _updated_cache: Option<Lit> = None;
+                let _ = cdb[ci].next_for_lit(propagating);
                 let c = &cdb[ci];
                 let lit0 = c.lit0();
                 let lit1 = c.lit1();
@@ -395,6 +399,7 @@ impl PropagateIF for AssignStack {
                 } else {
                     (0, lit1)
                 };
+                let next_ci = cdb[ci].next_for_lit(propagating);
                 //
                 //## Search an un-falsified literal
                 //
@@ -409,15 +414,14 @@ impl PropagateIF for AssignStack {
                     if lit_assign!(self.var[lk.vi()], *lk) != Some(false) {
                         let new_watch = !*lk;
                         // cdb.detach_watch_cache(propagating, &mut source);
-                        ci = cdb[ci].next_for_lit(propagating);
-                        cdb.remove_watcher(propagating, ci);
-                        cdb.transform_by_updating_watch(ci, false_watch_pos, k, true);
-                        cdb[ci].search_from = (k + 1) as u16;
+                        // cdb.remove_watcher(propagating, ci);
+                        cdb.transform_by_updating_watch(ci, false_watch_pos, k);
                         debug_assert_ne!(self.assigned(new_watch), Some(true));
                         check_in!(
                             ci,
                             Propagate::FindNewWatch(self.num_conflict, propagating, new_watch)
                         );
+                        ci = next_ci;
                         continue 'next_clause;
                     }
                 }
@@ -448,7 +452,7 @@ impl PropagateIF for AssignStack {
                     dl,
                 );
                 check_in!(cid, Propagate::BecameUnit(self.num_conflict, cached));
-                ci = cdb[ci].next_for_lit(propagating);
+                ci = next_ci;
             }
             from_saved_trail!();
         }
@@ -556,8 +560,9 @@ impl PropagateIF for AssignStack {
                 {
                     if lit_assign!(self.var[lk.vi()], *lk) != Some(false) {
                         let new_watch = !*lk;
-                        cdb.remove_watcher(propagating, ci);
-                        cdb.transform_by_updating_watch(ci, false_watch_pos, k, true);
+                        ci = cdb[ci].next_for_lit(propagating);
+                        // cdb.remove_watcher(propagating, ci);
+                        cdb.transform_by_updating_watch(ci, false_watch_pos, k);
                         cdb[ci].search_from = (k as u16).saturating_add(1);
                         debug_assert!(
                             self.assigned(!new_watch) == Some(true)
@@ -567,7 +572,6 @@ impl PropagateIF for AssignStack {
                             cid,
                             Propagate::SandboxFindNewWatch(self.num_conflict, false_lit, new_watch,)
                         );
-                        ci = cdb[ci].next_for_lit(propagating);
                         continue 'next_clause;
                     }
                 }
