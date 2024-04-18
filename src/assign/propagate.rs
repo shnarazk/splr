@@ -2,7 +2,10 @@
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
     super::{AssignIF, AssignStack, VarHeapIF, VarManipulateIF},
-    crate::{cdb::ClauseDBIF, types::*},
+    crate::{
+        cdb::{ClauseDBIF, DancingIndexIF},
+        types::*,
+    },
 };
 
 #[cfg(feature = "trail_saving")]
@@ -383,7 +386,7 @@ impl PropagateIF for AssignStack {
             //     .next()
             //     .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
             'next_clause: while ci != 0 {
-                let mut updated_cache: Option<Lit> = None;
+                let mut _updated_cache: Option<Lit> = None;
                 let c = &cdb[ci];
                 let lit0 = c.lit0();
                 let lit1 = c.lit1();
@@ -414,6 +417,7 @@ impl PropagateIF for AssignStack {
                             ci,
                             Propagate::FindNewWatch(self.num_conflict, propagating, new_watch)
                         );
+                        ci = cdb[ci].next_for_lit(propagating);
                         continue 'next_clause;
                     }
                 }
@@ -444,6 +448,7 @@ impl PropagateIF for AssignStack {
                     dl,
                 );
                 check_in!(cid, Propagate::BecameUnit(self.num_conflict, cached));
+                ci = cdb[ci].next_for_lit(propagating);
             }
             from_saved_trail!();
         }
@@ -528,7 +533,7 @@ impl PropagateIF for AssignStack {
             //
             let mut ci = cdb.get_watcher_link(propagating);
             'next_clause: while ci != 0 {
-                let mut c = &mut cdb[ci];
+                let c = &cdb[ci];
                 if c.is_dead() {
                     continue;
                 }
@@ -553,7 +558,7 @@ impl PropagateIF for AssignStack {
                         let new_watch = !*lk;
                         cdb.remove_watcher(propagating, ci);
                         cdb.transform_by_updating_watch(ci, false_watch_pos, k, true);
-                        c.search_from = (k as u16).saturating_add(1);
+                        cdb[ci].search_from = (k as u16).saturating_add(1);
                         debug_assert!(
                             self.assigned(!new_watch) == Some(true)
                                 || self.assigned(!new_watch).is_none()
@@ -562,6 +567,7 @@ impl PropagateIF for AssignStack {
                             cid,
                             Propagate::SandboxFindNewWatch(self.num_conflict, false_lit, new_watch,)
                         );
+                        ci = cdb[ci].next_for_lit(propagating);
                         continue 'next_clause;
                     }
                 }
@@ -590,6 +596,7 @@ impl PropagateIF for AssignStack {
                     dl,
                 );
                 check_in!(cid, Propagate::SandboxBecameUnit(self.num_conflict));
+                ci = cdb[ci].next_for_lit(propagating);
             }
         }
         Ok(())

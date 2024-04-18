@@ -54,7 +54,7 @@ impl IndexMut<Lit> for ClauseDB {
 }
 
 impl Instantiate for ClauseDB {
-    fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self {
+    fn instantiate(_conf: &Config, _cnf: &CNFDescription) -> Self {
         unimplemented!()
     }
 }
