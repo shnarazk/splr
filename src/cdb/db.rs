@@ -1,7 +1,7 @@
 use {
     super::{
         binary::BinaryLinkIF, dlink::LinkHead, ema::ProgressLBD, BinaryLinkDB, CertificationStore,
-        Clause,
+        Clause, DancingIndexManagerIF,
     },
     crate::types::*,
     std::ops::{Index, IndexMut},
@@ -82,6 +82,7 @@ pub struct ClauseDB {
     //
     //## incremental solving
     //
+    #[cfg(not(feature = "no_clause_elimination"))]
     pub(crate) eliminated_permanent: Vec<Vec<Lit>>,
 }
 
@@ -198,10 +199,12 @@ impl Instantiate for ClauseDB {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> ClauseDB {
         let nv = cnf.num_of_variables;
         let nc = cnf.num_of_clauses;
+        let mut clause = vec![Clause::default(); 1 + nc];
+        let watch = ClauseDB::make_watches(nv, &mut clause);
         ClauseDB {
-            clause: vec![Clause::default(); 1 + nc], // ci 0 must refer to the header
+            clause,
             binary_link: BinaryLinkDB::instantiate(config, cnf),
-            watch: vec![LinkHead::default(); 2 * (nv + 1)],
+            watch,
             certification_store: CertificationStore::instantiate(config, cnf),
             soft_limit: config.c_cls_lim,
             lbd: ProgressLBD::instantiate(config, cnf),

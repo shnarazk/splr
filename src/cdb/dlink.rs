@@ -15,11 +15,11 @@ pub trait DancingIndexIF {
 }
 
 pub trait DancingIndexManagerIF {
-    // fn erase_links(clause: &mut Self::Element);
     fn get_watcher_link(&mut self, lit: Lit) -> ClauseIndex;
-    fn get_free_watcher(&mut self) -> ClauseIndex;
+    fn get_free_index(&mut self) -> ClauseIndex;
     fn insert_watcher(&mut self, lit: Lit, index: ClauseIndex);
     fn remove_watcher(&mut self, lit: Lit, index: ClauseIndex);
+    fn make_watches(num_vars: usize, clauses: &mut [Clause]) -> Vec<LinkHead>;
 }
 
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]

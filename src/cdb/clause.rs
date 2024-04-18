@@ -317,7 +317,7 @@ impl DancingIndexIF for Clause {
         } else if self.lits[1] == l {
             self.link1.prev
         } else {
-            panic!("ilegal chain")
+            panic!("ilegal chain; clause:{:?}, lit:{:?}", self, lit);
         }
     }
     fn prev_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex {
@@ -327,7 +327,7 @@ impl DancingIndexIF for Clause {
         } else if self.lits[1] == l {
             &mut self.link1.prev
         } else {
-            panic!("ilegal chain")
+            panic!("ilegal chain; clause:{:?}, lit:{:?}", self, lit);
         }
     }
     fn clear_links(&mut self) {
