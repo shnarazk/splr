@@ -450,20 +450,10 @@ impl ClauseDBIF for ClauseDB {
                     // debug_assert!(watch_cache[!l1].iter().all(|e| e.0 != ci));
                     // watch_cache[!l1].insert_watch(ci, l0);
                     self.insert_watcher(!l1, ci);
-
-                    #[cfg(feature = "maintain_watch_cache")]
-                    {
-                        watch_cache[!l0].update_watch(ci, l1);
-                    }
                 } else if old_l1 == l1 {
                     // debug_assert!(watch_cache[!l0].iter().all(|e| e.0 != ci));
                     // watch_cache[!l0].insert_watch(ci, l1);
                     self.insert_watcher(!l0, ci);
-
-                    #[cfg(feature = "maintain_watch_cache")]
-                    {
-                        watch_cache[!l1].update_watch(ci, l0);
-                    }
                 } else {
                     unreachable!("transform_by_elimination");
                 }
@@ -474,20 +464,10 @@ impl ClauseDBIF for ClauseDB {
                     // debug_assert!(watch_cache[!l1].iter().all(|e| e.0 != ci));
                     // watch_cache[!l1].insert_watch(ci, l0);
                     self.insert_watcher(!l1, ci);
-
-                    #[cfg(feature = "maintain_watch_cache")]
-                    {
-                        watch_cache[!l0].update_watch(ci, l1);
-                    }
                 } else if old_l0 == l1 {
                     // debug_assert!(watch_cache[!l0].iter().all(|e| e.0 != ci));
                     // watch_cache[!l0].insert_watch(ci, l1);
                     self.insert_watcher(!l0, ci);
-
-                    #[cfg(feature = "maintain_watch_cache")]
-                    {
-                        watch_cache[!l1].update_watch(ci, l0);
-                    }
                 } else {
                     unreachable!("transform_by_elimination");
                 }
@@ -495,17 +475,6 @@ impl ClauseDBIF for ClauseDB {
                 debug_assert_eq!(old_l0, l0);
                 debug_assert_eq!(old_l1, l1);
             }
-
-            #[cfg(feature = "maintain_watch_cache")]
-            {
-                debug_assert!(watch_cache[!c.lits[0]]
-                    .iter()
-                    .any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
-                debug_assert!(watch_cache[!c.lits[1]]
-                    .iter()
-                    .any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
-            }
-
             // self.watches(cid, "after strengthen_by_elimination case:3-3");
         }
         if self.certification_store.is_active() {
@@ -740,11 +709,6 @@ impl ClauseDBIF for ClauseDB {
                 let l1 = self[ci].lit1();
 
                 if old_l0 == l0 && old_l1 == l1 {
-                    #[cfg(feature = "maintain_watch_cache")]
-                    {
-                        watch_cache[!l0].update_watch(ci, l1);
-                        watch_cache[!l1].update_watch(ci, l0);
-                    }
                 } else if old_l0 == l0 {
                     // assert_ne!(old_l1, l1);
                     // watch_cache[!old_l1].remove_watch(&ci);
@@ -842,16 +806,10 @@ impl ClauseDBIF for ClauseDB {
         }
         //## Step:2
         // assert!(watch_cache[!c.lits[new]].iter().all(|e| e.0 != cid));
-        self.insert_watcher(!self[ci].lits[new], ci);
-        // watch_cache[!c.lits[new]].insert_watch(ci, c.lits[other]);
-
-        if cfg!(feature = "maintain_watch_cache") {
-            //## Step:3
-            // watch_cache[!c.lits[other]].update_watch(ci, c.lits[new]);
-        }
-
         self[ci].lits.swap(old, new);
-
+        // so old becomes new now
+        self.insert_watcher(!self[ci].lits[old], ci);
+        // watch_cache[!c.lits[new]].insert_watch(ci, c.lits[other]);
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
     }
@@ -1240,6 +1198,12 @@ impl DancingIndexManagerIF for ClauseDB {
         }
     }
     fn insert_watcher(&mut self, lit: Lit, index: ClauseIndex) {
+        assert!(
+            self[index].lits[0] == lit.negate() || self[index].lits[1] == lit.negate(),
+            "invalid lit layout {:?}, lit: {:?}",
+            self[index],
+            lit
+        );
         let last = self.watch[ClauseIndex::from(lit)].prev;
         if last == HEAD_INDEX {
             self.watch[ClauseIndex::from(lit)].next = index;

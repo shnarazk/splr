@@ -409,6 +409,7 @@ impl PropagateIF for AssignStack {
                     if lit_assign!(self.var[lk.vi()], *lk) != Some(false) {
                         let new_watch = !*lk;
                         // cdb.detach_watch_cache(propagating, &mut source);
+                        ci = cdb[ci].next_for_lit(propagating);
                         cdb.remove_watcher(propagating, ci);
                         cdb.transform_by_updating_watch(ci, false_watch_pos, k, true);
                         cdb[ci].search_from = (k + 1) as u16;
@@ -417,7 +418,6 @@ impl PropagateIF for AssignStack {
                             ci,
                             Propagate::FindNewWatch(self.num_conflict, propagating, new_watch)
                         );
-                        ci = cdb[ci].next_for_lit(propagating);
                         continue 'next_clause;
                     }
                 }

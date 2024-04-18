@@ -42,7 +42,6 @@ default = [
 
         ### For DEBUG
         # "boundary_check",
-        # "maintain_watch_cache",
 
         ### platform dependency
         # "platform_wasm"
@@ -64,7 +63,6 @@ incremental_solver = [          # for all solution SAT sover
 ]
 just_used = []                  # Var and clause have 'just_used' flags
 LRB_rewarding = []              # Vearning Rate Based rewarding, a new var activity criteria
-maintain_watch_cache = []       # for DEBUG
 no_IO = []                      # to embed Splr into non-std environments
 platform_wasm = [
         "instant"               # use instant::Duration instead of std::time::Duration
