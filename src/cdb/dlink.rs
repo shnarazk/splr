@@ -1,7 +1,4 @@
-use {
-    crate::{cdb::clause::*, types::*},
-    std::ops::{Index, IndexMut},
-};
+use crate::types::*;
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DoubleLink {
@@ -31,30 +28,4 @@ pub struct LinkHead {
     pub next: ClauseIndex,
     pub count: ClauseIndex,
     pub timestamp: ClauseIndex,
-}
-
-struct ClauseDB {
-    pub header: Vec<LinkHead>,
-    pub clause: Vec<Clause>,
-}
-
-impl Index<Lit> for ClauseDB {
-    type Output = Clause;
-    #[inline]
-    fn index(&self, lit: Lit) -> &Self::Output {
-        &self.clause[ClauseIndex::from(lit)]
-    }
-}
-
-impl IndexMut<Lit> for ClauseDB {
-    #[inline]
-    fn index_mut(&mut self, lit: Lit) -> &mut Self::Output {
-        &mut self.clause[ClauseIndex::from(lit)]
-    }
-}
-
-impl Instantiate for ClauseDB {
-    fn instantiate(_conf: &Config, _cnf: &CNFDescription) -> Self {
-        unimplemented!()
-    }
 }

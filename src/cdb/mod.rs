@@ -554,17 +554,17 @@ impl ClauseDBIF for ClauseDB {
             // watch_cache[!old_l1].remove_watch(&ci);
             self.remove_watcher(!old_l1, ci);
             self.binary_link.add(l0, l1, ci);
-
-            if self.certification_store.is_active() {
-                self.certification_store.add_clause(new_lits);
-                self.certification_store.delete_clause(&self[ci].lits);
-            }
             self[ci].turn_off(FlagClause::LEARNT);
             self.num_bi_clause += 1;
+            let ClauseDB {
+                ref clause,
+                ref mut certification_store,
+                ..
+            } = self;
 
-            if self.certification_store.is_active() {
-                self.certification_store.add_clause(&self[ci].lits);
-                self.certification_store.delete_clause(new_lits);
+            if certification_store.is_active() {
+                certification_store.add_clause(&clause[ci].lits);
+                certification_store.delete_clause(new_lits);
             }
         } else {
             //
@@ -674,14 +674,14 @@ impl ClauseDBIF for ClauseDB {
             //
             return RefClause::Clause(ci);
         }
-        let ClauseDB {
-            clause,
-            binary_link,
-            certification_store,
-            ..
-        } = self;
-        let c = &mut clause[ci];
-        let mut new_lits = c
+        // let ClauseDB {
+        //     clause,
+        //     binary_link,
+        //     certification_store,
+        //     ..
+        // } = self;
+        // let c = &mut self[ci];
+        let mut new_lits = self[ci]
             .lits
             .iter()
             .filter(|l| asg.assigned(**l).is_none() && !asg.var(l.vi()).is(FlagVar::ELIMINATED))
@@ -694,21 +694,19 @@ impl ClauseDBIF for ClauseDB {
                 //## Case:2
                 let l0 = new_lits[0];
                 let l1 = new_lits[1];
-                debug_assert!(2 < c.lits.len());
-                if let Some(&bid) = binary_link.search(l0, l1) {
+                debug_assert!(2 < self[ci].lits.len());
+                if let Some(&bid) = self.binary_link.search(l0, l1) {
                     //
                     //## Case:3-0
                     //
-                    drop(c);
                     self.remove_clause(ci);
                     return RefClause::RegisteredClause(bid);
                 }
                 //
                 //## Case:3-2
                 //
-                let new_l0 = c.lits[0];
-                let new_l1 = c.lits[1];
-                drop(c);
+                let new_l0 = self[ci].lits[0];
+                let new_l1 = self[ci].lits[1];
                 // watch_cache[!c.lits[0]].remove_watch(&ci);
                 self.remove_watcher(!new_l0, ci);
                 // watch_cache[!c.lits[1]].remove_watch(&ci);
@@ -735,11 +733,11 @@ impl ClauseDBIF for ClauseDB {
                 //
                 //## Case:3-3
                 //
-                let old_l0 = c.lit0();
-                let old_l1 = c.lit1();
-                std::mem::swap(&mut c.lits, &mut new_lits);
-                let l0 = c.lit0();
-                let l1 = c.lit1();
+                let old_l0 = self[ci].lit0();
+                let old_l1 = self[ci].lit1();
+                std::mem::swap(&mut self[ci].lits, &mut new_lits);
+                let l0 = self[ci].lit0();
+                let l1 = self[ci].lit1();
 
                 if old_l0 == l0 && old_l1 == l1 {
                     #[cfg(feature = "maintain_watch_cache")]
@@ -793,7 +791,6 @@ impl ClauseDBIF for ClauseDB {
                 // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
                 // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
 
-                drop(c);
                 if self.certification_store.is_active() {
                     let ClauseDB {
                         ref clause,
@@ -1386,9 +1383,9 @@ mod tests {
         let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         // Now `asg.level` = [_, 1, 2, 3, 4, 5, 6].
-        let c0 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
-            .as_ci();
+        // let c0 = cdb
+        //     .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
+        //     .as_ci();
 
         asg.assign_by_decision(lit(-2)); // at level 1
         asg.assign_by_decision(lit(1)); // at level 2

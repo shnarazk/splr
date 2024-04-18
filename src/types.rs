@@ -36,6 +36,8 @@ pub trait LitIF {
     fn as_bool(&self) -> bool;
     /// convert to var index.
     fn vi(self) -> VarId;
+    // return the negatede value
+    fn negate(self) -> Self;
 }
 
 /// API for reward based activity management.
@@ -300,6 +302,11 @@ impl LitIF for Lit {
     #[inline]
     fn vi(self) -> VarId {
         (NonZeroU32::get(self.ordinal) >> 1) as VarId
+    }
+    fn negate(self) -> Self {
+        Lit {
+            ordinal: unsafe { NonZeroU32::new_unchecked(NonZeroU32::get(self.ordinal) ^ 1) },
+        }
     }
 }
 

@@ -291,40 +291,44 @@ impl fmt::Display for Clause {
 
 impl DancingIndexIF for Clause {
     fn next_for_lit(&self, lit: Lit) -> ClauseIndex {
-        if self.lits[0] == lit {
-            self.link0.next;
+        let l = lit.negate();
+        if self.lits[0] == l {
+            self.link0.next
+        } else if self.lits[1] == l {
+            self.link1.next
+        } else {
+            panic!("ilegal chain")
         }
-        if self.lits[1] == lit {
-            self.link1.next;
-        }
-        panic!("ilegal chain")
     }
     fn next_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex {
-        if self.lits[0] == lit {
-            &mut self.link0.next;
+        let l = lit.negate();
+        if self.lits[0] == l {
+            &mut self.link0.next
+        } else if self.lits[1] == l {
+            &mut self.link1.next
+        } else {
+            panic!("ilegal chain")
         }
-        if self.lits[1] == lit {
-            &mut self.link1.next;
-        }
-        panic!("ilegal chain")
     }
     fn prev_for_lit(&self, lit: Lit) -> ClauseIndex {
-        if self.lits[0] == lit {
-            self.link0.prev;
+        let l = lit.negate();
+        if self.lits[0] == l {
+            self.link0.prev
+        } else if self.lits[1] == l {
+            self.link1.prev
+        } else {
+            panic!("ilegal chain")
         }
-        if self.lits[1] == lit {
-            self.link1.prev;
-        }
-        panic!("ilegal chain")
     }
     fn prev_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex {
-        if self.lits[0] == lit {
-            &mut self.link0.prev;
+        let l = lit.negate();
+        if self.lits[0] == l {
+            &mut self.link0.prev
+        } else if self.lits[1] == l {
+            &mut self.link1.prev
+        } else {
+            panic!("ilegal chain")
         }
-        if self.lits[1] == lit {
-            &mut self.link1.prev;
-        }
-        panic!("ilegal chain")
     }
     fn clear_links(&mut self) {
         self.link0.prev = 0;
