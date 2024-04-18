@@ -699,26 +699,34 @@ impl ClauseDBIF for ClauseDB {
                     //
                     //## Case:3-0
                     //
+                    drop(c);
                     self.remove_clause(ci);
                     return RefClause::RegisteredClause(bid);
                 }
                 //
                 //## Case:3-2
                 //
+                let new_l0 = c.lits[0];
+                let new_l1 = c.lits[1];
+                drop(c);
                 // watch_cache[!c.lits[0]].remove_watch(&ci);
-                self.remove_watcher(!c.lits[0], ci);
+                self.remove_watcher(!new_l0, ci);
                 // watch_cache[!c.lits[1]].remove_watch(&ci);
-                self.remove_watcher(!c.lits[1], ci);
-                binary_link.add(l0, l1, ci);
-                std::mem::swap(&mut c.lits, &mut new_lits);
+                self.remove_watcher(!new_l1, ci);
+                self.binary_link.add(l0, l1, ci);
+                std::mem::swap(&mut self[ci].lits, &mut new_lits);
                 self.num_bi_clause += 1;
-                if c.is(FlagClause::LEARNT) {
+                if self[ci].is(FlagClause::LEARNT) {
                     self.num_learnt -= 1;
-                    c.turn_off(FlagClause::LEARNT);
+                    self[ci].turn_off(FlagClause::LEARNT);
                 }
-
+                let ClauseDB {
+                    ref clause,
+                    ref mut certification_store,
+                    ..
+                } = self;
                 if certification_store.is_active() {
-                    certification_store.add_clause(&c.lits);
+                    certification_store.add_clause(&clause[ci].lits);
                     certification_store.delete_clause(&new_lits);
                 }
                 RefClause::Clause(ci)
@@ -785,8 +793,14 @@ impl ClauseDBIF for ClauseDB {
                 // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
                 // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
 
-                if certification_store.is_active() {
-                    certification_store.add_clause(&c.lits);
+                drop(c);
+                if self.certification_store.is_active() {
+                    let ClauseDB {
+                        ref clause,
+                        ref mut certification_store,
+                        ..
+                    } = self;
+                    certification_store.add_clause(&clause[ci].lits);
                     certification_store.delete_clause(&new_lits);
                 }
                 RefClause::Clause(ci)
