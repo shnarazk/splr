@@ -72,9 +72,6 @@ pub trait ClauseDBIF:
     //## clause transformation
     //
 
-    /// swap the first twy literals in a clause
-    fn swap_watch(&mut self, ci: ClauseIndex);
-
     /// swap i-th watch with j-th literal then update watch caches correctly
     fn transform_by_updating_watch(&mut self, ci: ClauseIndex, old: usize, new: usize);
     /// allocate a new clause and return its id.
@@ -205,7 +202,6 @@ impl ClauseDBIF for ClauseDB {
         vec: &mut Vec<Lit>,
         learnt: bool,
     ) -> RefClause {
-        debug_assert!(!vec.is_empty());
         debug_assert!(1 < vec.len());
         debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{vec:?}");
         if vec.len() == 2 {
@@ -217,19 +213,16 @@ impl ClauseDBIF for ClauseDB {
         self.certification_store.add_clause(vec);
         let ci = self.get_free_index();
         self[ci].flags = FlagClause::empty();
-
-        debug_assert!(self[ci].lits.is_empty()); // c.lits.clear();
         std::mem::swap(&mut self[ci].lits, vec);
-
-        #[cfg(feature = "clause_rewarding")]
-        {
-            self[ci].reward = 0.0;
-            self[ci].timestamp = *tick;
-        }
-
         let len2 = self[ci].lits.len() == 2;
+        let l0 = self[ci].lits[0];
+        let l1 = self[ci].lits[1];
         if len2 {
             self[ci].rank = 1;
+            // A inary clause consumes one clause without watchers
+            self.num_bi_clause += 1;
+            self.binary_link.add(l0, l1, ci);
+            self[ci].lits.clear(); // no need to keep llits
 
             #[cfg(feature = "bi_clause_completion")]
             if learnt {
@@ -245,6 +238,8 @@ impl ClauseDBIF for ClauseDB {
             self[ci].search_from = 2;
             self[ci].update_lbd(asg, &mut tmp);
             std::mem::swap(&mut tmp, &mut self.lbd_temp);
+            self.insert_watcher(ci, false, !l0);
+            self.insert_watcher(ci, true, !l1);
         }
         self[ci].rank_old = self[ci].rank;
         self.lbd.update(self[ci].rank);
@@ -260,15 +255,13 @@ impl ClauseDBIF for ClauseDB {
                 }
             }
         }
-        let l0 = self[ci].lits[0];
-        let l1 = self[ci].lits[1];
-        if len2 {
-            self.num_bi_clause += 1;
-            // FIXME: DancingLinks
-            self.binary_link.add(l0, l1, ci);
+
+        #[cfg(feature = "clause_rewarding")]
+        {
+            self[ci].reward = 0.0;
+            self[ci].timestamp = *tick;
         }
-        self.insert_watcher(ci, false, !l0);
-        self.insert_watcher(ci, true, !l1);
+
         RefClause::Clause(ci)
     }
 
@@ -766,10 +759,6 @@ impl ClauseDBIF for ClauseDB {
             }
         }
     }
-    /// swap the first twy literals in a clause
-    fn swap_watch(&mut self, ci: ClauseIndex) {
-        self[ci].lits.swap(0, 1);
-    }
     // used in `propagate`, `propagate_sandbox`, and `handle_conflict` for chronoBT
     fn transform_by_updating_watch(&mut self, ci: ClauseIndex, old: usize, new: usize) {
         //
@@ -790,7 +779,6 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(old < 2);
         debug_assert!(1 < new);
         //## Step:1
-        dbg!(&self[ci]);
         let second = self.remove_watcher(ci, !self[ci].lits[old]);
         // watch_cache[!c.lits[old]].remove_watch(&ci);
 
@@ -800,7 +788,6 @@ impl ClauseDBIF for ClauseDB {
         // so old becomes new now
         self[ci].search_from = (new + 1) as u16;
         self.insert_watcher(ci, second, !self[ci].lits[old]);
-        dbg!(&self[ci]);
         // watch_cache[!c.lits[new]].insert_watch(ci, c.lits[other]);
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
@@ -1224,22 +1211,23 @@ impl DancingIndexManagerIF for ClauseDB {
         let next = self.clause[ci].next_for_lit(lit);
         match (prev, next) {
             (HEAD_INDEX, HEAD_INDEX) => {
-                self.watch[ClauseIndex::from(lit)].prev = HEAD_INDEX;
                 self.watch[ClauseIndex::from(lit)].next = HEAD_INDEX;
+                self.watch[ClauseIndex::from(lit)].prev = HEAD_INDEX;
             }
             (HEAD_INDEX, _) => {
                 self.watch[ClauseIndex::from(lit)].next = next;
-                *self.clause[next].next_for_lit_mut(lit) = HEAD_INDEX;
+                *self.clause[next].prev_for_lit_mut(lit) = HEAD_INDEX;
             }
             (_, HEAD_INDEX) => {
                 *self.clause[prev].next_for_lit_mut(lit) = HEAD_INDEX;
-                self.watch[ClauseIndex::from(lit)].next = prev;
+                self.watch[ClauseIndex::from(lit)].prev = prev;
             }
             _ => {
                 *self.clause[prev].next_for_lit_mut(lit) = next;
                 *self.clause[next].prev_for_lit_mut(lit) = prev;
             }
         }
+        assert!(self[ci].lits[1] == !lit || self[ci].lits[0] == !lit);
         self[ci].lits[1] == !lit
     }
     fn delete_watcher(&mut self, index: ClauseIndex) {

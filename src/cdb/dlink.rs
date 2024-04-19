@@ -12,6 +12,7 @@ pub trait DancingIndexIF {
     fn prev_for_lit(&self, lit: Lit) -> ClauseIndex;
     fn prev_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex;
     fn clear_links(&mut self);
+    fn swap_watch_positions(&mut self);
 }
 
 pub trait DancingIndexManagerIF {
