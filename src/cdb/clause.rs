@@ -10,8 +10,6 @@ use {
 /// API for Clause, providing literal accessors.
 pub trait ClauseIF {
     /// return true if it contains no literals; a clause after unit propagation.
-    fn is_empty(&self) -> bool;
-    /// return true if it contains no literals; a clause after unit propagation.
     fn is_dead(&self) -> bool;
     /// return 1st watch
     fn lit0(&self) -> Lit;
@@ -184,11 +182,8 @@ impl From<&Clause> for Vec<i32> {
 }
 
 impl ClauseIF for Clause {
-    fn is_empty(&self) -> bool {
-        self.lits.is_empty()
-    }
     fn is_dead(&self) -> bool {
-        self.lits.is_empty()
+        self.is(FlagClause::DEAD)
     }
     fn iter(&self) -> Iter<'_, Lit> {
         self.lits.iter()
@@ -336,7 +331,7 @@ impl DancingIndexIF for Clause {
         self.link1.prev = 0;
         self.link1.next = 0;
     }
-    fn swap_watch_positions(&mut self) {
+    fn swap_watch_orders(&mut self) {
         self.lits.swap(0, 1);
         std::mem::swap(&mut self.link0, &mut self.link1);
     }

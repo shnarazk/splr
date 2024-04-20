@@ -311,7 +311,7 @@ fn make_eliminated_clause(
     let first = store.len();
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:
     let c = &cdb[ci];
-    debug_assert!(!c.is_empty());
+    debug_assert!(!c.is_dead());
     for l in c.iter() {
         store.push(*l);
         if l.vi() == vi {
@@ -375,11 +375,6 @@ mod tests {
         elim.prepare(asg, cdb, true);
         eliminate_var(asg, cdb, &mut elim, state, vi, &mut timedout).expect("panic");
         assert!(asg.var(vi).is(FlagVar::ELIMINATED));
-        assert!(cdb
-            .iter()
-            .skip(1)
-            .filter(|c| c.is_dead())
-            .all(|c| c.is_empty()));
         assert!(cdb
             .iter()
             .skip(1)
