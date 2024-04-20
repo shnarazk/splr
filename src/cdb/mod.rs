@@ -183,6 +183,9 @@ impl Default for ClauseDB {
 impl ClauseDBIF for ClauseDB {
     fn check_chains(&self, ci: ClauseIndex) {
         if ci != 0 {
+            assert!(!self[ci].lits.is_empty());
+            return;
+        } else {
             return;
         }
         for (l, h) in self.watch.iter().enumerate().skip(2) {
@@ -368,7 +371,6 @@ impl ClauseDBIF for ClauseDB {
             // watcher[usize::from(!l1)].remove_watch(&ci);
             self.remove_watcher(ci, !l1);
         }
-        // c.lits.clear();
         self.mark_as_free(ci);
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
         self[ci].turn_on(FlagClause::DEAD);
@@ -1285,6 +1287,7 @@ impl DancingIndexManagerIF for ClauseDB {
         let nc = clauses.len();
         for (i, c) in clauses.iter_mut().enumerate().skip(1) {
             c.link0.next = (i + 1) % nc;
+            c.turn_on(FlagClause::DEAD);
         }
         let mut watches = vec![LinkHead::default(); 2 * (num_vars + 1)];
         watches[0].next = 1;
