@@ -106,7 +106,7 @@ impl VarManipulateIF for AssignStack {
             self.var.get_unchecked(vi).assign
         }
         #[cfg(not(feature = "unsafe_access"))]
-        self.assign[vi]
+        self.var[vi].assign
     }
     #[inline]
     fn level(&self, vi: VarId) -> DecisionLevel {
@@ -115,7 +115,7 @@ impl VarManipulateIF for AssignStack {
             self.var.get_unchecked(vi).level
         }
         #[cfg(not(feature = "unsafe_access"))]
-        self.level[vi]
+        self.var[vi].level
     }
     #[inline]
     fn reason(&self, vi: VarId) -> AssignReason {
@@ -124,7 +124,7 @@ impl VarManipulateIF for AssignStack {
             self.var.get_unchecked(vi).reason
         }
         #[cfg(not(feature = "unsafe_access"))]
-        self.reason[vi]
+        self.var[vi].reason
     }
     #[inline]
     fn var(&self, vi: VarId) -> &Var {

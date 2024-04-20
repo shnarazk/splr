@@ -435,7 +435,7 @@ impl Eliminator {
                     return Ok(());
                 }
                 let best: VarId = if cid.is_lifted() {
-                    let vi = Lit::from(cid).vi();
+                    let vi = cid.unlift().vi();
                     debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
                     vi
                 } else {
