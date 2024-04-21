@@ -1187,18 +1187,18 @@ impl DancingIndexManagerIF for ClauseDB {
         self.watch[ClauseIndex::from(lit)].next
     }
     fn get_free_index(&mut self) -> ClauseIndex {
-        let index = self.watch[FREE_INDEX].next;
-        if index != 0 {
-            let next = self.clause[index].link0.next;
-            self.watch[FREE_INDEX].next = next;
-            index
-        } else {
+        let ci = self.watch[FREE_INDEX].next;
+        if ci == 0 {
             self.clause.push(Clause::default());
             self.clause.len() - 1
+        } else {
+            let next = self.clause[ci].link0.next;
+            self.watch[FREE_INDEX].next = next;
+            ci
         }
     }
     fn insert_watcher(&mut self, ci: ClauseIndex, second: bool, lit: Lit) {
-        assert!(
+        debug_assert!(
             self[ci].lits[0] == !lit || self[ci].lits[1] == !lit,
             "invalid lit layout {:?}, lit: {:?}",
             self[ci],

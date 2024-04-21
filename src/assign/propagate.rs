@@ -386,8 +386,6 @@ impl PropagateIF for AssignStack {
             //     .next()
             //     .map(|index| cdb.fetch_watch_cache_entry(propagating, index))
             'next_clause: while ci != 0 {
-                let mut _updated_cache: Option<Lit> = None;
-                let _ = cdb[ci].next_for_lit(propagating);
                 let c = &cdb[ci];
                 let lit0 = c.lit0();
                 let lit1 = c.lit1();
@@ -397,9 +395,30 @@ impl PropagateIF for AssignStack {
                     (0, lit1)
                 };
                 let next_ci = c.next_for_lit(propagating);
-                if lit_assign!(self.var[other.vi()], other) == Some(true) {
-                    ci = next_ci;
-                    continue 'next_clause;
+                // if lit_assign!(self.var[other.vi()], other) == Some(true) {
+                //     ci = next_ci;
+                //     continue 'next_clause;
+                // }
+                let other_watch_value = lit_assign!(self.var[other.vi()], other);
+                match other_watch_value {
+                    Some(true) => {
+                        ci = next_ci;
+                        continue 'next_clause;
+                    }
+                    Some(false) if false => {
+                        assert!(
+                            c.iter()
+                                .filter(|l| lit_assign!(self.var[l.vi()], **l) != Some(false))
+                                .count()
+                                < 2
+                        );
+                        if false_watch_pos == 0 {
+                            cdb[ci].swap_watch_orders();
+                        }
+                        check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
+                        conflict_path!(other, AssignReason::Implication(ci));
+                    }
+                    _ => {}
                 }
 
                 //
@@ -430,15 +449,9 @@ impl PropagateIF for AssignStack {
                 if false_watch_pos == 0 {
                     cdb[ci].swap_watch_orders();
                 }
-                // cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
-                let other_watch_value = lit_assign!(self.var[other.vi()], other);
                 if other_watch_value == Some(false) {
                     check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
-                    // if cdb[ci].len() == 2 {
-                    //     conflict_path!(other, minimized_reason!(propagating));
-                    // } else {
                     conflict_path!(other, AssignReason::Implication(ci));
-                    // }
                 }
 
                 #[cfg(feature = "chrono_BT")]
