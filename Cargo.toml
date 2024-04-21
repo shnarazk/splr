@@ -21,7 +21,7 @@ instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
 default = [
         ### Essential
         # "incremental_solver",
-        "unsafe_access",
+        # "unsafe_access",
 
         ### Heuristics
         # "bi_clause_completion",

@@ -20,21 +20,27 @@ mod trail_saving;
 /// var struct and its methods
 mod var;
 
-pub use self::{propagate::PropagateIF, property::*, select::VarSelectIF, var::VarManipulateIF};
+pub use self::{
+    propagate::PropagateIF,
+    property::*,
+    select::VarSelectIF,
+    stack::AssignStack,
+    var::{Var, VarManipulateIF},
+};
 use {
-    self::{
-        ema::ProgressASG,
-        heap::{VarHeapIF, VarIdHeap},
-    },
+    self::heap::{VarHeapIF, VarIdHeap},
     crate::{cdb::ClauseDBIF, types::*},
-    std::{fmt, ops::Range, slice::Iter},
+    std::{
+        fmt,
+        ops::Range,
+        slice::{Iter, IterMut},
+    },
 };
 
 #[cfg(feature = "trail_saving")]
 pub use self::trail_saving::TrailSavingIF;
 
 #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
-use std::collections::HashMap;
 
 /// API about assignment like
 /// [`decision_level`](`crate::assign::AssignIF::decision_level`),
@@ -112,112 +118,114 @@ impl fmt::Display for AssignReason {
     }
 }
 
-/// Object representing a variable.
-#[derive(Clone, Debug)]
-pub struct Var {
-    /// assigns of vars
-    assign: Option<bool>,
-    /// levels of vars
-    level: DecisionLevel,
-    /// reason of assignment
-    reason: AssignReason,
+impl VarManipulateIF for AssignStack {
+    fn assigned(&self, l: Lit) -> Option<bool> {
+        match self.var[l.vi()].assign {
+            Some(x) if !bool::from(l) => Some(!x),
+            x => x,
+        }
+    }
+    #[inline]
+    fn assign(&self, vi: VarId) -> Option<bool> {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(vi).assign
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        self.var[vi].assign
+    }
+    #[inline]
+    fn level(&self, vi: VarId) -> DecisionLevel {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(vi).level
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        self.var[vi].level
+    }
+    #[inline]
+    fn reason(&self, vi: VarId) -> AssignReason {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(vi).reason
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        self.var[vi].reason
+    }
+    #[inline]
+    fn var(&self, vi: VarId) -> &Var {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(vi)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &self.var[vi]
+    }
+    #[inline]
+    fn var_mut(&mut self, vi: VarId) -> &mut Var {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked_mut(vi)
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        &mut self.var[vi]
+    }
+    fn var_iter(&self) -> Iter<'_, Var> {
+        self.var.iter()
+    }
+    fn var_iter_mut(&mut self) -> IterMut<'_, Var> {
+        self.var.iter_mut()
+    }
+    fn make_var_asserted(&mut self, vi: VarId) {
+        self.var[vi].reason = AssignReason::Decision(0);
+        self.set_activity(vi, 0.0);
+        self.remove_from_heap(vi);
 
-    /// the `Flag`s (8 bits)
-    flags: FlagVar,
-    /// a dynamic evaluation criterion like EVSIDS or ACID.
-    reward: f64,
-    // reward_ema: Ema2,
-    #[cfg(feature = "boundary_check")]
-    pub propagated_at: usize,
-    #[cfg(feature = "boundary_check")]
-    pub timestamp: usize,
-    #[cfg(feature = "boundary_check")]
-    pub state: VarState,
-}
+        #[cfg(feature = "boundary_check")]
+        {
+            self.var[vi].timestamp = self.tick;
+        }
 
-/// A record of assignment. It's called 'trail' in Glucose.
-#[derive(Clone, Debug)]
-pub struct AssignStack {
-    /// record of assignment
-    trail: Vec<Lit>,
-    trail_lim: Vec<usize>,
-    /// the-number-of-assigned-and-propagated-vars + 1
-    q_head: usize,
-    root_level: DecisionLevel,
-    var_order: VarIdHeap, // Variable Order
+        #[cfg(feature = "best_phases_tracking")]
+        self.check_best_phase(vi);
+    }
+    fn make_var_eliminated(&mut self, vi: VarId) {
+        if !self.var[vi].is(FlagVar::ELIMINATED) {
+            self.var[vi].turn_on(FlagVar::ELIMINATED);
+            self.set_activity(vi, 0.0);
+            self.remove_from_heap(vi);
+            debug_assert_eq!(self.decision_level(), self.root_level);
+            self.trail.retain(|l| l.vi() != vi);
+            self.num_eliminated_vars += 1;
 
-    #[cfg(feature = "trail_saving")]
-    reason_saved: Vec<AssignReason>,
-    #[cfg(feature = "trail_saving")]
-    trail_saved: Vec<Lit>,
-    num_reconflict: usize,
-    num_repropagation: usize,
+            #[cfg(feature = "boundary_check")]
+            {
+                self.var[vi].timestamp = self.tick;
+            }
 
-    //
-    //## Phase handling
-    //
-    best_assign: bool,
-    build_best_at: usize,
-    num_best_assign: usize,
-    num_rephase: usize,
-    bp_divergence_ema: Ema,
-
-    #[cfg(feature = "best_phases_tracking")]
-    best_phases: HashMap<VarId, (bool, AssignReason)>,
-    #[cfg(feature = "rephase")]
-    phase_age: usize,
-
-    //
-    //## Stage
-    //
-    pub stage_scale: usize,
-
-    //## Elimanated vars
-    //
-    pub eliminated: Vec<Lit>,
-
-    //
-    //## Statistics
-    //
-    /// the number of vars.
-    pub num_vars: usize,
-    /// the number of asserted vars.
-    pub num_asserted_vars: usize,
-    /// the number of eliminated vars.
-    pub num_eliminated_vars: usize,
-    num_decision: usize,
-    num_propagation: usize,
-    pub num_conflict: usize,
-    num_restart: usize,
-    /// Assign rate EMA
-    assign_rate: ProgressASG,
-    /// Decisions Per Conflict
-    dpc_ema: EmaSU,
-    /// Propagations Per Conflict
-    ppc_ema: EmaSU,
-    /// Conflicts Per Restart
-    cpr_ema: EmaSU,
-
-    //
-    //## Var DB
-    //
-    /// an index for counting elapsed time
-    tick: usize,
-    /// vars
-    var: Vec<Var>,
-
-    //
-    //## Var Rewarding
-    //
-    /// var activity decay
-    activity_decay: f64,
-    /// the default value of var activity decay in configuration
-    #[cfg(feature = "EVSIDS")]
-    activity_decay_default: f64,
-    /// its diff
-    activity_anti_decay: f64,
-    #[cfg(feature = "EVSIDS")]
-    activity_decay_step: f64,
+            #[cfg(feature = "trace_elimination")]
+            {
+                let lv = self.level[vi];
+                if self.root_level == self.level[vi] && self.assign[vi].is_some() {
+                    panic!("v:{}, dl:{}", self.var[vi], self.decision_level());
+                }
+                if !(self.root_level < self.level[vi] || self.assign[vi].is_none()) {
+                    panic!(
+                        "v:{}, lvl:{} => {}, dl:{}, assign:{:?} ",
+                        self.var[vi],
+                        lv,
+                        self.level[vi],
+                        self.decision_level(),
+                        self.assign[vi],
+                    );
+                }
+                debug_assert!(self.root_level < self.level[vi] || self.assign[vi].is_none());
+            }
+        } else {
+            #[cfg(feature = "boundary_check")]
+            panic!("double elimination");
+        }
+    }
 }
 
 #[cfg(feature = "boundary_check")]

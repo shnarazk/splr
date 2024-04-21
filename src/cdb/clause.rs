@@ -23,6 +23,8 @@ pub trait ClauseIF {
     fn iter(&self) -> Iter<'_, Lit>;
     /// return the number of literals.
     fn len(&self) -> usize;
+    /// just for cargo clippy
+    fn is_empty(&self) -> usize;
 
     #[cfg(feature = "boundary_check")]
     /// return timestamp.
@@ -219,6 +221,9 @@ impl ClauseIF for Clause {
     }
     fn len(&self) -> usize {
         self.lits.len()
+    }
+    fn is_empty(&self) -> usize {
+        unimplemented!()
     }
 
     #[cfg(feature = "boundary_check")]
