@@ -8,10 +8,10 @@ mod ci;
 mod clause;
 /// methods on `ClauseDB`
 mod db;
-/// methods on Watchers
-mod dlink;
 /// EMA
 mod ema;
+/// methods on Watchers
+mod slink;
 /// methods for Stochastic Local Search
 mod sls;
 /// methods for UNSAT certification
@@ -24,8 +24,8 @@ pub use self::{
     ci::LiftedClauseIF,
     clause::*,
     db::ClauseDB,
-    dlink::{DancingIndexIF, DancingIndexManagerIF, LinkHead},
     property::*,
+    slink::{DancingIndexIF, DancingIndexManagerIF, LinkHead},
     sls::StochasticLocalSearchIF,
     unsat_certificate::CertificationStore,
     vivify::VivifyIF,
@@ -1198,58 +1198,40 @@ impl DancingIndexManagerIF for ClauseDB {
         }
     }
     fn insert_watcher(&mut self, ci: ClauseIndex, second: bool, lit: Lit) {
-        debug_assert!(
-            self[ci].lits[0] == !lit || self[ci].lits[1] == !lit,
-            "invalid lit layout {:?}, lit: {:?}",
-            self[ci],
-            lit
-        );
-        let last = self.watch[ClauseIndex::from(lit)].prev;
-        if last == HEAD_INDEX {
-            self.watch[ClauseIndex::from(lit)].next = ci;
-            self.watch[ClauseIndex::from(lit)].prev = ci;
-            if second {
-                self.clause[ci].link1.prev = HEAD_INDEX;
-                self.clause[ci].link1.next = HEAD_INDEX;
-            } else {
-                self.clause[ci].link0.prev = HEAD_INDEX;
-                self.clause[ci].link0.next = HEAD_INDEX;
-            }
+        let old = self.watch[ClauseIndex::from(lit)].next;
+        self.watch[ClauseIndex::from(lit)].next = ci;
+        if second {
+            self.clause[ci].link1.next = old;
         } else {
-            *self.clause[last].next_for_lit_mut(lit) = ci;
-            self.watch[ClauseIndex::from(lit)].prev = ci;
-            if second {
-                self.clause[ci].link1.prev = last;
-                self.clause[ci].link1.next = HEAD_INDEX;
-            } else {
-                self.clause[ci].link0.prev = last;
-                self.clause[ci].link0.next = HEAD_INDEX;
-            }
+            self.clause[ci].link0.next = old;
         }
     }
-    fn remove_watcher(&mut self, ci: ClauseIndex, lit: Lit) -> bool {
-        let prev = self.clause[ci].prev_for_lit(lit);
-        let next = self.clause[ci].next_for_lit(lit);
-        match (prev, next) {
-            (HEAD_INDEX, HEAD_INDEX) => {
-                self.watch[ClauseIndex::from(lit)].next = HEAD_INDEX;
-                self.watch[ClauseIndex::from(lit)].prev = HEAD_INDEX;
-            }
-            (HEAD_INDEX, _) => {
-                self.watch[ClauseIndex::from(lit)].next = next;
-                *self.clause[next].prev_for_lit_mut(lit) = HEAD_INDEX;
-            }
-            (_, HEAD_INDEX) => {
-                *self.clause[prev].next_for_lit_mut(lit) = HEAD_INDEX;
-                self.watch[ClauseIndex::from(lit)].prev = prev;
-            }
-            _ => {
-                *self.clause[prev].next_for_lit_mut(lit) = next;
-                *self.clause[next].prev_for_lit_mut(lit) = prev;
-            }
+    fn remove_next_watcher(&mut self, prev: ClauseIndex, lit: Lit) -> bool {
+        let next = self.clause[ClauseIndex::from(lit)].next_for_lit(lit);
+        if prev == HEAD_INDEX {
+            self.watch[ClauseIndex::from(lit)].next = next;
+        } else {
+            *self.clause[prev].next_for_lit_mut(lit) = next;
         }
-        assert!(self[ci].lits[1] == !lit || self[ci].lits[0] == !lit);
-        self[ci].lits[1] == !lit
+        self[next].lits[1] == !lit
+    }
+    fn remove_watcher(&mut self, ci: ClauseIndex, lit: Lit) {
+        let mut prep = HEAD_INDEX;
+        let next = self.clause[ClauseIndex::from(lit)].next_for_lit(lit);
+        let mut cand = self.watch[ClauseIndex::from(lit)].next;
+        while cand != HEAD_INDEX {
+            if cand == ci {
+                if prep == HEAD_INDEX {
+                    self.watch[ClauseIndex::from(lit)].next = next;
+                } else {
+                    *self.clause[prep].next_for_lit_mut(lit) = next;
+                }
+                return;
+            }
+            prep = cand;
+            cand = self.clause[cand].next_for_lit(lit);
+        }
+        unreachable!();
     }
     fn mark_as_free(&mut self, index: ClauseIndex) {
         // Note: free list is a single-linked list

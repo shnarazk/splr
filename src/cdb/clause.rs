@@ -1,5 +1,5 @@
 use {
-    crate::{assign::AssignIF, cdb::dlink::*, types::*},
+    crate::{assign::AssignIF, cdb::slink::*, types::*},
     std::{
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -37,8 +37,8 @@ pub trait ClauseIF {
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct Clause {
     /// links. Note: watch0 is also used as freelist
-    pub(super) link0: DoubleLink,
-    pub(super) link1: DoubleLink,
+    pub(super) link0: SingleLink,
+    pub(super) link1: SingleLink,
     /// The literals in a clause.
     pub(super) lits: Vec<Lit>,
     /// Flags (8 bits)
@@ -68,8 +68,8 @@ pub struct Clause {
 impl Default for Clause {
     fn default() -> Clause {
         Clause {
-            link0: DoubleLink::default(),
-            link1: DoubleLink::default(),
+            link0: SingleLink::default(),
+            link1: SingleLink::default(),
             lits: vec![],
             flags: FlagClause::empty(),
             rank: 0,
@@ -331,54 +331,6 @@ impl DancingIndexIF for Clause {
                 panic!("#### &mut next: ilegal chain for {}: {:?}", lit, self);
             }
         }
-    }
-    fn prev_for_lit(&self, lit: Lit) -> ClauseIndex {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            if *self.lits.get_unchecked(0) == !lit {
-                self.link0.prev
-            } else {
-                self.link1.prev
-            }
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        {
-            let l = !lit;
-            if self.lits[0] == l {
-                self.link0.prev
-            } else if self.lits[1] == l {
-                self.link1.prev
-            } else {
-                panic!("#### prev: ilegal chain for {}: {:?}", lit, self);
-            }
-        }
-    }
-    fn prev_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            if *self.lits.get_unchecked(0) == !lit {
-                &mut self.link0.prev
-            } else {
-                &mut self.link1.prev
-            }
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        {
-            let l = !lit;
-            if self.lits[0] == l {
-                &mut self.link0.prev
-            } else if self.lits[1] == l {
-                &mut self.link1.prev
-            } else {
-                panic!("#### &mut prev: ilegal chain for {}: {:?}", lit, self);
-            }
-        }
-    }
-    fn clear_links(&mut self) {
-        self.link0.prev = 0;
-        self.link0.next = 0;
-        self.link1.prev = 0;
-        self.link1.next = 0;
     }
     fn swap_watch_orders(&mut self) {
         self.lits.swap(0, 1);

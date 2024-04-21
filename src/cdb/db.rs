@@ -1,6 +1,6 @@
 use {
     super::{
-        binary::BinaryLinkIF, dlink::LinkHead, ema::ProgressLBD, BinaryLinkDB, CertificationStore,
+        binary::BinaryLinkIF, ema::ProgressLBD, slink::LinkHead, BinaryLinkDB, CertificationStore,
         Clause, DancingIndexManagerIF,
     },
     crate::types::*,
