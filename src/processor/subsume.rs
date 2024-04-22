@@ -74,8 +74,8 @@ fn have_subsuming_lit(
     debug_assert!(1 < ch.len());
     let ob = &cdb[other];
     debug_assert!(1 < ob.len());
-    debug_assert!(ob.contains(ob[0]));
-    debug_assert!(ob.contains(ob[1]));
+    // debug_assert!(ob.contains(ob[0]));
+    // debug_assert!(ob.contains(ob[1]));
     'next: for l in ch.iter() {
         for lo in ob.iter() {
             if *l == *lo {

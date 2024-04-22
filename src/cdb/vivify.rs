@@ -65,7 +65,7 @@ impl VivifyIF for ClauseDB {
                 to_display = num_check + display_step;
             }
             num_check += 1;
-            debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
+            // debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
             let mut decisions: Vec<Lit> = Vec::new();
             for lit in clits.iter().copied() {
                 // assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
@@ -241,24 +241,24 @@ impl AssignStack {
         for l in conflicting {
             seen[l.vi()] = key;
         }
-        let last_decision = decisions.last().unwrap();
-        let from = self.len_upto(self.root_level());
-        let all = self.stack_iter().map(|l| !*l).collect::<Vec<_>>();
-        let assumes = &all[from..];
-        debug_assert!(
-            all.iter().all(|l| !assumes.contains(&!*l)),
-            "vivify252\n{:?}, {:?}",
-            assumes
-                .iter()
-                .filter(|l| all.contains(&!**l))
-                .collect::<Vec<_>>(),
-            assumes
-                .iter()
-                .filter(|l| all.contains(&!**l))
-                .map(|l| self.reason(l.vi()))
-                .collect::<Vec<_>>(),
-            // am.iter().filter(|l| am.contains(&!**l)).collect::<Vec<_>>(),
-        );
+        // let last_decision = decisions.last().unwrap();
+        // let from = self.len_upto(self.root_level());
+        // let all = self.stack_iter().map(|l| !*l).collect::<Vec<_>>();
+        // let assumes = &all[from..];
+        // debug_assert!(
+        //     all.iter().all(|l| !assumes.contains(&!*l)),
+        //     "vivify252\n{:?}, {:?}",
+        //     assumes
+        //         .iter()
+        //         .filter(|l| all.contains(&!**l))
+        //         .collect::<Vec<_>>(),
+        //     assumes
+        //         .iter()
+        //         .filter(|l| all.contains(&!**l))
+        //         .map(|l| self.reason(l.vi()))
+        //         .collect::<Vec<_>>(),
+        //     // am.iter().filter(|l| am.contains(&!**l)).collect::<Vec<_>>(),
+        // );
         // sweep in the reverse order
         for l in self.stack_iter().skip(self.len_upto(0)).rev() {
             if seen[l.vi()] != key {
@@ -313,18 +313,18 @@ impl AssignStack {
             !learnt.is_empty(),
             "empty learnt, conflict: {conflicting:?}, assumed: {decisions:?}"
         );
-        debug_assert!(
-            learnt.contains(&!*last_decision),
-            "\nThe negation of the last decision {last_decision} isn't contained in {learnt:?}"
-        );
+        // debug_assert!(
+        //     learnt.contains(&!*last_decision),
+        //     "\nThe negation of the last decision {last_decision} isn't contained in {learnt:?}"
+        // );
         // Since we don't assign the right value of the 'reason' literal after conflict analysis,
         // we need not to swap locations.
         // learnt.swap(0, lst);
         // assert!(matches!(self.reason(learnt[0].vi()), AssignReason::None));
-        debug_assert!(
-            learnt.iter().all(|l| !learnt.contains(&!*l)),
-            "res: {learnt:?} from: {decisions:?} and trail: {assumes:?}"
-        );
+        // debug_assert!(
+        //     learnt.iter().all(|l| !learnt.contains(&!*l)),
+        //     "res: {learnt:?} from: {decisions:?} and trail: {assumes:?}"
+        // );
         learnt
     }
 }

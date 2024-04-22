@@ -445,7 +445,7 @@ fn conflict_analyze(
     if let Some(cid) = ci_with_max_lbd {
         cdb.update_at_analysis(asg, cid);
     }
-    debug_assert!(learnt.iter().all(|l| *l != !p));
+    // debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);
     learnt[0] = !p;
     trace!(

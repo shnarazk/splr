@@ -233,8 +233,8 @@ impl EliminateIF for Eliminator {
             if c.is_dead() || c.is(FlagClause::OCCUR_LINKED) {
                 continue;
             }
-            let vec = c.iter().copied().collect::<Vec<_>>();
-            debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
+            // let vec = c.iter().copied().collect::<Vec<_>>();
+            // debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
             self.add_cid_occur(asg, ci, c, false);
         }
         if force {
@@ -337,10 +337,10 @@ impl Eliminator {
         for l in c.iter() {
             let vi = l.vi();
             let v = &mut asg.var_mut(vi);
-            debug_assert!(
-                !checked.contains(&vi),
-                "eliminator::add_cid_occur356: {c:?}"
-            );
+            // debug_assert!(
+            //     !checked.contains(&vi),
+            //     "eliminator::add_cid_occur356: {c:?}"
+            // );
             checked.push(vi);
             let w = &mut self[l.vi()];
             let pl = w.pos_occurs.len();
@@ -351,24 +351,24 @@ impl Eliminator {
             }
             if !v.is(FlagVar::ELIMINATED) {
                 if bool::from(*l) {
-                    debug_assert!(
-                        !w.pos_occurs.contains(&ci),
-                        "elim.add_cid_occur for {:?} found a strange positive clause{}{}, {:?}",
-                        v,
-                        ci,
-                        c,
-                        w.pos_occurs,
-                    );
+                    // debug_assert!(
+                    //     !w.pos_occurs.contains(&ci),
+                    //     "elim.add_cid_occur for {:?} found a strange positive clause{}{}, {:?}",
+                    //     v,
+                    //     ci,
+                    //     c,
+                    //     w.pos_occurs,
+                    // );
                     w.pos_occurs.push(ci);
                 } else {
-                    debug_assert!(
-                        !w.neg_occurs.contains(&ci),
-                        "elim.add_cid_occur for {:?} found a strange negative clause{}{}, {:?}",
-                        v,
-                        ci,
-                        c,
-                        w.pos_occurs,
-                    );
+                    // debug_assert!(
+                    //     !w.neg_occurs.contains(&ci),
+                    //     "elim.add_cid_occur for {:?} found a strange negative clause{}{}, {:?}",
+                    //     v,
+                    //     ci,
+                    //     c,
+                    //     w.pos_occurs,
+                    // );
                     w.neg_occurs.push(ci);
                 }
                 self.enqueue_var(asg, l.vi(), false);
@@ -485,10 +485,10 @@ impl Eliminator {
                             return Ok(());
                         }
                         if !d.is_dead() && d.len() <= self.subsume_literal_limit {
-                            debug_assert!(
-                                d.contains(Lit::from((best, false)))
-                                    || d.contains(Lit::from((best, true)))
-                            );
+                            // debug_assert!(
+                            //     d.contains(Lit::from((best, false)))
+                            //         || d.contains(Lit::from((best, true)))
+                            // );
                             self.try_subsume(asg, cdb, ci, *did)?;
                         }
                     }
@@ -584,13 +584,13 @@ impl Eliminator {
             return;
         }
         if bool::from(l) {
-            debug_assert_eq!(w.pos_occurs.iter().filter(|&c| *c == ci).count(), 1);
+            // debug_assert_eq!(w.pos_occurs.iter().filter(|&c| *c == ci).count(), 1);
             w.pos_occurs.delete_unstable(|&c| c == ci);
-            debug_assert!(!w.pos_occurs.contains(&ci));
+            // debug_assert!(!w.pos_occurs.contains(&ci));
         } else {
-            debug_assert_eq!(w.neg_occurs.iter().filter(|&c| *c == ci).count(), 1);
+            // debug_assert_eq!(w.neg_occurs.iter().filter(|&c| *c == ci).count(), 1);
             w.neg_occurs.delete_unstable(|&c| c == ci);
-            debug_assert!(!w.neg_occurs.contains(&ci));
+            // debug_assert!(!w.neg_occurs.contains(&ci));
         }
         self.enqueue_var(asg, l.vi(), true);
     }

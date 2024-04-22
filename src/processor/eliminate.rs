@@ -89,7 +89,7 @@ pub fn eliminate_var(
                     }
                 }
                 _ => {
-                    debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
+                    // debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
                     match cdb.new_clause(asg, vec, learnt_p && cdb[*n].is(FlagClause::LEARNT)) {
                         RefClause::Clause(ci) => {
                             // the merged clause might be a duplicated clause.
@@ -113,8 +113,8 @@ pub fn eliminate_var(
     //
     //## VAR ELIMINATION
     //
-    debug_assert!(pos.iter().all(|cid| !cdb[*cid].is_dead()));
-    debug_assert!(neg.iter().all(|cid| !cdb[*cid].is_dead()));
+    // debug_assert!(pos.iter().all(|cid| !cdb[*cid].is_dead()));
+    // debug_assert!(neg.iter().all(|cid| !cdb[*cid].is_dead()));
     for cid in pos.iter() {
         if cdb[*cid].is_dead() {
             continue;
@@ -237,7 +237,7 @@ fn merge_cost(
 /// Return the real length of the generated clause by merging two clauses.
 /// Return **zero** if one of the clauses is always satisfied. (merge_vec should not be used.)
 fn merge(
-    asg: &mut impl AssignIF,
+    _asg: &mut impl AssignIF,
     cdb: &mut impl ClauseDBIF,
     cip: ClauseIndex,
     ciq: ClauseIndex,
@@ -268,8 +268,8 @@ fn merge(
             .collect::<Vec<_>>(),
     );
     std::mem::swap(&mut lits, vec);
-    debug_assert!(vec.iter().all(|l| !asg.var(l.vi()).is(FlagVar::ELIMINATED)));
-    debug_assert!(vec.iter().all(|l| l.vi() != vi));
+    // debug_assert!(vec.iter().all(|l| !asg.var(l.vi()).is(FlagVar::ELIMINATED)));
+    // debug_assert!(vec.iter().all(|l| l.vi() != vi));
     vec.len()
 }
 

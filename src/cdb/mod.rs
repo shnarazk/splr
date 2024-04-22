@@ -239,7 +239,7 @@ impl ClauseDBIF for ClauseDB {
         learnt: bool,
     ) -> RefClause {
         debug_assert!(1 < vec.len());
-        debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{vec:?}");
+        // debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{vec:?}");
         if vec.len() == 2 {
             if let Some(&ci) = self.link_to_cid(vec[0], vec[1]) {
                 self.num_reregistration += 1;

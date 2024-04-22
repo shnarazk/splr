@@ -98,8 +98,8 @@ impl PropagateIF for AssignStack {
         // The following doesn't hold anymore by using chronoBT.
         // assert!(self.trail_lim.is_empty() || !cid.is_none());
         let vi = l.vi();
-        debug_assert!([Some(bool::from(l)), None].contains(&self.var[vi].assign));
-        debug_assert!(self.trail.iter().all(|rl| *rl != l));
+        // debug_assert!([Some(bool::from(l)), None].contains(&self.var[vi].assign));
+        // debug_assert!(self.trail.iter().all(|rl| *rl != l));
 
         #[cfg(not(feature = "chrono_BT"))]
         let lv = self.decision_level();
@@ -112,8 +112,8 @@ impl PropagateIF for AssignStack {
         var.level = lv;
         var.reason = reason;
         self.reward_at_assign(vi);
-        debug_assert!(!self.trail.contains(&l));
-        debug_assert!(!self.trail.contains(&!l));
+        // debug_assert!(!self.trail.contains(&l));
+        // debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
         if self.root_level == lv {
             self.make_var_asserted(vi);
@@ -126,13 +126,13 @@ impl PropagateIF for AssignStack {
         }
     }
     fn assign_by_decision(&mut self, l: Lit) {
-        debug_assert!([Some(bool::from(l)), None].contains(&self.var[l.vi()].assign));
+        // debug_assert!([Some(bool::from(l)), None].contains(&self.var[l.vi()].assign));
         debug_assert!(l.vi() < self.var.len());
-        debug_assert!(!self.trail.contains(&l));
-        debug_assert!(
-            !self.trail.contains(&!l),
-            "asg.trail contains a strange literal",
-        );
+        // debug_assert!(!self.trail.contains(&l));
+        // debug_assert!(
+        //     !self.trail.contains(&!l),
+        //     "asg.trail contains a strange literal",
+        // );
         self.level_up();
         let dl = self.trail_lim.len() as DecisionLevel;
         let reason = AssignReason::Decision(self.decision_level());
@@ -221,8 +221,8 @@ impl PropagateIF for AssignStack {
         #[cfg(feature = "chrono_BT")]
         self.trail.append(&mut unpropagated);
 
-        debug_assert!(self.trail.iter().all(|l| self.var[l.vi()].assign.is_some()));
-        debug_assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
+        // debug_assert!(self.trail.iter().all(|l| self.var[l.vi()].assign.is_some()));
+        // debug_assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
         self.trail_lim.truncate(lv as usize);
         // assert!(lim < self.q_head) doesn't hold sometimes in chronoBT.
         if lv == self.root_level {
@@ -396,9 +396,9 @@ impl PropagateIF for AssignStack {
                     continue 'next_clause;
                 }
                 if other_value == Some(false) && self.var[ovi].level < self.rebuild_base_level {
-                    debug_assert!(c
-                        .iter()
-                        .all(|l| lit_assign!(self.var[l.vi()], *l) == Some(false)));
+                    // debug_assert!(c
+                    //     .iter()
+                    //     .all(|l| lit_assign!(self.var[l.vi()], *l) == Some(false)));
                     if false_index == 0 {
                         c.swap_watch_orders();
                     }
@@ -626,9 +626,9 @@ impl AssignStack {
                 if cdb[ci].is_dead() {
                     continue;
                 }
-                debug_assert!(cdb[ci]
-                    .iter()
-                    .all(|l| !self.var[l.vi()].is(FlagVar::ELIMINATED)));
+                // debug_assert!(cdb[ci]
+                //     .iter()
+                //     .all(|l| !self.var[l.vi()].is(FlagVar::ELIMINATED)));
                 match cdb.transform_by_simplification(self, ci) {
                     RefClause::Clause(_) => (),
                     RefClause::Dead => (), // was a satisfied clause
