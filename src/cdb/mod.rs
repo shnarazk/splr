@@ -153,7 +153,7 @@ impl Default for ClauseDB {
             certification_store: CertificationStore::default(),
             soft_limit: 0, // 248_000_000
             co_lbd_bound: 4,
-            append_head: false,
+            preppend_head: true,
 
             bi_clause_completion_queue: Vec::new(),
             num_bi_clause_completion: 0,
@@ -997,7 +997,7 @@ impl ClauseDBIF for ClauseDB {
         }
     }
     fn preppend_clauses(&mut self, force: bool) {
-        self.append_head = force;
+        self.preppend_head = force;
     }
 
     #[cfg(feature = "incremental_solver")]
@@ -1217,8 +1217,8 @@ impl DancingIndexManagerIF for ClauseDB {
             self[ci],
             lit
         );
-        let head = self.watch[ClauseIndex::from(lit)].next;
-        if self.append_head {
+        if self.preppend_head {
+            let head = self.watch[ClauseIndex::from(lit)].next;
             if head == HEAD_INDEX {
                 self.watch[ClauseIndex::from(lit)].next = ci;
                 self.watch[ClauseIndex::from(lit)].prev = ci;
