@@ -450,15 +450,19 @@ impl ClauseDBIF for ClauseDB {
             self.num_bi_clause += 1;
             // self.watches(cid, "after strengthen_by_elimination case:3-2");
         } else {
-            let old_l0 = self[ci].lits[0];
-            let old_l1 = self[ci].lits[1];
-            std::mem::swap(&mut self[ci].lits, &mut new_lits);
-            let l0 = self[ci].lits[0];
-            let l1 = self[ci].lits[1];
             //
             //## Case:3-3
             //
-
+            let old_l0 = self[ci].lits[0];
+            let old_l1 = self[ci].lits[1];
+            self.remove_watcher(ci, !old_l0);
+            self.remove_watcher(ci, !old_l1);
+            std::mem::swap(&mut self[ci].lits, &mut new_lits);
+            let l0 = self[ci].lits[0];
+            let l1 = self[ci].lits[1];
+            self.insert_watcher(ci, false, !l0);
+            self.insert_watcher(ci, true, !l1);
+            /*
             // Here we assumed that there's no eliminated var in clause and *watch cache*.
             // Fortunately the current implementation purges all eliminated vars fully.
             if p == old_l0 {
@@ -494,6 +498,7 @@ impl ClauseDBIF for ClauseDB {
                 debug_assert_eq!(old_l1, l1);
             }
             // self.watches(cid, "after strengthen_by_elimination case:3-3");
+            */
         }
         if self.certification_store.is_active() {
             let ClauseDB {
