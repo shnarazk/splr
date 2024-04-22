@@ -11,7 +11,6 @@ pub trait DancingIndexIF {
     fn next_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex;
     fn prev_for_lit(&self, lit: Lit) -> ClauseIndex;
     fn prev_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex;
-    fn clear_links(&mut self);
     fn swap_watch_orders(&mut self);
 }
 

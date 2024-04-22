@@ -1248,7 +1248,7 @@ impl DancingIndexManagerIF for ClauseDB {
                 *self.clause[next].prev_for_lit_mut(lit) = prev;
             }
         }
-        assert!(self[ci].lits[1] == !lit || self[ci].lits[0] == !lit);
+        debug_assert!(self[ci].lits[1] == !lit || self[ci].lits[0] == !lit);
         self[ci].lits[1] == !lit
     }
     fn mark_as_free(&mut self, index: ClauseIndex) {

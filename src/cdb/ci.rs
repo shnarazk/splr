@@ -6,7 +6,8 @@ pub trait LiftedClauseIF {
     fn unlift(&self) -> Lit;
 }
 
-const MASK: usize = 0x8000_0000;
+const MASK: usize = 0x8000_0000_0000_0000;
+const U32BIT: usize = 0x0000_0000_FFFF_FFFF;
 
 impl LiftedClauseIF for ClauseIndex {
     fn is_lifted(&self) -> bool {
@@ -16,6 +17,17 @@ impl LiftedClauseIF for ClauseIndex {
         usize::from(lit) | MASK
     }
     fn unlift(&self) -> Lit {
-        Lit::from(*self & !MASK)
+        Lit::from(*self & U32BIT)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lift_unlift() {
+        let lit = Lit::from(0x8FFF_FFFF_u32);
+        assert_eq!(ClauseIndex::lift(lit).unlift(), lit);
     }
 }

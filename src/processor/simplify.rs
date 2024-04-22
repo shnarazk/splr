@@ -424,23 +424,23 @@ impl Eliminator {
             // and placing it in the queue:
             if self.clause_queue.is_empty() && self.bwdsub_assigns < asg.stack_len() {
                 let c = ClauseIndex::lift(asg.stack(self.bwdsub_assigns));
-                // let c = ClauseId::from(asg.stack(self.bwdsub_assigns));
+                assert_eq!(c.unlift(), asg.stack(self.bwdsub_assigns));
                 self.clause_queue.push(c);
                 self.bwdsub_assigns += 1;
             }
-            if let Some(cid) = self.clause_queue.pop() {
+            if let Some(ci) = self.clause_queue.pop() {
                 if *timedout == 0 {
                     self.clear_clause_queue(cdb);
                     self.clear_var_queue(asg);
                     return Ok(());
                 }
-                let best: VarId = if cid.is_lifted() {
-                    let vi = cid.unlift().vi();
+                let best: VarId = if ci.is_lifted() {
+                    let vi = ci.unlift().vi();
                     debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
                     vi
                 } else {
                     let mut tmp = cdb.derefer(cdb::property::Tusize::NumClause);
-                    let c = &mut cdb[cid];
+                    let c = &mut cdb[ci];
                     c.turn_off(FlagClause::ENQUEUED);
                     if c.is_dead() || self.subsume_literal_limit < c.len() {
                         continue;
@@ -470,11 +470,11 @@ impl Eliminator {
                 if best == 0 || asg.var(best).is(FlagVar::ELIMINATED) {
                     continue;
                 }
-                self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
-                self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
+                self[best].pos_occurs.retain(|ci| !cdb[*ci].is_dead());
+                self[best].neg_occurs.retain(|ci| !cdb[*ci].is_dead());
                 for cls in [self[best].pos_occurs.clone(), self[best].neg_occurs.clone()].iter() {
                     for did in cls.iter() {
-                        if *did == cid {
+                        if *did == ci {
                             continue;
                         }
                         let d = &cdb[*did];
@@ -489,12 +489,12 @@ impl Eliminator {
                                 d.contains(Lit::from((best, false)))
                                     || d.contains(Lit::from((best, true)))
                             );
-                            self.try_subsume(asg, cdb, cid, *did)?;
+                            self.try_subsume(asg, cdb, ci, *did)?;
                         }
                     }
                 }
-                self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
-                self[best].neg_occurs.retain(|cid| !cdb[*cid].is_dead());
+                self[best].pos_occurs.retain(|ci| !cdb[*ci].is_dead());
+                self[best].neg_occurs.retain(|ci| !cdb[*ci].is_dead());
             }
         }
         if asg.remains() {
@@ -612,8 +612,8 @@ impl Eliminator {
     }
     /// clear eliminator's clause queue.
     fn clear_clause_queue(&mut self, cdb: &mut impl ClauseDBIF) {
-        for cid in &self.clause_queue {
-            cdb[*cid].turn_off(FlagClause::ENQUEUED);
+        for ci in &self.clause_queue {
+            cdb[*ci].turn_off(FlagClause::ENQUEUED);
         }
         self.clause_queue.clear();
     }

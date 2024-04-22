@@ -28,7 +28,7 @@ impl Eliminator {
                 #[cfg(feature = "trace_elimination")]
                 println!(
                     "BackSubsC    => {} {} subsumed completely by {} {:#}",
-                    did, cdb[did], cid, cdb[cid],
+                    di, cdb[di], ci, cdb[ci],
                 );
                 debug_assert!(!cdb[di].is_dead());
                 if !cdb[di].is(FlagClause::LEARNT) {
@@ -42,7 +42,7 @@ impl Eliminator {
             Subsumable::By(l) => {
                 debug_assert!(ci.is_lifted());
                 #[cfg(feature = "trace_elimination")]
-                println!("BackSubC subsumes {} from {} and {}", l, cid, did);
+                println!("BackSubC subsumes {} from {} and {}", l, ci, di);
                 strengthen_clause(asg, cdb, self, di, !l)?;
                 self.enqueue_var(asg, l.vi(), true);
             }
@@ -60,7 +60,7 @@ fn have_subsuming_lit(
 ) -> Subsumable {
     debug_assert!(!other.is_lifted());
     if ci.is_lifted() {
-        let l = Lit::from(ci);
+        let l = ci.unlift();
         let oh = &cdb[other];
         for lo in oh.iter() {
             if l == !*lo {

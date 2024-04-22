@@ -374,12 +374,6 @@ impl DancingIndexIF for Clause {
             }
         }
     }
-    fn clear_links(&mut self) {
-        self.link0.prev = 0;
-        self.link0.next = 0;
-        self.link1.prev = 0;
-        self.link1.next = 0;
-    }
     fn swap_watch_orders(&mut self) {
         self.lits.swap(0, 1);
         std::mem::swap(&mut self.link0, &mut self.link1);

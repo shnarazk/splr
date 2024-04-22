@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 use crate::{
     assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-    cdb::{ClauseDB, ClauseDBIF, ClauseIF},
+    cdb::{ClauseDB, ClauseDBIF, ClauseIF, LiftedClauseIF},
     state::{Stat, State, StateIF},
     types::*,
 };
@@ -48,8 +48,9 @@ impl VivifyIF for ClauseDB {
 
             debug_assert!(asg.stack_is_empty() || !asg.remains());
             debug_assert_eq!(asg.root_level(), asg.decision_level());
-            let cid = cp.to();
-            let c = &mut self[cid];
+            let ci = cp.to();
+            assert!(!ci.is_lifted());
+            let c = &mut self[ci];
             if c.is_dead() {
                 continue;
             }
@@ -99,13 +100,13 @@ impl VivifyIF for ClauseDB {
                                         asg.backtrack_sandbox();
                                     }
                                 }
-                                AssignReason::Implication(ci) => {
-                                    if ci == cid && clits.len() == decisions.len() {
+                                AssignReason::Implication(cj) => {
+                                    if cj == ci && clits.len() == decisions.len() {
                                         asg.backtrack_sandbox();
                                         continue 'next_clause;
                                     } else {
                                         let cnfl_lits =
-                                            &self[ci].iter().copied().collect::<Vec<Lit>>();
+                                            &self[cj].iter().copied().collect::<Vec<Lit>>();
                                         seen[0] = num_check;
                                         vec = asg.analyze_sandbox(
                                             self, &decisions, cnfl_lits, &mut seen,
@@ -139,7 +140,7 @@ impl VivifyIF for ClauseDB {
                                     }
                                     #[cfg(not(feature = "clause_rewarding"))]
                                     self.new_clause(asg, &mut vec, is_learnt);
-                                    self.remove_clause(cid);
+                                    self.remove_clause(ci);
                                     num_shrink += 1;
                                 }
                             }
@@ -188,11 +189,15 @@ fn select_targets(
 ) -> Vec<OrderedProxy<ClauseIndex>> {
     if initial_stage {
         let mut seen: Vec<Option<OrderedProxy<ClauseIndex>>> = vec![None; 2 * (asg.num_vars + 1)];
-        for (i, c) in cdb.iter().enumerate().skip(1) {
+        for (ci, c) in cdb.iter().enumerate().skip(1) {
+            if c.is_dead() {
+                continue;
+            }
+            assert!(!ci.is_lifted());
             if let Some(rank) = c.to_vivify(true) {
                 let p = &mut seen[usize::from(c.lit0())];
                 if p.as_ref().map_or(0.0, |r| r.value()) < rank {
-                    *p = Some(OrderedProxy::new(i, rank));
+                    *p = Some(OrderedProxy::new(ci, rank));
                 }
             }
         }
@@ -275,8 +280,8 @@ impl AssignStack {
                 AssignReason::BinaryLink(bil) => {
                     seen[bil.vi()] = key;
                 }
-                AssignReason::Implication(cid) => {
-                    for r in cdb[cid].iter().skip(1) {
+                AssignReason::Implication(ci) => {
+                    for r in cdb[ci].iter().skip(1) {
                         seen[r.vi()] = key;
                     }
                 }
