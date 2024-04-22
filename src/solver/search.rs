@@ -376,6 +376,7 @@ fn search(
                         state.restart.set_segment_parameters(max_scale);
                     }
                 }
+                cdb.preppend_clauses(!new_segment);
             } else {
                 {
                     if cfg!(feature = "two_mode_reduction") {

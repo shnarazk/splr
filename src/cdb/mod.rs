@@ -121,6 +121,8 @@ pub trait ClauseDBIF:
     fn minimize_with_bi_clauses(&mut self, asg: &impl AssignIF, vec: &mut Vec<Lit>);
     /// complete bi-clause network
     fn complete_bi_clauses(&mut self, asg: &mut impl AssignIF);
+    /// FIXME:
+    fn preppend_clauses(&mut self, force: bool);
 
     #[cfg(feature = "incremental_solver")]
     /// save an eliminated permanent clause to an extra space for incremental solving.
@@ -151,6 +153,8 @@ impl Default for ClauseDB {
             certification_store: CertificationStore::default(),
             soft_limit: 0, // 248_000_000
             co_lbd_bound: 4,
+            append_head: false,
+
             bi_clause_completion_queue: Vec::new(),
             num_bi_clause_completion: 0,
             // lbd_frozen_clause: 30,
@@ -992,6 +996,10 @@ impl ClauseDBIF for ClauseDB {
             self.complete_bi_clauses_with(asg, lit);
         }
     }
+    fn preppend_clauses(&mut self, force: bool) {
+        self.append_head = force;
+    }
+
     #[cfg(feature = "incremental_solver")]
     fn make_permanent_immortal(&mut self, cid: ClauseId) {
         self.eliminated_permanent.push(
@@ -1209,26 +1217,51 @@ impl DancingIndexManagerIF for ClauseDB {
             self[ci],
             lit
         );
-        let last = self.watch[ClauseIndex::from(lit)].prev;
-        if last == HEAD_INDEX {
-            self.watch[ClauseIndex::from(lit)].next = ci;
-            self.watch[ClauseIndex::from(lit)].prev = ci;
-            if second {
-                self.clause[ci].link1.prev = HEAD_INDEX;
-                self.clause[ci].link1.next = HEAD_INDEX;
+        let head = self.watch[ClauseIndex::from(lit)].next;
+        if self.append_head {
+            if head == HEAD_INDEX {
+                self.watch[ClauseIndex::from(lit)].next = ci;
+                self.watch[ClauseIndex::from(lit)].prev = ci;
+                if second {
+                    self.clause[ci].link1.prev = HEAD_INDEX;
+                    self.clause[ci].link1.next = HEAD_INDEX;
+                } else {
+                    self.clause[ci].link0.prev = HEAD_INDEX;
+                    self.clause[ci].link0.next = HEAD_INDEX;
+                }
             } else {
-                self.clause[ci].link0.prev = HEAD_INDEX;
-                self.clause[ci].link0.next = HEAD_INDEX;
+                *self.clause[head].prev_for_lit_mut(lit) = ci;
+                self.watch[ClauseIndex::from(lit)].next = ci;
+                if second {
+                    self.clause[ci].link1.prev = HEAD_INDEX;
+                    self.clause[ci].link1.next = head;
+                } else {
+                    self.clause[ci].link0.prev = HEAD_INDEX;
+                    self.clause[ci].link0.next = head;
+                }
             }
         } else {
-            *self.clause[last].next_for_lit_mut(lit) = ci;
-            self.watch[ClauseIndex::from(lit)].prev = ci;
-            if second {
-                self.clause[ci].link1.prev = last;
-                self.clause[ci].link1.next = HEAD_INDEX;
+            let last = self.watch[ClauseIndex::from(lit)].prev;
+            if last == HEAD_INDEX {
+                self.watch[ClauseIndex::from(lit)].next = ci;
+                self.watch[ClauseIndex::from(lit)].prev = ci;
+                if second {
+                    self.clause[ci].link1.prev = HEAD_INDEX;
+                    self.clause[ci].link1.next = HEAD_INDEX;
+                } else {
+                    self.clause[ci].link0.prev = HEAD_INDEX;
+                    self.clause[ci].link0.next = HEAD_INDEX;
+                }
             } else {
-                self.clause[ci].link0.prev = last;
-                self.clause[ci].link0.next = HEAD_INDEX;
+                *self.clause[last].next_for_lit_mut(lit) = ci;
+                self.watch[ClauseIndex::from(lit)].prev = ci;
+                if second {
+                    self.clause[ci].link1.prev = last;
+                    self.clause[ci].link1.next = HEAD_INDEX;
+                } else {
+                    self.clause[ci].link0.prev = last;
+                    self.clause[ci].link0.next = HEAD_INDEX;
+                }
             }
         }
     }

@@ -31,6 +31,8 @@ pub struct ClauseDB {
     pub(super) soft_limit: usize,
     /// 'small' clause threshold
     pub(super) co_lbd_bound: u16,
+    /// add clauses moved by unit propagtion to head of watcher list or to tail
+    pub(super) append_head: bool,
     // not in use
     // lbd_frozen_clause: usize,
 
