@@ -98,7 +98,7 @@ pub trait ClauseDBIF:
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType);
+    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType, bonus: f64);
     /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.
@@ -840,7 +840,7 @@ impl ClauseDBIF for ClauseDB {
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType, bonus: f64) {
         impl Clause {
             fn reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
                 self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
@@ -911,10 +911,14 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         let keep = match setting {
-            ReductionType::RASonADD(size) => perm.len().saturating_sub(size),
-            ReductionType::RASonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
-            ReductionType::LBDonADD(size) => perm.len().saturating_sub(size),
-            ReductionType::LBDonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
+            ReductionType::RASonADD(size) => {
+                perm.len().saturating_sub((size as f64 / bonus) as usize)
+            }
+            ReductionType::RASonALL(_, scale) => (perm.len() as f64).powf(bonus - scale) as usize,
+            ReductionType::LBDonADD(size) => {
+                perm.len().saturating_sub((size as f64 / bonus) as usize)
+            }
+            ReductionType::LBDonALL(_, scale) => (perm.len() as f64).powf(bonus - scale) as usize,
         };
         self.reduction_threshold = match setting {
             ReductionType::RASonADD(_) | ReductionType::RASonALL(_, _) => {
