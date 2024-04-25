@@ -8,8 +8,6 @@ mod ci;
 mod clause;
 /// methods on `ClauseDB`
 mod db;
-/// methods on Watchers
-mod dlink;
 /// EMA
 mod ema;
 /// methods for Stochastic Local Search
@@ -18,17 +16,19 @@ mod sls;
 mod unsat_certificate;
 /// implementation of clause vivification
 mod vivify;
+/// methods on Watchers
+mod weaver;
 
 pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
     ci::LiftedClauseIF,
     clause::*,
     db::ClauseDB,
-    dlink::{DancingIndexIF, DancingIndexManagerIF, LinkHead},
     property::*,
     sls::StochasticLocalSearchIF,
     unsat_certificate::CertificationStore,
     vivify::VivifyIF,
+    weaver::*,
 };
 
 use {
@@ -48,7 +48,7 @@ use std::{io::Write, path::Path};
 pub trait ClauseDBIF:
     Instantiate
     + IndexMut<ClauseIndex, Output = Clause>
-    + DancingIndexManagerIF
+    + ClauseWeaverIF
     + PropertyDereference<property::Tusize, usize>
     + PropertyDereference<property::Tf64, f64>
 {
@@ -74,7 +74,13 @@ pub trait ClauseDBIF:
     //
 
     /// swap i-th watch with j-th literal then update watch caches correctly
-    fn transform_by_updating_watch(&mut self, ci: ClauseIndex, old: usize, new: usize);
+    fn transform_by_updating_watch(
+        &mut self,
+        prev: ClauseIndex,
+        ci: ClauseIndex,
+        old: usize,
+        new: usize,
+    );
     /// allocate a new clause and return its id.
     /// Note this removes an eliminated Lit `p` from a clause. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
@@ -187,7 +193,7 @@ impl Default for ClauseDB {
 impl ClauseDBIF for ClauseDB {
     fn check_chains(&self, ci: ClauseIndex) {
         for (l, h) in self.watch.iter().enumerate().skip(2) {
-            let mut nr = h.next;
+            let mut nr = *h;
             while nr != 0 {
                 assert!(!self[nr].is_dead());
                 nr = self[nr].next_for_lit(Lit::from(l));
@@ -197,7 +203,7 @@ impl ClauseDBIF for ClauseDB {
             assert!(!self[ci].lits.is_empty());
             let l0 = !self[ci].lits[0];
             let l1 = !self[ci].lits[1];
-            let mut nr = self.watch[usize::from(l0)].next;
+            let mut nr = self.watch[usize::from(l0)];
             let mut found = false;
             while nr != 0 {
                 if nr == ci {
@@ -208,7 +214,7 @@ impl ClauseDBIF for ClauseDB {
             }
             assert_eq!(2 < self[ci].lits.len(), found);
 
-            nr = self.watch[usize::from(l1)].next;
+            nr = self.watch[usize::from(l1)];
             found = false;
             while nr != 0 {
                 if nr == ci {
@@ -361,9 +367,8 @@ impl ClauseDBIF for ClauseDB {
             self.num_bi_clause -= 1;
         } else {
             // watcher[usize::from(!l0)].remove_watch(&ci);
-            self.remove_watcher(ci, !l0);
             // watcher[usize::from(!l1)].remove_watch(&ci);
-            self.remove_watcher(ci, !l1);
+            self.remove_watcher(ci);
         }
         self.mark_as_free(ci);
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
@@ -381,9 +386,8 @@ impl ClauseDBIF for ClauseDB {
                 .expect("Eror (remove_clause_fn#01)");
         }
         // watcher[usize::from(!l0)].remove_watch(&ci); // .expect("db1076");
-        self.remove_watcher(ci, !l0);
         // watcher[usize::from(!l1)].remove_watch(&ci); // .expect("db1077");
-        self.remove_watcher(ci, !l1);
+        self.remove_watcher(ci);
         self.mark_as_free(ci);
         self[ci].turn_on(FlagClause::DEAD);
     }
@@ -446,9 +450,8 @@ impl ClauseDBIF for ClauseDB {
             let l0 = self[ci].lits[0];
             let l1 = self[ci].lits[1];
             // watch_cache[!l0].remove_watch(&ci);
-            self.remove_watcher(ci, !l0);
             // watch_cache[!l1].remove_watch(&ci);
-            self.remove_watcher(ci, !l1);
+            self.remove_watcher(ci);
             std::mem::swap(&mut self[ci].lits, &mut new_lits);
             self.binary_link.add(self[ci].lits[0], self[ci].lits[1], ci);
             self.num_bi_clause += 1;
@@ -457,10 +460,9 @@ impl ClauseDBIF for ClauseDB {
             //
             //## Case:3-3
             //
-            let old_l0 = self[ci].lits[0];
-            let old_l1 = self[ci].lits[1];
-            self.remove_watcher(ci, !old_l0);
-            self.remove_watcher(ci, !old_l1);
+            // let old_l0 = self[ci].lits[0];
+            // let old_l1 = self[ci].lits[1];
+            self.remove_watcher(ci);
             std::mem::swap(&mut self[ci].lits, &mut new_lits);
             let l0 = self[ci].lits[0];
             let l1 = self[ci].lits[1];
@@ -546,9 +548,8 @@ impl ClauseDBIF for ClauseDB {
             let l0 = self[ci].lit0();
             let l1 = self[ci].lit0();
             // watch_cache[!old_l0].remove_watch(&ci);
-            self.remove_watcher(ci, !old_l0);
             // watch_cache[!old_l1].remove_watch(&ci);
-            self.remove_watcher(ci, !old_l1);
+            self.remove_watcher(ci);
             self.binary_link.add(l0, l1, ci);
             self[ci].turn_off(FlagClause::LEARNT);
             self.num_bi_clause += 1;
@@ -788,7 +789,13 @@ impl ClauseDBIF for ClauseDB {
         }
     }
     // used in `propagate`, `propagate_sandbox`, and `handle_conflict` for chronoBT
-    fn transform_by_updating_watch(&mut self, ci: ClauseIndex, old: usize, new: usize) {
+    fn transform_by_updating_watch(
+        &mut self,
+        prep: ClauseIndex,
+        ci: ClauseIndex,
+        old: usize,
+        new: usize,
+    ) {
         //
         //## Clause transform rules
         //
@@ -1199,18 +1206,18 @@ impl Clause {
 const HEAD_INDEX: ClauseIndex = 0;
 const FREE_INDEX: ClauseIndex = 1;
 
-impl DancingIndexManagerIF for ClauseDB {
+impl ClauseWeaverIF for ClauseDB {
     fn get_watcher_link(&mut self, lit: Lit) -> ClauseIndex {
-        self.watch[ClauseIndex::from(lit)].next
+        self.watch[ClauseIndex::from(lit)]
     }
     fn get_free_index(&mut self) -> ClauseIndex {
-        let ci = self.watch[FREE_INDEX].next;
+        let ci = self.watch[FREE_INDEX];
         if ci == 0 {
             self.clause.push(Clause::default());
             self.clause.len() - 1
         } else {
-            let next = self.clause[ci].link0.next;
-            self.watch[FREE_INDEX].next = next;
+            let next = self.clause[ci].link0;
+            self.watch[FREE_INDEX] = next;
             ci
         }
     }
@@ -1222,9 +1229,9 @@ impl DancingIndexManagerIF for ClauseDB {
             lit
         );
         if self.preppend_head {
-            let head = self.watch[ClauseIndex::from(lit)].next;
+            let head = self.watch[ClauseIndex::from(lit)];
             if head == HEAD_INDEX {
-                self.watch[ClauseIndex::from(lit)].next = ci;
+                self.watch[ClauseIndex::from(lit)] = ci;
                 self.watch[ClauseIndex::from(lit)].prev = ci;
                 if second {
                     self.clause[ci].link1.prev = HEAD_INDEX;
@@ -1269,45 +1276,56 @@ impl DancingIndexManagerIF for ClauseDB {
             }
         }
     }
-    fn remove_watcher(&mut self, ci: ClauseIndex, lit: Lit) -> bool {
-        let prev = self.clause[ci].prev_for_lit(lit);
-        let next = self.clause[ci].next_for_lit(lit);
-        match (prev, next) {
-            (HEAD_INDEX, HEAD_INDEX) => {
-                self.watch[ClauseIndex::from(lit)].next = HEAD_INDEX;
-                self.watch[ClauseIndex::from(lit)].prev = HEAD_INDEX;
-            }
-            (HEAD_INDEX, _) => {
-                self.watch[ClauseIndex::from(lit)].next = next;
-                *self.clause[next].prev_for_lit_mut(lit) = HEAD_INDEX;
-            }
-            (_, HEAD_INDEX) => {
-                *self.clause[prev].next_for_lit_mut(lit) = HEAD_INDEX;
-                self.watch[ClauseIndex::from(lit)].prev = prev;
-            }
-            _ => {
-                *self.clause[prev].next_for_lit_mut(lit) = next;
-                *self.clause[next].prev_for_lit_mut(lit) = prev;
-            }
-        }
+    /// O(1) implementation
+    fn remove_next_watcher(&mut self, ci: ClauseIndex, lit: Lit) -> bool {
+        let next1 = self.clause[ci].next_for_lit(lit);
+        let next2 = self.clause[next1].next_for_lit(lit);
+        *self.clause[ci].next_for_lit_mut(lit) = next2;
         debug_assert!(self[ci].lits[1] == !lit || self[ci].lits[0] == !lit);
-        self[ci].lits[1] == !lit
+        self[next1].lits[1] == !lit
+    }
+    /// O(N) implementation
+    fn remove_watcher(&mut self, ci: ClauseIndex) {
+        let lit0 = !self[ci].lit0();
+        let lit1 = !self[ci].lit1();
+        let mut index = self.watch[usize::from(lit0)];
+        let mut prev = HEAD_INDEX;
+        while index != HEAD_INDEX {
+            if index == ci {
+                self.remove_next_watcher(prev, lit0);
+                break;
+            }
+            prev = index;
+            index = self[index].next_for_lit(lit0);
+        }
+        assert_ne!(index, HEAD_INDEX);
+        let mut index = self.watch[usize::from(lit1)];
+        let mut prev = HEAD_INDEX;
+        while index != HEAD_INDEX {
+            if index == ci {
+                self.remove_next_watcher(prev, lit0);
+                break;
+            }
+            prev = index;
+            index = self[index].next_for_lit(lit0);
+        }
+        assert_ne!(index, HEAD_INDEX);
     }
     fn mark_as_free(&mut self, index: ClauseIndex) {
         // Note: free list is a single-linked list
-        let first = self.watch[FREE_INDEX].next;
-        self.watch[FREE_INDEX].next = index;
-        self.clause[index].link0.next = first;
+        let first = self.watch[FREE_INDEX];
+        self.watch[FREE_INDEX] = index;
+        self.clause[index].link0 = first;
     }
-    fn make_watches(num_vars: usize, clauses: &mut [Clause]) -> Vec<LinkHead> {
+    fn make_watches(num_vars: usize, clauses: &mut [Clause]) -> Vec<ClauseIndex> {
         // ci 0 must refer to the header
         let nc = clauses.len();
         for (i, c) in clauses.iter_mut().enumerate().skip(1) {
-            c.link0.next = (i + 1) % nc;
+            c.link0 = (i + 1) % nc;
             c.turn_on(FlagClause::DEAD);
         }
-        let mut watches = vec![LinkHead::default(); 2 * (num_vars + 1)];
-        watches[0].next = 1;
+        let mut watches = vec![ClauseIndex::default(); 2 * (num_vars + 1)];
+        watches[0] = 1;
         watches
     }
 }

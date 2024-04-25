@@ -3,7 +3,7 @@
 use {
     super::{AssignIF, AssignStack, VarHeapIF, VarManipulateIF},
     crate::{
-        cdb::{ClauseDBIF, DancingIndexIF},
+        cdb::{ClauseDBIF, WatcherLinkIF},
         types::*,
     },
 };
