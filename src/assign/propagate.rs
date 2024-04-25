@@ -381,6 +381,7 @@ impl PropagateIF for AssignStack {
             //
             //## normal clause loop
             //
+            let mut prev: usize = 0;
             let mut ci = cdb.get_watcher_link(propagating);
             'next_clause: while ci != 0 {
                 let c = &mut cdb[ci];
@@ -392,6 +393,7 @@ impl PropagateIF for AssignStack {
                 let ovi = other.vi();
                 let other_value = lit_assign!(self.var[ovi], other);
                 if other_value == Some(true) {
+                    prev = ci;
                     ci = c.next_for_lit(propagating);
                     continue 'next_clause;
                 }
@@ -415,7 +417,7 @@ impl PropagateIF for AssignStack {
                     if lit_assign!(self.var[lk.vi()], *lk) != Some(false) {
                         let next_ci = c.next_for_lit(propagating);
                         let new_watch = !*lk;
-                        cdb.transform_by_updating_watch(ci, false_index, k);
+                        cdb.transform_by_updating_watch(prev, ci, false_index, k);
                         debug_assert_ne!(self.assigned(new_watch), Some(true));
                         check_in!(
                             ci,
@@ -448,6 +450,7 @@ impl PropagateIF for AssignStack {
                         dl,
                     );
                     check_in!(cid, Propagate::BecameUnit(self.num_conflict, cached));
+                    prev = ci;
                     ci = c.next_for_lit(propagating);
                 }
             }
@@ -533,6 +536,7 @@ impl PropagateIF for AssignStack {
             //
             //## normal clause loop
             //
+            let mut prev: usize = 0;
             let mut ci = cdb.get_watcher_link(propagating);
             'next_clause: while ci != 0 {
                 let c = &mut cdb[ci];
@@ -549,6 +553,7 @@ impl PropagateIF for AssignStack {
                 let ovi = other.vi();
                 let other_value = lit_assign!(self.var[ovi], other);
                 if other_value == Some(true) {
+                    prev = ci;
                     ci = c.next_for_lit(propagating);
                     continue 'next_clause;
                 }
@@ -562,7 +567,7 @@ impl PropagateIF for AssignStack {
                     if lit_assign!(self.var[lk.vi()], *lk) != Some(false) {
                         let next_ci = c.next_for_lit(propagating);
                         let _new_watch = !*lk;
-                        cdb.transform_by_updating_watch(ci, false_index, k);
+                        cdb.transform_by_updating_watch(prev, ci, false_index, k);
                         check_in!(
                             ci,
                             Propagate::SandboxFindNewWatch(self.num_conflict, false_lit, new_watch)
@@ -583,6 +588,7 @@ impl PropagateIF for AssignStack {
                 }
                 self.assign_by_implication(other, AssignReason::Implication(ci));
                 check_in!(cid, Propagate::SandboxBecameUnit(self.num_conflict));
+                prev = ci;
                 ci = c.next_for_lit(propagating);
             }
         }
