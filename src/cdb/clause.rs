@@ -1,5 +1,5 @@
 use {
-    crate::{assign::AssignIF, types::*},
+    crate::{assign::AssignIF, cdb::dlink::*, types::*},
     std::{
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -7,9 +7,69 @@ use {
     },
 };
 
+/// API for Clause, providing literal accessors.
+pub trait ClauseIF {
+    /// return true if it contains no literals; a clause after unit propagation.
+    fn is_dead(&self) -> bool;
+    /// return 1st watch
+    fn lit0(&self) -> Lit;
+    /// return 2nd watch
+    fn lit1(&self) -> Lit;
+    /// return `true` if the clause contains the literal
+    fn contains(&self, lit: Lit) -> bool;
+    /// check clause satisfiability
+    fn is_satisfied_under(&self, asg: &impl AssignIF) -> bool;
+    /// return an iterator over its literals.
+    fn iter(&self) -> Iter<'_, Lit>;
+    /// return the number of literals.
+    fn len(&self) -> usize;
+    /// just for cargo clippy
+    fn is_empty(&self) -> usize;
+
+    #[cfg(feature = "boundary_check")]
+    /// return timestamp.
+    fn timestamp(&self) -> usize;
+    #[cfg(feature = "boundary_check")]
+    fn set_birth(&mut self, time: usize);
+}
+
+/// A representation of 'clause'
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
+pub struct Clause {
+    /// links. Note: watch0 is also used as freelist
+    pub(super) link0: DoubleLink,
+    pub(super) link1: DoubleLink,
+    /// The literals in a clause.
+    pub(super) lits: Vec<Lit>,
+    /// Flags (8 bits)
+    pub(super) flags: FlagClause,
+    /// A static clause evaluation criterion like LBD, NDD, or something.
+    pub rank: u16,
+    /// A record of the rank at previos stage.
+    pub rank_old: u16,
+    /// the index from which `propagate` starts searching an un-falsified literal.
+    /// Since it's just a hint, we don't need u32 or usize.
+    pub search_from: u16,
+
+    #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
+    /// the number of conflicts at which this clause was used in `conflict_analyze`
+    timestamp: usize,
+
+    #[cfg(feature = "clause_rewarding")]
+    /// A dynamic clause evaluation criterion based on the number of references.
+    reward: f64,
+
+    #[cfg(feature = "boundary_check")]
+    pub birth: usize,
+    #[cfg(feature = "boundary_check")]
+    pub moved_at: Propagate,
+}
+
 impl Default for Clause {
     fn default() -> Clause {
         Clause {
+            link0: DoubleLink::default(),
+            link1: DoubleLink::default(),
             lits: vec![],
             flags: FlagClause::empty(),
             rank: 0,
@@ -34,12 +94,11 @@ impl Index<usize> for Clause {
     type Output = Lit;
     #[inline]
     fn index(&self, i: usize) -> &Lit {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.lits.get_unchecked(i)
+        if cfg!(feature = "unsafe_access") {
+            unsafe { self.lits.get_unchecked(i) }
+        } else {
+            &self.lits[i]
         }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self.lits[i]
     }
 }
 
@@ -72,36 +131,33 @@ impl Index<RangeFrom<usize>> for Clause {
     type Output = [Lit];
     #[inline]
     fn index(&self, r: RangeFrom<usize>) -> &[Lit] {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.lits.get_unchecked(r)
+        if cfg!(feature = "unsafe_access") {
+            unsafe { self.lits.get_unchecked(r) }
+        } else {
+            &self.lits[r]
         }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self.lits[r]
     }
 }
 
 impl IndexMut<Range<usize>> for Clause {
     #[inline]
     fn index_mut(&mut self, r: Range<usize>) -> &mut [Lit] {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.lits.get_unchecked_mut(r)
+        if cfg!(feature = "unsafe_access") {
+            unsafe { self.lits.get_unchecked_mut(r) }
+        } else {
+            &mut self.lits[r]
         }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self.lits[r]
     }
 }
 
 impl IndexMut<RangeFrom<usize>> for Clause {
     #[inline]
     fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Lit] {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.lits.get_unchecked_mut(r)
+        if cfg!(feature = "unsafe_access") {
+            unsafe { self.lits.get_unchecked_mut(r) }
+        } else {
+            &mut self.lits[r]
         }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self.lits[r]
     }
 }
 
@@ -128,11 +184,8 @@ impl From<&Clause> for Vec<i32> {
 }
 
 impl ClauseIF for Clause {
-    fn is_empty(&self) -> bool {
-        self.lits.is_empty()
-    }
     fn is_dead(&self) -> bool {
-        self.lits.is_empty()
+        self.is(FlagClause::DEAD)
     }
     fn iter(&self) -> Iter<'_, Lit> {
         self.lits.iter()
@@ -168,6 +221,9 @@ impl ClauseIF for Clause {
     }
     fn len(&self) -> usize {
         self.lits.len()
+    }
+    fn is_empty(&self) -> usize {
+        unimplemented!()
     }
 
     #[cfg(feature = "boundary_check")]
@@ -206,28 +262,121 @@ impl FlagIF for Clause {
 }
 
 impl fmt::Display for Clause {
-    #[cfg(feature = "boundary_check")]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let st = |flag, mes| if self.is(flag) { mes } else { "" };
-        write!(
-            f,
-            "{{{:?}b{}{}{}}}",
-            i32s(&self.lits),
-            self.birth,
-            st(FlagClause::LEARNT, ", learnt"),
-            st(FlagClause::ENQUEUED, ", enqueued"),
-        )
+        #[cfg(feature = "boundary_check")]
+        {
+            let st = |flag, mes| if self.is(flag) { mes } else { "" };
+            write!(
+                f,
+                "{{{:?}b{}{}{}}}",
+                i32s(&self.lits),
+                self.birth,
+                st(FlagClause::LEARNT, ", learnt"),
+                st(FlagClause::ENQUEUED, ", enqueued"),
+            )
+        }
+        #[cfg(not(feature = "boundary_check"))]
+        {
+            let st = |flag, mes| if self.is(flag) { mes } else { "" };
+            write!(
+                f,
+                "{{{:?}{}{}}}",
+                i32s(&self.lits),
+                st(FlagClause::LEARNT, ", learnt"),
+                st(FlagClause::ENQUEUED, ", enqueued"),
+            )
+        }
     }
-    #[cfg(not(feature = "boundary_check"))]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let st = |flag, mes| if self.is(flag) { mes } else { "" };
-        write!(
-            f,
-            "{{{:?}{}{}}}",
-            i32s(&self.lits),
-            st(FlagClause::LEARNT, ", learnt"),
-            st(FlagClause::ENQUEUED, ", enqueued"),
-        )
+}
+
+impl DancingIndexIF for Clause {
+    fn next_for_lit(&self, lit: Lit) -> ClauseIndex {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            if *self.lits.get_unchecked(0) == !lit {
+                self.link0.next
+            } else {
+                self.link1.next
+            }
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        {
+            let l = !lit;
+            if self.lits[0] == l {
+                self.link0.next
+            } else if self.lits[1] == l {
+                self.link1.next
+            } else {
+                panic!("#### next: ilegal chain for {}: {:?}", lit, self);
+            }
+        }
+    }
+    fn next_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            if *self.lits.get_unchecked(0) == !lit {
+                &mut self.link0.next
+            } else {
+                &mut self.link1.next
+            }
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        {
+            let l = !lit;
+            if self.lits[0] == l {
+                &mut self.link0.next
+            } else if self.lits[1] == l {
+                &mut self.link1.next
+            } else {
+                panic!("#### &mut next: ilegal chain for {}: {:?}", lit, self);
+            }
+        }
+    }
+    fn prev_for_lit(&self, lit: Lit) -> ClauseIndex {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            if *self.lits.get_unchecked(0) == !lit {
+                self.link0.prev
+            } else {
+                self.link1.prev
+            }
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        {
+            let l = !lit;
+            if self.lits[0] == l {
+                self.link0.prev
+            } else if self.lits[1] == l {
+                self.link1.prev
+            } else {
+                panic!("#### prev: ilegal chain for {}: {:?}", lit, self);
+            }
+        }
+    }
+    fn prev_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            if *self.lits.get_unchecked(0) == !lit {
+                &mut self.link0.prev
+            } else {
+                &mut self.link1.prev
+            }
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        {
+            let l = !lit;
+            if self.lits[0] == l {
+                &mut self.link0.prev
+            } else if self.lits[1] == l {
+                &mut self.link1.prev
+            } else {
+                panic!("#### &mut prev: ilegal chain for {}: {:?}", lit, self);
+            }
+        }
+    }
+    fn swap_watch_orders(&mut self) {
+        self.lits.swap(0, 1);
+        std::mem::swap(&mut self.link0, &mut self.link1);
     }
 }
 

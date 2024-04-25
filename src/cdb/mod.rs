@@ -2,12 +2,14 @@
 mod activity;
 /// methods on binary link, namely binary clause
 mod binary;
-/// methods on `ClauseId`
-mod cid;
+/// methods on `ClauseIndex`
+mod ci;
 /// methods on `Clause`
 mod clause;
 /// methods on `ClauseDB`
 mod db;
+/// methods on Watchers
+mod dlink;
 /// EMA
 mod ema;
 /// methods for Stochastic Local Search
@@ -16,12 +18,13 @@ mod sls;
 mod unsat_certificate;
 /// implementation of clause vivification
 mod vivify;
-/// types about watching literal
-mod watch_cache;
 
 pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
-    cid::ClauseIdIF,
+    ci::LiftedClauseIF,
+    clause::*,
+    db::ClauseDB,
+    dlink::{DancingIndexIF, DancingIndexManagerIF, LinkHead},
     property::*,
     sls::StochasticLocalSearchIF,
     unsat_certificate::CertificationStore,
@@ -29,52 +32,27 @@ pub use self::{
 };
 
 use {
-    self::ema::ProgressLBD,
+    self::binary::BinaryLinkIF,
     crate::{assign::AssignIF, types::*},
+    ema::ProgressLBD,
     std::{
-        num::NonZeroU32,
         ops::IndexMut,
         slice::{Iter, IterMut},
     },
-    watch_cache::*,
 };
 
 #[cfg(not(feature = "no_IO"))]
-use std::path::Path;
-
-/// API for Clause, providing literal accessors.
-pub trait ClauseIF {
-    /// return true if it contains no literals; a clause after unit propagation.
-    fn is_empty(&self) -> bool;
-    /// return true if it contains no literals; a clause after unit propagation.
-    fn is_dead(&self) -> bool;
-    /// return 1st watch
-    fn lit0(&self) -> Lit;
-    /// return 2nd watch
-    fn lit1(&self) -> Lit;
-    /// return `true` if the clause contains the literal
-    fn contains(&self, lit: Lit) -> bool;
-    /// check clause satisfiability
-    fn is_satisfied_under(&self, asg: &impl AssignIF) -> bool;
-    /// return an iterator over its literals.
-    fn iter(&self) -> Iter<'_, Lit>;
-    /// return the number of literals.
-    fn len(&self) -> usize;
-
-    #[cfg(feature = "boundary_check")]
-    /// return timestamp.
-    fn timestamp(&self) -> usize;
-    #[cfg(feature = "boundary_check")]
-    fn set_birth(&mut self, time: usize);
-}
+use std::{io::Write, path::Path};
 
 /// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`remove_clause`](`crate::cdb::ClauseDBIF::remove_clause`), and so on.
 pub trait ClauseDBIF:
     Instantiate
-    + IndexMut<ClauseId, Output = Clause>
+    + IndexMut<ClauseIndex, Output = Clause>
+    + DancingIndexManagerIF
     + PropertyDereference<property::Tusize, usize>
     + PropertyDereference<property::Tf64, f64>
 {
+    fn check_chains(&self, ci: ClauseIndex);
     /// return the length of `clause`.
     fn len(&self) -> usize;
     /// return true if it's empty.
@@ -92,33 +70,11 @@ pub trait ClauseDBIF:
     fn binary_links(&self, l: Lit) -> &BinaryLinkList;
 
     //
-    //## abstraction to watch_cache
-    //
-
-    // get mutable reference to a watch_cache
-    fn fetch_watch_cache_entry(&self, lit: Lit, index: WatchCacheProxy) -> (ClauseId, Lit);
-    /// replace the mutable watcher list with an empty one, and return the list
-    fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator;
-    /// detach the watch_cache referred by the head of a watch_cache iterator
-    fn detach_watch_cache(&mut self, l: Lit, iter: &mut WatchCacheIterator);
-    /// Merge two watch cache
-    fn merge_watch_cache(&mut self, l: Lit, wc: WatchCache);
-    /// swap the first two literals in a clause.
-    fn swap_watch(&mut self, cid: ClauseId);
-
-    //
     //## clause transformation
     //
 
-    /// push back a watch literal cache by adjusting the iterator for `lit`
-    fn transform_by_restoring_watch_cache(
-        &mut self,
-        l: Lit,
-        iter: &mut WatchCacheIterator,
-        p: Option<Lit>,
-    );
     /// swap i-th watch with j-th literal then update watch caches correctly
-    fn transform_by_updating_watch(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool);
+    fn transform_by_updating_watch(&mut self, ci: ClauseIndex, old: usize, new: usize);
     /// allocate a new clause and return its id.
     /// Note this removes an eliminated Lit `p` from a clause. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
@@ -126,24 +82,28 @@ pub trait ClauseDBIF:
     fn new_clause(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
     fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>) -> RefClause;
     /// un-register a clause `cid` from clause database and make the clause dead.
-    fn remove_clause(&mut self, cid: ClauseId);
+    fn remove_clause(&mut self, ci: ClauseIndex);
     /// un-register a clause `cid` from clause database and make the clause dead.
-    fn remove_clause_sandbox(&mut self, cid: ClauseId);
+    fn remove_clause_sandbox(&mut self, ci: ClauseIndex);
     /// update watches of the clause
-    fn transform_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause;
+    fn transform_by_elimination(&mut self, ci: ClauseIndex, p: Lit) -> RefClause;
     /// generic clause transformer (not in use)
-    fn transform_by_replacement(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause;
+    fn transform_by_replacement(&mut self, ci: ClauseIndex, vec: &mut Vec<Lit>) -> RefClause;
     /// check satisfied and nullified literals in a clause
-    fn transform_by_simplification(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> RefClause;
+    fn transform_by_simplification(
+        &mut self,
+        asg: &mut impl AssignIF,
+        ci: ClauseIndex,
+    ) -> RefClause;
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType);
+    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType, bonus: f64);
     /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.
     /// return `true` if it's learnt.
-    fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool;
+    fn update_at_analysis(&mut self, asg: &impl AssignIF, ci: ClauseIndex) -> bool;
     /// record an asserted literal to unsat certification.
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.
@@ -156,11 +116,13 @@ pub trait ClauseDBIF:
     /// returns None if the given assignment is a model of a problem.
     /// Otherwise returns a clause which is not satisfiable under a given assignment.
     /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
-    fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId>;
+    fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseIndex>;
     /// minimize a clause.
     fn minimize_with_bi_clauses(&mut self, asg: &impl AssignIF, vec: &mut Vec<Lit>);
     /// complete bi-clause network
     fn complete_bi_clauses(&mut self, asg: &mut impl AssignIF);
+    /// FIXME:
+    fn preppend_clauses(&mut self, force: bool);
 
     #[cfg(feature = "incremental_solver")]
     /// save an eliminated permanent clause to an extra space for incremental solving.
@@ -182,121 +144,1172 @@ pub trait ClauseDBIF:
     fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);
 }
 
-/// Clause identifier, or clause index, starting with one.
-/// Note: ids are re-used after 'garbage collection'.
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct ClauseId {
-    /// a sequence number.
-    pub ordinal: NonZeroU32,
+impl Default for ClauseDB {
+    fn default() -> ClauseDB {
+        ClauseDB {
+            clause: Vec::new(),
+            binary_link: BinaryLinkDB::default(),
+            watch: Vec::new(),
+            certification_store: CertificationStore::default(),
+            soft_limit: 0, // 248_000_000
+            co_lbd_bound: 4,
+            preppend_head: true,
+
+            bi_clause_completion_queue: Vec::new(),
+            num_bi_clause_completion: 0,
+            // lbd_frozen_clause: 30,
+            #[cfg(feature = "clause_rewarding")]
+            tick: 0,
+            #[cfg(feature = "clause_rewarding")]
+            activity_decay: 0.99,
+            #[cfg(feature = "clause_rewarding")]
+            activity_anti_decay: 0.01,
+
+            lbd_temp: Vec::new(),
+            lbd: ProgressLBD::default(),
+
+            num_clause: 0,
+            num_bi_clause: 0,
+            num_bi_learnt: 0,
+            num_lbd2: 0,
+            num_learnt: 0,
+            num_reduction: 0,
+            num_reregistration: 0,
+            lb_entanglement: Ema2::new(1_000).with_slow(80_000).with_value(2.0),
+            reduction_threshold: 0.0,
+
+            #[cfg(not(feature = "no_clause_elimination"))]
+            eliminated_permanent: Vec::new(),
+        }
+    }
 }
 
-/// A representation of 'clause'
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct Clause {
-    /// The literals in a clause.
-    lits: Vec<Lit>,
-    /// Flags (8 bits)
-    flags: FlagClause,
-    /// A static clause evaluation criterion like LBD, NDD, or something.
-    pub rank: u16,
-    /// A record of the rank at previos stage.
-    pub rank_old: u16,
-    /// the index from which `propagate` starts searching an un-falsified literal.
-    /// Since it's just a hint, we don't need u32 or usize.
-    pub search_from: u16,
+impl ClauseDBIF for ClauseDB {
+    fn check_chains(&self, ci: ClauseIndex) {
+        for (l, h) in self.watch.iter().enumerate().skip(2) {
+            let mut nr = h.next;
+            while nr != 0 {
+                assert!(!self[nr].is_dead());
+                nr = self[nr].next_for_lit(Lit::from(l));
+            }
+        }
+        if ci != 0 {
+            assert!(!self[ci].lits.is_empty());
+            let l0 = !self[ci].lits[0];
+            let l1 = !self[ci].lits[1];
+            let mut nr = self.watch[usize::from(l0)].next;
+            let mut found = false;
+            while nr != 0 {
+                if nr == ci {
+                    found = true;
+                    break;
+                }
+                nr = self[nr].next_for_lit(l0);
+            }
+            assert_eq!(2 < self[ci].lits.len(), found);
 
-    #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
-    /// the number of conflicts at which this clause was used in `conflict_analyze`
-    timestamp: usize,
+            nr = self.watch[usize::from(l1)].next;
+            found = false;
+            while nr != 0 {
+                if nr == ci {
+                    found = true;
+                    break;
+                }
+                nr = self[nr].next_for_lit(l1);
+            }
+            assert_eq!(2 < self[ci].lits.len(), found);
+        }
+    }
+    fn len(&self) -> usize {
+        self.clause.len()
+    }
+    fn is_empty(&self) -> bool {
+        self.clause.is_empty()
+    }
+    fn iter(&self) -> Iter<'_, Clause> {
+        self.clause.iter()
+    }
+    fn iter_mut(&mut self) -> IterMut<'_, Clause> {
+        self.clause.iter_mut()
+    }
+    #[inline]
+    fn binary_links(&self, l: Lit) -> &BinaryLinkList {
+        self.binary_link.connect_with(l)
+    }
+    fn new_clause(
+        &mut self,
+        asg: &mut impl AssignIF,
+        vec: &mut Vec<Lit>,
+        learnt: bool,
+    ) -> RefClause {
+        debug_assert!(1 < vec.len());
+        // debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{vec:?}");
+        if vec.len() == 2 {
+            if let Some(&ci) = self.link_to_cid(vec[0], vec[1]) {
+                self.num_reregistration += 1;
+                return RefClause::RegisteredClause(ci);
+            }
+        }
+        self.certification_store.add_clause(vec);
+        let ci = self.get_free_index();
+        self[ci].flags = FlagClause::empty();
+        std::mem::swap(&mut self[ci].lits, vec);
+        let len2 = self[ci].lits.len() == 2;
+        let l0 = self[ci].lits[0];
+        let l1 = self[ci].lits[1];
+        if len2 {
+            self[ci].rank = 1;
+            // A binary clause consumes one clause without watchers
+            self.num_bi_clause += 1;
+            self.binary_link.add(l0, l1, ci);
 
-    #[cfg(feature = "clause_rewarding")]
-    /// A dynamic clause evaluation criterion based on the number of references.
-    reward: f64,
+            #[cfg(feature = "bi_clause_completion")]
+            if learnt {
+                for lit in c.iter() {
+                    if !self.bi_clause_completion_queue.contains(lit) {
+                        self.bi_clause_completion_queue.push(*lit);
+                    }
+                }
+            }
+        } else {
+            let mut tmp: Vec<usize> = Vec::new();
+            std::mem::swap(&mut tmp, &mut self.lbd_temp);
+            self[ci].update_lbd(asg, &mut tmp);
+            std::mem::swap(&mut tmp, &mut self.lbd_temp);
+            assert_eq!(l0, self[ci].lits[0]);
+            assert_eq!(l1, self[ci].lits[1]);
+            self[ci].search_from = 2;
+            self.insert_watcher(ci, false, !l0);
+            self.insert_watcher(ci, true, !l1);
+        }
+        self[ci].rank_old = self[ci].rank;
+        self.lbd.update(self[ci].rank);
+        self.num_clause += 1;
+        if learnt {
+            if len2 {
+                self.num_bi_learnt += 1;
+            } else {
+                self[ci].turn_on(FlagClause::LEARNT);
+                self.num_learnt += 1;
+                if self[ci].rank <= 2 {
+                    self.num_lbd2 += 1;
+                }
+            }
+        }
 
+        #[cfg(feature = "clause_rewarding")]
+        {
+            self[ci].reward = 0.0;
+            self[ci].timestamp = *tick;
+        }
+        RefClause::Clause(ci)
+    }
+
+    fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, vec: &mut Vec<Lit>) -> RefClause {
+        debug_assert!(1 < vec.len());
+        if vec.len() == 2 {
+            if let Some(&ci) = self.link_to_cid(vec[0], vec[1]) {
+                return RefClause::RegisteredClause(ci);
+            }
+        }
+        let ci = self.get_free_index();
+        // let c = &mut self[ci];
+        self[ci].flags = FlagClause::empty();
+        std::mem::swap(&mut self[ci].lits, vec);
+        let len2 = self[ci].lits.len() == 2;
+        let l0 = self[ci].lits[0];
+        let l1 = self[ci].lits[1];
+        if len2 {
+            self[ci].rank = 1;
+            self.binary_link.add(l0, l1, ci);
+        } else {
+            let mut tmp: Vec<usize> = Vec::new();
+            std::mem::swap(&mut tmp, &mut self.lbd_temp);
+            self[ci].search_from = 2;
+            self[ci].update_lbd(asg, &mut tmp);
+            self[ci].turn_on(FlagClause::LEARNT);
+            std::mem::swap(&mut tmp, &mut self.lbd_temp);
+            self.insert_watcher(ci, false, !l0);
+            self.insert_watcher(ci, true, !l1);
+        }
+        self[ci].rank_old = self[ci].rank;
+
+        #[cfg(feature = "clause_rewarding")]
+        {
+            self[ci].timestamp = *tick;
+        }
+
+        RefClause::Clause(ci)
+    }
+
+    /// ## Warning
+    /// this function is the only function that makes dead clauses
+    fn remove_clause(&mut self, ci: ClauseIndex) {
+        // assert!(!self[ci].is_dead());
+        let c = &self.clause[ci];
+        self.certification_store.delete_clause(&c.lits);
+        let l0 = c.lits[0];
+        let l1 = c.lits[1];
+        self.num_clause -= 1;
+        if c.is(FlagClause::LEARNT) {
+            self.num_learnt -= 1;
+        }
+        if c.len() == 2 {
+            self.binary_link
+                .remove(l0, l1)
+                .expect("Error (remove_clause)");
+            self.num_bi_clause -= 1;
+        } else {
+            // watcher[usize::from(!l0)].remove_watch(&ci);
+            self.remove_watcher(ci, !l0);
+            // watcher[usize::from(!l1)].remove_watch(&ci);
+            self.remove_watcher(ci, !l1);
+        }
+        self.mark_as_free(ci);
+        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
+        self[ci].turn_on(FlagClause::DEAD);
+        // assert!(self[ci].is_dead());
+    }
+    fn remove_clause_sandbox(&mut self, ci: ClauseIndex) {
+        let c = &self.clause[ci];
+        debug_assert!(1 < c.lits.len());
+        let l0 = c.lits[0];
+        let l1 = c.lits[1];
+        if c.len() == 2 {
+            self.binary_link
+                .remove(l0, l1)
+                .expect("Eror (remove_clause_fn#01)");
+        }
+        // watcher[usize::from(!l0)].remove_watch(&ci); // .expect("db1076");
+        self.remove_watcher(ci, !l0);
+        // watcher[usize::from(!l1)].remove_watch(&ci); // .expect("db1077");
+        self.remove_watcher(ci, !l1);
+        self.mark_as_free(ci);
+        self[ci].turn_on(FlagClause::DEAD);
+    }
+    //
+    // return a Lit if the clause becomes a unit clause.
+    fn transform_by_elimination(&mut self, ci: ClauseIndex, p: Lit) -> RefClause {
+        //
+        //## Clause transform rules
+        //
+        // There are four cases:
+        // 1. a bi-clause becomes a unit clause.                   [Case:2-1]
+        // 2. a normal clause is merged to a registered bi-clause. [Case:3-0]
+        // 3. a normal clause becomes a new bi-clause.             [Case:3-2]
+        // 4. a normal clause becomes a shorter normal clause.     [Case:3-3]
+        //
+
+        // self.watches(cid, "before strengthen_by_elimination");
+        debug_assert!(!self[ci].is_dead());
+        debug_assert!(1 < self[ci].len());
+        // let ClauseDB {
+        //     ref mut clause,
+        //     ref mut binary_link,
+        //     ref mut certification_store,
+        //     ref mut num_bi_clause,
+        //     ..
+        // } = self;
+        // let c = &mut self.clause[ci];
+        // debug_assert!((*ch).lits.contains(&p));
+        // debug_assert!(1 < (*ch).len());
+        debug_assert!(1 < usize::from(!p));
+        // let lits = &mut self[ci].lits;
+        debug_assert!(1 < self[ci].lits.len());
+        //
+        //## Case:2-0
+        //
+        if self[ci].lits.len() == 2 {
+            if self[ci].lits[0] == p {
+                self[ci].lits.swap(0, 1);
+            }
+            return RefClause::UnitClause(self[ci].lits[0]);
+        }
+
+        self[ci].search_from = 2;
+        let mut new_lits: Vec<Lit> = self[ci]
+            .lits
+            .iter()
+            .filter(|&l| *l != p)
+            .copied()
+            .collect::<Vec<Lit>>();
+        if new_lits.len() == 2 {
+            if let Some(&reg) = self.binary_link.search(new_lits[0], new_lits[1]) {
+                //
+                //## Case:3-0
+                //
+                return RefClause::RegisteredClause(reg);
+            }
+            //
+            //## Case:3-2
+            //
+            let l0 = self[ci].lits[0];
+            let l1 = self[ci].lits[1];
+            // watch_cache[!l0].remove_watch(&ci);
+            self.remove_watcher(ci, !l0);
+            // watch_cache[!l1].remove_watch(&ci);
+            self.remove_watcher(ci, !l1);
+            std::mem::swap(&mut self[ci].lits, &mut new_lits);
+            self.binary_link.add(self[ci].lits[0], self[ci].lits[1], ci);
+            self.num_bi_clause += 1;
+            // self.watches(cid, "after strengthen_by_elimination case:3-2");
+        } else {
+            //
+            //## Case:3-3
+            //
+            let old_l0 = self[ci].lits[0];
+            let old_l1 = self[ci].lits[1];
+            self.remove_watcher(ci, !old_l0);
+            self.remove_watcher(ci, !old_l1);
+            std::mem::swap(&mut self[ci].lits, &mut new_lits);
+            let l0 = self[ci].lits[0];
+            let l1 = self[ci].lits[1];
+            self.insert_watcher(ci, false, !l0);
+            self.insert_watcher(ci, true, !l1);
+            /*
+            // Here we assumed that there's no eliminated var in clause and *watch cache*.
+            // Fortunately the current implementation purges all eliminated vars fully.
+            if p == old_l0 {
+                // watch_cache[!p].remove_watch(&ci);
+                let second = self.remove_watcher(ci, !p);
+                if old_l1 == l0 {
+                    // debug_assert!(watch_cache[!l1].iter().all(|e| e.0 != ci));
+                    // watch_cache[!l1].insert_watch(ci, l0);
+                    self.insert_watcher(ci, second, !l1);
+                } else if old_l1 == l1 {
+                    // debug_assert!(watch_cache[!l0].iter().all(|e| e.0 != ci));
+                    // watch_cache[!l0].insert_watch(ci, l1);
+                    self.insert_watcher(ci, second, !l0);
+                } else {
+                    unreachable!("transform_by_elimination");
+                }
+            } else if p == old_l1 {
+                // watch_cache[!p].remove_watch(&ci);
+                let second = self.remove_watcher(ci, !p);
+                if old_l0 == l0 {
+                    // debug_assert!(watch_cache[!l1].iter().all(|e| e.0 != ci));
+                    // watch_cache[!l1].insert_watch(ci, l0);
+                    self.insert_watcher(ci, second, !l1);
+                } else if old_l0 == l1 {
+                    // debug_assert!(watch_cache[!l0].iter().all(|e| e.0 != ci));
+                    // watch_cache[!l0].insert_watch(ci, l1);
+                    self.insert_watcher(ci, second, !l0);
+                } else {
+                    unreachable!("transform_by_elimination");
+                }
+            } else {
+                debug_assert_eq!(old_l0, l0);
+                debug_assert_eq!(old_l1, l1);
+            }
+            // self.watches(cid, "after strengthen_by_elimination case:3-3");
+            */
+        }
+        if self.certification_store.is_active() {
+            let ClauseDB {
+                ref mut certification_store,
+                clause,
+                ..
+            } = self;
+            certification_store.add_clause(&clause[ci].lits);
+            certification_store.delete_clause(&new_lits);
+        }
+        RefClause::Clause(ci)
+    }
+    // Not in use so far
+    fn transform_by_replacement(&mut self, ci: ClauseIndex, new_lits: &mut Vec<Lit>) -> RefClause {
+        debug_assert!(1 < new_lits.len());
+        //
+        //## Clause transform rules
+        //
+        // There are three cases:
+        // 1. a normal clause is merged to a registered bi-clause. [Case:0]
+        // 2. a normal clause becomes a new bi-clause.             [Case:2]
+        // 3. a normal clause becomes a shorter normal clause.     [Case:3]
+        //
+        // debug_assert!(new_lits.len() < c.len());
+        if new_lits.len() == 2 {
+            if let Some(&did) = self.binary_link.search(new_lits[0], new_lits[1]) {
+                //
+                //## Case:0
+                //
+                if self.certification_store.is_active() {
+                    self.certification_store.delete_clause(new_lits);
+                }
+                return RefClause::RegisteredClause(did);
+            }
+            //
+            //## Case:2
+            //
+            let old_l0 = self[ci].lit0();
+            let old_l1 = self[ci].lit0();
+            std::mem::swap(&mut self[ci].lits, new_lits);
+            let l0 = self[ci].lit0();
+            let l1 = self[ci].lit0();
+            // watch_cache[!old_l0].remove_watch(&ci);
+            self.remove_watcher(ci, !old_l0);
+            // watch_cache[!old_l1].remove_watch(&ci);
+            self.remove_watcher(ci, !old_l1);
+            self.binary_link.add(l0, l1, ci);
+            self[ci].turn_off(FlagClause::LEARNT);
+            self.num_bi_clause += 1;
+            let ClauseDB {
+                ref clause,
+                ref mut certification_store,
+                ..
+            } = self;
+
+            if certification_store.is_active() {
+                certification_store.add_clause(&clause[ci].lits);
+                certification_store.delete_clause(new_lits);
+            }
+        } else {
+            //
+            //## Case:3
+            //
+            let old_l0 = self[ci].lit0();
+            let old_l1 = self[ci].lit0();
+            std::mem::swap(&mut self[ci].lits, new_lits);
+            let l0 = self[ci].lit0();
+            let l1 = self[ci].lit0();
+
+            if (l0 == old_l0 && l1 == old_l1) || (l0 == old_l1 && l1 == old_l0) {
+            } else if l0 == old_l0 {
+                // watch_cache[!old_l1].remove_watch(&ci);
+                let second = self.remove_watcher(ci, !old_l1);
+                // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
+                // watch_cache[!l0].update_watch(ci, l1);
+                // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
+                // watch_cache[!l1].insert_watch(ci, l0);
+                self.insert_watcher(ci, second, !l1);
+            } else if l0 == old_l1 {
+                // watch_cache[!old_l0].remove_watch(&ci);
+                let second = self.remove_watcher(ci, !old_l0);
+                // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
+                // watch_cache[!l0].update_watch(ci, l1);
+                // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
+                // watch_cache[!l1].insert_watch(ci, l0);
+                self.insert_watcher(ci, second, !l1);
+            } else if l1 == old_l0 {
+                // watch_cache[!old_l1].remove_watch(&ci);
+                let second = self.remove_watcher(ci, !old_l1);
+                // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
+                // watch_cache[!l0].insert_watch(ci, l1);
+                self.insert_watcher(ci, second, !l0);
+                // watch_cache[!l1].update_watch(ci, l0);
+            } else if l1 == old_l1 {
+                // watch_cache[!old_l0].remove_watch(&ci);
+                let second = self.remove_watcher(ci, !old_l0);
+                // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
+                // watch_cache[!l0].insert_watch(ci, l1);
+                self.insert_watcher(ci, second, !l0);
+                // watch_cache[!l1].update_watch(ci, l0);
+            } else {
+                // watch_cache[!old_l0].remove_watch(&ci);
+                self.remove_watcher(ci, !old_l0);
+                // watch_cache[!old_l1].remove_watch(&ci);
+                self.remove_watcher(ci, !old_l1);
+                // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
+                // watch_cache[!l0].insert_watch(ci, l1);
+                self.insert_watcher(ci, false, !l0);
+                // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
+                // watch_cache[!l1].insert_watch(ci, l0);
+                self.insert_watcher(ci, true, !l1);
+            }
+
+            // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
+            // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
+
+            if self.certification_store.is_active() {
+                self.certification_store.add_clause(new_lits);
+                self.certification_store
+                    .delete_clause(&self[ci].lits.clone());
+            }
+        }
+        RefClause::Clause(ci)
+    }
+    // only used in `propagate_at_root_level`
+    fn transform_by_simplification(
+        &mut self,
+        asg: &mut impl AssignIF,
+        ci: ClauseIndex,
+    ) -> RefClause {
+        //
+        //## Clause transform rules
+        //
+        // There are six cases:
+        // 1. a binary or normal clause becomes an empty clause.   [Case:0]
+        // 2. a binary or normal clause becomes a unit clause.     [Case:1]
+        // 3. a normal or binary clause remains as is.             [Case:2]
+        // 4. a normal clause is merged to a registered bi-clause. [Case:3-0]
+        // 5. a normal clause becomes a new bi-clause.             [Case:3-2]
+        // 5. a normal clause becomes a shorter normal clause.     [Case:3-3]
+        //
+        debug_assert!(!self[ci].is_dead());
+        // firstly sweep without consuming extra memory
+        let mut need_to_shrink = false;
+        for l in self[ci].iter() {
+            debug_assert!(!asg.var(l.vi()).is(FlagVar::ELIMINATED));
+            match asg.assigned(*l) {
+                Some(true) => {
+                    self.remove_clause(ci);
+                    return RefClause::Dead;
+                }
+                Some(false) => {
+                    need_to_shrink = true;
+                }
+                None if asg.var(l.vi()).is(FlagVar::ELIMINATED) => {
+                    need_to_shrink = true;
+                }
+                None => (),
+            }
+        }
+        if !need_to_shrink {
+            //
+            //## Case:2
+            //
+            return RefClause::Clause(ci);
+        }
+        let mut new_lits = self[ci]
+            .lits
+            .iter()
+            .filter(|l| asg.assigned(**l).is_none() && !asg.var(l.vi()).is(FlagVar::ELIMINATED))
+            .copied()
+            .collect::<Vec<_>>();
+        match new_lits.len() {
+            0 => RefClause::EmptyClause,             //## Case:0
+            1 => RefClause::UnitClause(new_lits[0]), //## Case:1
+            2 => {
+                //## Case:2
+                let l0 = new_lits[0];
+                let l1 = new_lits[1];
+                debug_assert!(2 < self[ci].lits.len());
+                if let Some(&bid) = self.binary_link.search(l0, l1) {
+                    //
+                    //## Case:3-0
+                    //
+                    self.remove_clause(ci);
+                    return RefClause::RegisteredClause(bid);
+                }
+                //
+                //## Case:3-2
+                //
+                let new_l0 = self[ci].lits[0];
+                let new_l1 = self[ci].lits[1];
+                // watch_cache[!c.lits[0]].remove_watch(&ci);
+                self.remove_watcher(ci, !new_l0);
+                // watch_cache[!c.lits[1]].remove_watch(&ci);
+                self.remove_watcher(ci, !new_l1);
+                self.binary_link.add(l0, l1, ci);
+                std::mem::swap(&mut self[ci].lits, &mut new_lits);
+                self.num_bi_clause += 1;
+                if self[ci].is(FlagClause::LEARNT) {
+                    self.num_learnt -= 1;
+                    self[ci].turn_off(FlagClause::LEARNT);
+                }
+                let ClauseDB {
+                    ref clause,
+                    ref mut certification_store,
+                    ..
+                } = self;
+                if certification_store.is_active() {
+                    certification_store.add_clause(&clause[ci].lits);
+                    certification_store.delete_clause(&new_lits);
+                }
+                RefClause::Clause(ci)
+            }
+            _ => {
+                //
+                //## Case:3-3
+                //
+                let old_l0 = self[ci].lit0();
+                let old_l1 = self[ci].lit1();
+                std::mem::swap(&mut self[ci].lits, &mut new_lits);
+                let l0 = self[ci].lit0();
+                let l1 = self[ci].lit1();
+
+                if old_l0 == l0 && old_l1 == l1 {
+                } else if old_l0 == l0 {
+                    // assert_ne!(old_l1, l1);
+                    // watch_cache[!old_l1].remove_watch(&ci);
+                    let second = self.remove_watcher(ci, !old_l1);
+                    // watch_cache[!l0].update_watch(ci, l1);
+                    // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
+                    // watch_cache[!l1].insert_watch(ci, l0);
+                    self.insert_watcher(ci, second, !l1);
+                } else if old_l0 == l1 {
+                    // assert_ne!(old_l1, l0);
+                    // watch_cache[!old_l1].remove_watch(&ci);
+                    let second = self.remove_watcher(ci, !old_l1);
+                    // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
+                    // watch_cache[!l0].insert_watch(ci, l1);
+                    self.insert_watcher(ci, second, !l0);
+                    // watch_cache[!l1].update_watch(ci, l0);
+                } else if old_l1 == l0 {
+                    // assert_ne!(old_l0, l1);
+                    // watch_cache[!old_l0].remove_watch(&ci);
+                    let second = self.remove_watcher(ci, !old_l0);
+                    // watch_cache[!l0].update_watch(ci, l1);
+                    // watch_cache[!l1].insert_watch(ci, l0);
+                    self.insert_watcher(ci, second, !l1);
+                } else if old_l1 == l1 {
+                    // assert_ne!(old_l0, l0);
+                    // watch_cache[!old_l0].remove_watch(&ci);
+                    let second = self.remove_watcher(ci, !old_l0);
+                    // watch_cache[!l0].insert_watch(ci, l1);
+                    self.insert_watcher(ci, second, !l0);
+                    // watch_cache[!l1].update_watch(ci, l0);
+                } else {
+                    // watch_cache[!old_l0].remove_watch(&ci);
+                    self.remove_watcher(ci, !old_l0);
+                    // watch_cache[!old_l1].remove_watch(&ci);
+                    self.remove_watcher(ci, !old_l1);
+                    // assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
+                    // watch_cache[!l0].insert_watch(ci, l1);
+                    self.insert_watcher(ci, false, !l0);
+                    // assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
+                    // watch_cache[!l1].insert_watch(ci, l0);
+                    self.insert_watcher(ci, true, !l1);
+                }
+
+                // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
+                // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
+
+                if self.certification_store.is_active() {
+                    let ClauseDB {
+                        ref clause,
+                        ref mut certification_store,
+                        ..
+                    } = self;
+                    certification_store.add_clause(&clause[ci].lits);
+                    certification_store.delete_clause(&new_lits);
+                }
+                RefClause::Clause(ci)
+            }
+        }
+    }
+    // used in `propagate`, `propagate_sandbox`, and `handle_conflict` for chronoBT
+    fn transform_by_updating_watch(&mut self, ci: ClauseIndex, old: usize, new: usize) {
+        //
+        //## Clause transform rules
+        //
+        // There is one case under non maintain_blocker:
+        // 1. one deletion (if not removed), and one insertion of watch caches
+        //
+        // There is one case under maintain_blocker:
+        // 1. one deletion (if not removed), one insertion, and one update
+        //
+        // So the proceduce is
+        // 1. delete an old one                   [Step:1]
+        // 2. insert a new watch                  [Step:2]
+        // 3. update a blocker cach e             [Step:3]
+
+        debug_assert!(!self[ci].is_dead());
+        debug_assert!(old < 2);
+        debug_assert!(1 < new);
+        //## Step:1
+        let second = self.remove_watcher(ci, !self[ci].lits[old]);
+        // watch_cache[!c.lits[old]].remove_watch(&ci);
+
+        //## Step:2
+        // assert!(watch_cache[!c.lits[new]].iter().all(|e| e.0 != cid));
+        self[ci].lits.swap(old, new);
+        // so old becomes new now
+        self[ci].search_from = (new + 1) as u16;
+        self.insert_watcher(ci, second, !self[ci].lits[old]);
+        // watch_cache[!c.lits[new]].insert_watch(ci, c.lits[other]);
+        // maintain_watch_literal
+        // assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
+        // maintain_watch_literal
+        // assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
+    }
+    fn update_at_analysis(&mut self, asg: &impl AssignIF, ci: ClauseIndex) -> bool {
+        let c = &mut self.clause[ci];
+        // Updating LBD at every analysis seems redundant.
+        // But it's crucial. Don't remove the below.
+        let rank = c.update_lbd(asg, &mut self.lbd_temp);
+        let learnt = c.is(FlagClause::LEARNT);
+        if learnt {
+            #[cfg(feature = "just_used")]
+            c.turn_on(FlagClause::USED);
+            #[cfg(feature = "clause_rewading")]
+            self.reward_at_analysis(ci);
+        }
+        if 1 < rank {
+            self.lb_entanglement.update(rank as f64);
+        }
+        learnt
+    }
+    /// reduce the number of 'learnt' or *removable* clauses.
+    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType, bonus: f64) {
+        impl Clause {
+            fn reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
+                self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
+            }
+            fn lbd(&self) -> f64 {
+                self.rank as f64
+            }
+        }
+        let ClauseDB {
+            ref mut clause,
+            ref mut lbd_temp,
+            ref mut num_reduction,
+
+            #[cfg(feature = "clause_rewarding")]
+            ref tick,
+            #[cfg(feature = "clause_rewarding")]
+            ref activity_decay,
+            ..
+        } = self;
+        *num_reduction += 1;
+
+        let mut perm: Vec<OrderedProxy<ClauseIndex>> = Vec::with_capacity(clause.len());
+        let mut alives = 0;
+        for (ci, c) in clause
+            .iter_mut()
+            .enumerate()
+            .skip(1)
+            .filter(|(_, c)| !c.is_dead())
+        {
+            c.update_lbd(asg, lbd_temp);
+
+            #[cfg(feature = "clause_rewarding")]
+            c.update_activity(*tick, *activity_decay, 0.0);
+
+            // There's no clause stored in `reason` because the decision level is 'zero.'
+            debug_assert_ne!(
+                asg.reason(c.lit0().vi()),
+                AssignReason::Implication(ci),
+                "Lit {} {:?} level {}, dl: {}",
+                i32::from(c.lit0()),
+                asg.assigned(c.lit0()),
+                asg.level(c.lit0().vi()),
+                asg.decision_level(),
+            );
+            if !c.is(FlagClause::LEARNT) {
+                continue;
+            }
+            alives += 1;
+            match setting {
+                ReductionType::RASonADD(_) => {
+                    perm.push(OrderedProxy::new(ci, c.reverse_activity_sum(asg)));
+                }
+                ReductionType::RASonALL(cutoff, _) => {
+                    let value = c.reverse_activity_sum(asg);
+                    if cutoff < value.min(c.rank_old as f64) {
+                        perm.push(OrderedProxy::new(ci, value));
+                    }
+                }
+                ReductionType::LBDonADD(_) => {
+                    perm.push(OrderedProxy::new(ci, c.lbd()));
+                }
+                ReductionType::LBDonALL(cutoff, _) => {
+                    let value = c.rank.min(c.rank_old);
+                    if cutoff < value {
+                        perm.push(OrderedProxy::new(ci, value as f64));
+                    }
+                }
+            }
+        }
+        let keep = match setting {
+            ReductionType::RASonADD(size) => {
+                perm.len().saturating_sub((size as f64 / bonus) as usize)
+            }
+            ReductionType::RASonALL(_, scale) => (perm.len() as f64).powf(bonus - scale) as usize,
+            ReductionType::LBDonADD(size) => {
+                perm.len().saturating_sub((size as f64 / bonus) as usize)
+            }
+            ReductionType::LBDonALL(_, scale) => (perm.len() as f64).powf(bonus - scale) as usize,
+        };
+        self.reduction_threshold = match setting {
+            ReductionType::RASonADD(_) | ReductionType::RASonALL(_, _) => {
+                keep as f64 / alives as f64
+            }
+            ReductionType::LBDonADD(_) | ReductionType::LBDonALL(_, _) => {
+                -(keep as f64) / alives as f64
+            }
+        };
+        perm.sort();
+        for i in perm.iter().skip(keep) {
+            self.remove_clause(i.to());
+        }
+    }
+    fn reset(&mut self) {
+        for ci in 1..self.len() {
+            let c = &self.clause[ci];
+            if c.is(FlagClause::LEARNT) && (self.co_lbd_bound as usize) < c.len() {
+                self.remove_clause(ci);
+            }
+        }
+    }
+    fn certificate_add_assertion(&mut self, lit: Lit) {
+        self.certification_store.add_clause(&[lit]);
+    }
+    fn certificate_save(&mut self) {
+        self.certification_store.close();
+    }
+    fn check_size(&self) -> Result<bool, SolverError> {
+        if self.soft_limit == 0 || self.num_clause <= self.soft_limit {
+            let nc = self.derefer(property::Tusize::NumClause);
+            Ok(0 == self.soft_limit || 4 * nc < 3 * self.soft_limit)
+        } else {
+            Err(SolverError::OutOfMemory)
+        }
+    }
+    fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseIndex> {
+        for (i, c) in self.clause.iter().enumerate().skip(1) {
+            if c.is_dead() || (strict && c.is(FlagClause::LEARNT)) {
+                continue;
+            }
+            match c.evaluate(model) {
+                Some(false) => return Some(i),
+                None if strict => return Some(i),
+                _ => (),
+            }
+        }
+        None
+    }
+    #[allow(clippy::unnecessary_cast)]
+    fn minimize_with_bi_clauses(&mut self, asg: &impl AssignIF, vec: &mut Vec<Lit>) {
+        if vec.len() <= 1 {
+            return;
+        }
+        self.lbd_temp[0] += 1;
+        let key = self.lbd_temp[0];
+        for l in &vec[1..] {
+            self.lbd_temp[l.vi() as usize] = key;
+        }
+        let l0 = vec[0];
+        let mut num_sat = 0;
+        for (_, ci) in self.binary_link.connect_with(l0).iter() {
+            let c = &self.clause[*ci];
+            debug_assert!(c[0] == l0 || c[1] == l0);
+            let other = c[(c[0] == l0) as usize];
+            let vi = other.vi();
+            if self.lbd_temp[vi] == key && asg.assigned(other) == Some(true) {
+                num_sat += 1;
+                self.lbd_temp[vi] = key - 1;
+            }
+        }
+        if 0 < num_sat {
+            self.lbd_temp[l0.vi()] = key;
+            vec.retain(|l| self.lbd_temp[l.vi()] == key);
+        }
+    }
+    fn complete_bi_clauses(&mut self, asg: &mut impl AssignIF) {
+        while let Some(lit) = self.bi_clause_completion_queue.pop() {
+            self.complete_bi_clauses_with(asg, lit);
+        }
+    }
+    fn preppend_clauses(&mut self, force: bool) {
+        self.preppend_head = force;
+    }
+
+    #[cfg(feature = "incremental_solver")]
+    fn make_permanent_immortal(&mut self, cid: ClauseId) {
+        self.eliminated_permanent.push(
+            self.clause[NonZeroU32::get(cid.ordinal) as usize]
+                .lits
+                .clone(),
+        );
+    }
     #[cfg(feature = "boundary_check")]
-    pub birth: usize,
+    fn watch_cache_contains(&self, lit: Lit, cid: ClauseId) -> bool {
+        self.watch_cache[lit].iter().any(|w| w.0 == cid)
+    }
     #[cfg(feature = "boundary_check")]
-    pub moved_at: Propagate,
+    fn watch_caches(&self, cid: ClauseId, mes: &str) -> (Vec<Lit>, Vec<Lit>) {
+        // let mut _found = None;
+        debug_assert!(!cid.is_lifted_lit());
+        let c = &self[cid];
+        debug_assert!(1 < c.len());
+        let l0 = c.lits[0];
+        let l1 = c.lits[1];
+        if 2 == c.lits.len() {
+            assert!(
+                self.binary_link.search(l0, l1).is_some(),
+                "(watch_cache health check: binary clause l0 not found){}, cid{}{:?}",
+                mes,
+                cid,
+                c
+            );
+            assert!(
+                self.binary_link.search(l1, l0).is_some(),
+                "(watch_cache health check: binary clause l1 not found){}, cid{}{:?}",
+                mes,
+                cid,
+                c
+            );
+            assert!(
+                !self.watch_cache[!l0].iter().any(|wc| wc.0 == cid),
+                "(watch_cache health check: binary clause l0 found in watch_cache){}, cid{}{:?}",
+                mes,
+                cid,
+                c
+            );
+            assert!(
+                !self.watch_cache[!l1].iter().any(|wc| wc.0 == cid),
+                "(watch_cache health check: binary clause l1 found in watch cache){}, cid{}{:?}",
+                mes,
+                cid,
+                c
+            );
+            (vec![l1], vec![l0])
+        } else {
+            assert!(
+                self.watch_cache[!l0].iter().any(|wc| wc.0 == cid),
+                "(watch_cache health check: clause l0 not found){}, cid{}{:?}",
+                mes,
+                cid,
+                c
+            );
+            assert!(
+                self.watch_cache[!l1].iter().any(|wc| wc.0 == cid),
+                "(watch_cache health check: clause l1 not found){}, cid{}{:?}",
+                mes,
+                cid,
+                c
+            );
+            (
+                self.watch_cache[!l0]
+                    .iter()
+                    .filter(|w| w.0 == cid)
+                    .map(|w| w.1)
+                    .collect(),
+                self.watch_cache[!l1]
+                    .iter()
+                    .filter(|w| w.0 == cid)
+                    .map(|w| w.1)
+                    .collect(),
+            )
+        }
+    }
+    #[cfg(feature = "boundary_check")]
+    fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool> {
+        self[cid].is_dead().then(|| self.freelist.contains(&cid))
+    }
+    #[cfg(not(feature = "no_IO"))]
+    /// dump all active clauses and assertions as a CNF file.
+    fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path) {
+        use std::fs::File;
+
+        let nv = asg.derefer(crate::assign::property::Tusize::NumVar);
+        for vi in 1..nv {
+            if asg.var(vi).is(FlagVar::ELIMINATED) && asg.assign(vi).is_some() {
+                panic!("conflicting var {} {:?}", vi, asg.assign(vi));
+            }
+        }
+        let Ok(out) = File::create(fname) else {
+            return;
+        };
+        let mut buf = std::io::BufWriter::new(out);
+        let na = asg.derefer(crate::assign::property::Tusize::NumAssertedVar);
+        let nc = self.iter().skip(1).filter(|c| !c.is_dead()).count();
+        buf.write_all(format!("p cnf {} {}\n", nv, nc + na).as_bytes())
+            .unwrap();
+        for c in self.iter().skip(1) {
+            if c.is_dead() {
+                continue;
+            }
+            for l in c.iter() {
+                buf.write_all(format!("{} ", i32::from(*l)).as_bytes())
+                    .unwrap();
+            }
+            buf.write_all(b"0\n").unwrap();
+        }
+        buf.write_all(b"c from trail\n").unwrap();
+        for x in asg.stack_iter().take(asg.len_upto(0)) {
+            buf.write_all(format!("{} 0\n", i32::from(*x)).as_bytes())
+                .unwrap();
+        }
+    }
 }
 
-/// Clause database
-///
-///```
-/// use crate::{splr::config::Config, splr::types::*};
-/// use crate::splr::cdb::ClauseDB;
-/// let cdb = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
-///```
-#[derive(Clone, Debug)]
-pub struct ClauseDB {
-    /// container of clauses
-    clause: Vec<Clause>,
-    /// hashed representation of binary clauses.
-    ///## Note
-    /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
+impl ClauseDB {
+    /// formula: -a => b and b => c implies -a => c
+    /// clause: [a, b] and [-b, c] deduces [a, c]
+    /// map: [a].get(b), [!b].get(c), [a].get(c)
+    /// rename: [lit].get(other), [!other].get(third), [a].get(third)
+    fn complete_bi_clauses_with(&mut self, asg: &mut impl AssignIF, lit: Lit) {
+        let mut vec: Vec<Vec<Lit>> = Vec::new();
+        // [lit, other]
+        for (other, _) in self.binary_link.connect_with(lit) {
+            // [!other, third]
+            for (third, _) in self.binary_link.connect_with(!*other) {
+                if lit.vi() != third.vi() && self.binary_link.search(lit, *third).is_none() {
+                    // the new [lit, third] should be added.
+                    vec.push(vec![lit, *third]);
+                }
+            }
+        }
+        for pair in vec.iter_mut() {
+            self.new_clause(asg, pair, false);
+            self.num_bi_clause_completion += 1;
+        }
+    }
+    /// return `true` if a literal pair `(l0, l1)` is registered.
+    ///```ignore
+    /// use splr::types::*;
+    /// use crate::splr::cdb::ClauseDBIF;
     ///
-    binary_link: BinaryLinkDB,
-    /// container of watch literals
-    watch_cache: Vec<WatchCache>,
-    /// collected free clause ids.
-    freelist: Vec<ClauseId>,
-    /// see unsat_certificate.rs
-    certification_store: CertificationStore,
-    /// a number of clauses to emit out-of-memory exception
-    soft_limit: usize,
-    /// 'small' clause threshold
-    co_lbd_bound: u16,
-    // not in use
-    // lbd_frozen_clause: usize,
+    /// let config = Config::default();
+    /// let cnf = CNFDescription {
+    ///     num_of_variables: 4,
+    ///     ..CNFDescription::default()
+    /// };
+    /// let mut asg = splr::assign::AssignStack::instantiate(&config, &cnf);
+    /// let mut cdb = splr::cdb::ClauseDB::instantiate(&config, &cnf);
+    /// let l1 = splr::types::Lit::from(1);
+    /// let l2 = splr::types::Lit::from(2);
+    /// let l3 = splr::types::Lit::from(3);
+    /// cdb.new_clause(&mut asg, &mut vec![l1, l2], false);
+    /// cdb.new_clause(&mut asg, &mut vec![!l1, !l2, !l3], false);
+    /// assert!(cdb.link_to_cid(l1, l2).is_some());
+    /// assert!(cdb.link_to_cid(!l1, l2).is_none());
+    /// assert!(cdb.link_to_cid(l1, !l2).is_none());
+    /// assert!(cdb.link_to_cid(!l1, !l2).is_none());
+    ///```
+    ///
+    /// this is equivalent to the following:
+    ///```ignore
+    /// bi_clause[l0].get(&l1).is_some()
+    ///```
+    fn link_to_cid(&self, l0: Lit, l1: Lit) -> Option<&ClauseIndex> {
+        self.binary_link.search(l0, l1)
+    }
+}
 
-    // bi-clause completion
-    bi_clause_completion_queue: Vec<Lit>,
-    num_bi_clause_completion: usize,
+impl Clause {
+    /// evaluate a clause and return Option<bool>.
+    /// - `Some(true)` -- the literals is satisfied by a literal
+    /// - `Some(false)` -- the literals is unsatisfied; no unassigned literal
+    /// - `None` -- the literals contains an unassigned literal
+    fn evaluate(&self, model: &[Option<bool>]) -> Option<bool> {
+        let mut falsified = Some(false);
+        for l in self.lits.iter() {
+            match model[l.vi()] {
+                Some(x) if x == bool::from(*l) => return Some(true),
+                Some(_) => (),
+                None => falsified = None,
+            }
+        }
+        falsified
+    }
+}
 
-    //
-    //## clause rewarding
-    //
-    /// an index for counting elapsed time
-    #[cfg(feature = "clause_rewarding")]
-    tick: usize,
-    #[cfg(feature = "clause_rewarding")]
-    activity_decay: f64,
-    #[cfg(feature = "clause_rewarding")]
-    activity_anti_decay: f64,
+const HEAD_INDEX: ClauseIndex = 0;
+const FREE_INDEX: ClauseIndex = 1;
 
-    //
-    //## LBD
-    //
-    /// a working buffer for LBD calculation
-    lbd_temp: Vec<usize>,
-    lbd: ProgressLBD,
-
-    //
-    //## statistics
-    //
-    /// the number of active (not DEAD) clauses.
-    num_clause: usize,
-    /// the number of binary clauses.
-    num_bi_clause: usize,
-    /// the number of binary learnt clauses.
-    num_bi_learnt: usize,
-    /// the number of clauses which LBDs are 2.
-    num_lbd2: usize,
-    /// the present number of learnt clauses.
-    num_learnt: usize,
-    /// the number of reductions.
-    num_reduction: usize,
-    /// the number of reregistration of a bi-clause
-    num_reregistration: usize,
-    /// Literal Block Entanglement
-    /// EMA of LBD of clauses used in conflict analysis (dependency graph)
-    lb_entanglement: Ema2,
-    /// cutoff value used in the last `reduce`
-    reduction_threshold: f64,
-
-    //
-    //## incremental solving
-    //
-    pub eliminated_permanent: Vec<Vec<Lit>>,
+impl DancingIndexManagerIF for ClauseDB {
+    fn get_watcher_link(&mut self, lit: Lit) -> ClauseIndex {
+        self.watch[ClauseIndex::from(lit)].next
+    }
+    fn get_free_index(&mut self) -> ClauseIndex {
+        let ci = self.watch[FREE_INDEX].next;
+        if ci == 0 {
+            self.clause.push(Clause::default());
+            self.clause.len() - 1
+        } else {
+            let next = self.clause[ci].link0.next;
+            self.watch[FREE_INDEX].next = next;
+            ci
+        }
+    }
+    fn insert_watcher(&mut self, ci: ClauseIndex, second: bool, lit: Lit) {
+        debug_assert!(
+            self[ci].lits[0] == !lit || self[ci].lits[1] == !lit,
+            "invalid lit layout {:?}, lit: {:?}",
+            self[ci],
+            lit
+        );
+        if self.preppend_head {
+            let head = self.watch[ClauseIndex::from(lit)].next;
+            if head == HEAD_INDEX {
+                self.watch[ClauseIndex::from(lit)].next = ci;
+                self.watch[ClauseIndex::from(lit)].prev = ci;
+                if second {
+                    self.clause[ci].link1.prev = HEAD_INDEX;
+                    self.clause[ci].link1.next = HEAD_INDEX;
+                } else {
+                    self.clause[ci].link0.prev = HEAD_INDEX;
+                    self.clause[ci].link0.next = HEAD_INDEX;
+                }
+            } else {
+                *self.clause[head].prev_for_lit_mut(lit) = ci;
+                self.watch[ClauseIndex::from(lit)].next = ci;
+                if second {
+                    self.clause[ci].link1.prev = HEAD_INDEX;
+                    self.clause[ci].link1.next = head;
+                } else {
+                    self.clause[ci].link0.prev = HEAD_INDEX;
+                    self.clause[ci].link0.next = head;
+                }
+            }
+        } else {
+            let last = self.watch[ClauseIndex::from(lit)].prev;
+            if last == HEAD_INDEX {
+                self.watch[ClauseIndex::from(lit)].next = ci;
+                self.watch[ClauseIndex::from(lit)].prev = ci;
+                if second {
+                    self.clause[ci].link1.prev = HEAD_INDEX;
+                    self.clause[ci].link1.next = HEAD_INDEX;
+                } else {
+                    self.clause[ci].link0.prev = HEAD_INDEX;
+                    self.clause[ci].link0.next = HEAD_INDEX;
+                }
+            } else {
+                *self.clause[last].next_for_lit_mut(lit) = ci;
+                self.watch[ClauseIndex::from(lit)].prev = ci;
+                if second {
+                    self.clause[ci].link1.prev = last;
+                    self.clause[ci].link1.next = HEAD_INDEX;
+                } else {
+                    self.clause[ci].link0.prev = last;
+                    self.clause[ci].link0.next = HEAD_INDEX;
+                }
+            }
+        }
+    }
+    fn remove_watcher(&mut self, ci: ClauseIndex, lit: Lit) -> bool {
+        let prev = self.clause[ci].prev_for_lit(lit);
+        let next = self.clause[ci].next_for_lit(lit);
+        match (prev, next) {
+            (HEAD_INDEX, HEAD_INDEX) => {
+                self.watch[ClauseIndex::from(lit)].next = HEAD_INDEX;
+                self.watch[ClauseIndex::from(lit)].prev = HEAD_INDEX;
+            }
+            (HEAD_INDEX, _) => {
+                self.watch[ClauseIndex::from(lit)].next = next;
+                *self.clause[next].prev_for_lit_mut(lit) = HEAD_INDEX;
+            }
+            (_, HEAD_INDEX) => {
+                *self.clause[prev].next_for_lit_mut(lit) = HEAD_INDEX;
+                self.watch[ClauseIndex::from(lit)].prev = prev;
+            }
+            _ => {
+                *self.clause[prev].next_for_lit_mut(lit) = next;
+                *self.clause[next].prev_for_lit_mut(lit) = prev;
+            }
+        }
+        debug_assert!(self[ci].lits[1] == !lit || self[ci].lits[0] == !lit);
+        self[ci].lits[1] == !lit
+    }
+    fn mark_as_free(&mut self, index: ClauseIndex) {
+        // Note: free list is a single-linked list
+        let first = self.watch[FREE_INDEX].next;
+        self.watch[FREE_INDEX].next = index;
+        self.clause[index].link0.next = first;
+    }
+    fn make_watches(num_vars: usize, clauses: &mut [Clause]) -> Vec<LinkHead> {
+        // ci 0 must refer to the header
+        let nc = clauses.len();
+        for (i, c) in clauses.iter_mut().enumerate().skip(1) {
+            c.link0.next = (i + 1) % nc;
+            c.turn_on(FlagClause::DEAD);
+        }
+        let mut watches = vec![LinkHead::default(); 2 * (num_vars + 1)];
+        watches[0].next = 1;
+        watches
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -413,19 +1426,6 @@ mod tests {
         Lit::from(i)
     }
 
-    #[allow(dead_code)]
-    fn check_watches(cdb: &ClauseDB, cid: ClauseId) {
-        let c = &cdb.clause[NonZeroU32::get(cid.ordinal) as usize];
-        if c.lits.is_empty() {
-            println!("skip checking watches of an empty clause");
-            return;
-        }
-        assert!(c.lits[0..2]
-            .iter()
-            .all(|l| cdb.watch_cache[!*l].iter().any(|(c, _)| *c == cid)));
-        println!("pass to check watches");
-    }
-
     #[test]
     fn test_clause_instantiation() {
         let config = Config::default();
@@ -436,9 +1436,9 @@ mod tests {
         let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         // Now `asg.level` = [_, 1, 2, 3, 4, 5, 6].
-        let c0 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
-            .as_cid();
+        // let c0 = cdb
+        //     .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
+        //     .as_ci();
 
         asg.assign_by_decision(lit(-2)); // at level 1
         asg.assign_by_decision(lit(1)); // at level 2
@@ -446,7 +1446,7 @@ mod tests {
         assert_eq!(asg.level(1), 2);
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cid();
+            .as_ci();
         let c = &cdb[c1];
 
         assert!(!c.is_dead());
@@ -455,7 +1455,7 @@ mod tests {
         assert!(!c.is(Flag::USED));
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
-            .as_cid();
+            .as_ci();
         let c = &cdb[c2];
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
@@ -473,10 +1473,10 @@ mod tests {
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cid();
+            .as_ci();
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false)
-            .as_cid();
+            .as_ci();
         // cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_ne!(c1, c2);
@@ -494,7 +1494,7 @@ mod tests {
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cid();
+            .as_ci();
         assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
         let mut iter = cdb[c1][0..].iter();
         assert_eq!(iter.next(), Some(&lit(1)));
