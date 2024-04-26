@@ -1,9 +1,6 @@
 /// main struct AssignStack
 use {
-    super::{
-        ema::ProgressASG, AssignIF, AssignStack, PropagateIF, Var, VarHeapIF, VarIdHeap,
-        VarManipulateIF,
-    },
+    super::{ema::ProgressASG, AssignIF, PropagateIF, Var, VarHeapIF, VarIdHeap, VarManipulateIF},
     crate::{cdb::ClauseDBIF, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
@@ -14,6 +11,92 @@ use std::collections::HashMap;
 #[cfg(feature = "trail_saving")]
 use super::TrailSavingIF;
 
+/// A record of assignment. It's called 'trail' in Glucose.
+#[derive(Clone, Debug)]
+pub struct AssignStack {
+    /// record of assignment
+    pub(super) trail: Vec<Lit>,
+    pub(super) trail_lim: Vec<usize>,
+    /// the-number-of-assigned-and-propagated-vars + 1
+    pub(super) q_head: usize,
+    pub(super) root_level: DecisionLevel,
+    pub(super) var_order: VarIdHeap, // Variable Order
+    pub(super) rebuild_base_level: DecisionLevel,
+
+    #[cfg(feature = "trail_saving")]
+    pub(super) reason_saved: Vec<AssignReason>,
+    #[cfg(feature = "trail_saving")]
+    pub(super) trail_saved: Vec<Lit>,
+    pub(super) num_reconflict: usize,
+    pub(super) num_repropagation: usize,
+
+    //
+    //## Phase handling
+    //
+    pub(super) best_assign: bool,
+    pub(super) build_best_at: usize,
+    pub(super) num_best_assign: usize,
+    pub(super) num_rephase: usize,
+    pub(super) bp_divergence_ema: Ema,
+
+    #[cfg(feature = "best_phases_tracking")]
+    pub(super) best_phases: HashMap<VarId, (bool, AssignReason)>,
+    #[cfg(feature = "rephase")]
+    pub(super) phase_age: usize,
+
+    //
+    //## Stage
+    //
+    pub stage_scale: usize,
+
+    //## Elimanated vars
+    //
+    pub eliminated: Vec<Lit>,
+
+    //
+    //## Statistics
+    //
+    /// the number of vars.
+    pub num_vars: usize,
+    /// the number of asserted vars.
+    pub num_asserted_vars: usize,
+    /// the number of eliminated vars.
+    pub num_eliminated_vars: usize,
+    pub(super) num_decision: usize,
+    pub(super) num_propagation: usize,
+    pub num_conflict: usize,
+    pub(super) num_restart: usize,
+    /// Assign rate EMA
+    pub(super) assign_rate: ProgressASG,
+    /// Decisions Per Conflict
+    pub(super) dpc_ema: EmaSU,
+    /// Propagations Per Conflict
+    pub(super) ppc_ema: EmaSU,
+    /// Conflicts Per Restart
+    pub(super) cpr_ema: EmaSU,
+
+    //
+    //## Var DB
+    //
+    /// an index for counting elapsed time
+    pub(super) tick: usize,
+    /// vars
+    pub(super) var: Vec<Var>,
+
+    //
+    //## Var Rewarding
+    //
+    /// var activity decay
+    pub(super) activity_decay: f64,
+    /// the default value of var activity decay in configuration
+    #[cfg(feature = "EVSIDS")]
+    pub(super) activity_decay_default: f64,
+    /// its diff
+    pub(super) activity_anti_decay: f64,
+    #[cfg(feature = "EVSIDS")]
+    pub(super) activity_decay_step: f64,
+}
+
 impl Default for AssignStack {
     fn default() -> AssignStack {
         AssignStack {
@@ -22,6 +105,7 @@ impl Default for AssignStack {
             q_head: 0,
             root_level: 0,
             var_order: VarIdHeap::default(),
+            rebuild_base_level: DecisionLevel::default(),
 
             #[cfg(feature = "trail_saving")]
             trail_saved: Vec::new(),
@@ -322,6 +406,26 @@ impl fmt::Display for AssignStack {
                 self.num_eliminated_vars,
             )
         }
+    }
+}
+
+#[cfg(feature = "best_phases_tracking")]
+impl AssignStack {
+    /// check usability of the saved best phase.
+    /// return `true` if the current best phase got invalid.
+    pub fn check_best_phase(&mut self, vi: VarId) -> bool {
+        if let Some((b, _)) = self.best_phases.get(&vi) {
+            let var = &self.var[vi];
+            debug_assert!(var.assign.is_some());
+            if var.assign != Some(*b) {
+                if self.root_level == var.level {
+                    self.best_phases.clear();
+                    self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
+                }
+                return true;
+            }
+        }
+        false
     }
 }
 

@@ -151,8 +151,8 @@ pub fn eliminate_var(
 fn skip_var_elimination(
     asg: &impl AssignIF,
     cdb: &impl ClauseDBIF,
-    pos: &[ClauseId],
-    neg: &[ClauseId],
+    pos: &[ClauseIndex],
+    neg: &[ClauseIndex],
     v: VarId,
     grow_limit: usize,
 ) -> bool {
@@ -192,8 +192,8 @@ fn skip_var_elimination(
 fn merge_cost(
     asg: &impl AssignIF,
     cdb: &impl ClauseDBIF,
-    cp: ClauseId,
-    cq: ClauseId,
+    cp: ClauseIndex,
+    cq: ClauseIndex,
     vi: VarId,
 ) -> Option<usize> {
     let c_p = &cdb[cp];
@@ -239,8 +239,8 @@ fn merge_cost(
 fn merge(
     asg: &mut impl AssignIF,
     cdb: &mut impl ClauseDBIF,
-    cip: ClauseId,
-    ciq: ClauseId,
+    cip: ClauseIndex,
+    ciq: ClauseIndex,
     vi: VarId,
     vec: &mut Vec<Lit>,
 ) -> usize {
@@ -277,8 +277,8 @@ fn make_eliminated_clauses(
     cdb: &mut impl ClauseDBIF,
     store: &mut Vec<Lit>,
     v: VarId,
-    pos: &[ClauseId],
-    neg: &[ClauseId],
+    pos: &[ClauseIndex],
+    neg: &[ClauseIndex],
 ) {
     if neg.len() < pos.len() {
         for cid in neg {
@@ -306,12 +306,12 @@ fn make_eliminated_clause(
     cdb: &mut impl ClauseDBIF,
     store: &mut Vec<Lit>,
     vi: VarId,
-    cid: ClauseId,
+    ci: ClauseIndex,
 ) {
     let first = store.len();
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:
-    let c = &cdb[cid];
-    debug_assert!(!c.is_empty());
+    let c = &cdb[ci];
+    debug_assert!(!c.is_dead());
     for l in c.iter() {
         store.push(*l);
         if l.vi() == vi {
@@ -375,15 +375,8 @@ mod tests {
         elim.prepare(asg, cdb, true);
         eliminate_var(asg, cdb, &mut elim, state, vi, &mut timedout).expect("panic");
         assert!(asg.var(vi).is(FlagVar::ELIMINATED));
-        assert!(cdb
-            .iter()
-            .skip(1)
-            .filter(|c| c.is_dead())
-            .all(|c| c.is_empty()));
-        assert!(cdb
-            .iter()
-            .skip(1)
-            .all(|c| c.iter().all(|l| *l != Lit::from((vi, false)))
-                && c.iter().all(|l| *l != Lit::from((vi, false)))));
+        assert!(cdb.iter().skip(1).all(|c| c.is_dead()
+            || (c.iter().all(|l| *l != Lit::from((vi, false)))
+                && c.iter().all(|l| *l != Lit::from((vi, true))))));
     }
 }
