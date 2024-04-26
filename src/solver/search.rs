@@ -384,7 +384,7 @@ fn search(
                             ReductionType::RASonADD(
                                 state.stm.num_reducible(state.config.cls_rdc_rm1),
                             ),
-                            reducing.powi(stagnation),
+                            1.0, // reducing.powi(stagnation),
                         );
                     }
                 }
@@ -394,7 +394,7 @@ fn search(
                     cdb.reduce(
                         asg,
                         ReductionType::RASonADD(state.stm.num_reducible(state.config.cls_rdc_rm1)),
-                        reducing.powi(stagnation),
+                        1.0, // reducing.powi(stagnation),
                     );
                 }
             }
