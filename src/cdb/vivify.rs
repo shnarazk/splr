@@ -145,8 +145,8 @@ impl VivifyIF for ClauseDB {
                                     #[cfg(not(feature = "clause_rewarding"))]
                                     self.new_clause(asg, &mut vec, is_learnt);
                                     // propage_sandbox can't handle dead watchers correctly
-                                    self.remove_clause(ci, &mut deads);
-                                    self.erase_marked(&deads);
+                                    self.nullify_clause(ci, &mut deads);
+                                    self.collect(&deads);
                                     deads.clear();
                                     num_shrink += 1;
                                 }

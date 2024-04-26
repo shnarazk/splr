@@ -304,7 +304,7 @@ impl EliminateIF for Eliminator {
         }
         self.var_queue.clear(asg);
         debug_assert!(self.clause_queue.is_empty());
-        cdb.erase_marked(&deads);
+        cdb.collect(&deads);
         cdb.check_size().map(|_| ())
     }
     fn sorted_iterator(&self) -> Iter<'_, u32> {

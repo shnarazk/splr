@@ -386,10 +386,13 @@ impl PropagateIF for AssignStack {
             let mut ci = cdb.get_watcher_link(propagating);
             'next_clause: while ci != 0 {
                 let c = &mut cdb[ci];
-                let (other, false_index) = if false_lit == c.lit0() {
-                    (c.lit1(), 0)
-                } else {
-                    (c.lit0(), 1)
+                let (other, false_index) = {
+                    let l0 = c.lit0();
+                    if false_lit == l0 {
+                        (c.lit1(), 0)
+                    } else {
+                        (l0, 1)
+                    }
                 };
                 let ovi = other.vi();
                 let other_value = lit_assign!(self.var[ovi], other);
@@ -512,9 +515,9 @@ impl PropagateIF for AssignStack {
             //## binary loop
             //
             for (blocker, ci) in cdb.binary_links(false_lit).iter().copied() {
-                if cdb[ci].is_dead() {
-                    continue;
-                }
+                // if cdb[ci].is_dead() {
+                //     continue;
+                // }
                 debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
 
@@ -543,10 +546,10 @@ impl PropagateIF for AssignStack {
             let mut ci = cdb.get_watcher_link(propagating);
             'next_clause: while ci != 0 {
                 let c = &mut cdb[ci];
-                if c.is_dead() {
-                    ci = c.next_for_lit(propagating);
-                    continue 'next_clause;
-                }
+                // if c.is_dead() {
+                //     ci = c.next_for_lit(propagating);
+                //     continue 'next_clause;
+                // }
                 let (other, false_index) = if false_lit == c.lit0() {
                     (c.lit1(), 0)
                 } else {
@@ -647,12 +650,12 @@ impl AssignStack {
                         debug_assert!(self.assigned(lit).is_none());
                         cdb.certificate_add_assertion(lit);
                         self.assign_at_root_level(lit)?;
-                        cdb.remove_clause(ci, &mut deads);
+                        cdb.nullify_clause(ci, &mut deads);
                     }
                 }
             }
         }
-        cdb.erase_marked(&deads);
+        cdb.collect(&deads);
         Ok(())
     }
     fn level_up(&mut self) {

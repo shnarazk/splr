@@ -1,10 +1,5 @@
 use {crate::types::*, std::collections::HashSet};
 
-// #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-// pub struct DoubleLink {
-//     pub next: ClauseIndex,
-// }
-
 pub trait WatcherLinkIF {
     fn next_for_lit(&self, lit: Lit) -> ClauseIndex;
     fn next_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex;
@@ -19,7 +14,12 @@ pub trait ClauseWeaverIF {
     fn remove_watcher(&mut self, ci: ClauseIndex);
     fn mark_as_free(&mut self, index: ClauseIndex);
     fn make_watches(num_vars: usize, clauses: &mut [Clause]) -> Vec<ClauseIndex>;
-    fn erase_marked(&mut self, targets: &HashSet<Lit>);
+    /// un-register a clause `cid` from clause database and make the clause dead.
+    fn nullify_clause(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>);
+    /// un-register a clause `cid` from clause database and make the clause dead.
+    fn nullify_clause_sandbox(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>);
+    /// update watches of the clause
+    fn collect(&mut self, targets: &HashSet<Lit>);
 }
 
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]

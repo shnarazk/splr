@@ -128,7 +128,7 @@ pub fn eliminate_var(
             }
         }
         elim.remove_cid_occur(asg, *ci, &mut cdb[*ci]);
-        cdb.remove_clause(*ci, deads);
+        cdb.nullify_clause(*ci, deads);
     }
     for ci in neg.iter() {
         if cdb[*ci].is_dead() {
@@ -141,7 +141,7 @@ pub fn eliminate_var(
             }
         }
         elim.remove_cid_occur(asg, *ci, &mut cdb[*ci]);
-        cdb.remove_clause(*ci, deads);
+        cdb.nullify_clause(*ci, deads);
     }
     elim[vi].clear();
     asg.handle(SolverEvent::Eliminate(vi));
@@ -379,7 +379,7 @@ mod tests {
         elim.prepare(asg, cdb, true);
         let mut deads: HashSet<Lit> = HashSet::new();
         eliminate_var(asg, cdb, &mut elim, state, vi, &mut timedout, &mut deads).expect("panic");
-        cdb.erase_marked(&deads);
+        cdb.collect(&deads);
         assert!(asg.var(vi).is(FlagVar::ELIMINATED));
         assert!(cdb.iter().skip(1).all(|c| c.is_dead()
             || (c.iter().all(|l| *l != Lit::from((vi, false)))
