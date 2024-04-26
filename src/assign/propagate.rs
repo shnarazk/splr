@@ -6,6 +6,7 @@ use {
         cdb::{ClauseDBIF, WatcherLinkIF},
         types::*,
     },
+    std::collections::HashSet,
 };
 
 #[cfg(feature = "trail_saving")]
@@ -510,8 +511,10 @@ impl PropagateIF for AssignStack {
             //
             //## binary loop
             //
-            for (blocker, cid) in cdb.binary_links(false_lit).iter().copied() {
-                debug_assert!(!cdb[cid].is_dead());
+            for (blocker, ci) in cdb.binary_links(false_lit).iter().copied() {
+                if cdb[ci].is_dead() {
+                    continue;
+                }
                 debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
 
@@ -522,7 +525,7 @@ impl PropagateIF for AssignStack {
                     Some(true) => (),
                     Some(false) => conflict_path!(blocker, AssignReason::BinaryLink(propagating)),
                     None => {
-                        debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
+                        debug_assert!(cdb[ci].lit0() == false_lit || cdb[ci].lit1() == false_lit);
 
                         self.assign_by_implication(
                             blocker,
@@ -542,7 +545,6 @@ impl PropagateIF for AssignStack {
                 let c = &mut cdb[ci];
                 if c.is_dead() {
                     ci = c.next_for_lit(propagating);
-                    // panic!();
                     continue 'next_clause;
                 }
                 let (other, false_index) = if false_lit == c.lit0() {
@@ -626,6 +628,7 @@ impl AssignStack {
     ///
     fn propagate_at_root_level(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
         let mut num_propagated = 0;
+        let mut deads: HashSet<Lit> = HashSet::new();
         while num_propagated < self.trail.len() {
             num_propagated = self.trail.len();
             for ci in 1..cdb.len() {
@@ -635,7 +638,7 @@ impl AssignStack {
                 // debug_assert!(cdb[ci]
                 //     .iter()
                 //     .all(|l| !self.var[l.vi()].is(FlagVar::ELIMINATED)));
-                match cdb.transform_by_simplification(self, ci) {
+                match cdb.transform_by_simplification(self, ci, &mut deads) {
                     RefClause::Clause(_) => (),
                     RefClause::Dead => (), // was a satisfied clause
                     RefClause::EmptyClause => return Err(SolverError::EmptyClause),
@@ -644,11 +647,12 @@ impl AssignStack {
                         debug_assert!(self.assigned(lit).is_none());
                         cdb.certificate_add_assertion(lit);
                         self.assign_at_root_level(lit)?;
-                        cdb.remove_clause(ci);
+                        cdb.remove_clause(ci, &mut deads);
                     }
                 }
             }
         }
+        cdb.erase_marked(&deads);
         Ok(())
     }
     fn level_up(&mut self) {

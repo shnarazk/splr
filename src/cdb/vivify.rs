@@ -1,10 +1,13 @@
 //! Vivification
 #![allow(dead_code)]
-use crate::{
-    assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-    cdb::{ClauseDB, ClauseDBIF, ClauseIF, LiftedClauseIF},
-    state::{Stat, State, StateIF},
-    types::*,
+use {
+    crate::{
+        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
+        cdb::{ClauseDB, ClauseDBIF, ClauseIF, ClauseWeaverIF},
+        state::{Stat, State, StateIF},
+        types::*,
+    },
+    std::collections::HashSet,
 };
 
 const VIVIFY_LIMIT: usize = 80_000;
@@ -38,6 +41,7 @@ impl VivifyIF for ClauseDB {
         let mut num_shrink = 0;
         let mut num_assert = 0;
         let mut to_display = 0;
+        let mut deads: HashSet<Lit> = HashSet::new();
         'next_clause: while let Some(cp) = clauses.pop() {
             asg.backtrack_sandbox();
             debug_assert_eq!(asg.decision_level(), asg.root_level());
@@ -49,7 +53,7 @@ impl VivifyIF for ClauseDB {
             debug_assert!(asg.stack_is_empty() || !asg.remains());
             debug_assert_eq!(asg.root_level(), asg.decision_level());
             let ci = cp.to();
-            assert!(!ci.is_lifted());
+            // assert!(!ci.is_lifted());
             let c = &mut self[ci];
             if c.is_dead() {
                 continue;
@@ -140,7 +144,10 @@ impl VivifyIF for ClauseDB {
                                     }
                                     #[cfg(not(feature = "clause_rewarding"))]
                                     self.new_clause(asg, &mut vec, is_learnt);
-                                    self.remove_clause(ci);
+                                    // propage_sandbox can't handle dead watchers correctly
+                                    self.remove_clause(ci, &mut deads);
+                                    self.erase_marked(&deads);
+                                    deads.clear();
                                     num_shrink += 1;
                                 }
                             }
@@ -193,7 +200,7 @@ fn select_targets(
             if c.is_dead() {
                 continue;
             }
-            assert!(!ci.is_lifted());
+            // assert!(!ci.is_lifted());
             if let Some(rank) = c.to_vivify(true) {
                 let p = &mut seen[usize::from(c.lit0())];
                 if p.as_ref().map_or(0.0, |r| r.value()) < rank {

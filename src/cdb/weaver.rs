@@ -1,4 +1,4 @@
-use crate::types::*;
+use {crate::types::*, std::collections::HashSet};
 
 // #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 // pub struct DoubleLink {
@@ -19,6 +19,7 @@ pub trait ClauseWeaverIF {
     fn remove_watcher(&mut self, ci: ClauseIndex);
     fn mark_as_free(&mut self, index: ClauseIndex);
     fn make_watches(num_vars: usize, clauses: &mut [Clause]) -> Vec<ClauseIndex>;
+    fn erase_marked(&mut self, targets: &HashSet<Lit>);
 }
 
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]

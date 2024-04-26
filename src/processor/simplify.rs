@@ -11,6 +11,7 @@ use {
         types::*,
     },
     std::{
+        collections::HashSet,
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::Iter,
     },
@@ -264,6 +265,7 @@ impl EliminateIF for Eliminator {
         state: &mut State,
         force_run: bool,
     ) -> MaybeInconsistent {
+        let mut deads: HashSet<Lit> = HashSet::new();
         debug_assert_eq!(asg.decision_level(), 0);
         // we can reset all the reasons because decision level is zero.
         #[cfg(feature = "boundary_check")]
@@ -289,7 +291,7 @@ impl EliminateIF for Eliminator {
                 .derefer(cdb::property::Tf64::LiteralBlockEntanglement)
                 .is_nan());
             // self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
-            self.eliminate(asg, cdb, state)?;
+            self.eliminate(asg, cdb, state, &mut deads)?;
         } else {
             asg.propagate_sandbox(cdb)
                 .map_err(SolverError::RootLevelConflict)?;
@@ -302,6 +304,7 @@ impl EliminateIF for Eliminator {
         }
         self.var_queue.clear(asg);
         debug_assert!(self.clause_queue.is_empty());
+        cdb.erase_marked(&deads);
         cdb.check_size().map(|_| ())
     }
     fn sorted_iterator(&self) -> Iter<'_, u32> {
@@ -417,6 +420,7 @@ impl Eliminator {
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
         timedout: &mut usize,
+        deads: &mut HashSet<Lit>,
     ) -> MaybeInconsistent {
         debug_assert_eq!(asg.decision_level(), 0);
         while !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.stack_len() {
@@ -489,7 +493,7 @@ impl Eliminator {
                             //     d.contains(Lit::from((best, false)))
                             //         || d.contains(Lit::from((best, true)))
                             // );
-                            self.try_subsume(asg, cdb, ci, *did)?;
+                            self.try_subsume(asg, cdb, ci, *did, deads)?;
                         }
                     }
                 }
@@ -513,11 +517,12 @@ impl Eliminator {
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
         state: &mut State,
+        deads: &mut HashSet<Lit>,
     ) -> MaybeInconsistent {
         let start = state.elapsed().unwrap_or(0.0);
         loop {
             let na = asg.stack_len();
-            self.eliminate_main(asg, cdb, state)?;
+            self.eliminate_main(asg, cdb, state, deads)?;
             asg.propagate_sandbox(cdb)
                 .map_err(SolverError::RootLevelConflict)?;
             if na == asg.stack_len()
@@ -540,6 +545,7 @@ impl Eliminator {
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
         state: &mut State,
+        deads: &mut HashSet<Lit>,
     ) -> MaybeInconsistent {
         debug_assert!(asg.decision_level() == 0);
         if self.mode == EliminatorMode::Dormant {
@@ -555,16 +561,16 @@ impl Eliminator {
             || !self.clause_queue.is_empty()
         {
             if !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.stack_len() {
-                self.backward_subsumption_check(asg, cdb, &mut timedout)?;
+                self.backward_subsumption_check(asg, cdb, &mut timedout, deads)?;
             }
             while let Some(vi) = self.var_queue.select_var(&self.var, asg) {
                 let v = asg.var_mut(vi);
                 v.turn_off(FlagVar::ENQUEUED);
                 if !v.is(FlagVar::ELIMINATED) && asg.assign(vi).is_none() {
-                    eliminate_var(asg, cdb, self, state, vi, &mut timedout)?;
+                    eliminate_var(asg, cdb, self, state, vi, &mut timedout, deads)?;
                 }
             }
-            self.backward_subsumption_check(asg, cdb, &mut timedout)?;
+            self.backward_subsumption_check(asg, cdb, &mut timedout, deads)?;
             debug_assert!(self.clause_queue.is_empty());
             asg.propagate_sandbox(cdb)
                 .map_err(SolverError::RootLevelConflict)?;

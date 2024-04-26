@@ -2,6 +2,7 @@
 use {
     super::Eliminator,
     crate::{assign::AssignIF, cdb::ClauseDBIF, solver::SolverEvent, state::State, types::*},
+    std::collections::HashSet,
 };
 
 // Stop elimination if a generated resolvent is larger than this
@@ -14,6 +15,7 @@ pub fn eliminate_var(
     state: &mut State,
     vi: VarId,
     timedout: &mut usize,
+    deads: &mut HashSet<Lit>,
 ) -> MaybeInconsistent {
     let v = &mut asg.var(vi);
     let w = &mut elim.var[vi];
@@ -115,36 +117,36 @@ pub fn eliminate_var(
     //
     // debug_assert!(pos.iter().all(|cid| !cdb[*cid].is_dead()));
     // debug_assert!(neg.iter().all(|cid| !cdb[*cid].is_dead()));
-    for cid in pos.iter() {
-        if cdb[*cid].is_dead() {
+    for ci in pos.iter() {
+        if cdb[*ci].is_dead() {
             continue;
         }
         #[cfg(feature = "incremental_solver")]
         {
-            if !cdb[*cid].is(FlagClause::LEARNT) {
-                cdb.make_permanent_immortal(*cid);
+            if !cdb[*ci].is(FlagClause::LEARNT) {
+                cdb.make_permanent_immortal(*ci);
             }
         }
-        elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
-        cdb.remove_clause(*cid);
+        elim.remove_cid_occur(asg, *ci, &mut cdb[*ci]);
+        cdb.remove_clause(*ci, deads);
     }
-    for cid in neg.iter() {
-        if cdb[*cid].is_dead() {
+    for ci in neg.iter() {
+        if cdb[*ci].is_dead() {
             continue;
         }
         #[cfg(feature = "incremental_solver")]
         {
-            if !cdb[*cid].is(FlagClause::LEARNT) {
-                cdb.make_permanent_immortal(*cid);
+            if !cdb[*ci].is(FlagClause::LEARNT) {
+                cdb.make_permanent_immortal(*ci);
             }
         }
-        elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
-        cdb.remove_clause(*cid);
+        elim.remove_cid_occur(asg, *ci, &mut cdb[*ci]);
+        cdb.remove_clause(*ci, deads);
     }
     elim[vi].clear();
     asg.handle(SolverEvent::Eliminate(vi));
     state.restart.handle(SolverEvent::Eliminate(vi));
-    elim.backward_subsumption_check(asg, cdb, timedout)
+    elim.backward_subsumption_check(asg, cdb, timedout, deads)
 }
 
 /// returns `true` if elimination is impossible.
@@ -359,6 +361,8 @@ mod tests {
     #[cfg(not(feature = "no_IO"))]
     #[test]
     fn test_eliminate_var() {
+        use crate::cdb::ClauseWeaverIF;
+
         let Solver {
             ref mut asg,
             ref mut cdb,
@@ -373,7 +377,9 @@ mod tests {
 
         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
         elim.prepare(asg, cdb, true);
-        eliminate_var(asg, cdb, &mut elim, state, vi, &mut timedout).expect("panic");
+        let mut deads: HashSet<Lit> = HashSet::new();
+        eliminate_var(asg, cdb, &mut elim, state, vi, &mut timedout, &mut deads).expect("panic");
+        cdb.erase_marked(&deads);
         assert!(asg.var(vi).is(FlagVar::ELIMINATED));
         assert!(cdb.iter().skip(1).all(|c| c.is_dead()
             || (c.iter().all(|l| *l != Lit::from((vi, false)))

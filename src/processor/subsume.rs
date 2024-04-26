@@ -6,6 +6,7 @@ use {
         cdb::{ClauseDBIF, LiftedClauseIF},
         types::*,
     },
+    std::collections::HashSet,
 };
 
 #[derive(Clone, Eq, Debug, Ord, PartialEq, PartialOrd)]
@@ -22,6 +23,7 @@ impl Eliminator {
         cdb: &mut impl ClauseDBIF,
         ci: ClauseIndex,
         di: ClauseIndex,
+        deads: &mut HashSet<Lit>,
     ) -> MaybeInconsistent {
         match have_subsuming_lit(cdb, ci, di) {
             Subsumable::Success => {
@@ -35,7 +37,7 @@ impl Eliminator {
                     cdb[ci].turn_off(FlagClause::LEARNT);
                 }
                 self.remove_cid_occur(asg, di, &mut cdb[di]);
-                cdb.remove_clause(di);
+                cdb.remove_clause(di, deads);
                 self.num_subsumed += 1;
             }
             // To avoid making a big clause, we have to add a condition for combining them.
@@ -43,7 +45,7 @@ impl Eliminator {
                 debug_assert!(ci.is_lifted());
                 #[cfg(feature = "trace_elimination")]
                 println!("BackSubC subsumes {} from {} and {}", l, ci, di);
-                strengthen_clause(asg, cdb, self, di, !l)?;
+                strengthen_clause(asg, cdb, self, di, !l, deads)?;
                 self.enqueue_var(asg, l.vi(), true);
             }
             Subsumable::None => (),
@@ -99,13 +101,14 @@ fn strengthen_clause(
     elim: &mut Eliminator,
     ci: ClauseIndex,
     l: Lit,
+    deads: &mut HashSet<Lit>,
 ) -> MaybeInconsistent {
     debug_assert!(!cdb[ci].is_dead());
     debug_assert!(1 < cdb[ci].len());
     match cdb.transform_by_elimination(ci, l) {
         RefClause::Clause(_ci) => {
             #[cfg(feature = "trace_elimination")]
-            println!("cid {} drops literal {}", cid, l);
+            println!("ci {} drops literal {}", ci, l);
 
             elim.enqueue_clause(ci, &mut cdb[ci]);
             elim.remove_lit_occur(asg, l, ci);
@@ -113,13 +116,13 @@ fn strengthen_clause(
         }
         RefClause::RegisteredClause(_) => {
             elim.remove_cid_occur(asg, ci, &mut cdb[ci]);
-            cdb.remove_clause(ci);
+            cdb.remove_clause(ci, deads);
             Ok(())
         }
         RefClause::UnitClause(l0) => {
             cdb.certificate_add_assertion(l0);
             elim.remove_cid_occur(asg, ci, &mut cdb[ci]);
-            cdb.remove_clause(ci);
+            cdb.remove_clause(ci, deads);
             match asg.assigned(l0) {
                 None => asg.assign_at_root_level(l0),
                 Some(true) => Ok(()),

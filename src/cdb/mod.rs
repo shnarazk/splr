@@ -36,6 +36,7 @@ use {
     crate::{assign::AssignIF, types::*},
     ema::ProgressLBD,
     std::{
+        collections::HashSet,
         ops::IndexMut,
         slice::{Iter, IterMut},
     },
@@ -88,9 +89,9 @@ pub trait ClauseDBIF:
     fn new_clause(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
     fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>) -> RefClause;
     /// un-register a clause `cid` from clause database and make the clause dead.
-    fn remove_clause(&mut self, ci: ClauseIndex);
+    fn remove_clause(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>);
     /// un-register a clause `cid` from clause database and make the clause dead.
-    fn remove_clause_sandbox(&mut self, ci: ClauseIndex);
+    fn remove_clause_sandbox(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>);
     /// update watches of the clause
     fn transform_by_elimination(&mut self, ci: ClauseIndex, p: Lit) -> RefClause;
     /// generic clause transformer (not in use)
@@ -100,6 +101,7 @@ pub trait ClauseDBIF:
         &mut self,
         asg: &mut impl AssignIF,
         ci: ClauseIndex,
+        deads: &mut HashSet<Lit>,
     ) -> RefClause;
     /// reduce learnt clauses
     /// # CAVEAT
@@ -350,46 +352,46 @@ impl ClauseDBIF for ClauseDB {
 
     /// ## Warning
     /// this function is the only function that makes dead clauses
-    fn remove_clause(&mut self, ci: ClauseIndex) {
-        // assert!(!self[ci].is_dead());
+    fn remove_clause(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>) {
+        assert!(!self[ci].is_dead());
         let c = &self.clause[ci];
         self.certification_store.delete_clause(&c.lits);
-        let l0 = c.lits[0];
-        let l1 = c.lits[1];
+        let l0 = c.lit0();
+        let l1 = c.lit1();
         self.num_clause -= 1;
         if c.is(FlagClause::LEARNT) {
             self.num_learnt -= 1;
         }
-        if c.len() == 2 {
+        if c.lits.len() == 2 {
             self.binary_link
                 .remove(l0, l1)
                 .expect("Error (remove_clause)");
             self.num_bi_clause -= 1;
         } else {
-            // watcher[usize::from(!l0)].remove_watch(&ci);
-            // watcher[usize::from(!l1)].remove_watch(&ci);
-            self.remove_watcher(ci);
+            deads.insert(!l0);
+            deads.insert(!l1);
         }
-        self.mark_as_free(ci);
+        // self.mark_as_free(ci);
+        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
+        self[ci].turn_on(FlagClause::DEAD);
+        // // assert!(self[ci].is_dead());
+    }
+    fn remove_clause_sandbox(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>) {
+        // assert!(!self[ci].is_dead());
+        let c = &self.clause[ci];
+        let l0 = c.lit0();
+        let l1 = c.lit1();
+        if c.lits.len() == 2 {
+            self.binary_link
+                .remove(l0, l1)
+                .expect("Error (remove_clause)");
+        } else {
+            deads.insert(!l0);
+            deads.insert(!l1);
+        }
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
         self[ci].turn_on(FlagClause::DEAD);
         // assert!(self[ci].is_dead());
-    }
-    fn remove_clause_sandbox(&mut self, ci: ClauseIndex) {
-        let c = &self.clause[ci];
-        debug_assert!(1 < c.lits.len());
-        let l0 = c.lits[0];
-        let l1 = c.lits[1];
-        if c.len() == 2 {
-            self.binary_link
-                .remove(l0, l1)
-                .expect("Eror (remove_clause_fn#01)");
-        }
-        // watcher[usize::from(!l0)].remove_watch(&ci); // .expect("db1076");
-        // watcher[usize::from(!l1)].remove_watch(&ci); // .expect("db1077");
-        self.remove_watcher(ci);
-        self.mark_as_free(ci);
-        self[ci].turn_on(FlagClause::DEAD);
     }
     //
     // return a Lit if the clause becomes a unit clause.
@@ -593,6 +595,7 @@ impl ClauseDBIF for ClauseDB {
         &mut self,
         asg: &mut impl AssignIF,
         ci: ClauseIndex,
+        deads: &mut HashSet<Lit>,
     ) -> RefClause {
         //
         //## Clause transform rules
@@ -612,7 +615,7 @@ impl ClauseDBIF for ClauseDB {
             debug_assert!(!asg.var(l.vi()).is(FlagVar::ELIMINATED));
             match asg.assigned(*l) {
                 Some(true) => {
-                    self.remove_clause(ci);
+                    self.remove_clause(ci, deads);
                     return RefClause::Dead;
                 }
                 Some(false) => {
@@ -648,7 +651,7 @@ impl ClauseDBIF for ClauseDB {
                     //
                     //## Case:3-0
                     //
-                    self.remove_clause(ci);
+                    self.remove_clause(ci, deads);
                     return RefClause::RegisteredClause(bid);
                 }
                 //
@@ -855,17 +858,22 @@ impl ClauseDBIF for ClauseDB {
             }
         };
         perm.sort();
+        let mut deads: HashSet<Lit> = HashSet::new();
         for i in perm.iter().skip(keep) {
-            self.remove_clause(i.to());
+            let ci = i.to();
+            self.remove_clause(ci, &mut deads);
         }
+        self.erase_marked(&deads);
     }
     fn reset(&mut self) {
+        let mut deads: HashSet<Lit> = HashSet::new();
         for ci in 1..self.len() {
             let c = &self.clause[ci];
             if c.is(FlagClause::LEARNT) && (self.co_lbd_bound as usize) < c.len() {
-                self.remove_clause(ci);
+                self.remove_clause(ci, &mut deads);
             }
         }
+        self.erase_marked(&deads);
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);
@@ -1186,7 +1194,7 @@ impl ClauseWeaverIF for ClauseDB {
             prev = index;
             index = self[index].next_for_lit(lit0);
         }
-        assert_ne!(index, HEAD_INDEX);
+        // assert_ne!(index, HEAD_INDEX);
         let mut index = self.watch[usize::from(lit1)];
         let mut prev = HEAD_INDEX;
         while index != HEAD_INDEX {
@@ -1197,7 +1205,7 @@ impl ClauseWeaverIF for ClauseDB {
             prev = index;
             index = self[index].next_for_lit(lit1);
         }
-        assert_ne!(index, HEAD_INDEX);
+        // assert_ne!(index, HEAD_INDEX);
     }
     fn mark_as_free(&mut self, index: ClauseIndex) {
         // Note: free list is a single-linked list
@@ -1215,6 +1223,27 @@ impl ClauseWeaverIF for ClauseDB {
         let mut watches = vec![ClauseIndex::default(); 2 * (num_vars + 1)];
         watches[0] = 1;
         watches
+    }
+    fn erase_marked(&mut self, targets: &HashSet<Lit>) {
+        for lit in targets.iter() {
+            let mut prev: ClauseIndex = HEAD_INDEX;
+            let mut ci: ClauseIndex = self.watch[usize::from(*lit)];
+            while ci != HEAD_INDEX {
+                if self[ci].is_dead() {
+                    let next_ci = self[ci].next_for_lit(*lit);
+                    self.remove_next_watcher(prev, *lit);
+                    if self[ci].is(FlagClause::SWEEPED) {
+                        self.mark_as_free(ci);
+                    } else {
+                        self[ci].turn_on(FlagClause::SWEEPED);
+                    }
+                    ci = next_ci;
+                    continue;
+                }
+                prev = ci;
+                ci = self[ci].next_for_lit(*lit);
+            }
+        }
     }
 }
 
