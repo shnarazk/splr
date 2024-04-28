@@ -240,12 +240,12 @@ fn search(
     let mut previous_stage: Option<bool> = Some(true);
     let mut num_learnt = 0;
     let mut current_core: usize = asg.derefer(assign::property::Tusize::NumUnassertedVar);
-    let reducing: f64 = 1.02;
-    let mut stagnation: i32 = 0;
     let mut core_was_rebuilt: Option<usize> = None;
+    let stage_size: usize = 32;
     #[cfg(feature = "rephase")]
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
 
+    state.stm.initialize(stage_size);
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
             let lit = asg.select_decision_literal();
@@ -281,6 +281,7 @@ fn search(
             dump_stage(asg, cdb, state, previous_stage);
             let next_stage: Option<bool> = state.stm.prepare_new_stage(num_learnt);
             let scale = state.stm.current_scale();
+            let max_scale = state.stm.max_scale();
             if cfg!(feature = "reward_annealing") {
                 let base = state.stm.current_stage() - state.stm.cycle_starting_stage();
                 let decay_index: f64 = (20 + 2 * base) as f64;
@@ -297,11 +298,7 @@ fn search(
                                 state.config.cls_rdc_lbd,
                                 state.config.cls_rdc_rm2,
                             ),
-                            reducing.powi(stagnation),
                         );
-                        if new_segment {
-                            stagnation += 1;
-                        }
                     }
                 }
                 #[cfg(feature = "rephase")]
@@ -375,6 +372,9 @@ fn search(
                         state[Stat::Simplify] += 1;
                         state[Stat::SubsumedClause] = elim.num_subsumed;
                     }
+                    if cfg!(feature = "dynamic_restart_threshold") {
+                        state.restart.set_segment_parameters(max_scale);
+                    }
                 }
             } else {
                 {
@@ -384,7 +384,6 @@ fn search(
                             ReductionType::RASonADD(
                                 state.stm.num_reducible(state.config.cls_rdc_rm1),
                             ),
-                            1.0, // reducing.powi(stagnation),
                         );
                     }
                 }
@@ -394,7 +393,6 @@ fn search(
                     cdb.reduce(
                         asg,
                         ReductionType::RASonADD(state.stm.num_reducible(state.config.cls_rdc_rm1)),
-                        1.0, // reducing.powi(stagnation),
                     );
                 }
             }
@@ -415,7 +413,6 @@ fn search(
             current_core = na;
             state.flush("");
             state.flush(format!("unreachable core: {na} "));
-            stagnation = 0;
         }
     }
     state.log(

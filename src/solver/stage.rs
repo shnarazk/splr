@@ -23,7 +23,6 @@ pub struct StageManager {
 impl Instantiate for StageManager {
     fn instantiate(_: &Config, cnf: &CNFDescription) -> StageManager {
         let unit_size = (cnf.num_of_variables as f64).sqrt() as usize;
-        // let unit_size = cnf.num_of_variables.ilog2() as usize;
         StageManager {
             unit_size,
             max_scale_of_segment: 1,
