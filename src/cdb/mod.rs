@@ -696,7 +696,7 @@ impl ClauseDBIF for ClauseDB {
         self[ci].lits.swap(old, new);
         // so old becomes new now
         self.insert_watcher(ci, second, !self[ci].lits[old]);
-        self[ci].search_from = (new + 1) as u16;
+        self[ci].search_from = ((new + 1) % self[ci].len()).max(2) as u16;
         // watch_cache[!c.lits[new]].insert_watch(ci, c.lits[other]);
         // maintain_watch_literal
         // assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
