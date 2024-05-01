@@ -105,7 +105,6 @@ impl Index<usize> for Clause {
 }
 
 impl IndexMut<usize> for Clause {
-    #[inline]
     fn index_mut(&mut self, i: usize) -> &mut Lit {
         #[cfg(feature = "unsafe_access")]
         unsafe {
@@ -118,7 +117,6 @@ impl IndexMut<usize> for Clause {
 
 impl Index<Range<usize>> for Clause {
     type Output = [Lit];
-    #[inline]
     fn index(&self, r: Range<usize>) -> &[Lit] {
         #[cfg(feature = "unsafe_access")]
         unsafe {
@@ -131,7 +129,6 @@ impl Index<Range<usize>> for Clause {
 
 impl Index<RangeFrom<usize>> for Clause {
     type Output = [Lit];
-    #[inline]
     fn index(&self, r: RangeFrom<usize>) -> &[Lit] {
         if cfg!(feature = "unsafe_access") {
             unsafe { self.lits.get_unchecked(r) }
@@ -142,7 +139,6 @@ impl Index<RangeFrom<usize>> for Clause {
 }
 
 impl IndexMut<Range<usize>> for Clause {
-    #[inline]
     fn index_mut(&mut self, r: Range<usize>) -> &mut [Lit] {
         if cfg!(feature = "unsafe_access") {
             unsafe { self.lits.get_unchecked_mut(r) }
@@ -153,7 +149,6 @@ impl IndexMut<Range<usize>> for Clause {
 }
 
 impl IndexMut<RangeFrom<usize>> for Clause {
-    #[inline]
     fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Lit] {
         if cfg!(feature = "unsafe_access") {
             unsafe { self.lits.get_unchecked_mut(r) }
