@@ -417,8 +417,7 @@ impl PropagateIF for AssignStack {
                     let k = (i + start) % len + 2;
                     let lk = c[k];
                     if lit_assign!(self.var[lk.vi()], lk) != Some(false) {
-                        let next_ci = c.next_for_lit(propagating);
-                        cdb.transform_by_updating_watch(prev, ci, false_index, k);
+                        let next_ci = cdb.transform_by_updating_watch(prev, ci, false_index, k);
                         debug_assert_ne!(self.assigned(!lk), Some(true));
                         check_in!(
                             ci,

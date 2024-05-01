@@ -305,10 +305,13 @@ impl WatcherLinkIF for Clause {
             let l = !lit;
             if self.lits[0] == l {
                 self.link0
-            } else if self.lits[1] == l {
-                self.link1
             } else {
-                panic!("#### next: ilegal chain for {}: {:?}", lit, self);
+                debug_assert_eq!(
+                    self.lits[1], l,
+                    "#### next: ilegal chain for {}: {:?}",
+                    lit, self
+                );
+                self.link1
             }
         }
     }
@@ -326,10 +329,13 @@ impl WatcherLinkIF for Clause {
             let l = !lit;
             if self.lits[0] == l {
                 &mut self.link0
-            } else if self.lits[1] == l {
-                &mut self.link1
             } else {
-                panic!("#### &mut next: ilegal chain for {}: {:?}", lit, self);
+                debug_assert_eq!(
+                    self.lits[1], l,
+                    "#### next: ilegal chain for {}: {:?}",
+                    lit, self
+                );
+                &mut self.link1
             }
         }
     }

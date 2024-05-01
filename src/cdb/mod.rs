@@ -81,7 +81,7 @@ pub trait ClauseDBIF:
         ci: ClauseIndex,
         old: usize,
         new: usize,
-    );
+    ) -> ClauseIndex;
     /// allocate a new clause and return its id.
     /// Note this removes an eliminated Lit `p` from a clause. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
@@ -663,13 +663,14 @@ impl ClauseDBIF for ClauseDB {
         }
     }
     // used in `propagate`, `propagate_sandbox`, and `handle_conflict` for chronoBT
+    #[inline]
     fn transform_by_updating_watch(
         &mut self,
         prev: ClauseIndex,
         ci: ClauseIndex,
         old: usize,
         new: usize,
-    ) {
+    ) -> ClauseIndex {
         //
         //## Clause transform rules
         //
@@ -688,6 +689,11 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(old < 2);
         debug_assert!(1 < new);
         //## Step:1
+        let ret = if old == 0 {
+            self[ci].link0
+        } else {
+            self[ci].link1
+        };
         let second = self.remove_next_watcher(prev, !self[ci].lits[old]);
         // watch_cache[!c.lits[old]].remove_watch(&ci);
 
@@ -698,6 +704,7 @@ impl ClauseDBIF for ClauseDB {
         self.insert_watcher(ci, second, !self[ci].lits[old]);
         let c = &mut self[ci];
         c.search_from = ((new + 1) % (c.len() - 2)) as u16;
+        ret
         // self[ci].search_from = ((new + 1) % (self[ci].len() - 2)) as u16;
         // watch_cache[!c.lits[new]].insert_watch(ci, c.lits[other]);
         // maintain_watch_literal
