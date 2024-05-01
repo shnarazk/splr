@@ -411,21 +411,18 @@ impl PropagateIF for AssignStack {
                     check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
                     conflict_path!(other, AssignReason::Implication(ci));
                 }
-                let start = c.search_from;
-                for (k, lk) in c
-                    .iter()
-                    .enumerate()
-                    .skip(start as usize)
-                    .chain(c.iter().enumerate().skip(2).take(start as usize - 2))
-                {
-                    if lit_assign!(self.var[lk.vi()], *lk) != Some(false) {
+                let start = c.search_from as usize;
+                let len = c.len() - 2;
+                for i in 0..c.len() - 2 {
+                    let k = (i + start) % len + 2;
+                    let lk = c[k];
+                    if lit_assign!(self.var[lk.vi()], lk) != Some(false) {
                         let next_ci = c.next_for_lit(propagating);
-                        let new_watch = !*lk;
                         cdb.transform_by_updating_watch(prev, ci, false_index, k);
-                        debug_assert_ne!(self.assigned(new_watch), Some(true));
+                        debug_assert_ne!(self.assigned(!lk), Some(true));
                         check_in!(
                             ci,
-                            Propagate::FindNewWatch(self.num_conflict, propagating, new_watch)
+                            Propagate::FindNewWatch(self.num_conflict, propagating, !lk)
                         );
                         ci = next_ci;
                         continue 'next_clause;
@@ -562,20 +559,17 @@ impl PropagateIF for AssignStack {
                     ci = c.next_for_lit(propagating);
                     continue 'next_clause;
                 }
-                let start = c.search_from;
-                for (k, lk) in c
-                    .iter()
-                    .enumerate()
-                    .skip(start as usize)
-                    .chain(c.iter().enumerate().skip(2).take(start as usize - 2))
-                {
-                    if lit_assign!(self.var[lk.vi()], *lk) != Some(false) {
+                let start = c.search_from as usize;
+                let len = c.len() - 2;
+                for i in 0..c.len() - 2 {
+                    let k = (i + start) % len + 2;
+                    let lk = c[k];
+                    if lit_assign!(self.var[lk.vi()], lk) != Some(false) {
                         let next_ci = c.next_for_lit(propagating);
-                        let _new_watch = !*lk;
                         cdb.transform_by_updating_watch(prev, ci, false_index, k);
                         check_in!(
                             ci,
-                            Propagate::SandboxFindNewWatch(self.num_conflict, false_lit, new_watch)
+                            Propagate::SandboxFindNewWatch(self.num_conflict, false_lit, !lk)
                         );
                         ci = next_ci;
                         continue 'next_clause;

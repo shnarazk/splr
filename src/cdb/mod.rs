@@ -281,7 +281,7 @@ impl ClauseDBIF for ClauseDB {
             std::mem::swap(&mut tmp, &mut self.lbd_temp);
             assert_eq!(l0, self[ci].lits[0]);
             assert_eq!(l1, self[ci].lits[1]);
-            self[ci].search_from = 2;
+            self[ci].search_from = 0;
             self.insert_watcher(ci, false, !l0);
             self.insert_watcher(ci, true, !l1);
         }
@@ -328,7 +328,7 @@ impl ClauseDBIF for ClauseDB {
         } else {
             let mut tmp: Vec<usize> = Vec::new();
             std::mem::swap(&mut tmp, &mut self.lbd_temp);
-            self[ci].search_from = 2;
+            self[ci].search_from = 0;
             self[ci].update_lbd(asg, &mut tmp);
             self[ci].turn_on(FlagClause::LEARNT);
             std::mem::swap(&mut tmp, &mut self.lbd_temp);
@@ -384,7 +384,7 @@ impl ClauseDBIF for ClauseDB {
             return RefClause::UnitClause(self[ci].lits[0]);
         }
 
-        self[ci].search_from = 2;
+        self[ci].search_from = 0;
         let mut new_lits: Vec<Lit> = self[ci]
             .lits
             .iter()
@@ -696,7 +696,9 @@ impl ClauseDBIF for ClauseDB {
         self[ci].lits.swap(old, new);
         // so old becomes new now
         self.insert_watcher(ci, second, !self[ci].lits[old]);
-        self[ci].search_from = ((new + 1) % self[ci].len()).max(2) as u16;
+        let c = &mut self[ci];
+        c.search_from = ((new + 1) % (c.len() - 2)) as u16;
+        // self[ci].search_from = ((new + 1) % (self[ci].len() - 2)) as u16;
         // watch_cache[!c.lits[new]].insert_watch(ci, c.lits[other]);
         // maintain_watch_literal
         // assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
