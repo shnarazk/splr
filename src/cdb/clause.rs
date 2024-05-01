@@ -2,6 +2,7 @@ use {
     super::WatcherLinkIF,
     crate::{assign::AssignIF, types::*},
     std::{
+        collections::HashSet,
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::Iter,
@@ -348,26 +349,32 @@ impl WatcherLinkIF for Clause {
 impl Clause {
     /// update rank field with the present LBD.
     // If it's big enough, skip the loop.
-    pub fn update_lbd(&mut self, asg: &impl AssignIF, lbd_temp: &mut [usize]) -> usize {
-        if 8192 <= self.lits.len() {
-            self.rank = u16::MAX;
-            return u16::MAX as usize;
-        }
-        let key: usize = lbd_temp[0] + 1;
-        lbd_temp[0] = key;
-        let mut cnt = 0;
-        for l in &self.lits {
-            let lv = asg.level(l.vi());
-            if lv == 0 {
-                continue;
-            }
-            let p = &mut lbd_temp[lv as usize];
-            if *p != key {
-                *p = key;
-                cnt += 1;
-            }
-        }
-        self.rank = cnt;
-        cnt as usize
+    pub fn update_lbd(&mut self, asg: &impl AssignIF, _lbd_temp: &mut [usize]) -> usize {
+        self.lits
+            .iter()
+            .map(|l| asg.level(l.vi()))
+            .filter(|l| *l != 0)
+            .collect::<HashSet<DecisionLevel>>()
+            .len()
+        // if 8192 <= self.lits.len() {
+        //     self.rank = u16::MAX;
+        //     return u16::MAX as usize;
+        // }
+        // let key: usize = lbd_temp[0] + 1;
+        // lbd_temp[0] = key;
+        // let mut cnt = 0;
+        // for l in &self.lits {
+        //     let lv = asg.level(l.vi());
+        //     if lv == 0 {
+        //         continue;
+        //     }
+        //     let p = &mut lbd_temp[lv as usize];
+        //     if *p != key {
+        //         *p = key;
+        //         cnt += 1;
+        //     }
+        // }
+        // self.rank = cnt;
+        // cnt as usize
     }
 }
