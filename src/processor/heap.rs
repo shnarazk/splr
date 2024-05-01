@@ -17,18 +17,14 @@ pub trait VarOrderIF {
 #[derive(Clone, Debug, Default)]
 pub struct LitOccurs {
     pub aborted: bool,
-    pub pos_occurs: Vec<ClauseId>,
-    pub neg_occurs: Vec<ClauseId>,
+    pub pos_occurs: Vec<ClauseIndex>,
+    pub neg_occurs: Vec<ClauseIndex>,
 }
 
 impl LitOccurs {
     /// return a new vector of $n$ `LitOccurs`s.
     pub fn new(n: usize) -> Vec<LitOccurs> {
-        let mut vec = Vec::with_capacity(n + 1);
-        for _ in 0..=n {
-            vec.push(LitOccurs::default());
-        }
-        vec
+        vec![LitOccurs::default(); n + 1]
     }
     pub fn clear(&mut self) {
         self.aborted = false;

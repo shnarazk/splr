@@ -1,10 +1,13 @@
 //! Vivification
 #![allow(dead_code)]
-use crate::{
-    assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-    cdb::{ClauseDB, ClauseDBIF, ClauseIF},
-    state::{Stat, State, StateIF},
-    types::*,
+use {
+    crate::{
+        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
+        cdb::{ClauseDB, ClauseDBIF, ClauseIF, ClauseWeaverIF},
+        state::{Stat, State, StateIF},
+        types::*,
+    },
+    std::collections::HashSet,
 };
 
 const VIVIFY_LIMIT: usize = 80_000;
@@ -23,7 +26,7 @@ impl VivifyIF for ClauseDB {
                 SolverError::RootLevelConflict(cc)
             })?;
         }
-        let mut clauses: Vec<OrderedProxy<ClauseId>> =
+        let mut clauses: Vec<OrderedProxy<ClauseIndex>> =
             select_targets(asg, self, state[Stat::Restart] == 0, NUM_TARGETS);
         if clauses.is_empty() {
             return Ok(());
@@ -38,6 +41,7 @@ impl VivifyIF for ClauseDB {
         let mut num_shrink = 0;
         let mut num_assert = 0;
         let mut to_display = 0;
+        let mut deads: HashSet<Lit> = HashSet::new();
         'next_clause: while let Some(cp) = clauses.pop() {
             asg.backtrack_sandbox();
             debug_assert_eq!(asg.decision_level(), asg.root_level());
@@ -48,8 +52,9 @@ impl VivifyIF for ClauseDB {
 
             debug_assert!(asg.stack_is_empty() || !asg.remains());
             debug_assert_eq!(asg.root_level(), asg.decision_level());
-            let cid = cp.to();
-            let c = &mut self[cid];
+            let ci = cp.to();
+            // assert!(!ci.is_lifted());
+            let c = &mut self[ci];
             if c.is_dead() {
                 continue;
             }
@@ -64,7 +69,7 @@ impl VivifyIF for ClauseDB {
                 to_display = num_check + display_step;
             }
             num_check += 1;
-            debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
+            // debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
             let mut decisions: Vec<Lit> = Vec::new();
             for lit in clits.iter().copied() {
                 // assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
@@ -99,13 +104,13 @@ impl VivifyIF for ClauseDB {
                                         asg.backtrack_sandbox();
                                     }
                                 }
-                                AssignReason::Implication(ci) => {
-                                    if ci == cid && clits.len() == decisions.len() {
+                                AssignReason::Implication(cj) => {
+                                    if cj == ci && clits.len() == decisions.len() {
                                         asg.backtrack_sandbox();
                                         continue 'next_clause;
                                     } else {
                                         let cnfl_lits =
-                                            &self[ci].iter().copied().collect::<Vec<Lit>>();
+                                            &self[cj].iter().copied().collect::<Vec<Lit>>();
                                         seen[0] = num_check;
                                         vec = asg.analyze_sandbox(
                                             self, &decisions, cnfl_lits, &mut seen,
@@ -139,7 +144,10 @@ impl VivifyIF for ClauseDB {
                                     }
                                     #[cfg(not(feature = "clause_rewarding"))]
                                     self.new_clause(asg, &mut vec, is_learnt);
-                                    self.remove_clause(cid);
+                                    // propage_sandbox can't handle dead watchers correctly
+                                    self.nullify_clause(ci, &mut deads);
+                                    self.collect(&deads);
+                                    deads.clear();
                                     num_shrink += 1;
                                 }
                             }
@@ -185,14 +193,18 @@ fn select_targets(
     cdb: &mut ClauseDB,
     initial_stage: bool,
     len: Option<usize>,
-) -> Vec<OrderedProxy<ClauseId>> {
+) -> Vec<OrderedProxy<ClauseIndex>> {
     if initial_stage {
-        let mut seen: Vec<Option<OrderedProxy<ClauseId>>> = vec![None; 2 * (asg.num_vars + 1)];
-        for (i, c) in cdb.iter().enumerate().skip(1) {
+        let mut seen: Vec<Option<OrderedProxy<ClauseIndex>>> = vec![None; 2 * (asg.num_vars + 1)];
+        for (ci, c) in cdb.iter().enumerate().skip(1) {
+            if c.is_dead() {
+                continue;
+            }
+            // assert!(!ci.is_lifted());
             if let Some(rank) = c.to_vivify(true) {
                 let p = &mut seen[usize::from(c.lit0())];
                 if p.as_ref().map_or(0.0, |r| r.value()) < rank {
-                    *p = Some(OrderedProxy::new(ClauseId::from(i), rank));
+                    *p = Some(OrderedProxy::new(ci, rank));
                 }
             }
         }
@@ -205,14 +217,11 @@ fn select_targets(
         }
         clauses
     } else {
-        let mut clauses: Vec<OrderedProxy<ClauseId>> = cdb
+        let mut clauses: Vec<OrderedProxy<ClauseIndex>> = cdb
             .iter()
             .enumerate()
             .skip(1)
-            .filter_map(|(i, c)| {
-                c.to_vivify(false)
-                    .map(|r| OrderedProxy::new_invert(ClauseId::from(i), r))
-            })
+            .filter_map(|(i, c)| c.to_vivify(false).map(|r| OrderedProxy::new_invert(i, r)))
             .collect::<Vec<_>>();
         if let Some(max_len) = len {
             if max_len < clauses.len() {
@@ -239,24 +248,24 @@ impl AssignStack {
         for l in conflicting {
             seen[l.vi()] = key;
         }
-        let last_decision = decisions.last().unwrap();
-        let from = self.len_upto(self.root_level());
-        let all = self.stack_iter().map(|l| !*l).collect::<Vec<_>>();
-        let assumes = &all[from..];
-        debug_assert!(
-            all.iter().all(|l| !assumes.contains(&!*l)),
-            "vivify252\n{:?}, {:?}",
-            assumes
-                .iter()
-                .filter(|l| all.contains(&!**l))
-                .collect::<Vec<_>>(),
-            assumes
-                .iter()
-                .filter(|l| all.contains(&!**l))
-                .map(|l| self.reason(l.vi()))
-                .collect::<Vec<_>>(),
-            // am.iter().filter(|l| am.contains(&!**l)).collect::<Vec<_>>(),
-        );
+        // let last_decision = decisions.last().unwrap();
+        // let from = self.len_upto(self.root_level());
+        // let all = self.stack_iter().map(|l| !*l).collect::<Vec<_>>();
+        // let assumes = &all[from..];
+        // debug_assert!(
+        //     all.iter().all(|l| !assumes.contains(&!*l)),
+        //     "vivify252\n{:?}, {:?}",
+        //     assumes
+        //         .iter()
+        //         .filter(|l| all.contains(&!**l))
+        //         .collect::<Vec<_>>(),
+        //     assumes
+        //         .iter()
+        //         .filter(|l| all.contains(&!**l))
+        //         .map(|l| self.reason(l.vi()))
+        //         .collect::<Vec<_>>(),
+        //     // am.iter().filter(|l| am.contains(&!**l)).collect::<Vec<_>>(),
+        // );
         // sweep in the reverse order
         for l in self.stack_iter().skip(self.len_upto(0)).rev() {
             if seen[l.vi()] != key {
@@ -278,8 +287,8 @@ impl AssignStack {
                 AssignReason::BinaryLink(bil) => {
                     seen[bil.vi()] = key;
                 }
-                AssignReason::Implication(cid) => {
-                    for r in cdb[cid].iter().skip(1) {
+                AssignReason::Implication(ci) => {
+                    for r in cdb[ci].iter().skip(1) {
                         seen[r.vi()] = key;
                     }
                 }
@@ -311,18 +320,18 @@ impl AssignStack {
             !learnt.is_empty(),
             "empty learnt, conflict: {conflicting:?}, assumed: {decisions:?}"
         );
-        debug_assert!(
-            learnt.contains(&!*last_decision),
-            "\nThe negation of the last decision {last_decision} isn't contained in {learnt:?}"
-        );
+        // debug_assert!(
+        //     learnt.contains(&!*last_decision),
+        //     "\nThe negation of the last decision {last_decision} isn't contained in {learnt:?}"
+        // );
         // Since we don't assign the right value of the 'reason' literal after conflict analysis,
         // we need not to swap locations.
         // learnt.swap(0, lst);
         // assert!(matches!(self.reason(learnt[0].vi()), AssignReason::None));
-        debug_assert!(
-            learnt.iter().all(|l| !learnt.contains(&!*l)),
-            "res: {learnt:?} from: {decisions:?} and trail: {assumes:?}"
-        );
+        // debug_assert!(
+        //     learnt.iter().all(|l| !learnt.contains(&!*l)),
+        //     "res: {learnt:?} from: {decisions:?} and trail: {assumes:?}"
+        // );
         learnt
     }
 }

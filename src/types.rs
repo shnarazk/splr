@@ -2,7 +2,7 @@
 /// some common traits.
 pub use crate::{
     assign::AssignReason,
-    cdb::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
+    cdb::{Clause, ClauseDB, ClauseIF},
     config::Config,
     primitive::{ema::*, luby::*},
     solver::SolverEvent,
@@ -183,32 +183,12 @@ impl From<i32> for Lit {
     }
 }
 
-impl From<ClauseId> for Lit {
-    #[inline]
-    fn from(cid: ClauseId) -> Self {
-        Lit {
-            ordinal: unsafe {
-                NonZeroU32::new_unchecked(NonZeroU32::get(cid.ordinal) & 0x7FFF_FFFF)
-            },
-        }
-    }
-}
-
 impl From<Lit> for bool {
     /// - positive Lit (= even u32) => Some(true)
     /// - negative Lit (= odd u32)  => Some(false)
     #[inline]
     fn from(l: Lit) -> bool {
         (NonZeroU32::get(l.ordinal) & 1) != 0
-    }
-}
-
-impl From<Lit> for ClauseId {
-    #[inline]
-    fn from(l: Lit) -> ClauseId {
-        ClauseId {
-            ordinal: unsafe { NonZeroU32::new_unchecked(NonZeroU32::get(l.ordinal) | 0x8000_0000) },
-        }
     }
 }
 
@@ -255,24 +235,22 @@ impl Index<Lit> for [bool] {
     type Output = bool;
     #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.get_unchecked(usize::from(l))
+        if cfg!(feature = "unsafe_access") {
+            unsafe { self.get_unchecked(usize::from(l)) }
+        } else {
+            &self[usize::from(l)]
         }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self[usize::from(l)]
     }
 }
 
 impl IndexMut<Lit> for [bool] {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.get_unchecked_mut(usize::from(l))
+        if cfg!(feature = "unsafe_access") {
+            unsafe { self.get_unchecked_mut(usize::from(l)) }
+        } else {
+            &mut self[usize::from(l)]
         }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self[usize::from(l)]
     }
 }
 
@@ -280,24 +258,22 @@ impl Index<Lit> for Vec<bool> {
     type Output = bool;
     #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.get_unchecked(usize::from(l))
+        if cfg!(feature = "unsafe_access") {
+            unsafe { self.get_unchecked(usize::from(l)) }
+        } else {
+            &self[usize::from(l)]
         }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self[usize::from(l)]
     }
 }
 
 impl IndexMut<Lit> for Vec<bool> {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.get_unchecked_mut(usize::from(l))
+        if cfg!(feature = "unsafe_access") {
+            unsafe { self.get_unchecked_mut(usize::from(l)) }
+        } else {
+            &mut self[usize::from(l)]
         }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self[usize::from(l)]
     }
 }
 
@@ -327,6 +303,12 @@ impl LitIF for Lit {
     }
 }
 
+//
+// Clause
+//
+
+pub type ClauseIndex = usize;
+
 /// Capture a conflict
 pub type ConflictContext = (Lit, AssignReason);
 
@@ -338,22 +320,22 @@ pub type PropagationResult = Result<(), ConflictContext>;
 // while EmptyClause can be used for simply UNSAT form.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RefClause {
-    Clause(ClauseId),
+    Clause(ClauseIndex),
     Dead,
     EmptyClause,
-    RegisteredClause(ClauseId),
+    RegisteredClause(ClauseIndex),
     UnitClause(Lit),
 }
 
 impl RefClause {
-    pub fn as_cid(&self) -> ClauseId {
+    pub fn as_ci(&self) -> ClauseIndex {
         match self {
-            RefClause::Clause(cid) => *cid,
-            RefClause::RegisteredClause(cid) => *cid,
+            RefClause::Clause(ci) => *ci,
+            RefClause::RegisteredClause(ci) => *ci,
             _ => panic!("invalid reference to clause"),
         }
     }
-    pub fn is_new(&self) -> Option<ClauseId> {
+    pub fn is_new(&self) -> Option<ClauseIndex> {
         match self {
             RefClause::Clause(cid) => Some(*cid),
             RefClause::RegisteredClause(_) => None,
@@ -567,16 +549,20 @@ bitflags! {
     /// Misc flags used by [`Clause`](`crate::cdb::Clause`).
     #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
     pub struct FlagClause: u8 {
+        /// a clause is dead.
+        const DEAD         = 0b0000_0001;
         /// a clause is a generated clause by conflict analysis and is removable.
-        const LEARNT       = 0b0000_0001;
+        const LEARNT       = 0b0000_0010;
         /// used in conflict analyze
-        const USED         = 0b0000_0010;
+        const USED         = 0b0000_0100;
         /// a clause or var is enqueued for eliminator.
-        const ENQUEUED     = 0b0000_0100;
+        const ENQUEUED     = 0b0000_1000;
         /// a clause is registered in vars' occurrence list.
-        const OCCUR_LINKED = 0b0000_1000;
+        const OCCUR_LINKED = 0b0001_0000;
         /// a given clause derived a learnt which LBD is smaller than 20.
-        const DERIVE20     = 0b0001_0000;
+        const DERIVE20     = 0b0010_0000;
+        /// used in garbage collector.
+        const SWEEPED      = 0b0100_0000;
     }
 }
 

@@ -239,7 +239,7 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut previous_stage: Option<bool> = Some(true);
     let mut num_learnt = 0;
-    let mut current_core: usize = 999_999;
+    let mut current_core: usize = asg.derefer(assign::property::Tusize::NumUnassertedVar);
     let mut core_was_rebuilt: Option<usize> = None;
     let stage_size: usize = 32;
     #[cfg(feature = "rephase")]
