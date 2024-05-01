@@ -345,12 +345,16 @@ impl Clause {
     /// update rank field with the present LBD.
     // If it's big enough, skip the loop.
     pub fn update_lbd(&mut self, asg: &impl AssignIF, _lbd_temp: &mut [usize]) -> usize {
-        self.lits
+        let base_level = asg.root_level();
+        let rank = self
+            .lits
             .iter()
             .map(|l| asg.level(l.vi()))
-            .filter(|l| *l != 0)
+            .filter(|l| *l != base_level)
             .collect::<HashSet<DecisionLevel>>()
-            .len()
+            .len();
+        self.rank = rank as u16;
+        rank
         // if 8192 <= self.lits.len() {
         //     self.rank = u16::MAX;
         //     return u16::MAX as usize;
