@@ -298,7 +298,13 @@ fn search(
                     state.exploration_rate_ema.update(1.0);
                     if cfg!(feature = "two_mode_reduction") && new_segment {
                         if cfg!(feature = "no_restart") {
-                            cdb.reduce(asg, ReductionType::RASonALL(0.2, 0.25));
+                            cdb.reduce(
+                                asg,
+                                ReductionType::RASonALL(
+                                    state.config.cls_rdc_ras,
+                                    state.config.cls_rdc_rm3,
+                                ),
+                            );
                         } else {
                             cdb.reduce(
                                 asg,
