@@ -271,9 +271,14 @@ fn search(
             } else {
                 return Err(SolverError::UndescribedError);
             }
-            RESTART!(asg, cdb, state);
-            asg.select_rephasing_target();
-            asg.clear_asserted_literals(cdb)?;
+            if !cfg!(feature = "no_restart") {
+                RESTART!(asg, cdb, state);
+            }
+            let at_base_level = asg.decision_level() == asg.root_level();
+            if at_base_level {
+                asg.select_rephasing_target();
+                asg.clear_asserted_literals(cdb)?;
+            }
 
             #[cfg(feature = "trace_equivalency")]
             cdb.check_consistency(asg, "before simplify");
@@ -291,7 +296,7 @@ fn search(
                 // a beginning of a new cycle
                 {
                     state.exploration_rate_ema.update(1.0);
-                    if cfg!(feature = "two_mode_reduction") {
+                    if cfg!(feature = "two_mode_reduction") && at_base_level {
                         cdb.reduce(
                             asg,
                             ReductionType::LBDonALL(
@@ -355,7 +360,7 @@ fn search(
                     }
                     asg.select_rephasing_target();
                 }
-                if cfg!(feature = "clause_vivification") {
+                if cfg!(feature = "clause_vivification") && at_base_level {
                     cdb.vivify(asg, state)?;
                 }
                 if new_segment {
@@ -364,7 +369,7 @@ fn search(
                         let decay_index: f64 = (20 + 2 * base) as f64;
                         asg.update_activity_decay((decay_index - 1.0) / decay_index);
                     }
-                    if !cfg!(feature = "no_clause_elimination") {
+                    if !cfg!(feature = "no_clause_elimination") && at_base_level {
                         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                         state.flush("clause subsumption, ");
                         elim.simplify(asg, cdb, state, false)?;
@@ -378,7 +383,7 @@ fn search(
                 }
             } else {
                 {
-                    if cfg!(feature = "two_mode_reduction") {
+                    if cfg!(feature = "two_mode_reduction") && at_base_level {
                         cdb.reduce(
                             asg,
                             ReductionType::RASonADD(
@@ -389,7 +394,7 @@ fn search(
                 }
             }
             {
-                if !cfg!(feature = "two_mode_reduction") {
+                if !cfg!(feature = "two_mode_reduction") && at_base_level {
                     cdb.reduce(
                         asg,
                         ReductionType::RASonADD(state.stm.num_reducible(state.config.cls_rdc_rm1)),
