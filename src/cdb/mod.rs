@@ -739,6 +739,14 @@ impl ClauseDBIF for ClauseDB {
                 self.rank as f64
             }
         }
+        let mut using: HashSet<ClauseIndex> = HashSet::new();
+        if asg.decision_level() != asg.root_level() {
+            for v in asg.var_iter_mut() {
+                if let AssignReason::Implication(ci) = v.reason {
+                    using.insert(ci);
+                }
+            }
+        }
         let ClauseDB {
             ref mut clause,
             ref mut lbd_temp,
@@ -775,7 +783,7 @@ impl ClauseDBIF for ClauseDB {
                 asg.level(c.lit0().vi()),
                 asg.decision_level(),
             );
-            if !c.is(FlagClause::LEARNT) {
+            if !c.is(FlagClause::LEARNT) || using.contains(&ci) {
                 continue;
             }
             alives += 1;
