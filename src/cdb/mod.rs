@@ -773,6 +773,9 @@ impl ClauseDBIF for ClauseDB {
             #[cfg(feature = "clause_rewarding")]
             c.update_activity(*tick, *activity_decay, 0.0);
 
+            if !c.is(FlagClause::LEARNT) || using.contains(&ci) {
+                continue;
+            }
             // There's no clause stored in `reason` because the decision level is 'zero.'
             debug_assert_ne!(
                 asg.reason(c.lit0().vi()),
@@ -783,9 +786,6 @@ impl ClauseDBIF for ClauseDB {
                 asg.level(c.lit0().vi()),
                 asg.decision_level(),
             );
-            if !c.is(FlagClause::LEARNT) || using.contains(&ci) {
-                continue;
-            }
             alives += 1;
             match setting {
                 ReductionType::RASonADD(_) => {
