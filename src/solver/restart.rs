@@ -40,7 +40,7 @@ impl Instantiate for RestartManager {
 }
 
 impl RestartIF for RestartManager {
-    fn restart(&mut self, _lbd: &EmaView, _ent: &EmaView) -> bool {
+    fn restart(&mut self, lbd: &EmaView, ent: &EmaView) -> bool {
         if cfg!(feature = "no_restart") {
             false
         } else {

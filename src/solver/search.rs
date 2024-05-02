@@ -296,14 +296,18 @@ fn search(
                 // a beginning of a new cycle
                 {
                     state.exploration_rate_ema.update(1.0);
-                    if cfg!(feature = "two_mode_reduction") && at_base_level {
-                        cdb.reduce(
-                            asg,
-                            ReductionType::LBDonALL(
-                                state.config.cls_rdc_lbd,
-                                state.config.cls_rdc_rm2,
-                            ),
-                        );
+                    if cfg!(feature = "two_mode_reduction") && new_segment {
+                        if cfg!(feature = "no_restart") {
+                            cdb.reduce(asg, ReductionType::RASonALL(0.2, 0.25));
+                        } else {
+                            cdb.reduce(
+                                asg,
+                                ReductionType::LBDonALL(
+                                    state.config.cls_rdc_lbd,
+                                    state.config.cls_rdc_rm2,
+                                ),
+                            );
+                        }
                     }
                 }
                 #[cfg(feature = "rephase")]
@@ -380,10 +384,8 @@ fn search(
                     if cfg!(feature = "dynamic_restart_threshold") {
                         state.restart.set_segment_parameters(max_scale);
                     }
-                }
-            } else {
-                {
-                    if cfg!(feature = "two_mode_reduction") && at_base_level {
+                } else {
+                    if cfg!(feature = "two_mode_reduction") && false {
                         cdb.reduce(
                             asg,
                             ReductionType::RASonADD(
@@ -394,7 +396,7 @@ fn search(
                 }
             }
             {
-                if !cfg!(feature = "two_mode_reduction") && at_base_level {
+                if !cfg!(feature = "two_mode_reduction") {
                     cdb.reduce(
                         asg,
                         ReductionType::RASonADD(state.stm.num_reducible(state.config.cls_rdc_rm1)),

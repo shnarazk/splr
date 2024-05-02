@@ -54,13 +54,21 @@ pub struct Config {
     //
     //## clause management
     //
+    // Note:
+    // - Meaning of cls_rdc_rm1:
+    //   The 1.0^(1.0-cls_rdc_rm1) of generated clauses in the latest stage
+    //   with be removed.
+    // - Meaning of (cls_rdc_lbd, cls_rdc_rm1):
+    //   Keep clauses with smaller LBDs than
+    //   cls_rdc_lbd, but warst N^(1.0 - cls_rdc_rm2) clauses will be removed.
+    //
     // clause reward dacay rate
     pub crw_dcy_rat: f64,
     // clause reduction LBD threshold for mode 2: exploration
     pub cls_rdc_lbd: u16,
-    // clause reduction ratio for mode 1: exploitation
+    // clause reduction ratio for mode 1: exploitation (smaller value, keep more)
     pub cls_rdc_rm1: f64,
-    // clause reduction ratio for mode 2: exploration
+    // clause reduction ratio for mode 2: exploration (smaller value, keep more)
     pub cls_rdc_rm2: f64,
 
     //
@@ -108,9 +116,9 @@ impl Default for Config {
             use_log: false,
 
             crw_dcy_rat: 0.95,
-            cls_rdc_lbd: 5,
-            cls_rdc_rm1: 0.2,
-            cls_rdc_rm2: 0.05,
+            cls_rdc_lbd: 10,
+            cls_rdc_rm1: 0.1,
+            cls_rdc_rm2: 0.1,
 
             enable_eliminator: !cfg!(feature = "no_clause_elimination"),
             elm_cls_lim: 64,

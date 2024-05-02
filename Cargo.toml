@@ -67,6 +67,7 @@ incremental_solver = [          # for all solution SAT sover
 just_used = []                  # Var and clause have 'just_used' flags
 LRB_rewarding = []              # Vearning Rate Based rewarding, a new var activity criteria
 no_IO = []                      # to embed Splr into non-std environments
+no_restart = []
 platform_wasm = [
         "instant"               # use instant::Duration instead of std::time::Duration
 ]
