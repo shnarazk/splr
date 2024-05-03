@@ -502,6 +502,7 @@ impl Eliminator {
             }
         }
         if asg.remains() {
+            cdb.collect(deads);
             asg.propagate_sandbox(cdb)
                 .map_err(SolverError::RootLevelConflict)?;
         }
