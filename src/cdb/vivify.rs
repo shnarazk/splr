@@ -19,12 +19,38 @@ pub trait VivifyIF {
 impl VivifyIF for ClauseDB {
     /// vivify clauses under `asg`
     fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent {
+        #[cfg(feature = "debug_weaver")]
+        self.check_all_chains();
         const NUM_TARGETS: Option<usize> = Some(VIVIFY_LIMIT);
+        let root_level = asg.decision_level();
+        let at_root_level = root_level == asg.root_level();
+        if !at_root_level {
+            return Ok(());
+        }
+        // self.check_chains(0);
+        // let mut free: HashSet<ClauseIndex> = HashSet::new();
+        // let mut ci = self.watch[1];
+        // while ci != 0 {
+        //     free.insert(ci);
+        //     ci = self.clause[ci].link0;
+        // }
+        // assert!(self
+        //     .iter()
+        //     .enumerate()
+        //     .skip(1)
+        //     .all(|(ci, c)| !c.is_dead() || free.contains(&ci)));
+        // if !at_root_level {
+        //     return Ok(());
+        // }
+        debug_assert!(at_root_level || asg.remains());
         if asg.remains() {
             asg.propagate_sandbox(self).map_err(|cc| {
                 state.log(None, "By vivifier");
                 SolverError::RootLevelConflict(cc)
             })?;
+        }
+        if !at_root_level {
+            return Ok(());
         }
         let mut clauses: Vec<OrderedProxy<ClauseIndex>> =
             select_targets(asg, self, state[Stat::Restart] == 0, NUM_TARGETS);
@@ -46,6 +72,7 @@ impl VivifyIF for ClauseDB {
             asg.backtrack_sandbox();
             debug_assert_eq!(asg.decision_level(), asg.root_level());
             if asg.remains() {
+                assert!(at_root_level);
                 asg.propagate_sandbox(self)
                     .map_err(SolverError::RootLevelConflict)?;
             }
@@ -53,6 +80,7 @@ impl VivifyIF for ClauseDB {
             debug_assert!(asg.stack_is_empty() || !asg.remains());
             debug_assert_eq!(asg.root_level(), asg.decision_level());
             let ci = cp.to();
+            // (*self).check_watcher_status(ci);
             // assert!(!ci.is_lifted());
             let c = &mut self[ci];
             if c.is_dead() {
@@ -122,20 +150,22 @@ impl VivifyIF for ClauseDB {
                                     unreachable!("vivify")
                                 }
                             }
+                            assert!(asg.decision_level() == root_level);
+                            assert!(!asg.remains());
                             match vec.len() {
-                                0 => {
+                                0 if at_root_level => {
                                     state.flush("");
                                     state[Stat::VivifiedClause] += num_shrink;
                                     state[Stat::VivifiedVar] += num_assert;
                                     state.log(None, "RootLevelConflict By vivify");
                                     return Err(SolverError::EmptyClause);
                                 }
-                                1 => {
+                                1 if at_root_level => {
                                     self.certificate_add_assertion(vec[0]);
                                     asg.assign_at_root_level(vec[0])?;
                                     num_assert += 1;
                                 }
-                                _ => {
+                                _ if at_root_level => {
                                     #[cfg(feature = "clause_rewarding")]
                                     if let Some(ci) =
                                         self.new_clause(asg, &mut vec, is_learnt).is_new()
@@ -146,10 +176,11 @@ impl VivifyIF for ClauseDB {
                                     self.new_clause(asg, &mut vec, is_learnt);
                                     // propage_sandbox can't handle dead watchers correctly
                                     self.nullify_clause(ci, &mut deads);
-                                    self.collect(&deads);
+                                    self.collect_dead_watchers(&mut deads);
                                     deads.clear();
                                     num_shrink += 1;
                                 }
+                                _ => (),
                             }
                             continue 'next_clause;
                         }
@@ -162,11 +193,16 @@ impl VivifyIF for ClauseDB {
             }
         }
         asg.backtrack_sandbox();
+        assert!(!asg.remains());
         if asg.remains() {
             asg.propagate_sandbox(self)
                 .map_err(SolverError::RootLevelConflict)?;
         }
-        asg.clear_asserted_literals(self)?;
+        if at_root_level {
+            asg.clear_asserted_literals(self)?;
+        } else {
+            asg.cancel_until(root_level);
+        }
         debug_assert!(asg.stack_is_empty() || !asg.remains());
         state.flush("");
         state.flush(format!(
@@ -184,6 +220,7 @@ impl VivifyIF for ClauseDB {
         // );
         state[Stat::VivifiedClause] += num_shrink;
         state[Stat::VivifiedVar] += num_assert;
+        assert!(!asg.remains());
         Ok(())
     }
 }
@@ -194,10 +231,18 @@ fn select_targets(
     initial_stage: bool,
     len: Option<usize>,
 ) -> Vec<OrderedProxy<ClauseIndex>> {
+    let mut using: HashSet<ClauseIndex> = HashSet::new();
+    if asg.decision_level() != asg.root_level() {
+        for v in asg.var_iter_mut() {
+            if let AssignReason::Implication(ci) = v.reason {
+                using.insert(ci);
+            }
+        }
+    }
     if initial_stage {
         let mut seen: Vec<Option<OrderedProxy<ClauseIndex>>> = vec![None; 2 * (asg.num_vars + 1)];
         for (ci, c) in cdb.iter().enumerate().skip(1) {
-            if c.is_dead() {
+            if c.is_dead() || c.len() == 2 || using.contains(&ci) {
                 continue;
             }
             // assert!(!ci.is_lifted());
@@ -221,6 +266,7 @@ fn select_targets(
             .iter()
             .enumerate()
             .skip(1)
+            .filter(|(ci, c)| !using.contains(ci) && 2 < c.len())
             .filter_map(|(i, c)| c.to_vivify(false).map(|r| OrderedProxy::new_invert(i, r)))
             .collect::<Vec<_>>();
         if let Some(max_len) = len {

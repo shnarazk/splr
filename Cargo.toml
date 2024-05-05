@@ -38,16 +38,17 @@ default = [
 
         ### Logic formula processor
         # "no_clause_elimination",
-        "clause_vivification",
+        # "clause_vivification",
 
         ### For DEBUG
         # "boundary_check",
+        # "debug_weaver",
 
         ### platform dependency
         # "platform_wasm"
 
         ### experimental
-        "no_restart",
+        # "no_restart",
 ]
 assign_rate = []                # for debug and study
 best_phases_tracking = []       # save the best-so-far assignment, used by 'rephase'
@@ -58,6 +59,7 @@ no_clause_elimination = []      # pre(in)-processor setting
 clause_rewarding = []           # clauses have activities w/ decay rate
 clause_vivification = []        # pre(in)-processor setting
 debug_propagation = []          # for debug
+debug_weaver = []
 dynamic_restart_threshold = []  # control restart spans like Glucose
 EMA_calibration = []            # each exponential moving average has a calbration value
 EVSIDS = []                     # Eponential Variable State Independent Decaying Sum

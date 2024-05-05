@@ -304,7 +304,7 @@ impl EliminateIF for Eliminator {
         }
         self.var_queue.clear(asg);
         debug_assert!(self.clause_queue.is_empty());
-        cdb.collect(&deads);
+        cdb.collect_dead_watchers(&mut deads);
         cdb.check_size().map(|_| ())
     }
     fn sorted_iterator(&self) -> Iter<'_, u32> {
@@ -494,15 +494,18 @@ impl Eliminator {
                             //         || d.contains(Lit::from((best, true)))
                             // );
                             self.try_subsume(asg, cdb, ci, *did, deads)?;
+                            // cdb.collect_dead_watchers(deads);
                         }
                     }
                 }
                 self[best].pos_occurs.retain(|ci| !cdb[*ci].is_dead());
                 self[best].neg_occurs.retain(|ci| !cdb[*ci].is_dead());
+                // #[cfg(feature = "check_weaver")]
+                // cdb.check_chain(ci);
             }
         }
         if asg.remains() {
-            cdb.collect(deads);
+            cdb.collect_dead_watchers(deads);
             asg.propagate_sandbox(cdb)
                 .map_err(SolverError::RootLevelConflict)?;
         }

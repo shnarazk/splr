@@ -131,7 +131,7 @@ fn main() {
         .to_str()
         .unwrap_or_else(|| panic!("{} does not exist.", args.problem.to_str().unwrap()));
     let mut config = Config::default();
-    config.cnf_file = args.problem.clone();
+    config.cnf_file.clone_from(&args.problem);
     config.quiet_mode = true;
     let (red, green, blue) = if args.no_color {
         (RESET, RESET, RESET)

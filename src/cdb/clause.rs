@@ -311,6 +311,12 @@ impl WatcherLinkIF for Clause {
             }
         }
     }
+    fn next_free(&self) -> ClauseIndex {
+        self.link0
+    }
+    fn next_free_mut(&mut self) -> &mut ClauseIndex {
+        &mut self.link0
+    }
     fn next_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex {
         #[cfg(feature = "unsafe_access")]
         unsafe {
@@ -344,7 +350,7 @@ impl WatcherLinkIF for Clause {
 impl Clause {
     /// update rank field with the present LBD.
     // If it's big enough, skip the loop.
-    pub fn update_lbd(&mut self, asg: &impl AssignIF, _lbd_temp: &mut [usize]) -> usize {
+    pub fn update_lbd(&mut self, asg: &impl AssignIF) -> usize {
         let base_level = asg.root_level();
         let rank = self
             .lits

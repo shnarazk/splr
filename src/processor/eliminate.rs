@@ -96,7 +96,6 @@ pub fn eliminate_var(
                         RefClause::Clause(ci) => {
                             // the merged clause might be a duplicated clause.
                             elim.add_cid_occur(asg, ci, &mut cdb[ci], true);
-
                             #[cfg(feature = "trace_elimination")]
                             println!(
                                 " - eliminate_var {}: X {} from {} and {}",
@@ -361,8 +360,6 @@ mod tests {
     #[cfg(not(feature = "no_IO"))]
     #[test]
     fn test_eliminate_var() {
-        use crate::cdb::ClauseWeaverIF;
-
         let Solver {
             ref mut asg,
             ref mut cdb,
@@ -379,7 +376,7 @@ mod tests {
         elim.prepare(asg, cdb, true);
         let mut deads: HashSet<Lit> = HashSet::new();
         eliminate_var(asg, cdb, &mut elim, state, vi, &mut timedout, &mut deads).expect("panic");
-        cdb.collect(&deads);
+        cdb.collect_dead_watchers(&mut daeds);
         assert!(asg.var(vi).is(FlagVar::ELIMINATED));
         assert!(cdb.iter().skip(1).all(|c| c.is_dead()
             || (c.iter().all(|l| *l != Lit::from((vi, false)))
