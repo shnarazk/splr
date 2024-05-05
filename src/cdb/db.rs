@@ -35,7 +35,6 @@ pub struct ClauseDB {
     pub(super) preppend_head: bool,
     // not in use
     // lbd_frozen_clause: usize,
-    pub num_correct: usize,
 
     // bi-clause completion
     pub(super) bi_clause_completion_queue: Vec<Lit>,

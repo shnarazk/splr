@@ -156,7 +156,6 @@ impl Default for ClauseDB {
             soft_limit: 0, // 248_000_000
             co_lbd_bound: 4,
             preppend_head: true,
-            num_correct: 0,
 
             bi_clause_completion_queue: Vec::new(),
             num_bi_clause_completion: 0,
@@ -1158,18 +1157,6 @@ impl ClauseWeaverIF for ClauseDB {
             deads.insert(!l0);
             deads.insert(!l1);
         }
-        // {
-        //     if 0 < self.num_correct {
-        //         self.num_correct += 1;
-        //         // 18778072
-        //         if 1 < self.num_correct {
-        //             self.collect_dead_watchers(deads);
-        //             if let Err(s) = self.check_all_watchers_status() {
-        //                 panic!("{s}");
-        //             }
-        //         }
-        //     }
-        // }
     }
     fn nullify_clause_sandbox(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>) {
         // assert!(!self[ci].is_dead());
@@ -1185,18 +1172,6 @@ impl ClauseWeaverIF for ClauseDB {
         } else {
             deads.insert(!l0);
             deads.insert(!l1);
-        }
-        {
-            // if 0 < self.num_correct {
-            //     self.num_correct += 1;
-            //     // 111670350
-            //     if 110000000 < self.num_correct {
-            //         self.collect_dead_watchers(deads);
-            //         if let Err(s) = self.check_all_watchers_status() {
-            //             panic!("{s}");
-            //         }
-            //     }
-            // }
         }
     }
     fn collect_dead_watchers(&mut self, targets: &mut HashSet<Lit>) {
@@ -1254,8 +1229,8 @@ impl ClauseWeaverIF for ClauseDB {
                 count += 1;
                 if len < count {
                     return Err(format!(
-                        "At {}, watcher list.{} for {}:{} became a loop",
-                        self.num_correct, !l0, ci, &self[ci]
+                        "watcher list.{} for {}:{} became a loop",
+                        !l0, ci, &self[ci]
                     ));
                 }
             }
@@ -1342,8 +1317,8 @@ impl ClauseWeaverIF for ClauseDB {
             while ci != Self::HEAD_INDEX {
                 if !allow_dead && self[ci].is_dead() {
                     return Err(format!(
-                        "At {}, watcher list {} contains a dead clause {}:{:?}",
-                        self.num_correct, l, ci, self[ci]
+                        "watcher list {} contains a dead clause {}:{:?}",
+                        l, ci, self[ci]
                     ));
                 }
                 ci = self[ci].next_for_lit(Lit::from(l));

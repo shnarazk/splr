@@ -142,7 +142,6 @@ impl SolveIF for Solver {
                 //## Run eliminator
                 //
                 if USE_PRE_PROCESSING_ELIMINATOR {
-                    // cdb.num_correct = 0;
                     state.flush("simplifying...");
                     if elim.simplify(asg, cdb, state, false).is_err() {
                         // Why inconsistent? Because the CNF contains a conflict, not an error!
@@ -153,7 +152,6 @@ impl SolveIF for Solver {
                         }
                         return Ok(Certificate::UNSAT);
                     }
-                    cdb.num_correct = 0;
                     for vi in 1..=asg.num_vars {
                         if asg.assign(vi).is_some() || asg.var(vi).is(FlagVar::ELIMINATED) {
                             continue;
