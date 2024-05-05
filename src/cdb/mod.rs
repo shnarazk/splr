@@ -1132,7 +1132,8 @@ impl ClauseWeaverIF for ClauseDB {
             c.turn_on(FlagClause::DEAD);
         }
         let mut watches = vec![ClauseIndex::default(); 2 * (num_vars + 1)];
-        watches[Self::FREE_INDEX] = 1;
+        *clauses[nc - 1].next_free_mut() = Self::HEAD_INDEX;
+        watches[Self::FREE_INDEX] = if 1 < nc { 1 } else { 0 };
         watches
     }
     /// This and the sandbox version are the only functions that make clause DEAD.
@@ -1552,6 +1553,7 @@ mod tests {
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_ci();
+        assert_eq!(cdb.len(), 2);
         assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
         let mut iter = cdb[c1][0..].iter();
         assert_eq!(iter.next(), Some(&lit(1)));

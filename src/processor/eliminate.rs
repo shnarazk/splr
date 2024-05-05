@@ -335,7 +335,7 @@ mod tests {
     use super::*;
     use crate::{
         assign::VarManipulateIF,
-        cdb::{Clause, ClauseDB},
+        cdb::{Clause, ClauseDB, ClauseWeaverIF},
         processor::EliminateIF,
         solver::Solver,
     };
@@ -376,7 +376,7 @@ mod tests {
         elim.prepare(asg, cdb, true);
         let mut deads: HashSet<Lit> = HashSet::new();
         eliminate_var(asg, cdb, &mut elim, state, vi, &mut timedout, &mut deads).expect("panic");
-        cdb.collect_dead_watchers(&mut daeds);
+        cdb.collect_dead_watchers(&mut deads);
         assert!(asg.var(vi).is(FlagVar::ELIMINATED));
         assert!(cdb.iter().skip(1).all(|c| c.is_dead()
             || (c.iter().all(|l| *l != Lit::from((vi, false)))
