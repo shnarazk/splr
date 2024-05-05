@@ -505,7 +505,7 @@ impl Eliminator {
             }
         }
         if asg.remains() {
-            cdb.collect_dead_watchers(deads);
+            // cdb.collect_dead_watchers(deads);
             asg.propagate_sandbox(cdb)
                 .map_err(SolverError::RootLevelConflict)?;
         }

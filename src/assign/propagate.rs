@@ -542,10 +542,10 @@ impl PropagateIF for AssignStack {
             let mut ci = cdb.get_watcher_link(propagating);
             'next_clause: while ci != 0 {
                 let c = &mut cdb[ci];
-                // if c.is_dead() {
-                //     ci = c.next_for_lit(propagating);
-                //     continue 'next_clause;
-                // }
+                if c.is_dead() {
+                    ci = c.next_for_lit(propagating);
+                    continue 'next_clause;
+                }
                 let (other, false_index) = if false_lit == c.lit0() {
                     (c.lit1(), 0)
                 } else {

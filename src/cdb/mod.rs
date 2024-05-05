@@ -1158,18 +1158,18 @@ impl ClauseWeaverIF for ClauseDB {
             deads.insert(!l0);
             deads.insert(!l1);
         }
-        {
-            if 0 < self.num_correct {
-                self.num_correct += 1;
-                // 18778072
-                if 1 < self.num_correct {
-                    self.collect_dead_watchers(deads);
-                    if let Err(s) = self.check_all_watchers_status() {
-                        panic!("{s}");
-                    }
-                }
-            }
-        }
+        // {
+        //     if 0 < self.num_correct {
+        //         self.num_correct += 1;
+        //         // 18778072
+        //         if 1 < self.num_correct {
+        //             self.collect_dead_watchers(deads);
+        //             if let Err(s) = self.check_all_watchers_status() {
+        //                 panic!("{s}");
+        //             }
+        //         }
+        //     }
+        // }
     }
     fn nullify_clause_sandbox(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>) {
         // assert!(!self[ci].is_dead());
@@ -1187,16 +1187,16 @@ impl ClauseWeaverIF for ClauseDB {
             deads.insert(!l1);
         }
         {
-            if 0 < self.num_correct {
-                self.num_correct += 1;
-                // 111670350
-                if 110000000 < self.num_correct {
-                    self.collect_dead_watchers(deads);
-                    if let Err(s) = self.check_all_watchers_status() {
-                        panic!("{s}");
-                    }
-                }
-            }
+            // if 0 < self.num_correct {
+            //     self.num_correct += 1;
+            //     // 111670350
+            //     if 110000000 < self.num_correct {
+            //         self.collect_dead_watchers(deads);
+            //         if let Err(s) = self.check_all_watchers_status() {
+            //             panic!("{s}");
+            //         }
+            //     }
+            // }
         }
     }
     fn collect_dead_watchers(&mut self, targets: &mut HashSet<Lit>) {

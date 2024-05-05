@@ -72,7 +72,7 @@ impl VivifyIF for ClauseDB {
             asg.backtrack_sandbox();
             debug_assert_eq!(asg.decision_level(), asg.root_level());
             if asg.remains() {
-                assert!(at_root_level);
+                debug_assert!(at_root_level);
                 asg.propagate_sandbox(self)
                     .map_err(SolverError::RootLevelConflict)?;
             }
@@ -110,6 +110,8 @@ impl VivifyIF for ClauseDB {
                         decisions.push(!lit);
                         asg.assign_by_decision(!lit);
                         //## Rule 3
+                        // propage_sandbox can't handle dead watchers correctly
+                        self.collect_dead_watchers(&mut deads);
                         if let Err(cc) = asg.propagate_sandbox(self) {
                             let mut vec: Vec<Lit>;
                             match cc.1 {
@@ -150,8 +152,8 @@ impl VivifyIF for ClauseDB {
                                     unreachable!("vivify")
                                 }
                             }
-                            assert!(asg.decision_level() == root_level);
-                            assert!(!asg.remains());
+                            debug_assert!(asg.decision_level() == root_level);
+                            debug_assert!(!asg.remains());
                             match vec.len() {
                                 0 if at_root_level => {
                                     state.flush("");
@@ -174,10 +176,7 @@ impl VivifyIF for ClauseDB {
                                     }
                                     #[cfg(not(feature = "clause_rewarding"))]
                                     self.new_clause(asg, &mut vec, is_learnt);
-                                    // propage_sandbox can't handle dead watchers correctly
                                     self.nullify_clause(ci, &mut deads);
-                                    self.collect_dead_watchers(&mut deads);
-                                    deads.clear();
                                     num_shrink += 1;
                                 }
                                 _ => (),
@@ -193,7 +192,7 @@ impl VivifyIF for ClauseDB {
             }
         }
         asg.backtrack_sandbox();
-        assert!(!asg.remains());
+        debug_assert!(!asg.remains());
         if asg.remains() {
             asg.propagate_sandbox(self)
                 .map_err(SolverError::RootLevelConflict)?;
@@ -220,7 +219,7 @@ impl VivifyIF for ClauseDB {
         // );
         state[Stat::VivifiedClause] += num_shrink;
         state[Stat::VivifiedVar] += num_assert;
-        assert!(!asg.remains());
+        debug_assert!(!asg.remains());
         Ok(())
     }
 }
