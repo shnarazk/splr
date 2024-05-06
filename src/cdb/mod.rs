@@ -643,6 +643,7 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(!self[ci].is_dead());
         debug_assert!(old < 2);
         debug_assert!(1 < new);
+        debug_assert!(!self[ci].is(FlagClause::SWEEPED));
         //## Step:1
         let ret = if old == 0 {
             self[ci].link0
@@ -1085,14 +1086,24 @@ impl ClauseWeaverIF for ClauseDB {
             let next1 = self.watch[usize::from(lit)];
             let next2 = self.clause[next1].next_for_lit(lit);
             self.watch[usize::from(lit)] = next2;
-            debug_assert!(self[next1].lits[1] == !lit || self[next1].lits[0] == !lit);
+            debug_assert!(self[next1].lits[0] == !lit || self[next1].lits[1] == !lit);
+            debug_assert!(
+                next2 == Self::HEAD_INDEX
+                    || self[next2].lits[0] == !lit
+                    || self[next2].lits[1] == !lit
+            );
             self[next1].lits[1] == !lit
         } else {
             let next1 = self.clause[ci].next_for_lit(lit);
             let next2 = self.clause[next1].next_for_lit(lit);
             *self.clause[ci].next_for_lit_mut(lit) = next2;
             debug_assert!(self[ci].lits[1] == !lit || self[ci].lits[0] == !lit);
-            debug_assert!(self[next1].lits[1] == !lit || self[next1].lits[0] == !lit);
+            debug_assert!(self[next1].lits[0] == !lit || self[next1].lits[1] == !lit);
+            debug_assert!(
+                next2 == Self::HEAD_INDEX
+                    || self[next2].lits[0] == !lit
+                    || self[next2].lits[1] == !lit
+            );
             self[next1].lits[1] == !lit
         }
     }
@@ -1137,7 +1148,8 @@ impl ClauseWeaverIF for ClauseDB {
     }
     /// This and the sandbox version are the only functions that make clause DEAD.
     fn nullify_clause(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>) {
-        // assert!(!self[ci].is_dead());
+        debug_assert!(!self[ci].is_dead());
+        debug_assert!(!self[ci].is(FlagClause::SWEEPED));
         let c = &mut self.clause[ci];
         self.certification_store.delete_clause(&c.lits);
         let l0 = c.lit0();
@@ -1152,6 +1164,7 @@ impl ClauseWeaverIF for ClauseDB {
                 .remove(l0, l1)
                 .expect("Error (remove_clause)");
             self.num_bi_clause -= 1;
+            self[ci].turn_on(FlagClause::SWEEPED);
             self.move_to_free_list(ci);
         } else {
             deads.insert(!l0);
@@ -1159,7 +1172,7 @@ impl ClauseWeaverIF for ClauseDB {
         }
     }
     fn nullify_clause_sandbox(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>) {
-        // assert!(!self[ci].is_dead());
+        debug_assert!(!self[ci].is_dead());
         let c = &mut self.clause[ci];
         let l0 = c.lit0();
         let l1 = c.lit1();
@@ -1183,8 +1196,11 @@ impl ClauseWeaverIF for ClauseDB {
                     let next_ci = self[ci].next_for_lit(*lit);
                     self.remove_next_watcher(prev, *lit);
                     if self[ci].is(FlagClause::SWEEPED) {
-                        self[ci].turn_off(FlagClause::SWEEPED);
                         self.move_to_free_list(ci);
+                        // self[ci].turn_off(FlagClause::SWEEPED);
+                        if let Err(s) = self.check_dead_watcher_status(ci) {
+                            panic!("{s}");
+                        }
                     } else {
                         self[ci].turn_on(FlagClause::SWEEPED);
                     }
@@ -1204,16 +1220,17 @@ impl ClauseWeaverIF for ClauseDB {
             free.insert(ci);
             ci = self.clause[ci].next_free();
         }
-        for ci in 1..self.len() {
-            if free.contains(&ci) {
-                continue;
-            } else {
-                self.check_watcher_status(ci)?;
-            }
-        }
+        // for ci in 1..self.len() {
+        //     if self[ci].is_dead() {
+        //         self.check_dead_watcher_status(ci)?;
+        //     } else {
+        //         self.check_watcher_status(ci, self[ci].is_dead())?;
+        //     }
+        // }
         Ok(())
     }
-    fn check_watcher_status(&self, ci: ClauseIndex) -> Result<(), String> {
+    fn check_watcher_status(&self, ci: ClauseIndex, should_be_dead: bool) -> Result<(), String> {
+        assert!(should_be_dead || !self[ci].is_dead());
         let len = self.len();
         let l0 = self[ci].lit0();
         let l1 = self[ci].lit1();
@@ -1302,6 +1319,122 @@ impl ClauseWeaverIF for ClauseDB {
             if !found {
                 return Err(format!(
                     "\nWatcher link {} does not include {}:{:?}",
+                    !l1, ci, &self[ci]
+                ));
+            }
+        }
+        Ok(())
+    }
+    fn check_dead_watcher_status(&self, ci: ClauseIndex) -> Result<(), String> {
+        assert!(self[ci].is_dead());
+        let len = self.len();
+        let l0 = self[ci].lit0();
+        let l1 = self[ci].lit1();
+        let mut count = 0;
+        let mut found = false;
+        if self[ci].is(FlagClause::SWEEPED) {
+            let mut i = self.watch[Self::FREE_INDEX];
+            while i != Self::HEAD_INDEX {
+                if i == ci {
+                    found = true;
+                }
+                i = self[i].next_free();
+                count += 1;
+                if len < count {
+                    return Err(format!("Free list for {}:{} became a loop", ci, &self[ci]));
+                }
+            }
+            if !found {
+                return Err(format!(
+                    "\nDead clause {}:{:?} is not included in the free list",
+                    ci, &self[ci]
+                ));
+            }
+            return Ok(());
+        }
+        if self[ci].lits.len() == 2 {
+            let mut i = self.watch[usize::from(!l0)];
+            while i != Self::HEAD_INDEX {
+                if i == ci {
+                    found = true;
+                }
+                i = self[i].next_for_lit(!l0);
+                count += 1;
+                if len < count {
+                    return Err(format!(
+                        "watcher list.{} for {}:{} became a loop",
+                        !l0, ci, &self[ci]
+                    ));
+                }
+            }
+            if found {
+                return Err(format!(
+                    "\nDead binary clause {}:{:?} is included in watcher list:{}",
+                    ci, &self[ci], !l0
+                ));
+            }
+            let mut i = self.watch[usize::from(!l1)];
+            count = 0;
+            found = false;
+            while i != Self::HEAD_INDEX {
+                if i == ci {
+                    found = true;
+                }
+                i = self[i].next_for_lit(!l1);
+                count += 1;
+                if len < count {
+                    return Err(format!(
+                        "\nwatcher list {}:for {}:{} became a loop",
+                        !l0, ci, &self[ci]
+                    ));
+                }
+            }
+            if found {
+                return Err(format!(
+                    "\nDead binary clause {}:{:?} is included in watcher list:{}",
+                    ci, &self[ci], !l1
+                ));
+            }
+        } else {
+            let mut i = self.watch[usize::from(!l0)];
+            found = false;
+            while i != Self::HEAD_INDEX {
+                if i == ci {
+                    found = true;
+                }
+                i = self[i].next_for_lit(!l0);
+                count += 1;
+                if len < count {
+                    return Err(format!(
+                        "\nwatcher list:{} for {}:{} became a loop",
+                        !l0, ci, &self[ci]
+                    ));
+                }
+            }
+            if found {
+                return Err(format!(
+                    "\nWatcher link {} includes {}:{:?}",
+                    !l0, ci, &self[ci]
+                ));
+            }
+            let mut i = self.watch[usize::from(!l1)];
+            found = false;
+            while i != Self::HEAD_INDEX {
+                if i == ci {
+                    found = true;
+                }
+                i = self[i].next_for_lit(!l1);
+                count += 1;
+                if len < count {
+                    return Err(format!(
+                        "watcher list {} for {}:{} became a loop",
+                        !l1, ci, &self[ci]
+                    ));
+                }
+            }
+            if found {
+                return Err(format!(
+                    "\nDead link {} includes {}:{:?}",
                     !l1, ci, &self[ci]
                 ));
             }

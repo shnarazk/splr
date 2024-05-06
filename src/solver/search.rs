@@ -94,6 +94,7 @@ impl SolveIF for Solver {
                 state.log(None, "By eliminator");
                 return Ok(Certificate::UNSAT);
             }
+            CHECK_WEAVER!(cdb);
             #[cfg(not(feature = "no_clause_elimination"))]
             {
                 const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
@@ -138,11 +139,13 @@ impl SolveIF for Solver {
                         elim.enqueue_var(asg, vi, false);
                     }
                 }
+                CHECK_WEAVER!(cdb);
                 //
                 //## Run eliminator
                 //
                 if USE_PRE_PROCESSING_ELIMINATOR {
                     state.flush("simplifying...");
+                    CHECK_WEAVER!(cdb);
                     if elim.simplify(asg, cdb, state, false).is_err() {
                         // Why inconsistent? Because the CNF contains a conflict, not an error!
                         // Or out of memory.
@@ -152,6 +155,7 @@ impl SolveIF for Solver {
                         }
                         return Ok(Certificate::UNSAT);
                     }
+                    CHECK_WEAVER!(cdb);
                     for vi in 1..=asg.num_vars {
                         if asg.assign(vi).is_some() || asg.var(vi).is(FlagVar::ELIMINATED) {
                             continue;

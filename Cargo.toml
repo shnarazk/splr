@@ -38,7 +38,7 @@ default = [
 
         ### Logic formula processor
         # "no_clause_elimination",
-        # "clause_vivification",
+        "clause_vivification",
 
         ### For DEBUG
         # "boundary_check",

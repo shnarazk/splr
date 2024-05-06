@@ -19,38 +19,27 @@ pub trait VivifyIF {
 impl VivifyIF for ClauseDB {
     /// vivify clauses under `asg`
     fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent {
-        #[cfg(feature = "debug_weaver")]
-        self.check_all_chains();
+        // #[cfg(feature = "debug_weaver")]
+        {
+            if let Err(s) = self.check_all_watchers_status() {
+                panic!("{s}");
+            }
+            if let Err(s) = self.check_chain_connectivity(true) {
+                panic!("{s}");
+            }
+        }
         const NUM_TARGETS: Option<usize> = Some(VIVIFY_LIMIT);
         let root_level = asg.decision_level();
         let at_root_level = root_level == asg.root_level();
         if !at_root_level {
             return Ok(());
         }
-        // self.check_chains(0);
-        // let mut free: HashSet<ClauseIndex> = HashSet::new();
-        // let mut ci = self.watch[1];
-        // while ci != 0 {
-        //     free.insert(ci);
-        //     ci = self.clause[ci].link0;
-        // }
-        // assert!(self
-        //     .iter()
-        //     .enumerate()
-        //     .skip(1)
-        //     .all(|(ci, c)| !c.is_dead() || free.contains(&ci)));
-        // if !at_root_level {
-        //     return Ok(());
-        // }
-        debug_assert!(at_root_level || asg.remains());
+        debug_assert!(at_root_level || !asg.remains());
         if asg.remains() {
             asg.propagate_sandbox(self).map_err(|cc| {
                 state.log(None, "By vivifier");
                 SolverError::RootLevelConflict(cc)
             })?;
-        }
-        if !at_root_level {
-            return Ok(());
         }
         let mut clauses: Vec<OrderedProxy<ClauseIndex>> =
             select_targets(asg, self, state[Stat::Restart] == 0, NUM_TARGETS);
@@ -80,7 +69,6 @@ impl VivifyIF for ClauseDB {
             debug_assert!(asg.stack_is_empty() || !asg.remains());
             debug_assert_eq!(asg.root_level(), asg.decision_level());
             let ci = cp.to();
-            // (*self).check_watcher_status(ci);
             // assert!(!ci.is_lifted());
             let c = &mut self[ci];
             if c.is_dead() {
@@ -111,7 +99,19 @@ impl VivifyIF for ClauseDB {
                         asg.assign_by_decision(!lit);
                         //## Rule 3
                         // propage_sandbox can't handle dead watchers correctly
+                        if let Err(s) = self.check_all_watchers_status() {
+                            panic!("{s}");
+                        }
+                        if let Err(s) = self.check_chain_connectivity(true) {
+                            panic!("{s}");
+                        }
                         self.collect_dead_watchers(&mut deads);
+                        if let Err(s) = self.check_all_watchers_status() {
+                            panic!("{s}");
+                        }
+                        if let Err(s) = self.check_chain_connectivity(true) {
+                            panic!("{s}");
+                        }
                         if let Err(cc) = asg.propagate_sandbox(self) {
                             let mut vec: Vec<Lit>;
                             match cc.1 {
@@ -183,6 +183,12 @@ impl VivifyIF for ClauseDB {
                             }
                             continue 'next_clause;
                         }
+                        if let Err(s) = self.check_all_watchers_status() {
+                            panic!("{s}");
+                        }
+                        if let Err(s) = self.check_chain_connectivity(true) {
+                            panic!("{s}");
+                        }
                         //## Rule 4
                     }
                 }
@@ -193,6 +199,8 @@ impl VivifyIF for ClauseDB {
         }
         asg.backtrack_sandbox();
         debug_assert!(!asg.remains());
+        self.collect_dead_watchers(&mut deads);
+        assert!(deads.is_empty());
         if asg.remains() {
             asg.propagate_sandbox(self)
                 .map_err(SolverError::RootLevelConflict)?;

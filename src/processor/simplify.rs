@@ -304,7 +304,13 @@ impl EliminateIF for Eliminator {
         }
         self.var_queue.clear(asg);
         debug_assert!(self.clause_queue.is_empty());
+        // if let Err(s) = cdb.check_all_watchers_status() {
+        //     panic!("{s}");
+        // }
         cdb.collect_dead_watchers(&mut deads);
+        // if let Err(s) = cdb.check_all_watchers_status() {
+        //     panic!("{s}");
+        // }
         cdb.check_size().map(|_| ())
     }
     fn sorted_iterator(&self) -> Iter<'_, u32> {

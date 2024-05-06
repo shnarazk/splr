@@ -24,7 +24,8 @@ pub trait ClauseWeaverIF {
     /// update watches of the clause
     fn collect_dead_watchers(&mut self, targets: &mut HashSet<Lit>);
     fn check_all_watchers_status(&self) -> Result<(), String>;
-    fn check_watcher_status(&self, ci: ClauseIndex) -> Result<(), String>;
+    fn check_watcher_status(&self, ci: ClauseIndex, should_be_dead: bool) -> Result<(), String>;
+    fn check_dead_watcher_status(&self, ci: ClauseIndex) -> Result<(), String>;
     fn check_chain_connectivity(&self, allow_dead: bool) -> Result<(), String>;
 }
 
