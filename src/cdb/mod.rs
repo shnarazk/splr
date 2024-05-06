@@ -316,16 +316,6 @@ impl ClauseDBIF for ClauseDB {
         // self.watches(cid, "before strengthen_by_elimination");
         debug_assert!(!self[ci].is_dead());
         debug_assert!(1 < self[ci].len());
-        // let ClauseDB {
-        //     ref mut clause,
-        //     ref mut binary_link,
-        //     ref mut certification_store,
-        //     ref mut num_bi_clause,
-        //     ..
-        // } = self;
-        // let c = &mut self.clause[ci];
-        // debug_assert!((*ch).lits.contains(&p));
-        // debug_assert!(1 < (*ch).len());
         debug_assert!(1 < usize::from(!p));
         // let lits = &mut self[ci].lits;
         debug_assert!(1 < self[ci].lits.len());
@@ -356,10 +346,6 @@ impl ClauseDBIF for ClauseDB {
             //
             //## Case:3-2
             //
-            // let l0 = self[ci].lits[0];
-            // let l1 = self[ci].lits[1];
-            // watch_cache[!l0].remove_watch(&ci);
-            // watch_cache[!l1].remove_watch(&ci);
             self.remove_watcher(ci);
             std::mem::swap(&mut self[ci].lits, &mut new_lits);
             self.binary_link.add(self[ci].lits[0], self[ci].lits[1], ci);
@@ -451,8 +437,6 @@ impl ClauseDBIF for ClauseDB {
             //
             //## Case:2
             //
-            // let old_l0 = self[ci].lit0();
-            // let old_l1 = self[ci].lit0();
             std::mem::swap(&mut self[ci].lits, new_lits);
             let l0 = self[ci].lit0();
             let l1 = self[ci].lit0();
@@ -476,8 +460,6 @@ impl ClauseDBIF for ClauseDB {
             //
             //## Case:3
             //
-            // let old_l0 = self[ci].lit0();
-            // let old_l1 = self[ci].lit0();
             std::mem::swap(&mut self[ci].lits, new_lits);
             let l0 = self[ci].lit0();
             let l1 = self[ci].lit0();
@@ -564,8 +546,6 @@ impl ClauseDBIF for ClauseDB {
                 //
                 //## Case:3-2
                 //
-                // let new_l0 = self[ci].lits[0];
-                // let new_l1 = self[ci].lits[1];
                 // watch_cache[!c.lits[0]].remove_watch(&ci);
                 // watch_cache[!c.lits[1]].remove_watch(&ci);
                 self.remove_watcher(ci);
@@ -591,8 +571,6 @@ impl ClauseDBIF for ClauseDB {
                 //
                 //## Case:3-3
                 //
-                // let old_l0 = self[ci].lit0();
-                // let old_l1 = self[ci].lit1();
                 std::mem::swap(&mut self[ci].lits, &mut new_lits);
                 let l0 = self[ci].lit0();
                 let l1 = self[ci].lit1();
@@ -1220,13 +1198,6 @@ impl ClauseWeaverIF for ClauseDB {
             free.insert(ci);
             ci = self.clause[ci].next_free();
         }
-        // for ci in 1..self.len() {
-        //     if self[ci].is_dead() {
-        //         self.check_dead_watcher_status(ci)?;
-        //     } else {
-        //         self.check_watcher_status(ci, self[ci].is_dead())?;
-        //     }
-        // }
         Ok(())
     }
     fn check_watcher_status(&self, ci: ClauseIndex, should_be_dead: bool) -> Result<(), String> {

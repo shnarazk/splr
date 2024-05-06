@@ -6,7 +6,7 @@ use {
     },
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
-        cdb::{self, ClauseDB, ClauseDBIF, ClauseWeaverIF, ReductionType, VivifyIF},
+        cdb::{self, ClauseDB, ClauseDBIF, ReductionType, VivifyIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
         types::*,
@@ -30,6 +30,8 @@ macro_rules! RESTART {
         $state.handle(SolverEvent::Restart);
     };
 }
+
+#[allow(unused_macros)]
 macro_rules! CHECK_WEAVER {
     ($cdb: expr) => {
         if let Err(s) = $cdb.check_all_watchers_status() {
@@ -65,8 +67,6 @@ impl SolveIF for Solver {
             // Reinitialize AssignStack::var_order with respect for assignments.
             asg.rebuild_order();
         }
-        // #[cfg(feature = "debug_weaver")]
-        // cdb.check_all_chains();
         state.progress_header();
         state.progress(asg, cdb);
         state.flush("");
@@ -94,7 +94,7 @@ impl SolveIF for Solver {
                 state.log(None, "By eliminator");
                 return Ok(Certificate::UNSAT);
             }
-            CHECK_WEAVER!(cdb);
+            // CHECK_WEAVER!(cdb);
             #[cfg(not(feature = "no_clause_elimination"))]
             {
                 const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
@@ -139,13 +139,13 @@ impl SolveIF for Solver {
                         elim.enqueue_var(asg, vi, false);
                     }
                 }
-                CHECK_WEAVER!(cdb);
+                // CHECK_WEAVER!(cdb);
                 //
                 //## Run eliminator
                 //
                 if USE_PRE_PROCESSING_ELIMINATOR {
                     state.flush("simplifying...");
-                    CHECK_WEAVER!(cdb);
+                    // CHECK_WEAVER!(cdb);
                     if elim.simplify(asg, cdb, state, false).is_err() {
                         // Why inconsistent? Because the CNF contains a conflict, not an error!
                         // Or out of memory.
@@ -155,7 +155,7 @@ impl SolveIF for Solver {
                         }
                         return Ok(Certificate::UNSAT);
                     }
-                    CHECK_WEAVER!(cdb);
+                    // CHECK_WEAVER!(cdb);
                     for vi in 1..=asg.num_vars {
                         if asg.assign(vi).is_some() || asg.var(vi).is(FlagVar::ELIMINATED) {
                             continue;
@@ -403,9 +403,9 @@ fn search(
                     if !cfg!(feature = "no_clause_elimination") && at_root_level {
                         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                         state.flush("clause subsumption, ");
-                        CHECK_WEAVER!(cdb);
+                        // CHECK_WEAVER!(cdb);
                         elim.simplify(asg, cdb, state, false)?;
-                        CHECK_WEAVER!(cdb);
+                        // CHECK_WEAVER!(cdb);
                         asg.eliminated.append(elim.eliminated_lits());
                         state[Stat::Simplify] += 1;
                         state[Stat::SubsumedClause] = elim.num_subsumed;
