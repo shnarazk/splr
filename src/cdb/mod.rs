@@ -1198,9 +1198,9 @@ impl ClauseWeaverIF for ClauseDB {
                     if self[ci].is(FlagClause::SWEEPED) {
                         self.move_to_free_list(ci);
                         // self[ci].turn_off(FlagClause::SWEEPED);
-                        if let Err(s) = self.check_dead_watcher_status(ci) {
-                            panic!("{s}");
-                        }
+                        // if let Err(s) = self.check_dead_watcher_status(ci) {
+                        //     panic!("{s}");
+                        // }
                     } else {
                         self[ci].turn_on(FlagClause::SWEEPED);
                     }
@@ -1472,6 +1472,7 @@ impl ClauseDB {
     fn move_to_free_list(&mut self, ci: ClauseIndex) {
         // Note: free list is a single-linked list
         assert!(self[ci].is_dead());
+        assert!(self[ci].is(FlagClause::SWEEPED));
         let first = self.watch[Self::FREE_INDEX];
         self.watch[Self::FREE_INDEX] = ci;
         *self.clause[ci].next_free_mut() = first;

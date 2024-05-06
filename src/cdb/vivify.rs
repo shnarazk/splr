@@ -20,14 +20,14 @@ impl VivifyIF for ClauseDB {
     /// vivify clauses under `asg`
     fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent {
         // #[cfg(feature = "debug_weaver")]
-        {
-            if let Err(s) = self.check_all_watchers_status() {
-                panic!("{s}");
-            }
-            if let Err(s) = self.check_chain_connectivity(true) {
-                panic!("{s}");
-            }
-        }
+        // {
+        //     if let Err(s) = self.check_all_watchers_status() {
+        //         panic!("{s}");
+        //     }
+        //     if let Err(s) = self.check_chain_connectivity(true) {
+        //         panic!("{s}");
+        //     }
+        // }
         const NUM_TARGETS: Option<usize> = Some(VIVIFY_LIMIT);
         let root_level = asg.decision_level();
         let at_root_level = root_level == asg.root_level();
@@ -99,19 +99,19 @@ impl VivifyIF for ClauseDB {
                         asg.assign_by_decision(!lit);
                         //## Rule 3
                         // propage_sandbox can't handle dead watchers correctly
-                        if let Err(s) = self.check_all_watchers_status() {
-                            panic!("{s}");
-                        }
-                        if let Err(s) = self.check_chain_connectivity(true) {
-                            panic!("{s}");
-                        }
+                        // if let Err(s) = self.check_all_watchers_status() {
+                        //     panic!("{s}");
+                        // }
+                        // if let Err(s) = self.check_chain_connectivity(true) {
+                        //     panic!("{s}");
+                        // }
                         self.collect_dead_watchers(&mut deads);
-                        if let Err(s) = self.check_all_watchers_status() {
-                            panic!("{s}");
-                        }
-                        if let Err(s) = self.check_chain_connectivity(true) {
-                            panic!("{s}");
-                        }
+                        // if let Err(s) = self.check_all_watchers_status() {
+                        //     panic!("{s}");
+                        // }
+                        // if let Err(s) = self.check_chain_connectivity(true) {
+                        //     panic!("{s}");
+                        // }
                         if let Err(cc) = asg.propagate_sandbox(self) {
                             let mut vec: Vec<Lit>;
                             match cc.1 {
@@ -183,12 +183,12 @@ impl VivifyIF for ClauseDB {
                             }
                             continue 'next_clause;
                         }
-                        if let Err(s) = self.check_all_watchers_status() {
-                            panic!("{s}");
-                        }
-                        if let Err(s) = self.check_chain_connectivity(true) {
-                            panic!("{s}");
-                        }
+                        // if let Err(s) = self.check_all_watchers_status() {
+                        //     panic!("{s}");
+                        // }
+                        // if let Err(s) = self.check_chain_connectivity(true) {
+                        //     panic!("{s}");
+                        // }
                         //## Rule 4
                     }
                 }
