@@ -254,7 +254,7 @@ fn search(
     let mut current_core: usize = asg.derefer(assign::property::Tusize::NumUnassertedVar);
     let mut core_was_rebuilt: Option<usize> = None;
     let stage_size: usize = 32;
-    let mut just_starting_new_stage = false;
+    let mut time_to_vivify = false;
     #[cfg(feature = "rephase")]
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
 
@@ -265,6 +265,14 @@ fn search(
             asg.assign_by_decision(lit);
         }
         let Err(cc) = asg.propagate(cdb) else {
+            if cfg!(feature = "clause_vivification")
+                && cfg!(feature = "no_restart")
+                && time_to_vivify
+            {
+                assert!(!asg.remains());
+                time_to_vivify = false;
+                cdb.vivify(asg, state)?;
+            }
             continue;
         };
         if asg.decision_level() == asg.root_level() {
@@ -307,7 +315,7 @@ fn search(
             }
             if let Some(new_segment) = next_stage {
                 // a beginning of a new cycle
-                just_starting_new_stage = true;
+                time_to_vivify = true;
                 {
                     state.exploration_rate_ema.update(1.0);
                     if cfg!(feature = "two_mode_reduction") && new_segment {
@@ -395,6 +403,7 @@ fn search(
                     cdb.vivify(asg, state)?;
                 }
                 if new_segment {
+                    // time_to_vivify = true;
                     {
                         let base = state.stm.current_segment();
                         let decay_index: f64 = (20 + 2 * base) as f64;
@@ -445,13 +454,6 @@ fn search(
             current_core = na;
             state.flush("");
             state.flush(format!("unreachable core: {na} "));
-        }
-        if cfg!(feature = "clause_vivification")
-            && cfg!(feature = "no_restart")
-            && just_starting_new_stage
-        {
-            just_starting_new_stage = false;
-            cdb.vivify(asg, state)?;
         }
     }
     state.log(
