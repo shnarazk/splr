@@ -73,6 +73,7 @@ pub struct Config {
     pub cls_rdc_ras: f64,
     /// clause reduction ratio for mode 3 (smaller value, keep more)
     pub cls_rdc_rm3: f64,
+    pub cls_rdc_rm4: f64,
 
     // clause reward dacay rate
     pub crw_dcy_rat: f64,
@@ -125,7 +126,8 @@ impl Default for Config {
             cls_rdc_lbd: 10,
             cls_rdc_rm2: 0.1,
             cls_rdc_ras: 0.2,
-            cls_rdc_rm3: 0.25,
+            cls_rdc_rm3: 0.0,
+            cls_rdc_rm4: 0.75,
             crw_dcy_rat: 0.95,
 
             enable_eliminator: !cfg!(feature = "no_clause_elimination"),
@@ -206,6 +208,7 @@ impl Config {
                                         "cr1" => self.cls_rdc_rm1 = val,
                                         "cr2" => self.cls_rdc_rm2 = val,
                                         "cr3" => self.cls_rdc_rm3 = val,
+                                        "cr4" => self.cls_rdc_rm4 = val,
                                         "crr" => self.cls_rdc_ras = val,
                                         "vdr" => self.vrw_dcy_rat = val,
                                         "vds" => self.vrw_dcy_stp = val,
@@ -357,7 +360,7 @@ FLAGS:
   -V, --version             Prints version information
 OPTIONS:
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
-{}{}{}{}{}{}      --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
+{}{}{}{}{}{}{}      --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
       --evo <elm-var-occ>   Max #cls for var elimination   {:>10}
   -o, --dir <io-outdir>     Output directory                {:>10}
@@ -392,7 +395,12 @@ OPTIONS:
         OPTION!(
             "no_restart",
             config.cls_rdc_rm3,
-            "      --cr3 <cls-rdc-rm3>   Clause reduction ratio for mode3  {:>10.2}\n"
+            "      --cr3 <cls-rdc-rm3>   Clause rdc. thr. for no restart   {:>10.2}\n"
+        ),
+        OPTION!(
+            "no_restart",
+            config.cls_rdc_rm4,
+            "      --cr4 <cls-rdc-rm4>   Clause rdc. ratio for no restart  {:>10.2}\n"
         ),
         OPTION!(
             "clause_rewarding",

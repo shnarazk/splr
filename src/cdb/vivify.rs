@@ -19,21 +19,22 @@ pub trait VivifyIF {
 impl VivifyIF for ClauseDB {
     /// vivify clauses under `asg`
     fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent {
-        {
-            if let Err(s) = self.check_all_watchers_status() {
-                panic!("{s}");
-            }
-            if let Err(s) = self.check_chain_connectivity(true) {
-                panic!("{s}");
-            }
-        }
+        // {
+        //     if let Err(s) = self.check_all_watchers_status() {
+        //         panic!("{s}");
+        //     }
+        //     if let Err(s) = self.check_chain_connectivity(true) {
+        //         panic!("{s}");
+        //     }
+        // }
         const NUM_TARGETS: Option<usize> = Some(VIVIFY_LIMIT);
         let root_level = asg.decision_level();
-        let at_root_level = root_level == asg.root_level();
+        assert!(root_level == asg.root_level());
         // if !at_root_level {
         //     return Ok(());
         // }
-        assert!(at_root_level || !asg.remains());
+        let at_root_level = true;
+        assert!(!asg.remains());
         if asg.remains() {
             asg.propagate_sandbox(self).map_err(|cc| {
                 state.log(None, "By vivifier");
@@ -59,7 +60,6 @@ impl VivifyIF for ClauseDB {
         'next_clause: while let Some(cp) = clauses.pop() {
             asg.backtrack_sandbox(root_level);
             if asg.remains() {
-                debug_assert!(at_root_level);
                 asg.propagate_sandbox(self)
                     .map_err(SolverError::RootLevelConflict)?;
             }
@@ -327,7 +327,7 @@ impl AssignStack {
             if seen[l.vi()] != key {
                 continue;
             }
-            /// FIXME: we must handle under the hood decitions for vivifiction in the air.
+            // FIXME: we must handle under the hood decitions for vivifiction in the air.
             if decisions.contains(l) {
                 // || assert!(!learnt.contains(l));
                 // Quiz: which is the correct learnt clause here?
