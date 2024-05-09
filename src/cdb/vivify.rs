@@ -34,13 +34,13 @@ impl VivifyIF for ClauseDB {
         //     return Ok(());
         // }
         let at_root_level = true;
-        assert!(!asg.remains());
         if asg.remains() {
             asg.propagate_sandbox(self).map_err(|cc| {
                 state.log(None, "By vivifier");
                 SolverError::RootLevelConflict(cc)
             })?;
         }
+        assert!(!asg.remains());
         let mut clauses: Vec<OrderedProxy<ClauseIndex>> =
             select_targets(asg, self, state[Stat::Restart] == 0, NUM_TARGETS);
         if clauses.is_empty() {
