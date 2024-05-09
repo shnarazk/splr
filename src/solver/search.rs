@@ -287,11 +287,13 @@ fn search(
             num_learnt += 1;
         }
         let bl = asg.decision_level();
-        if cfg!(feature = "no_restart") && 2 < dl {
+        if cfg!(feature = "no_restart") {
             // if asg.decision_level() < dl.ilog2() {
-            asg.cancel_until((2 * bl).saturating_sub(dl));
+            asg.cancel_until((3 * bl).saturating_sub(dl) / 2);
             // asg.cancel_until(bl.ilog2());
-            // let bl = asg.decision_level().next_power_of_two() / 2;
+            // let to = bl.next_power_of_two() / 2;
+            // let to = (bl as f64).sqrt() as DecisionLevel;
+            // asg.cancel_until(to);
             // if bl * 2 <= dl {
             //     RESTART!(asg, cdb, state);
             // } else {
@@ -341,7 +343,7 @@ fn search(
                                 if new_segment {
                                     ReductionType::RASonALL(config.cls_rdc_rm3, config.cls_rdc_rm4)
                                 } else {
-                                    ReductionType::RASonADD(stm.num_reducible(0.95))
+                                    ReductionType::RASonADD(stm.num_reducible(0.75))
                                 }
                             } else if new_segment {
                                 ReductionType::LBDonALL(config.cls_rdc_lbd, config.cls_rdc_rm2)
