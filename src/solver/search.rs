@@ -276,7 +276,8 @@ fn search(
             }
             continue;
         };
-        if asg.decision_level() == asg.root_level() {
+        let dl = asg.decision_level();
+        if dl == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }
         asg.update_activity_tick();
@@ -293,11 +294,22 @@ fn search(
             } else {
                 return Err(SolverError::UndescribedError);
             }
-            if !cfg!(feature = "no_restart") {
+            if cfg!(feature = "no_restart") {
+                // f asg.decision_level() < dl.ilog2() {
+                // let bl = asg.decision_level();
+                // asg.cancel_until((2 * bl).saturating_sub(dl));
+                let bl = asg.decision_level().next_power_of_two() / 2;
+                if bl * 2 <= dl {
+                    RESTART!(asg, cdb, state);
+                } else {
+                    asg.cancel_until(bl);
+                }
+            } else if !cfg!(feature = "no_restart") {
                 RESTART!(asg, cdb, state);
             }
             let at_root_level = asg.decision_level() == asg.root_level();
             if at_root_level {
+                #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
                 asg.select_rephasing_target();
                 asg.clear_asserted_literals(cdb)?;
             }
@@ -318,26 +330,28 @@ fn search(
                 // a beginning of a new cycle
                 time_to_vivify = true;
                 {
+                    let State { config, stm, .. } = state;
                     state.exploration_rate_ema.update(1.0);
-                    if cfg!(feature = "two_mode_reduction") && new_segment {
-                        if cfg!(feature = "no_restart") {
-                            cdb.reduce(
-                                asg,
-                                ReductionType::RASonALL(
-                                    state.config.cls_rdc_ras,
-                                    state.config.cls_rdc_rm3,
-                                ),
-                            );
+                    cdb.reduce(
+                        asg,
+                        if cfg!(feature = "two_mode_reduction") {
+                            if cfg!(feature = "no_restart") {
+                                if new_segment {
+                                    ReductionType::RASonALL(config.cls_rdc_rm3, config.cls_rdc_rm4)
+                                } else {
+                                    ReductionType::RASonADD(stm.num_reducible(0.95))
+                                }
+                            } else if new_segment {
+                                ReductionType::LBDonALL(config.cls_rdc_lbd, config.cls_rdc_rm2)
+                            } else {
+                                ReductionType::RASonADD(stm.num_reducible(config.cls_rdc_rm1))
+                            }
+                        } else if cfg!(feature = "no_restart") {
+                            ReductionType::RASonALL(config.cls_rdc_rm3, config.cls_rdc_rm4)
                         } else {
-                            cdb.reduce(
-                                asg,
-                                ReductionType::LBDonALL(
-                                    state.config.cls_rdc_lbd,
-                                    state.config.cls_rdc_rm2,
-                                ),
-                            );
-                        }
-                    }
+                            ReductionType::LBDonALL(config.cls_rdc_lbd, config.cls_rdc_rm2)
+                        },
+                    );
                 }
                 #[cfg(feature = "rephase")]
                 {
@@ -425,30 +439,6 @@ fn search(
                     if cfg!(feature = "dynamic_restart_threshold") {
                         state.restart.set_segment_parameters(max_scale);
                     }
-                } else if cfg!(feature = "two_mode_reduction") {
-                    if cfg!(feature = "no_restart") {
-                        cdb.reduce(
-                            asg,
-                            ReductionType::RASonADD(
-                                state.stm.num_reducible(state.config.cls_rdc_rm1 * 4.0),
-                            ),
-                        );
-                    } else {
-                        cdb.reduce(
-                            asg,
-                            ReductionType::RASonADD(
-                                state.stm.num_reducible(state.config.cls_rdc_rm1),
-                            ),
-                        )
-                    };
-                }
-            }
-            {
-                if !cfg!(feature = "two_mode_reduction") {
-                    cdb.reduce(
-                        asg,
-                        ReductionType::RASonADD(state.stm.num_reducible(state.config.cls_rdc_rm1)),
-                    );
                 }
             }
             state.progress(asg, cdb);
