@@ -249,6 +249,7 @@ fn search(
     cdb: &mut ClauseDB,
     state: &mut State,
 ) -> Result<bool, SolverError> {
+    let mut root_level = asg.root_level();
     let mut previous_stage: Option<bool> = Some(true);
     let mut num_learnt = 0;
     let mut current_core: usize = asg.derefer(assign::property::Tusize::NumUnassertedVar);
@@ -268,7 +269,7 @@ fn search(
             if cfg!(feature = "clause_vivification")
                 // && cfg!(feature = "no_restart")
                 && time_to_vivify
-                && asg.decision_level() == asg.root_level()
+                && asg.decision_level() == root_level
             {
                 // assert!(!asg.remains());
                 time_to_vivify = false;
@@ -277,7 +278,7 @@ fn search(
             continue;
         };
         let dl = asg.decision_level();
-        if dl == asg.root_level() {
+        if dl == root_level {
             return Err(SolverError::RootLevelConflict(cc));
         }
         asg.update_activity_tick();
@@ -288,8 +289,9 @@ fn search(
         }
         let bl = asg.decision_level();
         if cfg!(feature = "no_restart") {
+            asg.cancel_until((bl - 4).max(root_level));
             // if asg.decision_level() < dl.ilog2() {
-            asg.cancel_until((3 * bl).saturating_sub(dl) / 2);
+            // asg.cancel_until((3 * bl).saturating_sub(dl) / 2);
             // asg.cancel_until(bl.ilog2());
             // let to = bl.next_power_of_two() / 2;
             // let to = (bl as f64).sqrt() as DecisionLevel;
