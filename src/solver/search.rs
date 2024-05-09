@@ -286,6 +286,18 @@ fn search(
         if 1 < handle_conflict(asg, cdb, state, &cc)? {
             num_learnt += 1;
         }
+        let bl = asg.decision_level();
+        if cfg!(feature = "no_restart") && 2 < dl {
+            // if asg.decision_level() < dl.ilog2() {
+            asg.cancel_until((2 * bl).saturating_sub(dl));
+            // asg.cancel_until(bl.ilog2());
+            // let bl = asg.decision_level().next_power_of_two() / 2;
+            // if bl * 2 <= dl {
+            //     RESTART!(asg, cdb, state);
+            // } else {
+            //     asg.cancel_until(bl);
+            // }
+        }
         if state.stm.stage_ended(num_learnt) {
             if let Some(p) = state.elapsed() {
                 if 1.0 <= p {
@@ -294,17 +306,7 @@ fn search(
             } else {
                 return Err(SolverError::UndescribedError);
             }
-            if cfg!(feature = "no_restart") {
-                // f asg.decision_level() < dl.ilog2() {
-                // let bl = asg.decision_level();
-                // asg.cancel_until((2 * bl).saturating_sub(dl));
-                let bl = asg.decision_level().next_power_of_two() / 2;
-                if bl * 2 <= dl {
-                    RESTART!(asg, cdb, state);
-                } else {
-                    asg.cancel_until(bl);
-                }
-            } else if !cfg!(feature = "no_restart") {
+            if !cfg!(feature = "no_restart") {
                 RESTART!(asg, cdb, state);
             }
             let at_root_level = asg.decision_level() == asg.root_level();
