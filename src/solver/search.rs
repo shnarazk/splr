@@ -249,7 +249,7 @@ fn search(
     cdb: &mut ClauseDB,
     state: &mut State,
 ) -> Result<bool, SolverError> {
-    let mut root_level = asg.root_level();
+    let root_level = asg.root_level();
     let mut previous_stage: Option<bool> = Some(true);
     let mut num_learnt = 0;
     let mut current_core: usize = asg.derefer(assign::property::Tusize::NumUnassertedVar);
@@ -289,7 +289,9 @@ fn search(
         }
         let bl = asg.decision_level();
         if cfg!(feature = "no_restart") {
-            asg.cancel_until((bl - 4).max(root_level));
+            // if bl < 3 {
+            //     RESTART!(asg, cdb, state);
+            // }
             // if asg.decision_level() < dl.ilog2() {
             // asg.cancel_until((3 * bl).saturating_sub(dl) / 2);
             // asg.cancel_until(bl.ilog2());
@@ -312,6 +314,9 @@ fn search(
             }
             if !cfg!(feature = "no_restart") {
                 RESTART!(asg, cdb, state);
+            }
+            if cfg!(feature = "no_restart") {
+                asg.cancel_until(bl.saturating_sub(1));
             }
             let at_root_level = asg.decision_level() == asg.root_level();
             if at_root_level {
