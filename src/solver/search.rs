@@ -254,12 +254,15 @@ fn search(
     let mut num_learnt = 0;
     let mut current_core: usize = asg.derefer(assign::property::Tusize::NumUnassertedVar);
     let mut core_was_rebuilt: Option<usize> = None;
-    let stage_size: usize = 32;
+    // let stage_size: usize = 32;
     let mut time_to_vivify = false;
     #[cfg(feature = "rephase")]
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
 
-    state.stm.initialize(stage_size);
+    let mut nl = 0;
+
+    // state.stm.initialize(stage_size);
+    state.stm.initialize(1);
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
             let lit = asg.select_decision_literal();
@@ -288,23 +291,9 @@ fn search(
             num_learnt += 1;
         }
         let bl = asg.decision_level();
-        if cfg!(feature = "no_restart") {
-            // if bl < 3 {
-            //     RESTART!(asg, cdb, state);
-            // }
-            // if asg.decision_level() < dl.ilog2() {
-            // asg.cancel_until((3 * bl).saturating_sub(dl) / 2);
-            // asg.cancel_until(bl.ilog2());
-            // let to = bl.next_power_of_two() / 2;
-            // let to = (bl as f64).sqrt() as DecisionLevel;
-            // asg.cancel_until(to);
-            // if bl * 2 <= dl {
-            //     RESTART!(asg, cdb, state);
-            // } else {
-            //     asg.cancel_until(bl);
-            // }
-        }
         if state.stm.stage_ended(num_learnt) {
+            assert!(nl <= state.stm.current_span());
+            nl = 0;
             if let Some(p) = state.elapsed() {
                 if 1.0 <= p {
                     return Err(SolverError::TimeOut);
@@ -314,9 +303,23 @@ fn search(
             }
             if !cfg!(feature = "no_restart") {
                 RESTART!(asg, cdb, state);
-            }
-            if cfg!(feature = "no_restart") {
+            } else {
+                /* if cfg!(feature = "no_restart") */
                 asg.cancel_until(bl.saturating_sub(1));
+                // if bl < 3 {
+                //     RESTART!(asg, cdb, state);
+                // }
+                // if asg.decision_level() < dl.ilog2() {
+                // asg.cancel_until((3 * bl).saturating_sub(dl) / 2);
+                // asg.cancel_until(bl.ilog2());
+                // let to = bl.next_power_of_two() / 2;
+                // let to = (bl as f64).sqrt() as DecisionLevel;
+                // asg.cancel_until(to);
+                // if bl * 2 <= dl {
+                //     RESTART!(asg, cdb, state);
+                // } else {
+                //     asg.cancel_until(bl);
+                // }
             }
             let at_root_level = asg.decision_level() == asg.root_level();
             if at_root_level {
@@ -329,6 +332,7 @@ fn search(
             cdb.check_consistency(asg, "before simplify");
 
             dump_stage(asg, cdb, state, previous_stage);
+            // let last_span = state.stm.current_span();
             let next_stage: Option<bool> = state.stm.prepare_new_stage(num_learnt);
             let scale = state.stm.current_scale();
             let max_scale = state.stm.max_scale();
@@ -347,22 +351,35 @@ fn search(
                         asg,
                         if cfg!(feature = "two_mode_reduction") {
                             if cfg!(feature = "no_restart") {
-                                if new_segment {
-                                    ReductionType::RASonALL(config.cls_rdc_rm3, config.cls_rdc_rm4)
-                                } else {
-                                    ReductionType::RASonADD(stm.num_reducible(0.75))
-                                }
-                            } else if new_segment {
-                                ReductionType::LBDonALL(config.cls_rdc_lbd, config.cls_rdc_rm2)
+                                // ReductionType::RASonADD(
+                                //     (last_span as f64).powf(0.98) as usize, // stm.num_reducible(1.00)
+                                // )
+                                // ReductionType::RASonALL(2.0, 0.01)
+                                // ReductionType::LBDonALL(5, 0.01)
+                                ReductionType::Exp(5.0, 0.1)
                             } else {
                                 ReductionType::RASonADD(stm.num_reducible(config.cls_rdc_rm1))
                             }
-                        } else if cfg!(feature = "no_restart") {
-                            ReductionType::RASonALL(config.cls_rdc_rm3, config.cls_rdc_rm4)
                         } else {
                             ReductionType::LBDonALL(config.cls_rdc_lbd, config.cls_rdc_rm2)
                         },
                     );
+                    if new_segment {
+                        cdb.reduce(
+                            asg,
+                            if cfg!(feature = "two_mode_reduction") {
+                                if cfg!(feature = "no_restart") {
+                                    // ReductionType::LBDonALL(5, 0.5)
+                                    ReductionType::Exp(2.5, 0.1)
+                                } else {
+                                    ReductionType::LBDonALL(config.cls_rdc_lbd, config.cls_rdc_rm2)
+                                }
+                            } else {
+                                ReductionType::LBDonALL(2, 0.99)
+                                // ReductionType::RASonALL(config.cls_rdc_rm3, config.cls_rdc_rm4)
+                            },
+                        );
+                    }
                 }
                 #[cfg(feature = "rephase")]
                 {

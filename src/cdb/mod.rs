@@ -672,6 +672,15 @@ impl ClauseDBIF for ClauseDB {
             fn lbd(&self) -> f64 {
                 self.rank as f64
             }
+            fn an_valuation(&self, asg: &impl AssignIF) -> f64 {
+                let mut l = self
+                    .iter()
+                    .map(|l| 1.0 - asg.activity(l.vi()))
+                    .collect::<Vec<_>>();
+                l.sort_unstable_by(|a, b| a.partial_cmp(&b).unwrap());
+                l.truncate(self.rank as usize);
+                l.iter().sum()
+            }
         }
         let mut using: HashSet<ClauseIndex> = HashSet::new();
         if asg.decision_level() != asg.root_level() {
@@ -726,7 +735,7 @@ impl ClauseDBIF for ClauseDB {
                 }
                 ReductionType::RASonALL(cutoff, _) => {
                     let value = c.reverse_activity_sum(asg);
-                    if cutoff < value.min(c.rank_old as f64) {
+                    if cutoff < value {
                         perm.push(OrderedProxy::new(ci, value));
                     }
                 }
@@ -734,7 +743,13 @@ impl ClauseDBIF for ClauseDB {
                     perm.push(OrderedProxy::new(ci, c.lbd()));
                 }
                 ReductionType::LBDonALL(cutoff, _) => {
-                    let value = c.rank.min(c.rank_old);
+                    let value = c.rank;
+                    if cutoff < value {
+                        perm.push(OrderedProxy::new(ci, value as f64));
+                    }
+                }
+                ReductionType::Exp(cutoff, _) => {
+                    let value = c.an_valuation(asg);
                     if cutoff < value {
                         perm.push(OrderedProxy::new(ci, value as f64));
                     }
@@ -746,6 +761,7 @@ impl ClauseDBIF for ClauseDB {
             ReductionType::RASonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
             ReductionType::LBDonADD(size) => perm.len().saturating_sub(size),
             ReductionType::LBDonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
+            ReductionType::Exp(_u, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
         };
         self.reduction_threshold = match setting {
             ReductionType::RASonADD(_) | ReductionType::RASonALL(_, _) => {
@@ -754,6 +770,7 @@ impl ClauseDBIF for ClauseDB {
             ReductionType::LBDonADD(_) | ReductionType::LBDonALL(_, _) => {
                 -(keep as f64) / alives as f64
             }
+            ReductionType::Exp(_u, _) => 0.0,
         };
         perm.sort();
         let mut deads: HashSet<Lit> = HashSet::new();
@@ -1460,6 +1477,8 @@ pub enum ReductionType {
     LBDonADD(usize),
     /// weight by Literal Block Distance over all learnt clauses
     LBDonALL(u16, f64),
+    /// weight by Literal Block Distance over all learnt clauses
+    Exp(f64, f64),
 }
 
 pub mod property {

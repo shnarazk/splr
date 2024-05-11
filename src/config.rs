@@ -126,8 +126,8 @@ impl Default for Config {
             cls_rdc_lbd: 10,
             cls_rdc_rm2: 0.1,
             cls_rdc_ras: 0.2,
-            cls_rdc_rm3: 4.0,
-            cls_rdc_rm4: 0.4,
+            cls_rdc_rm3: 0.75,
+            cls_rdc_rm4: 0.95,
             crw_dcy_rat: 0.95,
 
             enable_eliminator: !cfg!(feature = "no_clause_elimination"),
