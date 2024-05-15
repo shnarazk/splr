@@ -22,7 +22,7 @@ pub fn handle_conflict(
     cdb: &mut ClauseDB,
     state: &mut State,
     cc: &ConflictContext,
-) -> Result<u16, SolverError> {
+) -> Result<(Lit, u16), SolverError> {
     #[cfg(feature = "chrono_BT")]
     let mut conflicting_level = asg.decision_level();
     #[cfg(not(feature = "chrono_BT"))]
@@ -115,7 +115,7 @@ pub fn handle_conflict(
                 let vi = l0.vi();
                 state.restart.handle(SolverEvent::Assert(vi));
                 cdb.handle(SolverEvent::Assert(vi));
-                return Ok(0);
+                return Ok((l0, 0));
             }
         }
     }
@@ -243,7 +243,7 @@ pub fn handle_conflict(
         .e_mode
         .update(conflicting_level as f64 - assign_level as f64);
     state.derive20.clear();
-    Ok(rank)
+    Ok((l0, rank))
 }
 
 ///

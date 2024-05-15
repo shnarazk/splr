@@ -138,7 +138,7 @@ impl Default for Config {
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_rat: 0.98,
             #[cfg(feature = "LRB_rewarding")]
-            vrw_dcy_rat: 0.96,
+            vrw_dcy_rat: 0.98,
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_stp: 0.0001,
             #[cfg(feature = "LRB_rewarding")]

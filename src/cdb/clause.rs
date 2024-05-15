@@ -55,11 +55,11 @@ pub struct Clause {
 
     #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
     /// the number of conflicts at which this clause was used in `conflict_analyze`
-    timestamp: usize,
+    pub(crate) timestamp: usize,
 
     #[cfg(feature = "clause_rewarding")]
     /// A dynamic clause evaluation criterion based on the number of references.
-    reward: f64,
+    pub(crate) reward: u32,
 
     #[cfg(feature = "boundary_check")]
     pub birth: usize,
@@ -359,7 +359,9 @@ impl Clause {
             .filter(|l| *l != base_level)
             .collect::<HashSet<DecisionLevel>>()
             .len();
-        self.rank = rank as u16;
+        let old_rank = self.rank;
+        self.rank_old = self.rank;
+        self.rank = old_rank.min(rank as u16);
         rank
         // if 8192 <= self.lits.len() {
         //     self.rank = u16::MAX;

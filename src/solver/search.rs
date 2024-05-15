@@ -139,7 +139,6 @@ impl SolveIF for Solver {
                         elim.enqueue_var(asg, vi, false);
                     }
                 }
-                // CHECK_WEAVER!(cdb);
                 //
                 //## Run eliminator
                 //
@@ -270,7 +269,7 @@ fn search(
         }
         let Err(cc) = asg.propagate(cdb) else {
             if cfg!(feature = "clause_vivification")
-                // && cfg!(feature = "no_restart")
+                && cfg!(feature = "no_restart")
                 && time_to_vivify
                 && asg.decision_level() == root_level
             {
@@ -287,10 +286,20 @@ fn search(
         asg.update_activity_tick();
         #[cfg(feature = "clause_rewarding")]
         cdb.update_activity_tick();
-        if 1 < handle_conflict(asg, cdb, state, &cc)? {
+        let (reassignd, rank) = handle_conflict(asg, cdb, state, &cc)?;
+        if 1 < rank {
             num_learnt += 1;
         }
         let bl = asg.decision_level();
+        if cfg!(feature = "no_restart") && 1 < bl {
+            let a = asg.activity(reassignd.vi());
+            for i in 1..bl - 1 {
+                if asg.activity(asg.decision_vi(i)) < a {
+                    asg.cancel_until(i - 1);
+                    break;
+                }
+            }
+        }
         if state.stm.stage_ended(num_learnt) {
             assert!(nl <= state.stm.current_span());
             nl = 0;
@@ -305,7 +314,11 @@ fn search(
                 RESTART!(asg, cdb, state);
             } else {
                 /* if cfg!(feature = "no_restart") */
-                asg.cancel_until(bl.saturating_sub(1));
+                // let _depth = (state.stm.max_scale()
+                // let depth = ((state.stm.max_scale() - state.stm.current_scale()) as f64).sqrt()
+                // as DecisionLevel)
+                // .saturating_sub(1);
+                // asg.cancel_until(bl.saturating_sub(bl.saturating_sub(depth).max(asg.root_level())));
                 // if bl < 3 {
                 //     RESTART!(asg, cdb, state);
                 // }
@@ -356,7 +369,7 @@ fn search(
                                 // )
                                 // ReductionType::RASonALL(2.0, 0.01)
                                 // ReductionType::LBDonALL(5, 0.01)
-                                ReductionType::Exp(5.0, 0.1)
+                                ReductionType::Exp(3.0, 0.05)
                             } else {
                                 ReductionType::RASonADD(stm.num_reducible(config.cls_rdc_rm1))
                             }
@@ -370,7 +383,7 @@ fn search(
                             if cfg!(feature = "two_mode_reduction") {
                                 if cfg!(feature = "no_restart") {
                                     // ReductionType::LBDonALL(5, 0.5)
-                                    ReductionType::Exp(2.5, 0.1)
+                                    ReductionType::Exp(5.0, 0.01)
                                 } else {
                                     ReductionType::LBDonALL(config.cls_rdc_lbd, config.cls_rdc_rm2)
                                 }
@@ -473,10 +486,12 @@ fn search(
             asg.handle(SolverEvent::Stage(scale));
             state.restart.set_stage_parameters(scale);
             previous_stage = next_stage;
-        } else if state.restart.restart(
-            cdb.refer(cdb::property::TEma::LBD),
-            cdb.refer(cdb::property::TEma::Entanglement),
-        ) {
+        } else if !cfg!(feature = "no_restart")
+            && state.restart.restart(
+                cdb.refer(cdb::property::TEma::LBD),
+                cdb.refer(cdb::property::TEma::Entanglement),
+            )
+        {
             RESTART!(asg, cdb, state);
         }
         if let Some(na) = asg.best_assigned() {

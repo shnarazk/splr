@@ -221,6 +221,8 @@ impl ClauseDBIF for ClauseDB {
         let ci = self.get_free_index();
         self[ci].flags = FlagClause::empty();
         std::mem::swap(&mut self[ci].lits, vec);
+        self[ci].rank = self[ci].len() as u16;
+        self[ci].rank_old = self[ci].len() as u16;
         let len2 = self[ci].lits.len() == 2;
         let l0 = self[ci].lits[0];
         let l1 = self[ci].lits[1];
@@ -244,7 +246,6 @@ impl ClauseDBIF for ClauseDB {
             self.insert_watcher(ci, false, !l0);
             self.insert_watcher(ci, true, !l1);
         }
-        self[ci].rank_old = self[ci].rank;
         self.lbd.update(self[ci].rank);
         self.num_clause += 1;
         if learnt {
@@ -283,6 +284,7 @@ impl ClauseDBIF for ClauseDB {
         let l1 = self[ci].lits[1];
         if len2 {
             self[ci].rank = 1;
+            self[ci].rank_old = 1;
             self.binary_link.add(l0, l1, ci);
         } else {
             self[ci].search_from = 0;
@@ -291,7 +293,6 @@ impl ClauseDBIF for ClauseDB {
             self.insert_watcher(ci, false, !l0);
             self.insert_watcher(ci, true, !l1);
         }
-        self[ci].rank_old = self[ci].rank;
 
         #[cfg(feature = "clause_rewarding")]
         {
@@ -677,7 +678,7 @@ impl ClauseDBIF for ClauseDB {
                     .iter()
                     .map(|l| 1.0 - asg.activity(l.vi()))
                     .collect::<Vec<_>>();
-                l.sort_unstable_by(|a, b| a.partial_cmp(&b).unwrap());
+                l.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
                 l.truncate(self.rank as usize);
                 l.iter().sum()
             }
@@ -751,7 +752,7 @@ impl ClauseDBIF for ClauseDB {
                 ReductionType::Exp(cutoff, _) => {
                     let value = c.an_valuation(asg);
                     if cutoff < value {
-                        perm.push(OrderedProxy::new(ci, value as f64));
+                        perm.push(OrderedProxy::new(ci, value));
                     }
                 }
             }
@@ -775,6 +776,10 @@ impl ClauseDBIF for ClauseDB {
         perm.sort();
         let mut deads: HashSet<Lit> = HashSet::new();
         for i in perm.iter().skip(keep) {
+            let ci = i.to();
+            if self[ci].rank < 6 {
+                continue;
+            }
             self.nullify_clause(i.to(), &mut deads);
         }
         self.collect_dead_watchers(&mut deads);
