@@ -82,7 +82,7 @@ impl Default for Clause {
             timestamp: 0,
 
             #[cfg(feature = "clause_rewarding")]
-            reward: 0.0,
+            reward: 0,
 
             #[cfg(feature = "boundary_check")]
             birth: 0,

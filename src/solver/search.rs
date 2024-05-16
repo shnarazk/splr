@@ -1,4 +1,6 @@
 //! Conflict-Driven Clause Learning Search engine
+#[cfg(feature = "clause_activity")]
+use crate::types::ActivityIF;
 use {
     super::{
         conflict::handle_conflict, restart::RestartIF, Certificate, Solver, SolverEvent,
