@@ -59,7 +59,7 @@ pub struct Clause {
 
     #[cfg(feature = "clause_rewarding")]
     /// A dynamic clause evaluation criterion based on the number of references.
-    pub(crate) reward: u32,
+    pub(crate) activity: u32,
 
     #[cfg(feature = "boundary_check")]
     pub birth: usize,
@@ -82,7 +82,7 @@ impl Default for Clause {
             timestamp: 0,
 
             #[cfg(feature = "clause_rewarding")]
-            reward: 0,
+            activity: 0,
 
             #[cfg(feature = "boundary_check")]
             birth: 0,

@@ -262,7 +262,7 @@ impl ClauseDBIF for ClauseDB {
 
         #[cfg(feature = "clause_rewarding")]
         {
-            self[ci].reward = 0;
+            self[ci].activity = 0;
             self[ci].timestamp = self.tick;
         }
         RefClause::Clause(ci)
