@@ -48,7 +48,7 @@ default = [
         # "platform_wasm"
 
         ### experimental
-        "no_restart",
+        # "no_restart",
 ]
 assign_rate = []                # for debug and study
 best_phases_tracking = []       # save the best-so-far assignment, used by 'rephase'
