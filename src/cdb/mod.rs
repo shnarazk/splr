@@ -45,7 +45,7 @@ use {
 #[cfg(not(feature = "no_IO"))]
 use std::{io::Write, path::Path};
 
-/// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`remove_clause`](`crate::cdb::ClauseDBIF::remove_clause`), and so on.
+/// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`) and so on.
 pub trait ClauseDBIF:
     Instantiate
     + IndexMut<ClauseIndex, Output = Clause>
@@ -53,7 +53,6 @@ pub trait ClauseDBIF:
     + PropertyDereference<property::Tusize, usize>
     + PropertyDereference<property::Tf64, f64>
 {
-    fn check_chains(&self, ci: ClauseIndex);
     /// return the length of `clause`.
     fn len(&self) -> usize;
     /// return true if it's empty.
@@ -188,41 +187,6 @@ impl Default for ClauseDB {
 }
 
 impl ClauseDBIF for ClauseDB {
-    fn check_chains(&self, ci: ClauseIndex) {
-        for (l, h) in self.watch.iter().enumerate().skip(2) {
-            let mut nr = *h;
-            while nr != 0 {
-                assert!(!self[nr].is_dead());
-                nr = self[nr].next_for_lit(Lit::from(l));
-            }
-        }
-        if ci != 0 {
-            assert!(!self[ci].lits.is_empty());
-            let l0 = !self[ci].lits[0];
-            let l1 = !self[ci].lits[1];
-            let mut nr = self.watch[usize::from(l0)];
-            let mut found = false;
-            while nr != 0 {
-                if nr == ci {
-                    found = true;
-                    break;
-                }
-                nr = self[nr].next_for_lit(l0);
-            }
-            assert_eq!(2 < self[ci].lits.len(), found);
-
-            nr = self.watch[usize::from(l1)];
-            found = false;
-            while nr != 0 {
-                if nr == ci {
-                    found = true;
-                    break;
-                }
-                nr = self[nr].next_for_lit(l1);
-            }
-            assert_eq!(2 < self[ci].lits.len(), found);
-        }
-    }
     fn len(&self) -> usize {
         self.clause.len()
     }
@@ -257,6 +221,8 @@ impl ClauseDBIF for ClauseDB {
         let ci = self.get_free_index();
         self[ci].flags = FlagClause::empty();
         std::mem::swap(&mut self[ci].lits, vec);
+        self[ci].rank = self[ci].len() as u16;
+        self[ci].rank_old = self[ci].len() as u16;
         let len2 = self[ci].lits.len() == 2;
         let l0 = self[ci].lits[0];
         let l1 = self[ci].lits[1];
@@ -275,17 +241,11 @@ impl ClauseDBIF for ClauseDB {
                 }
             }
         } else {
-            let mut tmp: Vec<usize> = Vec::new();
-            std::mem::swap(&mut tmp, &mut self.lbd_temp);
-            self[ci].update_lbd(asg, &mut tmp);
-            std::mem::swap(&mut tmp, &mut self.lbd_temp);
-            assert_eq!(l0, self[ci].lits[0]);
-            assert_eq!(l1, self[ci].lits[1]);
+            self[ci].update_lbd(asg);
             self[ci].search_from = 0;
             self.insert_watcher(ci, false, !l0);
             self.insert_watcher(ci, true, !l1);
         }
-        self[ci].rank_old = self[ci].rank;
         self.lbd.update(self[ci].rank);
         self.num_clause += 1;
         if learnt {
@@ -302,8 +262,8 @@ impl ClauseDBIF for ClauseDB {
 
         #[cfg(feature = "clause_rewarding")]
         {
-            self[ci].reward = 0.0;
-            self[ci].timestamp = *tick;
+            self[ci].reward = 0;
+            self[ci].timestamp = self.tick;
         }
         RefClause::Clause(ci)
     }
@@ -324,24 +284,20 @@ impl ClauseDBIF for ClauseDB {
         let l1 = self[ci].lits[1];
         if len2 {
             self[ci].rank = 1;
+            self[ci].rank_old = 1;
             self.binary_link.add(l0, l1, ci);
         } else {
-            let mut tmp: Vec<usize> = Vec::new();
-            std::mem::swap(&mut tmp, &mut self.lbd_temp);
             self[ci].search_from = 0;
-            self[ci].update_lbd(asg, &mut tmp);
+            self[ci].update_lbd(asg);
             self[ci].turn_on(FlagClause::LEARNT);
-            std::mem::swap(&mut tmp, &mut self.lbd_temp);
             self.insert_watcher(ci, false, !l0);
             self.insert_watcher(ci, true, !l1);
         }
-        self[ci].rank_old = self[ci].rank;
 
         #[cfg(feature = "clause_rewarding")]
         {
-            self[ci].timestamp = *tick;
+            self[ci].timestamp = self.tick;
         }
-
         RefClause::Clause(ci)
     }
 
@@ -361,16 +317,6 @@ impl ClauseDBIF for ClauseDB {
         // self.watches(cid, "before strengthen_by_elimination");
         debug_assert!(!self[ci].is_dead());
         debug_assert!(1 < self[ci].len());
-        // let ClauseDB {
-        //     ref mut clause,
-        //     ref mut binary_link,
-        //     ref mut certification_store,
-        //     ref mut num_bi_clause,
-        //     ..
-        // } = self;
-        // let c = &mut self.clause[ci];
-        // debug_assert!((*ch).lits.contains(&p));
-        // debug_assert!(1 < (*ch).len());
         debug_assert!(1 < usize::from(!p));
         // let lits = &mut self[ci].lits;
         debug_assert!(1 < self[ci].lits.len());
@@ -401,10 +347,6 @@ impl ClauseDBIF for ClauseDB {
             //
             //## Case:3-2
             //
-            // let l0 = self[ci].lits[0];
-            // let l1 = self[ci].lits[1];
-            // watch_cache[!l0].remove_watch(&ci);
-            // watch_cache[!l1].remove_watch(&ci);
             self.remove_watcher(ci);
             std::mem::swap(&mut self[ci].lits, &mut new_lits);
             self.binary_link.add(self[ci].lits[0], self[ci].lits[1], ci);
@@ -496,8 +438,6 @@ impl ClauseDBIF for ClauseDB {
             //
             //## Case:2
             //
-            // let old_l0 = self[ci].lit0();
-            // let old_l1 = self[ci].lit0();
             std::mem::swap(&mut self[ci].lits, new_lits);
             let l0 = self[ci].lit0();
             let l1 = self[ci].lit0();
@@ -521,8 +461,6 @@ impl ClauseDBIF for ClauseDB {
             //
             //## Case:3
             //
-            // let old_l0 = self[ci].lit0();
-            // let old_l1 = self[ci].lit0();
             std::mem::swap(&mut self[ci].lits, new_lits);
             let l0 = self[ci].lit0();
             let l1 = self[ci].lit0();
@@ -609,8 +547,6 @@ impl ClauseDBIF for ClauseDB {
                 //
                 //## Case:3-2
                 //
-                // let new_l0 = self[ci].lits[0];
-                // let new_l1 = self[ci].lits[1];
                 // watch_cache[!c.lits[0]].remove_watch(&ci);
                 // watch_cache[!c.lits[1]].remove_watch(&ci);
                 self.remove_watcher(ci);
@@ -636,8 +572,6 @@ impl ClauseDBIF for ClauseDB {
                 //
                 //## Case:3-3
                 //
-                // let old_l0 = self[ci].lit0();
-                // let old_l1 = self[ci].lit1();
                 std::mem::swap(&mut self[ci].lits, &mut new_lits);
                 let l0 = self[ci].lit0();
                 let l1 = self[ci].lit1();
@@ -688,6 +622,7 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(!self[ci].is_dead());
         debug_assert!(old < 2);
         debug_assert!(1 < new);
+        debug_assert!(!self[ci].is(FlagClause::SWEEPED));
         //## Step:1
         let ret = if old == 0 {
             self[ci].link0
@@ -716,7 +651,7 @@ impl ClauseDBIF for ClauseDB {
         let c = &mut self.clause[ci];
         // Updating LBD at every analysis seems redundant.
         // But it's crucial. Don't remove the below.
-        let rank = c.update_lbd(asg, &mut self.lbd_temp);
+        let rank = c.update_lbd(asg);
         let learnt = c.is(FlagClause::LEARNT);
         if learnt {
             #[cfg(feature = "just_used")]
@@ -738,10 +673,26 @@ impl ClauseDBIF for ClauseDB {
             fn lbd(&self) -> f64 {
                 self.rank as f64
             }
+            fn an_valuation(&self, asg: &impl AssignIF) -> f64 {
+                let mut l = self
+                    .iter()
+                    .map(|l| 1.0 - asg.activity(l.vi()))
+                    .collect::<Vec<_>>();
+                l.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+                l.truncate(self.rank as usize);
+                l.iter().sum()
+            }
+        }
+        let mut using: HashSet<ClauseIndex> = HashSet::new();
+        if asg.decision_level() != asg.root_level() {
+            for v in asg.var_iter_mut() {
+                if let AssignReason::Implication(ci) = v.reason {
+                    using.insert(ci);
+                }
+            }
         }
         let ClauseDB {
             ref mut clause,
-            ref mut lbd_temp,
             ref mut num_reduction,
 
             #[cfg(feature = "clause_rewarding")]
@@ -760,11 +711,14 @@ impl ClauseDBIF for ClauseDB {
             .skip(1)
             .filter(|(_, c)| !c.is_dead())
         {
-            c.update_lbd(asg, lbd_temp);
+            c.update_lbd(asg);
 
             #[cfg(feature = "clause_rewarding")]
             c.update_activity(*tick, *activity_decay, 0.0);
 
+            if !c.is(FlagClause::LEARNT) || using.contains(&ci) {
+                continue;
+            }
             // There's no clause stored in `reason` because the decision level is 'zero.'
             debug_assert_ne!(
                 asg.reason(c.lit0().vi()),
@@ -775,9 +729,6 @@ impl ClauseDBIF for ClauseDB {
                 asg.level(c.lit0().vi()),
                 asg.decision_level(),
             );
-            if !c.is(FlagClause::LEARNT) {
-                continue;
-            }
             alives += 1;
             match setting {
                 ReductionType::RASonADD(_) => {
@@ -785,7 +736,7 @@ impl ClauseDBIF for ClauseDB {
                 }
                 ReductionType::RASonALL(cutoff, _) => {
                     let value = c.reverse_activity_sum(asg);
-                    if cutoff < value.min(c.rank_old as f64) {
+                    if cutoff < value {
                         perm.push(OrderedProxy::new(ci, value));
                     }
                 }
@@ -793,9 +744,15 @@ impl ClauseDBIF for ClauseDB {
                     perm.push(OrderedProxy::new(ci, c.lbd()));
                 }
                 ReductionType::LBDonALL(cutoff, _) => {
-                    let value = c.rank.min(c.rank_old);
+                    let value = c.rank;
                     if cutoff < value {
                         perm.push(OrderedProxy::new(ci, value as f64));
+                    }
+                }
+                ReductionType::Exp(cutoff, _) => {
+                    let value = c.an_valuation(asg);
+                    if cutoff < value {
+                        perm.push(OrderedProxy::new(ci, value));
                     }
                 }
             }
@@ -805,6 +762,7 @@ impl ClauseDBIF for ClauseDB {
             ReductionType::RASonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
             ReductionType::LBDonADD(size) => perm.len().saturating_sub(size),
             ReductionType::LBDonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
+            ReductionType::Exp(_u, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
         };
         self.reduction_threshold = match setting {
             ReductionType::RASonADD(_) | ReductionType::RASonALL(_, _) => {
@@ -813,13 +771,18 @@ impl ClauseDBIF for ClauseDB {
             ReductionType::LBDonADD(_) | ReductionType::LBDonALL(_, _) => {
                 -(keep as f64) / alives as f64
             }
+            ReductionType::Exp(_u, _) => 0.0,
         };
         perm.sort();
         let mut deads: HashSet<Lit> = HashSet::new();
         for i in perm.iter().skip(keep) {
+            let ci = i.to();
+            if self[ci].rank < 6 {
+                continue;
+            }
             self.nullify_clause(i.to(), &mut deads);
         }
-        self.collect(&deads);
+        self.collect_dead_watchers(&mut deads);
     }
     fn reset(&mut self) {
         let mut deads: HashSet<Lit> = HashSet::new();
@@ -829,7 +792,7 @@ impl ClauseDBIF for ClauseDB {
                 self.nullify_clause(ci, &mut deads);
             }
         }
-        self.collect(&deads);
+        self.collect_dead_watchers(&mut deads);
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);
@@ -1086,21 +1049,18 @@ impl Clause {
     }
 }
 
-const HEAD_INDEX: ClauseIndex = 0;
-const FREE_INDEX: ClauseIndex = 1;
-
 impl ClauseWeaverIF for ClauseDB {
     fn get_watcher_link(&mut self, lit: Lit) -> ClauseIndex {
         self.watch[ClauseIndex::from(lit)]
     }
     fn get_free_index(&mut self) -> ClauseIndex {
-        let ci = self.watch[FREE_INDEX];
-        if ci == HEAD_INDEX {
+        let ci = self.watch[Self::FREE_INDEX];
+        if ci == Self::HEAD_INDEX {
             self.clause.push(Clause::default());
             self.clause.len() - 1
         } else {
-            let next = self.clause[ci].link0;
-            self.watch[FREE_INDEX] = next;
+            let next = self.clause[ci].next_free();
+            self.watch[Self::FREE_INDEX] = next;
             ci
         }
     }
@@ -1111,8 +1071,9 @@ impl ClauseWeaverIF for ClauseDB {
             self[ci],
             lit
         );
-        let head = self.watch[ClauseIndex::from(lit)];
-        self.watch[ClauseIndex::from(lit)] = ci;
+        let head = self.watch[usize::from(lit)];
+        self.watch[usize::from(lit)] = ci;
+        debug_assert_ne!(ci, head);
         if second {
             self.clause[ci].link1 = head;
         } else {
@@ -1121,18 +1082,28 @@ impl ClauseWeaverIF for ClauseDB {
     }
     /// O(1) implementation
     fn remove_next_watcher(&mut self, ci: ClauseIndex, lit: Lit) -> bool {
-        if ci == HEAD_INDEX {
+        if ci == Self::HEAD_INDEX {
             let next1 = self.watch[usize::from(lit)];
             let next2 = self.clause[next1].next_for_lit(lit);
             self.watch[usize::from(lit)] = next2;
-            debug_assert!(self[next1].lits[1] == !lit || self[next1].lits[0] == !lit);
+            debug_assert!(self[next1].lits[0] == !lit || self[next1].lits[1] == !lit);
+            debug_assert!(
+                next2 == Self::HEAD_INDEX
+                    || self[next2].lits[0] == !lit
+                    || self[next2].lits[1] == !lit
+            );
             self[next1].lits[1] == !lit
         } else {
             let next1 = self.clause[ci].next_for_lit(lit);
             let next2 = self.clause[next1].next_for_lit(lit);
             *self.clause[ci].next_for_lit_mut(lit) = next2;
             debug_assert!(self[ci].lits[1] == !lit || self[ci].lits[0] == !lit);
-            debug_assert!(self[next1].lits[1] == !lit || self[next1].lits[0] == !lit);
+            debug_assert!(self[next1].lits[0] == !lit || self[next1].lits[1] == !lit);
+            debug_assert!(
+                next2 == Self::HEAD_INDEX
+                    || self[next2].lits[0] == !lit
+                    || self[next2].lits[1] == !lit
+            );
             self[next1].lits[1] == !lit
         }
     }
@@ -1141,8 +1112,8 @@ impl ClauseWeaverIF for ClauseDB {
         let lit0 = !self[ci].lit0();
         let lit1 = !self[ci].lit1();
         let mut index = self.watch[usize::from(lit0)];
-        let mut prev = HEAD_INDEX;
-        while index != HEAD_INDEX {
+        let mut prev = Self::HEAD_INDEX;
+        while index != Self::HEAD_INDEX {
             if index == ci {
                 self.remove_next_watcher(prev, lit0);
                 break;
@@ -1152,8 +1123,8 @@ impl ClauseWeaverIF for ClauseDB {
         }
         // assert_ne!(index, HEAD_INDEX);
         let mut index = self.watch[usize::from(lit1)];
-        let mut prev = HEAD_INDEX;
-        while index != HEAD_INDEX {
+        let mut prev = Self::HEAD_INDEX;
+        while index != Self::HEAD_INDEX {
             if index == ci {
                 self.remove_next_watcher(prev, lit1);
                 break;
@@ -1163,28 +1134,23 @@ impl ClauseWeaverIF for ClauseDB {
         }
         // assert_ne!(index, HEAD_INDEX);
     }
-    fn mark_as_free(&mut self, index: ClauseIndex) {
-        // Note: free list is a single-linked list
-        let first = self.watch[FREE_INDEX];
-        self.watch[FREE_INDEX] = index;
-        self.clause[index].link0 = first;
-    }
     fn make_watches(num_vars: usize, clauses: &mut [Clause]) -> Vec<ClauseIndex> {
         // ci 0 must refer to the header
         let nc = clauses.len();
         for (i, c) in clauses.iter_mut().enumerate().skip(1) {
-            c.link0 = (i + 1) % nc;
+            *c.next_free_mut() = (i + 1) % nc;
             c.turn_on(FlagClause::DEAD);
         }
         let mut watches = vec![ClauseIndex::default(); 2 * (num_vars + 1)];
-        watches[0] = 1;
+        *clauses[nc - 1].next_free_mut() = Self::HEAD_INDEX;
+        watches[Self::FREE_INDEX] = if 1 < nc { 1 } else { 0 };
         watches
     }
-    /// ## Warning
-    /// this function is the only function that makes dead clauses
+    /// This and the sandbox version are the only functions that make clause DEAD.
     fn nullify_clause(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>) {
-        assert!(!self[ci].is_dead());
-        let c = &self.clause[ci];
+        debug_assert!(!self[ci].is_dead());
+        debug_assert!(!self[ci].is(FlagClause::SWEEPED));
+        let c = &mut self.clause[ci];
         self.certification_store.delete_clause(&c.lits);
         let l0 = c.lit0();
         let l1 = c.lit1();
@@ -1192,47 +1158,49 @@ impl ClauseWeaverIF for ClauseDB {
         if c.is(FlagClause::LEARNT) {
             self.num_learnt -= 1;
         }
+        c.turn_on(FlagClause::DEAD);
         if c.lits.len() == 2 {
             self.binary_link
                 .remove(l0, l1)
                 .expect("Error (remove_clause)");
             self.num_bi_clause -= 1;
+            self[ci].turn_on(FlagClause::SWEEPED);
+            self.move_to_free_list(ci);
         } else {
             deads.insert(!l0);
             deads.insert(!l1);
         }
-        // self.mark_as_free(ci);
-        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
-        self[ci].turn_on(FlagClause::DEAD);
-        // // assert!(self[ci].is_dead());
     }
     fn nullify_clause_sandbox(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>) {
-        // assert!(!self[ci].is_dead());
-        let c = &self.clause[ci];
+        debug_assert!(!self[ci].is_dead());
+        let c = &mut self.clause[ci];
         let l0 = c.lit0();
         let l1 = c.lit1();
+        c.turn_on(FlagClause::DEAD);
         if c.lits.len() == 2 {
             self.binary_link
                 .remove(l0, l1)
                 .expect("Error (remove_clause)");
+            self.move_to_free_list(ci);
         } else {
             deads.insert(!l0);
             deads.insert(!l1);
         }
-        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
-        self[ci].turn_on(FlagClause::DEAD);
-        // assert!(self[ci].is_dead());
     }
-    fn collect(&mut self, targets: &HashSet<Lit>) {
+    fn collect_dead_watchers(&mut self, targets: &mut HashSet<Lit>) {
         for lit in targets.iter() {
-            let mut prev: ClauseIndex = HEAD_INDEX;
+            let mut prev: ClauseIndex = Self::HEAD_INDEX;
             let mut ci: ClauseIndex = self.watch[usize::from(*lit)];
-            while ci != HEAD_INDEX {
+            while ci != Self::HEAD_INDEX {
                 if self[ci].is_dead() {
                     let next_ci = self[ci].next_for_lit(*lit);
                     self.remove_next_watcher(prev, *lit);
                     if self[ci].is(FlagClause::SWEEPED) {
-                        self.mark_as_free(ci);
+                        self.move_to_free_list(ci);
+                        // self[ci].turn_off(FlagClause::SWEEPED);
+                        // if let Err(s) = self.check_dead_watcher_status(ci) {
+                        //     panic!("{s}");
+                        // }
                     } else {
                         self[ci].turn_on(FlagClause::SWEEPED);
                     }
@@ -1243,6 +1211,264 @@ impl ClauseWeaverIF for ClauseDB {
                 ci = self[ci].next_for_lit(*lit);
             }
         }
+        targets.clear();
+    }
+    fn check_all_watchers_status(&self) -> Result<(), String> {
+        let mut free: HashSet<ClauseIndex> = HashSet::new();
+        let mut ci = self.watch[Self::FREE_INDEX];
+        while ci != Self::HEAD_INDEX {
+            free.insert(ci);
+            ci = self.clause[ci].next_free();
+        }
+        Ok(())
+    }
+    fn check_watcher_status(&self, ci: ClauseIndex, should_be_dead: bool) -> Result<(), String> {
+        assert!(should_be_dead || !self[ci].is_dead());
+        let len = self.len();
+        let l0 = self[ci].lit0();
+        let l1 = self[ci].lit1();
+        let mut count = 0;
+        let mut found = false;
+        if self[ci].lits.len() == 2 {
+            let mut i = self.watch[usize::from(!l0)];
+            while i != Self::HEAD_INDEX {
+                if i == ci {
+                    found = true;
+                }
+                i = self[i].next_for_lit(!l0);
+                count += 1;
+                if len < count {
+                    return Err(format!(
+                        "watcher list.{} for {}:{} became a loop",
+                        !l0, ci, &self[ci]
+                    ));
+                }
+            }
+            if found {
+                return Err(format!(
+                    "\nWatcher binary clause {}:{:?} is included in watcher list:{}",
+                    ci, &self[ci], !l0
+                ));
+            }
+            let mut i = self.watch[usize::from(!l1)];
+            count = 0;
+            found = false;
+            while i != Self::HEAD_INDEX {
+                if i == ci {
+                    found = true;
+                }
+                i = self[i].next_for_lit(!l1);
+                count += 1;
+                if len < count {
+                    return Err(format!(
+                        "watcher list {}:for {}:{} became a loop",
+                        !l0, ci, &self[ci]
+                    ));
+                }
+            }
+            if found {
+                return Err(format!(
+                    "\nWatcher binary clause {}:{:?} is included in watcher list:{}",
+                    ci, &self[ci], !l1
+                ));
+            }
+        } else {
+            let mut i = self.watch[usize::from(!l0)];
+            found = false;
+            while i != Self::HEAD_INDEX {
+                if i == ci {
+                    found = true;
+                }
+                i = self[i].next_for_lit(!l0);
+                count += 1;
+                if len < count {
+                    return Err(format!(
+                        "watcher list:{} for {}:{} became a loop",
+                        !l0, ci, &self[ci]
+                    ));
+                }
+            }
+            if !found {
+                return Err(format!(
+                    "\nWatcher link {} does not include {}:{:?}",
+                    !l0, ci, &self[ci]
+                ));
+            }
+            let mut i = self.watch[usize::from(!l1)];
+            found = false;
+            while i != Self::HEAD_INDEX {
+                if i == ci {
+                    found = true;
+                }
+                i = self[i].next_for_lit(!l1);
+                count += 1;
+                if len < count {
+                    return Err(format!(
+                        "watcher list {} for {}:{} became a loop",
+                        !l1, ci, &self[ci]
+                    ));
+                }
+            }
+            if !found {
+                return Err(format!(
+                    "\nWatcher link {} does not include {}:{:?}",
+                    !l1, ci, &self[ci]
+                ));
+            }
+        }
+        Ok(())
+    }
+    fn check_dead_watcher_status(&self, ci: ClauseIndex) -> Result<(), String> {
+        assert!(self[ci].is_dead());
+        let len = self.len();
+        let l0 = self[ci].lit0();
+        let l1 = self[ci].lit1();
+        let mut count = 0;
+        let mut found = false;
+        if self[ci].is(FlagClause::SWEEPED) {
+            let mut i = self.watch[Self::FREE_INDEX];
+            while i != Self::HEAD_INDEX {
+                if i == ci {
+                    found = true;
+                }
+                i = self[i].next_free();
+                count += 1;
+                if len < count {
+                    return Err(format!("Free list for {}:{} became a loop", ci, &self[ci]));
+                }
+            }
+            if !found {
+                return Err(format!(
+                    "\nDead clause {}:{:?} is not included in the free list",
+                    ci, &self[ci]
+                ));
+            }
+            return Ok(());
+        }
+        if self[ci].lits.len() == 2 {
+            let mut i = self.watch[usize::from(!l0)];
+            while i != Self::HEAD_INDEX {
+                if i == ci {
+                    found = true;
+                }
+                i = self[i].next_for_lit(!l0);
+                count += 1;
+                if len < count {
+                    return Err(format!(
+                        "watcher list.{} for {}:{} became a loop",
+                        !l0, ci, &self[ci]
+                    ));
+                }
+            }
+            if found {
+                return Err(format!(
+                    "\nDead binary clause {}:{:?} is included in watcher list:{}",
+                    ci, &self[ci], !l0
+                ));
+            }
+            let mut i = self.watch[usize::from(!l1)];
+            count = 0;
+            found = false;
+            while i != Self::HEAD_INDEX {
+                if i == ci {
+                    found = true;
+                }
+                i = self[i].next_for_lit(!l1);
+                count += 1;
+                if len < count {
+                    return Err(format!(
+                        "\nwatcher list {}:for {}:{} became a loop",
+                        !l0, ci, &self[ci]
+                    ));
+                }
+            }
+            if found {
+                return Err(format!(
+                    "\nDead binary clause {}:{:?} is included in watcher list:{}",
+                    ci, &self[ci], !l1
+                ));
+            }
+        } else {
+            let mut i = self.watch[usize::from(!l0)];
+            found = false;
+            while i != Self::HEAD_INDEX {
+                if i == ci {
+                    found = true;
+                }
+                i = self[i].next_for_lit(!l0);
+                count += 1;
+                if len < count {
+                    return Err(format!(
+                        "\nwatcher list:{} for {}:{} became a loop",
+                        !l0, ci, &self[ci]
+                    ));
+                }
+            }
+            if found {
+                return Err(format!(
+                    "\nWatcher link {} includes {}:{:?}",
+                    !l0, ci, &self[ci]
+                ));
+            }
+            let mut i = self.watch[usize::from(!l1)];
+            found = false;
+            while i != Self::HEAD_INDEX {
+                if i == ci {
+                    found = true;
+                }
+                i = self[i].next_for_lit(!l1);
+                count += 1;
+                if len < count {
+                    return Err(format!(
+                        "watcher list {} for {}:{} became a loop",
+                        !l1, ci, &self[ci]
+                    ));
+                }
+            }
+            if found {
+                return Err(format!(
+                    "\nDead link {} includes {}:{:?}",
+                    !l1, ci, &self[ci]
+                ));
+            }
+        }
+        Ok(())
+    }
+    fn check_chain_connectivity(&self, allow_dead: bool) -> Result<(), String> {
+        // check whether all watcher lists are loops.
+        let len = self.len();
+        for (l, h) in self.watch.iter().enumerate().skip(2) {
+            let mut ci = *h;
+            let mut count = 0;
+            while ci != Self::HEAD_INDEX {
+                if !allow_dead && self[ci].is_dead() {
+                    return Err(format!(
+                        "watcher list {} contains a dead clause {}:{:?}",
+                        l, ci, self[ci]
+                    ));
+                }
+                ci = self[ci].next_for_lit(Lit::from(l));
+                count += 1;
+                if len < count {
+                    return Err(format!(
+                        "watcher list {} for {}:{} became a loop",
+                        l, ci, &self[ci]
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl ClauseDB {
+    fn move_to_free_list(&mut self, ci: ClauseIndex) {
+        // Note: free list is a single-linked list
+        assert!(self[ci].is_dead());
+        assert!(self[ci].is(FlagClause::SWEEPED));
+        let first = self.watch[Self::FREE_INDEX];
+        self.watch[Self::FREE_INDEX] = ci;
+        *self.clause[ci].next_free_mut() = first;
     }
 }
 
@@ -1256,6 +1482,8 @@ pub enum ReductionType {
     LBDonADD(usize),
     /// weight by Literal Block Distance over all learnt clauses
     LBDonALL(u16, f64),
+    /// weight by Literal Block Distance over all learnt clauses
+    Exp(f64, f64),
 }
 
 pub mod property {
@@ -1429,6 +1657,7 @@ mod tests {
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_ci();
+        assert_eq!(cdb.len(), 2);
         assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
         let mut iter = cdb[c1][0..].iter();
         assert_eq!(iter.next(), Some(&lit(1)));

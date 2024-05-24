@@ -1,4 +1,6 @@
 //! Conflict-Driven Clause Learning Search engine
+#[cfg(feature = "clause_activity")]
+use crate::types::ActivityIF;
 use {
     super::{
         conflict::handle_conflict, restart::RestartIF, Certificate, Solver, SolverEvent,
@@ -28,6 +30,15 @@ macro_rules! RESTART {
         $asg.cancel_until($asg.root_level());
         $cdb.handle(SolverEvent::Restart);
         $state.handle(SolverEvent::Restart);
+    };
+}
+
+#[allow(unused_macros)]
+macro_rules! CHECK_WEAVER {
+    ($cdb: expr) => {
+        if let Err(s) = $cdb.check_all_watchers_status() {
+            panic!("{s}");
+        }
     };
 }
 
@@ -85,7 +96,7 @@ impl SolveIF for Solver {
                 state.log(None, "By eliminator");
                 return Ok(Certificate::UNSAT);
             }
-
+            // CHECK_WEAVER!(cdb);
             #[cfg(not(feature = "no_clause_elimination"))]
             {
                 const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
@@ -135,6 +146,7 @@ impl SolveIF for Solver {
                 //
                 if USE_PRE_PROCESSING_ELIMINATOR {
                     state.flush("simplifying...");
+                    // CHECK_WEAVER!(cdb);
                     if elim.simplify(asg, cdb, state, false).is_err() {
                         // Why inconsistent? Because the CNF contains a conflict, not an error!
                         // Or out of memory.
@@ -144,6 +156,7 @@ impl SolveIF for Solver {
                         }
                         return Ok(Certificate::UNSAT);
                     }
+                    // CHECK_WEAVER!(cdb);
                     for vi in 1..=asg.num_vars {
                         if asg.assign(vi).is_some() || asg.var(vi).is(FlagVar::ELIMINATED) {
                             continue;
@@ -237,33 +250,61 @@ fn search(
     cdb: &mut ClauseDB,
     state: &mut State,
 ) -> Result<bool, SolverError> {
+    let root_level = asg.root_level();
     let mut previous_stage: Option<bool> = Some(true);
     let mut num_learnt = 0;
     let mut current_core: usize = asg.derefer(assign::property::Tusize::NumUnassertedVar);
     let mut core_was_rebuilt: Option<usize> = None;
-    let stage_size: usize = 32;
+    // let stage_size: usize = 32;
+    let mut time_to_vivify = false;
     #[cfg(feature = "rephase")]
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
 
-    state.stm.initialize(stage_size);
+    let mut nl = 0;
+
+    // state.stm.initialize(stage_size);
+    state.stm.initialize(1);
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
             let lit = asg.select_decision_literal();
             asg.assign_by_decision(lit);
         }
         let Err(cc) = asg.propagate(cdb) else {
+            if cfg!(feature = "clause_vivification")
+                && cfg!(feature = "no_restart")
+                && time_to_vivify
+                && asg.decision_level() == root_level
+            {
+                // assert!(!asg.remains());
+                time_to_vivify = false;
+                cdb.vivify(asg, state)?;
+            }
             continue;
         };
-        if asg.decision_level() == asg.root_level() {
+        let dl = asg.decision_level();
+        if dl == root_level {
             return Err(SolverError::RootLevelConflict(cc));
         }
         asg.update_activity_tick();
         #[cfg(feature = "clause_rewarding")]
         cdb.update_activity_tick();
-        if 1 < handle_conflict(asg, cdb, state, &cc)? {
+        let (reassignd, rank) = handle_conflict(asg, cdb, state, &cc)?;
+        if 1 < rank {
             num_learnt += 1;
         }
+        let bl = asg.decision_level();
+        if cfg!(feature = "no_restart") && 1 < bl {
+            let a = asg.activity(reassignd.vi());
+            for i in 1..bl - 1 {
+                if asg.activity(asg.decision_vi(i)) < a {
+                    asg.cancel_until(i - 1);
+                    break;
+                }
+            }
+        }
         if state.stm.stage_ended(num_learnt) {
+            assert!(nl <= state.stm.current_span());
+            nl = 0;
             if let Some(p) = state.elapsed() {
                 if 1.0 <= p {
                     return Err(SolverError::TimeOut);
@@ -271,14 +312,42 @@ fn search(
             } else {
                 return Err(SolverError::UndescribedError);
             }
-            RESTART!(asg, cdb, state);
-            asg.select_rephasing_target();
-            asg.clear_asserted_literals(cdb)?;
+            if !cfg!(feature = "no_restart") {
+                RESTART!(asg, cdb, state);
+            } else {
+                /* if cfg!(feature = "no_restart") */
+                // let _depth = (state.stm.max_scale()
+                // let depth = ((state.stm.max_scale() - state.stm.current_scale()) as f64).sqrt()
+                // as DecisionLevel)
+                // .saturating_sub(1);
+                // asg.cancel_until(bl.saturating_sub(bl.saturating_sub(depth).max(asg.root_level())));
+                // if bl < 3 {
+                //     RESTART!(asg, cdb, state);
+                // }
+                // if asg.decision_level() < dl.ilog2() {
+                // asg.cancel_until((3 * bl).saturating_sub(dl) / 2);
+                // asg.cancel_until(bl.ilog2());
+                // let to = bl.next_power_of_two() / 2;
+                // let to = (bl as f64).sqrt() as DecisionLevel;
+                // asg.cancel_until(to);
+                // if bl * 2 <= dl {
+                //     RESTART!(asg, cdb, state);
+                // } else {
+                //     asg.cancel_until(bl);
+                // }
+            }
+            let at_root_level = asg.decision_level() == asg.root_level();
+            if at_root_level {
+                #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
+                asg.select_rephasing_target();
+                asg.clear_asserted_literals(cdb)?;
+            }
 
             #[cfg(feature = "trace_equivalency")]
             cdb.check_consistency(asg, "before simplify");
 
             dump_stage(asg, cdb, state, previous_stage);
+            // let last_span = state.stm.current_span();
             let next_stage: Option<bool> = state.stm.prepare_new_stage(num_learnt);
             let scale = state.stm.current_scale();
             let max_scale = state.stm.max_scale();
@@ -289,15 +358,41 @@ fn search(
             }
             if let Some(new_segment) = next_stage {
                 // a beginning of a new cycle
+                time_to_vivify = true;
                 {
+                    let State { config, stm, .. } = state;
                     state.exploration_rate_ema.update(1.0);
-                    if cfg!(feature = "two_mode_reduction") {
+                    cdb.reduce(
+                        asg,
+                        if cfg!(feature = "two_mode_reduction") {
+                            if cfg!(feature = "no_restart") {
+                                // ReductionType::RASonADD(
+                                //     (last_span as f64).powf(0.98) as usize, // stm.num_reducible(1.00)
+                                // )
+                                // ReductionType::RASonALL(2.0, 0.01)
+                                // ReductionType::LBDonALL(5, 0.01)
+                                ReductionType::Exp(3.0, 0.05)
+                            } else {
+                                ReductionType::RASonADD(stm.num_reducible(config.cls_rdc_rm1))
+                            }
+                        } else {
+                            ReductionType::LBDonALL(config.cls_rdc_lbd, config.cls_rdc_rm2)
+                        },
+                    );
+                    if new_segment {
                         cdb.reduce(
                             asg,
-                            ReductionType::LBDonALL(
-                                state.config.cls_rdc_lbd,
-                                state.config.cls_rdc_rm2,
-                            ),
+                            if cfg!(feature = "two_mode_reduction") {
+                                if cfg!(feature = "no_restart") {
+                                    // ReductionType::LBDonALL(5, 0.5)
+                                    ReductionType::Exp(5.0, 0.01)
+                                } else {
+                                    ReductionType::LBDonALL(config.cls_rdc_lbd, config.cls_rdc_rm2)
+                                }
+                            } else {
+                                ReductionType::LBDonALL(2, 0.99)
+                                // ReductionType::RASonALL(config.cls_rdc_rm3, config.cls_rdc_rm4)
+                            },
                         );
                     }
                 }
@@ -355,19 +450,31 @@ fn search(
                     }
                     asg.select_rephasing_target();
                 }
-                if cfg!(feature = "clause_vivification") {
-                    cdb.vivify(asg, state)?;
-                }
+                // After a coflict, there is one unpropagated literal in asg.trail,
+                // which is generated by conflict analysis.
+                // So we must avoid vivification at non root level.
+
+                // if cfg!(feature = "clause_vivification")
+                //     && !cfg!(feature = "no_restart")
+                //     && at_root_level
+                // {
+                //     assert!(!asg.remains());
+                //     cdb.vivify(asg, state)?;
+                // }
+
                 if new_segment {
+                    // time_to_vivify = true;
                     {
                         let base = state.stm.current_segment();
                         let decay_index: f64 = (20 + 2 * base) as f64;
                         asg.update_activity_decay((decay_index - 1.0) / decay_index);
                     }
-                    if !cfg!(feature = "no_clause_elimination") {
+                    if !cfg!(feature = "no_clause_elimination") && at_root_level {
                         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                         state.flush("clause subsumption, ");
+                        // CHECK_WEAVER!(cdb);
                         elim.simplify(asg, cdb, state, false)?;
+                        // CHECK_WEAVER!(cdb);
                         asg.eliminated.append(elim.eliminated_lits());
                         state[Stat::Simplify] += 1;
                         state[Stat::SubsumedClause] = elim.num_subsumed;
@@ -376,34 +483,17 @@ fn search(
                         state.restart.set_segment_parameters(max_scale);
                     }
                 }
-            } else {
-                {
-                    if cfg!(feature = "two_mode_reduction") {
-                        cdb.reduce(
-                            asg,
-                            ReductionType::RASonADD(
-                                state.stm.num_reducible(state.config.cls_rdc_rm1),
-                            ),
-                        );
-                    }
-                }
-            }
-            {
-                if !cfg!(feature = "two_mode_reduction") {
-                    cdb.reduce(
-                        asg,
-                        ReductionType::RASonADD(state.stm.num_reducible(state.config.cls_rdc_rm1)),
-                    );
-                }
             }
             state.progress(asg, cdb);
             asg.handle(SolverEvent::Stage(scale));
             state.restart.set_stage_parameters(scale);
             previous_stage = next_stage;
-        } else if state.restart.restart(
-            cdb.refer(cdb::property::TEma::LBD),
-            cdb.refer(cdb::property::TEma::Entanglement),
-        ) {
+        } else if !cfg!(feature = "no_restart")
+            && state.restart.restart(
+                cdb.refer(cdb::property::TEma::LBD),
+                cdb.refer(cdb::property::TEma::Entanglement),
+            )
+        {
             RESTART!(asg, cdb, state);
         }
         if let Some(na) = asg.best_assigned() {

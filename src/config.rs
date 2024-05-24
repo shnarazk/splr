@@ -54,14 +54,29 @@ pub struct Config {
     //
     //## clause management
     //
+    /// Meaning of cls_rdc_rm1 for mode-1, stage-based exploration:
+    /// The 1.0^(1.0-cls_rdc_rm1) of generated clauses in the latest stage
+    /// with be removed.
+    /// clause reduction ratio for mode 1: exploitation (smaller value, keep more)
+    pub cls_rdc_rm1: f64,
+
+    /// Meaning of (cls_rdc_lbd, cls_rdc_rm2) for mode-2, segment-based exploitation
+    /// Keep clauses with smaller LBDs than cls_rdc_lbd,
+    /// but warst N^(1.0 - cls_rdc_rm2) clauses will be removed.
+    pub cls_rdc_lbd: u16,
+    /// clause reduction ratio for mode 2 (smaller value, keep more)
+    pub cls_rdc_rm2: f64,
+
+    /// Meaning of (cls_rdc_ras, cls_rdc_rm3) for mode-3, no restart research idea:
+    /// Keep clauses with smaller reverse activity sum than cls_rdc_ras,
+    /// but warst N^(1.0 - cls_rdc_rm3) clauses will be removed.
+    pub cls_rdc_ras: f64,
+    /// clause reduction ratio for mode 3 (smaller value, keep more)
+    pub cls_rdc_rm3: f64,
+    pub cls_rdc_rm4: f64,
+
     // clause reward dacay rate
     pub crw_dcy_rat: f64,
-    // clause reduction LBD threshold for mode 2: exploration
-    pub cls_rdc_lbd: u16,
-    // clause reduction ratio for mode 1: exploitation
-    pub cls_rdc_rm1: f64,
-    // clause reduction ratio for mode 2: exploration
-    pub cls_rdc_rm2: f64,
 
     //
     //## eliminator
@@ -107,10 +122,13 @@ impl Default for Config {
             use_certification: false,
             use_log: false,
 
+            cls_rdc_rm1: 0.1,
+            cls_rdc_lbd: 10,
+            cls_rdc_rm2: 0.1,
+            cls_rdc_ras: 0.2,
+            cls_rdc_rm3: 0.75,
+            cls_rdc_rm4: 0.95,
             crw_dcy_rat: 0.95,
-            cls_rdc_lbd: 5,
-            cls_rdc_rm1: 0.2,
-            cls_rdc_rm2: 0.05,
 
             enable_eliminator: !cfg!(feature = "no_clause_elimination"),
             elm_cls_lim: 64,
@@ -120,7 +138,7 @@ impl Default for Config {
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_rat: 0.98,
             #[cfg(feature = "LRB_rewarding")]
-            vrw_dcy_rat: 0.96,
+            vrw_dcy_rat: 0.98,
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_stp: 0.0001,
             #[cfg(feature = "LRB_rewarding")]
@@ -189,6 +207,9 @@ impl Config {
                                         "cdr" => self.crw_dcy_rat = val,
                                         "cr1" => self.cls_rdc_rm1 = val,
                                         "cr2" => self.cls_rdc_rm2 = val,
+                                        "cr3" => self.cls_rdc_rm3 = val,
+                                        "cr4" => self.cls_rdc_rm4 = val,
+                                        "crr" => self.cls_rdc_ras = val,
                                         "vdr" => self.vrw_dcy_rat = val,
                                         "vds" => self.vrw_dcy_stp = val,
 
@@ -339,7 +360,7 @@ FLAGS:
   -V, --version             Prints version information
 OPTIONS:
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
-{}{}{}{}      --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
+{}{}{}{}{}{}{}      --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
       --evo <elm-var-occ>   Max #cls for var elimination   {:>10}
   -o, --dir <io-outdir>     Output directory                {:>10}
@@ -352,9 +373,9 @@ OPTIONS:
 ",
         config.c_cls_lim,
         OPTION!(
-            "clause_rewarding",
-            config.crw_dcy_rat,
-            "      --cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}\n"
+            "two_mode_reduction",
+            config.cls_rdc_rm1,
+            "      --cr1 <cls-rdc-rm1>   Clause reduction ratio for mode1  {:>10.2}\n"
         ),
         OPTION!(
             "two_mode_reduction",
@@ -363,13 +384,28 @@ OPTIONS:
         ),
         OPTION!(
             "two_mode_reduction",
-            config.cls_rdc_rm1,
-            "      --cr1 <cls-rdc-rm1>   Clause reduction ratio for mode1  {:>10.2}\n"
-        ),
-        OPTION!(
-            "two_mode_reduction",
             config.cls_rdc_rm2,
             "      --cr2 <cls-rdc-rm2>   Clause reduction ratio for mode2  {:>10.2}\n"
+        ),
+        OPTION!(
+            "no_restart",
+            config.cls_rdc_ras,
+            "      --crr <cls-rdc-ras>   Clause reduction RAS threshold    {:>10.2}\n"
+        ),
+        OPTION!(
+            "no_restart",
+            config.cls_rdc_rm3,
+            "      --cr3 <cls-rdc-rm3>   Clause rdc. thr. for no restart   {:>10.2}\n"
+        ),
+        OPTION!(
+            "no_restart",
+            config.cls_rdc_rm4,
+            "      --cr4 <cls-rdc-rm4>   Clause rdc. ratio for no restart  {:>10.2}\n"
+        ),
+        OPTION!(
+            "clause_rewarding",
+            config.crw_dcy_rat,
+            "      --cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}\n"
         ),
         config.elm_cls_lim,
         config.elm_grw_lim,

@@ -55,11 +55,11 @@ pub struct Clause {
 
     #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
     /// the number of conflicts at which this clause was used in `conflict_analyze`
-    timestamp: usize,
+    pub(crate) timestamp: usize,
 
     #[cfg(feature = "clause_rewarding")]
     /// A dynamic clause evaluation criterion based on the number of references.
-    reward: f64,
+    pub(crate) reward: u32,
 
     #[cfg(feature = "boundary_check")]
     pub birth: usize,
@@ -82,7 +82,7 @@ impl Default for Clause {
             timestamp: 0,
 
             #[cfg(feature = "clause_rewarding")]
-            reward: 0.0,
+            reward: 0,
 
             #[cfg(feature = "boundary_check")]
             birth: 0,
@@ -311,6 +311,12 @@ impl WatcherLinkIF for Clause {
             }
         }
     }
+    fn next_free(&self) -> ClauseIndex {
+        self.link0
+    }
+    fn next_free_mut(&mut self) -> &mut ClauseIndex {
+        &mut self.link0
+    }
     fn next_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex {
         #[cfg(feature = "unsafe_access")]
         unsafe {
@@ -344,7 +350,7 @@ impl WatcherLinkIF for Clause {
 impl Clause {
     /// update rank field with the present LBD.
     // If it's big enough, skip the loop.
-    pub fn update_lbd(&mut self, asg: &impl AssignIF, _lbd_temp: &mut [usize]) -> usize {
+    pub fn update_lbd(&mut self, asg: &impl AssignIF) -> usize {
         let base_level = asg.root_level();
         let rank = self
             .lits
@@ -353,7 +359,9 @@ impl Clause {
             .filter(|l| *l != base_level)
             .collect::<HashSet<DecisionLevel>>()
             .len();
-        self.rank = rank as u16;
+        let old_rank = self.rank;
+        self.rank_old = self.rank;
+        self.rank = old_rank.min(rank as u16);
         rank
         // if 8192 <= self.lits.len() {
         //     self.rank = u16::MAX;

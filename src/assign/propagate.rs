@@ -40,7 +40,7 @@ pub trait PropagateIF {
     /// execute *backjump*.
     fn cancel_until(&mut self, lv: DecisionLevel);
     /// execute backjump in vivification sandbox
-    fn backtrack_sandbox(&mut self);
+    fn backtrack_sandbox(&mut self, level: DecisionLevel);
     /// execute *boolean constraint propagation* or *unit propagation*.
     fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
     /// `propagate` for vivification, which allows dead clauses.
@@ -248,22 +248,22 @@ impl PropagateIF for AssignStack {
         );
         self.rebuild_base_level = self.decision_level();
     }
-    fn backtrack_sandbox(&mut self) {
-        if self.trail_lim.is_empty() {
+    fn backtrack_sandbox(&mut self, level: DecisionLevel) {
+        if self.decision_level() == level {
             return;
         }
-        let lim = self.trail_lim[self.root_level as usize];
+        let lim = self.trail_lim[level as usize];
         for i in lim..self.trail.len() {
             let l = self.trail[i];
             let vi = l.vi();
             let var = &mut self.var[vi];
-            debug_assert!(self.root_level < var.level);
+            debug_assert!(level < var.level);
             var.assign = None;
             var.reason = AssignReason::None;
             self.insert_heap(vi);
         }
         self.trail.truncate(lim);
-        self.trail_lim.truncate(self.root_level as usize);
+        self.trail_lim.truncate(level as usize);
         self.q_head = self.trail.len();
     }
     /// UNIT PROPAGATION.
@@ -542,10 +542,10 @@ impl PropagateIF for AssignStack {
             let mut ci = cdb.get_watcher_link(propagating);
             'next_clause: while ci != 0 {
                 let c = &mut cdb[ci];
-                // if c.is_dead() {
-                //     ci = c.next_for_lit(propagating);
-                //     continue 'next_clause;
-                // }
+                if c.is_dead() {
+                    ci = c.next_for_lit(propagating);
+                    continue 'next_clause;
+                }
                 let (other, false_index) = if false_lit == c.lit0() {
                     (c.lit1(), 0)
                 } else {
@@ -621,7 +621,7 @@ impl AssignStack {
         assert_ne!(self.assigned(b0), Some(false));
         assert_ne!(self.assigned(b1), Some(false));
     }
-    ///
+    /// fix unpropagated literals at root_level
     fn propagate_at_root_level(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
         let mut num_propagated = 0;
         let mut deads: HashSet<Lit> = HashSet::new();
@@ -648,7 +648,7 @@ impl AssignStack {
                 }
             }
         }
-        cdb.collect(&deads);
+        cdb.collect_dead_watchers(&mut deads);
         Ok(())
     }
     fn level_up(&mut self) {

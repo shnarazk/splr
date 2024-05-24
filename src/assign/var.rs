@@ -15,7 +15,7 @@ pub struct Var {
     /// levels of vars
     pub(super) level: DecisionLevel,
     /// reason of assignment
-    pub(super) reason: AssignReason,
+    pub(crate) reason: AssignReason,
 
     /// the `Flag`s (8 bits)
     pub(super) flags: FlagVar,

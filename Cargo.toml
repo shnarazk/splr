@@ -25,12 +25,12 @@ default = [
 
         ### Heuristics
         # "bi_clause_completion",
-        # "clause_rewarding",
-        "dynamic_restart_threshold",
+        "clause_rewarding",
+        # "dynamic_restart_threshold",
         "LRB_rewarding",
-        "reason_side_rewarding",
-        "rephase",
-        "reward_annealing",
+        # "reason_side_rewarding",
+        # "rephase",
+        # "reward_annealing",
         # "stochastic_local_search",
         # "suppress_reason_chain",
         "two_mode_reduction",
@@ -42,9 +42,13 @@ default = [
 
         ### For DEBUG
         # "boundary_check",
+        # "debug_weaver",
 
         ### platform dependency
         # "platform_wasm"
+
+        ### experimental
+        # "no_restart",
 ]
 assign_rate = []                # for debug and study
 best_phases_tracking = []       # save the best-so-far assignment, used by 'rephase'
@@ -55,6 +59,7 @@ no_clause_elimination = []      # pre(in)-processor setting
 clause_rewarding = []           # clauses have activities w/ decay rate
 clause_vivification = []        # pre(in)-processor setting
 debug_propagation = []          # for debug
+debug_weaver = []
 dynamic_restart_threshold = []  # control restart spans like Glucose
 EMA_calibration = []            # each exponential moving average has a calbration value
 EVSIDS = []                     # Eponential Variable State Independent Decaying Sum
@@ -64,6 +69,7 @@ incremental_solver = [          # for all solution SAT sover
 just_used = []                  # Var and clause have 'just_used' flags
 LRB_rewarding = []              # Vearning Rate Based rewarding, a new var activity criteria
 no_IO = []                      # to embed Splr into non-std environments
+no_restart = []
 platform_wasm = [
         "instant"               # use instant::Duration instead of std::time::Duration
 ]
