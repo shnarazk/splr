@@ -160,11 +160,8 @@ impl Default for ClauseDB {
             bi_clause_completion_queue: Vec::new(),
             num_bi_clause_completion: 0,
             // lbd_frozen_clause: 30,
-            #[cfg(feature = "clause_rewarding")]
             tick: 0,
-            #[cfg(feature = "clause_rewarding")]
             activity_decay: 0.99,
-            #[cfg(feature = "clause_rewarding")]
             activity_anti_decay: 0.01,
 
             lbd_temp: Vec::new(),
@@ -260,11 +257,8 @@ impl ClauseDBIF for ClauseDB {
             }
         }
 
-        #[cfg(feature = "clause_rewarding")]
-        {
-            self[ci].activity = 0;
-            self[ci].timestamp = self.tick;
-        }
+        self[ci].activity = 0;
+        self[ci].timestamp = self.tick;
         RefClause::Clause(ci)
     }
 
@@ -293,11 +287,7 @@ impl ClauseDBIF for ClauseDB {
             self.insert_watcher(ci, false, !l0);
             self.insert_watcher(ci, true, !l1);
         }
-
-        #[cfg(feature = "clause_rewarding")]
-        {
-            self[ci].timestamp = self.tick;
-        }
+        self[ci].timestamp = self.tick;
         RefClause::Clause(ci)
     }
 
@@ -694,10 +684,7 @@ impl ClauseDBIF for ClauseDB {
         let ClauseDB {
             ref mut clause,
             ref mut num_reduction,
-
-            #[cfg(feature = "clause_rewarding")]
             ref tick,
-            #[cfg(feature = "clause_rewarding")]
             ref activity_decay,
             ..
         } = self;
@@ -712,8 +699,6 @@ impl ClauseDBIF for ClauseDB {
             .filter(|(_, c)| !c.is_dead())
         {
             c.update_lbd(asg);
-
-            #[cfg(feature = "clause_rewarding")]
             c.update_activity(*tick, *activity_decay, 0.0);
 
             if !c.is(FlagClause::LEARNT) || using.contains(&ci) {
@@ -1527,11 +1512,7 @@ pub mod property {
                 Tusize::NumLearnt => self.num_learnt,
                 Tusize::NumReduction => self.num_reduction,
                 Tusize::NumReRegistration => self.num_reregistration,
-
-                #[cfg(feature = "clause_rewarding")]
                 Tusize::Timestamp => self.tick,
-                #[cfg(not(feature = "clause_rewarding"))]
-                Tusize::Timestamp => 0,
             }
         }
     }

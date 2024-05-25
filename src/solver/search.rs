@@ -28,7 +28,6 @@ pub trait SolveIF {
 macro_rules! RESTART {
     ($asg: expr, $cdb: expr, $state: expr) => {
         $asg.update_activity_tick();
-        #[cfg(feature = "clause_rewarding")]
         $cdb.update_activity_tick();
         $asg.cancel_until($asg.root_level());
         $cdb.handle(SolverEvent::Restart);
@@ -289,7 +288,6 @@ fn search(
             return Err(SolverError::RootLevelConflict(cc));
         }
         // asg.update_activity_tick();
-        // #[cfg(feature = "clause_rewarding")]
         // cdb.update_activity_tick();
         let (reassignd, rank) = handle_conflict(asg, cdb, state, &cc)?;
         if 1 < rank {
@@ -354,11 +352,6 @@ fn search(
             let next_stage: Option<bool> = state.stm.prepare_new_stage(num_learnt);
             let scale = state.stm.current_scale();
             let max_scale = state.stm.max_scale();
-            if cfg!(feature = "reward_annealing") {
-                let base = state.stm.current_stage() - state.stm.cycle_starting_stage();
-                let decay_index: f64 = (20 + 2 * base) as f64;
-                asg.update_activity_decay((decay_index - 1.0) / decay_index);
-            }
             if let Some(new_segment) = next_stage {
                 // a beginning of a new cycle
                 time_to_vivify = true;

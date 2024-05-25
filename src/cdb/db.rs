@@ -44,11 +44,8 @@ pub struct ClauseDB {
     //## clause rewarding
     //
     /// an index for counting elapsed time
-    #[cfg(feature = "clause_rewarding")]
     pub(super) tick: usize,
-    #[cfg(feature = "clause_rewarding")]
     pub(super) activity_decay: f64,
-    #[cfg(feature = "clause_rewarding")]
     pub(super) activity_anti_decay: f64,
 
     //
@@ -139,12 +136,8 @@ impl Instantiate for ClauseDB {
             certification_store: CertificationStore::instantiate(config, cnf),
             soft_limit: config.c_cls_lim,
             lbd: ProgressLBD::instantiate(config, cnf),
-
-            #[cfg(feature = "clause_rewarding")]
             activity_decay: config.crw_dcy_rat,
-            #[cfg(feature = "clause_rewarding")]
             activity_anti_decay: 1.0 - config.crw_dcy_rat,
-
             lbd_temp: vec![0; nv + 1],
             ..ClauseDB::default()
         }

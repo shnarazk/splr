@@ -52,12 +52,8 @@ pub struct Clause {
     /// the index from which `propagate` starts searching an un-falsified literal.
     /// Since it's just a hint, we don't need u32 or usize.
     pub search_from: u16,
-
-    #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
     /// the number of conflicts at which this clause was used in `conflict_analyze`
     pub(crate) timestamp: usize,
-
-    #[cfg(feature = "clause_rewarding")]
     /// A dynamic clause evaluation criterion based on the number of references.
     pub(crate) activity: u32,
 
@@ -77,11 +73,7 @@ impl Default for Clause {
             rank: 0,
             rank_old: 0,
             search_from: 2,
-
-            #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
             timestamp: 0,
-
-            #[cfg(feature = "clause_rewarding")]
             activity: 0,
 
             #[cfg(feature = "boundary_check")]

@@ -165,14 +165,11 @@ impl VivifyIF for ClauseDB {
                                     num_assert += 1;
                                 }
                                 _ if at_root_level => {
-                                    #[cfg(feature = "clause_rewarding")]
                                     if let Some(ci) =
                                         self.new_clause(asg, &mut vec, is_learnt).is_new()
                                     {
                                         self.set_activity(ci, cp.value());
                                     }
-                                    #[cfg(not(feature = "clause_rewarding"))]
-                                    self.new_clause(asg, &mut vec, is_learnt);
                                     self.nullify_clause(ci, &mut deads);
                                     num_shrink += 1;
                                 }
@@ -396,7 +393,6 @@ impl AssignStack {
 impl Clause {
     /// return `true` if the clause should try vivification.
     /// smaller is better.
-    #[cfg(feature = "clause_rewarding")]
     fn to_vivify(&self, initial_stage: bool) -> Option<f64> {
         if initial_stage {
             (!self.is_dead()).then(|| self.len() as f64)
@@ -405,17 +401,6 @@ impl Clause {
                 && self.rank * 2 <= self.rank_old
                 && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
             .then_some(self.activity as f64)
-        }
-    }
-    #[cfg(not(feature = "clause_rewarding"))]
-    fn to_vivify(&self, initial_stage: bool) -> Option<f64> {
-        if initial_stage {
-            (!self.is_dead()).then(|| self.len() as f64)
-        } else {
-            (!self.is_dead()
-                && self.rank * 2 <= self.rank_old
-                && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
-            .then(|| -((self.rank_old - self.rank) as f64 / self.rank as f64))
         }
     }
     /// clear flags about vivification

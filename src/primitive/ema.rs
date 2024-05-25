@@ -62,17 +62,10 @@ impl EmaIF for EmaView {
 #[derive(Clone, Debug)]
 pub struct Ema {
     val: EmaView,
-    #[cfg(feature = "EMA_calibration")]
-    cal: f64,
     sca: f64,
 }
 
 impl EmaIF for Ema {
-    #[cfg(feature = "EMA_calibration")]
-    fn get_fast(&self) -> f64 {
-        self.val.fast / self.cal
-    }
-    #[cfg(not(feature = "EMA_calibration"))]
     fn get_fast(&self) -> f64 {
         self.val.fast
     }
@@ -86,14 +79,8 @@ impl EmaIF for Ema {
 
 impl EmaMutIF for Ema {
     type Input = f64;
-    #[cfg(not(feature = "EMA_calibration"))]
     fn update(&mut self, x: Self::Input) {
         self.val.fast = self.sca * x + (1.0 - self.sca) * self.val.fast;
-    }
-    #[cfg(feature = "EMA_calibration")]
-    fn update(&mut self, x: Self::Input) {
-        self.val.fast = self.sca * x + (1.0 - self.sca) * self.val.fast;
-        self.cal = self.sca + (1.0 - self.sca) * self.cal;
     }
     fn as_view(&self) -> &EmaView {
         &self.val
@@ -111,8 +98,6 @@ impl Ema {
                 fast: 0.0,
                 slow: 0.0,
             },
-            #[cfg(feature = "EMA_calibration")]
-            cal: 0.0,
             sca: 1.0 / (s as f64),
         }
     }
@@ -124,40 +109,20 @@ impl Ema {
     }
 }
 
-/// Exponential Moving Average pair, with a calibrator if feature `EMA_calibration` is on.
 #[derive(Clone, Debug)]
 pub struct Ema2 {
     ema: EmaView,
-    #[cfg(feature = "EMA_calibration")]
-    calf: f64,
-    #[cfg(feature = "EMA_calibration")]
-    cals: f64,
     fe: f64,
     se: f64,
 }
 
 impl EmaIF for Ema2 {
-    #[cfg(feature = "EMA_calibration")]
-    fn get_fast(&self) -> f64 {
-        self.ema.fast / self.calf
-    }
-    #[cfg(not(feature = "EMA_calibration"))]
     fn get_fast(&self) -> f64 {
         self.ema.fast
     }
-    #[cfg(feature = "EMA_calibration")]
-    fn get_slow(&self) -> f64 {
-        self.ema.slow / self.calf
-    }
-    #[cfg(not(feature = "EMA_calibration"))]
     fn get_slow(&self) -> f64 {
         self.ema.slow
     }
-    #[cfg(feature = "EMA_calibration")]
-    fn trend(&self) -> f64 {
-        self.ema.fast / self.ema.slow * (self.cals / self.calf)
-    }
-    #[cfg(not(feature = "EMA_calibration"))]
     fn trend(&self) -> f64 {
         self.ema.fast / self.ema.slow
     }
@@ -165,38 +130,18 @@ impl EmaIF for Ema2 {
 
 impl EmaMutIF for Ema2 {
     type Input = f64;
-    #[cfg(not(feature = "EMA_calibration"))]
     fn update(&mut self, x: Self::Input) {
         self.ema.fast = self.fe * x + (1.0 - self.fe) * self.ema.fast;
         self.ema.slow = self.se * x + (1.0 - self.se) * self.ema.slow;
-    }
-    #[cfg(feature = "EMA_calibration")]
-    fn update(&mut self, x: Self::Input) {
-        self.ema.fast = self.fe * x + (1.0 - self.fe) * self.ema.fast;
-        self.ema.slow = self.se * x + (1.0 - self.se) * self.ema.slow;
-        self.calf = self.fe + (1.0 - self.fe) * self.calf;
-        self.cals = self.se + (1.0 - self.se) * self.cals;
     }
     fn reset_to(&mut self, val: f64) {
         self.ema.fast = val;
     }
-    #[cfg(not(feature = "EMA_calibration"))]
     fn reset_fast(&mut self) {
         self.ema.fast = self.ema.slow;
     }
-    #[cfg(feature = "EMA_calibration")]
-    fn reset_fast(&mut self) {
-        self.ema.fast = self.ema.slow;
-        self.calf = self.cals;
-    }
-    #[cfg(not(feature = "EMA_calibration"))]
     fn reset_slow(&mut self) {
         self.ema.slow = self.ema.fast;
-    }
-    #[cfg(feature = "EMA_calibration")]
-    fn reset_slow(&mut self) {
-        self.ema.slow = self.ema.fast;
-        self.cals = self.calf;
     }
     fn as_view(&self) -> &EmaView {
         &self.ema
@@ -210,10 +155,6 @@ impl Ema2 {
                 fast: 0.0,
                 slow: 0.0,
             },
-            #[cfg(feature = "EMA_calibration")]
-            calf: 0.0,
-            #[cfg(feature = "EMA_calibration")]
-            cals: 0.0,
             fe: 1.0 / (len as f64),
             se: 1.0 / (len as f64),
         }
@@ -230,11 +171,6 @@ impl Ema2 {
     pub fn with_value(mut self, x: f64) -> Self {
         self.ema.fast = x;
         self.ema.slow = x;
-        #[cfg(feature = "EMA_calibration")]
-        {
-            self.calf = 1.0;
-            self.cals = 1.0;
-        }
         self
     }
 }
@@ -326,14 +262,11 @@ impl<const N: usize> Ewa<N> {
     }
 }
 
-/// Exponential Moving Average pair, with a calibrator if feature `EMA_calibration` is on.
 #[derive(Clone, Debug)]
 pub struct Ewa2<const N: usize> {
     ema: EmaView,
     pool: [f64; N],
     last: usize,
-    #[cfg(feature = "EMA_calibration")]
-    cals: f64,
     se: f64,
     sx: f64,
 }
@@ -342,13 +275,8 @@ impl<const N: usize> EmaIF for Ewa2<N> {
     fn get_fast(&self) -> f64 {
         self.ema.fast
     }
-    #[cfg(not(feature = "EMA_calibration"))]
     fn trend(&self) -> f64 {
         self.ema.fast / self.ema.slow
-    }
-    #[cfg(feature = "EMA_calibration")]
-    fn trend(&self) -> f64 {
-        self.ema.fast * self.cals / self.slow
     }
 }
 
@@ -361,30 +289,15 @@ impl<const N: usize> EmaMutIF for Ewa2<N> {
         self.pool[self.last] = val;
         self.last = (self.last + 1) % N;
         self.ema.slow = self.se * x + self.sx * self.ema.slow;
-        #[cfg(feature = "EMA_calibration")]
-        {
-            self.cals = self.se + self.sx * self.cals;
-        }
     }
     fn reset_to(&mut self, val: f64) {
         self.ema.fast = val;
     }
-    #[cfg(not(feature = "EMA_calibration"))]
     fn reset_fast(&mut self) {
         unimplemented!();
     }
-    #[cfg(feature = "EMA_calibration")]
-    fn reset_fast(&mut self) {
-        unimplemented!();
-    }
-    #[cfg(not(feature = "EMA_calibration"))]
     fn reset_slow(&mut self) {
         self.ema.slow = self.ema.fast;
-    }
-    #[cfg(feature = "EMA_calibration")]
-    fn reset_slow(&mut self) {
-        self.ema.slow = self.fast.get();
-        self.cals = self.calf;
     }
     fn as_view(&self) -> &EmaView {
         &self.ema
@@ -400,8 +313,6 @@ impl<const N: usize> Ewa2<N> {
             },
             pool: [initial; N],
             last: 0,
-            #[cfg(feature = "EMA_calibration")]
-            cals: initial,
             se: 1.0 / (N as f64),
             sx: 1.0 - 1.0 / (N as f64),
         }
