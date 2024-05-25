@@ -252,12 +252,9 @@ fn search(
     let mut num_learnt = 0;
     let mut current_core: usize = asg.derefer(assign::property::Tusize::NumUnassertedVar);
     let mut core_was_rebuilt: Option<usize> = None;
-    // let stage_size: usize = 32;
     let mut time_to_vivify = false;
     #[cfg(feature = "rephase")]
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
-
-    let mut nl = 0;
 
     // state.stm.initialize(stage_size);
     state.stm.initialize(1);
@@ -299,8 +296,6 @@ fn search(
             }
         }
         if state.stm.stage_ended(num_learnt) {
-            assert!(nl <= state.stm.current_span());
-            nl = 0;
             if let Some(p) = state.elapsed() {
                 if 1.0 <= p {
                     return Err(SolverError::TimeOut);
