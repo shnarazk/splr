@@ -27,7 +27,8 @@ default = [
         # "bi_clause_completion",
         "clause_rewarding",
         # "dynamic_restart_threshold",
-        "LRB_rewarding",
+        # "LRB_rewarding",
+        "reward_by_order",
         # "reason_side_rewarding",
         # "rephase",
         # "reward_annealing",
@@ -78,6 +79,7 @@ rephase = [                     # search around the best-so-far candidate repeat
         "best_phases_tracking",
         ]
 reward_annealing = []           # use bigger and smaller decay rates cycliclly
+reward_by_order = []
 stochastic_local_search = [     # since 0.17
         # "reward_annealing",
         "rephase",

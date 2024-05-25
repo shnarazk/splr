@@ -92,6 +92,7 @@ pub struct AssignStack {
     #[cfg(feature = "EVSIDS")]
     pub(super) activity_decay_default: f64,
     /// its diff
+    #[cfg(feature = "LRB_rewarding")]
     pub(super) activity_anti_decay: f64,
     #[cfg(feature = "EVSIDS")]
     pub(super) activity_decay_step: f64,
@@ -148,6 +149,7 @@ impl Default for AssignStack {
             #[cfg(feature = "EVSIDS")]
             activity_decay_default: 0.94,
 
+            #[cfg(not(feature = "reward_by_order"))]
             activity_anti_decay: 0.06,
 
             #[cfg(feature = "EVSIDS")]
@@ -188,14 +190,15 @@ impl Instantiate for AssignStack {
 
             #[cfg(feature = "EVSIDS")]
             activity_decay: config.vrw_dcy_rat * 0.6,
-            #[cfg(not(feature = "EVSIDS"))]
+            #[cfg(feature = "LRB_rewarding")]
             activity_decay: config.vrw_dcy_rat,
 
             #[cfg(feature = "EVSIDS")]
             activity_decay_default: config.vrw_dcy_rat,
 
+            #[cfg(not(feature = "reward_by_order"))]
             activity_anti_decay: 1.0 - config.vrw_dcy_rat,
-            #[cfg(feature = "EVSIDS")]
+            #[cfg(feature = "LRB_rewarding")]
             activity_decay_step: config.vrw_dcy_stp,
 
             ..AssignStack::default()

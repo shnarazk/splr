@@ -27,6 +27,9 @@ pub trait SolveIF {
 
 macro_rules! RESTART {
     ($asg: expr, $cdb: expr, $state: expr) => {
+        $asg.update_activity_tick();
+        #[cfg(feature = "clause_rewarding")]
+        $cdb.update_activity_tick();
         $asg.cancel_until($asg.root_level());
         $cdb.handle(SolverEvent::Restart);
         $state.handle(SolverEvent::Restart);
@@ -285,9 +288,9 @@ fn search(
         if dl == root_level {
             return Err(SolverError::RootLevelConflict(cc));
         }
-        asg.update_activity_tick();
-        #[cfg(feature = "clause_rewarding")]
-        cdb.update_activity_tick();
+        // asg.update_activity_tick();
+        // #[cfg(feature = "clause_rewarding")]
+        // cdb.update_activity_tick();
         let (reassignd, rank) = handle_conflict(asg, cdb, state, &cc)?;
         if 1 < rank {
             num_learnt += 1;

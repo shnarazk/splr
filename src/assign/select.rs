@@ -73,8 +73,11 @@ impl VarSelectIF for AssignStack {
             if v.is(FlagVar::PHASE) != *b {
                 num_flipped += 1;
                 v.set(FlagVar::PHASE, *b);
-                v.activity *= self.activity_decay;
-                v.activity += self.activity_anti_decay;
+                #[cfg(not(feature = "reward_by_order"))]
+                {
+                    v.activity *= self.activity_decay;
+                    v.activity += self.activity_anti_decay;
+                }
                 self.update_heap(*vi);
             }
         }

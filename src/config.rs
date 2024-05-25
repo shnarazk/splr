@@ -139,9 +139,13 @@ impl Default for Config {
             vrw_dcy_rat: 0.98,
             #[cfg(feature = "LRB_rewarding")]
             vrw_dcy_rat: 0.98,
+            #[cfg(feature = "reward_by_order")]
+            vrw_dcy_rat: 0.8,
             #[cfg(feature = "EVSIDS")]
             vrw_dcy_stp: 0.0001,
             #[cfg(feature = "LRB_rewarding")]
+            vrw_dcy_stp: 0.0,
+            #[cfg(feature = "reward_by_order")]
             vrw_dcy_stp: 0.0,
         }
     }

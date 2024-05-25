@@ -20,7 +20,10 @@ pub struct Var {
     /// the `Flag`s (8 bits)
     pub(super) flags: FlagVar,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
+    #[cfg(not(feature = "reward_by_order"))]
     pub(super) activity: f64,
+    #[cfg(feature = "reward_by_order")]
+    pub(super) activity: usize,
     // reward_ema: Ema2,
     #[cfg(feature = "boundary_check")]
     pub propagated_at: usize,
@@ -37,7 +40,10 @@ impl Default for Var {
             level: DecisionLevel::default(),
             reason: AssignReason::None,
             flags: FlagVar::empty(),
+            #[cfg(not(feature = "reward_by_order"))]
             activity: 0.0,
+            #[cfg(feature = "reward_by_order")]
+            activity: 0,
             // reward_ema: Ema2::new(200).with_slow(4_000),
             #[cfg(feature = "boundary_check")]
             propagated_at: 0,
@@ -60,9 +66,6 @@ impl Var {
     /// return a new vector of $n$ `Var`s.
     pub fn new_vars(n: usize) -> Vec<Var> {
         vec![Var::default(); n + 1]
-    }
-    pub fn activity(&self) -> f64 {
-        self.activity
     }
 }
 

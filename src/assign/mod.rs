@@ -7,9 +7,9 @@ mod ema;
 mod heap;
 /// Boolean constraint propagation
 mod propagate;
-/// Var rewarding
 #[cfg_attr(feature = "EVSIDS", path = "evsids.rs")]
 #[cfg_attr(feature = "LRB_rewarding", path = "learning_rate.rs")]
+#[cfg_attr(feature = "reward_by_order", path = "used_order.rs")]
 mod reward;
 /// Decision var selection
 mod select;
