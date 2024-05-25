@@ -30,7 +30,6 @@ default = [
         "reward_by_order",
         # "reason_side_rewarding",
         # "rephase",
-        # "reward_annealing",
         # "stochastic_local_search",
         # "suppress_reason_chain",
         "two_mode_reduction",
@@ -64,7 +63,6 @@ dynamic_restart_threshold = []  # control restart spans like Glucose
 incremental_solver = [          # for all solution SAT sover
         "no_clause_elimination",
 ]
-just_used = []                  # Var and clause have 'just_used' flags
 no_IO = []                      # to embed Splr into non-std environments
 no_restart = []
 platform_wasm = [
@@ -76,14 +74,10 @@ rephase = [                     # search around the best-so-far candidate repeat
         ]
 reward_by_order = []
 stochastic_local_search = [     # since 0.17
-        # "reward_annealing",
         "rephase",
 ]
 support_user_assumption = []    # NOT WORK (defined in Glucose)
 suppress_reason_chain = []      # make direct links between a dicision var and its implications
-trace_analysis = []             # for debug
-trace_elimination = []          # for debug
-trace_equivalency = []          # for debug
 trail_saving = []               # reduce propagation cost by reusing propagation chain
 two_mode_reduction = []         # exploration mode and exploitation mode since 0.17
 unsafe_access = []              # access elements of vectors without boundary checking

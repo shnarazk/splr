@@ -36,9 +36,6 @@ impl Default for Var {
             level: DecisionLevel::default(),
             reason: AssignReason::None,
             flags: FlagVar::empty(),
-            #[cfg(not(feature = "reward_by_order"))]
-            activity: 0.0,
-            #[cfg(feature = "reward_by_order")]
             activity: 0,
             // reward_ema: Ema2::new(200).with_slow(4_000),
             #[cfg(feature = "boundary_check")]

@@ -9,7 +9,7 @@ impl ActivityIF<ClauseIndex> for ClauseDB {
         unreachable!()
     }
     fn set_activity(&mut self, cid: ClauseIndex, val: f64) {
-        self[cid].activity = val as u32;
+        self[cid].activity = val;
     }
     #[inline]
     fn reward_at_analysis(&mut self, cid: ClauseIndex) {
@@ -25,13 +25,16 @@ impl ActivityIF<ClauseIndex> for ClauseDB {
 }
 
 impl Clause {
+    pub(crate) fn activity(&self) -> f64 {
+        self.activity
+    }
     #[inline]
     pub fn update_activity(&mut self, t: usize, decay: f64, reward: f64) -> f64 {
         if self.timestamp < t {
-            self.activity *= decay.powi(t as i32 - self.timestamp as i32) as u32;
-            self.activity += reward as u32;
+            self.activity *= decay.powi(t as i32 - self.timestamp as i32);
+            self.activity += reward;
             self.timestamp = t;
         }
-        self.activity as f64
+        self.activity
     }
 }

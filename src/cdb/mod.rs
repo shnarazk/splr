@@ -257,7 +257,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
 
-        self[ci].activity = 0;
+        self[ci].activity = 0.0;
         self[ci].timestamp = self.tick;
         RefClause::Clause(ci)
     }
@@ -644,9 +644,6 @@ impl ClauseDBIF for ClauseDB {
         let rank = c.update_lbd(asg);
         let learnt = c.is(FlagClause::LEARNT);
         if learnt {
-            #[cfg(feature = "just_used")]
-            c.turn_on(FlagClause::USED);
-            #[cfg(feature = "clause_rewading")]
             self.reward_at_analysis(ci);
         }
         if 1 < rank {
@@ -656,23 +653,6 @@ impl ClauseDBIF for ClauseDB {
     }
     /// reduce the number of 'learnt' or *removable* clauses.
     fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
-        impl Clause {
-            fn reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
-                self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
-            }
-            fn lbd(&self) -> f64 {
-                self.rank as f64
-            }
-            fn an_valuation(&self, asg: &impl AssignIF) -> f64 {
-                let mut l = self
-                    .iter()
-                    .map(|l| 1.0 - asg.activity(l.vi()))
-                    .collect::<Vec<_>>();
-                l.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
-                l.truncate(self.rank as usize);
-                l.iter().sum()
-            }
-        }
         let mut using: HashSet<ClauseIndex> = HashSet::new();
         if asg.decision_level() != asg.root_level() {
             for v in asg.var_iter_mut() {
@@ -716,17 +696,8 @@ impl ClauseDBIF for ClauseDB {
             );
             alives += 1;
             match setting {
-                ReductionType::RASonADD(_) => {
-                    perm.push(OrderedProxy::new(ci, c.reverse_activity_sum(asg)));
-                }
-                ReductionType::RASonALL(cutoff, _) => {
-                    let value = c.reverse_activity_sum(asg);
-                    if cutoff < value {
-                        perm.push(OrderedProxy::new(ci, value));
-                    }
-                }
                 ReductionType::LBDonADD(_) => {
-                    perm.push(OrderedProxy::new(ci, c.lbd()));
+                    perm.push(OrderedProxy::new(ci, c.rank as f64));
                 }
                 ReductionType::LBDonALL(cutoff, _) => {
                     let value = c.rank;
@@ -734,8 +705,8 @@ impl ClauseDBIF for ClauseDB {
                         perm.push(OrderedProxy::new(ci, value as f64));
                     }
                 }
-                ReductionType::Exp(cutoff, _) => {
-                    let value = c.an_valuation(asg);
+                ReductionType::ClauseActivity(cutoff) => {
+                    let value = c.activity();
                     if cutoff < value {
                         perm.push(OrderedProxy::new(ci, value));
                     }
@@ -743,20 +714,15 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         let keep = match setting {
-            ReductionType::RASonADD(size) => perm.len().saturating_sub(size),
-            ReductionType::RASonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
             ReductionType::LBDonADD(size) => perm.len().saturating_sub(size),
             ReductionType::LBDonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
-            ReductionType::Exp(_u, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
+            ReductionType::ClauseActivity(_) => (perm.len() as f64).powf(1.0 - 0.7) as usize,
         };
         self.reduction_threshold = match setting {
-            ReductionType::RASonADD(_) | ReductionType::RASonALL(_, _) => {
-                keep as f64 / alives as f64
-            }
             ReductionType::LBDonADD(_) | ReductionType::LBDonALL(_, _) => {
                 -(keep as f64) / alives as f64
             }
-            ReductionType::Exp(_u, _) => 0.0,
+            ReductionType::ClauseActivity(_u) => 0.0,
         };
         perm.sort();
         let mut deads: HashSet<Lit> = HashSet::new();
@@ -1459,16 +1425,12 @@ impl ClauseDB {
 
 #[derive(Clone, Debug)]
 pub enum ReductionType {
-    /// weight by Reverse Activity Sum over the added clauses
-    RASonADD(usize),
-    /// weight by Reverse Activito Sum over all learnt clauses
-    RASonALL(f64, f64),
     /// weight by Literal Block Distance over the added clauses
     LBDonADD(usize),
     /// weight by Literal Block Distance over all learnt clauses
     LBDonALL(u16, f64),
-    /// weight by Literal Block Distance over all learnt clauses
-    Exp(f64, f64),
+    /// classic one
+    ClauseActivity(f64),
 }
 
 pub mod property {
@@ -1594,16 +1556,12 @@ mod tests {
 
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
-        #[cfg(feature = "just_used")]
-        assert!(!c.is(Flag::USED));
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
             .as_ci();
         let c = &cdb[c2];
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
-        #[cfg(feature = "just_used")]
-        assert!(!c.is(Flag::USED));
     }
     #[test]
     fn test_clause_equality() {

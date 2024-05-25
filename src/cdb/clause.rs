@@ -36,7 +36,7 @@ pub trait ClauseIF {
 }
 
 /// A representation of 'clause'
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Debug)]
 pub struct Clause {
     /// links. Note: watch0 is also used as freelist
     pub(super) link0: ClauseIndex,
@@ -55,7 +55,7 @@ pub struct Clause {
     /// the number of conflicts at which this clause was used in `conflict_analyze`
     pub(crate) timestamp: usize,
     /// A dynamic clause evaluation criterion based on the number of references.
-    pub(crate) activity: u32,
+    pub(crate) activity: f64,
 
     #[cfg(feature = "boundary_check")]
     pub birth: usize,
@@ -74,7 +74,7 @@ impl Default for Clause {
             rank_old: 0,
             search_from: 2,
             timestamp: 0,
-            activity: 0,
+            activity: 0.0,
 
             #[cfg(feature = "boundary_check")]
             birth: 0,

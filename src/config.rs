@@ -270,8 +270,6 @@ impl Config {
                 "EMA calibration",
                 #[cfg(feature = "incremental_solver")]
                 "incremental solver",
-                #[cfg(feature = "just_used")]
-                "use 'just used' flag",
                 #[cfg(feature = "reason_side_rewarding")]
                 "reason-side rewarding",
                 #[cfg(feature = "rephase")]

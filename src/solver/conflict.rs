@@ -270,23 +270,6 @@ fn conflict_analyze(
             asg.reward_at_analysis($vi);
         };
     }
-    macro_rules! trace {
-        ($($arg: expr),*) => {
-            #[cfg(feature = "trace_analysis")]
-            println!($($arg),*);
-        };
-    }
-    macro_rules! trace_lit {
-        ($lit: expr, $message: expr) => {
-            #[cfg(feature = "trace_analysis")]
-            {
-                let vi = $lit.vi();
-                let lv = asg.level(vi);
-                println!("{}: literal {} at level {}", $message, i32::from($lit), $lv);
-            }
-        };
-    }
-
     macro_rules! validate_vi {
         ($vi: expr) => {
             debug_assert!(!asg.var($vi).is(FlagVar::ELIMINATED));
@@ -322,7 +305,6 @@ fn conflict_analyze(
     }
 
     {
-        trace_lit!("- handle conflicting literal", p);
         let vi = p.vi();
         validate_vi!(vi);
         set_seen!(vi);
@@ -346,17 +328,10 @@ fn conflict_analyze(
                     debug_assert_eq!(asg.level(vi), dl, "strange level binary clause");
                     // if root_level == asg.level(vi) { continue; }
                     set_seen!(vi);
-                    trace_lit!(l, " - binary linked");
                     conflict_level!(vi);
                 }
             }
             AssignReason::Implication(cid) => {
-                trace!(
-                    "analyze clause {}(first literal: {}) for {}",
-                    cid,
-                    i32::from(cdb[cid].lit0()),
-                    p
-                );
                 debug_assert!(!cdb[cid].is_dead() && 2 < cdb[cid].len());
                 // if !cdb.update_at_analysis(asg, cid) {
                 if !cdb[cid].is(FlagClause::LEARNT) {
@@ -372,19 +347,14 @@ fn conflict_analyze(
                     if !asg.var(vi).is(FlagVar::CA_SEEN) {
                         let lvl = asg.level(vi);
                         if root_level == lvl {
-                            trace_lit!(q, " -- ignore");
                             continue;
                         }
                         set_seen!(vi);
                         if dl == lvl {
-                            trace_lit!(q, " -- found another path");
                             conflict_level!(vi);
                         } else {
-                            trace_lit!(q, " -- push to earnt");
                             learnt.push(*q);
                         }
-                    } else {
-                        trace!(q, " -- ignore flagged already");
                     }
                 }
             }
@@ -419,7 +389,6 @@ fn conflict_analyze(
             let v = asg.var(vi);
             !v.is(FlagVar::CA_SEEN) || lvl != dl
         } {
-            trace_lit!(asg.stack(trail_index), "skip, not flagged");
             boundary_check!(
                 0 < trail_index,
                 "Broke the bottom:: path_cnt {} scanned to {}",
@@ -429,7 +398,6 @@ fn conflict_analyze(
             trail_index -= 1;
         }
         p = asg.stack(trail_index);
-        trace!("move to flagged {}; num path: {}", p.vi(), path_cnt - 1);
 
         asg.var_mut(p.vi()).turn_off(FlagVar::CA_SEEN);
         // since the trail can contain a literal which level is under `dl` after
@@ -448,11 +416,6 @@ fn conflict_analyze(
     // debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);
     learnt[0] = !p;
-    trace!(
-        "appending {}, the final (but not minimized) learnt is {:?}",
-        learnt[0],
-        learnt
-    );
     minimize_learnt(&mut state.new_learnt, asg, cdb)
 }
 

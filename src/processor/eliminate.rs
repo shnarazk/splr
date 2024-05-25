@@ -50,8 +50,6 @@ pub fn eliminate_var(
     }
     let pos = w.pos_occurs.clone();
     let neg = w.neg_occurs.clone();
-    #[cfg(feature = "trace_elimination")]
-    println!("# eliminate_var {}", vi);
     // OK, eliminate the literal and build constraints on it.
     make_eliminated_clauses(cdb, &mut elim.elim_lits, vi, &pos, &neg);
     let vec = &mut state.new_learnt;
@@ -61,20 +59,9 @@ pub fn eliminate_var(
         let learnt_p = cdb[*p].is(FlagClause::LEARNT);
         for n in neg.iter() {
             match merge(asg, cdb, *p, *n, vi, vec) {
-                0 => {
-                    #[cfg(feature = "trace_elimination")]
-                    println!(
-                        " - eliminate_var {}: fusion {}{} and {}{}",
-                        vi, p, cdb[*p], n, cdb[*n],
-                    );
-                }
+                0 => {}
                 1 => {
                     let lit = vec[0];
-                    #[cfg(feature = "trace_elimination")]
-                    println!(
-                        " - eliminate_var {}: found assign {} from {}{} and {}{}",
-                        vi, lit, p, cdb[*p], n, cdb[*n],
-                    );
                     match asg.assigned(lit) {
                         Some(true) => (),
                         Some(false) => {
@@ -96,11 +83,6 @@ pub fn eliminate_var(
                         RefClause::Clause(ci) => {
                             // the merged clause might be a duplicated clause.
                             elim.add_cid_occur(asg, ci, &mut cdb[ci], true);
-                            #[cfg(feature = "trace_elimination")]
-                            println!(
-                                " - eliminate_var {}: X {} from {} and {}",
-                                vi, cdb[ci], cdb[*p], cdb[*n],
-                            );
                         }
                         RefClause::Dead => (),
                         RefClause::EmptyClause => (),
@@ -250,12 +232,9 @@ fn merge(
     let qpb = &cdb[ciq];
     let ps_smallest = pqb.len() < qpb.len();
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
-    #[cfg(feature = "trace_elimination")]
-    println!("# merge {} & {}", pb, qb);
     if pb.iter().filter(|l| l.vi() != vi).any(|l| qb.contains(!*l)) {
         return 0;
     }
-
     let mut lits = pb
         .iter()
         .filter(|l| l.vi() != vi && !qb.contains(**l))
@@ -297,8 +276,6 @@ fn make_eliminated_clauses(
 }
 
 fn make_eliminating_unit_clause(store: &mut Vec<Lit>, x: Lit) {
-    #[cfg(feature = "trace_elimination")]
-    println!(" - eliminator save {}", x);
     store.push(x);
     store.push(Lit::from(1usize));
 }
@@ -326,8 +303,6 @@ fn make_eliminated_clause(
     // Store the length of the clause last:
     debug_assert_eq!(store[first].vi(), vi);
     store.push(Lit::from(c.len()));
-    #[cfg(feature = "trace_elimination")]
-    println!("# make_eliminated_clause: eliminate({}) clause {}", vi, c);
 }
 
 #[cfg(test)]

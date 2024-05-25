@@ -200,25 +200,6 @@ impl VarManipulateIF for AssignStack {
             {
                 self.var[vi].timestamp = self.tick;
             }
-
-            #[cfg(feature = "trace_elimination")]
-            {
-                let lv = self.level[vi];
-                if self.root_level == self.level[vi] && self.assign[vi].is_some() {
-                    panic!("v:{}, dl:{}", self.var[vi], self.decision_level());
-                }
-                if !(self.root_level < self.level[vi] || self.assign[vi].is_none()) {
-                    panic!(
-                        "v:{}, lvl:{} => {}, dl:{}, assign:{:?} ",
-                        self.var[vi],
-                        lv,
-                        self.level[vi],
-                        self.decision_level(),
-                        self.assign[vi],
-                    );
-                }
-                debug_assert!(self.root_level < self.level[vi] || self.assign[vi].is_none());
-            }
         } else {
             #[cfg(feature = "boundary_check")]
             panic!("double elimination");

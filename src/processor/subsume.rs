@@ -27,11 +27,6 @@ impl Eliminator {
     ) -> MaybeInconsistent {
         match have_subsuming_lit(cdb, ci, di) {
             Subsumable::Success => {
-                #[cfg(feature = "trace_elimination")]
-                println!(
-                    "BackSubsC    => {} {} subsumed completely by {} {:#}",
-                    di, cdb[di], ci, cdb[ci],
-                );
                 debug_assert!(!cdb[di].is_dead());
                 if !cdb[di].is(FlagClause::LEARNT) {
                     cdb[ci].turn_off(FlagClause::LEARNT);
@@ -43,8 +38,6 @@ impl Eliminator {
             // To avoid making a big clause, we have to add a condition for combining them.
             Subsumable::By(l) => {
                 debug_assert!(ci.is_lifted());
-                #[cfg(feature = "trace_elimination")]
-                println!("BackSubC subsumes {} from {} and {}", l, ci, di);
                 strengthen_clause(asg, cdb, self, di, !l, deads)?;
                 self.enqueue_var(asg, l.vi(), true);
             }
@@ -107,9 +100,6 @@ fn strengthen_clause(
     debug_assert!(1 < cdb[ci].len());
     match cdb.transform_by_elimination(ci, l) {
         RefClause::Clause(_ci) => {
-            #[cfg(feature = "trace_elimination")]
-            println!("ci {} drops literal {}", ci, l);
-
             elim.enqueue_clause(ci, &mut cdb[ci]);
             elim.remove_lit_occur(asg, l, ci);
             Ok(())

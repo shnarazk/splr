@@ -1,6 +1,4 @@
 //! Conflict-Driven Clause Learning Search engine
-#[cfg(feature = "clause_activity")]
-use crate::types::ActivityIF;
 use {
     super::{
         conflict::handle_conflict, restart::RestartIF, Certificate, Solver, SolverEvent,
@@ -192,9 +190,6 @@ impl SolveIF for Solver {
         state.progress(asg, cdb);
         match answer {
             Ok(true) => {
-                #[cfg(feature = "trace_equivalency")]
-                asg.dump_cnf(cdb, "last-step.cnf");
-
                 // As a preparation for incremental solving, we need to backtrack to the
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
@@ -344,9 +339,6 @@ fn search(
                 asg.clear_asserted_literals(cdb)?;
             }
 
-            #[cfg(feature = "trace_equivalency")]
-            cdb.check_consistency(asg, "before simplify");
-
             dump_stage(asg, cdb, state, previous_stage);
             // let last_span = state.stm.current_span();
             let next_stage: Option<bool> = state.stm.prepare_new_stage(num_learnt);
@@ -356,41 +348,18 @@ fn search(
                 // a beginning of a new cycle
                 time_to_vivify = true;
                 {
-                    let State { config, stm, .. } = state;
+                    let State { config, .. } = state;
                     state.exploration_rate_ema.update(1.0);
                     cdb.reduce(
                         asg,
-                        if cfg!(feature = "two_mode_reduction") {
-                            if cfg!(feature = "no_restart") {
-                                // ReductionType::RASonADD(
-                                //     (last_span as f64).powf(0.98) as usize, // stm.num_reducible(1.00)
-                                // )
-                                // ReductionType::RASonALL(2.0, 0.01)
-                                // ReductionType::LBDonALL(5, 0.01)
-                                ReductionType::Exp(3.0, 0.05)
-                            } else {
-                                ReductionType::RASonADD(stm.num_reducible(config.cls_rdc_rm1))
-                            }
+                        if new_segment {
+                            ReductionType::LBDonALL(2, 0.99)
+                        } else if cfg!(feature = "two_mode_reduction") {
+                            ReductionType::ClauseActivity(0.0)
                         } else {
                             ReductionType::LBDonALL(config.cls_rdc_lbd, config.cls_rdc_rm2)
                         },
                     );
-                    if new_segment {
-                        cdb.reduce(
-                            asg,
-                            if cfg!(feature = "two_mode_reduction") {
-                                if cfg!(feature = "no_restart") {
-                                    // ReductionType::LBDonALL(5, 0.5)
-                                    ReductionType::Exp(5.0, 0.01)
-                                } else {
-                                    ReductionType::LBDonALL(config.cls_rdc_lbd, config.cls_rdc_rm2)
-                                }
-                            } else {
-                                ReductionType::LBDonALL(2, 0.99)
-                                // ReductionType::RASonALL(config.cls_rdc_rm3, config.cls_rdc_rm4)
-                            },
-                        );
-                    }
                 }
                 #[cfg(feature = "rephase")]
                 {
