@@ -20,11 +20,7 @@ pub struct Var {
     /// the `Flag`s (8 bits)
     pub(super) flags: FlagVar,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
-    #[cfg(not(feature = "reward_by_order"))]
-    pub(super) activity: f64,
-    #[cfg(feature = "reward_by_order")]
     pub(super) activity: usize,
-    // reward_ema: Ema2,
     #[cfg(feature = "boundary_check")]
     pub propagated_at: usize,
     #[cfg(feature = "boundary_check")]

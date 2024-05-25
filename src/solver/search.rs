@@ -530,7 +530,6 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: O
     let stage = state.stm.current_stage();
     let segment = state.stm.current_segment();
     let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
-    let vdr = asg.derefer(assign::property::Tf64::VarDecayRate);
     let cdt = cdb.derefer(cdb::property::Tf64::ReductionThreshold);
     let fuel = if active {
         state.restart.penetration_energy_charged
@@ -543,7 +542,7 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: O
             Some(false) => Some((None, Some(cycle), stage)),
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
-        format!("{span:>7}, fuel:{fuel:>9.2}, cpr:{cpr:>8.2}, vdr:{vdr:>3.2}, cdt:{cdt:>5.2}"),
+        format!("{span:>7}, fuel:{fuel:>9.2}, cpr:{cpr:>8.2}, cdt:{cdt:>5.2}"),
     );
 }
 

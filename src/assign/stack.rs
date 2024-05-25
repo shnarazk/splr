@@ -82,20 +82,6 @@ pub struct AssignStack {
     pub(super) tick: usize,
     /// vars
     pub(super) var: Vec<Var>,
-
-    //
-    //## Var Rewarding
-    //
-    /// var activity decay
-    pub(super) activity_decay: f64,
-    /// the default value of var activity decay in configuration
-    #[cfg(feature = "EVSIDS")]
-    pub(super) activity_decay_default: f64,
-    /// its diff
-    #[cfg(feature = "LRB_rewarding")]
-    pub(super) activity_anti_decay: f64,
-    #[cfg(feature = "EVSIDS")]
-    pub(super) activity_decay_step: f64,
 }
 
 impl Default for AssignStack {
@@ -143,17 +129,6 @@ impl Default for AssignStack {
 
             tick: 0,
             var: Vec::new(),
-
-            activity_decay: 0.94,
-
-            #[cfg(feature = "EVSIDS")]
-            activity_decay_default: 0.94,
-
-            #[cfg(not(feature = "reward_by_order"))]
-            activity_anti_decay: 0.06,
-
-            #[cfg(feature = "EVSIDS")]
-            activity_decay_step: 0.1,
         }
     }
 }
@@ -187,20 +162,6 @@ impl Instantiate for AssignStack {
             num_vars: cnf.num_of_variables,
             assign_rate: ProgressASG::instantiate(config, cnf),
             var: Var::new_vars(nv),
-
-            #[cfg(feature = "EVSIDS")]
-            activity_decay: config.vrw_dcy_rat * 0.6,
-            #[cfg(feature = "LRB_rewarding")]
-            activity_decay: config.vrw_dcy_rat,
-
-            #[cfg(feature = "EVSIDS")]
-            activity_decay_default: config.vrw_dcy_rat,
-
-            #[cfg(not(feature = "reward_by_order"))]
-            activity_anti_decay: 1.0 - config.vrw_dcy_rat,
-            #[cfg(feature = "LRB_rewarding")]
-            activity_decay_step: config.vrw_dcy_stp,
-
             ..AssignStack::default()
         }
     }

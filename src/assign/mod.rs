@@ -7,16 +7,14 @@ mod ema;
 mod heap;
 /// Boolean constraint propagation
 mod propagate;
-#[cfg_attr(feature = "EVSIDS", path = "evsids.rs")]
-#[cfg_attr(feature = "LRB_rewarding", path = "learning_rate.rs")]
-#[cfg_attr(feature = "reward_by_order", path = "used_order.rs")]
-mod reward;
 /// Decision var selection
 mod select;
 /// assignment management
 mod stack;
 /// trail saving
 mod trail_saving;
+/// var selection criteria
+mod used_order;
 /// var struct and its methods
 mod var;
 
@@ -370,14 +368,9 @@ pub mod property {
     pub enum Tf64 {
         AverageVarActivity,
         CurrentWorkingSetSize,
-        VarDecayRate,
     }
 
-    pub const F64S: [Tf64; 3] = [
-        Tf64::AverageVarActivity,
-        Tf64::CurrentWorkingSetSize,
-        Tf64::VarDecayRate,
-    ];
+    pub const F64S: [Tf64; 2] = [Tf64::AverageVarActivity, Tf64::CurrentWorkingSetSize];
 
     impl PropertyDereference<Tf64, f64> for AssignStack {
         #[inline]
@@ -385,7 +378,6 @@ pub mod property {
             match k {
                 Tf64::AverageVarActivity => 0.0,    // self.activity_averaged,
                 Tf64::CurrentWorkingSetSize => 0.0, // self.cwss,
-                Tf64::VarDecayRate => self.activity_decay,
             }
         }
     }

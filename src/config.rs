@@ -90,18 +90,6 @@ pub struct Config {
 
     /// Max #cls for var elimination
     pub elm_var_occ: usize,
-
-    //
-    //## vivifier
-    //
-
-    //
-    //## var rewarding
-    //
-    /// Var Reward Decay Rate
-    pub vrw_dcy_rat: f64,
-    /// Decay increment step.
-    pub vrw_dcy_stp: f64,
 }
 
 impl Default for Config {
@@ -134,19 +122,6 @@ impl Default for Config {
             elm_cls_lim: 64,
             elm_grw_lim: 0,
             elm_var_occ: 20000,
-
-            #[cfg(feature = "EVSIDS")]
-            vrw_dcy_rat: 0.98,
-            #[cfg(feature = "LRB_rewarding")]
-            vrw_dcy_rat: 0.98,
-            #[cfg(feature = "reward_by_order")]
-            vrw_dcy_rat: 0.8,
-            #[cfg(feature = "EVSIDS")]
-            vrw_dcy_stp: 0.0001,
-            #[cfg(feature = "LRB_rewarding")]
-            vrw_dcy_stp: 0.0,
-            #[cfg(feature = "reward_by_order")]
-            vrw_dcy_stp: 0.0,
         }
     }
 }
@@ -214,8 +189,6 @@ impl Config {
                                         "cr3" => self.cls_rdc_rm3 = val,
                                         "cr4" => self.cls_rdc_rm4 = val,
                                         "crr" => self.cls_rdc_ras = val,
-                                        "vdr" => self.vrw_dcy_rat = val,
-                                        "vds" => self.vrw_dcy_stp = val,
 
                                         _ => panic!("invalid option: {name}"),
                                     }
@@ -295,14 +268,10 @@ impl Config {
                 "stage-based dynamic restart threshold",
                 #[cfg(feature = "EMA_calibration")]
                 "EMA calibration",
-                #[cfg(feature = "EVSIDS")]
-                "EVSIDS rewarding",
                 #[cfg(feature = "incremental_solver")]
                 "incremental solver",
                 #[cfg(feature = "just_used")]
                 "use 'just used' flag",
-                #[cfg(feature = "LRB_rewarding")]
-                "Learning-Rate Based rewarding",
                 #[cfg(feature = "reason_side_rewarding")]
                 "reason-side rewarding",
                 #[cfg(feature = "rephase")]
@@ -364,7 +333,7 @@ FLAGS:
   -V, --version             Prints version information
 OPTIONS:
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
-{}{}{}{}{}{}{}      --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
+{}{}{}{}{}      --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
       --evo <elm-var-occ>   Max #cls for var elimination   {:>10}
   -o, --dir <io-outdir>     Output directory                {:>10}
@@ -418,12 +387,6 @@ OPTIONS:
         config.io_pfile.to_string_lossy(),
         config.io_rfile.to_string_lossy(),
         config.c_timeout,
-        config.vrw_dcy_rat,
-        OPTION!(
-            "EVSIDS",
-            config.vrw_dcy_stp,
-            "      --vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}\n"
-        ),
     )
 }
 
@@ -469,13 +432,12 @@ pub mod property {
     pub enum Tf64 {
         #[cfg(feature = "clase_rewarding")]
         ClauseRewardDecayRate,
-        VarRewardDecayRate,
     }
 
     #[cfg(not(feature = "clase_rewarding"))]
-    pub const F64S: [Tf64; 1] = [Tf64::VarRewardDecayRate];
+    pub const F64S: [Tf64; 0] = [];
     #[cfg(feature = "clase_rewarding")]
-    pub const F64S: [Tf64; 2] = [Tf64::ClauseRewardDecayRate, Tf64::VarRewardDecayRate];
+    pub const F64S: [Tf64; 1] = [Tf64::ClauseRewardDecayRate];
 
     impl PropertyDereference<Tf64, f64> for Config {
         #[inline]
@@ -483,7 +445,6 @@ pub mod property {
             match k {
                 #[cfg(feature = "clase_rewarding")]
                 Tf64::ClauseRewardDecayRate => self.crw_dcy_rat,
-                Tf64::VarRewardDecayRate => self.vrw_dcy_rat,
             }
         }
     }
