@@ -452,6 +452,7 @@ impl PropagateIF for AssignStack {
                     check_in!(cid, Propagate::BecameUnit(self.num_conflict, cached));
                     prev = ci;
                     ci = c.next_for_lit(propagating);
+                    // cdb.reward_at_propagation(ci);
                 }
             }
             from_saved_trail!();

@@ -281,20 +281,20 @@ fn search(
         }
         // asg.update_activity_tick();
         // cdb.update_activity_tick();
-        let (reassignd, rank) = handle_conflict(asg, cdb, state, &cc)?;
+        let (_reassignd, rank) = handle_conflict(asg, cdb, state, &cc)?;
         if 1 < rank {
             num_learnt += 1;
         }
-        let bl = asg.decision_level();
-        if cfg!(feature = "no_restart") && 1 < bl {
-            let a = asg.activity(reassignd.vi());
-            for i in 1..bl - 1 {
-                if asg.activity(asg.decision_vi(i)) < a {
-                    asg.cancel_until(i - 1);
-                    break;
-                }
-            }
-        }
+        // let bl = asg.decision_level();
+        // if cfg!(feature = "no_restart") && 1 < bl {
+        //     let a = asg.activity(reassignd.vi());
+        //     for i in 1..bl - 1 {
+        //         if asg.activity(asg.decision_vi(i)) < a {
+        //             asg.cancel_until(i - 1);
+        //             break;
+        //         }
+        //     }
+        // }
         if state.stm.stage_ended(num_learnt) {
             if let Some(p) = state.elapsed() {
                 if 1.0 <= p {
@@ -343,17 +343,18 @@ fn search(
                 // a beginning of a new cycle
                 time_to_vivify = true;
                 {
-                    let State { config, .. } = state;
+                    // let State { config, .. } = state;
                     state.exploration_rate_ema.update(1.0);
                     cdb.reduce(
                         asg,
-                        if new_segment {
-                            ReductionType::LBDonALL(2, 0.99)
-                        } else if cfg!(feature = "two_mode_reduction") {
-                            ReductionType::ClauseActivity(0.0)
-                        } else {
-                            ReductionType::LBDonALL(config.cls_rdc_lbd, config.cls_rdc_rm2)
-                        },
+                        // if new_segment {
+                        //     ReductionType::LBDonALL(2, 0.99)
+                        // } else if cfg!(feature = "two_mode_reduction") {
+                        //     ReductionType::ClauseActivity(0.8)
+                        // } else {
+                        //     ReductionType::LBDonALL(config.cls_rdc_lbd, config.cls_rdc_rm2)
+                        // },
+                        ReductionType::ClauseActivity(0.9),
                     );
                 }
                 #[cfg(feature = "rephase")]

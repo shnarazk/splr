@@ -45,8 +45,6 @@ pub struct ClauseDB {
     //
     /// an index for counting elapsed time
     pub(super) tick: usize,
-    pub(super) activity_decay: f64,
-    pub(super) activity_anti_decay: f64,
 
     //
     //## LBD
@@ -136,8 +134,6 @@ impl Instantiate for ClauseDB {
             certification_store: CertificationStore::instantiate(config, cnf),
             soft_limit: config.c_cls_lim,
             lbd: ProgressLBD::instantiate(config, cnf),
-            activity_decay: config.crw_dcy_rat,
-            activity_anti_decay: 1.0 - config.crw_dcy_rat,
             lbd_temp: vec![0; nv + 1],
             ..ClauseDB::default()
         }

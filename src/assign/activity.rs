@@ -18,7 +18,7 @@ impl ActivityIF<VarId> for AssignStack {
     fn reward_at_unassign(&mut self, vi: VarId) {
         if let Some(offset) = self.var[vi].activity.checked_sub(self.tick) {
             // self.var[vi].activity = self.tick + 1;
-            self.var[vi].activity = self.tick + (offset + 1).ilog2() as usize;
+            self.var[vi].activity = self.tick + (offset as f64).sqrt() as usize;
         }
     }
     fn update_activity_decay(&mut self, _scaling: f64) {}

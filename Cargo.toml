@@ -32,7 +32,7 @@ default = [
         # "rephase",
         # "stochastic_local_search",
         # "suppress_reason_chain",
-        "two_mode_reduction",
+        # "two_mode_reduction",
         "trail_saving",
 
         ### Logic formula processor

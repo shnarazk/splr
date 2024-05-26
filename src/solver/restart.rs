@@ -11,8 +11,8 @@ pub trait RestartIF: Instantiate {
     fn set_segment_parameters(&mut self, segment_scale: usize);
 }
 
-const FUEL: f64 = 2.0;
-const SCALE: f64 = 64.0;
+const FUEL: f64 = 1.0;
+const SCALE: f64 = 0.25;
 
 /// `RestartManager` provides restart API and holds data about restart conditions.
 #[derive(Clone, Debug, Default)]

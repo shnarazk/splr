@@ -161,8 +161,6 @@ impl Default for ClauseDB {
             num_bi_clause_completion: 0,
             // lbd_frozen_clause: 30,
             tick: 0,
-            activity_decay: 0.99,
-            activity_anti_decay: 0.01,
 
             lbd_temp: Vec::new(),
             lbd: ProgressLBD::default(),
@@ -257,7 +255,6 @@ impl ClauseDBIF for ClauseDB {
             }
         }
 
-        self[ci].activity = 0.0;
         self[ci].timestamp = self.tick;
         RefClause::Clause(ci)
     }
@@ -665,7 +662,6 @@ impl ClauseDBIF for ClauseDB {
             ref mut clause,
             ref mut num_reduction,
             ref tick,
-            ref activity_decay,
             ..
         } = self;
         *num_reduction += 1;
@@ -679,7 +675,7 @@ impl ClauseDBIF for ClauseDB {
             .filter(|(_, c)| !c.is_dead())
         {
             c.update_lbd(asg);
-            c.update_activity(*tick, *activity_decay, 0.0);
+            c.update_activity(*tick);
 
             if !c.is(FlagClause::LEARNT) || using.contains(&ci) {
                 continue;
@@ -705,10 +701,9 @@ impl ClauseDBIF for ClauseDB {
                         perm.push(OrderedProxy::new(ci, value as f64));
                     }
                 }
-                ReductionType::ClauseActivity(cutoff) => {
-                    let value = c.activity();
-                    if cutoff < value {
-                        perm.push(OrderedProxy::new(ci, value));
+                ReductionType::ClauseActivity(_) => {
+                    if c.timestamp < self.tick {
+                        perm.push(OrderedProxy::new(ci, -c.activity()));
                     }
                 }
             }
@@ -716,13 +711,13 @@ impl ClauseDBIF for ClauseDB {
         let keep = match setting {
             ReductionType::LBDonADD(size) => perm.len().saturating_sub(size),
             ReductionType::LBDonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
-            ReductionType::ClauseActivity(_) => (perm.len() as f64).powf(1.0 - 0.7) as usize,
+            ReductionType::ClauseActivity(scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
         };
         self.reduction_threshold = match setting {
             ReductionType::LBDonADD(_) | ReductionType::LBDonALL(_, _) => {
                 -(keep as f64) / alives as f64
             }
-            ReductionType::ClauseActivity(_u) => 0.0,
+            ReductionType::ClauseActivity(_u) => -(keep as f64) / alives as f64,
         };
         perm.sort();
         let mut deads: HashSet<Lit> = HashSet::new();

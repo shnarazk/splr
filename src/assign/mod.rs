@@ -1,6 +1,8 @@
 /// Module `assign` implements Boolean Constraint Propagation and decision var selection.
 /// This version can handle Chronological and Non Chronological Backtrack.
 
+/// var selection criteria
+mod activity;
 /// Ema
 mod ema;
 /// Heap
@@ -13,8 +15,6 @@ mod select;
 mod stack;
 /// trail saving
 mod trail_saving;
-/// var selection criteria
-mod used_order;
 /// var struct and its methods
 mod var;
 
