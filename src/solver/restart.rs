@@ -44,9 +44,10 @@ impl RestartIF for RestartManager {
         if cfg!(feature = "no_restart") {
             false
         } else {
-            let gscale = |x: f64| self.field_scale * (x - 1.0) + 1.0;
-            self.penetration_energy -= (lbd.trend() + gscale(ent.trend())) - 2.0;
-            self.penetration_energy < 0.0
+            // let gscale = |x: f64| self.field_scale * (x - 1.0) + 1.0;
+            // self.penetration_energy -= (lbd.trend() + gscale(ent.trend())) - 2.0;
+            // self.penetration_energy < 0.0
+            1.2 < lbd.trend()
         }
     }
     fn set_segment_parameters(&mut self, segment_scale: usize) {
