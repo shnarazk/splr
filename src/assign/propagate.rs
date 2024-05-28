@@ -621,7 +621,7 @@ impl AssignStack {
         assert_ne!(self.assigned(b0), Some(false));
         assert_ne!(self.assigned(b1), Some(false));
     }
-    ///
+    /// clear unpropagated literal as root_level
     fn propagate_at_root_level(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
         let mut num_propagated = 0;
         let mut deads: HashSet<Lit> = HashSet::new();
