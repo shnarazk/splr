@@ -309,6 +309,22 @@ impl LitIF for Lit {
 
 pub type ClauseIndex = usize;
 
+pub type WatchLiteralIndex = usize;
+
+pub trait WatchLiteralIndexIf {
+    fn as_watch(&self) -> usize;
+    fn as_clause(&self) -> ClauseIndex;
+}
+
+impl WatchLiteralIndexIf for WatchLiteralIndex {
+    fn as_watch(&self) -> usize {
+        self & 1
+    }
+    fn as_clause(&self) -> ClauseIndex {
+        self >> 1
+    }
+}
+
 /// Capture a conflict
 pub type ConflictContext = (Lit, AssignReason);
 
