@@ -22,7 +22,7 @@ default = [
         ### Essential
         # "incremental_solver",
         # "unsafe_access",
-        # "disordered_propagation",
+        "disordered_propagation",
         ### Heuristics
         # "bi_clause_completion",
         # "clause_rewarding",
@@ -34,11 +34,11 @@ default = [
         # "stochastic_local_search",
         # "suppress_reason_chain",
         "two_mode_reduction",
-        "trail_saving",
+        # "trail_saving",
 
         ### Logic formula processor
-        # "no_clause_elimination",
-        "clause_vivification",
+        "no_clause_elimination",
+        # "clause_vivification",
 
         ### For DEBUG
         # "boundary_check",

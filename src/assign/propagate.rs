@@ -519,9 +519,10 @@ impl PropagateIF for AssignStack {
             //## binary loop
             //
             for (blocker, ci) in cdb.binary_links(false_lit).iter().copied() {
-                // if cdb[ci].is_dead() {
-                //     continue;
-                // }
+                // In some configurations, dead clauses can exist here.
+                if cdb[ci].is_dead() {
+                    continue;
+                }
                 debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
 
