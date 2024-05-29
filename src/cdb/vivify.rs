@@ -288,7 +288,11 @@ impl AssignStack {
                     seen[bil.vi()] = key;
                 }
                 AssignReason::Implication(ci) => {
-                    for r in cdb[ci].iter().skip(1) {
+                    let skip = cdb[ci].is(FlagClause::PROPAGATEBY1) as usize;
+                    for (i, r) in cdb[ci].iter().enumerate() {
+                        if i == skip {
+                            continue;
+                        }
                         seen[r.vi()] = key;
                     }
                 }

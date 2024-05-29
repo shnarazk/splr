@@ -109,7 +109,14 @@ impl TrailSavingIF for AssignStack {
                     debug_assert!(cdb[cid].iter().all(|l| self.assigned(*l) == Some(false)));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_saved_trail();
-                    return Err((cdb[cid].lit0(), AssignReason::Implication(cid)));
+                    return Err((
+                        if cdb[cid].is(FlagClause::PROPAGATEBY1) {
+                            cdb[cid].lit1()
+                        } else {
+                            cdb[cid].lit0()
+                        },
+                        AssignReason::Implication(cid),
+                    ));
                 }
                 (_, AssignReason::Decision(lvl)) => {
                     debug_assert_ne!(0, lvl);

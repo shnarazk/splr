@@ -432,7 +432,11 @@ impl PropagateIF for AssignStack {
                     }
                 }
                 if false_index == 0 {
-                    c.swap_watch_orders();
+                    if cfg!(feature = "disordered_propagation") {
+                        c.turn_on(FlagClause::PROPAGATEBY1);
+                    } else {
+                        c.swap_watch_orders();
+                    }
                 }
                 if other_value == Some(false) {
                     check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
@@ -579,7 +583,11 @@ impl PropagateIF for AssignStack {
                     }
                 }
                 if false_index == 0 {
-                    c.swap_watch_orders();
+                    if cfg!(feature = "disordered_propagation") {
+                        c.turn_on(FlagClause::PROPAGATEBY1);
+                    } else {
+                        c.swap_watch_orders();
+                    }
                 }
                 if other_value == Some(false) {
                     check_in!(

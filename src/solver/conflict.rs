@@ -366,7 +366,11 @@ fn conflict_analyze(
                     max_lbd = cdb[cid].rank;
                     ci_with_max_lbd = Some(cid);
                 }
-                for q in cdb[cid].iter().skip(1) {
+                let skip = cdb[cid].is(FlagClause::PROPAGATEBY1) as usize;
+                for (i, q) in cdb[cid].iter().enumerate() {
+                    if i == skip {
+                        continue;
+                    }
                     let vi = q.vi();
                     validate_vi!(vi);
                     if !asg.var(vi).is(FlagVar::CA_SEEN) {
@@ -535,7 +539,11 @@ impl Lit {
                 }
                 AssignReason::Implication(cid) => {
                     let c = &cdb[cid];
-                    for q in &(*c)[1..] {
+                    let skip = c.is(FlagClause::PROPAGATEBY1) as usize;
+                    for (i, q) in c.iter().enumerate() {
+                        if skip == i {
+                            continue;
+                        }
                         let vi = q.vi();
                         let lv = asg.level(vi);
                         if 0 < lv && !asg.var(vi).is(FlagVar::CA_SEEN) {
@@ -609,10 +617,12 @@ fn lit_level(
             //     dumper(asg, cdb, bag),
             // );
             // bag.push(lit);
+            let skip = cdb[cid].is(FlagClause::PROPAGATEBY1) as usize;
             cdb[cid]
                 .iter()
-                .skip(1)
-                .map(|l| lit_level(asg, cdb, !*l, bag, _mes))
+                .enumerate()
+                .filter(|(i, _)| *i != skip)
+                .map(|(_, l)| lit_level(asg, cdb, !*l, bag, _mes))
                 .max()
                 .unwrap()
         }

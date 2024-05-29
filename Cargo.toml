@@ -22,7 +22,7 @@ default = [
         ### Essential
         # "incremental_solver",
         # "unsafe_access",
-        "disordered_propagation",
+        # "disordered_propagation",
         ### Heuristics
         # "bi_clause_completion",
         # "clause_rewarding",
