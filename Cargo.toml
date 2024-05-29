@@ -22,7 +22,7 @@ default = [
         ### Essential
         # "incremental_solver",
         # "unsafe_access",
-
+        "disordered_propagation",
         ### Heuristics
         # "bi_clause_completion",
         # "clause_rewarding",
@@ -54,6 +54,7 @@ chrono_BT = []                  # NOT WORK
 no_clause_elimination = []      # pre(in)-processor setting
 clause_rewarding = []           # clauses have activities w/ decay rate
 clause_vivification = []        # pre(in)-processor setting
+disordered_propagation = []
 debug_propagation = []          # for debug
 dynamic_restart_threshold = []  # control restart spans like Glucose
 EMA_calibration = []            # each exponential moving average has a calbration value

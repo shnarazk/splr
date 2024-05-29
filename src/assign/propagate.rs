@@ -406,7 +406,11 @@ impl PropagateIF for AssignStack {
                     //     .iter()
                     //     .all(|l| lit_assign!(self.var[l.vi()], *l) == Some(false)));
                     if false_index == 0 {
-                        c.swap_watch_orders();
+                        if cfg!(feature = "disordered_propagation") {
+                            c.turn_on(FlagClause::PROPAGATEBY1);
+                        } else {
+                            c.swap_watch_orders();
+                        }
                     }
                     check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
                     conflict_path!(other, AssignReason::Implication(ci));
