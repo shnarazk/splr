@@ -84,11 +84,19 @@ impl TrailSavingIF for AssignStack {
                     return self.truncate_trail_saved(i + 1);
                 }
                 (None, AssignReason::Implication(cid)) => {
-                    debug_assert_eq!(cdb[cid].lit0(), lit);
+                    debug_assert_eq!(
+                        if cdb[cid].is(FlagClause::PROPAGATEBY1) {
+                            cdb[cid].lit1()
+                        } else {
+                            cdb[cid].lit0()
+                        },
+                        lit
+                    );
                     debug_assert!(cdb[cid]
                         .iter()
-                        .skip(1)
-                        .all(|l| self.assigned(*l) == Some(false)));
+                        .enumerate()
+                        .filter(|(i, _)| *i != cdb[cid].is(FlagClause::PROPAGATEBY1) as usize)
+                        .all(|(_, l)| self.assigned(*l) == Some(false)));
                     self.num_repropagation += 1;
 
                     self.assign_by_implication(
