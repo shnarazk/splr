@@ -411,6 +411,8 @@ impl PropagateIF for AssignStack {
                         } else {
                             c.swap_watch_orders();
                         }
+                    } else {
+                        c.turn_off(FlagClause::PROPAGATEBY1);
                     }
                     check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
                     conflict_path!(other, AssignReason::Implication(ci));
@@ -437,6 +439,8 @@ impl PropagateIF for AssignStack {
                     } else {
                         c.swap_watch_orders();
                     }
+                } else {
+                    c.turn_off(FlagClause::PROPAGATEBY1);
                 }
                 if other_value == Some(false) {
                     check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));

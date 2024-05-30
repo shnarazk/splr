@@ -282,11 +282,10 @@ fn conflict_analyze(
             {
                 let vi = $lit.vi();
                 let lv = asg.level(vi);
-                println!("{}: literal {} at level {}", $message, i32::from($lit), $lv);
+                println!("{}: literal {} at level {}", $message, i32::from($lit), lv);
             }
         };
     }
-
     macro_rules! validate_vi {
         ($vi: expr) => {
             debug_assert!(!asg.var($vi).is(FlagVar::ELIMINATED));
@@ -322,7 +321,7 @@ fn conflict_analyze(
     }
 
     {
-        trace_lit!("- handle conflicting literal", p);
+        trace_lit!(p, "- handle conflicting literal");
         let vi = p.vi();
         validate_vi!(vi);
         set_seen!(vi);
@@ -337,6 +336,8 @@ fn conflict_analyze(
     let mut trail_index = asg.stack_len() - 1;
     let mut max_lbd: u16 = 0;
     let mut ci_with_max_lbd: Option<ClauseIndex> = None;
+    #[cfg(feature = "trace_analysis")]
+    println!("##################");
     loop {
         match reason {
             AssignReason::BinaryLink(l) => {
@@ -367,6 +368,16 @@ fn conflict_analyze(
                     ci_with_max_lbd = Some(cid);
                 }
                 let skip = cdb[cid].is(FlagClause::PROPAGATEBY1) as usize;
+                #[cfg(feature = "trace_analysis")]
+                if skip == 1 {
+                    trace!(
+                        "AMEND: analyze disordered clause {}{:?}(second literal: {}) for {}",
+                        cid,
+                        cdb[cid],
+                        i32::from(cdb[cid].lit1()),
+                        p
+                    );
+                }
                 for (i, q) in cdb[cid].iter().enumerate() {
                     if i == skip {
                         continue;
@@ -384,11 +395,11 @@ fn conflict_analyze(
                             trace_lit!(q, " -- found another path");
                             conflict_level!(vi);
                         } else {
-                            trace_lit!(q, " -- push to earnt");
+                            trace_lit!(q, " -- push to learnt");
                             learnt.push(*q);
                         }
                     } else {
-                        trace!(q, " -- ignore flagged already");
+                        trace!("{:?} -- ignore flagged already", q);
                     }
                 }
             }

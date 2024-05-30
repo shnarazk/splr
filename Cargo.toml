@@ -42,6 +42,7 @@ default = [
 
         ### For DEBUG
         # "boundary_check",
+        # "trace_analysis",
 
         ### platform dependency
         # "platform_wasm"
