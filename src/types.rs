@@ -312,15 +312,15 @@ pub type ClauseIndex = usize;
 pub type WatchLiteralIndex = usize;
 
 pub trait WatchLiteralIndexIf {
-    fn as_watch(&self) -> usize;
-    fn as_clause(&self) -> ClauseIndex;
+    fn as_wi(&self) -> usize;
+    fn as_ci(&self) -> ClauseIndex;
 }
 
 impl WatchLiteralIndexIf for WatchLiteralIndex {
-    fn as_watch(&self) -> usize {
+    fn as_wi(&self) -> usize {
         self & 1
     }
-    fn as_clause(&self) -> ClauseIndex {
+    fn as_ci(&self) -> ClauseIndex {
         self >> 1
     }
 }
