@@ -1,9 +1,9 @@
 use {crate::types::*, std::collections::HashSet};
 
 pub trait WatcherLinkIF {
-    fn next_for_lit(&self, lit: Lit) -> ClauseIndex;
-    fn next_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex;
-    fn swap_watch_orders(&mut self);
+    fn next_watch(&self, li: usize) -> WatchLiteralIndex;
+    fn next_watch_mut(&mut self, li: usize) -> &WatchLiteralIndex;
+    // fn swap_watch_orders(&mut self);
 }
 
 pub trait ClauseWeaverIF {

@@ -314,19 +314,27 @@ pub struct WatchLiteralIndex(usize);
 
 pub trait WatchLiteralIndexIf {
     fn new(ci: ClauseIndex, li: usize) -> Self;
-    fn as_wi(&self) -> usize;
+    fn set(&mut self, ci: ClauseIndex, li: usize);
+    fn indices(&self) -> (ClauseIndex, usize);
     fn as_ci(&self) -> ClauseIndex;
+    fn as_wi(&self) -> usize;
 }
 
 impl WatchLiteralIndexIf for WatchLiteralIndex {
     fn new(ci: ClauseIndex, li: usize) -> Self {
         WatchLiteralIndex(ci * 2 + li)
     }
-    fn as_wi(&self) -> usize {
-        self.0 & 1
+    fn set(&mut self, ci: ClauseIndex, li: usize) {
+        self.0 = ci * 2 + li;
+    }
+    fn indices(&self) -> (ClauseIndex, usize) {
+        (self.0 >> 1, self.0 & 1)
     }
     fn as_ci(&self) -> ClauseIndex {
         self.0 >> 1
+    }
+    fn as_wi(&self) -> usize {
+        self.0 & 1
     }
 }
 

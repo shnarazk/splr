@@ -24,7 +24,7 @@ pub struct ClauseDB {
     ///
     pub(super) binary_link: BinaryLinkDB,
     /// container of watch literals
-    pub(super) watch: Vec<ClauseIndex>,
+    pub(super) watch: Vec<WatchLiteralIndex>,
     /// see unsat_certificate.rs
     pub(super) certification_store: CertificationStore,
     /// a number of clauses to emit out-of-memory exception

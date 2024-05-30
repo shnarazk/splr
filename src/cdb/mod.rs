@@ -1112,7 +1112,7 @@ impl ClauseWeaverIF for ClauseDB {
             lit
         );
         let head = self.watch[ClauseIndex::from(lit)];
-        self.watch[ClauseIndex::from(lit)] = ci;
+        self.watch[ClauseIndex::from(lit)].set(ci, second as usize);
         if second {
             self.clause[ci].link1 = head;
         } else {
@@ -1166,14 +1166,15 @@ impl ClauseWeaverIF for ClauseDB {
     fn mark_as_free(&mut self, index: ClauseIndex) {
         // Note: free list is a single-linked list
         let first = self.watch[FREE_INDEX];
-        self.watch[FREE_INDEX] = index;
+        self.watch[FREE_INDEX].set(index, FREE_INDEX);
+        // self.clause[index].link0 = first;
         self.clause[index].link0 = first;
     }
     fn make_watches(num_vars: usize, clauses: &mut [Clause]) -> Vec<ClauseIndex> {
         // ci 0 must refer to the header
         let nc = clauses.len();
         for (i, c) in clauses.iter_mut().enumerate().skip(1) {
-            c.link0 = (i + 1) % nc;
+            c.link0.set((i + 1) % nc, FREE_INDEX);
             c.turn_on(FlagClause::DEAD);
         }
         let mut watches = vec![ClauseIndex::default(); 2 * (num_vars + 1)];
@@ -1226,7 +1227,7 @@ impl ClauseWeaverIF for ClauseDB {
     fn collect(&mut self, targets: &HashSet<Lit>) {
         for lit in targets.iter() {
             let mut prev: ClauseIndex = HEAD_INDEX;
-            let mut ci: ClauseIndex = self.watch[usize::from(*lit)];
+            let (mut ci, mut li) = self.watch[usize::from(*lit)].indices();
             while ci != HEAD_INDEX {
                 if self[ci].is_dead() {
                     let next_ci = self[ci].next_for_lit(*lit);
