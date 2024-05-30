@@ -1226,22 +1226,22 @@ impl ClauseWeaverIF for ClauseDB {
     }
     fn collect(&mut self, targets: &HashSet<Lit>) {
         for lit in targets.iter() {
-            let mut prev: ClauseIndex = HEAD_INDEX;
+            let mut prev: WatchLiteralIndex = WatchLiteralIndex::new(HEAD_INDEX, HEAD_INDEX);
             let (mut ci, mut li) = self.watch[usize::from(*lit)].indices();
             while ci != HEAD_INDEX {
                 if self[ci].is_dead() {
-                    let next_ci = self[ci].next_for_lit(*lit);
-                    self.remove_next_watcher(prev, *lit);
+                    let next_watch = self[ci].next_watch(li);
+                    self.remove_next_watch(prev, *lit);
                     if self[ci].is(FlagClause::SWEEPED) {
                         self.mark_as_free(ci);
                     } else {
                         self[ci].turn_on(FlagClause::SWEEPED);
                     }
-                    ci = next_ci;
+                    (ci, li) = next_watch.indices();
                     continue;
                 }
                 prev = ci;
-                ci = self[ci].next_for_lit(*lit);
+                (ci, li) = self[ci].next_watch(li).indices();
             }
         }
     }
