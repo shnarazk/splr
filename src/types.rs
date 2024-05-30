@@ -309,19 +309,24 @@ impl LitIF for Lit {
 
 pub type ClauseIndex = usize;
 
-pub type WatchLiteralIndex = usize;
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+pub struct WatchLiteralIndex(usize);
 
 pub trait WatchLiteralIndexIf {
+    fn new(ci: ClauseIndex, li: usize) -> Self;
     fn as_wi(&self) -> usize;
     fn as_ci(&self) -> ClauseIndex;
 }
 
 impl WatchLiteralIndexIf for WatchLiteralIndex {
+    fn new(ci: ClauseIndex, li: usize) -> Self {
+        WatchLiteralIndex(ci * 2 + li)
+    }
     fn as_wi(&self) -> usize {
-        self & 1
+        self.0 & 1
     }
     fn as_ci(&self) -> ClauseIndex {
-        self >> 1
+        self.0 >> 1
     }
 }
 

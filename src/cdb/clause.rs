@@ -39,8 +39,8 @@ pub trait ClauseIF {
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct Clause {
     /// links. Note: watch0 is also used as freelist
-    pub(super) link0: ClauseIndex,
-    pub(super) link1: ClauseIndex,
+    pub(super) link0: WatchLiteralIndex,
+    pub(super) link1: WatchLiteralIndex,
     /// The literals in a clause.
     pub(super) lits: Vec<Lit>,
     /// Flags (8 bits)
