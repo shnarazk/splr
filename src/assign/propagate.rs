@@ -593,6 +593,8 @@ impl PropagateIF for AssignStack {
                     } else {
                         c.swap_watch_orders();
                     }
+                } else {
+                    c.turn_off(FlagClause::PROPAGATEBY1);
                 }
                 if other_value == Some(false) {
                     check_in!(
