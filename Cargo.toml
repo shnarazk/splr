@@ -34,7 +34,7 @@ default = [
         # "stochastic_local_search",
         # "suppress_reason_chain",
         "two_mode_reduction",
-        # "trail_saving",
+        "trail_saving",
 
         ### Logic formula processor
         # "no_clause_elimination",
