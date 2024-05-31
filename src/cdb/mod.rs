@@ -673,7 +673,7 @@ impl ClauseDBIF for ClauseDB {
         // 2. insert a new watch                  [Step:2]
         // 3. update a blocker cach e             [Step:3]
 
-        assert!(!wli.is_none());
+        debug_assert!(!wli.is_none());
         debug_assert!(1 < new);
         //## Step:1
         // let target: WatchLiteralIndex = self[prev.as_ci()].links[prev.as_wi()];
@@ -1119,9 +1119,6 @@ impl ClauseWeaverIF for ClauseDB {
             let (ci, li) = wli.indices();
             let target: WatchLiteralIndex = self[ci].links[li];
             let next: WatchLiteralIndex = self[target.as_ci()].links[target.as_wi()];
-            if !next.is_none() {
-                assert_eq!(self[ci].lits[li], self[next.as_ci()].lits[next.as_wi()]);
-            }
             self[ci].links[li] = next;
             target.as_ci()
         }

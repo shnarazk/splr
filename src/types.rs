@@ -329,9 +329,6 @@ impl WatchLiteralIndexIf for WatchLiteralIndex {
         self.0 = ci * 2 + wi;
     }
     fn is_none(&self) -> bool {
-        if self.0 >> 1 == 0 && self.0 & 1 != 0 {
-            panic!("invalid default{self:?}");
-        }
         self.0 == 0
     }
     fn indices(&self) -> (ClauseIndex, usize) {
