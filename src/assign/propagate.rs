@@ -284,7 +284,6 @@ impl PropagateIF for AssignStack {
         macro_rules! check_in {
             ($cid: expr, $tag :expr) => {};
         }
-
         macro_rules! conflict_path {
             ($lit: expr, $reason: expr) => {
                 self.dpc_ema.update(self.num_decision);
@@ -293,7 +292,6 @@ impl PropagateIF for AssignStack {
                 return Err(($lit, $reason));
             };
         }
-
         #[cfg(feature = "suppress_reason_chain")]
         macro_rules! minimized_reason {
             ($lit: expr) => {
@@ -310,7 +308,6 @@ impl PropagateIF for AssignStack {
                 AssignReason::BinaryLink($lit)
             };
         }
-
         #[cfg(feature = "trail_saving")]
         macro_rules! from_saved_trail {
             () => {
@@ -382,23 +379,17 @@ impl PropagateIF for AssignStack {
             //
             //## normal clause loop
             //
-            let mut prev: usize = 0;
-            let mut ci = cdb.get_watcher_link(propagating);
-            'next_clause: while ci != 0 {
+            let mut prev = WatchLiteralIndex::default();
+            let mut wli = cdb.get_watch_literal_index(propagating);
+            'next_clause: while !wli.is_none() {
+                let (ci, false_index) = wli.indices();
                 let c = &mut cdb[ci];
-                let (other, false_index) = {
-                    let l0 = c.lit0();
-                    if false_lit == l0 {
-                        (c.lit1(), 0)
-                    } else {
-                        (l0, 1)
-                    }
-                };
+                let other = *c.iter().nth(1 - false_index).unwrap();
                 let ovi = other.vi();
                 let other_value = lit_assign!(self.var[ovi], other);
                 if other_value == Some(true) {
-                    prev = ci;
-                    ci = c.next_for_lit(propagating);
+                    prev = wli;
+                    wli = c.next_watch(false_index);
                     continue 'next_clause;
                 }
                 if other_value == Some(false) && self.var[ovi].level < self.rebuild_base_level {
@@ -406,16 +397,12 @@ impl PropagateIF for AssignStack {
                     //     .iter()
                     //     .all(|l| lit_assign!(self.var[l.vi()], *l) == Some(false)));
                     if false_index == 0 {
-                        if cfg!(feature = "disordered_propagation") {
-                            c.turn_on(FlagClause::PROPAGATEBY1);
-                        } else {
-                            c.swap_watch_orders();
-                        }
+                        c.turn_on(FlagClause::PROPAGATEBY1);
                     } else {
                         c.turn_off(FlagClause::PROPAGATEBY1);
                     }
                     check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
-                    conflict_path!(other, AssignReason::Implication(ci));
+                    conflict_path!(other, AssignReason::Implication(wli.as_ci()));
                 }
                 let start = c.search_from as usize;
                 let len = c.len() - 2;
@@ -423,28 +410,24 @@ impl PropagateIF for AssignStack {
                     let k = (i + start) % len + 2;
                     let lk = c[k];
                     if lit_assign!(self.var[lk.vi()], lk) != Some(false) {
-                        let next_ci = cdb.transform_by_updating_watch(prev, ci, false_index, k);
+                        let next = cdb.transform_by_updating_watch(prev, wli, k);
                         debug_assert_ne!(self.assigned(!lk), Some(true));
                         check_in!(
                             ci,
                             Propagate::FindNewWatch(self.num_conflict, propagating, !lk)
                         );
-                        ci = next_ci;
+                        wli = next;
                         continue 'next_clause;
                     }
                 }
                 if false_index == 0 {
-                    if cfg!(feature = "disordered_propagation") {
-                        c.turn_on(FlagClause::PROPAGATEBY1);
-                    } else {
-                        c.swap_watch_orders();
-                    }
+                    c.turn_on(FlagClause::PROPAGATEBY1);
                 } else {
                     c.turn_off(FlagClause::PROPAGATEBY1);
                 }
                 if other_value == Some(false) {
                     check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
-                    conflict_path!(other, AssignReason::Implication(ci));
+                    conflict_path!(other, AssignReason::Implication(wli.as_ci()));
                 } else {
                     #[cfg(feature = "chrono_BT")]
                     let dl = cdb[cid]
@@ -457,13 +440,13 @@ impl PropagateIF for AssignStack {
                     debug_assert_eq!(self.assigned(other), None);
                     self.assign_by_implication(
                         other,
-                        AssignReason::Implication(ci),
+                        AssignReason::Implication(wli.as_ci()),
                         #[cfg(feature = "chrono_BT")]
                         dl,
                     );
                     check_in!(cid, Propagate::BecameUnit(self.num_conflict, cached));
-                    prev = ci;
-                    ci = c.next_for_lit(propagating);
+                    prev = wli;
+                    wli = c.next_watch(false_index);
                 }
             }
             from_saved_trail!();
@@ -551,24 +534,21 @@ impl PropagateIF for AssignStack {
             //
             //## normal clause loop
             //
-            let mut prev: usize = 0;
-            let mut ci = cdb.get_watcher_link(propagating);
-            'next_clause: while ci != 0 {
+            let mut prev = WatchLiteralIndex::default();
+            let mut wli = cdb.get_watch_literal_index(propagating);
+            'next_clause: while !wli.is_none() {
+                let (ci, false_index) = wli.indices();
                 let c = &mut cdb[ci];
                 // if c.is_dead() {
                 //     ci = c.next_for_lit(propagating);
                 //     continue 'next_clause;
                 // }
-                let (other, false_index) = if false_lit == c.lit0() {
-                    (c.lit1(), 0)
-                } else {
-                    (c.lit0(), 1)
-                };
+                let other = *c.iter().nth(1 - false_index).unwrap();
                 let ovi = other.vi();
                 let other_value = lit_assign!(self.var[ovi], other);
                 if other_value == Some(true) {
-                    prev = ci;
-                    ci = c.next_for_lit(propagating);
+                    prev = wli;
+                    wli = c.next_watch(false_index);
                     continue 'next_clause;
                 }
                 let start = c.search_from as usize;
@@ -577,22 +557,17 @@ impl PropagateIF for AssignStack {
                     let k = (i + start) % len + 2;
                     let lk = c[k];
                     if lit_assign!(self.var[lk.vi()], lk) != Some(false) {
-                        let next_ci = c.next_for_lit(propagating);
-                        cdb.transform_by_updating_watch(prev, ci, false_index, k);
+                        let next = cdb.transform_by_updating_watch(prev, wli, k);
                         check_in!(
                             ci,
                             Propagate::SandboxFindNewWatch(self.num_conflict, false_lit, !lk)
                         );
-                        ci = next_ci;
+                        wli = next;
                         continue 'next_clause;
                     }
                 }
                 if false_index == 0 {
-                    if cfg!(feature = "disordered_propagation") {
-                        c.turn_on(FlagClause::PROPAGATEBY1);
-                    } else {
-                        c.swap_watch_orders();
-                    }
+                    c.turn_on(FlagClause::PROPAGATEBY1);
                 } else {
                     c.turn_off(FlagClause::PROPAGATEBY1);
                 }
@@ -601,12 +576,12 @@ impl PropagateIF for AssignStack {
                         ci,
                         Propagate::SandboxEmitConflict(self.num_conflict, propagating)
                     );
-                    return Err((other, AssignReason::Implication(ci)));
+                    return Err((other, AssignReason::Implication(wli.as_ci())));
                 }
-                self.assign_by_implication(other, AssignReason::Implication(ci));
+                self.assign_by_implication(other, AssignReason::Implication(wli.as_ci()));
                 check_in!(cid, Propagate::SandboxBecameUnit(self.num_conflict));
-                prev = ci;
-                ci = c.next_for_lit(propagating);
+                prev = wli;
+                wli = c.next_watch(false_index);
             }
         }
         Ok(())

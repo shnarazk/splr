@@ -69,8 +69,7 @@ pub struct Clause {
 impl Default for Clause {
     fn default() -> Clause {
         Clause {
-            link0: ClauseIndex::default(),
-            link1: ClauseIndex::default(),
+            links: [WatchLiteralIndex::default(); 2],
             lits: vec![],
             flags: FlagClause::empty(),
             rank: 0,
@@ -286,57 +285,25 @@ impl fmt::Display for Clause {
 }
 
 impl WatcherLinkIF for Clause {
-    fn next_watch(&self, li: usize) -> WatchLiteralIndex {
+    fn next_watch(&self, wi: usize) -> WatchLiteralIndex {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            if *self.lits.get_unchecked(0) == !lit {
-                self.link0
-            } else {
-                self.link1
-            }
+            *self.links.get_unchecked(wi)
         }
         #[cfg(not(feature = "unsafe_access"))]
         {
-            let l = !lit;
-            if self.lits[0] == l {
-                self.link0
-            } else {
-                debug_assert_eq!(
-                    self.lits[1], l,
-                    "#### next: ilegal chain for {}: {:?}",
-                    lit, self
-                );
-                self.link1
-            }
+            self.links[wi]
         }
     }
-    fn next_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex {
+    fn next_watch_mut(&mut self, wi: usize) -> &mut WatchLiteralIndex {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            if *self.lits.get_unchecked(0) == !lit {
-                &mut self.link0
-            } else {
-                &mut self.link1
-            }
+            self.links.get_unchecked_mut(wi)
         }
         #[cfg(not(feature = "unsafe_access"))]
         {
-            let l = !lit;
-            if self.lits[0] == l {
-                &mut self.link0
-            } else {
-                debug_assert_eq!(
-                    self.lits[1], l,
-                    "#### next: ilegal chain for {}: {:?}",
-                    lit, self
-                );
-                &mut self.link1
-            }
+            &mut self.links[wi]
         }
-    }
-    fn swap_watch_orders(&mut self) {
-        self.lits.swap(0, 1);
-        std::mem::swap(&mut self.link0, &mut self.link1);
     }
 }
 

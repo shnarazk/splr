@@ -158,9 +158,9 @@ impl Instantiate for ClauseDB {
             SolverEvent::NewVar => {
                 self.binary_link.add_new_var();
                 // for negated literal
-                self.watch.push(ClauseIndex::default());
+                self.watch.push(WatchLiteralIndex::default());
                 // for positive literal
-                self.watch.push(ClauseIndex::default());
+                self.watch.push(WatchLiteralIndex::default());
                 self.lbd_temp.push(0);
             }
             SolverEvent::Restart => {
