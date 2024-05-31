@@ -396,17 +396,13 @@ impl PropagateIF for AssignStack {
                     // debug_assert!(c
                     //     .iter()
                     //     .all(|l| lit_assign!(self.var[l.vi()], *l) == Some(false)));
-                    if false_index == 0 {
-                        c.turn_on(FlagClause::PROPAGATEBY1);
-                    } else {
-                        c.turn_off(FlagClause::PROPAGATEBY1);
-                    }
+                    c.set(FlagClause::PROPAGATEBY1, false_index == 0);
                     check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
                     conflict_path!(other, AssignReason::Implication(wli.as_ci()));
                 }
                 let start = c.search_from as usize;
                 let len = c.len() - 2;
-                for i in 0..c.len() - 2 {
+                for i in 0..len {
                     let k = (i + start) % len + 2;
                     let lk = c[k];
                     if lit_assign!(self.var[lk.vi()], lk) != Some(false) {
@@ -420,11 +416,7 @@ impl PropagateIF for AssignStack {
                         continue 'next_clause;
                     }
                 }
-                if false_index == 0 {
-                    c.turn_on(FlagClause::PROPAGATEBY1);
-                } else {
-                    c.turn_off(FlagClause::PROPAGATEBY1);
-                }
+                c.set(FlagClause::PROPAGATEBY1, false_index == 0);
                 if other_value == Some(false) {
                     check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
                     conflict_path!(other, AssignReason::Implication(wli.as_ci()));
@@ -566,11 +558,7 @@ impl PropagateIF for AssignStack {
                         continue 'next_clause;
                     }
                 }
-                if false_index == 0 {
-                    c.turn_on(FlagClause::PROPAGATEBY1);
-                } else {
-                    c.turn_off(FlagClause::PROPAGATEBY1);
-                }
+                c.set(FlagClause::PROPAGATEBY1, false_index == 0);
                 if other_value == Some(false) {
                     check_in!(
                         ci,
