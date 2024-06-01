@@ -84,7 +84,7 @@ pub struct ClauseDB {
     //
     //## incremental solving
     //
-    #[cfg(not(feature = "no_clause_elimination"))]
+    #[cfg(all(feature = "clause_elimination", not(feature = "incremental_solver")))]
     pub(crate) eliminated_permanent: Vec<Vec<Lit>>,
 }
 

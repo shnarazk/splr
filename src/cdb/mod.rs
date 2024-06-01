@@ -180,7 +180,7 @@ impl Default for ClauseDB {
             lb_entanglement: Ema2::new(1_000).with_slow(80_000).with_value(2.0),
             reduction_threshold: 0.0,
 
-            #[cfg(not(feature = "no_clause_elimination"))]
+            #[cfg(all(feature = "clause_elimination", not(feature = "incremental_solver")))]
             eliminated_permanent: Vec::new(),
         }
     }

@@ -20,7 +20,7 @@ use {
 impl Default for Eliminator {
     fn default() -> Eliminator {
         Eliminator {
-            enable: !cfg!(feature = "no_clause_elimination"),
+            enable: cfg!(feature = "clause_elimination") && !cfg!(feature = "incremental_solver"),
             mode: EliminatorMode::Dormant,
             var_queue: VarOccHeap::new(0, 0),
             clause_queue: Vec::new(),
