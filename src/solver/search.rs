@@ -272,6 +272,8 @@ fn search(
                 return Err(SolverError::UndescribedError);
             }
             RESTART!(asg, cdb, state);
+
+            #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
             asg.select_rephasing_target();
             asg.clear_asserted_literals(cdb)?;
 

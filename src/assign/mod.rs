@@ -40,8 +40,6 @@ use {
 #[cfg(feature = "trail_saving")]
 pub use self::trail_saving::TrailSavingIF;
 
-#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
-
 /// API about assignment like
 /// [`decision_level`](`crate::assign::AssignIF::decision_level`),
 /// [`stack`](`crate::assign::AssignIF::stack`),
