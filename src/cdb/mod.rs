@@ -1143,28 +1143,22 @@ impl ClauseWeaverIF for ClauseDB {
         let wli0 = WatchLiteralIndex::new(ci, 0);
         let mut index = self.watch[usize::from(lit0)];
         let mut prev = WatchLiteralIndex::default();
-        while !index.is_none() {
-            if index == wli0 {
-                self.remove_next_watch(prev, lit0);
-                break;
-            }
+        while index != wli0 {
             prev = index;
             index = self[index.as_ci()].next_watch(index.as_wi());
+            debug_assert_ne!(index, WatchLiteralIndex::default());
         }
-        // assert_ne!(index, HEAD_INDEX);
+        self.remove_next_watch(prev, lit0);
         let lit1 = !self[ci].lit1();
         let wli1 = WatchLiteralIndex::new(ci, 1);
         let mut index = self.watch[usize::from(lit1)];
         let mut prev = WatchLiteralIndex::default();
-        while !index.is_none() {
-            if index == wli1 {
-                self.remove_next_watch(prev, lit1);
-                break;
-            }
+        while index != wli1 {
             prev = index;
             index = self[index.as_ci()].next_watch(index.as_wi());
+            debug_assert_ne!(index, WatchLiteralIndex::default());
         }
-        // assert_ne!(index, HEAD_INDEX);
+        self.remove_next_watch(prev, lit1);
     }
     fn mark_as_free(&mut self, ci: ClauseIndex) {
         // Note: free list is a single-linked list
