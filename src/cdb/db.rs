@@ -105,24 +105,14 @@ pub struct ClauseDB {
 
 impl Index<ClauseIndex> for ClauseDB {
     type Output = Clause;
-    #[inline]
     fn index(&self, ci: ClauseIndex) -> &Clause {
-        if cfg!(feature = "unsafe_access") {
-            unsafe { self.clause.get_unchecked(ci) }
-        } else {
-            &self.clause[ci]
-        }
+        &self.clause[ci]
     }
 }
 
 impl IndexMut<ClauseIndex> for ClauseDB {
-    #[inline]
     fn index_mut(&mut self, ci: ClauseIndex) -> &mut Clause {
-        if cfg!(feature = "unsafe_access") {
-            unsafe { self.clause.get_unchecked_mut(ci) }
-        } else {
-            &mut self.clause[ci]
-        }
+        &mut self.clause[ci]
     }
 }
 

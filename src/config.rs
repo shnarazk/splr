@@ -289,8 +289,6 @@ impl Config {
                 "two-mode reduction",
                 #[cfg(feature = "trail_saving")]
                 "trail saving",
-                #[cfg(feature = "unsafe_access")]
-                "unsafe access",
             ];
             println!(
                 "{}\nActivated features: {}\n{}",

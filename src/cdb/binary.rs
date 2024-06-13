@@ -11,25 +11,13 @@ pub type BinaryLinkList = Vec<(Lit, ClauseIndex)>;
 
 impl Index<Lit> for Vec<BinaryLinkList> {
     type Output = BinaryLinkList;
-    #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.get_unchecked(usize::from(l))
-        }
-        #[cfg(not(feature = "unsafe_access"))]
         &self[usize::from(l)]
     }
 }
 
 impl IndexMut<Lit> for Vec<BinaryLinkList> {
-    #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.get_unchecked_mut(usize::from(l))
-        }
-        #[cfg(not(feature = "unsafe_access"))]
         &mut self[usize::from(l)]
     }
 }

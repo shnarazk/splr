@@ -125,47 +125,22 @@ impl VarManipulateIF for AssignStack {
     }
     #[inline]
     fn assign(&self, vi: VarId) -> Option<bool> {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.var.get_unchecked(vi).assign
-        }
-        #[cfg(not(feature = "unsafe_access"))]
         self.var[vi].assign
     }
     #[inline]
     fn level(&self, vi: VarId) -> DecisionLevel {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.var.get_unchecked(vi).level
-        }
-        #[cfg(not(feature = "unsafe_access"))]
         self.var[vi].level
     }
     #[inline]
     fn reason(&self, vi: VarId) -> AssignReason {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.var.get_unchecked(vi).reason
-        }
-        #[cfg(not(feature = "unsafe_access"))]
         self.var[vi].reason
     }
     #[inline]
     fn var(&self, vi: VarId) -> &Var {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.var.get_unchecked(vi)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
         &self.var[vi]
     }
     #[inline]
     fn var_mut(&mut self, vi: VarId) -> &mut Var {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.var.get_unchecked_mut(vi)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
         &mut self.var[vi]
     }
     fn var_iter(&self) -> Iter<'_, Var> {

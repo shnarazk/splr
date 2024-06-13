@@ -21,7 +21,6 @@ instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
 default = [
         ### Essential
         # "incremental_solver", # this requires "clause_elimination" is off
-        # "unsafe_access",
 
         ### Heuristics
         # "bi_clause_completion",
@@ -82,7 +81,6 @@ trace_elimination = []          # for debug
 trace_equivalency = []          # for debug
 trail_saving = []               # reduce propagation cost by reusing propagation chain
 two_mode_reduction = []         # exploration mode and exploitation mode since 0.17
-unsafe_access = []              # access elements of vectors without boundary checking
 
 [profile.release]
 lto = "fat"
