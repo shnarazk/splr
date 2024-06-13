@@ -34,7 +34,7 @@ impl LitOccurs {
     }
     pub fn activity(&self) -> usize {
         if self.aborted {
-            std::usize::MAX
+            usize::MAX
         } else {
             self.pos_occurs.len().min(self.neg_occurs.len())
         }
