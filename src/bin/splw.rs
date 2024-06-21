@@ -37,6 +37,7 @@ pub struct App {
     solver: Splr,
     process: SearchContext,
     counter: i16,
+    asg_stats: [u64; 4],
     #[allow(dead_code)]
     start: Instant,
 }
@@ -47,12 +48,19 @@ impl App {
             solver,
             process,
             counter: 0,
+            asg_stats: [0; 4],
             start: Instant::now(),
         }
     }
     fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<(), Box<dyn Error>> {
+        macro_rules! scaling {
+            ($n: expr) => {
+                (($n.max(1) as f64).log2() * 10.0) as u64
+            };
+        }
         let timeout = Duration::from_millis(0);
         loop {
+            self.counter += 1;
             let ret: Result<Option<bool>, SolverError> = {
                 let App {
                     ref mut solver,
@@ -61,6 +69,15 @@ impl App {
                 } = self;
                 solver.search_stage(process)
             };
+            self.asg_stats[0] = scaling!(self.process.current_core());
+            self.asg_stats[1] = scaling!(self
+                .solver
+                .asg
+                .derefer(splr::assign::property::Tusize::NumAssertedVar));
+            self.asg_stats[2] = scaling!(self
+                .solver
+                .asg
+                .derefer(splr::assign::property::Tusize::NumEliminatedVar));
             terminal.draw(|f| self.render_frame(f))?;
             match ret {
                 Ok(None) => {
@@ -151,10 +168,9 @@ impl App {
 impl App {
     fn bar_chart(&self) -> BarChart<'_> {
         let b = vec![
-            ("data0", 2),
-            ("data1", 4),
-            ("data2", 1),
-            ("data3", (self.counter.max(1) as f64).log2() as u64),
+            ("core", self.asg_stats[0]),
+            ("fixed", self.asg_stats[1]),
+            ("elim", self.asg_stats[2]),
             ("data4", 3),
             ("data5", 5),
             ("data6", 10),
@@ -163,7 +179,7 @@ impl App {
             ("data9", 5),
         ];
         let barchart = BarChart::default()
-            .block(Block::bordered().title("BarChart"))
+            .block(Block::bordered().title("BarChart of `10.0 * log_2(n)`"))
             .data(&b)
             .bar_width(7)
             .bar_style(Style::default().fg(Color::Red))
@@ -213,7 +229,7 @@ impl App {
 fn main() -> Result<(), Box<dyn Error>> {
     let mut config = Config::default();
     config.inject_from_args();
-    config.splr_interface = true;
+    config.splr_interface = false;
     if !config.cnf_file.exists() {
         println!(
             "{} does not exist.",
@@ -285,11 +301,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let res: Result<Certificate, SolverError> = Ok(Certificate::UNSAT);
     save_result(&mut app.solver, &res, &cnf_file, ans_file);
-    // std::process::exit(match res {
-    //     Ok(Certificate::SAT(_)) => 10,
-    //     Ok(Certificate::UNSAT) => 20,
-    //     Err(_) => 0,
-    // });
     Ok(())
 }
 

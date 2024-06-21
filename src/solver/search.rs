@@ -25,6 +25,12 @@ pub struct SearchContext {
     sls_core: usize,
 }
 
+impl SearchContext {
+    pub fn current_core(&self) -> usize {
+        self.current_core
+    }
+}
+
 /// API to [`solve`](`crate::solver::SolveIF::solve`) SAT problems.
 pub trait SolveIF {
     /// search an assignment.
@@ -517,14 +523,15 @@ impl SolveIF for Solver {
                             let n = cdb.derefer(cdb::property::Tusize::NumClause);
                             if let Some(c) = core_was_rebuilt {
                                 core_was_rebuilt = None;
-                                if c < current_core {
+                                if c < context.current_core {
                                     let steps = scale!(27_u32, c) * scale!(24_u32, n) / ent;
                                     let mut assignment = asg.best_phases_ref(Some(false));
                                     sls!(assignment, steps);
                                 }
                             } else if new_segment {
                                 let n = cdb.derefer(cdb::property::Tusize::NumClause);
-                                let steps = scale!(27_u32, current_core) * scale!(24_u32, n) / ent;
+                                let steps =
+                                    scale!(27_u32, context.current_core) * scale!(24_u32, n) / ent;
                                 let mut assignment = asg.best_phases_ref(Some(false));
                                 sls!(assignment, steps);
                             }
