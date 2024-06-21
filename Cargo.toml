@@ -15,13 +15,18 @@ rust-version = "1.65"
 
 [dependencies]
 bitflags = "^2.5"
+
 instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
+
+color-eyre = { version = "^0.6", optional = true }
+crossterm = { version = "^0.27", optional = true }
+ratatui = { version = "^0.26", features = ["all-widgets"], optional = true }
 
 [features]
 default = [
         ### Essential
         # "incremental_solver", # this requires "clause_elimination" is off
-        "interleave",
+        "watch",
 
         ### Heuristics
         # "bi_clause_completion",
@@ -83,6 +88,12 @@ trace_elimination = []          # for debug
 trace_equivalency = []          # for debug
 trail_saving = []               # reduce propagation cost by reusing propagation chain
 two_mode_reduction = []         # exploration mode and exploitation mode since 0.17
+watch = [
+        "interleave",
+        "ratatui",
+        "crossterm",
+        "color-eyre",
+]
 
 [profile.release]
 lto = "fat"
