@@ -21,6 +21,7 @@ instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
 default = [
         ### Essential
         # "incremental_solver", # this requires "clause_elimination" is off
+        "interleave",
 
         ### Heuristics
         # "bi_clause_completion",
@@ -59,6 +60,7 @@ dynamic_restart_threshold = []  # control restart spans like Glucose
 EMA_calibration = []            # each exponential moving average has a calbration value
 EVSIDS = []                     # Eponential Variable State Independent Decaying Sum
 incremental_solver = []         # for all solution SAT sover; requires no cluse_elimination
+interleave = []                 # switch to multi-step search IF
 just_used = []                  # Var and clause have 'just_used' flags
 LRB_rewarding = []              # Vearning Rate Based rewarding, a new var activity criteria
 no_IO = []                      # to embed Splr into non-std environments
