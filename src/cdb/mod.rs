@@ -679,7 +679,7 @@ impl ClauseDBIF for ClauseDB {
         // let target: WatchLiteralIndex = self[prev.as_ci()].links[prev.as_wi()];
         let (ci, old) = wli.indices();
         debug_assert!(old < 2);
-        debug_assert!(!self[ci].is_dead());
+        debug_assert!(!self[ci].is_dead()); // FIXME: assertion failed
         let ret: WatchLiteralIndex = self[ci].links[wli.as_wi()];
         // let target = self.remove_next_watch(prev);
         // watch_cache[!c.lits[old]].remove_watch(&ci);
