@@ -15,12 +15,17 @@ rust-version = "1.65"
 
 [dependencies]
 bitflags = "^2.5"
+
 instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
+
+crossterm = { version = "^0.27", optional = true }
+ratatui = { version = "^0.26", features = ["all-widgets"], optional = true }
 
 [features]
 default = [
         ### Essential
         # "incremental_solver", # this requires "clause_elimination" is off
+        "watch",
 
         ### Heuristics
         # "bi_clause_completion",
@@ -59,6 +64,7 @@ dynamic_restart_threshold = []  # control restart spans like Glucose
 EMA_calibration = []            # each exponential moving average has a calbration value
 EVSIDS = []                     # Eponential Variable State Independent Decaying Sum
 incremental_solver = []         # for all solution SAT sover; requires no cluse_elimination
+interleave = []                 # switch to multi-step search IF
 just_used = []                  # Var and clause have 'just_used' flags
 LRB_rewarding = []              # Vearning Rate Based rewarding, a new var activity criteria
 no_IO = []                      # to embed Splr into non-std environments
@@ -81,6 +87,11 @@ trace_elimination = []          # for debug
 trace_equivalency = []          # for debug
 trail_saving = []               # reduce propagation cost by reusing propagation chain
 two_mode_reduction = []         # exploration mode and exploitation mode since 0.17
+watch = [
+        "interleave",
+        "ratatui",
+        "crossterm",
+]
 
 [profile.release]
 lto = "fat"
