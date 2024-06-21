@@ -15,7 +15,8 @@ use {
     splr::{
         assign, cdb,
         config::{self, CERTIFICATION_DEFAULT_FILENAME},
-        solver::*,
+        solver::Solver as Splr,
+        solver::{Certificate, SatSolverIF, SearchContext, SolveIF, SolverResult},
         state::{self, LogF64Id, LogUsizeId},
         Config, EmaIF, PropertyDereference, PropertyReference, SolverError, VERSION,
     },
@@ -33,28 +34,55 @@ use {
 
 #[derive(Debug)]
 pub struct App {
+    solver: Splr,
+    process: SearchContext,
     counter: i16,
     #[allow(dead_code)]
     start: Instant,
 }
-impl Default for App {
-    fn default() -> Self {
+
+impl App {
+    fn solver(solver: Splr, process: SearchContext) -> Self {
         App {
+            solver,
+            process,
             counter: 0,
             start: Instant::now(),
         }
     }
-}
-
-impl App {
-    fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()> {
+    fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<(), Box<dyn Error>> {
         let timeout = Duration::from_millis(0);
         loop {
+            let ret: Result<Option<bool>, SolverError> = {
+                let App {
+                    ref mut solver,
+                    ref mut process,
+                    ..
+                } = self;
+                solver.search_stage(process)
+            };
             terminal.draw(|f| self.render_frame(f))?;
-            if crossterm::event::poll(timeout)? && self.handle_events()? {
-                return Ok(());
+            match ret {
+                Ok(None) => {
+                    if crossterm::event::poll(timeout)? && self.handle_events()? {
+                        return Ok(());
+                    }
+                }
+                Ok(Some(sat)) => {
+                    if self.solver.postprocess(Ok(sat)).is_ok() {
+                        return Ok(());
+                    } else {
+                        return Err("postprocessing error".into());
+                    }
+                }
+                Err(e) => {
+                    if self.solver.postprocess(Err(e)).is_ok() {
+                        return Ok(());
+                    } else {
+                        return Err("postprocessing error".into());
+                    }
+                }
             }
-            self.counter += 1;
         }
     }
     fn render_frame(&self, frame: &mut Frame) {
@@ -209,11 +237,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
     if let Ok(val) = env::var("SPLR_TIMEOUT") {
-        if let Ok(timeout) = val.parse::<u64>() {
+        if let Ok(splr_timeout) = val.parse::<u64>() {
             let input = cnf_file.as_ref().to_string();
             let no_color = config.no_color;
             thread::spawn(move || {
-                thread::sleep(Duration::from_millis(timeout * 1000));
+                thread::sleep(Duration::from_millis(splr_timeout * 1000));
                 println!(
                     "{} (TimeOut): {}",
                     colored(Err(&SolverError::TimeOut), no_color),
@@ -223,7 +251,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             });
         }
     }
-    let mut s = match Solver::build(&config) {
+    let mut splr = match Splr::build(&config) {
         Err(SolverError::EmptyClause | SolverError::RootLevelConflict(_)) => {
             println!(
                 "\x1B[1G\x1B[K{}: {}",
@@ -237,13 +265,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         Ok(solver) => solver,
     };
+    let Ok(sc) = splr.prepare() else {
+        return Err("failed to start SAT preproecss".into());
+    };
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let result = App::default().run(&mut terminal);
+    let mut app = App::solver(splr, sc);
+    let result = app.run(&mut terminal);
 
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
@@ -252,7 +284,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("{err:?}");
     }
     let res: Result<Certificate, SolverError> = Ok(Certificate::UNSAT);
-    save_result(&mut s, &res, &cnf_file, ans_file);
+    save_result(&mut app.solver, &res, &cnf_file, ans_file);
     // std::process::exit(match res {
     //     Ok(Certificate::SAT(_)) => 10,
     //     Ok(Certificate::UNSAT) => 20,
@@ -282,7 +314,7 @@ fn colored(v: Result<bool, &SolverError>, no_color: bool) -> Cow<'static, str> {
     }
 }
 fn save_result<S: AsRef<str> + std::fmt::Display>(
-    s: &mut Solver,
+    s: &mut Splr,
     res: &SolverResult,
     input: S,
     output: Option<PathBuf>,
@@ -399,7 +431,7 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
     }
 }
 
-fn report(s: &Solver, out: &mut dyn io::Write) -> std::io::Result<()> {
+fn report(s: &Splr, out: &mut dyn io::Write) -> std::io::Result<()> {
     let state = &s.state;
     let elapsed: Duration = s.state.start.elapsed();
     let tm: f64 = elapsed.as_millis() as f64 / 1_000.0;
