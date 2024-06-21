@@ -18,7 +18,6 @@ bitflags = "^2.5"
 
 instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
 
-color-eyre = { version = "^0.6", optional = true }
 crossterm = { version = "^0.27", optional = true }
 ratatui = { version = "^0.26", features = ["all-widgets"], optional = true }
 
@@ -92,7 +91,6 @@ watch = [
         "interleave",
         "ratatui",
         "crossterm",
-        "color-eyre",
 ]
 
 [profile.release]
