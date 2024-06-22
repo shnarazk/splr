@@ -17,6 +17,9 @@ use {
     },
 };
 
+#[cfg(feature = "deterministic")]
+use {crate::config::RANDOM_STATE_SEED, ahash::RandomState};
+
 impl Default for Eliminator {
     fn default() -> Eliminator {
         Eliminator {
@@ -193,6 +196,10 @@ impl EliminateIF for Eliminator {
         state: &mut State,
         force_run: bool,
     ) -> MaybeInconsistent {
+        #[cfg(feature = "deterministic")]
+        let mut deads: HashSet<Lit, RandomState> =
+            HashSet::with_hasher(RandomState::with_seed(RANDOM_STATE_SEED));
+        #[cfg(not(feature = "deterministic"))]
         let mut deads: HashSet<Lit> = HashSet::new();
         debug_assert_eq!(asg.decision_level(), 0);
         // we can reset all the reasons because decision level is zero.
@@ -348,7 +355,8 @@ impl Eliminator {
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
         timedout: &mut usize,
-        deads: &mut HashSet<Lit>,
+        #[cfg(feature = "deterministic")] deads: &mut HashSet<Lit, RandomState>,
+        #[cfg(not(feature = "deterministic"))] deads: &mut HashSet<Lit>,
     ) -> MaybeInconsistent {
         debug_assert_eq!(asg.decision_level(), 0);
         while !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.stack_len() {
@@ -446,7 +454,8 @@ impl Eliminator {
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
         state: &mut State,
-        deads: &mut HashSet<Lit>,
+        #[cfg(feature = "deterministic")] deads: &mut HashSet<Lit, RandomState>,
+        #[cfg(not(feature = "deterministic"))] deads: &mut HashSet<Lit>,
     ) -> MaybeInconsistent {
         let start = state.elapsed().unwrap_or(0.0);
         loop {
@@ -474,7 +483,8 @@ impl Eliminator {
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
         state: &mut State,
-        deads: &mut HashSet<Lit>,
+        #[cfg(feature = "deterministic")] deads: &mut HashSet<Lit, RandomState>,
+        #[cfg(not(feature = "deterministic"))] deads: &mut HashSet<Lit>,
     ) -> MaybeInconsistent {
         debug_assert!(asg.decision_level() == 0);
         if self.mode == EliminatorMode::Dormant {

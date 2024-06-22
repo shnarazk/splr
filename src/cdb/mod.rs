@@ -42,6 +42,9 @@ use {
     },
 };
 
+#[cfg(feature = "deterministic")]
+use {crate::config::RANDOM_STATE_SEED, ahash::RandomState};
+
 #[cfg(not(feature = "no_IO"))]
 use std::{io::Write, path::Path};
 
@@ -95,7 +98,8 @@ pub trait ClauseDBIF:
         &mut self,
         asg: &mut impl AssignIF,
         ci: ClauseIndex,
-        deads: &mut HashSet<Lit>,
+        #[cfg(feature = "deterministic")] deads: &mut HashSet<Lit, RandomState>,
+        #[cfg(not(feature = "deterministic"))] deads: &mut HashSet<Lit>,
     ) -> RefClause;
     /// reduce learnt clauses
     /// # CAVEAT
@@ -541,7 +545,8 @@ impl ClauseDBIF for ClauseDB {
         &mut self,
         asg: &mut impl AssignIF,
         ci: ClauseIndex,
-        deads: &mut HashSet<Lit>,
+        #[cfg(feature = "deterministic")] deads: &mut HashSet<Lit, RandomState>,
+        #[cfg(not(feature = "deterministic"))] deads: &mut HashSet<Lit>,
     ) -> RefClause {
         //
         //## Clause transform rules
@@ -810,6 +815,10 @@ impl ClauseDBIF for ClauseDB {
             }
         };
         perm.sort();
+        #[cfg(feature = "deterministic")]
+        let mut deads: HashSet<Lit, RandomState> =
+            HashSet::with_hasher(RandomState::with_seed(RANDOM_STATE_SEED));
+        #[cfg(not(feature = "deterministic"))]
         let mut deads: HashSet<Lit> = HashSet::new();
         for i in perm.iter().skip(keep) {
             self.nullify_clause(i.to(), &mut deads);
@@ -817,6 +826,10 @@ impl ClauseDBIF for ClauseDB {
         self.collect(&deads);
     }
     fn reset(&mut self) {
+        #[cfg(feature = "deterministic")]
+        let mut deads: HashSet<Lit, RandomState> =
+            HashSet::with_hasher(RandomState::with_seed(RANDOM_STATE_SEED));
+        #[cfg(not(feature = "deterministic"))]
         let mut deads: HashSet<Lit> = HashSet::new();
         for ci in 1..self.len() {
             let c = &self.clause[ci];
@@ -1186,7 +1199,12 @@ impl ClauseWeaverIF for ClauseDB {
     }
     /// ## Warning
     /// this function is the only function that makes dead clauses
-    fn nullify_clause(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>) {
+    fn nullify_clause(
+        &mut self,
+        ci: ClauseIndex,
+        #[cfg(feature = "deterministic")] deads: &mut HashSet<Lit, RandomState>,
+        #[cfg(not(feature = "deterministic"))] deads: &mut HashSet<Lit>,
+    ) {
         assert!(!self[ci].is_dead());
         let c = &self.clause[ci];
         self.certification_store.delete_clause(&c.lits);
@@ -1210,7 +1228,12 @@ impl ClauseWeaverIF for ClauseDB {
         self[ci].turn_on(FlagClause::DEAD);
         // // assert!(self[ci].is_dead());
     }
-    fn nullify_clause_sandbox(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>) {
+    fn nullify_clause_sandbox(
+        &mut self,
+        ci: ClauseIndex,
+        #[cfg(feature = "deterministic")] deads: &mut HashSet<Lit, RandomState>,
+        #[cfg(not(feature = "deterministic"))] deads: &mut HashSet<Lit>,
+    ) {
         // assert!(!self[ci].is_dead());
         let c = &self.clause[ci];
         let l0 = c.lit0();
@@ -1227,7 +1250,11 @@ impl ClauseWeaverIF for ClauseDB {
         self[ci].turn_on(FlagClause::DEAD);
         // assert!(self[ci].is_dead());
     }
-    fn collect(&mut self, targets: &HashSet<Lit>) {
+    fn collect(
+        &mut self,
+        #[cfg(feature = "deterministic")] targets: &HashSet<Lit, RandomState>,
+        #[cfg(not(feature = "deterministic"))] targets: &HashSet<Lit>,
+    ) {
         for lit in targets.iter() {
             let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
             let mut wli = self.watch[usize::from(*lit)];

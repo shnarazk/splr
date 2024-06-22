@@ -9,6 +9,9 @@ use {
     std::collections::HashSet,
 };
 
+#[cfg(feature = "deterministic")]
+use {crate::config::RANDOM_STATE_SEED, ahash::RandomState};
+
 #[cfg(feature = "trail_saving")]
 use super::TrailSavingIF;
 
@@ -606,6 +609,10 @@ impl AssignStack {
     /// clear unpropagated literal as root_level
     fn propagate_at_root_level(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
         let mut num_propagated = 0;
+        #[cfg(feature = "deterministic")]
+        let mut deads: HashSet<Lit, RandomState> =
+            HashSet::with_hasher(RandomState::with_seed(RANDOM_STATE_SEED));
+        #[cfg(not(feature = "deterministic"))]
         let mut deads: HashSet<Lit> = HashSet::new();
         while num_propagated < self.trail.len() {
             num_propagated = self.trail.len();

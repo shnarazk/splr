@@ -10,6 +10,9 @@ use {
     std::collections::HashSet,
 };
 
+#[cfg(feature = "deterministic")]
+use {crate::config::RANDOM_STATE_SEED, ahash::RandomState};
+
 const VIVIFY_LIMIT: usize = 80_000;
 
 pub trait VivifyIF {
@@ -41,6 +44,10 @@ impl VivifyIF for ClauseDB {
         let mut num_shrink = 0;
         let mut num_assert = 0;
         let mut to_display = 0;
+        #[cfg(feature = "deterministic")]
+        let mut deads: HashSet<Lit, RandomState> =
+            HashSet::with_hasher(RandomState::with_seed(RANDOM_STATE_SEED));
+        #[cfg(not(feature = "deterministic"))]
         let mut deads: HashSet<Lit> = HashSet::new();
         'next_clause: while let Some(cp) = clauses.pop() {
             asg.backtrack_sandbox();

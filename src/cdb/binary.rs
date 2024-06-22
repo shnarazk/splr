@@ -6,9 +6,6 @@ use {
     },
 };
 
-#[cfg(feature = "deterministic")]
-use {crate::config::RANDOM_STATE_SEED, ahash::RandomState};
-
 /// storage of binary links
 pub type BinaryLinkList = Vec<(Lit, ClauseIndex)>;
 
@@ -28,9 +25,6 @@ impl IndexMut<Lit> for Vec<BinaryLinkList> {
 /// storage with mapper to `ClauseIndex` of binary links
 #[derive(Clone, Debug, Default)]
 pub struct BinaryLinkDB {
-    #[cfg(feature = "deterministic")]
-    pub(super) hash: HashMap<(Lit, Lit), ClauseIndex, RandomState>,
-    #[cfg(not(feature = "deterministic"))]
     pub(super) hash: HashMap<(Lit, Lit), ClauseIndex>,
     pub(super) list: Vec<BinaryLinkList>,
 }
@@ -38,12 +32,7 @@ pub struct BinaryLinkDB {
 impl Instantiate for BinaryLinkDB {
     fn instantiate(_conf: &Config, cnf: &CNFDescription) -> Self {
         let num_lit = 2 * (cnf.num_of_variables + 1);
-        #[cfg(feature = "deterministic")]
-        let random_state = RandomState::with_seed(RANDOM_STATE_SEED);
         BinaryLinkDB {
-            #[cfg(feature = "deterministic")]
-            hash: HashMap::with_hasher(random_state),
-            #[cfg(not(feature = "deterministic"))]
             hash: HashMap::new(),
             list: vec![Vec::new(); num_lit],
         }

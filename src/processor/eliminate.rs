@@ -5,6 +5,9 @@ use {
     std::collections::HashSet,
 };
 
+#[cfg(feature = "deterministic")]
+use ahash::RandomState;
+
 // Stop elimination if a generated resolvent is larger than this
 const COMBINATION_LIMIT: f64 = 32.0;
 
@@ -15,7 +18,8 @@ pub fn eliminate_var(
     state: &mut State,
     vi: VarId,
     timedout: &mut usize,
-    deads: &mut HashSet<Lit>,
+    #[cfg(feature = "deterministic")] deads: &mut HashSet<Lit, RandomState>,
+    #[cfg(not(feature = "deterministic"))] deads: &mut HashSet<Lit>,
 ) -> MaybeInconsistent {
     let v = &mut asg.var(vi);
     let w = &mut elim.var[vi];
@@ -342,6 +346,9 @@ mod tests {
     };
     use ::std::path::Path;
 
+    #[cfg(feature = "deterministic")]
+    use {crate::config::RANDOM_STATE_SEED, ahash::RandomState};
+
     impl Clause {
         #[allow(dead_code)]
         fn as_vec(&self) -> Vec<i32> {
@@ -377,6 +384,10 @@ mod tests {
 
         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
         elim.prepare(asg, cdb, true);
+        #[cfg(feature = "deterministic")]
+        let mut deads: HashSet<Lit, RandomState> =
+            HashSet::with_hasher(RandomState::with_seed(RANDOM_STATE_SEED));
+        #[cfg(not(feature = "deterministic"))]
         let mut deads: HashSet<Lit> = HashSet::new();
         eliminate_var(asg, cdb, &mut elim, state, vi, &mut timedout, &mut deads).expect("panic");
         cdb.collect(&deads);

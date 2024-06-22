@@ -1,5 +1,8 @@
 use {crate::types::*, std::collections::HashSet};
 
+#[cfg(feature = "deterministic")]
+use ahash::RandomState;
+
 pub trait WatcherLinkIF {
     fn next_watch(&self, wi: usize) -> WatchLiteralIndex;
     fn next_watch_mut(&mut self, wi: usize) -> &mut WatchLiteralIndex;
@@ -24,11 +27,27 @@ pub trait ClauseWeaverIF {
     /// instantiate a list of watch lists
     fn make_watches(num_vars: usize, clauses: &mut [Clause]) -> Vec<WatchLiteralIndex>;
     /// un-register a clause `cid` from alive clause database and make the clause dead.
-    fn nullify_clause(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>);
+    fn nullify_clause(
+        &mut self,
+        ci: ClauseIndex,
+        #[cfg(feature = "deterministic")] deads: &mut HashSet<Lit, RandomState>,
+        #[cfg(not(feature = "deterministic"))] deads: &mut HashSet<Lit>,
+    );
     /// un-register a clause `cid` from clause database and make the clause dead.
-    fn nullify_clause_sandbox(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>);
+    fn nullify_clause_sandbox(
+        &mut self,
+        ci: ClauseIndex,
+        #[cfg(feature = "deterministic")] deads: &mut HashSet<Lit, RandomState>,
+        #[cfg(not(feature = "deterministic"))] deads: &mut HashSet<Lit>,
+    );
     /// update watches of the clause
-    fn collect(&mut self, targets: &HashSet<Lit>);
+    #[cfg(feature = "deterministic")]
+    fn collect(
+        &mut self,
+        #[cfg(feature = "deterministic")] targets: &HashSet<Lit, RandomState>,
+
+        #[cfg(not(feature = "deterministic"))] targets: &HashSet<Lit>,
+    );
 }
 
 // #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
