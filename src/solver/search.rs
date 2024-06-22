@@ -489,12 +489,12 @@ impl SolveIF for Solver {
                                     state.sls_index += 1;
                                     state.flush(format!(
                                         "SLS(#{}, core: {}, steps: {})",
-                                        state.sls_index, sls_core, $limit
+                                        state.sls_index, context.sls_core, $limit
                                     ));
                                     let cls =
                                         cdb.stochastic_local_search(asg, &mut $assign, $limit);
                                     asg.override_rephasing_target(&$assign);
-                                    sls_core = sls_core.min(cls.1);
+                                    context.sls_core = context.sls_core.min(cls.1);
                                 };
                                 ($assign: expr, $improved: expr, $limit: expr) => {
                                     state.sls_index += 1;
@@ -508,7 +508,7 @@ impl SolveIF for Solver {
                                     if $improved(cls) {
                                         asg.override_rephasing_target(&$assign);
                                     }
-                                    sls_core = sls_core.min(cls.1);
+                                    context.sls_core = sls_core.min(cls.1);
                                 };
                             }
                             macro_rules! scale {
@@ -521,8 +521,8 @@ impl SolveIF for Solver {
                             }
                             let ent = cdb.refer(cdb::property::TEma::Entanglement).get() as usize;
                             let n = cdb.derefer(cdb::property::Tusize::NumClause);
-                            if let Some(c) = core_was_rebuilt {
-                                core_was_rebuilt = None;
+                            if let Some(c) = context.core_was_rebuilt {
+                                context.core_was_rebuilt = None;
                                 if c < context.current_core {
                                     let steps = scale!(27_u32, c) * scale!(24_u32, n) / ent;
                                     let mut assignment = asg.best_phases_ref(Some(false));

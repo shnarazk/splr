@@ -4,6 +4,9 @@ use {
     std::collections::HashMap,
 };
 
+#[cfg(feature = "deterministic")]
+use {crate::config::RANDOM_STATE_SEED, ahash::RandomState};
+
 pub trait StochasticLocalSearchIF {
     /// returns the decision level of the given assignment and the one of the final assignment.
     /// Note: the lower level a set of clauses make a conflict at,
@@ -27,10 +30,16 @@ impl StochasticLocalSearchIF for ClauseDB {
         let mut returns: (usize, usize) = (0, 0);
         let mut last_flip = self.num_clause;
         let mut seed = 721_109;
+        #[cfg(feature = "deterministic")]
         for step in 1..=limit {
+            let random_state = RandomState::with_seed(RANDOM_STATE_SEED);
             let mut unsat_clauses = 0;
             // let mut level: DecisionLevel = 0;
             // CONSIDER: counting only given (permanent) clauses.
+            #[cfg(feature = "deterministic")]
+            let mut flip_target: HashMap<VarId, usize, RandomState> =
+                HashMap::with_hasher(random_state);
+            #[cfg(not(feature = "deterministic"))]
             let mut flip_target: HashMap<VarId, usize> = HashMap::new();
             let mut target_clause: Option<&Clause> = None;
             for c in self.clause.iter().skip(1).filter(|c| !c.is_dead()) {
@@ -88,7 +97,8 @@ impl Clause {
     fn is_falsified(
         &self,
         assignment: &HashMap<VarId, bool>,
-        flip_target: &mut HashMap<VarId, usize>,
+        #[cfg(feature = "deterministic")] flip_target: &mut HashMap<VarId, usize, RandomState>,
+        #[cfg(not(feature = "deterministic"))] flip_target: &mut HashMap<VarId, usize>,
     ) -> bool {
         let mut num_sat = 0;
         let mut sat_vi = 0;

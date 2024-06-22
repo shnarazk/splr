@@ -3,6 +3,9 @@ use {crate::types::DecisionLevel, std::path::PathBuf};
 
 pub const CERTIFICATION_DEFAULT_FILENAME: &str = "proof.drat";
 
+#[cfg(feature = "deterministic")]
+pub(crate) const RANDOM_STATE_SEED: usize = 2024_0622_1347_0181;
+
 /// Configuration built from command line options
 #[derive(Clone, Debug)]
 pub struct Config {
