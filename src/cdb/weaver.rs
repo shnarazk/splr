@@ -42,11 +42,11 @@ pub trait ClauseWeaverIF {
     );
     /// update watches of the clause
     #[cfg(feature = "deterministic")]
-    fn collect(
+    fn reinitialize_frees(
         &mut self,
-        #[cfg(feature = "deterministic")] targets: &HashSet<Lit, RandomState>,
+        #[cfg(feature = "deterministic")] targets: &mut HashSet<Lit, RandomState>,
 
-        #[cfg(not(feature = "deterministic"))] targets: &HashSet<Lit>,
+        #[cfg(not(feature = "deterministic"))] targets: &mut HashSet<Lit>,
     );
 }
 

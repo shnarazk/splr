@@ -390,7 +390,7 @@ mod tests {
         #[cfg(not(feature = "deterministic"))]
         let mut deads: HashSet<Lit> = HashSet::new();
         eliminate_var(asg, cdb, &mut elim, state, vi, &mut timedout, &mut deads).expect("panic");
-        cdb.collect(&deads);
+        cdb.reinitialize_frees(&mut deads);
         assert!(asg.var(vi).is(FlagVar::ELIMINATED));
         assert!(cdb.iter().skip(1).all(|c| c.is_dead()
             || (c.iter().all(|l| *l != Lit::from((vi, false)))

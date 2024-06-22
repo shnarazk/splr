@@ -823,7 +823,7 @@ impl ClauseDBIF for ClauseDB {
         for i in perm.iter().skip(keep) {
             self.nullify_clause(i.to(), &mut deads);
         }
-        self.collect(&deads);
+        self.reinitialize_frees(&mut deads);
     }
     fn reset(&mut self) {
         #[cfg(feature = "deterministic")]
@@ -837,7 +837,7 @@ impl ClauseDBIF for ClauseDB {
                 self.nullify_clause(ci, &mut deads);
             }
         }
-        self.collect(&deads);
+        self.reinitialize_frees(&mut deads);
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);
@@ -1108,7 +1108,19 @@ impl ClauseWeaverIF for ClauseDB {
             self.clause.len() - 1
         } else {
             self.watch[FREE_LIT] = self.clause[wli.as_ci()].links[wli.as_wi()];
-            wli.as_ci()
+            let ci = wli.as_ci();
+            self[ci].rank = 0;
+            self[ci].rank_old = 0;
+            self[ci].flags = FlagClause::empty();
+            #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
+            {
+                self[ci].timestamp = 0;
+            }
+            #[cfg(feature = "clause_rewarding")]
+            {
+                self[ci].reward = 0.0;
+            }
+            ci
         }
     }
     fn insert_watch(&mut self, ci: ClauseIndex, wi: usize) {
@@ -1250,37 +1262,127 @@ impl ClauseWeaverIF for ClauseDB {
         self[ci].turn_on(FlagClause::DEAD);
         // assert!(self[ci].is_dead());
     }
-    fn collect(
+    fn reinitialize_frees(
         &mut self,
-        #[cfg(feature = "deterministic")] targets: &HashSet<Lit, RandomState>,
-        #[cfg(not(feature = "deterministic"))] targets: &HashSet<Lit>,
+        #[cfg(feature = "deterministic")] targets: &mut HashSet<Lit, RandomState>,
+        #[cfg(not(feature = "deterministic"))] targets: &mut HashSet<Lit>,
     ) {
         // I can't beleave but the iteration order on a HashSet with a fix seed
         // isn't fixed. So I need sorting here.
         // BUT, WHY DOES THE SWEEPING ORDER MATTER?
         #[cfg(feature = "deterministic")]
-        let mut targets = targets.iter().copied().collect::<Vec<_>>();
-        #[cfg(feature = "deterministic")]
-        targets.sort();
-        for lit in targets.iter() {
-            let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
-            let mut wli: WatchLiteralIndex = self.watch[usize::from(*lit)];
-            while !wli.is_none() {
-                let (ci, li) = wli.indices();
-                if self[ci].is_dead() {
-                    let next = self[ci].next_watch(li);
-                    self.remove_next_watch(prev, *lit);
-                    if self[ci].is(FlagClause::SWEEPED) {
-                        self.mark_as_free(ci);
-                    } else {
-                        self[ci].turn_on(FlagClause::SWEEPED);
+        {
+            let mut other = self.clone();
+            let mut lits = targets.iter().copied().collect::<Vec<_>>();
+            // lits.sort();
+            for lit in lits.iter() {
+                let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
+                let mut wli: WatchLiteralIndex = self.watch[usize::from(*lit)];
+                while !wli.is_none() {
+                    let (ci, li) = wli.indices();
+                    if self[ci].is_dead() {
+                        let next = self[ci].next_watch(li);
+                        self.remove_next_watch(prev, *lit);
+                        if self[ci].is(FlagClause::SWEEPED) {
+                            self.mark_as_free(ci);
+                        } else {
+                            self[ci].turn_on(FlagClause::SWEEPED);
+                        }
+                        wli = next;
+                        continue;
                     }
-                    wli = next;
-                    continue;
+                    prev = wli;
+                    wli = self[ci].next_watch(li);
                 }
-                prev = wli;
-                wli = self[ci].next_watch(li);
             }
+            lits.sort();
+            for lit in lits.iter() {
+                let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
+                let mut wli: WatchLiteralIndex = other.watch[usize::from(*lit)];
+                while !wli.is_none() {
+                    let (ci, li) = wli.indices();
+                    if other[ci].is_dead() {
+                        let next = other[ci].next_watch(li);
+                        other.remove_next_watch(prev, *lit);
+                        if other[ci].is(FlagClause::SWEEPED) {
+                            other.mark_as_free(ci);
+                        } else {
+                            other[ci].turn_on(FlagClause::SWEEPED);
+                        }
+                        wli = next;
+                        continue;
+                    }
+                    prev = wli;
+                    wli = other[ci].next_watch(li);
+                }
+            }
+            for n in 2..self.watch.len() {
+                let mut my_wli: WatchLiteralIndex = self.watch[n];
+                let mut his_wli: WatchLiteralIndex = other.watch[n];
+                while !my_wli.is_none() {
+                    let (my_ci, my_li) = my_wli.indices();
+                    let (his_ci, his_li) = his_wli.indices();
+                    assert_eq!(my_ci, his_ci);
+                    my_wli = self[my_ci].next_watch(my_li);
+                    his_wli = other[his_ci].next_watch(his_li);
+                }
+            }
+            let mut my_n = 0;
+            let mut my_wli: WatchLiteralIndex = self.watch[FREE_WATCH_INDEX];
+            while !my_wli.is_none() {
+                let (my_ci, my_li) = my_wli.indices();
+                my_wli = self[my_ci].next_watch(my_li);
+                my_n += 1;
+            }
+            let mut his_n = 0;
+            let mut his_wli: WatchLiteralIndex = other.watch[FREE_WATCH_INDEX];
+            while !his_wli.is_none() {
+                let (his_ci, his_li) = his_wli.indices();
+                his_wli = other[his_ci].next_watch(his_li);
+                his_n += 1;
+            }
+            assert_eq!(my_n, his_n);
+            // for lit in lits.iter() {
+            //     let mut wli: WatchLiteralIndex = self.watch[usize::from(*lit)];
+            //     while !wli.is_none() {
+            //         let (ci, li) = wli.indices();
+            //         assert!(!self[ci].is_dead());
+            //         wli = self[ci].next_watch(li);
+            //     }
+            // }
+            targets.clear();
+        }
+        #[cfg(not(feature = "deterministic"))]
+        {
+            for lit in targets.iter() {
+                let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
+                let mut wli: WatchLiteralIndex = self.watch[usize::from(*lit)];
+                while !wli.is_none() {
+                    let (ci, li) = wli.indices();
+                    if self[ci].is_dead() {
+                        let next = self[ci].next_watch(li);
+                        self.remove_next_watch(prev, *lit);
+                        if self[ci].is(FlagClause::SWEEPED) {
+                            self.mark_as_free(ci);
+                        } else {
+                            self[ci].turn_on(FlagClause::SWEEPED);
+                        }
+                        wli = next;
+                        continue;
+                    }
+                    prev = wli;
+                    wli = self[ci].next_watch(li);
+                }
+            }
+            // for lit in targets.iter() {
+            //     let mut wli: WatchLiteralIndex = self.watch[usize::from(*lit)];
+            //     while !wli.is_none() {
+            //         let (ci, li) = wli.indices();
+            //         assert!(!self[ci].is_dead());
+            //         wli = self[ci].next_watch(li);
+            //     }
+            // }
+            targets.clear();
         }
     }
 }
