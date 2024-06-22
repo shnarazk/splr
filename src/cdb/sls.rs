@@ -15,7 +15,8 @@ pub trait StochasticLocalSearchIF {
     fn stochastic_local_search(
         &mut self,
         asg: &impl AssignIF,
-        start: &mut HashMap<VarId, bool>,
+        #[cfg(feature = "deterministic")] start: &mut HashMap<VarId, bool, RandomState>,
+        #[cfg(not(feature = "deterministic"))] start: &mut HashMap<VarId, bool>,
         limit: usize,
     ) -> (usize, usize);
 }
@@ -24,7 +25,8 @@ impl StochasticLocalSearchIF for ClauseDB {
     fn stochastic_local_search(
         &mut self,
         _asg: &impl AssignIF,
-        assignment: &mut HashMap<VarId, bool>,
+        #[cfg(feature = "deterministic")] assignment: &mut HashMap<VarId, bool, RandomState>,
+        #[cfg(not(feature = "deterministic"))] assignment: &mut HashMap<VarId, bool>,
         limit: usize,
     ) -> (usize, usize) {
         let mut returns: (usize, usize) = (0, 0);
@@ -96,7 +98,8 @@ impl StochasticLocalSearchIF for ClauseDB {
 impl Clause {
     fn is_falsified(
         &self,
-        assignment: &HashMap<VarId, bool>,
+        #[cfg(feature = "deterministic")] assignment: &mut HashMap<VarId, bool, RandomState>,
+        #[cfg(not(feature = "deterministic"))] assignment: &mut HashMap<VarId, bool>,
         #[cfg(feature = "deterministic")] flip_target: &mut HashMap<VarId, usize, RandomState>,
         #[cfg(not(feature = "deterministic"))] flip_target: &mut HashMap<VarId, usize>,
     ) -> bool {

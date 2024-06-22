@@ -3,6 +3,10 @@
 #[cfg(feature = "rephase")]
 use super::property;
 
+#[cfg(feature = "deterministic")]
+#[allow(unused_imports)]
+use {crate::config::RANDOM_STATE_SEED, ahash::RandomState};
+
 use {
     super::{AssignStack, VarHeapIF},
     crate::types::*,
@@ -13,12 +17,24 @@ use {
 pub trait VarSelectIF {
     #[cfg(feature = "rephase")]
     /// return best phases
+    #[cfg(feature = "deterministic")]
+    fn best_phases_ref(&mut self, default_value: Option<bool>)
+        -> HashMap<VarId, bool, RandomState>;
+    #[cfg(not(feature = "deterministic"))]
     fn best_phases_ref(&mut self, default_value: Option<bool>) -> HashMap<VarId, bool>;
-    #[cfg(feature = "rephase")]
     /// force an assignment obtained by SLS
-    fn override_rephasing_target(&mut self, assignment: &HashMap<VarId, bool>) -> usize;
+    #[cfg(feature = "rephase")]
+    fn override_rephasing_target(
+        &mut self,
+        #[cfg(feature = "deterministic")] assignment: &HashMap<VarId, bool, RandomState>,
+        #[cfg(not(feature = "deterministic"))] assignment: &HashMap<VarId, bool>,
+    ) -> usize;
     /// give rewards to vars selected by SLS
-    fn reward_by_sls(&mut self, assignment: &HashMap<VarId, bool>) -> usize;
+    fn reward_by_sls(
+        &mut self,
+        #[cfg(feature = "deterministic")] assignment: &HashMap<VarId, bool, RandomState>,
+        #[cfg(not(feature = "deterministic"))] assignment: &HashMap<VarId, bool>,
+    ) -> usize;
     #[cfg(feature = "rephase")]
     /// select rephasing target
     fn select_rephasing_target(&mut self);
@@ -35,6 +51,38 @@ pub trait VarSelectIF {
 
 impl VarSelectIF for AssignStack {
     #[cfg(feature = "rephase")]
+    #[cfg(feature = "deterministic")]
+    fn best_phases_ref(
+        &mut self,
+        default_value: Option<bool>,
+    ) -> HashMap<VarId, bool, RandomState> {
+        let random_state = RandomState::with_seed(RANDOM_STATE_SEED);
+        let mut hash = HashMap::with_hasher(random_state);
+        self.var
+            .iter()
+            .enumerate()
+            .filter_map(|(vi, v)| {
+                let var = &self.var[vi];
+                if var.level == self.root_level || var.is(FlagVar::ELIMINATED) {
+                    default_value.map(|b| (vi, b))
+                } else {
+                    Some((
+                        vi,
+                        self.best_phases.get(&vi).map_or(
+                            var.assign.unwrap_or_else(|| v.is(FlagVar::PHASE)),
+                            |(b, _)| *b,
+                        ),
+                    ))
+                }
+            })
+            // .collect::<Vec<_>>()
+            // .iter()
+            .for_each(|(k, v)| {
+                hash.insert(k, v);
+            });
+        hash
+    }
+    #[cfg(not(feature = "deterministic"))]
     fn best_phases_ref(&mut self, default_value: Option<bool>) -> HashMap<VarId, bool> {
         self.var
             .iter()
@@ -56,7 +104,11 @@ impl VarSelectIF for AssignStack {
             .collect::<HashMap<VarId, bool>>()
     }
     #[cfg(feature = "rephase")]
-    fn override_rephasing_target(&mut self, assignment: &HashMap<VarId, bool>) -> usize {
+    fn override_rephasing_target(
+        &mut self,
+        #[cfg(feature = "deterministic")] assignment: &HashMap<VarId, bool, RandomState>,
+        #[cfg(not(feature = "deterministic"))] assignment: &HashMap<VarId, bool>,
+    ) -> usize {
         let mut num_flipped = 0;
         for (vi, b) in assignment.iter() {
             if !self.best_phases.get(vi).map_or(false, |(p, _)| *p == *b) {
@@ -66,7 +118,11 @@ impl VarSelectIF for AssignStack {
         }
         num_flipped
     }
-    fn reward_by_sls(&mut self, assignment: &HashMap<VarId, bool>) -> usize {
+    fn reward_by_sls(
+        &mut self,
+        #[cfg(feature = "deterministic")] assignment: &HashMap<VarId, bool, RandomState>,
+        #[cfg(not(feature = "deterministic"))] assignment: &HashMap<VarId, bool>,
+    ) -> usize {
         let mut num_flipped = 0;
         for (vi, b) in assignment.iter() {
             let v = &mut self.var[*vi];
