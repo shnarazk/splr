@@ -1255,9 +1255,16 @@ impl ClauseWeaverIF for ClauseDB {
         #[cfg(feature = "deterministic")] targets: &HashSet<Lit, RandomState>,
         #[cfg(not(feature = "deterministic"))] targets: &HashSet<Lit>,
     ) {
+        // I can't beleave but the iteration order on a HashSet with a fix seed
+        // isn't fixed. So I need sorting here.
+        // BUT, WHY DOES THE SWEEPING ORDER MATTER?
+        #[cfg(feature = "deterministic")]
+        let mut targets = targets.iter().copied().collect::<Vec<_>>();
+        #[cfg(feature = "deterministic")]
+        targets.sort();
         for lit in targets.iter() {
             let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
-            let mut wli = self.watch[usize::from(*lit)];
+            let mut wli: WatchLiteralIndex = self.watch[usize::from(*lit)];
             while !wli.is_none() {
                 let (ci, li) = wli.indices();
                 if self[ci].is_dead() {
