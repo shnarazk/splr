@@ -651,7 +651,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
     }
-    // used in `propagate`, `propagate_sandbox`, and `handle_conflict` for chronoBT
+    /// called from `propagate`, `propagate_sandbox`, and `handle_conflict` for chronoBT
     #[inline]
     fn transform_by_updating_watch(
         &mut self,
@@ -673,13 +673,15 @@ impl ClauseDBIF for ClauseDB {
         // 2. insert a new watch                  [Step:2]
         // 3. update a blocker cach e             [Step:3]
 
+        // Note: since `propagate_sandbox` calls this function, we can't assume below.
+        // assert!(!self[wli.as_ci()].is_dead());
+
         debug_assert!(!wli.is_none());
         debug_assert!(1 < new);
         //## Step:1
         // let target: WatchLiteralIndex = self[prev.as_ci()].links[prev.as_wi()];
         let (ci, old) = wli.indices();
         debug_assert!(old < 2);
-        debug_assert!(!self[ci].is_dead()); // FIXME: assertion failed
         let ret: WatchLiteralIndex = self[ci].links[wli.as_wi()];
         // let target = self.remove_next_watch(prev);
         // watch_cache[!c.lits[old]].remove_watch(&ci);
