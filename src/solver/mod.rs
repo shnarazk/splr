@@ -15,7 +15,7 @@ mod validate;
 pub use self::{
     build::SatSolverIF,
     restart::{RestartIF, RestartManager},
-    search::{SearchContext, SolveIF},
+    search::{SearchState, SolveIF},
     stage::StageManager,
     validate::ValidateIF,
 };

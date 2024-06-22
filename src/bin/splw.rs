@@ -16,7 +16,7 @@ use {
         assign, cdb,
         config::{self, CERTIFICATION_DEFAULT_FILENAME},
         solver::Solver as Splr,
-        solver::{Certificate, SatSolverIF, SearchContext, SolveIF, SolverResult},
+        solver::{Certificate, SatSolverIF, SearchState, SolveIF, SolverResult},
         state::{self, LogF64Id, LogUsizeId},
         Config, EmaIF, PropertyDereference, PropertyReference, SolverError, VERSION,
     },
@@ -35,7 +35,7 @@ use {
 #[derive(Debug)]
 pub struct App {
     solver: Splr,
-    process: SearchContext,
+    process: SearchState,
     counter: i16,
     asg_stats: [u64; 4],
     #[allow(dead_code)]
@@ -43,7 +43,7 @@ pub struct App {
 }
 
 impl App {
-    fn solver(solver: Splr, process: SearchContext) -> Self {
+    fn solver(solver: Splr, process: SearchState) -> Self {
         App {
             solver,
             process,
