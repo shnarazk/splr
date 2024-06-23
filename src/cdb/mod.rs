@@ -812,7 +812,7 @@ impl ClauseDBIF for ClauseDB {
         for i in perm.iter().skip(keep) {
             self.nullify_clause(i.to(), &mut deads);
         }
-        self.collect(&mut deads);
+        self.reinitialize_frees(&mut deads);
     }
     fn reset(&mut self) {
         let mut deads: HashSet<Lit> = HashSet::new();
@@ -822,7 +822,7 @@ impl ClauseDBIF for ClauseDB {
                 self.nullify_clause(ci, &mut deads);
             }
         }
-        self.collect(&mut deads);
+        self.reinitialize_frees(&mut deads);
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);
@@ -1225,7 +1225,7 @@ impl ClauseWeaverIF for ClauseDB {
         self[ci].turn_on(FlagClause::DEAD);
         // assert!(self[ci].is_dead());
     }
-    fn collect(&mut self, targets: &mut HashSet<Lit>) {
+    fn reinitialize_frees(&mut self, targets: &mut HashSet<Lit>) {
         if cfg!(feature = "deterministic") {
             let mut lits = targets.iter().copied().collect::<Vec<_>>();
             lits.sort_unstable();
