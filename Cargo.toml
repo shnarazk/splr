@@ -26,6 +26,7 @@ default = [
         ### Essential
         # "incremental_solver", # this requires "clause_elimination" is off
         "watch",
+        "deterministic",
 
         ### Heuristics
         # "bi_clause_completion",
@@ -60,6 +61,7 @@ clause_elimination = []         # pre(in)-processor setting
 clause_rewarding = []           # clauses have activities w/ decay rate
 clause_vivification = []        # pre(in)-processor setting
 debug_propagation = []          # for debug
+deterministic = []              # make solver deterministic with tiny overhead
 dynamic_restart_threshold = []  # control restart spans like Glucose
 EMA_calibration = []            # each exponential moving average has a calbration value
 EVSIDS = []                     # Eponential Variable State Independent Decaying Sum

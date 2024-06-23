@@ -28,7 +28,7 @@ pub trait ClauseWeaverIF {
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn nullify_clause_sandbox(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>);
     /// update watches of the clause
-    fn collect(&mut self, targets: &HashSet<Lit>);
+    fn collect(&mut self, targets: &mut HashSet<Lit>);
 }
 
 // #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]

@@ -812,7 +812,7 @@ impl ClauseDBIF for ClauseDB {
         for i in perm.iter().skip(keep) {
             self.nullify_clause(i.to(), &mut deads);
         }
-        self.collect(&deads);
+        self.collect(&mut deads);
     }
     fn reset(&mut self) {
         let mut deads: HashSet<Lit> = HashSet::new();
@@ -822,7 +822,7 @@ impl ClauseDBIF for ClauseDB {
                 self.nullify_clause(ci, &mut deads);
             }
         }
-        self.collect(&deads);
+        self.collect(&mut deads);
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);
@@ -1225,27 +1225,53 @@ impl ClauseWeaverIF for ClauseDB {
         self[ci].turn_on(FlagClause::DEAD);
         // assert!(self[ci].is_dead());
     }
-    fn collect(&mut self, targets: &HashSet<Lit>) {
-        for lit in targets.iter() {
-            let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
-            let mut wli = self.watch[usize::from(*lit)];
-            while !wli.is_none() {
-                let (ci, li) = wli.indices();
-                if self[ci].is_dead() {
-                    let next = self[ci].next_watch(li);
-                    self.remove_next_watch(prev, *lit);
-                    if self[ci].is(FlagClause::SWEEPED) {
-                        self.mark_as_free(ci);
-                    } else {
-                        self[ci].turn_on(FlagClause::SWEEPED);
+    fn collect(&mut self, targets: &mut HashSet<Lit>) {
+        if cfg!(feature = "deterministic") {
+            let mut lits = targets.iter().copied().collect::<Vec<_>>();
+            lits.sort_unstable();
+            for lit in lits.iter() {
+                let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
+                let mut wli = self.watch[usize::from(*lit)];
+                while !wli.is_none() {
+                    let (ci, li) = wli.indices();
+                    if self[ci].is_dead() {
+                        let next = self[ci].next_watch(li);
+                        self.remove_next_watch(prev, *lit);
+                        if self[ci].is(FlagClause::SWEEPED) {
+                            self.mark_as_free(ci);
+                        } else {
+                            self[ci].turn_on(FlagClause::SWEEPED);
+                        }
+                        wli = next;
+                        continue;
                     }
-                    wli = next;
-                    continue;
+                    prev = wli;
+                    wli = self[ci].next_watch(li);
                 }
-                prev = wli;
-                wli = self[ci].next_watch(li);
             }
-        }
+        } else {
+            for lit in targets.iter() {
+                let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
+                let mut wli = self.watch[usize::from(*lit)];
+                while !wli.is_none() {
+                    let (ci, li) = wli.indices();
+                    if self[ci].is_dead() {
+                        let next = self[ci].next_watch(li);
+                        self.remove_next_watch(prev, *lit);
+                        if self[ci].is(FlagClause::SWEEPED) {
+                            self.mark_as_free(ci);
+                        } else {
+                            self[ci].turn_on(FlagClause::SWEEPED);
+                        }
+                        wli = next;
+                        continue;
+                    }
+                    prev = wli;
+                    wli = self[ci].next_watch(li);
+                }
+            }
+        };
+        targets.clear();
     }
 }
 
