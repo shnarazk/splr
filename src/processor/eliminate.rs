@@ -9,7 +9,7 @@ use {
 use ahash::RandomState;
 
 // Stop elimination if a generated resolvent is larger than this
-const COMBINATION_LIMIT: f64 = 32.0;
+const COMBINATION_LIMIT: f64 = 8.0;
 
 pub fn eliminate_var(
     asg: &mut impl AssignIF,
@@ -31,10 +31,10 @@ pub fn eliminate_var(
     // Note: it may contain the target literal somehow. So the following may be failed.
     // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, true)))));
     w.pos_occurs
-        .retain(|&c| cdb[c].contains(Lit::from((vi, true))));
+        .retain(|&c| !cdb[c].is_dead() && cdb[c].contains(Lit::from((vi, true))));
     // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, false)))));
     w.neg_occurs
-        .retain(|&c| cdb[c].contains(Lit::from((vi, false))));
+        .retain(|&c| !cdb[c].is_dead() && cdb[c].contains(Lit::from((vi, false))));
 
     let num_combination = w.pos_occurs.len() * w.neg_occurs.len();
 
