@@ -384,7 +384,7 @@ impl PropagateIF for AssignStack {
             //
             let mut prev = WatchLiteralIndex::default();
             let mut wli = cdb.get_watch_literal_index(propagating);
-            'next_clause: while !wli.is_none() {
+            'next_clause: while wli.is_some() {
                 let (ci, false_index) = wli.indices();
                 let c = &mut cdb[ci];
                 let other = *c.iter().nth(1 - false_index).unwrap();
@@ -531,7 +531,7 @@ impl PropagateIF for AssignStack {
             //
             let mut prev = WatchLiteralIndex::default();
             let mut wli = cdb.get_watch_literal_index(propagating);
-            'next_clause: while !wli.is_none() {
+            'next_clause: while wli.is_some() {
                 let (ci, false_index) = wli.indices();
                 let c = &mut cdb[ci];
                 // if c.is_dead() {
