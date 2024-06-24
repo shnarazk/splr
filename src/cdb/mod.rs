@@ -1079,7 +1079,9 @@ impl Clause {
     }
 }
 
+// valid (encoded) lits start from 2. So we have two extra room.
 const FREE_LIT: usize = 1;
+// Clauses have two watches. We use the second watch holder to chain free clauses
 const FREE_WATCH_INDEX: usize = 1;
 
 impl ClauseWeaverIF for ClauseDB {
