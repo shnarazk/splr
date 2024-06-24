@@ -42,6 +42,9 @@ use {
     },
 };
 
+#[cfg(feature = "deterministic")]
+use {crate::config::RANDOM_STATE_SEED, ahash::RandomState};
+
 #[cfg(not(feature = "no_IO"))]
 use std::{io::Write, path::Path};
 
@@ -95,7 +98,8 @@ pub trait ClauseDBIF:
         &mut self,
         asg: &mut impl AssignIF,
         ci: ClauseIndex,
-        deads: &mut HashSet<Lit>,
+        #[cfg(feature = "deterministic")] deads: &mut HashSet<Lit, RandomState>,
+        #[cfg(not(feature = "deterministic"))] deads: &mut HashSet<Lit>,
     ) -> RefClause;
     /// reduce learnt clauses
     /// # CAVEAT
@@ -190,7 +194,7 @@ impl ClauseDBIF for ClauseDB {
     fn check_chains(&self, ci: ClauseIndex) {
         for (_l, h) in self.watch.iter().enumerate().skip(2) {
             let mut nr = *h;
-            while !nr.is_none() {
+            while nr.is_some() {
                 assert!(!self[nr.as_ci()].is_dead());
                 nr = self[nr.as_ci()].next_watch(nr.as_wi());
             }
@@ -201,7 +205,7 @@ impl ClauseDBIF for ClauseDB {
             let l1 = !self[ci].lits[1];
             let mut nr = self.watch[usize::from(l0)];
             let mut found = false;
-            while !nr.is_none() {
+            while nr.is_some() {
                 if nr.as_ci() == ci {
                     found = true;
                     break;
@@ -212,7 +216,7 @@ impl ClauseDBIF for ClauseDB {
 
             nr = self.watch[usize::from(l1)];
             found = false;
-            while !nr.is_none() {
+            while nr.is_some() {
                 if nr.as_ci() == ci {
                     found = true;
                     break;
@@ -278,8 +282,8 @@ impl ClauseDBIF for ClauseDB {
             std::mem::swap(&mut tmp, &mut self.lbd_temp);
             self[ci].update_lbd(asg, &mut tmp);
             std::mem::swap(&mut tmp, &mut self.lbd_temp);
-            assert_eq!(l0, self[ci].lits[0]);
-            assert_eq!(l1, self[ci].lits[1]);
+            debug_assert_eq!(l0, self[ci].lits[0]);
+            debug_assert_eq!(l1, self[ci].lits[1]);
             self[ci].search_from = 0;
             self.insert_watch(ci, 0);
             self.insert_watch(ci, 1);
@@ -541,7 +545,8 @@ impl ClauseDBIF for ClauseDB {
         &mut self,
         asg: &mut impl AssignIF,
         ci: ClauseIndex,
-        deads: &mut HashSet<Lit>,
+        #[cfg(feature = "deterministic")] deads: &mut HashSet<Lit, RandomState>,
+        #[cfg(not(feature = "deterministic"))] deads: &mut HashSet<Lit>,
     ) -> RefClause {
         //
         //## Clause transform rules
@@ -651,7 +656,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
     }
-    // used in `propagate`, `propagate_sandbox`, and `handle_conflict` for chronoBT
+    /// called from `propagate`, `propagate_sandbox`, and `handle_conflict` for chronoBT
     #[inline]
     fn transform_by_updating_watch(
         &mut self,
@@ -673,24 +678,26 @@ impl ClauseDBIF for ClauseDB {
         // 2. insert a new watch                  [Step:2]
         // 3. update a blocker cach e             [Step:3]
 
-        debug_assert!(!wli.is_none());
+        // Note: since `propagate_sandbox` calls this function, we can't assume below.
+        // assert!(!self[wli.as_ci()].is_dead());
+
+        debug_assert!(wli.is_some());
         debug_assert!(1 < new);
         //## Step:1
         // let target: WatchLiteralIndex = self[prev.as_ci()].links[prev.as_wi()];
         let (ci, old) = wli.indices();
         debug_assert!(old < 2);
-        debug_assert!(!self[ci].is_dead()); // FIXME: assertion failed
         let ret: WatchLiteralIndex = self[ci].links[wli.as_wi()];
         // let target = self.remove_next_watch(prev);
         // watch_cache[!c.lits[old]].remove_watch(&ci);
 
         //## Step:2
         // assert!(watch_cache[!c.lits[new]].iter().all(|e| e.0 != cid));
-        if prev.is_none() {
+        if prev.is_some() {
+            self[prev.as_ci()].links[prev.as_wi()] = ret;
+        } else {
             let lit = !self[ci].lits[wli.as_wi()];
             self.watch[usize::from(lit)] = ret;
-        } else {
-            self[prev.as_ci()].links[prev.as_wi()] = ret;
         }
         self[ci].lits.swap(old, new);
         // so old becomes new now
@@ -808,13 +815,21 @@ impl ClauseDBIF for ClauseDB {
             }
         };
         perm.sort();
+        #[cfg(feature = "deterministic")]
+        let mut deads: HashSet<Lit, RandomState> =
+            HashSet::with_hasher(RandomState::with_seed(RANDOM_STATE_SEED));
+        #[cfg(not(feature = "deterministic"))]
         let mut deads: HashSet<Lit> = HashSet::new();
         for i in perm.iter().skip(keep) {
             self.nullify_clause(i.to(), &mut deads);
         }
-        self.collect(&deads);
+        self.reinitialize_frees(&mut deads);
     }
     fn reset(&mut self) {
+        #[cfg(feature = "deterministic")]
+        let mut deads: HashSet<Lit, RandomState> =
+            HashSet::with_hasher(RandomState::with_seed(RANDOM_STATE_SEED));
+        #[cfg(not(feature = "deterministic"))]
         let mut deads: HashSet<Lit> = HashSet::new();
         for ci in 1..self.len() {
             let c = &self.clause[ci];
@@ -822,7 +837,7 @@ impl ClauseDBIF for ClauseDB {
                 self.nullify_clause(ci, &mut deads);
             }
         }
-        self.collect(&deads);
+        self.reinitialize_frees(&mut deads);
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);
@@ -1079,7 +1094,9 @@ impl Clause {
     }
 }
 
+// encoded valid lits start from 1.
 const FREE_LIT: usize = 1;
+// Clauses have two watches, Free clauses point the next one by the 2nd watch.
 const FREE_WATCH_INDEX: usize = 1;
 
 impl ClauseWeaverIF for ClauseDB {
@@ -1088,12 +1105,12 @@ impl ClauseWeaverIF for ClauseDB {
     }
     fn get_free_index(&mut self) -> ClauseIndex {
         let wli = self.watch[FREE_LIT];
-        if wli.is_none() {
-            self.clause.push(Clause::default());
-            self.clause.len() - 1
-        } else {
+        if wli.is_some() {
             self.watch[FREE_LIT] = self.clause[wli.as_ci()].links[wli.as_wi()];
             wli.as_ci()
+        } else {
+            self.clause.push(Clause::default());
+            self.clause.len() - 1
         }
     }
     fn insert_watch(&mut self, ci: ClauseIndex, wi: usize) {
@@ -1110,32 +1127,18 @@ impl ClauseWeaverIF for ClauseDB {
     }
     /// O(1) implementation
     fn remove_next_watch(&mut self, wli: WatchLiteralIndex, lit: Lit) -> ClauseIndex {
-        if wli.is_none() {
-            let target = self.watch[usize::from(lit)];
-            let next: WatchLiteralIndex = self[target.as_ci()].links[target.as_wi()];
-            self.watch[usize::from(lit)] = next;
-            target.as_ci()
-        } else {
+        if wli.is_some() {
             let (ci, li) = wli.indices();
             let target: WatchLiteralIndex = self[ci].links[li];
             let next: WatchLiteralIndex = self[target.as_ci()].links[target.as_wi()];
             self[ci].links[li] = next;
             target.as_ci()
-        }
-        /* if ci == HEAD_INDEX {
-            let next1 = self.watch[usize::from(lit)];
-            let next2 = self.clause[next1].next_for_lit(lit);
-            self.watch[usize::from(lit)] = next2;
-            debug_assert!(self[next1].lits[1] == !lit || self[next1].lits[0] == !lit);
-            self[next1].lits[1] == !lit
         } else {
-            let next1 = self.clause[ci].next_for_lit(lit);
-            let next2 = self.clause[next1].next_for_lit(lit);
-            *self.clause[ci].next_for_lit_mut(lit) = next2;
-            debug_assert!(self[ci].lits[1] == !lit || self[ci].lits[0] == !lit);
-            debug_assert!(self[next1].lits[1] == !lit || self[next1].lits[0] == !lit);
-            self[next1].lits[1] == !lit
-        } */
+            let target = self.watch[usize::from(lit)];
+            let next: WatchLiteralIndex = self[target.as_ci()].links[target.as_wi()];
+            self.watch[usize::from(lit)] = next;
+            target.as_ci()
+        }
     }
     /// O(N) implementation
     fn remove_watches(&mut self, ci: ClauseIndex) {
@@ -1184,7 +1187,12 @@ impl ClauseWeaverIF for ClauseDB {
     }
     /// ## Warning
     /// this function is the only function that makes dead clauses
-    fn nullify_clause(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>) {
+    fn nullify_clause(
+        &mut self,
+        ci: ClauseIndex,
+        #[cfg(feature = "deterministic")] deads: &mut HashSet<Lit, RandomState>,
+        #[cfg(not(feature = "deterministic"))] deads: &mut HashSet<Lit>,
+    ) {
         assert!(!self[ci].is_dead());
         let c = &self.clause[ci];
         self.certification_store.delete_clause(&c.lits);
@@ -1208,7 +1216,12 @@ impl ClauseWeaverIF for ClauseDB {
         self[ci].turn_on(FlagClause::DEAD);
         // // assert!(self[ci].is_dead());
     }
-    fn nullify_clause_sandbox(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>) {
+    fn nullify_clause_sandbox(
+        &mut self,
+        ci: ClauseIndex,
+        #[cfg(feature = "deterministic")] deads: &mut HashSet<Lit, RandomState>,
+        #[cfg(not(feature = "deterministic"))] deads: &mut HashSet<Lit>,
+    ) {
         // assert!(!self[ci].is_dead());
         let c = &self.clause[ci];
         let l0 = c.lit0();
@@ -1225,26 +1238,127 @@ impl ClauseWeaverIF for ClauseDB {
         self[ci].turn_on(FlagClause::DEAD);
         // assert!(self[ci].is_dead());
     }
-    fn collect(&mut self, targets: &HashSet<Lit>) {
-        for lit in targets.iter() {
-            let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
-            let mut wli = self.watch[usize::from(*lit)];
-            while !wli.is_none() {
-                let (ci, li) = wli.indices();
-                if self[ci].is_dead() {
-                    let next = self[ci].next_watch(li);
-                    self.remove_next_watch(prev, *lit);
-                    if self[ci].is(FlagClause::SWEEPED) {
-                        self.mark_as_free(ci);
-                    } else {
-                        self[ci].turn_on(FlagClause::SWEEPED);
+    fn reinitialize_frees(
+        &mut self,
+        #[cfg(feature = "deterministic")] targets: &mut HashSet<Lit, RandomState>,
+        #[cfg(not(feature = "deterministic"))] targets: &mut HashSet<Lit>,
+    ) {
+        // I can't beleave but the iteration order on a HashSet with a fix seed
+        // isn't fixed. So I need sorting here.
+        // BUT, WHY DOES THE SWEEPING ORDER MATTER?
+        #[cfg(feature = "deterministic")]
+        {
+            let mut other = self.clone();
+            let mut lits = targets.iter().copied().collect::<Vec<_>>();
+            // lits.sort();
+            for lit in lits.iter() {
+                let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
+                let mut wli: WatchLiteralIndex = self.watch[usize::from(*lit)];
+                while !wli.is_none() {
+                    let (ci, li) = wli.indices();
+                    if self[ci].is_dead() {
+                        let next = self[ci].next_watch(li);
+                        self.remove_next_watch(prev, *lit);
+                        if self[ci].is(FlagClause::SWEEPED) {
+                            self.mark_as_free(ci);
+                        } else {
+                            self[ci].turn_on(FlagClause::SWEEPED);
+                        }
+                        wli = next;
+                        continue;
                     }
-                    wli = next;
-                    continue;
+                    prev = wli;
+                    wli = self[ci].next_watch(li);
                 }
-                prev = wli;
-                wli = self[ci].next_watch(li);
             }
+            lits.sort();
+            for lit in lits.iter() {
+                let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
+                let mut wli: WatchLiteralIndex = other.watch[usize::from(*lit)];
+                while !wli.is_none() {
+                    let (ci, li) = wli.indices();
+                    if other[ci].is_dead() {
+                        let next = other[ci].next_watch(li);
+                        other.remove_next_watch(prev, *lit);
+                        if other[ci].is(FlagClause::SWEEPED) {
+                            other.mark_as_free(ci);
+                        } else {
+                            other[ci].turn_on(FlagClause::SWEEPED);
+                        }
+                        wli = next;
+                        continue;
+                    }
+                    prev = wli;
+                    wli = other[ci].next_watch(li);
+                }
+            }
+            for n in 2..self.watch.len() {
+                let mut my_wli: WatchLiteralIndex = self.watch[n];
+                let mut his_wli: WatchLiteralIndex = other.watch[n];
+                while !my_wli.is_none() {
+                    let (my_ci, my_li) = my_wli.indices();
+                    let (his_ci, his_li) = his_wli.indices();
+                    assert_eq!(my_ci, his_ci);
+                    my_wli = self[my_ci].next_watch(my_li);
+                    his_wli = other[his_ci].next_watch(his_li);
+                }
+            }
+            let mut my_n = 0;
+            let mut my_wli: WatchLiteralIndex = self.watch[FREE_WATCH_INDEX];
+            while !my_wli.is_none() {
+                let (my_ci, my_li) = my_wli.indices();
+                my_wli = self[my_ci].next_watch(my_li);
+                my_n += 1;
+            }
+            let mut his_n = 0;
+            let mut his_wli: WatchLiteralIndex = other.watch[FREE_WATCH_INDEX];
+            while !his_wli.is_none() {
+                let (his_ci, his_li) = his_wli.indices();
+                his_wli = other[his_ci].next_watch(his_li);
+                his_n += 1;
+            }
+            assert_eq!(my_n, his_n);
+            // for lit in lits.iter() {
+            //     let mut wli: WatchLiteralIndex = self.watch[usize::from(*lit)];
+            //     while !wli.is_none() {
+            //         let (ci, li) = wli.indices();
+            //         assert!(!self[ci].is_dead());
+            //         wli = self[ci].next_watch(li);
+            //     }
+            // }
+            targets.clear();
+        }
+        #[cfg(not(feature = "deterministic"))]
+        {
+            for lit in targets.iter() {
+                let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
+                let mut wli: WatchLiteralIndex = self.watch[usize::from(*lit)];
+                while !wli.is_none() {
+                    let (ci, li) = wli.indices();
+                    if self[ci].is_dead() {
+                        let next = self[ci].next_watch(li);
+                        self.remove_next_watch(prev, *lit);
+                        if self[ci].is(FlagClause::SWEEPED) {
+                            self.mark_as_free(ci);
+                        } else {
+                            self[ci].turn_on(FlagClause::SWEEPED);
+                        }
+                        wli = next;
+                        continue;
+                    }
+                    prev = wli;
+                    wli = self[ci].next_watch(li);
+                }
+            }
+            // for lit in targets.iter() {
+            //     let mut wli: WatchLiteralIndex = self.watch[usize::from(*lit)];
+            //     while !wli.is_none() {
+            //         let (ci, li) = wli.indices();
+            //         assert!(!self[ci].is_dead());
+            //         wli = self[ci].next_watch(li);
+            //     }
+            // }
+            targets.clear();
         }
     }
 }

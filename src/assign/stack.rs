@@ -5,8 +5,11 @@ use {
     std::{fmt, ops::Range, slice::Iter},
 };
 
-#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
+#[cfg(feature = "best_phases_tracking")]
 use std::collections::HashMap;
+
+#[cfg(all(feature = "deterministic", feature = "best_phases_tracking"))]
+use {crate::config::RANDOM_STATE_SEED, ahash::RandomState};
 
 #[cfg(feature = "trail_saving")]
 use super::TrailSavingIF;
@@ -39,7 +42,9 @@ pub struct AssignStack {
     pub(super) num_rephase: usize,
     pub(super) bp_divergence_ema: Ema,
 
-    #[cfg(feature = "best_phases_tracking")]
+    #[cfg(all(feature = "deterministic", feature = "best_phases_tracking"))]
+    pub(super) best_phases: HashMap<VarId, (bool, AssignReason), RandomState>,
+    #[cfg(all(not(feature = "deterministic"), feature = "best_phases_tracking"))]
     pub(super) best_phases: HashMap<VarId, (bool, AssignReason)>,
     #[cfg(feature = "rephase")]
     pub(super) phase_age: usize,
@@ -99,6 +104,8 @@ pub struct AssignStack {
 
 impl Default for AssignStack {
     fn default() -> AssignStack {
+        #[cfg(all(feature = "deterministic", feature = "best_phases_tracking"))]
+        let random_state = RandomState::with_seed(RANDOM_STATE_SEED);
         AssignStack {
             trail: Vec::new(),
             trail_lim: Vec::new(),
@@ -120,7 +127,9 @@ impl Default for AssignStack {
             num_rephase: 0,
             bp_divergence_ema: Ema::new(10),
 
-            #[cfg(feature = "best_phases_tracking")]
+            #[cfg(all(feature = "deterministic", feature = "best_phases_tracking"))]
+            best_phases: HashMap::with_hasher(random_state),
+            #[cfg(all(not(feature = "deterministic"), feature = "best_phases_tracking"))]
             best_phases: HashMap::new(),
             #[cfg(feature = "rephase")]
             phase_age: 0,

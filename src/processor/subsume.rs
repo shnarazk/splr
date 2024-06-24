@@ -9,6 +9,9 @@ use {
     std::collections::HashSet,
 };
 
+#[cfg(feature = "deterministic")]
+use ahash::RandomState;
+
 #[derive(Clone, Eq, Debug, Ord, PartialEq, PartialOrd)]
 enum Subsumable {
     None,
@@ -23,7 +26,8 @@ impl Eliminator {
         cdb: &mut impl ClauseDBIF,
         ci: ClauseIndex,
         di: ClauseIndex,
-        deads: &mut HashSet<Lit>,
+        #[cfg(feature = "deterministic")] deads: &mut HashSet<Lit, RandomState>,
+        #[cfg(not(feature = "deterministic"))] deads: &mut HashSet<Lit>,
     ) -> MaybeInconsistent {
         match have_subsuming_lit(cdb, ci, di) {
             Subsumable::Success => {
@@ -101,7 +105,8 @@ fn strengthen_clause(
     elim: &mut Eliminator,
     ci: ClauseIndex,
     l: Lit,
-    deads: &mut HashSet<Lit>,
+    #[cfg(feature = "deterministic")] deads: &mut HashSet<Lit, RandomState>,
+    #[cfg(not(feature = "deterministic"))] deads: &mut HashSet<Lit>,
 ) -> MaybeInconsistent {
     debug_assert!(!cdb[ci].is_dead());
     debug_assert!(1 < cdb[ci].len());

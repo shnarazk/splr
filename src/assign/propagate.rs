@@ -9,6 +9,9 @@ use {
     std::collections::HashSet,
 };
 
+#[cfg(feature = "deterministic")]
+use {crate::config::RANDOM_STATE_SEED, ahash::RandomState};
+
 #[cfg(feature = "trail_saving")]
 use super::TrailSavingIF;
 
@@ -381,7 +384,7 @@ impl PropagateIF for AssignStack {
             //
             let mut prev = WatchLiteralIndex::default();
             let mut wli = cdb.get_watch_literal_index(propagating);
-            'next_clause: while !wli.is_none() {
+            'next_clause: while wli.is_some() {
                 let (ci, false_index) = wli.indices();
                 let c = &mut cdb[ci];
                 let other = *c.iter().nth(1 - false_index).unwrap();
@@ -528,7 +531,7 @@ impl PropagateIF for AssignStack {
             //
             let mut prev = WatchLiteralIndex::default();
             let mut wli = cdb.get_watch_literal_index(propagating);
-            'next_clause: while !wli.is_none() {
+            'next_clause: while wli.is_some() {
                 let (ci, false_index) = wli.indices();
                 let c = &mut cdb[ci];
                 // if c.is_dead() {
@@ -606,6 +609,10 @@ impl AssignStack {
     /// clear unpropagated literal as root_level
     fn propagate_at_root_level(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
         let mut num_propagated = 0;
+        #[cfg(feature = "deterministic")]
+        let mut deads: HashSet<Lit, RandomState> =
+            HashSet::with_hasher(RandomState::with_seed(RANDOM_STATE_SEED));
+        #[cfg(not(feature = "deterministic"))]
         let mut deads: HashSet<Lit> = HashSet::new();
         while num_propagated < self.trail.len() {
             num_propagated = self.trail.len();
@@ -630,7 +637,7 @@ impl AssignStack {
                 }
             }
         }
-        cdb.collect(&deads);
+        cdb.reinitialize_frees(&mut deads);
         Ok(())
     }
     fn level_up(&mut self) {

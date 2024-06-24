@@ -296,6 +296,7 @@ pub trait WatchLiteralIndexIf {
     fn new(ci: ClauseIndex, wi: usize) -> Self;
     fn set(&mut self, ci: ClauseIndex, wi: usize);
     fn is_none(&self) -> bool;
+    fn is_some(&self) -> bool;
     fn indices(&self) -> (ClauseIndex, usize);
     fn as_ci(&self) -> ClauseIndex;
     fn as_wi(&self) -> usize;
@@ -310,6 +311,9 @@ impl WatchLiteralIndexIf for WatchLiteralIndex {
     }
     fn is_none(&self) -> bool {
         self.0 == 0
+    }
+    fn is_some(&self) -> bool {
+        self.0 != 0
     }
     fn indices(&self) -> (ClauseIndex, usize) {
         (self.0 >> 1, self.0 & 1)
