@@ -1094,7 +1094,9 @@ impl Clause {
     }
 }
 
+// encoded valid lits start from 1.
 const FREE_LIT: usize = 1;
+// Clauses have two watches, Free clauses point the next one by the 2nd watch.
 const FREE_WATCH_INDEX: usize = 1;
 
 impl ClauseWeaverIF for ClauseDB {
