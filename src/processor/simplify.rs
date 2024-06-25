@@ -347,7 +347,6 @@ impl Eliminator {
         &mut self,
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
-        timedout: &mut usize,
         deads: &mut HashSet<Lit>,
     ) -> MaybeInconsistent {
         debug_assert_eq!(asg.decision_level(), 0);
@@ -361,11 +360,6 @@ impl Eliminator {
                 self.bwdsub_assigns += 1;
             }
             if let Some(ci) = self.clause_queue.pop() {
-                if *timedout == 0 {
-                    self.clear_clause_queue(cdb);
-                    self.clear_var_queue(asg);
-                    return Ok(());
-                }
                 let best: VarId = if ci.is_lifted() {
                     let vi = ci.unlift().vi();
                     debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
@@ -410,12 +404,6 @@ impl Eliminator {
                             continue;
                         }
                         let d = &cdb[*did];
-                        if d.len() <= *timedout {
-                            *timedout -= d.len();
-                        } else {
-                            *timedout = 0;
-                            return Ok(());
-                        }
                         if !d.is_dead() && d.len() <= self.subsume_literal_limit {
                             // debug_assert!(
                             //     d.contains(Lit::from((best, false)))
@@ -479,36 +467,27 @@ impl Eliminator {
         if self.mode == EliminatorMode::Dormant {
             return Ok(());
         }
-        let mut timedout: usize = {
-            let nv = asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64;
-            let nc = cdb.derefer(cdb::property::Tusize::NumClause) as f64;
-            (6.0 * nv.log(1.5) * nc) as usize
-        };
         while self.bwdsub_assigns < asg.stack_len()
             || !self.var_queue.is_empty()
             || !self.clause_queue.is_empty()
         {
             if !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.stack_len() {
-                self.backward_subsumption_check(asg, cdb, &mut timedout, deads)?;
+                self.backward_subsumption_check(asg, cdb, deads)?;
             }
             while let Some(vi) = self.var_queue.select_var(&self.var, asg) {
                 let v = asg.var_mut(vi);
                 v.turn_off(FlagVar::ENQUEUED);
                 if !v.is(FlagVar::ELIMINATED) && asg.assign(vi).is_none() {
-                    eliminate_var(asg, cdb, self, state, vi, &mut timedout, deads)?;
+                    eliminate_var(asg, cdb, self, state, vi, deads)?;
                 }
             }
-            self.backward_subsumption_check(asg, cdb, &mut timedout, deads)?;
+            self.backward_subsumption_check(asg, cdb, deads)?;
             debug_assert!(self.clause_queue.is_empty());
             asg.propagate_sandbox(cdb)
                 .map_err(SolverError::RootLevelConflict)?;
-            if timedout == 0 {
-                self.clear_clause_queue(cdb);
-                self.clear_var_queue(asg);
-            } else {
-                timedout -= 1;
-            }
         }
+        self.clear_clause_queue(cdb);
+        self.clear_var_queue(asg);
         Ok(())
     }
     /// remove a clause id from literal's occur list.

@@ -14,7 +14,6 @@ pub fn eliminate_var(
     elim: &mut Eliminator,
     state: &mut State,
     vi: VarId,
-    timedout: &mut usize,
     deads: &mut HashSet<Lit>,
 ) -> MaybeInconsistent {
     let v = &mut asg.var(vi);
@@ -32,21 +31,15 @@ pub fn eliminate_var(
     w.neg_occurs
         .retain(|&c| cdb[c].contains(Lit::from((vi, false))));
 
-    let num_combination = w.pos_occurs.len() * w.neg_occurs.len();
-
-    if *timedout < num_combination
-        || skip_var_elimination(
-            asg,
-            cdb,
-            &w.pos_occurs,
-            &w.neg_occurs,
-            vi,
-            elim.eliminate_grow_limit,
-        )
-    {
+    if skip_var_elimination(
+        asg,
+        cdb,
+        &w.pos_occurs,
+        &w.neg_occurs,
+        vi,
+        elim.eliminate_grow_limit,
+    ) {
         return Ok(());
-    } else {
-        *timedout -= num_combination;
     }
     let pos = w.pos_occurs.clone();
     let neg = w.neg_occurs.clone();
@@ -146,7 +139,7 @@ pub fn eliminate_var(
     elim[vi].clear();
     asg.handle(SolverEvent::Eliminate(vi));
     state.restart.handle(SolverEvent::Eliminate(vi));
-    elim.backward_subsumption_check(asg, cdb, timedout, deads)
+    elim.backward_subsumption_check(asg, cdb, deads)
 }
 
 /// returns `true` if elimination is impossible.
@@ -375,13 +368,12 @@ mod tests {
         if !state.config.enable_eliminator {
             return;
         }
-        let mut timedout = 10_000;
         let vi = 4;
 
         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
         elim.prepare(asg, cdb, true);
         let mut deads: HashSet<Lit> = HashSet::new();
-        eliminate_var(asg, cdb, &mut elim, state, vi, &mut timedout, &mut deads).expect("panic");
+        eliminate_var(asg, cdb, &mut elim, state, vi, &mut deads).expect("panic");
         cdb.reinitialize_frees(&mut deads);
         assert!(asg.var(vi).is(FlagVar::ELIMINATED));
         assert!(cdb.iter().skip(1).all(|c| c.is_dead()
