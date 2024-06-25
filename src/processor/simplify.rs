@@ -26,7 +26,7 @@ impl Default for Eliminator {
             clause_queue: Vec::new(),
             bwdsub_assigns: 0,
             elim_lits: Vec::new(),
-            eliminate_var_occurrence_limit: 1_000,
+            // eliminate_var_occurrence_limit: 1_000,
             eliminate_grow_limit: 0, // 64
             eliminate_occurrence_limit: 800,
             subsume_literal_limit: 100,
@@ -120,7 +120,7 @@ impl Instantiate for Eliminator {
         Eliminator {
             enable: config.enable_eliminator,
             var_queue: VarOccHeap::new(nv, 0),
-            eliminate_var_occurrence_limit: config.elm_var_occ,
+            // eliminate_var_occurrence_limit: config.elm_var_occ,
             eliminate_grow_limit: config.elm_grw_lim,
             subsume_literal_limit: config.elm_cls_lim,
             var: LitOccurs::new(nv + 1),
@@ -263,8 +263,9 @@ impl Eliminator {
         if self.mode != EliminatorMode::Running || c.is(FlagClause::OCCUR_LINKED) {
             return;
         }
-        let evo = self.eliminate_var_occurrence_limit;
+        // let evo = self.eliminate_var_occurrence_limit;
         let mut checked: Vec<VarId> = Vec::new();
+        let clause_size = c.len();
         for l in c.iter() {
             let vi = l.vi();
             let v = &mut asg.var_mut(vi);
@@ -274,12 +275,19 @@ impl Eliminator {
             // );
             checked.push(vi);
             let w = &mut self[l.vi()];
-            let pl = w.pos_occurs.len();
+            if w.aborted {
+                continue;
+            }
+            if 12 < clause_size {
+                w.aborted = true;
+                continue;
+            }
+            /* let pl = w.pos_occurs.len();
             let nl = w.neg_occurs.len();
             if evo < pl * nl {
                 w.aborted = true;
                 continue;
-            }
+            } */
             if !v.is(FlagVar::ELIMINATED) {
                 if bool::from(*l) {
                     // debug_assert!(

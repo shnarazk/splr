@@ -93,8 +93,8 @@ pub struct Eliminator {
     bwdsub_assigns: usize,
     /// constraints on eliminated var. It is used by `extend_model`.
     elim_lits: Vec<Lit>,
-    /// Maximum number of clauses to try to eliminate a var
-    eliminate_var_occurrence_limit: usize,
+    // Maximum number of clauses to try to eliminate a var
+    // eliminate_var_occurrence_limit: usize,
     /// Stop elimination if the increase of clauses is over this
     eliminate_grow_limit: usize,
     /// A criteria by the product's of its positive occurrences and negative ones
