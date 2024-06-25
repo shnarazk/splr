@@ -692,11 +692,13 @@ impl ClauseDBIF for ClauseDB {
         } else {
             self[prev.as_ci()].links[prev.as_wi()] = ret;
         }
-        self[ci].lits.swap(old, new);
+        {
+            let c = &mut self[ci];
+            c.search_from = ((new + 1) % (c.len() - 2)) as u16;
+            c.lits.swap(old, new);
+        }
         // so old becomes new now
         self.insert_watch(ci, old);
-        let c = &mut self[ci];
-        c.search_from = ((new + 1) % (c.len() - 2)) as u16;
         ret
         // self[ci].search_from = ((new + 1) % (self[ci].len() - 2)) as u16;
         // watch_cache[!c.lits[new]].insert_watch(ci, c.lits[other]);
