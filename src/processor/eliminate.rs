@@ -6,7 +6,7 @@ use {
 };
 
 // Stop elimination if a generated resolvent is larger than this
-const COMBINATION_LIMIT: f64 = 8.0;
+const COMBINATION_LIMIT: f64 = 12.0;
 
 pub fn eliminate_var(
     asg: &mut impl AssignIF,
@@ -168,8 +168,9 @@ fn skip_var_elimination(
     let mut cnt = 0;
     let scale: f64 = 0.5;
     let mut average_len: f64 = 0.0;
-    let c_limit: f64 =
-        (cdb.derefer(crate::cdb::property::Tf64::LiteralBlockDistance) + COMBINATION_LIMIT) * 0.5;
+    let c_limit: f64 = COMBINATION_LIMIT.min(
+        (cdb.derefer(crate::cdb::property::Tf64::LiteralBlockDistance) + COMBINATION_LIMIT) * 0.5,
+    );
     for c_pos in pos {
         for c_neg in neg {
             if let Some(clause_size) = merge_cost(asg, cdb, *c_pos, *c_neg, v) {
