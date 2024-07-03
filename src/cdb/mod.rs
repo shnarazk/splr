@@ -692,11 +692,13 @@ impl ClauseDBIF for ClauseDB {
         } else {
             self[prev.as_ci()].links[prev.as_wi()] = ret;
         }
-        self[ci].lits.swap(old, new);
+        {
+            let c = &mut self[ci];
+            c.search_from = ((new + 1) % (c.len() - 2)) as u16;
+            c.lits.swap(old, new);
+        }
         // so old becomes new now
         self.insert_watch(ci, old);
-        let c = &mut self[ci];
-        c.search_from = ((new + 1) % (c.len() - 2)) as u16;
         ret
         // self[ci].search_from = ((new + 1) % (self[ci].len() - 2)) as u16;
         // watch_cache[!c.lits[new]].insert_watch(ci, c.lits[other]);
@@ -812,7 +814,7 @@ impl ClauseDBIF for ClauseDB {
         for i in perm.iter().skip(keep) {
             self.nullify_clause(i.to(), &mut deads);
         }
-        self.collect(&deads);
+        self.reinitialize_frees(&mut deads);
     }
     fn reset(&mut self) {
         let mut deads: HashSet<Lit> = HashSet::new();
@@ -822,7 +824,7 @@ impl ClauseDBIF for ClauseDB {
                 self.nullify_clause(ci, &mut deads);
             }
         }
-        self.collect(&deads);
+        self.reinitialize_frees(&mut deads);
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);
@@ -1079,7 +1081,9 @@ impl Clause {
     }
 }
 
+// valid (encoded) lits start from 2. So we have two extra room.
 const FREE_LIT: usize = 1;
+// Clauses have two watches. We use the second watch holder to chain free clauses
 const FREE_WATCH_INDEX: usize = 1;
 
 impl ClauseWeaverIF for ClauseDB {
@@ -1225,27 +1229,53 @@ impl ClauseWeaverIF for ClauseDB {
         self[ci].turn_on(FlagClause::DEAD);
         // assert!(self[ci].is_dead());
     }
-    fn collect(&mut self, targets: &HashSet<Lit>) {
-        for lit in targets.iter() {
-            let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
-            let mut wli = self.watch[usize::from(*lit)];
-            while !wli.is_none() {
-                let (ci, li) = wli.indices();
-                if self[ci].is_dead() {
-                    let next = self[ci].next_watch(li);
-                    self.remove_next_watch(prev, *lit);
-                    if self[ci].is(FlagClause::SWEEPED) {
-                        self.mark_as_free(ci);
-                    } else {
-                        self[ci].turn_on(FlagClause::SWEEPED);
+    fn reinitialize_frees(&mut self, targets: &mut HashSet<Lit>) {
+        if cfg!(feature = "deterministic") {
+            let mut lits = targets.iter().copied().collect::<Vec<_>>();
+            lits.sort_unstable();
+            for lit in lits.iter() {
+                let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
+                let mut wli = self.watch[usize::from(*lit)];
+                while !wli.is_none() {
+                    let (ci, li) = wli.indices();
+                    if self[ci].is_dead() {
+                        let next = self[ci].next_watch(li);
+                        self.remove_next_watch(prev, *lit);
+                        if self[ci].is(FlagClause::SWEEPED) {
+                            self.mark_as_free(ci);
+                        } else {
+                            self[ci].turn_on(FlagClause::SWEEPED);
+                        }
+                        wli = next;
+                        continue;
                     }
-                    wli = next;
-                    continue;
+                    prev = wli;
+                    wli = self[ci].next_watch(li);
                 }
-                prev = wli;
-                wli = self[ci].next_watch(li);
             }
-        }
+        } else {
+            for lit in targets.iter() {
+                let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
+                let mut wli = self.watch[usize::from(*lit)];
+                while !wli.is_none() {
+                    let (ci, li) = wli.indices();
+                    if self[ci].is_dead() {
+                        let next = self[ci].next_watch(li);
+                        self.remove_next_watch(prev, *lit);
+                        if self[ci].is(FlagClause::SWEEPED) {
+                            self.mark_as_free(ci);
+                        } else {
+                            self[ci].turn_on(FlagClause::SWEEPED);
+                        }
+                        wli = next;
+                        continue;
+                    }
+                    prev = wli;
+                    wli = self[ci].next_watch(li);
+                }
+            }
+        };
+        targets.clear();
     }
 }
 

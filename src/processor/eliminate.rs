@@ -6,7 +6,7 @@ use {
 };
 
 // Stop elimination if a generated resolvent is larger than this
-const COMBINATION_LIMIT: f64 = 32.0;
+const COMBINATION_LIMIT: f64 = 12.0;
 
 pub fn eliminate_var(
     asg: &mut impl AssignIF,
@@ -14,7 +14,6 @@ pub fn eliminate_var(
     elim: &mut Eliminator,
     state: &mut State,
     vi: VarId,
-    timedout: &mut usize,
     deads: &mut HashSet<Lit>,
 ) -> MaybeInconsistent {
     let v = &mut asg.var(vi);
@@ -32,21 +31,15 @@ pub fn eliminate_var(
     w.neg_occurs
         .retain(|&c| cdb[c].contains(Lit::from((vi, false))));
 
-    let num_combination = w.pos_occurs.len() * w.neg_occurs.len();
-
-    if *timedout < num_combination
-        || skip_var_elimination(
-            asg,
-            cdb,
-            &w.pos_occurs,
-            &w.neg_occurs,
-            vi,
-            elim.eliminate_grow_limit,
-        )
-    {
+    if skip_var_elimination(
+        asg,
+        cdb,
+        &w.pos_occurs,
+        &w.neg_occurs,
+        vi,
+        elim.eliminate_grow_limit,
+    ) {
         return Ok(());
-    } else {
-        *timedout -= num_combination;
     }
     let pos = w.pos_occurs.clone();
     let neg = w.neg_occurs.clone();
@@ -146,7 +139,7 @@ pub fn eliminate_var(
     elim[vi].clear();
     asg.handle(SolverEvent::Eliminate(vi));
     state.restart.handle(SolverEvent::Eliminate(vi));
-    elim.backward_subsumption_check(asg, cdb, timedout, deads)
+    elim.backward_subsumption_check(asg, cdb, deads)
 }
 
 /// returns `true` if elimination is impossible.
@@ -168,6 +161,9 @@ fn skip_var_elimination(
     let mut cnt = 0;
     let scale: f64 = 0.5;
     let mut average_len: f64 = 0.0;
+    let c_limit: f64 = COMBINATION_LIMIT.min(
+        (cdb.derefer(crate::cdb::property::Tf64::LiteralBlockDistance) + COMBINATION_LIMIT) * 0.5,
+    );
     for c_pos in pos {
         for c_neg in neg {
             if let Some(clause_size) = merge_cost(asg, cdb, *c_pos, *c_neg, v) {
@@ -177,7 +173,7 @@ fn skip_var_elimination(
                 cnt += 1;
                 average_len *= 1.0 - scale;
                 average_len += scale * clause_size as f64;
-                if clslen + limit < cnt || COMBINATION_LIMIT < average_len {
+                if clslen + limit < cnt || c_limit < average_len {
                     return true;
                 }
             } else {
@@ -372,14 +368,13 @@ mod tests {
         if !state.config.enable_eliminator {
             return;
         }
-        let mut timedout = 10_000;
         let vi = 4;
 
         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
         elim.prepare(asg, cdb, true);
         let mut deads: HashSet<Lit> = HashSet::new();
-        eliminate_var(asg, cdb, &mut elim, state, vi, &mut timedout, &mut deads).expect("panic");
-        cdb.collect(&deads);
+        eliminate_var(asg, cdb, &mut elim, state, vi, &mut deads).expect("panic");
+        cdb.reinitialize_frees(&mut deads);
         assert!(asg.var(vi).is(FlagVar::ELIMINATED));
         assert!(cdb.iter().skip(1).all(|c| c.is_dead()
             || (c.iter().all(|l| *l != Lit::from((vi, false)))

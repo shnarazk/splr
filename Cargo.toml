@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.18.0-dev0"
+version = "0.18.0-dev1"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2021"
@@ -14,18 +14,19 @@ default-run = "splr"
 rust-version = "1.65"
 
 [dependencies]
-bitflags = "^2.5"
+bitflags = "^2.6"
 
 instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
 
 crossterm = { version = "^0.27", optional = true }
-ratatui = { version = "^0.26", features = ["all-widgets"], optional = true }
+ratatui = { version = "^0.27", features = ["all-widgets"], optional = true }
 
 [features]
 default = [
         ### Essential
         # "incremental_solver", # this requires "clause_elimination" is off
         "watch",
+        "deterministic",
 
         ### Heuristics
         # "bi_clause_completion",
@@ -60,6 +61,7 @@ clause_elimination = []         # pre(in)-processor setting
 clause_rewarding = []           # clauses have activities w/ decay rate
 clause_vivification = []        # pre(in)-processor setting
 debug_propagation = []          # for debug
+deterministic = []              # make solver deterministic with tiny overhead
 dynamic_restart_threshold = []  # control restart spans like Glucose
 EMA_calibration = []            # each exponential moving average has a calbration value
 EVSIDS = []                     # Eponential Variable State Independent Decaying Sum
