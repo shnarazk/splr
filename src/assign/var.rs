@@ -64,6 +64,10 @@ impl Var {
     pub fn activity(&self) -> f64 {
         self.reward
     }
+    /// return `true` if var is fixed.
+    pub fn is_fixed(&self, root_level: DecisionLevel) -> bool {
+        self.assign.is_some() && self.level == root_level
+    }
 }
 
 impl FlagIF for Var {

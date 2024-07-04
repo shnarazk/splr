@@ -13,11 +13,13 @@ use {
         widgets::{block::*, *},
     },
     splr::{
-        assign, cdb,
+        assign::{self, AssignIF, VarManipulateIF},
+        cdb,
         config::{self, CERTIFICATION_DEFAULT_FILENAME},
         solver::Solver as Splr,
         solver::{Certificate, SatSolverIF, SearchState, SolveIF, SolverResult},
         state::{self, LogF64Id, LogUsizeId},
+        types::{FlagIF, FlagVar},
         Config, EmaIF, PropertyDereference, PropertyReference, SolverError, VERSION,
     },
     std::{
@@ -37,7 +39,7 @@ pub struct App {
     solver: Splr,
     state: SearchState,
     counter: i16,
-    asg_stats: [u64; 4],
+    asg_stats: [u64; 10],
     #[allow(dead_code)]
     start: Instant,
 }
@@ -48,17 +50,18 @@ impl App {
             solver,
             state,
             counter: 0,
-            asg_stats: [0; 4],
+            asg_stats: [0; 10],
             start: Instant::now(),
         }
     }
     fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<(), Box<dyn Error>> {
-        macro_rules! scaling {
+        macro_rules! _scaling {
             ($n: expr) => {
                 (($n.max(1) as f64).log2() * 10.0) as u64
             };
         }
         let timeout = Duration::from_millis(0);
+        let root_level = self.solver.asg.root_level();
         loop {
             self.counter += 1;
             let ret: Result<Option<bool>, SolverError> = {
@@ -69,15 +72,22 @@ impl App {
                 } = self;
                 solver.search_stage(ss)
             };
-            self.asg_stats[0] = scaling!(self.state.current_core());
-            self.asg_stats[1] = scaling!(self
-                .solver
-                .asg
-                .derefer(splr::assign::property::Tusize::NumAssertedVar));
-            self.asg_stats[2] = scaling!(self
-                .solver
-                .asg
-                .derefer(splr::assign::property::Tusize::NumEliminatedVar));
+            let v: Vec<f64> = {
+                let mut h: [usize; 10] = [0; 10];
+                let mut num_var: usize = 0;
+                self.solver.asg.var_iter().for_each(|v| {
+                    if !v.is(FlagVar::ELIMINATED) && !v.is_fixed(root_level) {
+                        num_var += 1;
+                        h[(v.activity() / 0.1) as usize] += 1;
+                    }
+                });
+                h.iter()
+                    .map(|c| (*c as f64) / (num_var as f64))
+                    .collect::<Vec<f64>>()
+            };
+            for i in 0..10 {
+                self.asg_stats[i] = (v[i] * 100.0) as u64;
+            }
             terminal.draw(|f| self.render_frame(f))?;
             match ret {
                 Ok(None) => {
@@ -168,18 +178,19 @@ impl App {
 impl App {
     fn bar_chart(&self) -> BarChart<'_> {
         let b = vec![
-            ("core", self.asg_stats[0]),
-            ("fixed", self.asg_stats[1]),
-            ("elim", self.asg_stats[2]),
-            ("data4", 3),
-            ("data5", 5),
-            ("data6", 10),
-            ("data7", 6),
-            ("data8", 18),
-            ("data9", 5),
+            ("0.0", self.asg_stats[0]),
+            ("0.1", self.asg_stats[1]),
+            ("0.2", self.asg_stats[2]),
+            ("0.3", self.asg_stats[3]),
+            ("0.4", self.asg_stats[4]),
+            ("0.5", self.asg_stats[5]),
+            ("0.6", self.asg_stats[6]),
+            ("0.7", self.asg_stats[7]),
+            ("0.8", self.asg_stats[8]),
+            ("0.9", self.asg_stats[9]),
         ];
         let barchart = BarChart::default()
-            .block(Block::bordered().title("BarChart of `10.0 * log_2(n)`"))
+            .block(Block::bordered().title("Var Activity Histogram"))
             .data(&b)
             .bar_width(7)
             .bar_style(Style::default().fg(Color::Red))
