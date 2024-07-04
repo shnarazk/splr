@@ -72,7 +72,7 @@ impl App {
                 } = self;
                 solver.search_stage(ss)
             };
-            let v: Vec<f64> = {
+            let dist: Vec<f64> = {
                 let mut h: [usize; 10] = [0; 10];
                 let mut num_var: usize = 0;
                 self.solver.asg.var_iter().for_each(|v| {
@@ -85,8 +85,8 @@ impl App {
                     .map(|c| (*c as f64) / (num_var as f64))
                     .collect::<Vec<f64>>()
             };
-            for i in 0..10 {
-                self.asg_stats[i] = (v[i] * 100.0) as u64;
+            for (i, d) in dist.iter().enumerate().take(10) {
+                self.asg_stats[i] = (d * 100.0) as u64;
             }
             terminal.draw(|f| self.render_frame(f))?;
             match ret {
