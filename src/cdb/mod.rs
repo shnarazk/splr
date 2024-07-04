@@ -1189,7 +1189,7 @@ impl ClauseWeaverIF for ClauseDB {
     /// ## Warning
     /// this function is the only function that makes dead clauses
     fn nullify_clause(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>) {
-        assert!(!self[ci].is_dead());
+        debug_assert!(!self[ci].is_dead());
         let c = &self.clause[ci];
         self.certification_store.delete_clause(&c.lits);
         let l0 = c.lit0();
@@ -1207,13 +1207,10 @@ impl ClauseWeaverIF for ClauseDB {
             deads.insert(!l0);
             deads.insert(!l1);
         }
-        // self.mark_as_free(ci);
-        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
         self[ci].turn_on(FlagClause::DEAD);
-        // // assert!(self[ci].is_dead());
     }
     fn nullify_clause_sandbox(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>) {
-        // assert!(!self[ci].is_dead());
+        debug_assert!(!self[ci].is_dead());
         let c = &self.clause[ci];
         let l0 = c.lit0();
         let l1 = c.lit1();
@@ -1225,13 +1222,15 @@ impl ClauseWeaverIF for ClauseDB {
             deads.insert(!l0);
             deads.insert(!l1);
         }
-        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
         self[ci].turn_on(FlagClause::DEAD);
-        // assert!(self[ci].is_dead());
     }
     fn reinitialize_frees(&mut self, targets: &mut HashSet<Lit>) {
+        if targets.is_empty() {
+            return;
+        }
         if cfg!(feature = "deterministic") {
             let mut lits = targets.iter().copied().collect::<Vec<_>>();
+            // I DON'T KNOW WHY THE BELOW ASSURES BEING DETERMINISTIC.
             lits.sort_unstable();
             for lit in lits.iter() {
                 let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();

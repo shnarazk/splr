@@ -25,7 +25,7 @@ ratatui = { version = "^0.27", features = ["all-widgets"], optional = true }
 default = [
         ### Essential
         # "incremental_solver", # this requires "clause_elimination" is off
-        "watch",
+        "watch", # FIXME: bad naming
         "deterministic",
 
         ### Heuristics
