@@ -1,6 +1,6 @@
 {
   description = "A modern SAT solver in Rust";
-  inputs.nixpkgs.url = github:NixOS/nixpkgs;
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs";
   outputs = { self, nixpkgs }:
   {
     packages = builtins.listToAttrs
@@ -12,11 +12,11 @@
             value = {
                default =
                  rustPlatform.buildRustPackage rec {
-                   version = "0.18.0-dev0";
+                   version = "0.18.0-dev1";
                    name = "splr-${version}";
                    pname = "splr";
                    src = self;
-                   cargoHash = "sha256-inZ6gvvof3YwUeplHpAMme8AI+Y7B2R/uT1KojSEHxE=";
+                   cargoHash = "sha256-7MY2o1aHJQ7ow5BbItQaDuc8vIQ68MqU2+aYuFVqK38=";
                    buildInputs = rustc.buildInputs ++ lib.optional stdenv.isDarwin [ libiconv ];
                    buildPhase = "cargo build --release";
                    installPhase = ''
