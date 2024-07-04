@@ -117,8 +117,6 @@ impl SolveIF for Solver {
 
             #[cfg(all(feature = "clause_elimination", not(feature = "incremental_solver")))]
             {
-                const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
-
                 //
                 //## Propagate all trivial literals (an essential step)
                 //
@@ -162,37 +160,36 @@ impl SolveIF for Solver {
                 //
                 //## Run eliminator
                 //
-                if USE_PRE_PROCESSING_ELIMINATOR {
-                    state.flush("simplifying...");
-                    if elim.simplify(asg, cdb, state, false).is_err() {
-                        // Why inconsistent? Because the CNF contains a conflict, not an error!
-                        // Or out of memory.
-                        state.progress(asg, cdb);
-                        if cdb.check_size().is_err() {
-                            return Err(SolverError::OutOfMemory);
-                        }
-                        return Ok(Certificate::UNSAT);
+
+                state.flush("simplifying...");
+                if elim.simplify(asg, cdb, state, false).is_err() {
+                    // Why inconsistent? Because the CNF contains a conflict, not an error!
+                    // Or out of memory.
+                    state.progress(asg, cdb);
+                    if cdb.check_size().is_err() {
+                        return Err(SolverError::OutOfMemory);
                     }
-                    for vi in 1..=asg.num_vars {
-                        if asg.assign(vi).is_some() || asg.var(vi).is(FlagVar::ELIMINATED) {
-                            continue;
-                        }
-                        match elim.stats(vi) {
-                            Some((_, 0)) => (),
-                            Some((0, _)) => (),
-                            Some((p, m)) if m * 10 < p => asg.var_mut(vi).turn_on(FlagVar::PHASE),
-                            Some((p, m)) if p * 10 < m => asg.var_mut(vi).turn_off(FlagVar::PHASE),
-                            _ => (),
-                        }
-                    }
-                    let act = 1.0 / (asg.num_vars as f64).powf(0.25);
-                    for vi in 1..asg.num_vars {
-                        if !asg.var(vi).is(FlagVar::ELIMINATED) {
-                            asg.set_activity(vi, act);
-                        }
-                    }
-                    asg.rebuild_order();
+                    return Ok(Certificate::UNSAT);
                 }
+                for vi in 1..=asg.num_vars {
+                    if asg.assign(vi).is_some() || asg.var(vi).is(FlagVar::ELIMINATED) {
+                        continue;
+                    }
+                    match elim.stats(vi) {
+                        Some((_, 0)) => (),
+                        Some((0, _)) => (),
+                        Some((p, m)) if m * 10 < p => asg.var_mut(vi).turn_on(FlagVar::PHASE),
+                        Some((p, m)) if p * 10 < m => asg.var_mut(vi).turn_off(FlagVar::PHASE),
+                        _ => (),
+                    }
+                }
+                let act = 1.0 / (asg.num_vars as f64).powf(0.25);
+                for vi in 1..asg.num_vars {
+                    if !asg.var(vi).is(FlagVar::ELIMINATED) {
+                        asg.set_activity(vi, act);
+                    }
+                }
+                asg.rebuild_order();
             }
             asg.eliminated.append(elim.eliminated_lits());
             state[Stat::Simplify] += 1;
@@ -310,6 +307,7 @@ impl SolveIF for Solver {
             }
             debug_assert!(!asg.remains());
         }
+        #[cfg(all(feature = "clause_elimination", not(feature = "incremental_solver")))]
         {
             debug_assert_eq!(asg.decision_level(), asg.root_level());
             let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
@@ -321,7 +319,7 @@ impl SolveIF for Solver {
                 return Err(Ok(Certificate::UNSAT));
             }
 
-            #[cfg(all(feature = "clause_elimination", not(feature = "incremental_solver")))]
+            // #[cfg(all(feature = "clause_elimination", not(feature = "incremental_solver")))]
             {
                 const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
 
