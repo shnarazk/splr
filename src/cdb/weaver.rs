@@ -16,7 +16,12 @@ pub trait ClauseWeaverIF {
     /// insert a watch to a watch list`
     fn insert_watch(&mut self, ci: ClauseIndex, wi: usize);
     /// O(1) remove the *next* watch literal index of the watch literal index `wli`
-    fn remove_next_watch(&mut self, wli: WatchLiteralIndex, lit: Lit) -> ClauseIndex;
+    fn remove_next_watch(
+        &mut self,
+        wli: WatchLiteralIndex,
+        next: WatchLiteralIndex,
+        lit: Lit,
+    ) -> ClauseIndex;
     /// O(n) remove function which remove the clause refered from `wli`
     fn remove_watches(&mut self, ci: ClauseIndex);
     /// link a clause `ci` to free list

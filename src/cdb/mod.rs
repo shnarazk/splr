@@ -1113,16 +1113,21 @@ impl ClauseWeaverIF for ClauseDB {
         self.clause[ci].links[wi] = head;
     }
     /// O(1) implementation
-    fn remove_next_watch(&mut self, wli: WatchLiteralIndex, lit: Lit) -> ClauseIndex {
+    fn remove_next_watch(
+        &mut self,
+        wli: WatchLiteralIndex,
+        next: WatchLiteralIndex,
+        lit: Lit,
+    ) -> ClauseIndex {
         if wli.is_none() {
             let target = self.watch[usize::from(lit)];
-            let next: WatchLiteralIndex = self[target.as_ci()].links[target.as_wi()];
+            // let next: WatchLiteralIndex = self[target.as_ci()].links[target.as_wi()];
             self.watch[usize::from(lit)] = next;
             target.as_ci()
         } else {
             let (ci, li) = wli.indices();
             let target: WatchLiteralIndex = self[ci].links[li];
-            let next: WatchLiteralIndex = self[target.as_ci()].links[target.as_wi()];
+            // let next: WatchLiteralIndex = self[target.as_ci()].links[target.as_wi()];
             self[ci].links[li] = next;
             target.as_ci()
         }
@@ -1152,7 +1157,7 @@ impl ClauseWeaverIF for ClauseDB {
             index = self[index.as_ci()].next_watch(index.as_wi());
             debug_assert_ne!(index, WatchLiteralIndex::default());
         }
-        self.remove_next_watch(prev, lit0);
+        self.remove_next_watch(prev, index, lit0);
         let lit1 = !self[ci].lit1();
         let wli1 = WatchLiteralIndex::new(ci, 1);
         let mut index = self.watch[usize::from(lit1)];
@@ -1162,7 +1167,7 @@ impl ClauseWeaverIF for ClauseDB {
             index = self[index.as_ci()].next_watch(index.as_wi());
             debug_assert_ne!(index, WatchLiteralIndex::default());
         }
-        self.remove_next_watch(prev, lit1);
+        self.remove_next_watch(prev, index, lit1);
     }
     fn link_to_freelist(&mut self, ci: ClauseIndex) {
         // Note: free list is a single-linked list
@@ -1239,7 +1244,7 @@ impl ClauseWeaverIF for ClauseDB {
                     let (ci, li) = wli.indices();
                     if self[ci].is_dead() {
                         let next = self[ci].next_watch(li);
-                        self.remove_next_watch(prev, *lit);
+                        self.remove_next_watch(prev, next, *lit);
                         if self[ci].is(FlagClause::SWEEPED) {
                             self.link_to_freelist(ci);
                         } else {
@@ -1260,7 +1265,7 @@ impl ClauseWeaverIF for ClauseDB {
                     let (ci, li) = wli.indices();
                     if self[ci].is_dead() {
                         let next = self[ci].next_watch(li);
-                        self.remove_next_watch(prev, *lit);
+                        self.remove_next_watch(prev, next, *lit);
                         if self[ci].is(FlagClause::SWEEPED) {
                             self.link_to_freelist(ci);
                         } else {
