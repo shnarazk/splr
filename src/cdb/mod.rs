@@ -809,9 +809,18 @@ impl ClauseDBIF for ClauseDB {
                 -(keep as f64) / alives as f64
             }
         };
+        if perm.is_empty() {
+            return;
+        }
         perm.sort();
         let mut deads: HashSet<Lit> = HashSet::new();
+        let threshold = perm[keep.min(perm.len() - 1)].value();
         for i in perm.iter().skip(keep) {
+            // Being clause-position-independent, we keep or delete
+            // all clauses that have a same value as a unit.
+            if i.value() == threshold {
+                continue;
+            }
             self.nullify_clause(i.to(), &mut deads);
         }
         self.reweave(&mut deads);
