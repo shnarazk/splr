@@ -1120,13 +1120,11 @@ impl ClauseWeaverIF for ClauseDB {
         lit: Lit,
     ) -> WatchLiteralIndex {
         if wli.is_none() {
-            // let target = self.watch[usize::from(lit)];
             let next: WatchLiteralIndex = self[target.as_ci()].links[target.as_wi()];
             self.watch[usize::from(lit)] = next;
             next
         } else {
             let (ci, li) = wli.indices();
-            // let target: WatchLiteralIndex = self[ci].links[li];
             let next: WatchLiteralIndex = self[target.as_ci()].links[target.as_wi()];
             self[ci].links[li] = next;
             next
@@ -1227,43 +1225,39 @@ impl ClauseWeaverIF for ClauseDB {
             lits.sort_unstable();
             for lit in lits.iter() {
                 let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
-                let mut wli = self.watch[usize::from(*lit)];
+                let mut wli: WatchLiteralIndex = self.watch[usize::from(*lit)];
                 while !wli.is_none() {
                     let (ci, li) = wli.indices();
                     if self[ci].is_dead() {
-                        // let next = self[ci].next_watch(li);
                         wli = self.remove_next_watch(prev, wli, *lit);
                         if self[ci].is(FlagClause::SWEEPED) {
                             self.link_to_freelist(ci);
                         } else {
                             self[ci].turn_on(FlagClause::SWEEPED);
                         }
-                        // wli = next;
-                        continue;
+                    } else {
+                        prev = wli;
+                        wli = self[ci].next_watch(li);
                     }
-                    prev = wli;
-                    wli = self[ci].next_watch(li);
                 }
             }
         } else {
             for lit in targets.iter() {
                 let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
-                let mut wli = self.watch[usize::from(*lit)];
+                let mut wli: WatchLiteralIndex = self.watch[usize::from(*lit)];
                 while !wli.is_none() {
                     let (ci, li) = wli.indices();
                     if self[ci].is_dead() {
-                        // let next = self[ci].next_watch(li);
                         wli = self.remove_next_watch(prev, wli, *lit);
                         if self[ci].is(FlagClause::SWEEPED) {
                             self.link_to_freelist(ci);
                         } else {
                             self[ci].turn_on(FlagClause::SWEEPED);
                         }
-                        // wli = next;
-                        continue;
+                    } else {
+                        prev = wli;
+                        wli = self[ci].next_watch(li);
                     }
-                    prev = wli;
-                    wli = self[ci].next_watch(li);
                 }
             }
         };
