@@ -814,7 +814,7 @@ impl ClauseDBIF for ClauseDB {
         for i in perm.iter().skip(keep) {
             self.nullify_clause(i.to(), &mut deads);
         }
-        self.reinitialize_nulls(&mut deads);
+        self.reweave(&mut deads);
     }
     fn reset(&mut self) {
         let mut deads: HashSet<Lit> = HashSet::new();
@@ -824,7 +824,7 @@ impl ClauseDBIF for ClauseDB {
                 self.nullify_clause(ci, &mut deads);
             }
         }
-        self.reinitialize_nulls(&mut deads);
+        self.reweave(&mut deads);
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);
@@ -1153,13 +1153,6 @@ impl ClauseWeaverIF for ClauseDB {
         }
         self.remove_next_watch(prev, index, lit1);
     }
-    fn link_to_freelist(&mut self, ci: ClauseIndex) {
-        // Note: free list is a single-linked list
-        let first = self.watch[FREE_LIT];
-        self.watch[FREE_LIT].set(ci, FREE_WATCH_INDEX);
-        // self.clause[index].link0 = first;
-        self.clause[ci].links[FREE_WATCH_INDEX] = first;
-    }
     fn make_watches(num_vars: usize, clauses: &mut [Clause]) -> Vec<WatchLiteralIndex> {
         // ci 0 must refer to the header
         let nc = clauses.len();
@@ -1191,7 +1184,7 @@ impl ClauseWeaverIF for ClauseDB {
             self.binary_link
                 .remove(l0, l1)
                 .expect("Error (remove_clause)");
-            self.link_to_freelist(ci);
+            self.free_clause(ci);
             self.num_bi_clause -= 1;
         } else {
             deads.insert(!l0);
@@ -1208,14 +1201,14 @@ impl ClauseWeaverIF for ClauseDB {
             self.binary_link
                 .remove(l0, l1)
                 .expect("Error (remove_clause)");
-            self.link_to_freelist(ci);
+            self.free_clause(ci);
         } else {
             deads.insert(!l0);
             deads.insert(!l1);
         }
         self[ci].turn_on(FlagClause::DEAD);
     }
-    fn reinitialize_nulls(&mut self, targets: &mut HashSet<Lit>) {
+    fn reweave(&mut self, targets: &mut HashSet<Lit>) {
         if targets.is_empty() {
             return;
         }
@@ -1231,7 +1224,7 @@ impl ClauseWeaverIF for ClauseDB {
                     if self[ci].is_dead() {
                         wli = self.remove_next_watch(prev, wli, *lit);
                         if self[ci].is(FlagClause::SWEEPED) {
-                            self.link_to_freelist(ci);
+                            self.free_clause(ci);
                         } else {
                             self[ci].turn_on(FlagClause::SWEEPED);
                         }
@@ -1250,7 +1243,7 @@ impl ClauseWeaverIF for ClauseDB {
                     if self[ci].is_dead() {
                         wli = self.remove_next_watch(prev, wli, *lit);
                         if self[ci].is(FlagClause::SWEEPED) {
-                            self.link_to_freelist(ci);
+                            self.free_clause(ci);
                         } else {
                             self[ci].turn_on(FlagClause::SWEEPED);
                         }
@@ -1262,6 +1255,13 @@ impl ClauseWeaverIF for ClauseDB {
             }
         };
         targets.clear();
+    }
+    fn free_clause(&mut self, ci: ClauseIndex) {
+        // Note: free list is a single-linked list
+        let first = self.watch[FREE_LIT];
+        self.watch[FREE_LIT].set(ci, FREE_WATCH_INDEX);
+        // self.clause[index].link0 = first;
+        self.clause[ci].links[FREE_WATCH_INDEX] = first;
     }
 }
 

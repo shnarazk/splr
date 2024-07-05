@@ -631,7 +631,7 @@ impl AssignStack {
                 }
             }
         }
-        cdb.reinitialize_nulls(&mut deads);
+        cdb.reweave(&mut deads);
         Ok(())
     }
     fn level_up(&mut self) {

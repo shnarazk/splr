@@ -146,7 +146,7 @@ impl VivifyIF for ClauseDB {
                                     self.new_clause(asg, &mut vec, is_learnt);
                                     // propage_sandbox can't handle dead watchers correctly
                                     self.nullify_clause(ci, &mut deads);
-                                    self.reinitialize_nulls(&mut deads);
+                                    self.reweave(&mut deads);
                                     num_shrink += 1;
                                 }
                             }
