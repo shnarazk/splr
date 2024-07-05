@@ -1116,35 +1116,21 @@ impl ClauseWeaverIF for ClauseDB {
     fn remove_next_watch(
         &mut self,
         wli: WatchLiteralIndex,
-        next: WatchLiteralIndex,
+        target: WatchLiteralIndex,
         lit: Lit,
-    ) -> ClauseIndex {
+    ) -> WatchLiteralIndex {
         if wli.is_none() {
-            let target = self.watch[usize::from(lit)];
-            // let next: WatchLiteralIndex = self[target.as_ci()].links[target.as_wi()];
+            // let target = self.watch[usize::from(lit)];
+            let next: WatchLiteralIndex = self[target.as_ci()].links[target.as_wi()];
             self.watch[usize::from(lit)] = next;
-            target.as_ci()
+            next
         } else {
             let (ci, li) = wli.indices();
-            let target: WatchLiteralIndex = self[ci].links[li];
-            // let next: WatchLiteralIndex = self[target.as_ci()].links[target.as_wi()];
+            // let target: WatchLiteralIndex = self[ci].links[li];
+            let next: WatchLiteralIndex = self[target.as_ci()].links[target.as_wi()];
             self[ci].links[li] = next;
-            target.as_ci()
+            next
         }
-        /* if ci == HEAD_INDEX {
-            let next1 = self.watch[usize::from(lit)];
-            let next2 = self.clause[next1].next_for_lit(lit);
-            self.watch[usize::from(lit)] = next2;
-            debug_assert!(self[next1].lits[1] == !lit || self[next1].lits[0] == !lit);
-            self[next1].lits[1] == !lit
-        } else {
-            let next1 = self.clause[ci].next_for_lit(lit);
-            let next2 = self.clause[next1].next_for_lit(lit);
-            *self.clause[ci].next_for_lit_mut(lit) = next2;
-            debug_assert!(self[ci].lits[1] == !lit || self[ci].lits[0] == !lit);
-            debug_assert!(self[next1].lits[1] == !lit || self[next1].lits[0] == !lit);
-            self[next1].lits[1] == !lit
-        } */
     }
     /// O(N) implementation
     fn remove_watches(&mut self, ci: ClauseIndex) {
@@ -1207,6 +1193,7 @@ impl ClauseWeaverIF for ClauseDB {
             self.binary_link
                 .remove(l0, l1)
                 .expect("Error (remove_clause)");
+            self.link_to_freelist(ci);
             self.num_bi_clause -= 1;
         } else {
             deads.insert(!l0);
@@ -1223,6 +1210,7 @@ impl ClauseWeaverIF for ClauseDB {
             self.binary_link
                 .remove(l0, l1)
                 .expect("Error (remove_clause)");
+            self.link_to_freelist(ci);
         } else {
             deads.insert(!l0);
             deads.insert(!l1);
@@ -1243,14 +1231,14 @@ impl ClauseWeaverIF for ClauseDB {
                 while !wli.is_none() {
                     let (ci, li) = wli.indices();
                     if self[ci].is_dead() {
-                        let next = self[ci].next_watch(li);
-                        self.remove_next_watch(prev, next, *lit);
+                        // let next = self[ci].next_watch(li);
+                        wli = self.remove_next_watch(prev, wli, *lit);
                         if self[ci].is(FlagClause::SWEEPED) {
                             self.link_to_freelist(ci);
                         } else {
                             self[ci].turn_on(FlagClause::SWEEPED);
                         }
-                        wli = next;
+                        // wli = next;
                         continue;
                     }
                     prev = wli;
@@ -1264,14 +1252,14 @@ impl ClauseWeaverIF for ClauseDB {
                 while !wli.is_none() {
                     let (ci, li) = wli.indices();
                     if self[ci].is_dead() {
-                        let next = self[ci].next_watch(li);
-                        self.remove_next_watch(prev, next, *lit);
+                        // let next = self[ci].next_watch(li);
+                        wli = self.remove_next_watch(prev, wli, *lit);
                         if self[ci].is(FlagClause::SWEEPED) {
                             self.link_to_freelist(ci);
                         } else {
                             self[ci].turn_on(FlagClause::SWEEPED);
                         }
-                        wli = next;
+                        // wli = next;
                         continue;
                     }
                     prev = wli;

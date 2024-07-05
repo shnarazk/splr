@@ -21,7 +21,7 @@ pub trait ClauseWeaverIF {
         wli: WatchLiteralIndex,
         next: WatchLiteralIndex,
         lit: Lit,
-    ) -> ClauseIndex;
+    ) -> WatchLiteralIndex;
     /// O(n) remove function which remove the clause refered from `wli`
     fn remove_watches(&mut self, ci: ClauseIndex);
     /// link a clause `ci` to free list
