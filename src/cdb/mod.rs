@@ -814,7 +814,7 @@ impl ClauseDBIF for ClauseDB {
         for i in perm.iter().skip(keep) {
             self.nullify_clause(i.to(), &mut deads);
         }
-        self.reinitialize_frees(&mut deads);
+        self.reinitialize_nulls(&mut deads);
     }
     fn reset(&mut self) {
         let mut deads: HashSet<Lit> = HashSet::new();
@@ -824,7 +824,7 @@ impl ClauseDBIF for ClauseDB {
                 self.nullify_clause(ci, &mut deads);
             }
         }
-        self.reinitialize_frees(&mut deads);
+        self.reinitialize_nulls(&mut deads);
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);
@@ -1164,7 +1164,7 @@ impl ClauseWeaverIF for ClauseDB {
         }
         self.remove_next_watch(prev, lit1);
     }
-    fn mark_as_free(&mut self, ci: ClauseIndex) {
+    fn link_to_freelist(&mut self, ci: ClauseIndex) {
         // Note: free list is a single-linked list
         let first = self.watch[FREE_LIT];
         self.watch[FREE_LIT].set(ci, FREE_WATCH_INDEX);
@@ -1224,7 +1224,7 @@ impl ClauseWeaverIF for ClauseDB {
         }
         self[ci].turn_on(FlagClause::DEAD);
     }
-    fn reinitialize_frees(&mut self, targets: &mut HashSet<Lit>) {
+    fn reinitialize_nulls(&mut self, targets: &mut HashSet<Lit>) {
         if targets.is_empty() {
             return;
         }
@@ -1241,7 +1241,7 @@ impl ClauseWeaverIF for ClauseDB {
                         let next = self[ci].next_watch(li);
                         self.remove_next_watch(prev, *lit);
                         if self[ci].is(FlagClause::SWEEPED) {
-                            self.mark_as_free(ci);
+                            self.link_to_freelist(ci);
                         } else {
                             self[ci].turn_on(FlagClause::SWEEPED);
                         }
@@ -1262,7 +1262,7 @@ impl ClauseWeaverIF for ClauseDB {
                         let next = self[ci].next_watch(li);
                         self.remove_next_watch(prev, *lit);
                         if self[ci].is(FlagClause::SWEEPED) {
-                            self.mark_as_free(ci);
+                            self.link_to_freelist(ci);
                         } else {
                             self[ci].turn_on(FlagClause::SWEEPED);
                         }

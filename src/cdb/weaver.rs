@@ -20,7 +20,7 @@ pub trait ClauseWeaverIF {
     /// O(n) remove function which remove the clause refered from `wli`
     fn remove_watches(&mut self, ci: ClauseIndex);
     /// link a clause `ci` to free list
-    fn mark_as_free(&mut self, ci: ClauseIndex);
+    fn link_to_freelist(&mut self, ci: ClauseIndex);
     /// instantiate a list of watch lists
     fn make_watches(num_vars: usize, clauses: &mut [Clause]) -> Vec<WatchLiteralIndex>;
     /// un-register a clause `cid` from alive clause database and make the clause dead.
@@ -28,7 +28,7 @@ pub trait ClauseWeaverIF {
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn nullify_clause_sandbox(&mut self, ci: ClauseIndex, deads: &mut HashSet<Lit>);
     /// update watches of the clause
-    fn reinitialize_frees(&mut self, targets: &mut HashSet<Lit>);
+    fn reinitialize_nulls(&mut self, targets: &mut HashSet<Lit>);
 }
 
 // #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]

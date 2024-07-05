@@ -232,7 +232,7 @@ impl EliminateIF for Eliminator {
         }
         self.var_queue.clear(asg);
         debug_assert!(self.clause_queue.is_empty());
-        cdb.reinitialize_frees(&mut deads);
+        cdb.reinitialize_nulls(&mut deads);
         cdb.check_size().map(|_| ())
     }
     fn sorted_iterator(&self) -> Iter<'_, u32> {
