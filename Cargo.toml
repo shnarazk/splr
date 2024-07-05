@@ -24,8 +24,8 @@ ratatui = { version = "^0.27", features = ["all-widgets"], optional = true }
 [features]
 default = [
         ### Essential
-        # "incremental_solver", # this requires "clause_elimination" is off
         "deterministic",
+        # "incremental_solver", # this requires "clause_elimination" is off
 
         ### Heuristics
         # "bi_clause_completion",
