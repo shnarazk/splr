@@ -1216,6 +1216,7 @@ impl ClauseWeaverIF for ClauseDB {
             let mut lits = targets.iter().copied().collect::<Vec<_>>();
             // I DON'T KNOW WHY THE BELOW ASSURES BEING DETERMINISTIC.
             lits.sort_unstable();
+            // lits.reverse();
             for lit in lits.iter() {
                 let mut prev: WatchLiteralIndex = WatchLiteralIndex::default();
                 let mut wli: WatchLiteralIndex = self.watch[usize::from(*lit)];
