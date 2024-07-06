@@ -24,7 +24,7 @@ pub struct ClauseDB {
     ///
     pub(super) binary_link: BinaryLinkDB,
     /// container of watch literals
-    pub(super) watch: Vec<ClauseIndex>,
+    pub(super) watch: Vec<WatchLiteralIndex>,
     /// see unsat_certificate.rs
     pub(super) certification_store: CertificationStore,
     /// a number of clauses to emit out-of-memory exception
@@ -84,7 +84,7 @@ pub struct ClauseDB {
     //
     //## incremental solving
     //
-    #[cfg(not(feature = "no_clause_elimination"))]
+    #[cfg(all(feature = "clause_elimination", not(feature = "incremental_solver")))]
     pub(crate) eliminated_permanent: Vec<Vec<Lit>>,
 }
 
@@ -105,24 +105,14 @@ pub struct ClauseDB {
 
 impl Index<ClauseIndex> for ClauseDB {
     type Output = Clause;
-    #[inline]
     fn index(&self, ci: ClauseIndex) -> &Clause {
-        if cfg!(feature = "unsafe_access") {
-            unsafe { self.clause.get_unchecked(ci) }
-        } else {
-            &self.clause[ci]
-        }
+        &self.clause[ci]
     }
 }
 
 impl IndexMut<ClauseIndex> for ClauseDB {
-    #[inline]
     fn index_mut(&mut self, ci: ClauseIndex) -> &mut Clause {
-        if cfg!(feature = "unsafe_access") {
-            unsafe { self.clause.get_unchecked_mut(ci) }
-        } else {
-            &mut self.clause[ci]
-        }
+        &mut self.clause[ci]
     }
 }
 
@@ -158,9 +148,9 @@ impl Instantiate for ClauseDB {
             SolverEvent::NewVar => {
                 self.binary_link.add_new_var();
                 // for negated literal
-                self.watch.push(ClauseIndex::default());
+                self.watch.push(WatchLiteralIndex::default());
                 // for positive literal
-                self.watch.push(ClauseIndex::default());
+                self.watch.push(WatchLiteralIndex::default());
                 self.lbd_temp.push(0);
             }
             SolverEvent::Restart => {

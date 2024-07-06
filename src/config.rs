@@ -112,7 +112,8 @@ impl Default for Config {
             cls_rdc_rm1: 0.2,
             cls_rdc_rm2: 0.05,
 
-            enable_eliminator: !cfg!(feature = "no_clause_elimination"),
+            enable_eliminator: cfg!(feature = "clause_elimination")
+                && !cfg!(feature = "incremental_solver"),
             elm_cls_lim: 64,
             elm_grw_lim: 0,
             elm_var_occ: 20000,
@@ -262,7 +263,7 @@ impl Config {
                 "binary clause completion",
                 #[cfg(feature = "chrono_BT")]
                 "chrono BT",
-                #[cfg(not(feature = "no_clause_elimination"))]
+                #[cfg(all(feature = "clause_elimination", not(feature = "incremental_solver")))]
                 "stage-based clause elimination",
                 #[cfg(feature = "clause_vivification")]
                 "stage-based clause vivification",
@@ -274,6 +275,8 @@ impl Config {
                 "EVSIDS rewarding",
                 #[cfg(feature = "incremental_solver")]
                 "incremental solver",
+                #[cfg(feature = "interleave")]
+                "interleaving slover",
                 #[cfg(feature = "just_used")]
                 "use 'just used' flag",
                 #[cfg(feature = "LRB_rewarding")]
@@ -288,8 +291,6 @@ impl Config {
                 "two-mode reduction",
                 #[cfg(feature = "trail_saving")]
                 "trail saving",
-                #[cfg(feature = "unsafe_access")]
-                "unsafe access",
             ];
             println!(
                 "{}\nActivated features: {}\n{}",

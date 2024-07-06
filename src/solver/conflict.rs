@@ -282,11 +282,10 @@ fn conflict_analyze(
             {
                 let vi = $lit.vi();
                 let lv = asg.level(vi);
-                println!("{}: literal {} at level {}", $message, i32::from($lit), $lv);
+                println!("{}: literal {} at level {}", $message, i32::from($lit), lv);
             }
         };
     }
-
     macro_rules! validate_vi {
         ($vi: expr) => {
             debug_assert!(!asg.var($vi).is(FlagVar::ELIMINATED));
@@ -322,7 +321,7 @@ fn conflict_analyze(
     }
 
     {
-        trace_lit!("- handle conflicting literal", p);
+        trace_lit!(p, "- handle conflicting literal");
         let vi = p.vi();
         validate_vi!(vi);
         set_seen!(vi);
@@ -337,6 +336,8 @@ fn conflict_analyze(
     let mut trail_index = asg.stack_len() - 1;
     let mut max_lbd: u16 = 0;
     let mut ci_with_max_lbd: Option<ClauseIndex> = None;
+    #[cfg(feature = "trace_analysis")]
+    println!("##################");
     loop {
         match reason {
             AssignReason::BinaryLink(l) => {
@@ -366,7 +367,21 @@ fn conflict_analyze(
                     max_lbd = cdb[cid].rank;
                     ci_with_max_lbd = Some(cid);
                 }
-                for q in cdb[cid].iter().skip(1) {
+                let skip = cdb[cid].is(FlagClause::PROPAGATEBY1) as usize;
+                #[cfg(feature = "trace_analysis")]
+                if skip == 1 {
+                    trace!(
+                        "AMEND: analyze disordered clause {}{:?}(second literal: {}) for {}",
+                        cid,
+                        cdb[cid],
+                        i32::from(cdb[cid].lit1()),
+                        p
+                    );
+                }
+                for (i, q) in cdb[cid].iter().enumerate() {
+                    if i == skip {
+                        continue;
+                    }
                     let vi = q.vi();
                     validate_vi!(vi);
                     if !asg.var(vi).is(FlagVar::CA_SEEN) {
@@ -380,11 +395,11 @@ fn conflict_analyze(
                             trace_lit!(q, " -- found another path");
                             conflict_level!(vi);
                         } else {
-                            trace_lit!(q, " -- push to earnt");
+                            trace_lit!(q, " -- push to learnt");
                             learnt.push(*q);
                         }
                     } else {
-                        trace!(q, " -- ignore flagged already");
+                        trace!("{:?} -- ignore flagged already", q);
                     }
                 }
             }
@@ -535,7 +550,11 @@ impl Lit {
                 }
                 AssignReason::Implication(cid) => {
                     let c = &cdb[cid];
-                    for q in &(*c)[1..] {
+                    let skip = c.is(FlagClause::PROPAGATEBY1) as usize;
+                    for (i, q) in c.iter().enumerate() {
+                        if skip == i {
+                            continue;
+                        }
                         let vi = q.vi();
                         let lv = asg.level(vi);
                         if 0 < lv && !asg.var(vi).is(FlagVar::CA_SEEN) {
@@ -609,10 +628,12 @@ fn lit_level(
             //     dumper(asg, cdb, bag),
             // );
             // bag.push(lit);
+            let skip = cdb[cid].is(FlagClause::PROPAGATEBY1) as usize;
             cdb[cid]
                 .iter()
-                .skip(1)
-                .map(|l| lit_level(asg, cdb, !*l, bag, _mes))
+                .enumerate()
+                .filter(|(i, _)| *i != skip)
+                .map(|(_, l)| lit_level(asg, cdb, !*l, bag, _mes))
                 .max()
                 .unwrap()
         }

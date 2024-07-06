@@ -39,8 +39,7 @@ pub trait ClauseIF {
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct Clause {
     /// links. Note: watch0 is also used as freelist
-    pub(super) link0: ClauseIndex,
-    pub(super) link1: ClauseIndex,
+    pub(super) links: [WatchLiteralIndex; 2],
     /// The literals in a clause.
     pub(super) lits: Vec<Lit>,
     /// Flags (8 bits)
@@ -70,8 +69,7 @@ pub struct Clause {
 impl Default for Clause {
     fn default() -> Clause {
         Clause {
-            link0: ClauseIndex::default(),
-            link1: ClauseIndex::default(),
+            links: [WatchLiteralIndex::default(); 2],
             lits: vec![],
             flags: FlagClause::empty(),
             rank: 0,
@@ -94,23 +92,13 @@ impl Default for Clause {
 
 impl Index<usize> for Clause {
     type Output = Lit;
-    #[inline]
     fn index(&self, i: usize) -> &Lit {
-        if cfg!(feature = "unsafe_access") {
-            unsafe { self.lits.get_unchecked(i) }
-        } else {
-            &self.lits[i]
-        }
+        &self.lits[i]
     }
 }
 
 impl IndexMut<usize> for Clause {
     fn index_mut(&mut self, i: usize) -> &mut Lit {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.lits.get_unchecked_mut(i)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
         &mut self.lits[i]
     }
 }
@@ -118,11 +106,6 @@ impl IndexMut<usize> for Clause {
 impl Index<Range<usize>> for Clause {
     type Output = [Lit];
     fn index(&self, r: Range<usize>) -> &[Lit] {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.lits.get_unchecked(r)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
         &self.lits[r]
     }
 }
@@ -130,31 +113,19 @@ impl Index<Range<usize>> for Clause {
 impl Index<RangeFrom<usize>> for Clause {
     type Output = [Lit];
     fn index(&self, r: RangeFrom<usize>) -> &[Lit] {
-        if cfg!(feature = "unsafe_access") {
-            unsafe { self.lits.get_unchecked(r) }
-        } else {
-            &self.lits[r]
-        }
+        &self.lits[r]
     }
 }
 
 impl IndexMut<Range<usize>> for Clause {
     fn index_mut(&mut self, r: Range<usize>) -> &mut [Lit] {
-        if cfg!(feature = "unsafe_access") {
-            unsafe { self.lits.get_unchecked_mut(r) }
-        } else {
-            &mut self.lits[r]
-        }
+        &mut self.lits[r]
     }
 }
 
 impl IndexMut<RangeFrom<usize>> for Clause {
     fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Lit] {
-        if cfg!(feature = "unsafe_access") {
-            unsafe { self.lits.get_unchecked_mut(r) }
-        } else {
-            &mut self.lits[r]
-        }
+        &mut self.lits[r]
     }
 }
 
@@ -189,20 +160,10 @@ impl ClauseIF for Clause {
     }
     #[inline]
     fn lit0(&self) -> Lit {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            *self.lits.get_unchecked(0)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
         self.lits[0]
     }
     #[inline]
     fn lit1(&self) -> Lit {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            *self.lits.get_unchecked(1)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
         self.lits[1]
     }
     fn contains(&self, lit: Lit) -> bool {
@@ -287,57 +248,11 @@ impl fmt::Display for Clause {
 }
 
 impl WatcherLinkIF for Clause {
-    fn next_for_lit(&self, lit: Lit) -> ClauseIndex {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            if *self.lits.get_unchecked(0) == !lit {
-                self.link0
-            } else {
-                self.link1
-            }
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        {
-            let l = !lit;
-            if self.lits[0] == l {
-                self.link0
-            } else {
-                debug_assert_eq!(
-                    self.lits[1], l,
-                    "#### next: ilegal chain for {}: {:?}",
-                    lit, self
-                );
-                self.link1
-            }
-        }
+    fn next_watch(&self, wi: usize) -> WatchLiteralIndex {
+        self.links[wi]
     }
-    fn next_for_lit_mut(&mut self, lit: Lit) -> &mut ClauseIndex {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            if *self.lits.get_unchecked(0) == !lit {
-                &mut self.link0
-            } else {
-                &mut self.link1
-            }
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        {
-            let l = !lit;
-            if self.lits[0] == l {
-                &mut self.link0
-            } else {
-                debug_assert_eq!(
-                    self.lits[1], l,
-                    "#### next: ilegal chain for {}: {:?}",
-                    lit, self
-                );
-                &mut self.link1
-            }
-        }
-    }
-    fn swap_watch_orders(&mut self) {
-        self.lits.swap(0, 1);
-        std::mem::swap(&mut self.link0, &mut self.link1);
+    fn next_watch_mut(&mut self, wi: usize) -> &mut WatchLiteralIndex {
+        &mut self.links[wi]
     }
 }
 

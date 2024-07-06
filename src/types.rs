@@ -233,47 +233,27 @@ impl Not for Lit {
 
 impl Index<Lit> for [bool] {
     type Output = bool;
-    #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
-        if cfg!(feature = "unsafe_access") {
-            unsafe { self.get_unchecked(usize::from(l)) }
-        } else {
-            &self[usize::from(l)]
-        }
+        &self[usize::from(l)]
     }
 }
 
 impl IndexMut<Lit> for [bool] {
-    #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        if cfg!(feature = "unsafe_access") {
-            unsafe { self.get_unchecked_mut(usize::from(l)) }
-        } else {
-            &mut self[usize::from(l)]
-        }
+        &mut self[usize::from(l)]
     }
 }
 
 impl Index<Lit> for Vec<bool> {
     type Output = bool;
-    #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
-        if cfg!(feature = "unsafe_access") {
-            unsafe { self.get_unchecked(usize::from(l)) }
-        } else {
-            &self[usize::from(l)]
-        }
+        &self[usize::from(l)]
     }
 }
 
 impl IndexMut<Lit> for Vec<bool> {
-    #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        if cfg!(feature = "unsafe_access") {
-            unsafe { self.get_unchecked_mut(usize::from(l)) }
-        } else {
-            &mut self[usize::from(l)]
-        }
+        &mut self[usize::from(l)]
     }
 }
 
@@ -308,6 +288,39 @@ impl LitIF for Lit {
 //
 
 pub type ClauseIndex = usize;
+
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+pub struct WatchLiteralIndex(usize);
+
+pub trait WatchLiteralIndexIf {
+    fn new(ci: ClauseIndex, wi: usize) -> Self;
+    fn set(&mut self, ci: ClauseIndex, wi: usize);
+    fn is_none(&self) -> bool;
+    fn indices(&self) -> (ClauseIndex, usize);
+    fn as_ci(&self) -> ClauseIndex;
+    fn as_wi(&self) -> usize;
+}
+
+impl WatchLiteralIndexIf for WatchLiteralIndex {
+    fn new(ci: ClauseIndex, wi: usize) -> Self {
+        WatchLiteralIndex(ci * 2 + wi)
+    }
+    fn set(&mut self, ci: ClauseIndex, wi: usize) {
+        self.0 = ci * 2 + wi;
+    }
+    fn is_none(&self) -> bool {
+        self.0 == 0
+    }
+    fn indices(&self) -> (ClauseIndex, usize) {
+        (self.0 >> 1, self.0 & 1)
+    }
+    fn as_ci(&self) -> ClauseIndex {
+        self.0 >> 1
+    }
+    fn as_wi(&self) -> usize {
+        self.0 & 1
+    }
+}
 
 /// Capture a conflict
 pub type ConflictContext = (Lit, AssignReason);
@@ -549,20 +562,22 @@ bitflags! {
     /// Misc flags used by [`Clause`](`crate::cdb::Clause`).
     #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
     pub struct FlagClause: u8 {
+        /// propagation reason is placed at one.
+        const PROPAGATEBY1 = 0b0000_0001;
         /// a clause is dead.
-        const DEAD         = 0b0000_0001;
+        const DEAD         = 0b0000_0010;
         /// a clause is a generated clause by conflict analysis and is removable.
-        const LEARNT       = 0b0000_0010;
+        const LEARNT       = 0b0000_0100;
         /// used in conflict analyze
-        const USED         = 0b0000_0100;
+        const USED         = 0b0000_1000;
         /// a clause or var is enqueued for eliminator.
-        const ENQUEUED     = 0b0000_1000;
+        const ENQUEUED     = 0b0001_0000;
         /// a clause is registered in vars' occurrence list.
-        const OCCUR_LINKED = 0b0001_0000;
+        const OCCUR_LINKED = 0b0010_0000;
         /// a given clause derived a learnt which LBD is smaller than 20.
-        const DERIVE20     = 0b0010_0000;
+        const DERIVE20     = 0b0100_0000;
         /// used in garbage collector.
-        const SWEEPED      = 0b0100_0000;
+        const SWEEPED      = 0b1000_0000;
     }
 }
 
