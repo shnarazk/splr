@@ -6,7 +6,7 @@ use {
 };
 
 // Stop elimination if a generated resolvent is larger than this
-const COMBINATION_LIMIT: f64 = 12.0;
+const COMBINATION_LIMIT: f64 = 32.0;
 
 pub fn eliminate_var(
     asg: &mut impl AssignIF,
