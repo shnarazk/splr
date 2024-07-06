@@ -603,8 +603,9 @@ impl AssignStack {
         assert_ne!(self.assigned(b0), Some(false));
         assert_ne!(self.assigned(b1), Some(false));
     }
-    /// clear unpropagated literal as root_level
+    /// clear unpropagated literal and satisfied clauses at root_level
     fn propagate_at_root_level(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
+        debug_assert_eq!(self.decision_level(), self.root_level);
         let mut num_propagated = 0;
         let mut deads: HashSet<Lit> = HashSet::new();
         while num_propagated < self.trail.len() {
@@ -630,7 +631,7 @@ impl AssignStack {
                 }
             }
         }
-        cdb.collect(&deads);
+        cdb.reweave(&mut deads);
         Ok(())
     }
     fn level_up(&mut self) {

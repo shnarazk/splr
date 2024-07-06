@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.18.0-dev0"
+version = "0.18.0-dev1"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2021"
@@ -11,15 +11,20 @@ homepage = "https://github.com/shnarazk/splr"
 keywords = ["SAT", "SAT-solver", "logic", "satisfiability"]
 categories = ["science", "mathematics"]
 default-run = "splr"
-rust-version = "1.65"
+rust-version = "1.79"
 
 [dependencies]
-bitflags = "^2.5"
+bitflags = "^2.6"
+
 instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
+
+crossterm = { version = "^0.27", optional = true }
+ratatui = { version = "^0.27", features = ["all-widgets"], optional = true }
 
 [features]
 default = [
         ### Essential
+        "deterministic",
         # "incremental_solver", # this requires "clause_elimination" is off
 
         ### Heuristics
@@ -28,7 +33,7 @@ default = [
         # "dynamic_restart_threshold",
         "LRB_rewarding",
         "reason_side_rewarding",
-        # "rephase",
+        "rephase",
         # "reward_annealing",
         # "stochastic_local_search",
         # "suppress_reason_chain",
@@ -43,6 +48,9 @@ default = [
         # "boundary_check",
         # "trace_analysis",
 
+        ### For SAT researcher
+        "graph_view",
+
         ### platform dependency
         # "platform_wasm"
 ]
@@ -55,10 +63,17 @@ clause_elimination = []         # pre(in)-processor setting
 clause_rewarding = []           # clauses have activities w/ decay rate
 clause_vivification = []        # pre(in)-processor setting
 debug_propagation = []          # for debug
+deterministic = []              # make solver deterministic with tiny overhead
 dynamic_restart_threshold = []  # control restart spans like Glucose
 EMA_calibration = []            # each exponential moving average has a calbration value
 EVSIDS = []                     # Eponential Variable State Independent Decaying Sum
+graph_view = [
+        "interleave",
+        "ratatui",
+        "crossterm",
+]
 incremental_solver = []         # for all solution SAT sover; requires no cluse_elimination
+interleave = []                 # switch to multi-step search IF
 just_used = []                  # Var and clause have 'just_used' flags
 LRB_rewarding = []              # Vearning Rate Based rewarding, a new var activity criteria
 no_IO = []                      # to embed Splr into non-std environments

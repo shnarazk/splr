@@ -26,7 +26,7 @@ impl Default for Eliminator {
             clause_queue: Vec::new(),
             bwdsub_assigns: 0,
             elim_lits: Vec::new(),
-            eliminate_var_occurrence_limit: 1_000,
+            // eliminate_var_occurrence_limit: 1_000,
             eliminate_grow_limit: 0, // 64
             eliminate_occurrence_limit: 800,
             subsume_literal_limit: 100,
@@ -120,7 +120,7 @@ impl Instantiate for Eliminator {
         Eliminator {
             enable: config.enable_eliminator,
             var_queue: VarOccHeap::new(nv, 0),
-            eliminate_var_occurrence_limit: config.elm_var_occ,
+            // eliminate_var_occurrence_limit: config.elm_var_occ,
             eliminate_grow_limit: config.elm_grw_lim,
             subsume_literal_limit: config.elm_cls_lim,
             var: LitOccurs::new(nv + 1),
@@ -232,7 +232,7 @@ impl EliminateIF for Eliminator {
         }
         self.var_queue.clear(asg);
         debug_assert!(self.clause_queue.is_empty());
-        cdb.collect(&deads);
+        cdb.reweave(&mut deads);
         cdb.check_size().map(|_| ())
     }
     fn sorted_iterator(&self) -> Iter<'_, u32> {
@@ -263,8 +263,9 @@ impl Eliminator {
         if self.mode != EliminatorMode::Running || c.is(FlagClause::OCCUR_LINKED) {
             return;
         }
-        let evo = self.eliminate_var_occurrence_limit;
+        // let evo = self.eliminate_var_occurrence_limit;
         let mut checked: Vec<VarId> = Vec::new();
+        let clause_size = c.len();
         for l in c.iter() {
             let vi = l.vi();
             let v = &mut asg.var_mut(vi);
@@ -274,12 +275,19 @@ impl Eliminator {
             // );
             checked.push(vi);
             let w = &mut self[l.vi()];
-            let pl = w.pos_occurs.len();
+            if w.aborted {
+                continue;
+            }
+            if 12 < clause_size {
+                w.aborted = true;
+                continue;
+            }
+            /* let pl = w.pos_occurs.len();
             let nl = w.neg_occurs.len();
             if evo < pl * nl {
                 w.aborted = true;
                 continue;
-            }
+            } */
             if !v.is(FlagVar::ELIMINATED) {
                 if bool::from(*l) {
                     // debug_assert!(
@@ -347,7 +355,6 @@ impl Eliminator {
         &mut self,
         asg: &mut impl AssignIF,
         cdb: &mut impl ClauseDBIF,
-        timedout: &mut usize,
         deads: &mut HashSet<Lit>,
     ) -> MaybeInconsistent {
         debug_assert_eq!(asg.decision_level(), 0);
@@ -361,11 +368,6 @@ impl Eliminator {
                 self.bwdsub_assigns += 1;
             }
             if let Some(ci) = self.clause_queue.pop() {
-                if *timedout == 0 {
-                    self.clear_clause_queue(cdb);
-                    self.clear_var_queue(asg);
-                    return Ok(());
-                }
                 let best: VarId = if ci.is_lifted() {
                     let vi = ci.unlift().vi();
                     debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
@@ -410,12 +412,6 @@ impl Eliminator {
                             continue;
                         }
                         let d = &cdb[*did];
-                        if d.len() <= *timedout {
-                            *timedout -= d.len();
-                        } else {
-                            *timedout = 0;
-                            return Ok(());
-                        }
                         if !d.is_dead() && d.len() <= self.subsume_literal_limit {
                             // debug_assert!(
                             //     d.contains(Lit::from((best, false)))
@@ -479,36 +475,27 @@ impl Eliminator {
         if self.mode == EliminatorMode::Dormant {
             return Ok(());
         }
-        let mut timedout: usize = {
-            let nv = asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64;
-            let nc = cdb.derefer(cdb::property::Tusize::NumClause) as f64;
-            (6.0 * nv.log(1.5) * nc) as usize
-        };
         while self.bwdsub_assigns < asg.stack_len()
             || !self.var_queue.is_empty()
             || !self.clause_queue.is_empty()
         {
             if !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.stack_len() {
-                self.backward_subsumption_check(asg, cdb, &mut timedout, deads)?;
+                self.backward_subsumption_check(asg, cdb, deads)?;
             }
             while let Some(vi) = self.var_queue.select_var(&self.var, asg) {
                 let v = asg.var_mut(vi);
                 v.turn_off(FlagVar::ENQUEUED);
                 if !v.is(FlagVar::ELIMINATED) && asg.assign(vi).is_none() {
-                    eliminate_var(asg, cdb, self, state, vi, &mut timedout, deads)?;
+                    eliminate_var(asg, cdb, self, state, vi, deads)?;
                 }
             }
-            self.backward_subsumption_check(asg, cdb, &mut timedout, deads)?;
+            self.backward_subsumption_check(asg, cdb, deads)?;
             debug_assert!(self.clause_queue.is_empty());
             asg.propagate_sandbox(cdb)
                 .map_err(SolverError::RootLevelConflict)?;
-            if timedout == 0 {
-                self.clear_clause_queue(cdb);
-                self.clear_var_queue(asg);
-            } else {
-                timedout -= 1;
-            }
         }
+        self.clear_clause_queue(cdb);
+        self.clear_var_queue(asg);
         Ok(())
     }
     /// remove a clause id from literal's occur list.

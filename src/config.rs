@@ -275,6 +275,8 @@ impl Config {
                 "EVSIDS rewarding",
                 #[cfg(feature = "incremental_solver")]
                 "incremental solver",
+                #[cfg(feature = "interleave")]
+                "interleaving slover",
                 #[cfg(feature = "just_used")]
                 "use 'just used' flag",
                 #[cfg(feature = "LRB_rewarding")]
