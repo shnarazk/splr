@@ -382,11 +382,14 @@ impl PropagateIF for AssignStack {
             'next_clause: while !wli.is_none() {
                 let (ci, false_index) = wli.indices();
                 let c = &mut cdb[ci];
+                dbg!(wli, &c);
                 let other = *c.iter().nth(1 - false_index).unwrap();
                 let ovi = other.vi();
                 let other_value = lit_assign!(self.var[ovi], other);
                 if other_value == Some(true) {
-                    wli = c.next_watch(false_index);
+                    let next = c.next_watch(false_index);
+                    assert_ne!(wli, next);
+                    wli = next;
                     continue 'next_clause;
                 }
                 if other_value == Some(false) && self.var[ovi].level < self.rebuild_base_level {

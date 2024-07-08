@@ -1141,12 +1141,13 @@ impl ClauseWeaverIF for ClauseDB {
         if self.clause[ci].lits.len() == 2 {
             return;
         }
-        for wi in 0..2 {
+        for wi in 0..=1 {
             let lit = !self.clause[ci].lits[wi];
             let wli = WatchLiteralIndex::new(ci, wi);
             let head: &mut WatchLiteralIndexRef = &mut self.watch[usize::from(lit)];
             let next: WatchLiteralIndex = head.next;
             head.next = wli;
+            self.clause[ci].links[wi].prev = WatchLiteralIndex::default();
             self.clause[ci].links[wi].next = next;
             if next.is_none() {
                 head.prev = wli;

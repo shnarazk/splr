@@ -41,8 +41,8 @@ default = [
         "trail_saving",
 
         ### Logic formula processor
-        "clause_elimination",
-        "clause_vivification",
+        # "clause_elimination",
+        # "clause_vivification",
 
         ### For DEBUG
         # "boundary_check",

@@ -16,7 +16,7 @@
                    name = "splr-${version}";
                    pname = "splr";
                    src = self;
-                   cargoHash = "sha256-7MY2o1aHJQ7ow5BbItQaDuc8vIQ68MqU2+aYuFVqK38=";
+                   cargoHash = "sha256-VEnunp6Y7dZQZllNIaq3DYs3c5eTZ1qVy5ggNdNnFoM=";
                    buildInputs = rustc.buildInputs ++ lib.optional stdenv.isDarwin [ libiconv ];
                    buildPhase = "cargo build --release";
                    installPhase = ''
@@ -29,5 +29,13 @@
         )
       [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ]
     );
+    devShells.default = nixpkgs.mkShell {
+      packages = [
+        nixpkgs.bashInteractive
+        nixpkgs.tokei
+        # nixpkgs.cargo-watch
+        # nixpkgs.lldb_18
+      ];
+    };
   };
 }
