@@ -357,7 +357,14 @@ impl ClauseDBIF for ClauseDB {
                 self.num_bi_clause -= 1;
             }
         }
-        self.unweave(ci);
+        if self.clause[ci].lits.len() == 2 {
+            let _ = self
+                .binary_link
+                .remove(self.clause[ci].lits[0], self.clause[ci].lits[1]);
+        } else {
+            self.unweave(ci, !FREE_LIT);
+            self.reweave(ci, FREE_WATCH_INDEX, FREE_WATCH_INDEX);
+        }
     }
 
     //
@@ -420,7 +427,9 @@ impl ClauseDBIF for ClauseDB {
             // let l1 = self[ci].lits[1];
             // watch_cache[!l0].remove_watch(&ci);
             // watch_cache[!l1].remove_watch(&ci);
-            self.unweave(ci);
+            self.unweave(ci, 0);
+            self.unweave(ci, 1);
+            // now ci is separeted from fabric
             // self.remove_watches(ci);
             std::mem::swap(&mut self[ci].lits, &mut new_lits);
             self.binary_link.add(self[ci].lits[0], self[ci].lits[1], ci);
@@ -432,7 +441,8 @@ impl ClauseDBIF for ClauseDB {
             //
             // let old_l0 = self[ci].lits[0];
             // let old_l1 = self[ci].lits[1];
-            self.unweave(ci);
+            self.unweave(ci, 0);
+            self.unweave(ci, 1);
             std::mem::swap(&mut self[ci].lits, &mut new_lits);
             self.weave(ci);
             // self.insert_watch(ci, 0);
@@ -513,9 +523,10 @@ impl ClauseDBIF for ClauseDB {
             //
             // let old_l0 = self[ci].lit0();
             // let old_l1 = self[ci].lit0();
-            self.unweave(ci);
+            self.unweave(ci, 0);
+            self.unweave(ci, 1);
             std::mem::swap(&mut self[ci].lits, new_lits);
-            self.weave(ci);
+            // self.weave(ci);
             let l0 = self[ci].lit0();
             let l1 = self[ci].lit0();
             // watch_cache[!old_l0].remove_watch(&ci);
@@ -541,7 +552,8 @@ impl ClauseDBIF for ClauseDB {
             // let old_l0 = self[ci].lit0();
             // let old_l1 = self[ci].lit0();
             // self.remove_watches(ci);
-            self.unweave(ci);
+            self.unweave(ci, 0);
+            self.unweave(ci, 1);
             std::mem::swap(&mut self[ci].lits, new_lits);
             self.weave(ci);
             // self.insert_watch(ci, 0);
@@ -582,7 +594,7 @@ impl ClauseDBIF for ClauseDB {
             debug_assert!(!asg.var(l.vi()).is(FlagVar::ELIMINATED));
             match asg.assigned(*l) {
                 Some(true) => {
-                    self.unweave(ci);
+                    self.delete_clause(ci);
                     return RefClause::Dead;
                 }
                 Some(false) => {
@@ -618,7 +630,7 @@ impl ClauseDBIF for ClauseDB {
                     //
                     //## Case:3-0
                     //
-                    self.unweave(ci);
+                    self.delete_clause(ci);
                     return RefClause::RegisteredClause(bid);
                 }
                 //
@@ -629,7 +641,8 @@ impl ClauseDBIF for ClauseDB {
                 // watch_cache[!c.lits[0]].remove_watch(&ci);
                 // watch_cache[!c.lits[1]].remove_watch(&ci);
                 // self.remove_watches(ci);
-                self.unweave(ci);
+                self.unweave(ci, 0);
+                self.unweave(ci, 1);
                 self.binary_link.add(l0, l1, ci);
                 std::mem::swap(&mut self[ci].lits, &mut new_lits);
                 self.weave(ci);
@@ -654,7 +667,8 @@ impl ClauseDBIF for ClauseDB {
                 //## Case:3-3
                 //
                 // self.remove_watches(ci);
-                self.unweave(ci);
+                self.unweave(ci, 0);
+                self.unweave(ci, 1);
                 std::mem::swap(&mut self[ci].lits, &mut new_lits);
                 self.weave(ci);
                 // self.insert_watch(ci, 0);
@@ -849,14 +863,14 @@ impl ClauseDBIF for ClauseDB {
             if i.value() == threshold {
                 continue;
             }
-            self.unweave(i.to());
+            self.delete_clause(i.to());
         }
     }
     fn reset(&mut self) {
         for ci in 1..self.len() {
             let c = &self.clause[ci];
             if c.is(FlagClause::LEARNT) && (self.co_lbd_bound as usize) < c.len() {
-                self.unweave(ci);
+                self.delete_clause(ci);
             }
         }
     }
@@ -1122,26 +1136,9 @@ const FREE_WATCH_INDEX: usize = 1;
 
 impl ClauseWeaverIF for ClauseDB {
     fn weave(&mut self, ci: ClauseIndex) {
-        // 1. check whether this clause is in the initial or dead state
-        // assert_eq!(ci, self.clause[ci].links[0].prev.as_ci());
-        // 2. unlink from free list
-        let WatchLiteralIndexRef { prev, next } = self.clause[ci].links[FREE_WATCH_INDEX];
-        if prev.is_none() {
-            self.watch[FREE_LIT].next = next;
-        } else {
-            self.clause[prev.as_ci()].links[FREE_WATCH_INDEX].next = next;
-        }
-        // let next: WatchLiteralIndex = head.next;
-        if next.is_none() {
-            self.watch[FREE_LIT].prev = prev;
-        } else {
-            self.clause[next.as_ci()].links[FREE_WATCH_INDEX].prev = prev;
-        }
-        // 3. attach each watch literal to watcher list
-        if self.clause[ci].lits.len() == 2 {
-            return;
-        }
-        for wi in 0..=1 {
+        // attach each watch literal to watcher list
+        assert!(2 < self.clause[ci].lits.len());
+        for wi in 0..2 {
             let lit = !self.clause[ci].lits[wi];
             let wli = WatchLiteralIndex::new(ci, wi);
             let head: &mut WatchLiteralIndexRef = &mut self.watch[usize::from(lit)];
@@ -1157,42 +1154,22 @@ impl ClauseWeaverIF for ClauseDB {
         }
         dbg!(&self.clause[ci]);
     }
-    fn unweave(&mut self, ci: ClauseIndex) {
-        // 1. unlink from both watcher lists
-        if self.clause[ci].lits.len() == 2 {
-            let lit0 = self.clause[ci].lits[0];
-            let lit1 = self.clause[ci].lits[1];
-            let _ = self.binary_link.remove(lit0, lit1);
+    fn unweave(&mut self, ci: ClauseIndex, wi: usize) {
+        let WatchLiteralIndexRef { prev, next } = self.clause[ci].links[wi];
+        let lit = !self.clause[ci].lits[wi];
+        if prev.is_none() {
+            self.watch[usize::from(lit)].next = next;
         } else {
-            for wi in 0..2 {
-                let WatchLiteralIndexRef { prev, next } = self.clause[ci].links[wi];
-                let lit = !self.clause[ci].lits[wi];
-                if prev.is_none() {
-                    self.watch[usize::from(lit)].next = next;
-                } else {
-                    self.clause[prev.as_ci()].links[prev.as_wi()].next = next;
-                }
-                if next.is_none() {
-                    self.watch[usize::from(lit)].prev = prev;
-                } else {
-                    self.clause[next.as_ci()].links[next.as_wi()].prev = prev;
-                }
-            }
+            self.clause[prev.as_ci()].links[prev.as_wi()].next = next;
         }
-        // 2. link to free-list
-        let wli = WatchLiteralIndex::new(ci, FREE_WATCH_INDEX);
-        let next: WatchLiteralIndex = self.watch[FREE_LIT].next;
-        self.watch[FREE_LIT].next = wli;
-        self.clause[ci].links[FREE_WATCH_INDEX].next = next;
         if next.is_none() {
-            self.watch[FREE_LIT].prev = wli;
+            self.watch[usize::from(lit)].prev = prev;
         } else {
-            self.clause[next.as_ci()].links[FREE_WATCH_INDEX].prev = wli;
+            self.clause[next.as_ci()].links[next.as_wi()].prev = prev;
         }
     }
     fn reweave(&mut self, ci: ClauseIndex, wi: usize, wj: usize) {
         // 1. unlink wi
-        let wli = WatchLiteralIndex::new(ci, wi);
         let WatchLiteralIndexRef { prev, next } = self.clause[ci].links[FREE_WATCH_INDEX];
         let lit = !self.clause[ci].lits[wi];
         if prev.is_none() {
@@ -1208,6 +1185,7 @@ impl ClauseWeaverIF for ClauseDB {
         // 2. swap two literals
         self.clause[ci].lits.swap(wi, wj);
         // 3. link (new) wi
+        let wli = WatchLiteralIndex::new(ci, wi);
         let lit = !self.clause[ci].lits[wi];
         let head: &mut WatchLiteralIndexRef = &mut self.watch[usize::from(lit)];
         let next: WatchLiteralIndex = head.next;
@@ -1246,8 +1224,7 @@ impl ClauseWeaverIF for ClauseDB {
         let next = self.watch[FREE_LIT].next;
         if next.is_none() {
             self.clause.push(Clause::default());
-            let ci = self.clause.len() - 1;
-            ci
+            self.clause.len() - 1
         } else {
             next.as_ci()
         }

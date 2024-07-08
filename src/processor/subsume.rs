@@ -35,7 +35,7 @@ impl Eliminator {
                     cdb[ci].turn_off(FlagClause::LEARNT);
                 }
                 self.remove_cid_occur(asg, di, &mut cdb[di]);
-                cdb.unweave(di);
+                cdb.delete_clause(ci);
                 self.num_subsumed += 1;
             }
             // To avoid making a big clause, we have to add a condition for combining them.
@@ -113,13 +113,13 @@ fn strengthen_clause(
         }
         RefClause::RegisteredClause(_) => {
             elim.remove_cid_occur(asg, ci, &mut cdb[ci]);
-            cdb.unweave(ci);
+            cdb.delete_clause(ci);
             Ok(())
         }
         RefClause::UnitClause(l0) => {
             cdb.certificate_add_assertion(l0);
             elim.remove_cid_occur(asg, ci, &mut cdb[ci]);
-            cdb.unweave(ci);
+            cdb.delete_clause(ci);
             match asg.assigned(l0) {
                 None => asg.assign_at_root_level(l0),
                 Some(true) => Ok(()),

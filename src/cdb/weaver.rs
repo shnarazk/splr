@@ -40,12 +40,14 @@ pub trait WatcherLinkIF {
 /// Note: this interface is based on ClauseIndex and Watch literal's position
 /// in a clause.
 pub trait ClauseWeaverIF {
-    /// unlink from freelist then link to watcher lists
+    /// overwrite both link pairs for the present watch literals
     fn weave(&mut self, ci: ClauseIndex);
-    /// unlink both watch list and link to freelist; update stats and certificate
-    fn unweave(&mut self, ci: ClauseIndex);
-    /// unlink watch list for `wi`, swap `wi`-th lit and `wj`-th lit, then link to watcher list for the new watch leteral
+    /// separete from a *single* link pair for `wi`,
+    /// swap `wi`-th lit and `wj`-th lit,
+    /// then link to watcher list for the new watch leteral at `wi`
     fn reweave(&mut self, ci: ClauseIndex, wi: usize, wj: usize);
+    /// separete from a *single link pair for `wi`
+    fn unweave(&mut self, ci: ClauseIndex, wi: usize);
     /// instantiate a list of watch lists
     fn make_watches(num_vars: usize, clauses: &mut [Clause]) -> Vec<WatchLiteralIndexRef>;
     /// return the first watch literal index for literal `lit`

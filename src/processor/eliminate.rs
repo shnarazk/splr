@@ -119,7 +119,7 @@ pub fn eliminate_var(
             }
         }
         elim.remove_cid_occur(asg, *ci, &mut cdb[*ci]);
-        cdb.unweave(*ci);
+        cdb.delete_clause(*ci);
     }
     for ci in neg.iter() {
         if cdb[*ci].is_dead() {
@@ -132,7 +132,7 @@ pub fn eliminate_var(
             }
         }
         elim.remove_cid_occur(asg, *ci, &mut cdb[*ci]);
-        cdb.unweave(*ci);
+        cdb.delete_clause(*ci);
     }
     elim[vi].clear();
     asg.handle(SolverEvent::Eliminate(vi));
