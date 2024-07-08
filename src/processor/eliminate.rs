@@ -2,7 +2,6 @@
 use {
     super::Eliminator,
     crate::{assign::AssignIF, cdb::ClauseDBIF, solver::SolverEvent, state::State, types::*},
-    std::collections::HashSet,
 };
 
 // Stop elimination if a generated resolvent is larger than this
@@ -14,7 +13,6 @@ pub fn eliminate_var(
     elim: &mut Eliminator,
     state: &mut State,
     vi: VarId,
-    deads: &mut HashSet<Lit>,
 ) -> MaybeInconsistent {
     let v = &mut asg.var(vi);
     let w = &mut elim.var[vi];
@@ -121,7 +119,7 @@ pub fn eliminate_var(
             }
         }
         elim.remove_cid_occur(asg, *ci, &mut cdb[*ci]);
-        cdb.nullify_clause(*ci, deads);
+        cdb.unweave(*ci);
     }
     for ci in neg.iter() {
         if cdb[*ci].is_dead() {
@@ -134,12 +132,12 @@ pub fn eliminate_var(
             }
         }
         elim.remove_cid_occur(asg, *ci, &mut cdb[*ci]);
-        cdb.nullify_clause(*ci, deads);
+        cdb.unweave(*ci);
     }
     elim[vi].clear();
     asg.handle(SolverEvent::Eliminate(vi));
     state.restart.handle(SolverEvent::Eliminate(vi));
-    elim.backward_subsumption_check(asg, cdb, deads)
+    elim.backward_subsumption_check(asg, cdb)
 }
 
 /// returns `true` if elimination is impossible.
@@ -357,8 +355,6 @@ mod tests {
     #[cfg(not(feature = "no_IO"))]
     #[test]
     fn test_eliminate_var() {
-        use crate::cdb::ClauseWeaverIF;
-
         let Solver {
             ref mut asg,
             ref mut cdb,
@@ -372,9 +368,7 @@ mod tests {
 
         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
         elim.prepare(asg, cdb, true);
-        let mut deads: HashSet<Lit> = HashSet::new();
-        eliminate_var(asg, cdb, &mut elim, state, vi, &mut deads).expect("panic");
-        cdb.reweave(&mut deads);
+        eliminate_var(asg, cdb, &mut elim, state, vi).expect("panic");
         assert!(asg.var(vi).is(FlagVar::ELIMINATED));
         assert!(cdb.iter().skip(1).all(|c| c.is_dead()
             || (c.iter().all(|l| *l != Lit::from((vi, false)))

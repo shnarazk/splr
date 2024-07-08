@@ -1,13 +1,10 @@
 //! Vivification
 #![allow(dead_code)]
-use {
-    crate::{
-        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-        cdb::{ClauseDB, ClauseDBIF, ClauseIF, ClauseWeaverIF},
-        state::{Stat, State, StateIF},
-        types::*,
-    },
-    std::collections::HashSet,
+use crate::{
+    assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
+    cdb::{ClauseDB, ClauseDBIF, ClauseIF},
+    state::{Stat, State, StateIF},
+    types::*,
 };
 
 const VIVIFY_LIMIT: usize = 80_000;
@@ -41,7 +38,6 @@ impl VivifyIF for ClauseDB {
         let mut num_shrink = 0;
         let mut num_assert = 0;
         let mut to_display = 0;
-        let mut deads: HashSet<Lit> = HashSet::new();
         'next_clause: while let Some(cp) = clauses.pop() {
             asg.backtrack_sandbox();
             debug_assert_eq!(asg.decision_level(), asg.root_level());
@@ -145,8 +141,7 @@ impl VivifyIF for ClauseDB {
                                     #[cfg(not(feature = "clause_rewarding"))]
                                     self.new_clause(asg, &mut vec, is_learnt);
                                     // propage_sandbox can't handle dead watchers correctly
-                                    self.nullify_clause(ci, &mut deads);
-                                    self.reweave(&mut deads);
+                                    self.delete_clause(ci);
                                     num_shrink += 1;
                                 }
                             }

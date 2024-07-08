@@ -1,5 +1,5 @@
 use {
-    super::WatcherLinkIF,
+    super::{weaver::WatchLiteralIndexRef, WatcherLinkIF},
     crate::{assign::AssignIF, types::*},
     std::{
         collections::HashSet,
@@ -39,7 +39,7 @@ pub trait ClauseIF {
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct Clause {
     /// links. Note: watch0 is also used as freelist
-    pub(super) links: [WatchLiteralIndex; 2],
+    pub(super) links: [WatchLiteralIndexRef; 2],
     /// The literals in a clause.
     pub(super) lits: Vec<Lit>,
     /// Flags (8 bits)
@@ -69,7 +69,10 @@ pub struct Clause {
 impl Default for Clause {
     fn default() -> Clause {
         Clause {
-            links: [WatchLiteralIndex::default(); 2],
+            links: [
+                WatchLiteralIndexRef::default(),
+                WatchLiteralIndexRef::default(),
+            ],
             lits: vec![],
             flags: FlagClause::empty(),
             rank: 0,
@@ -249,10 +252,16 @@ impl fmt::Display for Clause {
 
 impl WatcherLinkIF for Clause {
     fn next_watch(&self, wi: usize) -> WatchLiteralIndex {
-        self.links[wi]
+        self.links[wi].next
+    }
+    fn prev_watch(&self, wi: usize) -> WatchLiteralIndex {
+        self.links[wi].prev
     }
     fn next_watch_mut(&mut self, wi: usize) -> &mut WatchLiteralIndex {
-        &mut self.links[wi]
+        &mut self.links[wi].next
+    }
+    fn prev_watch_mut(&mut self, wi: usize) -> &mut WatchLiteralIndex {
+        &mut self.links[wi].prev
     }
 }
 

@@ -1,33 +1,55 @@
-use crate::types::*;
+use {
+    crate::types::*,
+    std::ops::{Index, IndexMut},
+};
 
-#[derive(Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct WatchLiteralIndexRef {
-    prev: WatchLiteralIndex,
-    next: WatchLiteralIndex,
+    pub(crate) prev: WatchLiteralIndex,
+    pub(crate) next: WatchLiteralIndex,
+}
+
+impl WatchLiteralIndexRef {
+    pub fn set(&mut self, prev: WatchLiteralIndex, next: WatchLiteralIndex) -> &mut Self {
+        self.prev = prev;
+        self.next = next;
+        self
+    }
+}
+
+impl Index<Lit> for [WatchLiteralIndexRef] {
+    type Output = WatchLiteralIndexRef;
+    fn index(&self, l: Lit) -> &Self::Output {
+        &self[usize::from(l)]
+    }
+}
+
+impl IndexMut<Lit> for [WatchLiteralIndexRef] {
+    fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
+        &mut self[usize::from(l)]
+    }
 }
 
 pub trait WatcherLinkIF {
     fn next_watch(&self, wi: usize) -> WatchLiteralIndex;
     fn next_watch_mut(&mut self, wi: usize) -> &mut WatchLiteralIndex;
+    fn prev_watch(&self, wi: usize) -> WatchLiteralIndex;
+    fn prev_watch_mut(&mut self, wi: usize) -> &mut WatchLiteralIndex;
 }
 
 /// Note: this interface is based on ClauseIndex and Watch literal's position
 /// in a clause.
 pub trait ClauseWeaverIF {
+    /// unlink from freelist then link to watcher lists
+    fn weave(&mut self, ci: ClauseIndex);
+    /// unlink both watch list and link to freelist; update stats and certificate
+    fn unweave(&mut self, ci: ClauseIndex);
+    /// unlink watch list for `wi`, swap `wi`-th lit and `wj`-th lit, then link to watcher list for the new watch leteral
+    fn reweave(&mut self, ci: ClauseIndex, wi: usize, wj: usize);
+    /// instantiate a list of watch lists
+    fn make_watches(num_vars: usize, clauses: &mut [Clause]) -> Vec<WatchLiteralIndexRef>;
     /// return the first watch literal index for literal `lit`
-    fn get_watch_literal_index(&mut self, lit: Lit) -> WatchLiteralIndex;
+    fn get_first_watch(&mut self, lit: Lit) -> WatchLiteralIndex;
     /// return a ClauseIndex of an unused clause
     fn get_free_index(&mut self) -> ClauseIndex;
-    /// insert a watch to a watch list`
-    fn insert_watch(&mut self, ci: ClauseIndex, wi: usize);
-    /// O(1) remove the watch literal index of the watch literal index `wli`
-    fn remove_watch(&mut self, wli: WatchLiteralIndex, lit: Lit) -> WatchLiteralIndex;
-    /// O(1) remove function which remove the clause from two watcher lists
-    fn remove_watches(&mut self, ci: ClauseIndex);
-    /// instantiate a list of watch lists
-    fn make_watches(num_vars: usize, clauses: &mut [Clause]) -> Vec<WatchLiteralIndex>;
-    /// unlink and link to freelist
-    fn unweave(&mut self, ci: ClauseIndex);
-    /// unlink and link to freelist
-    fn unweave_sandbox(&mut self, ci: ClauseIndex);
 }

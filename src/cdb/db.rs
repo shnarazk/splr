@@ -1,7 +1,7 @@
 use {
     super::{
-        binary::BinaryLinkIF, ema::ProgressLBD, BinaryLinkDB, CertificationStore, Clause,
-        ClauseWeaverIF,
+        binary::BinaryLinkIF, ema::ProgressLBD, weaver::WatchLiteralIndexRef, BinaryLinkDB,
+        CertificationStore, Clause, ClauseWeaverIF,
     },
     crate::types::*,
     std::ops::{Index, IndexMut},
@@ -24,7 +24,7 @@ pub struct ClauseDB {
     ///
     pub(super) binary_link: BinaryLinkDB,
     /// container of watch literals
-    pub(super) watch: Vec<WatchLiteralIndex>,
+    pub(super) watch: Vec<WatchLiteralIndexRef>,
     /// see unsat_certificate.rs
     pub(super) certification_store: CertificationStore,
     /// a number of clauses to emit out-of-memory exception
@@ -148,9 +148,9 @@ impl Instantiate for ClauseDB {
             SolverEvent::NewVar => {
                 self.binary_link.add_new_var();
                 // for negated literal
-                self.watch.push(WatchLiteralIndex::default());
+                self.watch.push(WatchLiteralIndexRef::default());
                 // for positive literal
-                self.watch.push(WatchLiteralIndex::default());
+                self.watch.push(WatchLiteralIndexRef::default());
                 self.lbd_temp.push(0);
             }
             SolverEvent::Restart => {

@@ -64,6 +64,7 @@ impl BinaryLinkIF for BinaryLinkDB {
         self.list[lit0].push((lit1, cid));
         self.list[lit1].push((lit0, cid));
     }
+    /// O(n)
     fn remove(&mut self, lit0: Lit, lit1: Lit) -> MaybeInconsistent {
         let l0 = lit0.min(lit1);
         let l1 = lit0.max(lit1);

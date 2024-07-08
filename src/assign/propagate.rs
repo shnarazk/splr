@@ -6,7 +6,6 @@ use {
         cdb::{ClauseDBIF, WatcherLinkIF},
         types::*,
     },
-    std::collections::HashSet,
 };
 
 #[cfg(feature = "trail_saving")]
@@ -379,8 +378,7 @@ impl PropagateIF for AssignStack {
             //
             //## normal clause loop
             //
-            let mut prev = WatchLiteralIndex::default();
-            let mut wli = cdb.get_watch_literal_index(propagating);
+            let mut wli = cdb.get_first_watch(propagating);
             'next_clause: while !wli.is_none() {
                 let (ci, false_index) = wli.indices();
                 let c = &mut cdb[ci];
@@ -388,7 +386,6 @@ impl PropagateIF for AssignStack {
                 let ovi = other.vi();
                 let other_value = lit_assign!(self.var[ovi], other);
                 if other_value == Some(true) {
-                    prev = wli;
                     wli = c.next_watch(false_index);
                     continue 'next_clause;
                 }
@@ -406,7 +403,7 @@ impl PropagateIF for AssignStack {
                     let k = (i + start) % len + 2;
                     let lk = c[k];
                     if lit_assign!(self.var[lk.vi()], lk) != Some(false) {
-                        let next = cdb.transform_by_updating_watch(prev, wli, k);
+                        let next = cdb.transform_by_updating_watch(wli, k);
                         debug_assert_ne!(self.assigned(!lk), Some(true));
                         check_in!(
                             ci,
@@ -437,7 +434,6 @@ impl PropagateIF for AssignStack {
                         dl,
                     );
                     check_in!(cid, Propagate::BecameUnit(self.num_conflict, cached));
-                    prev = wli;
                     wli = c.next_watch(false_index);
                 }
             }
@@ -526,8 +522,7 @@ impl PropagateIF for AssignStack {
             //
             //## normal clause loop
             //
-            let mut prev = WatchLiteralIndex::default();
-            let mut wli = cdb.get_watch_literal_index(propagating);
+            let mut wli = cdb.get_first_watch(propagating);
             'next_clause: while !wli.is_none() {
                 let (ci, false_index) = wli.indices();
                 let c = &mut cdb[ci];
@@ -539,7 +534,6 @@ impl PropagateIF for AssignStack {
                 let ovi = other.vi();
                 let other_value = lit_assign!(self.var[ovi], other);
                 if other_value == Some(true) {
-                    prev = wli;
                     wli = c.next_watch(false_index);
                     continue 'next_clause;
                 }
@@ -549,7 +543,7 @@ impl PropagateIF for AssignStack {
                     let k = (i + start) % len + 2;
                     let lk = c[k];
                     if lit_assign!(self.var[lk.vi()], lk) != Some(false) {
-                        let next = cdb.transform_by_updating_watch(prev, wli, k);
+                        let next = cdb.transform_by_updating_watch(wli, k);
                         check_in!(
                             ci,
                             Propagate::SandboxFindNewWatch(self.num_conflict, false_lit, !lk)
@@ -568,7 +562,6 @@ impl PropagateIF for AssignStack {
                 }
                 self.assign_by_implication(other, AssignReason::Implication(wli.as_ci()));
                 check_in!(cid, Propagate::SandboxBecameUnit(self.num_conflict));
-                prev = wli;
                 wli = c.next_watch(false_index);
             }
         }
@@ -607,7 +600,6 @@ impl AssignStack {
     fn propagate_at_root_level(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
         debug_assert_eq!(self.decision_level(), self.root_level);
         let mut num_propagated = 0;
-        let mut deads: HashSet<Lit> = HashSet::new();
         while num_propagated < self.trail.len() {
             num_propagated = self.trail.len();
             for ci in 1..cdb.len() {
@@ -617,7 +609,7 @@ impl AssignStack {
                 // debug_assert!(cdb[ci]
                 //     .iter()
                 //     .all(|l| !self.var[l.vi()].is(FlagVar::ELIMINATED)));
-                match cdb.transform_by_simplification(self, ci, &mut deads) {
+                match cdb.transform_by_simplification(self, ci) {
                     RefClause::Clause(_) => (),
                     RefClause::Dead => (), // was a satisfied clause
                     RefClause::EmptyClause => return Err(SolverError::EmptyClause),
@@ -626,12 +618,11 @@ impl AssignStack {
                         debug_assert!(self.assigned(lit).is_none());
                         cdb.certificate_add_assertion(lit);
                         self.assign_at_root_level(lit)?;
-                        cdb.nullify_clause(ci, &mut deads);
+                        cdb.delete_clause(ci);
                     }
                 }
             }
         }
-        cdb.reweave(&mut deads);
         Ok(())
     }
     fn level_up(&mut self) {
