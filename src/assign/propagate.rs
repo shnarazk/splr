@@ -403,12 +403,17 @@ impl PropagateIF for AssignStack {
                     let k = (i + start) % len + 2;
                     let lk = c[k];
                     if lit_assign!(self.var[lk.vi()], lk) != Some(false) {
-                        let next = cdb.transform_by_updating_watch(wli, k);
+                        dbg!(wli);
+                        dbg!(&cdb[wli.as_ci()]);
+                        let next: WatchLiteralIndex = cdb.transform_by_updating_watch(wli, k);
                         debug_assert_ne!(self.assigned(!lk), Some(true));
                         check_in!(
                             ci,
                             Propagate::FindNewWatch(self.num_conflict, propagating, !lk)
                         );
+                        assert!(2 < cdb[ci].len());
+                        dbg!(&cdb[wli.as_ci()]);
+                        assert_ne!(wli, next);
                         wli = next;
                         continue 'next_clause;
                     }
