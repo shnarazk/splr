@@ -1162,6 +1162,7 @@ impl ClauseWeaverIF for ClauseDB {
         }
     }
     fn unweave(&mut self, ci: ClauseIndex, wi: usize) {
+        assert!(wi < 2);
         let WatchLiteralIndexRef { prev, next } = self.clause[ci].links[wi];
         let lit: usize = usize::from(!self.clause[ci].lits[wi]);
         if prev.is_none() {
@@ -1243,6 +1244,7 @@ impl ClauseWeaverIF for ClauseDB {
             self.clause.push(Clause::default());
             self.clause.len() - 1
         } else {
+            self.watch[FREE_LIT].next = self.clause[next.as_ci()].links[next.as_wi()].next;
             next.as_ci()
         }
     }
