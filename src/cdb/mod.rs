@@ -1138,11 +1138,13 @@ impl ClauseWeaverIF for ClauseDB {
     fn weave(&mut self, ci: ClauseIndex) {
         // attach each watch literal to watcher list
         assert!(2 < self.clause[ci].lits.len());
-        for wi in 0..2 {
-            let lit = !self.clause[ci].lits[wi];
+        dbg!(ci, &self.clause[ci]);
+        for wi in 0..=1 {
+            let lit: usize = usize::from(!self.clause[ci].lits[wi]);
             let wli = WatchLiteralIndex::new(ci, wi);
-            let head: &mut WatchLiteralIndexRef = &mut self.watch[usize::from(lit)];
+            let head: &mut WatchLiteralIndexRef = &mut self.watch[lit];
             let next: WatchLiteralIndex = head.next;
+            assert_ne!(next, wli);
             head.next = wli;
             self.clause[ci].links[wi].prev = WatchLiteralIndex::default();
             self.clause[ci].links[wi].next = next;
@@ -1151,43 +1153,52 @@ impl ClauseWeaverIF for ClauseDB {
             } else {
                 self.clause[next.as_ci()].links[next.as_wi()].prev = wli;
             }
+            dbg!(ci, &self.clause[ci]);
+            assert!(
+                (self.clause[ci].links[wi].prev != self.clause[ci].links[wi].next)
+                    || (self.clause[ci].links[wi].prev == WatchLiteralIndex::default()
+                        && self.clause[ci].links[wi].next == WatchLiteralIndex::default())
+            );
         }
-        dbg!(&self.clause[ci]);
     }
     fn unweave(&mut self, ci: ClauseIndex, wi: usize) {
         let WatchLiteralIndexRef { prev, next } = self.clause[ci].links[wi];
-        let lit = !self.clause[ci].lits[wi];
+        let lit: usize = usize::from(!self.clause[ci].lits[wi]);
         if prev.is_none() {
-            self.watch[usize::from(lit)].next = next;
+            self.watch[lit].next = next;
         } else {
             self.clause[prev.as_ci()].links[prev.as_wi()].next = next;
         }
         if next.is_none() {
-            self.watch[usize::from(lit)].prev = prev;
+            self.watch[lit].prev = prev;
         } else {
             self.clause[next.as_ci()].links[next.as_wi()].prev = prev;
         }
     }
     fn reweave(&mut self, ci: ClauseIndex, wi: usize, wj: usize) {
         // 1. unlink wi
-        let WatchLiteralIndexRef { prev, next } = self.clause[ci].links[FREE_WATCH_INDEX];
-        let lit = !self.clause[ci].lits[wi];
+        let WatchLiteralIndexRef { prev, next } = self.clause[ci].links[wi];
+        let lit: usize = usize::from(!self.clause[ci].lits[wi]);
         if prev.is_none() {
-            self.watch[usize::from(lit)].next = next;
+            self.watch[lit].next = next;
         } else {
             self.clause[prev.as_ci()].links[prev.as_wi()].next = next;
         }
         if next.is_none() {
-            self.watch[usize::from(lit)].prev = prev;
+            self.watch[lit].prev = prev;
         } else {
             self.clause[next.as_ci()].links[next.as_wi()].prev = prev;
         }
         // 2. swap two literals
-        self.clause[ci].lits.swap(wi, wj);
-        // 3. link (new) wi
+        let lit: usize = if wi == wj {
+            FREE_LIT
+        } else {
+            self.clause[ci].lits.swap(wi, wj);
+            usize::from(!self.clause[ci].lits[wi])
+        };
+        // 3. link to watch list by new wi
         let wli = WatchLiteralIndex::new(ci, wi);
-        let lit = !self.clause[ci].lits[wi];
-        let head: &mut WatchLiteralIndexRef = &mut self.watch[usize::from(lit)];
+        let head: &mut WatchLiteralIndexRef = &mut self.watch[lit];
         let next: WatchLiteralIndex = head.next;
         head.next = wli;
         self.clause[ci].links[wi].prev = WatchLiteralIndex::default();
@@ -1197,6 +1208,11 @@ impl ClauseWeaverIF for ClauseDB {
         } else {
             self.clause[next.as_ci()].links[next.as_wi()].prev = wli;
         }
+        assert!(
+            (self.clause[ci].links[wi].prev != self.clause[ci].links[wi].next)
+                || (self.clause[ci].links[wi].prev == WatchLiteralIndex::default()
+                    && self.clause[ci].links[wi].next == WatchLiteralIndex::default())
+        );
     }
     fn make_watches(num_vars: usize, clauses: &mut [Clause]) -> Vec<WatchLiteralIndexRef> {
         // ci 0 must refer to the header
