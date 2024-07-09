@@ -270,6 +270,18 @@ impl Clause {
     // If it's big enough, skip the loop.
     pub fn update_lbd(&mut self, asg: &impl AssignIF, _lbd_temp: &mut [usize]) -> usize {
         let base_level = asg.root_level();
+        let mut rank = 0;
+        let mut levels: HashSet<DecisionLevel> = HashSet::new();
+        for lit in self.lits.iter() {
+            let lv = asg.level(lit.vi());
+            if lv == base_level {
+                rank += 1;
+            } else {
+                levels.insert(lv);
+            }
+        }
+        rank += levels.len();
+        /*
         let rank = self
             .lits
             .iter()
@@ -277,6 +289,7 @@ impl Clause {
             .filter(|l| *l != base_level)
             .collect::<HashSet<DecisionLevel>>()
             .len();
+        */
         self.rank = rank as u16;
         rank
         // if 8192 <= self.lits.len() {
