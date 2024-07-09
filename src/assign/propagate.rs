@@ -382,7 +382,6 @@ impl PropagateIF for AssignStack {
             'next_clause: while !wli.is_none() {
                 let (ci, false_index) = wli.indices();
                 let c = &mut cdb[ci];
-                dbg!(wli, &c);
                 let other = *c.iter().nth(1 - false_index).unwrap();
                 let ovi = other.vi();
                 let other_value = lit_assign!(self.var[ovi], other);
@@ -406,8 +405,6 @@ impl PropagateIF for AssignStack {
                     let k = (i + start) % len + 2;
                     let lk = c[k];
                     if lit_assign!(self.var[lk.vi()], lk) != Some(false) {
-                        dbg!(wli);
-                        dbg!(&cdb[wli.as_ci()]);
                         let next: WatchLiteralIndex = cdb.transform_by_updating_watch(wli, k);
                         debug_assert_ne!(self.assigned(!lk), Some(true));
                         check_in!(
@@ -415,7 +412,6 @@ impl PropagateIF for AssignStack {
                             Propagate::FindNewWatch(self.num_conflict, propagating, !lk)
                         );
                         assert!(2 < cdb[ci].len());
-                        dbg!(&cdb[wli.as_ci()]);
                         assert_ne!(wli, next);
                         wli = next;
                         continue 'next_clause;

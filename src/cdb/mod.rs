@@ -362,7 +362,7 @@ impl ClauseDBIF for ClauseDB {
                 .binary_link
                 .remove(self.clause[ci].lits[0], self.clause[ci].lits[1]);
         } else {
-            self.unweave(ci, !FREE_LIT);
+            self.unweave(ci, 0);
             self.reweave(ci, FREE_WATCH_INDEX, FREE_WATCH_INDEX);
         }
     }
@@ -1138,7 +1138,6 @@ impl ClauseWeaverIF for ClauseDB {
     fn weave(&mut self, ci: ClauseIndex) {
         // attach each watch literal to watcher list
         assert!(2 < self.clause[ci].lits.len());
-        dbg!(ci, &self.clause[ci]);
         for wi in 0..=1 {
             let lit: usize = usize::from(!self.clause[ci].lits[wi]);
             let wli = WatchLiteralIndex::new(ci, wi);
@@ -1153,7 +1152,6 @@ impl ClauseWeaverIF for ClauseDB {
             } else {
                 self.clause[next.as_ci()].links[next.as_wi()].prev = wli;
             }
-            dbg!(ci, &self.clause[ci]);
             assert!(
                 (self.clause[ci].links[wi].prev != self.clause[ci].links[wi].next)
                     || (self.clause[ci].links[wi].prev == WatchLiteralIndex::default()
