@@ -305,6 +305,9 @@ impl ClauseDBIF for ClauseDB {
             self[ci].reward = 0.0;
             self[ci].timestamp = *tick;
         }
+        if ci == 261 {
+            println!("!!!!!!!!!!!!!!! new_clause {ci}");
+        }
         RefClause::Clause(ci)
     }
 
@@ -358,11 +361,11 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         if self.clause[ci].lits.len() == 2 {
-            let _ = self
-                .binary_link
-                .remove(self.clause[ci].lits[0], self.clause[ci].lits[1]);
+            self.binary_link
+                .remove(self.clause[ci].lits[0], self.clause[ci].lits[1])
+                .expect("ilegal biclause found");
         } else {
-            self.unweave(ci, 0);
+            self.unweave(ci, NEFR_WATCH_INDEX);
             self.reweave(ci, FREE_WATCH_INDEX, FREE_WATCH_INDEX);
         }
     }
@@ -1132,6 +1135,7 @@ impl Clause {
 const FREE_LIT: usize = 1;
 // Clauses have two watches. We use the second watch holder to chain free clauses
 const FREE_WATCH_INDEX: usize = 1;
+const NEFR_WATCH_INDEX: usize = 0;
 
 impl ClauseWeaverIF for ClauseDB {
     fn weave(&mut self, ci: ClauseIndex) {
@@ -1190,6 +1194,7 @@ impl ClauseWeaverIF for ClauseDB {
         }
         // 2. swap two literals
         let lit: usize = if wi == wj {
+            assert_eq!(wi, 1);
             FREE_LIT
         } else {
             self.clause[ci].lits.swap(wi, wj);
@@ -1237,7 +1242,7 @@ impl ClauseWeaverIF for ClauseDB {
         self.watch[usize::from(lit)].next
     }
     fn get_free_index(&mut self) -> ClauseIndex {
-        let next = self.watch[FREE_LIT].next;
+        let next: WatchLiteralIndex = self.watch[FREE_LIT].next;
         if next.is_none() {
             self.clause.push(Clause::default());
             self.clause.len() - 1

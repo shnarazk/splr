@@ -367,6 +367,19 @@ fn conflict_analyze(
                     max_lbd = cdb[cid].rank;
                     ci_with_max_lbd = Some(cid);
                 }
+                assert_eq!(
+                    p,
+                    if cdb[cid].is(FlagClause::PROPAGATEBY1) {
+                        cdb[cid].lit1()
+                    } else {
+                        cdb[cid].lit0()
+                    },
+                    "At level {}, broken implication chain from {:?}@{} to {cid}{:?}",
+                    asg.decision_level(),
+                    p,
+                    asg.level(p.vi()),
+                    &cdb[cid],
+                );
                 let skip = cdb[cid].is(FlagClause::PROPAGATEBY1) as usize;
                 #[cfg(feature = "trace_analysis")]
                 if skip == 1 {

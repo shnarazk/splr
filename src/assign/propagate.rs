@@ -382,8 +382,9 @@ impl PropagateIF for AssignStack {
             'next_clause: while !wli.is_none() {
                 let (ci, false_index) = wli.indices();
                 let c = &mut cdb[ci];
-                let other = *c.iter().nth(1 - false_index).unwrap();
-                let ovi = other.vi();
+                c.turn_off(FlagClause::PROPAGATEBY1);
+                let other: Lit = *c.iter().nth(1 - false_index).unwrap();
+                let ovi: usize = other.vi();
                 let other_value = lit_assign!(self.var[ovi], other);
                 if other_value == Some(true) {
                     let next = c.next_watch(false_index);
@@ -396,14 +397,15 @@ impl PropagateIF for AssignStack {
                     //     .iter()
                     //     .all(|l| lit_assign!(self.var[l.vi()], *l) == Some(false)));
                     c.set(FlagClause::PROPAGATEBY1, false_index == 0);
+                    assert_eq!(other, c[1 - false_index]);
                     check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
                     conflict_path!(other, AssignReason::Implication(wli.as_ci()));
                 }
                 let start = c.search_from as usize;
                 let len = c.len() - 2;
                 for i in 0..len {
-                    let k = (i + start) % len + 2;
-                    let lk = c[k];
+                    let k: usize = (i + start) % len + 2;
+                    let lk: Lit = c[k];
                     if lit_assign!(self.var[lk.vi()], lk) != Some(false) {
                         let next: WatchLiteralIndex = cdb.transform_by_updating_watch(wli, k);
                         debug_assert_ne!(self.assigned(!lk), Some(true));
@@ -431,6 +433,12 @@ impl PropagateIF for AssignStack {
                         .unwrap_or(self.root_level);
 
                     debug_assert_eq!(self.assigned(other), None);
+                    if ci == 261 {
+                        println!(
+                            "unit propagation: {other} by {ci} at {dl}: {} {c:?}",
+                            false_index == 0
+                        );
+                    }
                     self.assign_by_implication(
                         other,
                         AssignReason::Implication(wli.as_ci()),
@@ -443,7 +451,7 @@ impl PropagateIF for AssignStack {
             }
             from_saved_trail!();
         }
-        let na = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
+        let na: usize = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
         if self.num_best_assign <= na && 0 < dl {
             self.best_assign = true;
             self.num_best_assign = na;
