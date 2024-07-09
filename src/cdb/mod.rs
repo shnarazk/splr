@@ -1226,6 +1226,7 @@ impl ClauseWeaverIF for ClauseDB {
         }
         let mut watches = vec![WatchLiteralIndexRef::default(); 2 * (num_vars + 1)];
         if 1 < nc {
+            clauses[1].links[FREE_WATCH_INDEX].prev = WatchLiteralIndex::default();
             watches[FREE_LIT].set(
                 WatchLiteralIndex::new(nc - 1, FREE_WATCH_INDEX),
                 WatchLiteralIndex::new(1, FREE_WATCH_INDEX),
