@@ -645,7 +645,6 @@ impl ClauseDBIF for ClauseDB {
                 self.unweave(ci, 1);
                 self.binary_link.add(l0, l1, ci);
                 std::mem::swap(&mut self[ci].lits, &mut new_lits);
-                self.weave(ci);
                 self.num_bi_clause += 1;
                 if self[ci].is(FlagClause::LEARNT) {
                     self.num_learnt -= 1;
@@ -1175,6 +1174,7 @@ impl ClauseWeaverIF for ClauseDB {
         }
     }
     fn reweave(&mut self, ci: ClauseIndex, wi: usize, wj: usize) {
+        assert!(wi < 2);
         // 1. unlink wi
         let WatchLiteralIndexRef { prev, next } = self.clause[ci].links[wi];
         let lit: usize = usize::from(!self.clause[ci].lits[wi]);
