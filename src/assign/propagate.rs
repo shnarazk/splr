@@ -382,7 +382,7 @@ impl PropagateIF for AssignStack {
             'next_clause: while !wli.is_none() {
                 let (ci, false_index) = wli.indices();
                 let c = &mut cdb[ci];
-                c.turn_off(FlagClause::PROPAGATEBY1);
+                // c.turn_off(FlagClause::PROPAGATEBY1);
                 let other: Lit = *c.iter().nth(1 - false_index).unwrap();
                 let ovi: usize = other.vi();
                 let other_value = lit_assign!(self.var[ovi], other);
