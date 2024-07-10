@@ -73,7 +73,7 @@ impl Default for Clause {
                 WatchLiteralIndexRef::default(),
                 WatchLiteralIndexRef::default(),
             ],
-            lits: vec![],
+            lits: vec![Lit::default(), Lit::default()],
             flags: FlagClause::empty(),
             rank: 0,
             rank_old: 0,

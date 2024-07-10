@@ -369,6 +369,7 @@ impl ClauseDBIF for ClauseDB {
             self.unweave(ci, NEFR_WATCH_INDEX);
             self.reweave(ci, FREE_WATCH_INDEX, FREE_WATCH_INDEX);
         }
+        self.clause[ci].turn_on(FlagClause::DEAD);
     }
 
     //
@@ -751,7 +752,7 @@ impl ClauseDBIF for ClauseDB {
         // assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
         let ret: WatchLiteralIndex = self.clause[wli.as_ci()].links[wli.as_wi()].next;
         self.reweave(wli.as_ci(), wli.as_wi(), new);
-        // self.check_weave(wli.as_ci());
+        self.check_weave(wli.as_ci(), &[0, 1]);
         ret
     }
     fn update_at_analysis(&mut self, asg: &impl AssignIF, ci: ClauseIndex) -> bool {
@@ -1163,7 +1164,7 @@ impl ClauseWeaverIF for ClauseDB {
                         && self.clause[ci].links[wi].next == WatchLiteralIndex::default())
             );
         }
-        // self.check_weave(ci);
+        self.check_weave(ci, &[0, 1]);
     }
     fn unweave(&mut self, ci: ClauseIndex, wi: usize) {
         assert!(wi < 2);
@@ -1182,6 +1183,7 @@ impl ClauseWeaverIF for ClauseDB {
     }
     fn reweave(&mut self, ci: ClauseIndex, wi: usize, wj: usize) {
         assert!(wi < 2);
+        assert!((wi == 1 && wj == 1) || 2 <= wj, "not {wi} < {wj}");
         // 1. unlink wi
         let WatchLiteralIndexRef { prev, next } = self.clause[ci].links[wi];
         let lit: usize = usize::from(!self.clause[ci].lits[wi]);
@@ -1198,6 +1200,12 @@ impl ClauseWeaverIF for ClauseDB {
         // 2. swap two literals
         let lit: usize = if wi == wj {
             assert_eq!(wi, 1);
+
+            if self.clause[ci].lits[FREE_WATCH_INDEX] == Lit::default() {
+                dbg!(ci, &self.clause[ci]);
+            }
+            assert_ne!(self.clause[ci].lits[FREE_WATCH_INDEX], Lit::default());
+            self.clause[ci].lits[FREE_WATCH_INDEX] = Lit::default();
             FREE_LIT
         } else {
             self.clause[ci].lits.swap(wi, wj);
@@ -1220,6 +1228,11 @@ impl ClauseWeaverIF for ClauseDB {
                 || (self.clause[ci].links[wi].prev == WatchLiteralIndex::default()
                     && self.clause[ci].links[wi].next == WatchLiteralIndex::default())
         );
+        if wi == wj {
+            self.check_weave(ci, &[FREE_WATCH_INDEX]);
+        } else {
+            self.check_weave(ci, &[0, 1]);
+        }
     }
     fn make_watches(num_vars: usize, clauses: &mut [Clause]) -> Vec<WatchLiteralIndexRef> {
         // ci 0 must refer to the header
@@ -1252,8 +1265,19 @@ impl ClauseWeaverIF for ClauseDB {
             // assert_ne!(1, self.clause.len());
             self.clause.len() - 1
         } else {
-            self.watch[FREE_LIT].next = self.clause[next.as_ci()].links[next.as_wi()].next;
-            // assert_ne!(0, next.as_ci());
+            self.check_weave(next.as_ci(), &[FREE_WATCH_INDEX]);
+            self.unweave(next.as_ci(), FREE_WATCH_INDEX);
+            // self.watch[FREE_LIT].next = self.clause[next.as_ci()].links[next.as_wi()].next;
+            // let prev: &mut WatchLiteralIndex = &mut self.watch[FREE_LIT].prev;
+            // if *prev == next {
+            //     *prev = WatchLiteralIndex::default();
+            // }
+            assert_eq!(
+                self.clause[next.as_ci()].lits[FREE_WATCH_INDEX],
+                Lit::default(),
+            );
+            assert_ne!(next, self.watch[FREE_LIT].next);
+            assert_ne!(0, next.as_ci());
             next.as_ci()
         }
     }
@@ -1391,40 +1415,61 @@ impl ClauseWeaverIF for ClauseDB {
 
 impl ClauseDB {
     #[allow(dead_code)]
-    fn check_weave(&self, ci: ClauseIndex) {
-        assert_ne!(0, ci);
-        for l in self.clause[ci].lits.iter().take(2) {
-            let mut ptr = self.watch[usize::from(!*l)].next;
+    fn check_weave(&self, ci: ClauseIndex, v: &[usize]) {
+        const RED: &str = "\x1B[001m\x1B[031m";
+        const GREEN: &str = "\x1B[001m\x1B[032m";
+        const BLUE: &str = "\x1B[001m\x1B[034m";
+        const RESET: &str = "\x1B[000m";
+        for i in v.iter() {
+            let lit: usize = usize::from(!self.clause[ci].lits[*i]);
+            let mut ptr = self.watch[lit].next;
             let mut found = false;
+            let mut forward = 0;
             while !ptr.is_none() {
+                assert!(ptr.as_ci() != 0 || ptr.as_wi() == 0);
                 if ptr.as_ci() == ci {
                     found = true;
-                    break;
                 }
                 ptr = self.clause[ptr.as_ci()].links[ptr.as_wi()].next;
+                forward += 1;
+                assert!(
+                    forward < 10000,
+                    "{GREEN}forward weave {lit} has a loop!{RESET}"
+                );
             }
             assert!(
                 found,
-                "{}: {:?} is not in forward weave {}",
-                ci, &self.clause[ci], l
+                "{RED}{}: {:?} is not in forward weave {}{RESET}",
+                ci, &self.clause[ci], lit
             );
-            let mut ptr = self.watch[usize::from(!*l)].prev;
+            if lit == 1 {
+                continue;
+            }
+            let mut ptr = self.watch[lit].prev;
             let mut found = false;
+            let mut backward = 0;
             while !ptr.is_none() {
+                assert!(ptr.as_ci() != 0 || ptr.as_wi() == 0);
                 if ptr.as_ci() == ci {
                     found = true;
-                    break;
                 }
                 ptr = self.clause[ptr.as_ci()].links[ptr.as_wi()].prev;
+                backward += 1;
+                assert!(
+                    backward < 10000,
+                    "{RED}backward weave {lit} has a loop!{RESET}"
+                );
             }
             assert!(
                 found,
-                "ci {}:{:?} is not in backward weave {} (head: {:?})",
-                ci,
-                &self.clause[ci],
-                l,
-                self.watch[usize::from(!*l)]
+                "{BLUE}ci {}:{:?} is not in backward weave {} (head: {:?}){RESET}",
+                ci, &self.clause[ci], lit, self.watch[lit]
             );
+            assert_eq!(
+                forward, backward,
+                "{GREEN}weave {lit} forward length {forward}, backward length {backward}\nAfter {ci} modification: {:?}{RESET}",
+                &self.clause[ci]
+            )
         }
     }
 }

@@ -13,7 +13,6 @@ use std::{
     fmt,
     fs::File,
     io::{BufRead, BufReader},
-    num::NonZeroU32,
     ops::{Index, IndexMut, Not},
     path::Path,
 };
@@ -122,10 +121,10 @@ pub type DecisionLevel = u32;
 /// assert_eq!( 2i32, Lit::from( 2i32).into());
 /// assert_eq!(-2i32, Lit::from(-2i32).into());
 /// ```
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, Default, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Lit {
     /// literal encoded into folded u32
-    ordinal: NonZeroU32,
+    ordinal: u32,
 }
 
 impl fmt::Display for Lit {
@@ -149,7 +148,7 @@ impl From<(VarId, bool)> for Lit {
     #[inline]
     fn from((vi, b): (VarId, bool)) -> Self {
         Lit {
-            ordinal: unsafe { NonZeroU32::new_unchecked(((vi as u32) << 1) + (b as u32)) },
+            ordinal: ((vi as u32) << 1) + (b as u32),
         }
     }
 }
@@ -157,18 +156,14 @@ impl From<(VarId, bool)> for Lit {
 impl From<usize> for Lit {
     #[inline]
     fn from(l: usize) -> Self {
-        Lit {
-            ordinal: unsafe { NonZeroU32::new_unchecked(l as u32) },
-        }
+        Lit { ordinal: l as u32 }
     }
 }
 
 impl From<u32> for Lit {
     #[inline]
     fn from(l: u32) -> Self {
-        Lit {
-            ordinal: unsafe { NonZeroU32::new_unchecked(l) },
-        }
+        Lit { ordinal: l }
     }
 }
 
@@ -176,9 +171,7 @@ impl From<i32> for Lit {
     #[inline]
     fn from(x: i32) -> Self {
         Lit {
-            ordinal: unsafe {
-                NonZeroU32::new_unchecked((if x < 0 { -2 * x } else { 2 * x + 1 }) as u32)
-            },
+            ordinal: (if x < 0 { -2 * x } else { 2 * x + 1 }) as u32,
         }
     }
 }
@@ -188,24 +181,24 @@ impl From<Lit> for bool {
     /// - negative Lit (= odd u32)  => Some(false)
     #[inline]
     fn from(l: Lit) -> bool {
-        (NonZeroU32::get(l.ordinal) & 1) != 0
+        (l.ordinal & 1) != 0
     }
 }
 
 impl From<Lit> for usize {
     #[inline]
     fn from(l: Lit) -> usize {
-        NonZeroU32::get(l.ordinal) as usize
+        l.ordinal as usize
     }
 }
 
 impl From<Lit> for i32 {
     #[inline]
     fn from(l: Lit) -> i32 {
-        if NonZeroU32::get(l.ordinal) % 2 == 0 {
-            -((NonZeroU32::get(l.ordinal) >> 1) as i32)
+        if l.ordinal % 2 == 0 {
+            -((l.ordinal >> 1) as i32)
         } else {
-            (NonZeroU32::get(l.ordinal) >> 1) as i32
+            (l.ordinal >> 1) as i32
         }
     }
 }
@@ -213,10 +206,10 @@ impl From<Lit> for i32 {
 impl From<&Lit> for i32 {
     #[inline]
     fn from(l: &Lit) -> i32 {
-        if NonZeroU32::get(l.ordinal) % 2 == 0 {
-            -((NonZeroU32::get(l.ordinal) >> 1) as i32)
+        if l.ordinal % 2 == 0 {
+            -((l.ordinal >> 1) as i32)
         } else {
-            (NonZeroU32::get(l.ordinal) >> 1) as i32
+            (l.ordinal >> 1) as i32
         }
     }
 }
@@ -226,7 +219,7 @@ impl Not for Lit {
     #[inline]
     fn not(self) -> Self {
         Lit {
-            ordinal: unsafe { NonZeroU32::new_unchecked(NonZeroU32::get(self.ordinal) ^ 1) },
+            ordinal: self.ordinal ^ 1,
         }
     }
 }
@@ -275,11 +268,11 @@ impl IndexMut<Lit> for Vec<bool> {
 impl LitIF for Lit {
     #[inline]
     fn as_bool(&self) -> bool {
-        NonZeroU32::get(self.ordinal) & 1 == 1
+        self.ordinal & 1 == 1
     }
     #[inline]
     fn vi(self) -> VarId {
-        (NonZeroU32::get(self.ordinal) >> 1) as VarId
+        (self.ordinal >> 1) as VarId
     }
 }
 
