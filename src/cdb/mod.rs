@@ -305,8 +305,8 @@ impl ClauseDBIF for ClauseDB {
             self[ci].reward = 0.0;
             self[ci].timestamp = *tick;
         }
-        if ci == 261 {
-            println!("!!!!!!!!!!!!!!! new_clause {ci}");
+        if ci == 392 {
+            println!("!!!!!!!!!!!!!!! new_clause {ci} {:?}", &self[ci]);
         }
         RefClause::Clause(ci)
     }

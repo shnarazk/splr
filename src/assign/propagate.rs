@@ -383,6 +383,10 @@ impl PropagateIF for AssignStack {
                 let (ci, false_index) = wli.indices();
                 let c = &mut cdb[ci];
                 // c.turn_off(FlagClause::PROPAGATEBY1);
+                assert!(
+                    c.lit0() == false_lit || c.lit1() == false_lit,
+                    "Clause{ci}:{c:?} does not have {false_lit}"
+                );
                 let other: Lit = *c.iter().nth(1 - false_index).unwrap();
                 let ovi: usize = other.vi();
                 let other_value = lit_assign!(self.var[ovi], other);
@@ -397,6 +401,12 @@ impl PropagateIF for AssignStack {
                     //     .iter()
                     //     .all(|l| lit_assign!(self.var[l.vi()], *l) == Some(false)));
                     c.set(FlagClause::PROPAGATEBY1, false_index == 0);
+                    if ci == 392 {
+                        println!(
+                            "early conflict {other} by {ci} at {dl}: PROPAGATE1 {}",
+                            c.is(FlagClause::PROPAGATEBY1)
+                        );
+                    }
                     assert_eq!(other, c[1 - false_index]);
                     check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
                     conflict_path!(other, AssignReason::Implication(wli.as_ci()));
@@ -422,6 +432,18 @@ impl PropagateIF for AssignStack {
                 c.set(FlagClause::PROPAGATEBY1, false_index == 0);
                 if other_value == Some(false) {
                     check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
+                    if ci == 392 {
+                        println!(
+                            "conflict {other} by {ci} at {dl}: PROPAGATE1 {}\n-51:{:?}\n-65:{:?}\n{:?}\nother:{:?}, other_value:{:?}\nfalselit(should be included in the clause):{:?}",
+                            c.is(FlagClause::PROPAGATEBY1),
+                            self.var[other.vi()],
+                            self.var[65],
+                            c,
+                            other,
+                            other_value,
+                            false_lit
+                        );
+                    }
                     conflict_path!(other, AssignReason::Implication(wli.as_ci()));
                 } else {
                     #[cfg(feature = "chrono_BT")]
@@ -433,10 +455,11 @@ impl PropagateIF for AssignStack {
                         .unwrap_or(self.root_level);
 
                     debug_assert_eq!(self.assigned(other), None);
-                    if ci == 261 {
+                    if ci == 392 {
                         println!(
-                            "unit propagation: {other} by {ci} at {dl}: {} {c:?}",
-                            false_index == 0
+                            "unit propagation: {other} by {ci} at {dl}: PROPAGATE1 {}; next is {:?}",
+                            c.is(FlagClause::PROPAGATEBY1),
+                            c.next_watch(false_index).as_ci()
                         );
                     }
                     self.assign_by_implication(
@@ -472,6 +495,7 @@ impl PropagateIF for AssignStack {
     // 1. (allow eliminated vars)
     //
     fn propagate_sandbox(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
+        panic!();
         #[cfg(feature = "boundary_check")]
         macro_rules! check_in {
             ($cid: expr, $tag :expr) => {
