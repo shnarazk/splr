@@ -383,7 +383,7 @@ impl PropagateIF for AssignStack {
                 let (ci, false_index) = wli.indices();
                 let c = &mut cdb[ci];
                 // c.turn_off(FlagClause::PROPAGATEBY1);
-                assert!(
+                debug_assert!(
                     c.lit0() == false_lit || c.lit1() == false_lit,
                     "Clause{ci}:{c:?} does not have {false_lit}"
                 );
@@ -392,7 +392,7 @@ impl PropagateIF for AssignStack {
                 let other_value = lit_assign!(self.var[ovi], other);
                 if other_value == Some(true) {
                     let next = c.next_watch(false_index);
-                    assert_ne!(wli, next);
+                    debug_assert_ne!(wli, next);
                     wli = next;
                     continue 'next_clause;
                 }
@@ -401,13 +401,7 @@ impl PropagateIF for AssignStack {
                     //     .iter()
                     //     .all(|l| lit_assign!(self.var[l.vi()], *l) == Some(false)));
                     c.set(FlagClause::PROPAGATEBY1, false_index == 0);
-                    // if ci == 392 {
-                    //     println!(
-                    //         "early conflict {other} by {ci} at {dl}: PROPAGATE1 {}",
-                    //         c.is(FlagClause::PROPAGATEBY1)
-                    //     );
-                    // }
-                    assert_eq!(other, c[1 - false_index]);
+                    debug_assert_eq!(other, c[1 - false_index]);
                     check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
                     conflict_path!(other, AssignReason::Implication(wli.as_ci()));
                 }
@@ -423,8 +417,8 @@ impl PropagateIF for AssignStack {
                             ci,
                             Propagate::FindNewWatch(self.num_conflict, propagating, !lk)
                         );
-                        assert!(2 < cdb[ci].len());
-                        assert_ne!(wli, next);
+                        debug_assert!(2 < cdb[ci].len());
+                        debug_assert_ne!(wli, next);
                         wli = next;
                         continue 'next_clause;
                     }
@@ -432,18 +426,6 @@ impl PropagateIF for AssignStack {
                 c.set(FlagClause::PROPAGATEBY1, false_index == 0);
                 if other_value == Some(false) {
                     check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
-                    // if ci == 392 {
-                    //     println!(
-                    //         "conflict {other} by {ci} at {dl}: PROPAGATE1 {}\n-51:{:?}\n-65:{:?}\n{:?}\nother:{:?}, other_value:{:?}\nfalselit(should be included in the clause):{:?}",
-                    //         c.is(FlagClause::PROPAGATEBY1),
-                    //         self.var[other.vi()],
-                    //         self.var[65],
-                    //         c,
-                    //         other,
-                    //         other_value,
-                    //         false_lit
-                    //     );
-                    // }
                     conflict_path!(other, AssignReason::Implication(wli.as_ci()));
                 } else {
                     #[cfg(feature = "chrono_BT")]
@@ -455,13 +437,6 @@ impl PropagateIF for AssignStack {
                         .unwrap_or(self.root_level);
 
                     debug_assert_eq!(self.assigned(other), None);
-                    // if ci == 392 {
-                    //     println!(
-                    //         "unit propagation: {other} by {ci} at {dl}: PROPAGATE1 {}; next is {:?}",
-                    //         c.is(FlagClause::PROPAGATEBY1),
-                    //         c.next_watch(false_index).as_ci()
-                    //     );
-                    // }
                     self.assign_by_implication(
                         other,
                         AssignReason::Implication(wli.as_ci()),
@@ -495,7 +470,6 @@ impl PropagateIF for AssignStack {
     // 1. (allow eliminated vars)
     //
     fn propagate_sandbox(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
-        panic!();
         #[cfg(feature = "boundary_check")]
         macro_rules! check_in {
             ($cid: expr, $tag :expr) => {
@@ -513,7 +487,7 @@ impl PropagateIF for AssignStack {
         }
         while let Some(p) = self.trail.get(self.q_head) {
             #[cfg(feature = "debug_propagation")]
-            assert!(!self.var[p.vi()].is(Flag::PROPAGATED));
+            debug_assert!(!self.var[p.vi()].is(Flag::PROPAGATED));
             #[cfg(feature = "debug_propagation")]
             self.var[p.vi()].turn_on(Flag::PROPAGATED);
 

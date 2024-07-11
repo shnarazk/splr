@@ -254,7 +254,7 @@ impl ClauseDBIF for ClauseDB {
         }
         self.certification_store.add_clause(vec);
         let ci = self.get_free_index();
-        assert_ne!(0, ci);
+        debug_assert_ne!(0, ci);
         self[ci].flags = FlagClause::empty();
         std::mem::swap(&mut self[ci].lits, vec);
         let len2 = self[ci].lits.len() == 2;
@@ -279,8 +279,8 @@ impl ClauseDBIF for ClauseDB {
             std::mem::swap(&mut tmp, &mut self.lbd_temp);
             self[ci].update_lbd(asg, &mut tmp);
             std::mem::swap(&mut tmp, &mut self.lbd_temp);
-            assert_eq!(l0, self[ci].lits[0]);
-            assert_eq!(l1, self[ci].lits[1]);
+            debug_assert_eq!(l0, self[ci].lits[0]);
+            debug_assert_eq!(l1, self[ci].lits[1]);
             self[ci].search_from = 0;
             self.weave(ci);
             // self.insert_watch(ci, 0);
@@ -305,9 +305,6 @@ impl ClauseDBIF for ClauseDB {
         {
             self[ci].reward = 0.0;
             self[ci].timestamp = *tick;
-        }
-        if ci == 392 {
-            println!("!!!!!!!!!!!!!!! new_clause {ci} {:?}", &self[ci]);
         }
         RefClause::Clause(ci)
     }
@@ -752,6 +749,7 @@ impl ClauseDBIF for ClauseDB {
         // assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
         let ret: WatchLiteralIndex = self.clause[wli.as_ci()].links[wli.as_wi()].next;
         self.reweave(wli.as_ci(), wli.as_wi(), new);
+        #[cfg(debug)]
         self.check_weave(wli.as_ci(), &[0, 1]);
         ret
     }
@@ -1143,13 +1141,13 @@ const NEFR_WATCH_INDEX: usize = 0;
 impl ClauseWeaverIF for ClauseDB {
     fn weave(&mut self, ci: ClauseIndex) {
         // attach each watch literal to watcher list
-        assert!(2 < self.clause[ci].lits.len());
+        debug_assert!(2 < self.clause[ci].lits.len());
         for wi in 0..=1 {
             let lit: usize = usize::from(!self.clause[ci].lits[wi]);
             let wli = WatchLiteralIndex::new(ci, wi);
             let head: &mut WatchLiteralIndexRef = &mut self.watch[lit];
             let next: WatchLiteralIndex = head.next;
-            assert_ne!(next, wli);
+            debug_assert_ne!(next, wli);
             head.next = wli;
             self.clause[ci].links[wi].prev = WatchLiteralIndex::default();
             self.clause[ci].links[wi].next = next;
@@ -1158,16 +1156,17 @@ impl ClauseWeaverIF for ClauseDB {
             } else {
                 self.clause[next.as_ci()].links[next.as_wi()].prev = wli;
             }
-            assert!(
+            debug_assert!(
                 (self.clause[ci].links[wi].prev != self.clause[ci].links[wi].next)
                     || (self.clause[ci].links[wi].prev == WatchLiteralIndex::default()
                         && self.clause[ci].links[wi].next == WatchLiteralIndex::default())
             );
         }
+        #[cfg(debug)]
         self.check_weave(ci, &[0, 1]);
     }
     fn unweave(&mut self, ci: ClauseIndex, wi: usize) {
-        assert!(wi < 2);
+        debug_assert!(wi < 2);
         let WatchLiteralIndexRef { prev, next } = self.clause[ci].links[wi];
         let lit: usize = usize::from(!self.clause[ci].lits[wi]);
         if prev.is_none() {
@@ -1182,8 +1181,8 @@ impl ClauseWeaverIF for ClauseDB {
         }
     }
     fn reweave(&mut self, ci: ClauseIndex, wi: usize, wj: usize) {
-        assert!(wi < 2);
-        assert!((wi == 1 && wj == 1) || 2 <= wj, "not {wi} < {wj}");
+        debug_assert!(wi < 2);
+        debug_assert!((wi == 1 && wj == 1) || 2 <= wj, "not {wi} < {wj}");
         // 1. unlink wi
         let WatchLiteralIndexRef { prev, next } = self.clause[ci].links[wi];
         let lit: usize = usize::from(!self.clause[ci].lits[wi]);
@@ -1199,12 +1198,12 @@ impl ClauseWeaverIF for ClauseDB {
         }
         // 2. swap two literals
         let lit: usize = if wi == wj {
-            assert_eq!(wi, 1);
+            debug_assert_eq!(wi, 1);
 
-            if self.clause[ci].lits[FREE_WATCH_INDEX] == Lit::default() {
-                dbg!(ci, &self.clause[ci]);
-            }
-            assert_ne!(self.clause[ci].lits[FREE_WATCH_INDEX], Lit::default());
+            // if self.clause[ci].lits[FREE_WATCH_INDEX] == Lit::default() {
+            //     dbg!(ci, &self.clause[ci]);
+            // }
+            debug_assert_ne!(self.clause[ci].lits[FREE_WATCH_INDEX], Lit::default());
             self.clause[ci].lits[FREE_WATCH_INDEX] = Lit::default();
             FREE_LIT
         } else {
@@ -1223,11 +1222,12 @@ impl ClauseWeaverIF for ClauseDB {
         } else {
             self.clause[next.as_ci()].links[next.as_wi()].prev = wli;
         }
-        assert!(
+        debug_assert!(
             (self.clause[ci].links[wi].prev != self.clause[ci].links[wi].next)
                 || (self.clause[ci].links[wi].prev == WatchLiteralIndex::default()
                     && self.clause[ci].links[wi].next == WatchLiteralIndex::default())
         );
+        #[cfg(debug)]
         if wi == wj {
             self.check_weave(ci, &[FREE_WATCH_INDEX]);
         } else {
@@ -1265,6 +1265,7 @@ impl ClauseWeaverIF for ClauseDB {
             // assert_ne!(1, self.clause.len());
             self.clause.len() - 1
         } else {
+            #[cfg(debug)]
             self.check_weave(next.as_ci(), &[FREE_WATCH_INDEX]);
             self.unweave(next.as_ci(), FREE_WATCH_INDEX);
             // self.watch[FREE_LIT].next = self.clause[next.as_ci()].links[next.as_wi()].next;
@@ -1272,12 +1273,12 @@ impl ClauseWeaverIF for ClauseDB {
             // if *prev == next {
             //     *prev = WatchLiteralIndex::default();
             // }
-            assert_eq!(
+            debug_assert_eq!(
                 self.clause[next.as_ci()].lits[FREE_WATCH_INDEX],
                 Lit::default(),
             );
-            assert_ne!(next, self.watch[FREE_LIT].next);
-            assert_ne!(0, next.as_ci());
+            debug_assert_ne!(next, self.watch[FREE_LIT].next);
+            debug_assert_ne!(0, next.as_ci());
             next.as_ci()
         }
     }
