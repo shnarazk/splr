@@ -276,16 +276,11 @@ impl ClauseDBIF for ClauseDB {
                 }
             }
         } else {
-            let mut tmp: Vec<usize> = Vec::new();
-            std::mem::swap(&mut tmp, &mut self.lbd_temp);
-            self[ci].update_lbd(asg, &mut tmp);
-            std::mem::swap(&mut tmp, &mut self.lbd_temp);
+            self[ci].update_lbd(asg);
             debug_assert_eq!(l0, self[ci].lits[0]);
             debug_assert_eq!(l1, self[ci].lits[1]);
             self[ci].search_from = 0;
             self.weave(ci);
-            // self.insert_watch(ci, 0);
-            // self.insert_watch(ci, 1);
         }
         self[ci].rank_old = self[ci].rank;
         self.lbd.update(self[ci].rank);
@@ -328,12 +323,9 @@ impl ClauseDBIF for ClauseDB {
             self[ci].rank = 1;
             self.binary_link.add(l0, l1, ci);
         } else {
-            let mut tmp: Vec<usize> = Vec::new();
-            std::mem::swap(&mut tmp, &mut self.lbd_temp);
             self[ci].search_from = 0;
-            self[ci].update_lbd(asg, &mut tmp);
+            self[ci].update_lbd(asg);
             self[ci].turn_on(FlagClause::LEARNT);
-            std::mem::swap(&mut tmp, &mut self.lbd_temp);
             self.weave(ci);
             // self.insert_watch(ci, 0);
             // self.insert_watch(ci, 1);
@@ -759,7 +751,7 @@ impl ClauseDBIF for ClauseDB {
         let c = &mut self.clause[ci];
         // Updating LBD at every analysis seems redundant.
         // But it's crucial. Don't remove the below.
-        let rank = c.update_lbd(asg, &mut self.lbd_temp);
+        let rank = c.update_lbd(asg);
         let learnt = c.is(FlagClause::LEARNT);
         if learnt {
             #[cfg(feature = "just_used")]
@@ -784,7 +776,6 @@ impl ClauseDBIF for ClauseDB {
         }
         let ClauseDB {
             ref mut clause,
-            ref mut lbd_temp,
             ref mut num_reduction,
 
             #[cfg(feature = "clause_rewarding")]
@@ -803,7 +794,7 @@ impl ClauseDBIF for ClauseDB {
             .skip(1)
             .filter(|(_, c)| !c.is_dead())
         {
-            c.update_lbd(asg, lbd_temp);
+            c.update_lbd(asg);
 
             #[cfg(feature = "clause_rewarding")]
             c.update_activity(*tick, *activity_decay, 0.0);

@@ -268,7 +268,7 @@ impl WatcherLinkIF for Clause {
 impl Clause {
     /// update rank field with the present LBD.
     // If it's big enough, skip the loop.
-    pub fn update_lbd(&mut self, asg: &impl AssignIF, _lbd_temp: &mut [usize]) -> usize {
+    pub fn update_lbd(&mut self, asg: &impl AssignIF) -> usize {
         let base_level = asg.root_level();
         let mut rank = 0;
         let mut levels: HashSet<DecisionLevel> = HashSet::new();
