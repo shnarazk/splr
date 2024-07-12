@@ -156,7 +156,7 @@ impl From<&Clause> for Vec<i32> {
 
 impl ClauseIF for Clause {
     fn is_dead(&self) -> bool {
-        self.is(FlagClause::DEAD)
+        self.lits[1] == Lit::default()
     }
     fn iter(&self) -> Iter<'_, Lit> {
         self.lits.iter()
