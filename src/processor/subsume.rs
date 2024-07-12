@@ -35,7 +35,7 @@ impl Eliminator {
                     cdb[ci].turn_off(FlagClause::LEARNT);
                 }
                 self.remove_cid_occur(asg, di, &mut cdb[di]);
-                cdb.delete_clause(ci);
+                cdb.delete_clause(di);
                 self.num_subsumed += 1;
             }
             // To avoid making a big clause, we have to add a condition for combining them.
@@ -103,7 +103,7 @@ fn strengthen_clause(
     debug_assert!(!cdb[ci].is_dead());
     debug_assert!(1 < cdb[ci].len());
     match cdb.transform_by_elimination(ci, l) {
-        RefClause::Clause(_ci) => {
+        RefClause::Clause(_) => {
             #[cfg(feature = "trace_elimination")]
             println!("ci {} drops literal {}", ci, l);
 

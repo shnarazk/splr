@@ -261,8 +261,8 @@ impl Eliminator {
             return;
         }
         // let evo = self.eliminate_var_occurrence_limit;
-        let mut checked: Vec<VarId> = Vec::new();
-        let clause_size = c.len();
+        // let mut checked: Vec<VarId> = Vec::new();
+        // let clause_size = c.len();
         for l in c.iter() {
             let vi = l.vi();
             let v = &mut asg.var_mut(vi);
@@ -270,15 +270,15 @@ impl Eliminator {
             //     !checked.contains(&vi),
             //     "eliminator::add_cid_occur356: {c:?}"
             // );
-            checked.push(vi);
+            // checked.push(vi);
             let w = &mut self[l.vi()];
             if w.aborted {
                 continue;
             }
-            if 12 < clause_size {
-                w.aborted = true;
-                continue;
-            }
+            // if 12 < clause_size {
+            //     w.aborted = true;
+            //     continue;
+            // }
             /* let pl = w.pos_occurs.len();
             let nl = w.neg_occurs.len();
             if evo < pl * nl {

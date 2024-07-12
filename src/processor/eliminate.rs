@@ -23,11 +23,11 @@ pub fn eliminate_var(
     // count only alive clauses
     // Note: it may contain the target literal somehow. So the following may be failed.
     // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, true)))));
-    w.pos_occurs
-        .retain(|&c| cdb[c].contains(Lit::from((vi, true))));
+    // w.pos_occurs
+    //     .retain(|&c| cdb[c].contains(Lit::from((vi, true))));
     // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, false)))));
-    w.neg_occurs
-        .retain(|&c| cdb[c].contains(Lit::from((vi, false))));
+    // w.neg_occurs
+    //     .retain(|&c| cdb[c].contains(Lit::from((vi, false))));
 
     if skip_var_elimination(
         asg,
@@ -39,8 +39,8 @@ pub fn eliminate_var(
     ) {
         return Ok(());
     }
-    let pos = w.pos_occurs.clone();
-    let neg = w.neg_occurs.clone();
+    let pos: Vec<usize> = w.pos_occurs.clone();
+    let neg: Vec<usize> = w.neg_occurs.clone();
     #[cfg(feature = "trace_elimination")]
     println!("# eliminate_var {}", vi);
     // OK, eliminate the literal and build constraints on it.
@@ -82,7 +82,13 @@ pub fn eliminate_var(
                     }
                 }
                 _ => {
-                    // debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
+                    debug_assert!(
+                        vec.iter().all(|l| l.vi() != vi),
+                        "c{} and c{} emit {:?}",
+                        p,
+                        n,
+                        &vec
+                    );
                     match cdb.new_clause(asg, vec, learnt_p && cdb[*n].is(FlagClause::LEARNT)) {
                         RefClause::Clause(ci) => {
                             // the merged clause might be a duplicated clause.
@@ -134,6 +140,22 @@ pub fn eliminate_var(
         elim.remove_cid_occur(asg, *ci, &mut cdb[*ci]);
         cdb.delete_clause(*ci);
     }
+    /*
+    // check completeness
+    for (ci, c) in cdb.iter().enumerate().skip(1) {
+        if !(c.iter().all(|l| l.vi() != vi) || c.is_dead()) {
+            dbg!(
+                vi,
+                ci,
+                c,
+                pos.contains(&ci),
+                neg.contains(&ci),
+                elim[vi].aborted
+            );
+        }
+        assert!(c.iter().all(|l| l.vi() != vi) || c.is_dead());
+    }
+    */
     elim[vi].clear();
     asg.handle(SolverEvent::Eliminate(vi));
     state.restart.handle(SolverEvent::Eliminate(vi));
