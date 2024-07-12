@@ -749,7 +749,7 @@ impl ClauseDBIF for ClauseDB {
         // assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
         // maintain_watch_literal
         // assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
-        let ret: WatchLiteralIndex = self.clause[wli.as_ci()].links[wli.as_wi()].next;
+        let ret: WatchLiteralIndex = self.clause[wli.as_ci()].link[wli.as_wi()].next;
         self.reweave(wli.as_ci(), wli.as_wi(), new);
         #[cfg(debug)]
         self.check_weave(wli.as_ci(), &[0, 1]);
@@ -1151,17 +1151,17 @@ impl ClauseWeaverIF for ClauseDB {
             let next: WatchLiteralIndex = head.next;
             debug_assert_ne!(next, wli);
             head.next = wli;
-            self.clause[ci].links[wi].prev = WatchLiteralIndex::default();
-            self.clause[ci].links[wi].next = next;
+            self.clause[ci].link[wi].prev = WatchLiteralIndex::default();
+            self.clause[ci].link[wi].next = next;
             if next.is_none() {
                 head.prev = wli;
             } else {
-                self.clause[next.as_ci()].links[next.as_wi()].prev = wli;
+                self.clause[next.as_ci()].link[next.as_wi()].prev = wli;
             }
             debug_assert!(
-                (self.clause[ci].links[wi].prev != self.clause[ci].links[wi].next)
-                    || (self.clause[ci].links[wi].prev == WatchLiteralIndex::default()
-                        && self.clause[ci].links[wi].next == WatchLiteralIndex::default())
+                (self.clause[ci].link[wi].prev != self.clause[ci].link[wi].next)
+                    || (self.clause[ci].link[wi].prev == WatchLiteralIndex::default()
+                        && self.clause[ci].link[wi].next == WatchLiteralIndex::default())
             );
         }
         #[cfg(debug)]
@@ -1169,34 +1169,34 @@ impl ClauseWeaverIF for ClauseDB {
     }
     fn unweave(&mut self, ci: ClauseIndex, wi: usize) {
         debug_assert!(wi < 2);
-        let WatchLiteralIndexRef { prev, next } = self.clause[ci].links[wi];
+        let WatchLiteralIndexRef { prev, next } = self.clause[ci].link[wi];
         let lit: usize = usize::from(!self.clause[ci].lits[wi]);
         if prev.is_none() {
             self.watch[lit].next = next;
         } else {
-            self.clause[prev.as_ci()].links[prev.as_wi()].next = next;
+            self.clause[prev.as_ci()].link[prev.as_wi()].next = next;
         }
         if next.is_none() {
             self.watch[lit].prev = prev;
         } else {
-            self.clause[next.as_ci()].links[next.as_wi()].prev = prev;
+            self.clause[next.as_ci()].link[next.as_wi()].prev = prev;
         }
     }
     fn reweave(&mut self, ci: ClauseIndex, wi: usize, wj: usize) {
         debug_assert!(wi < 2);
         debug_assert!((wi == 1 && wj == 1) || 2 <= wj, "not {wi} < {wj}");
         // 1. unlink wi
-        let WatchLiteralIndexRef { prev, next } = self.clause[ci].links[wi];
+        let WatchLiteralIndexRef { prev, next } = self.clause[ci].link[wi];
         let lit: usize = usize::from(!self.clause[ci].lits[wi]);
         if prev.is_none() {
             self.watch[lit].next = next;
         } else {
-            self.clause[prev.as_ci()].links[prev.as_wi()].next = next;
+            self.clause[prev.as_ci()].link[prev.as_wi()].next = next;
         }
         if next.is_none() {
             self.watch[lit].prev = prev;
         } else {
-            self.clause[next.as_ci()].links[next.as_wi()].prev = prev;
+            self.clause[next.as_ci()].link[next.as_wi()].prev = prev;
         }
         // 2. swap two literals
         let lit: usize = if wi == wj {
@@ -1223,17 +1223,17 @@ impl ClauseWeaverIF for ClauseDB {
         let head: &mut WatchLiteralIndexRef = &mut self.watch[lit];
         let next: WatchLiteralIndex = head.next;
         head.next = wli;
-        self.clause[ci].links[wi].prev = WatchLiteralIndex::default();
-        self.clause[ci].links[wi].next = next;
+        self.clause[ci].link[wi].prev = WatchLiteralIndex::default();
+        self.clause[ci].link[wi].next = next;
         if next.is_none() {
             head.prev = wli;
         } else {
-            self.clause[next.as_ci()].links[next.as_wi()].prev = wli;
+            self.clause[next.as_ci()].link[next.as_wi()].prev = wli;
         }
         debug_assert!(
-            (self.clause[ci].links[wi].prev != self.clause[ci].links[wi].next)
-                || (self.clause[ci].links[wi].prev == WatchLiteralIndex::default()
-                    && self.clause[ci].links[wi].next == WatchLiteralIndex::default())
+            (self.clause[ci].link[wi].prev != self.clause[ci].link[wi].next)
+                || (self.clause[ci].link[wi].prev == WatchLiteralIndex::default()
+                    && self.clause[ci].link[wi].next == WatchLiteralIndex::default())
         );
         #[cfg(debug)]
         if wi == wj {
@@ -1246,7 +1246,7 @@ impl ClauseWeaverIF for ClauseDB {
         // ci 0 must refer to the header
         let nc = clauses.len();
         for (ci, c) in clauses.iter_mut().enumerate().skip(1) {
-            c.links[FREE_WATCH_INDEX].set(
+            c.link[FREE_WATCH_INDEX].set(
                 WatchLiteralIndex::new(ci - 1, FREE_WATCH_INDEX),
                 WatchLiteralIndex::new((ci + 1) % nc, FREE_WATCH_INDEX),
             );
@@ -1254,8 +1254,8 @@ impl ClauseWeaverIF for ClauseDB {
         }
         let mut watches = vec![WatchLiteralIndexRef::default(); 2 * (num_vars + 1)];
         if 1 < nc {
-            clauses[1].links[FREE_WATCH_INDEX].prev = WatchLiteralIndex::default();
-            clauses[nc - 1].links[FREE_WATCH_INDEX].next = WatchLiteralIndex::default();
+            clauses[1].link[FREE_WATCH_INDEX].prev = WatchLiteralIndex::default();
+            clauses[nc - 1].link[FREE_WATCH_INDEX].next = WatchLiteralIndex::default();
             watches[FREE_LIT].set(
                 WatchLiteralIndex::new(nc - 1, FREE_WATCH_INDEX),
                 WatchLiteralIndex::new(1, FREE_WATCH_INDEX),
@@ -1439,7 +1439,7 @@ impl ClauseDB {
                 if ptr.as_ci() == ci {
                     found = true;
                 }
-                ptr = self.clause[ptr.as_ci()].links[ptr.as_wi()].next;
+                ptr = self.clause[ptr.as_ci()].link[ptr.as_wi()].next;
                 forward += 1;
                 assert!(
                     forward < 10000,
@@ -1462,7 +1462,7 @@ impl ClauseDB {
                 if ptr.as_ci() == ci {
                     found = true;
                 }
-                ptr = self.clause[ptr.as_ci()].links[ptr.as_wi()].prev;
+                ptr = self.clause[ptr.as_ci()].link[ptr.as_wi()].prev;
                 backward += 1;
                 assert!(
                     backward < 10000,

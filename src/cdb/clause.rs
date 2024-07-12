@@ -39,7 +39,7 @@ pub trait ClauseIF {
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct Clause {
     /// links. Note: watch0 is also used as freelist
-    pub(super) links: [WatchLiteralIndexRef; 2],
+    pub(super) link: [WatchLiteralIndexRef; 2],
     /// The literals in a clause.
     pub(super) lits: Vec<Lit>,
     /// Flags (8 bits)
@@ -69,7 +69,7 @@ pub struct Clause {
 impl Default for Clause {
     fn default() -> Clause {
         Clause {
-            links: [
+            link: [
                 WatchLiteralIndexRef::default(),
                 WatchLiteralIndexRef::default(),
             ],
@@ -252,16 +252,16 @@ impl fmt::Display for Clause {
 
 impl WatcherLinkIF for Clause {
     fn next_watch(&self, wi: usize) -> WatchLiteralIndex {
-        self.links[wi].next
+        self.link[wi].next
     }
     fn prev_watch(&self, wi: usize) -> WatchLiteralIndex {
-        self.links[wi].prev
+        self.link[wi].prev
     }
     fn next_watch_mut(&mut self, wi: usize) -> &mut WatchLiteralIndex {
-        &mut self.links[wi].next
+        &mut self.link[wi].next
     }
     fn prev_watch_mut(&mut self, wi: usize) -> &mut WatchLiteralIndex {
-        &mut self.links[wi].prev
+        &mut self.link[wi].prev
     }
 }
 
