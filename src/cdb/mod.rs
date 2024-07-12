@@ -1147,25 +1147,48 @@ impl ClauseWeaverIF for ClauseDB {
     fn weave(&mut self, ci: ClauseIndex) {
         // attach each watch literal to watcher list
         debug_assert!(2 < self.clause[ci].lits.len());
-        for wi in 0..=1 {
-            let lit: usize = usize::from(!self.clause[ci].lits[wi]);
-            let wli = WatchLiteralIndex::new(ci, wi);
-            let head: &mut WatchLiteralIndexRef = &mut self.watch[lit];
-            let next: WatchLiteralIndex = head.next;
-            debug_assert_ne!(next, wli);
-            head.next = wli;
-            self.clause[ci].link[wi].prev = WatchLiteralIndex::default();
-            self.clause[ci].link[wi].next = next;
-            if next.is_none() {
-                head.prev = wli;
-            } else {
-                self.clause[next.as_ci()].link[next.as_wi()].prev = wli;
+        if self.clause[ci].len() < 4 {
+            for wi in 0..=1 {
+                let lit: usize = usize::from(!self.clause[ci].lits[wi]);
+                let wli = WatchLiteralIndex::new(ci, wi);
+                let head: &mut WatchLiteralIndexRef = &mut self.watch[lit];
+                let next: WatchLiteralIndex = head.next;
+                debug_assert_ne!(next, wli);
+                head.next = wli;
+                self.clause[ci].link[wi].prev = WatchLiteralIndex::default();
+                self.clause[ci].link[wi].next = next;
+                if next.is_none() {
+                    head.prev = wli;
+                } else {
+                    self.clause[next.as_ci()].link[next.as_wi()].prev = wli;
+                }
+                debug_assert!(
+                    (self.clause[ci].link[wi].prev != self.clause[ci].link[wi].next)
+                        || (self.clause[ci].link[wi].prev == WatchLiteralIndex::default()
+                            && self.clause[ci].link[wi].next == WatchLiteralIndex::default())
+                );
             }
-            debug_assert!(
-                (self.clause[ci].link[wi].prev != self.clause[ci].link[wi].next)
-                    || (self.clause[ci].link[wi].prev == WatchLiteralIndex::default()
-                        && self.clause[ci].link[wi].next == WatchLiteralIndex::default())
-            );
+        } else {
+            for wi in 0..=1 {
+                let lit: usize = usize::from(!self.clause[ci].lits[wi]);
+                let wli = WatchLiteralIndex::new(ci, wi);
+                let head: &mut WatchLiteralIndexRef = &mut self.watch[lit];
+                let prev: WatchLiteralIndex = head.prev;
+                debug_assert_ne!(prev, wli);
+                head.prev = wli;
+                self.clause[ci].link[wi].prev = prev;
+                self.clause[ci].link[wi].next = WatchLiteralIndex::default();
+                if prev.is_none() {
+                    head.next = wli;
+                } else {
+                    self.clause[prev.as_ci()].link[prev.as_wi()].next = wli;
+                }
+                debug_assert!(
+                    (self.clause[ci].link[wi].prev != self.clause[ci].link[wi].next)
+                        || (self.clause[ci].link[wi].prev == WatchLiteralIndex::default()
+                            && self.clause[ci].link[wi].next == WatchLiteralIndex::default())
+                );
+            }
         }
         #[cfg(debug)]
         self.check_weave(ci, &[0, 1]);
@@ -1223,26 +1246,39 @@ impl ClauseWeaverIF for ClauseDB {
         // 3. link to watch list by new wi
         let wli = WatchLiteralIndex::new(ci, wi);
         let head: &mut WatchLiteralIndexRef = &mut self.watch[lit];
-        let next: WatchLiteralIndex = head.next;
-        head.next = wli;
-        self.clause[ci].link[wi].prev = WatchLiteralIndex::default();
-        self.clause[ci].link[wi].next = next;
-        if next.is_none() {
+        if self.clause[ci].len() < 4 {
+            let next: WatchLiteralIndex = head.next;
+            head.next = wli;
+            self.clause[ci].link[wi].prev = WatchLiteralIndex::default();
+            self.clause[ci].link[wi].next = next;
+            if next.is_none() {
+                head.prev = wli;
+            } else {
+                self.clause[next.as_ci()].link[next.as_wi()].prev = wli;
+            }
+            debug_assert!(
+                (self.clause[ci].link[wi].prev != self.clause[ci].link[wi].next)
+                    || (self.clause[ci].link[wi].prev == WatchLiteralIndex::default()
+                        && self.clause[ci].link[wi].next == WatchLiteralIndex::default())
+            );
+        } else {
+            let prev: WatchLiteralIndex = head.prev;
             head.prev = wli;
-        } else {
-            self.clause[next.as_ci()].link[next.as_wi()].prev = wli;
+            self.clause[ci].link[wi].prev = prev;
+            self.clause[ci].link[wi].next = WatchLiteralIndex::default();
+            if prev.is_none() {
+                head.next = wli;
+            } else {
+                self.clause[prev.as_ci()].link[prev.as_wi()].next = wli;
+            }
+            debug_assert!(
+                (self.clause[ci].link[wi].prev != self.clause[ci].link[wi].next)
+                    || (self.clause[ci].link[wi].prev == WatchLiteralIndex::default()
+                        && self.clause[ci].link[wi].next == WatchLiteralIndex::default())
+            );
         }
-        debug_assert!(
-            (self.clause[ci].link[wi].prev != self.clause[ci].link[wi].next)
-                || (self.clause[ci].link[wi].prev == WatchLiteralIndex::default()
-                    && self.clause[ci].link[wi].next == WatchLiteralIndex::default())
-        );
         #[cfg(debug)]
-        if wi == wj {
-            self.check_weave(ci, &[FREE_WATCH_INDEX]);
-        } else {
-            self.check_weave(ci, &[0, 1]);
-        }
+        self.check_weave(ci, &[wi]);
     }
     fn make_watches(num_vars: usize, clauses: &mut [Clause]) -> Vec<WatchLiteralIndexRef> {
         // ci 0 must refer to the header
