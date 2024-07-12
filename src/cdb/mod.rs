@@ -347,6 +347,7 @@ impl ClauseDBIF for ClauseDB {
         RefClause::Clause(ci)
     }
     fn delete_clause(&mut self, ci: ClauseIndex) {
+        debug_assert_ne!(Lit::default(), self.clause[ci].lit1());
         if !self.clause[ci].is(FlagClause::SANDBOX) {
             let c = &self.clause[ci];
             self.certification_store.delete_clause(&c.lits);
@@ -362,11 +363,12 @@ impl ClauseDBIF for ClauseDB {
             self.binary_link
                 .remove(self.clause[ci].lits[0], self.clause[ci].lits[1])
                 .expect("ilegal biclause found");
+            self.clause[ci].lits[FREE_WATCH_INDEX] = Lit::default();
+            self.clause[ci].turn_on(FlagClause::DEAD);
         } else {
             self.unweave(ci, NEFR_WATCH_INDEX);
             self.reweave(ci, FREE_WATCH_INDEX, FREE_WATCH_INDEX);
         }
-        self.clause[ci].turn_on(FlagClause::DEAD);
     }
 
     //
@@ -1203,8 +1205,14 @@ impl ClauseWeaverIF for ClauseDB {
             // if self.clause[ci].lits[FREE_WATCH_INDEX] == Lit::default() {
             //     dbg!(ci, &self.clause[ci]);
             // }
-            debug_assert_ne!(self.clause[ci].lits[FREE_WATCH_INDEX], Lit::default());
+            debug_assert_ne!(
+                self.clause[ci].lits[FREE_WATCH_INDEX],
+                Lit::default(),
+                "{ci}: self.clause[ci].lits[FREE_WATCH_INDEX]{}",
+                self.clause[ci].lits[FREE_WATCH_INDEX]
+            );
             self.clause[ci].lits[FREE_WATCH_INDEX] = Lit::default();
+            self.clause[ci].turn_on(FlagClause::DEAD);
             FREE_LIT
         } else {
             self.clause[ci].lits.swap(wi, wj);
