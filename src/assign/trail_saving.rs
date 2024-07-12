@@ -79,23 +79,16 @@ impl TrailSavingIF for AssignStack {
                     );
                 }
                 // reason refinement by ignoring this dependecy
-                (None, AssignReason::Implication(c)) if q < cdb[c].rank => {
+                (None, AssignReason::Implication(wli)) if q < cdb[wli.as_ci()].rank => {
                     self.insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
-                (None, AssignReason::Implication(cid)) => {
-                    debug_assert_eq!(
-                        if cdb[cid].is(FlagClause::PROPAGATEBY1) {
-                            cdb[cid].lit1()
-                        } else {
-                            cdb[cid].lit0()
-                        },
-                        lit
-                    );
-                    debug_assert!(cdb[cid]
+                (None, AssignReason::Implication(wli)) => {
+                    debug_assert_eq!(cdb[wli], lit);
+                    debug_assert!(cdb[wli.as_ci()]
                         .iter()
                         .enumerate()
-                        .filter(|(i, _)| *i != cdb[cid].is(FlagClause::PROPAGATEBY1) as usize)
+                        .filter(|(i, _)| *i != wli.as_wi())
                         .all(|(_, l)| self.assigned(*l) == Some(false)));
                     self.num_repropagation += 1;
 
@@ -113,18 +106,13 @@ impl TrailSavingIF for AssignStack {
                     self.clear_saved_trail();
                     return Err((lit, old_reason));
                 }
-                (Some(false), AssignReason::Implication(cid)) => {
-                    debug_assert!(cdb[cid].iter().all(|l| self.assigned(*l) == Some(false)));
+                (Some(false), AssignReason::Implication(wli)) => {
+                    debug_assert!(cdb[wli.as_ci()]
+                        .iter()
+                        .all(|l| self.assigned(*l) == Some(false)));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_saved_trail();
-                    return Err((
-                        if cdb[cid].is(FlagClause::PROPAGATEBY1) {
-                            cdb[cid].lit1()
-                        } else {
-                            cdb[cid].lit0()
-                        },
-                        AssignReason::Implication(cid),
-                    ));
+                    return Err((cdb[wli], AssignReason::Implication(wli)));
                 }
                 (_, AssignReason::Decision(lvl)) => {
                     debug_assert_ne!(0, lvl);

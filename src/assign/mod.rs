@@ -99,7 +99,7 @@ pub enum AssignReason {
     /// Assigned by decision
     Decision(DecisionLevel),
     /// Assigned by a non-binary clause.
-    Implication(ClauseIndex),
+    Implication(WatchLiteralIndex),
     /// None of the above.
     None,
 }
@@ -110,7 +110,7 @@ impl fmt::Display for AssignReason {
             &AssignReason::BinaryLink(_) => write!(f, "Implied by a binary clause"),
             AssignReason::Decision(0) => write!(f, "Asserted"),
             AssignReason::Decision(lvl) => write!(f, "Decided at level {lvl}"),
-            AssignReason::Implication(cid) => write!(f, "Implied by {cid}"),
+            AssignReason::Implication(wli) => write!(f, "Implied by {wli:?}"),
             AssignReason::None => write!(f, "Not assigned"),
         }
     }

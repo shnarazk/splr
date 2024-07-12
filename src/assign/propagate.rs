@@ -382,7 +382,6 @@ impl PropagateIF for AssignStack {
             'next_clause: while !wli.is_none() {
                 let (ci, false_index) = wli.indices();
                 let c = &mut cdb[ci];
-                // c.turn_off(FlagClause::PROPAGATEBY1);
                 debug_assert!(
                     c.lit0() == false_lit || c.lit1() == false_lit,
                     "Clause{ci}:{c:?} does not have {false_lit}"
@@ -400,10 +399,9 @@ impl PropagateIF for AssignStack {
                     // debug_assert!(c
                     //     .iter()
                     //     .all(|l| lit_assign!(self.var[l.vi()], *l) == Some(false)));
-                    c.set(FlagClause::PROPAGATEBY1, false_index == 0);
                     debug_assert_eq!(other, c[1 - false_index]);
                     check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
-                    conflict_path!(other, AssignReason::Implication(wli.as_ci()));
+                    conflict_path!(other, AssignReason::Implication(!wli));
                 }
                 let start = c.search_from as usize;
                 let len = c.len() - 2;
@@ -423,10 +421,9 @@ impl PropagateIF for AssignStack {
                         continue 'next_clause;
                     }
                 }
-                c.set(FlagClause::PROPAGATEBY1, false_index == 0);
                 if other_value == Some(false) {
                     check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
-                    conflict_path!(other, AssignReason::Implication(wli.as_ci()));
+                    conflict_path!(other, AssignReason::Implication(!wli));
                 } else {
                     #[cfg(feature = "chrono_BT")]
                     let dl = cdb[cid]
@@ -439,7 +436,7 @@ impl PropagateIF for AssignStack {
                     debug_assert_eq!(self.assigned(other), None);
                     self.assign_by_implication(
                         other,
-                        AssignReason::Implication(wli.as_ci()),
+                        AssignReason::Implication(!wli),
                         #[cfg(feature = "chrono_BT")]
                         dl,
                     );
@@ -562,15 +559,14 @@ impl PropagateIF for AssignStack {
                         continue 'next_clause;
                     }
                 }
-                c.set(FlagClause::PROPAGATEBY1, false_index == 0);
                 if other_value == Some(false) {
                     check_in!(
                         ci,
                         Propagate::SandboxEmitConflict(self.num_conflict, propagating)
                     );
-                    return Err((other, AssignReason::Implication(wli.as_ci())));
+                    return Err((other, AssignReason::Implication(!wli)));
                 }
-                self.assign_by_implication(other, AssignReason::Implication(wli.as_ci()));
+                self.assign_by_implication(other, AssignReason::Implication(!wli));
                 check_in!(cid, Propagate::SandboxBecameUnit(self.num_conflict));
                 wli = c.next_watch(false_index);
             }

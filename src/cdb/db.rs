@@ -116,6 +116,19 @@ impl IndexMut<ClauseIndex> for ClauseDB {
     }
 }
 
+impl Index<WatchLiteralIndex> for ClauseDB {
+    type Output = Lit;
+    fn index(&self, wli: WatchLiteralIndex) -> &Lit {
+        &self.clause[wli.as_ci()].lits[wli.as_wi()]
+    }
+}
+
+impl IndexMut<WatchLiteralIndex> for ClauseDB {
+    fn index_mut(&mut self, wli: WatchLiteralIndex) -> &mut Lit {
+        &mut self.clause[wli.as_ci()].lits[wli.as_wi()]
+    }
+}
+
 impl Instantiate for ClauseDB {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> ClauseDB {
         let nv = cnf.num_of_variables;

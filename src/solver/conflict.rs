@@ -32,8 +32,8 @@ pub fn handle_conflict(
     // at higher level due to the incoherence between the current level and conflicting
     // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
     {
-        if let AssignReason::Implication(cid) = cc.1 {
-            if cdb[cid].iter().all(|l| asg.level(l.vi()) == 0) {
+        if let AssignReason::Implication(wli) = cc.1 {
+            if cdb[wli.as_ci()].iter().all(|l| asg.level(l.vi()) == 0) {
                 return Err(SolverError::RootLevelConflict(*cc));
             }
         }
@@ -149,7 +149,7 @@ pub fn handle_conflict(
                 }
             }
             AssignReason::Implication(r) => {
-                for l in cdb[r].iter() {
+                for l in cdb[r.as_ci()].iter() {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
                         asg.reward_at_analysis(vi);
@@ -204,7 +204,7 @@ pub fn handle_conflict(
             debug_assert_eq!(asg.assigned(l0), None);
             asg.assign_by_implication(
                 l0,
-                AssignReason::Implication(cid),
+                AssignReason::Implication(WatchLiteralIndex::new(cid, 0)),
                 #[cfg(feature = "chrono_BT")]
                 assign_level,
             );
@@ -351,47 +351,45 @@ fn conflict_analyze(
                     conflict_level!(vi);
                 }
             }
-            AssignReason::Implication(cid) => {
+            AssignReason::Implication(wli) => {
                 trace!(
                     "analyze clause {}(first literal: {}) for {}",
                     cid,
-                    i32::from(cdb[cid].lit0()),
+                    i32::from(cdb[wli.as_ci()].lit0()),
                     p
                 );
-                debug_assert!(!cdb[cid].is_dead() && 2 < cdb[cid].len());
+                debug_assert!(!cdb[wli.as_ci()].is_dead() && 2 < cdb[wli.as_ci()].len());
                 // if !cdb.update_at_analysis(asg, cid) {
-                if !cdb[cid].is(FlagClause::LEARNT) {
-                    state.derive20.push(cid);
+                let ci = wli.as_ci();
+                if !cdb[ci].is(FlagClause::LEARNT) {
+                    state.derive20.push(ci);
                 }
-                if max_lbd < cdb[cid].rank {
-                    max_lbd = cdb[cid].rank;
-                    ci_with_max_lbd = Some(cid);
+                if max_lbd < cdb[ci].rank {
+                    max_lbd = cdb[ci].rank;
+                    ci_with_max_lbd = Some(ci);
                 }
                 assert_eq!(
                     p,
-                    if cdb[cid].is(FlagClause::PROPAGATEBY1) {
-                        cdb[cid].lit1()
-                    } else {
-                        cdb[cid].lit0()
-                    },
-                    "At level {}, broken implication chain from {:?}@{} to {cid}{:?}",
+                    cdb[wli],
+                    "At level {}, broken implication chain from {:?}@{} to {:?}{:?}",
                     asg.decision_level(),
                     p,
                     asg.level(p.vi()),
-                    &cdb[cid],
+                    wli,
+                    &cdb[wli],
                 );
-                let skip = cdb[cid].is(FlagClause::PROPAGATEBY1) as usize;
+                let skip = wli.as_wi();
                 #[cfg(feature = "trace_analysis")]
                 if skip == 1 {
                     trace!(
                         "AMEND: analyze disordered clause {}{:?}(second literal: {}) for {}",
-                        cid,
-                        cdb[cid],
-                        i32::from(cdb[cid].lit1()),
+                        ci,
+                        cdb[ci],
+                        i32::from(cdb[ci].lit1()),
                         p
                     );
                 }
-                for (i, q) in cdb[cid].iter().enumerate() {
+                for (i, q) in cdb[ci].iter().enumerate() {
                     if i == skip {
                         continue;
                     }
@@ -561,9 +559,9 @@ impl Lit {
                         }
                     }
                 }
-                AssignReason::Implication(cid) => {
-                    let c = &cdb[cid];
-                    let skip = c.is(FlagClause::PROPAGATEBY1) as usize;
+                AssignReason::Implication(wli) => {
+                    let c = &cdb[wli.as_ci()];
+                    let skip = wli.as_wi();
                     for (i, q) in c.iter().enumerate() {
                         if skip == i {
                             continue;
@@ -621,15 +619,15 @@ fn lit_level(
     match asg.reason(lit.vi()) {
         AssignReason::Decision(0) => asg.root_level(),
         AssignReason::Decision(lvl) => lvl,
-        AssignReason::Implication(cid) => {
+        AssignReason::Implication(wli) => {
             assert_eq!(
-                cdb[cid].lit0(),
+                cdb[wli.as_ci()].lit0(),
                 lit,
                 "lit0 {} != lit{}, cid {}, {}",
-                cdb[cid].lit0(),
+                cdb[wli.as_ci()].lit0(),
                 lit,
-                cid,
-                &cdb[cid]
+                wli.as_ci(),
+                &cdb[wli]
             );
             // assert!(
             //     !bag.contains(&lit),
@@ -641,11 +639,10 @@ fn lit_level(
             //     dumper(asg, cdb, bag),
             // );
             // bag.push(lit);
-            let skip = cdb[cid].is(FlagClause::PROPAGATEBY1) as usize;
-            cdb[cid]
+            cdb[wli.as_ci()]
                 .iter()
                 .enumerate()
-                .filter(|(i, _)| *i != skip)
+                .filter(|(i, _)| *i != wli.as_wi())
                 .map(|(_, l)| lit_level(asg, cdb, !*l, bag, _mes))
                 .max()
                 .unwrap()
@@ -669,7 +666,8 @@ fn dumper(asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
             match asg.reason(l.vi()) {
                 AssignReason::Decision(_) => vec![],
                 AssignReason::BinaryLink(lit) => vec![*l, !lit],
-                AssignReason::Implication(cid) => cdb[cid].iter().copied().collect::<Vec<Lit>>(),
+                AssignReason::Implication(wli) =>
+                    cdb[wli.as_ci()].iter().copied().collect::<Vec<Lit>>(),
                 AssignReason::None => vec![],
             },
         )

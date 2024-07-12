@@ -48,6 +48,7 @@ use std::{io::Write, path::Path};
 pub trait ClauseDBIF:
     Instantiate
     + IndexMut<ClauseIndex, Output = Clause>
+    + IndexMut<WatchLiteralIndex, Output = Lit>
     + ClauseWeaverIF
     + PropertyDereference<property::Tusize, usize>
     + PropertyDereference<property::Tf64, f64>
@@ -808,9 +809,12 @@ impl ClauseDBIF for ClauseDB {
             c.update_activity(*tick, *activity_decay, 0.0);
 
             // There's no clause stored in `reason` because the decision level is 'zero.'
-            debug_assert_ne!(
-                asg.reason(c.lit0().vi()),
-                AssignReason::Implication(ci),
+            debug_assert!(
+                [
+                    AssignReason::Implication(WatchLiteralIndex::new(ci, 0)),
+                    AssignReason::Implication(WatchLiteralIndex::new(ci, 1))
+                ]
+                .contains(&asg.reason(c.lit0().vi())),
                 "Lit {} {:?} level {}, dl: {}",
                 i32::from(c.lit0()),
                 asg.assigned(c.lit0()),

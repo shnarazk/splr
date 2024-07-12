@@ -100,13 +100,15 @@ impl VivifyIF for ClauseDB {
                                         asg.backtrack_sandbox();
                                     }
                                 }
-                                AssignReason::Implication(cj) => {
-                                    if cj == ci && clits.len() == decisions.len() {
+                                AssignReason::Implication(wli) => {
+                                    if wli.as_ci() == ci && clits.len() == decisions.len() {
                                         asg.backtrack_sandbox();
                                         continue 'next_clause;
                                     } else {
-                                        let cnfl_lits =
-                                            &self[cj].iter().copied().collect::<Vec<Lit>>();
+                                        let cnfl_lits = &self[wli.as_ci()]
+                                            .iter()
+                                            .copied()
+                                            .collect::<Vec<Lit>>();
                                         seen[0] = num_check;
                                         vec = asg.analyze_sandbox(
                                             self, &decisions, cnfl_lits, &mut seen,
@@ -281,10 +283,9 @@ impl AssignStack {
                 AssignReason::BinaryLink(bil) => {
                     seen[bil.vi()] = key;
                 }
-                AssignReason::Implication(ci) => {
-                    let skip = cdb[ci].is(FlagClause::PROPAGATEBY1) as usize;
-                    for (i, r) in cdb[ci].iter().enumerate() {
-                        if i == skip {
+                AssignReason::Implication(wli) => {
+                    for (i, r) in cdb[wli.as_ci()].iter().enumerate() {
+                        if i == wli.as_wi() {
                             continue;
                         }
                         seen[r.vi()] = key;
