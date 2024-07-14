@@ -177,6 +177,8 @@ pub fn handle_conflict(
             #[cfg(feature = "boundary_check")]
             cdb[cid].set_birth(asg.num_conflict);
 
+            debug_assert_ne!(l0, Lit::default());
+            debug_assert_ne!(l1, Lit::default());
             debug_assert_eq!(l0, cdb[cid].lit0());
             debug_assert_eq!(l1, cdb[cid].lit1());
             debug_assert_eq!(asg.assigned(l1), Some(false));
@@ -323,6 +325,7 @@ fn conflict_analyze(
     {
         trace_lit!(p, "- handle conflicting literal");
         let vi = p.vi();
+        debug_assert_ne!(asg.assign(vi), None);
         validate_vi!(vi);
         set_seen!(vi);
         let lvl = asg.level(vi);
@@ -488,6 +491,7 @@ fn minimize_learnt(
     cdb: &mut ClauseDB,
 ) -> DecisionLevel {
     let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
+    debug_assert!(asg.assign(new_learnt[0].vi()).is_some());
     let mut levels = vec![false; asg.decision_level() as usize + 1];
     for l in &new_learnt[1..] {
         to_clear.push(*l);
@@ -496,7 +500,7 @@ fn minimize_learnt(
     let l0 = new_learnt[0];
     new_learnt.retain(|l| *l == l0 || !l.is_redundant(asg, cdb, &mut to_clear, &levels));
     let len = new_learnt.len();
-    if 2 < len && len < 30 {
+    if (8..=20).contains(&len) {
         cdb.minimize_with_bi_clauses(asg, new_learnt);
     }
     // find correct backtrack level from remaining literals

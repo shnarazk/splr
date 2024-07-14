@@ -29,13 +29,25 @@
         )
       [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ]
     );
-    devShells.default = nixpkgs.mkShell {
-      packages = [
-        nixpkgs.bashInteractive
-        nixpkgs.tokei
-        # nixpkgs.cargo-watch
-        # nixpkgs.lldb_18
-      ];
-    };
+    devShell = builtins.listToAttrs
+      (map
+        (system:
+          with import nixpkgs { system = "${system}"; };
+          {
+            name = system;
+            value = mkShell {
+                packages = [
+                  bashInteractive
+                  libiconv
+                  samply
+                  tokei
+                  # cargo-watch
+                  # nixpkgs.lldb_18
+                ];
+            };
+          }
+        )
+      [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ]
+    );
   };
 }
