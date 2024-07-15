@@ -345,26 +345,6 @@ impl PropagateIF for AssignStack {
                 self.var[p.vi()].state = VarState::Propagated(self.num_conflict);
             }
             // we have to drop `p` here to use self as a mutable reference again later.
-
-            //## binary loop
-            /*
-            match lit_assign!(var, blocker) {
-                Some(true) => (),
-                Some(false) => {
-                    check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, blocker));
-                    conflict_path!(blocker, minimized_reason!(propagating));
-                }
-                None => {
-                    debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
-                    self.assign_by_implication(
-                        blocker,
-                        minimized_reason!(propagating),
-                        #[cfg(feature = "chrono_BT")]
-                        self.level[propagating.vi()],
-                    );
-                }
-            }
-            */
             let mut wli = cdb.get_first_watch(propagating);
             'next_clause: while !wli.is_none() {
                 let (ci, false_index) = wli.indices();
@@ -373,9 +353,7 @@ impl PropagateIF for AssignStack {
                     c.lit0() == false_lit || c.lit1() == false_lit,
                     "Clause{ci}:{c:?} does not have {false_lit}"
                 );
-                // let other: Lit = *c.iter().nth(1 - false_index).unwrap();
                 let other: Lit = c[!wli];
-                // assert_eq!(other, other1);
                 let ovi: usize = other.vi();
                 let other_value = lit_assign!(self.var[ovi], other);
                 if other_value == Some(true) {
@@ -502,7 +480,7 @@ impl PropagateIF for AssignStack {
             'next_clause: while !wli.is_none() {
                 let (ci, false_index) = wli.indices();
                 let c = &mut cdb[ci];
-                let other = *c.iter().nth(1 - false_index).unwrap();
+                let other: Lit = c[!wli];
                 let ovi = other.vi();
                 let other_value = lit_assign!(self.var[ovi], other);
                 if other_value == Some(true) {
