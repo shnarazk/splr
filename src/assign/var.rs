@@ -20,7 +20,7 @@ pub struct Var {
     /// the `Flag`s (8 bits)
     pub(super) flags: FlagVar,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
-    pub(super) reward: f64,
+    pub(super) activity: f64,
     // reward_ema: Ema2,
     #[cfg(feature = "boundary_check")]
     pub propagated_at: usize,
@@ -37,7 +37,7 @@ impl Default for Var {
             level: DecisionLevel::default(),
             reason: AssignReason::None,
             flags: FlagVar::empty(),
-            reward: 0.0,
+            activity: 0.0,
             // reward_ema: Ema2::new(200).with_slow(4_000),
             #[cfg(feature = "boundary_check")]
             propagated_at: 0,
@@ -62,7 +62,7 @@ impl Var {
         vec![Var::default(); n + 1]
     }
     pub fn activity(&self) -> f64 {
-        self.reward
+        self.activity
     }
     /// return `true` if var is fixed.
     pub fn is_fixed(&self, root_level: DecisionLevel) -> bool {

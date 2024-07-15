@@ -7,13 +7,13 @@ use {
 impl ActivityIF<VarId> for AssignStack {
     #[inline]
     fn activity(&self, vi: VarId) -> f64 {
-        self.var[vi].reward
+        self.var[vi].activity
     }
     // fn activity_slow(&self, vi: VarId) -> f64 {
     //     self.var[vi].reward_ema.get()
     // }
     fn set_activity(&mut self, vi: VarId, val: f64) {
-        self.var[vi].reward = val;
+        self.var[vi].activity = val;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
         self.var[vi].turn_on(FlagVar::USED);
@@ -40,7 +40,7 @@ impl ActivityIF<VarId> for AssignStack {
 impl AssignStack {
     pub fn rescale_activity(&mut self, scaling: f64) {
         for v in self.var.iter_mut().skip(1) {
-            v.reward *= scaling;
+            v.activity *= scaling;
         }
     }
     // pub fn set_activity_trend(&mut self) -> f64 {
@@ -76,12 +76,12 @@ impl Var {
         // 1. restart
         // 1. cancel_until -> reward_at_unassign -> assertion failed
         //
-        self.reward *= decay;
+        self.activity *= decay;
         if self.is(FlagVar::USED) {
-            self.reward += reward;
+            self.activity += reward;
             self.turn_off(FlagVar::USED);
         }
         // self.reward_ema.update(self.reward);
-        self.reward
+        self.activity
     }
 }
