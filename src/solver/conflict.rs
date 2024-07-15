@@ -499,9 +499,7 @@ fn minimize_learnt(
     }
     let l0 = new_learnt[0];
     new_learnt.retain(|l| *l == l0 || !l.is_redundant(asg, cdb, &mut to_clear, &levels));
-    if (2..=32).contains(&new_learnt.len()) {
-        cdb.minimize_with_bi_clauses(asg, new_learnt);
-    }
+    cdb.minimize_with_bi_clauses(asg, new_learnt);
     // find correct backtrack level from remaining literals
     let mut level_to_return = 0;
     if 1 < new_learnt.len() {
