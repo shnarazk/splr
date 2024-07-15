@@ -2,7 +2,6 @@ use {
     super::{weaver::WatchLiteralIndexRef, WatcherLinkIF},
     crate::{assign::AssignIF, types::*},
     std::{
-        collections::HashSet,
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::Iter,
@@ -103,6 +102,19 @@ impl Index<usize> for Clause {
 impl IndexMut<usize> for Clause {
     fn index_mut(&mut self, i: usize) -> &mut Lit {
         &mut self.lits[i]
+    }
+}
+
+impl Index<WatchLiteralIndex> for Clause {
+    type Output = Lit;
+    fn index(&self, i: WatchLiteralIndex) -> &Lit {
+        &self.lits[i.as_wi()]
+    }
+}
+
+impl IndexMut<WatchLiteralIndex> for Clause {
+    fn index_mut(&mut self, i: WatchLiteralIndex) -> &mut Lit {
+        &mut self.lits[i.as_wi()]
     }
 }
 
@@ -268,49 +280,28 @@ impl WatcherLinkIF for Clause {
 impl Clause {
     /// update rank field with the present LBD.
     // If it's big enough, skip the loop.
-    pub fn update_lbd(&mut self, asg: &impl AssignIF, _lbd_temp: &mut [usize]) -> usize {
+    pub fn update_lbd(&mut self, asg: &impl AssignIF, lbd_temp: &mut [usize]) -> usize {
+        if 8192 <= self.lits.len() {
+            self.rank = u16::MAX;
+            return u16::MAX as usize;
+        }
         let base_level = asg.root_level();
-        let mut rank = 0;
-        let mut levels: HashSet<DecisionLevel> = HashSet::new();
-        for lit in self.lits.iter() {
-            let lv = asg.level(lit.vi());
+        let key: usize = lbd_temp[0] + 1;
+        lbd_temp[0] = key;
+        let mut cnt: u16 = 0;
+        for l in &self.lits {
+            let lv = asg.level(l.vi());
             if lv == base_level {
-                rank += 1;
-            } else {
-                levels.insert(lv);
+                cnt += 1;
+                continue;
+            }
+            let p = &mut lbd_temp[lv as usize];
+            if *p != key {
+                *p = key;
+                cnt += 1;
             }
         }
-        rank += levels.len();
-        /*
-        let rank = self
-            .lits
-            .iter()
-            .map(|l| asg.level(l.vi()))
-            .filter(|l| *l != base_level)
-            .collect::<HashSet<DecisionLevel>>()
-            .len();
-        */
-        self.rank = rank as u16;
-        rank
-        // if 8192 <= self.lits.len() {
-        //     self.rank = u16::MAX;
-        //     return u16::MAX as usize;
-        // }
-        // let key: usize = lbd_temp[0] + 1;
-        // lbd_temp[0] = key;
-        // let mut cnt = 0;
-        // for l in &self.lits {
-        //     let lv = asg.level(l.vi());
-        //     if lv == 0 {
-        //         continue;
-        //     }
-        //     let p = &mut lbd_temp[lv as usize];
-        //     if *p != key {
-        //         *p = key;
-        //         cnt += 1;
-        //     }
-        // }
-        // self.rank = cnt;
-        // cnt as usize
+        self.rank = cnt;
+        cnt as usize
     }
 }

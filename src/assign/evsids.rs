@@ -6,10 +6,10 @@ use {
 
 impl ActivityIF<VarId> for AssignStack {
     fn activity(&self, vi: VarId) -> f64 {
-        self.var[vi].reward
+        self.var[vi].activity
     }
     fn set_activity(&mut self, vi: VarId, val: f64) {
-        self.var[vi].reward = val;
+        self.var[vi].activity = val;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
         let s = self.activity_decay_step;
@@ -19,12 +19,12 @@ impl ActivityIF<VarId> for AssignStack {
             return;
         }
         v.timestamp = t;
-        v.reward += s;
+        v.activity += s;
         const SCALE: f64 = 1e-100;
         const SCALE_MAX: f64 = 1e100;
-        if SCALE_MAX < v.reward {
+        if SCALE_MAX < v.activity {
             for v in &mut self.var[1..] {
-                v.reward *= SCALE;
+                v.activity *= SCALE;
             }
             self.activity_decay_step *= SCALE;
         }
