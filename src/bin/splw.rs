@@ -24,6 +24,7 @@ use {
     },
     std::{
         borrow::Cow,
+        collections::HashMap,
         env,
         error::Error,
         fs::File,
@@ -40,8 +41,10 @@ pub struct App {
     state: SearchState,
     counter: i16,
     asg_stats: [u64; 10],
+    vah_stats: [u64; 21],
     #[allow(dead_code)]
     start: Instant,
+    var_act_hist: HashMap<usize, f64>,
 }
 
 impl App {
@@ -51,7 +54,9 @@ impl App {
             state,
             counter: 0,
             asg_stats: [0; 10],
+            vah_stats: [0; 21],
             start: Instant::now(),
+            var_act_hist: HashMap::new(),
         }
     }
     fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<(), Box<dyn Error>> {
@@ -63,6 +68,7 @@ impl App {
         let timeout = Duration::from_millis(0);
         let root_level = self.solver.asg.root_level();
         loop {
+            // call solver
             self.counter += 1;
             let ret: Result<Option<bool>, SolverError> = {
                 let App {
@@ -72,6 +78,7 @@ impl App {
                 } = self;
                 solver.search_stage(ss)
             };
+            // build stats data
             let dist: Vec<f64> = {
                 let mut h: [usize; 10] = [0; 10];
                 let mut num_var: usize = 0;
@@ -88,7 +95,42 @@ impl App {
             for (i, d) in dist.iter().enumerate().take(10) {
                 self.asg_stats[i] = (d * 100.0) as u64;
             }
+            // make history histogram
+            let va: Vec<f64> = self
+                .solver
+                .asg
+                .var_iter()
+                .map(|v| v.activity())
+                .collect::<Vec<_>>();
+            let shift: Vec<f64> = va
+                .iter()
+                .enumerate()
+                .map(|(vi, val)| {
+                    (*val - *self.var_act_hist.get(&vi).unwrap_or(&0.0)).clamp(-1.0, 1.0)
+                })
+                .collect::<Vec<_>>();
+            shift.iter().enumerate().for_each(|(i, v)| {
+                self.var_act_hist.insert(i, *v);
+            });
+            let hist: Vec<f64> = {
+                let mut h: [usize; 21] = [0; 21];
+                let mut num_var: usize = 0;
+                self.solver.asg.var_iter().enumerate().for_each(|(va, v)| {
+                    if 0 < va && !v.is(FlagVar::ELIMINATED) && !v.is_fixed(root_level) {
+                        num_var += 1;
+                        h[((1.0 + shift[va]) / 0.1) as usize] += 1;
+                    }
+                });
+                h.iter()
+                    .map(|c| (*c as f64) / (num_var as f64))
+                    .collect::<Vec<f64>>()
+            };
+            for (i, d) in hist.iter().enumerate().take(21) {
+                self.vah_stats[i] = (d * 100.0) as u64;
+            }
+            // draw them
             terminal.draw(|f| self.render_frame(f))?;
+            // check termination conditions
             match ret {
                 Ok(None) => {
                     if crossterm::event::poll(timeout)? && self.handle_events()? {
@@ -131,7 +173,7 @@ impl App {
                 (x, ((x * d2 + d1) * 6.0).cos())
             })
             .collect::<Vec<_>>();
-        let dataset: Vec<Dataset> = vec![
+        let _dataset: Vec<Dataset> = vec![
             Dataset::default()
                 .name("sin() wave")
                 .marker(symbols::Marker::Dot)
@@ -143,10 +185,11 @@ impl App {
                 .style(Style::default().fg(Color::Red))
                 .data(&v2),
         ];
-        let chart = self.chart(dataset);
-        let bar_chart = self.bar_chart();
-        frame.render_widget(chart, chunks[0]);
-        frame.render_widget(bar_chart, chunks[1]);
+        // let chart = self.chart(dataset);
+        let bar_chart1 = self.var_activity_bar_chart();
+        let bar_chart2 = self.va_history_bar_chart();
+        frame.render_widget(bar_chart1, chunks[0]);
+        frame.render_widget(bar_chart2, chunks[1]);
     }
     fn handle_events(&mut self) -> io::Result<bool> {
         if let Event::Key(key_event) = event::read()? {
@@ -176,7 +219,8 @@ impl App {
 }
 
 impl App {
-    fn bar_chart(&self) -> BarChart<'_> {
+    /// var activity histogram
+    fn var_activity_bar_chart(&self) -> BarChart<'_> {
         let b = vec![
             ("0.0", self.asg_stats[0]),
             ("0.1", self.asg_stats[1]),
@@ -197,7 +241,39 @@ impl App {
             .value_style(Style::default().fg(Color::White).bg(Color::Blue));
         barchart
     }
-    fn chart<'a>(&'a self, dataset: Vec<Dataset<'a>>) -> Chart<'a> {
+    fn va_history_bar_chart(&self) -> BarChart<'_> {
+        let b = vec![
+            ("-1.0", self.vah_stats[0]),
+            ("-0.9", self.vah_stats[1]),
+            ("-0.8", self.vah_stats[2]),
+            ("-0.7", self.vah_stats[3]),
+            ("-0.6", self.vah_stats[4]),
+            ("-0.5", self.vah_stats[5]),
+            ("-0.4", self.vah_stats[6]),
+            ("-0.3", self.vah_stats[7]),
+            ("-0.2", self.vah_stats[8]),
+            ("-0.1", self.vah_stats[9]),
+            ("0.0", self.vah_stats[10]),
+            ("0.1", self.vah_stats[11]),
+            ("0.2", self.vah_stats[12]),
+            ("0.3", self.vah_stats[13]),
+            ("0.4", self.vah_stats[14]),
+            ("0.5", self.vah_stats[15]),
+            ("0.6", self.vah_stats[16]),
+            ("0.7", self.vah_stats[17]),
+            ("0.8", self.vah_stats[18]),
+            ("0.9", self.vah_stats[19]),
+            ("1.0", self.vah_stats[20]),
+        ];
+        let barchart = BarChart::default()
+            .block(Block::bordered().title("Var Activity Moving History"))
+            .data(&b)
+            .bar_width(4)
+            .bar_style(Style::default().fg(Color::Red))
+            .value_style(Style::default().fg(Color::White).bg(Color::Blue));
+        barchart
+    }
+    fn _chart<'a>(&'a self, dataset: Vec<Dataset<'a>>) -> Chart<'a> {
         let x_labels = vec![
             Span::styled("-1.0", Style::default()),
             Span::styled("-0.5", Style::default()),
