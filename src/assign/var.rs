@@ -22,7 +22,7 @@ impl Default for Spin {
         Spin {
             last_phase: bool::default(),
             last_assign: usize::default(),
-            probability: Ema2::new(256).with_slow(8192),
+            probability: Ema2::new(256).with_slow(4096),
         }
     }
 }
@@ -30,13 +30,11 @@ impl Default for Spin {
 impl Spin {
     // call after assignment to var
     pub fn update(&mut self, phase: bool, tick: usize) {
-        if phase != self.last_phase {
-            let span: usize = tick - self.last_assign + 1; // 1 for conflicing situation
-            let moment: f64 = (phase as usize as f64) / span as f64;
-            self.probability.update(moment);
-            self.last_phase = phase;
-        }
+        let span: usize = (tick - self.last_assign).max(1); // 1 for conflicing situation
+        let moment: f64 = (if phase { 1.0 } else { -1.0 }) / span as f64;
+        self.probability.update(moment);
         self.last_assign = tick;
+        self.last_phase = phase;
     }
     pub fn ema(&self) -> EmaView {
         EmaView {
@@ -113,6 +111,9 @@ impl Var {
     /// return `true` if var is fixed.
     pub fn is_fixed(&self, root_level: DecisionLevel) -> bool {
         self.assign.is_some() && self.level == root_level
+    }
+    pub fn spin_energy(&self) -> (f64, f64) {
+        self.spin.energy()
     }
 }
 
