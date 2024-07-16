@@ -1,0 +1,8 @@
+[profile.profiling]
+inherits = "release"
+lto = "thin" # "fat"
+codegen-units = 1
+opt-level = 1 # 3
+panic = "abort"
+strip = false
+debug = true

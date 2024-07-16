@@ -10,6 +10,7 @@ pub trait VarOrderIF {
     fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upward: bool);
     fn is_empty(&self) -> bool;
     fn select_var(&mut self, occur: &[LitOccurs], asg: &impl AssignIF) -> Option<VarId>;
+    #[allow(dead_code)]
     fn rebuild(&mut self, asg: &impl AssignIF, occur: &[LitOccurs]);
 }
 
@@ -17,18 +18,14 @@ pub trait VarOrderIF {
 #[derive(Clone, Debug, Default)]
 pub struct LitOccurs {
     pub aborted: bool,
-    pub pos_occurs: Vec<ClauseId>,
-    pub neg_occurs: Vec<ClauseId>,
+    pub pos_occurs: Vec<ClauseIndex>,
+    pub neg_occurs: Vec<ClauseIndex>,
 }
 
 impl LitOccurs {
     /// return a new vector of $n$ `LitOccurs`s.
     pub fn new(n: usize) -> Vec<LitOccurs> {
-        let mut vec = Vec::with_capacity(n + 1);
-        for _ in 0..=n {
-            vec.push(LitOccurs::default());
-        }
-        vec
+        vec![LitOccurs::default(); n + 1]
     }
     pub fn clear(&mut self) {
         self.aborted = false;
@@ -37,7 +34,7 @@ impl LitOccurs {
     }
     pub fn activity(&self) -> usize {
         if self.aborted {
-            std::usize::MAX
+            usize::MAX
         } else {
             self.pos_occurs.len().min(self.neg_occurs.len())
         }

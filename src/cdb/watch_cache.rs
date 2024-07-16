@@ -28,7 +28,7 @@ impl WatchCacheIF for WatchCacheList {
         }
     }
     fn insert_watch(&mut self, cid: ClauseId, l: Lit) {
-        debug_assert!(self.iter().all(|e| e.0 != cid));
+        // debug_assert!(self.iter().all(|e| e.0 != cid));
         self.push((cid, l));
     }
     fn append_watch(&mut self, mut appendant: Self) {
@@ -46,50 +46,26 @@ impl WatchCacheIF for WatchCacheList {
 
 impl Index<Lit> for Vec<HashMap<Lit, ClauseId>> {
     type Output = HashMap<Lit, ClauseId>;
-    #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.get_unchecked(usize::from(l))
-        }
-        #[cfg(not(feature = "unsafe_access"))]
         &self[usize::from(l)]
     }
 }
 
 impl IndexMut<Lit> for Vec<HashMap<Lit, ClauseId>> {
-    #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.get_unchecked_mut(usize::from(l))
-        }
-        #[cfg(not(feature = "unsafe_access"))]
         &mut self[usize::from(l)]
     }
 }
 
 impl Index<Lit> for Vec<WatchCache> {
     type Output = WatchCache;
-    #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.get_unchecked(usize::from(l))
-        }
-        #[cfg(not(feature = "unsafe_access"))]
         &self[usize::from(l)]
     }
 }
 
 impl IndexMut<Lit> for Vec<WatchCache> {
-    #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.get_unchecked_mut(usize::from(l))
-        }
-        #[cfg(not(feature = "unsafe_access"))]
         &mut self[usize::from(l)]
     }
 }

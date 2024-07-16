@@ -1,149 +1,81 @@
 use {
-    super::ClauseId,
     crate::types::*,
     std::{
-        collections::HashMap,
+        collections::hash_map::HashMap,
         ops::{Index, IndexMut},
+        slice::Iter,
     },
 };
 
 /// storage of binary links
-pub type BinaryLinkList = Vec<(Lit, ClauseId)>;
+pub type BinaryLinkList = Vec<(Lit, ClauseIndex)>;
 
 impl Index<Lit> for Vec<BinaryLinkList> {
     type Output = BinaryLinkList;
-    #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.get_unchecked(usize::from(l))
-        }
-        #[cfg(not(feature = "unsafe_access"))]
         &self[usize::from(l)]
     }
 }
 
 impl IndexMut<Lit> for Vec<BinaryLinkList> {
-    #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.get_unchecked_mut(usize::from(l))
-        }
-        #[cfg(not(feature = "unsafe_access"))]
         &mut self[usize::from(l)]
     }
 }
 
-/// storage with mapper to `ClauseId` of binary links
+/// storage with mapper to `ClauseIndex` of binary links
 #[derive(Clone, Debug, Default)]
 pub struct BinaryLinkDB {
-    hash: HashMap<(Lit, Lit), ClauseId>,
-    list: Vec<BinaryLinkList>,
+    pub(super) hash: HashMap<Lit, BinaryLinkList>,
+    empty: BinaryLinkList,
 }
 
 impl Instantiate for BinaryLinkDB {
-    fn instantiate(_conf: &Config, cnf: &CNFDescription) -> Self {
-        let num_lit = 2 * (cnf.num_of_variables + 1);
+    fn instantiate(_conf: &Config, _cnf: &CNFDescription) -> Self {
         BinaryLinkDB {
             hash: HashMap::new(),
-            list: vec![Vec::new(); num_lit],
+            empty: BinaryLinkList::default(),
         }
     }
     fn handle(&mut self, _e: SolverEvent) {}
 }
 
 pub trait BinaryLinkIF {
-    /// add a mapping from a pair of Lit to a `ClauseId`
-    fn add(&mut self, lit0: Lit, lit1: Lit, cid: ClauseId);
+    /// add a mapping from a pair of Lit to a `ClauseIndex`
+    fn add(&mut self, lit0: Lit, lit1: Lit, cid: ClauseIndex);
     /// remove a pair of `Lit`s
     fn remove(&mut self, lit0: Lit, lit1: Lit) -> MaybeInconsistent;
-    /// return 'ClauseId` linked from a pair of `Lit`s
-    fn search(&self, lit0: Lit, lit1: Lit) -> Option<&ClauseId>;
-    /// return the all links that include `Lit`.
-    /// Note this is not a `watch_list`. The other literal has an opposite phase.
-    fn connect_with(&self, lit: Lit) -> &BinaryLinkList;
+    /// return 'ClauseIndex` linked from a pair of `Lit`s
+    fn search(&self, lit0: Lit, lit1: Lit) -> Option<ClauseIndex>;
     /// add new var
     fn add_new_var(&mut self);
-    // /// sort links based on var activities
-    // fn reorder(&mut self, asg: &impl AssignIF);
+    /// iterate on binary clauses containing `lit`
+    fn iter(&self, lit: Lit) -> Iter<(Lit, ClauseIndex)>;
 }
 
 impl BinaryLinkIF for BinaryLinkDB {
-    fn add(&mut self, lit0: Lit, lit1: Lit, cid: ClauseId) {
-        let l0 = lit0.min(lit1);
-        let l1 = lit0.max(lit1);
-        self.hash.insert((l0, l1), cid);
-        self.list[lit0].push((lit1, cid));
-        self.list[lit1].push((lit0, cid));
+    fn add(&mut self, lit0: Lit, lit1: Lit, cid: ClauseIndex) {
+        self.hash.entry(lit0).or_default().push((lit1, cid));
+        self.hash.entry(lit1).or_default().push((lit0, cid));
     }
+    /// O(n)
     fn remove(&mut self, lit0: Lit, lit1: Lit) -> MaybeInconsistent {
-        let l0 = lit0.min(lit1);
-        let l1 = lit0.max(lit1);
-        self.hash.remove(&(l0, l1));
-        self.list[lit0].delete_unstable(|p| p.0 == lit1);
-        self.list[lit1].delete_unstable(|p| p.0 == lit0);
+        self.hash
+            .entry(lit0)
+            .and_modify(|l| l.delete_unstable(|lc| lc.0 == lit1));
+        self.hash
+            .entry(lit1)
+            .and_modify(|l| l.delete_unstable(|lc| lc.0 == lit0));
         Ok(())
     }
-    fn search(&self, lit0: Lit, lit1: Lit) -> Option<&ClauseId> {
-        let l0 = lit0.min(lit1);
-        let l1 = lit0.max(lit1);
-        self.hash.get(&(l0, l1))
+    fn search(&self, lit0: Lit, lit1: Lit) -> Option<ClauseIndex> {
+        self.hash
+            .get(&lit0)
+            .and_then(|v| v.iter().find(|e| e.0 == lit1))
+            .map(|e| e.1)
     }
-    fn connect_with(&self, lit: Lit) -> &BinaryLinkList {
-        &self.list[lit]
+    fn add_new_var(&mut self) {}
+    fn iter(&self, lit: Lit) -> Iter<(Lit, ClauseIndex)> {
+        self.hash.get(&lit).unwrap_or(&self.empty).iter()
     }
-    fn add_new_var(&mut self) {
-        for _ in 0..2 {
-            self.list.push(Vec::new());
-        }
-    }
-    /*
-    fn reorder(&mut self, asg: &impl AssignIF) {
-        let nv = self.list.len() / 2;
-        let thr: f64 = (1usize..nv).map(|i| asg.activity(i)).sum::<f64>()
-            / (1usize..nv)
-                .filter(|i| {
-                    !asg.var(*i).is(FlagVar::ELIMINATED)
-                        && asg.reason(*i) != AssignReason::Decision(0)
-                })
-                .count() as f64;
-        'next_lit: for (l, vec) in self.list.iter_mut().enumerate().skip(2) {
-            if asg.var(Lit::from(l).vi()).is(FlagVar::ELIMINATED) {
-                continue 'next_lit;
-            }
-            if 0.5 * thr <= asg.activity(Lit::from(l).vi()) {
-                vec.sort_by_cached_key(|p|
-                                       (asg.activity(p.0.vi()) * -100_000.0) as isize);
-            } else {
-                // Run just the first stage of quick sort.
-                let len = vec.len();
-                let mut i = 0;
-                let mut j = len;
-                while i < j {
-                    loop {
-                        if len == i {
-                            continue 'next_lit;
-                        }
-                        if asg.activity(vec[i].0.vi()) < thr {
-                            break;
-                        }
-                        i += 1;
-                    }
-                    loop {
-                        if j == 0 {
-                            continue 'next_lit;
-                        }
-                        j -= 1;
-                        if thr < asg.activity(vec[j].0.vi()) {
-                            break;
-                        }
-                    }
-                    vec.swap(i, j);
-                    i += 1;
-                }
-            }
-        }
-    }
-    */
 }

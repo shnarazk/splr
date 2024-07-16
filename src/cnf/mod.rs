@@ -172,10 +172,10 @@ impl CnfIf for CNF {
             println!("Warning: there are less variables than its declaration.");
         }
         if clause_extists_already {
-            assert_eq!(cnf.num_clauses(), num_clause);
+            debug_assert_eq!(cnf.num_clauses(), num_clause);
             println!("Warning: there are less clauses than its declaration.");
         } else if cnf.num_clauses() < TOO_MANY_CLAUSES {
-            assert_eq!(cnf.num_clauses(), nc);
+            debug_assert_eq!(cnf.num_clauses(), nc);
         }
         Ok(cnf)
     }

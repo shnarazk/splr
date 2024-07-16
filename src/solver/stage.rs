@@ -97,7 +97,7 @@ impl StageManager {
         new_cycle.then_some(new_segment)
     }
     pub fn stage_ended(&self, now: usize) -> bool {
-        self.end_of_stage == now
+        self.end_of_stage <= now
     }
     /// returns the number of conflicts in the current stage
     /// Note: we need not to make a strong correlation between this value and
@@ -143,5 +143,8 @@ impl StageManager {
     }
     pub fn segment_starting_stage(&self) -> usize {
         self.segment_starting_stage
+    }
+    pub fn set_unit_size(&mut self, size: usize) {
+        self.unit_size = size;
     }
 }

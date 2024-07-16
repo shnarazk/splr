@@ -32,8 +32,8 @@ pub fn handle_conflict(
     // at higher level due to the incoherence between the current level and conflicting
     // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
     {
-        if let AssignReason::Implication(cid) = cc.1 {
-            if cdb[cid].iter().all(|l| asg.level(l.vi()) == 0) {
+        if let AssignReason::Implication(wli) = cc.1 {
+            if cdb[wli.as_ci()].iter().all(|l| asg.level(l.vi()) == 0) {
                 return Err(SolverError::RootLevelConflict(*cc));
             }
         }
@@ -149,7 +149,7 @@ pub fn handle_conflict(
                 }
             }
             AssignReason::Implication(r) => {
-                for l in cdb[r].iter() {
+                for l in cdb[r.as_ci()].iter() {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
                         asg.reward_at_analysis(vi);
@@ -177,6 +177,8 @@ pub fn handle_conflict(
             #[cfg(feature = "boundary_check")]
             cdb[cid].set_birth(asg.num_conflict);
 
+            debug_assert_ne!(l0, Lit::default());
+            debug_assert_ne!(l1, Lit::default());
             debug_assert_eq!(l0, cdb[cid].lit0());
             debug_assert_eq!(l1, cdb[cid].lit1());
             debug_assert_eq!(asg.assigned(l1), Some(false));
@@ -190,7 +192,7 @@ pub fn handle_conflict(
             );
             // || check_graph(asg, cdb, l0, "biclause");
             for cid in &state.derive20 {
-                cdb[cid].turn_on(FlagClause::DERIVE20);
+                cdb[*cid].turn_on(FlagClause::DERIVE20);
             }
             rank = 1;
             #[cfg(feature = "bi_clause_completion")]
@@ -204,7 +206,7 @@ pub fn handle_conflict(
             debug_assert_eq!(asg.assigned(l0), None);
             asg.assign_by_implication(
                 l0,
-                AssignReason::Implication(cid),
+                AssignReason::Implication(WatchLiteralIndex::new(cid, 0)),
                 #[cfg(feature = "chrono_BT")]
                 assign_level,
             );
@@ -212,7 +214,7 @@ pub fn handle_conflict(
             rank = cdb[cid].rank;
             if rank <= 20 {
                 for cid in &state.derive20 {
-                    cdb[cid].turn_on(FlagClause::DERIVE20);
+                    cdb[*cid].turn_on(FlagClause::DERIVE20);
                 }
             }
         }
@@ -282,11 +284,10 @@ fn conflict_analyze(
             {
                 let vi = $lit.vi();
                 let lv = asg.level(vi);
-                println!("{}: literal {} at level {}", $message, i32::from($lit), $lv);
+                println!("{}: literal {} at level {}", $message, i32::from($lit), lv);
             }
         };
     }
-
     macro_rules! validate_vi {
         ($vi: expr) => {
             debug_assert!(!asg.var($vi).is(FlagVar::ELIMINATED));
@@ -322,8 +323,9 @@ fn conflict_analyze(
     }
 
     {
-        trace_lit!("- handle conflicting literal", p);
+        trace_lit!(p, "- handle conflicting literal");
         let vi = p.vi();
+        debug_assert_ne!(asg.assign(vi), None);
         validate_vi!(vi);
         set_seen!(vi);
         let lvl = asg.level(vi);
@@ -336,7 +338,9 @@ fn conflict_analyze(
     }
     let mut trail_index = asg.stack_len() - 1;
     let mut max_lbd: u16 = 0;
-    let mut cid_with_max_lbd: Option<ClauseId> = None;
+    let mut ci_with_max_lbd: Option<ClauseIndex> = None;
+    #[cfg(feature = "trace_analysis")]
+    println!("##################");
     loop {
         match reason {
             AssignReason::BinaryLink(l) => {
@@ -350,23 +354,48 @@ fn conflict_analyze(
                     conflict_level!(vi);
                 }
             }
-            AssignReason::Implication(cid) => {
+            AssignReason::Implication(wli) => {
                 trace!(
                     "analyze clause {}(first literal: {}) for {}",
                     cid,
-                    i32::from(cdb[cid].lit0()),
+                    i32::from(cdb[wli.as_ci()].lit0()),
                     p
                 );
-                debug_assert!(!cdb[cid].is_dead() && 2 < cdb[cid].len());
+                debug_assert!(!cdb[wli.as_ci()].is_dead() && 2 < cdb[wli.as_ci()].len());
                 // if !cdb.update_at_analysis(asg, cid) {
-                if !cdb[cid].is(FlagClause::LEARNT) {
-                    state.derive20.push(cid);
+                let ci = wli.as_ci();
+                if !cdb[ci].is(FlagClause::LEARNT) {
+                    state.derive20.push(ci);
                 }
-                if max_lbd < cdb[cid].rank {
-                    max_lbd = cdb[cid].rank;
-                    cid_with_max_lbd = Some(cid);
+                if max_lbd < cdb[ci].rank {
+                    max_lbd = cdb[ci].rank;
+                    ci_with_max_lbd = Some(ci);
                 }
-                for q in cdb[cid].iter().skip(1) {
+                assert_eq!(
+                    p,
+                    cdb[wli],
+                    "At level {}, broken implication chain from {:?}@{} to {:?}{:?}",
+                    asg.decision_level(),
+                    p,
+                    asg.level(p.vi()),
+                    wli,
+                    &cdb[wli],
+                );
+                let skip = wli.as_wi();
+                #[cfg(feature = "trace_analysis")]
+                if skip == 1 {
+                    trace!(
+                        "AMEND: analyze disordered clause {}{:?}(second literal: {}) for {}",
+                        ci,
+                        cdb[ci],
+                        i32::from(cdb[ci].lit1()),
+                        p
+                    );
+                }
+                for (i, q) in cdb[ci].iter().enumerate() {
+                    if i == skip {
+                        continue;
+                    }
                     let vi = q.vi();
                     validate_vi!(vi);
                     if !asg.var(vi).is(FlagVar::CA_SEEN) {
@@ -380,11 +409,11 @@ fn conflict_analyze(
                             trace_lit!(q, " -- found another path");
                             conflict_level!(vi);
                         } else {
-                            trace_lit!(q, " -- push to earnt");
+                            trace_lit!(q, " -- push to learnt");
                             learnt.push(*q);
                         }
                     } else {
-                        trace!(q, " -- ignore flagged already");
+                        trace!("{:?} -- ignore flagged already", q);
                     }
                 }
             }
@@ -442,10 +471,10 @@ fn conflict_analyze(
         trail_index -= 1;
         reason = asg.reason(p.vi());
     }
-    if let Some(cid) = cid_with_max_lbd {
+    if let Some(cid) = ci_with_max_lbd {
         cdb.update_at_analysis(asg, cid);
     }
-    debug_assert!(learnt.iter().all(|l| *l != !p));
+    // debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);
     learnt[0] = !p;
     trace!(
@@ -462,6 +491,7 @@ fn minimize_learnt(
     cdb: &mut ClauseDB,
 ) -> DecisionLevel {
     let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
+    debug_assert!(asg.assign(new_learnt[0].vi()).is_some());
     let mut levels = vec![false; asg.decision_level() as usize + 1];
     for l in &new_learnt[1..] {
         to_clear.push(*l);
@@ -469,8 +499,7 @@ fn minimize_learnt(
     }
     let l0 = new_learnt[0];
     new_learnt.retain(|l| *l == l0 || !l.is_redundant(asg, cdb, &mut to_clear, &levels));
-    let len = new_learnt.len();
-    if 2 < len && len < 30 {
+    if 1 < new_learnt.len() {
         cdb.minimize_with_bi_clauses(asg, new_learnt);
     }
     // find correct backtrack level from remaining literals
@@ -533,9 +562,13 @@ impl Lit {
                         }
                     }
                 }
-                AssignReason::Implication(cid) => {
-                    let c = &cdb[cid];
-                    for q in &(*c)[1..] {
+                AssignReason::Implication(wli) => {
+                    let c = &cdb[wli.as_ci()];
+                    let skip = wli.as_wi();
+                    for (i, q) in c.iter().enumerate() {
+                        if skip == i {
+                            continue;
+                        }
                         let vi = q.vi();
                         let lv = asg.level(vi);
                         if 0 < lv && !asg.var(vi).is(FlagVar::CA_SEEN) {
@@ -589,15 +622,15 @@ fn lit_level(
     match asg.reason(lit.vi()) {
         AssignReason::Decision(0) => asg.root_level(),
         AssignReason::Decision(lvl) => lvl,
-        AssignReason::Implication(cid) => {
+        AssignReason::Implication(wli) => {
             assert_eq!(
-                cdb[cid].lit0(),
+                cdb[wli.as_ci()].lit0(),
                 lit,
                 "lit0 {} != lit{}, cid {}, {}",
-                cdb[cid].lit0(),
+                cdb[wli.as_ci()].lit0(),
                 lit,
-                cid,
-                &cdb[cid]
+                wli.as_ci(),
+                &cdb[wli]
             );
             // assert!(
             //     !bag.contains(&lit),
@@ -609,10 +642,11 @@ fn lit_level(
             //     dumper(asg, cdb, bag),
             // );
             // bag.push(lit);
-            cdb[cid]
+            cdb[wli.as_ci()]
                 .iter()
-                .skip(1)
-                .map(|l| lit_level(asg, cdb, !*l, bag, _mes))
+                .enumerate()
+                .filter(|(i, _)| *i != wli.as_wi())
+                .map(|(_, l)| lit_level(asg, cdb, !*l, bag, _mes))
                 .max()
                 .unwrap()
         }
@@ -635,7 +669,8 @@ fn dumper(asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
             match asg.reason(l.vi()) {
                 AssignReason::Decision(_) => vec![],
                 AssignReason::BinaryLink(lit) => vec![*l, !lit],
-                AssignReason::Implication(cid) => cdb[cid].iter().copied().collect::<Vec<Lit>>(),
+                AssignReason::Implication(wli) =>
+                    cdb[wli.as_ci()].iter().copied().collect::<Vec<Lit>>(),
                 AssignReason::None => vec![],
             },
         )
