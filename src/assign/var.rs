@@ -7,6 +7,36 @@ use {
     },
 };
 
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Spin {
+    /// the values are updated at every assignment
+    pub(crate) last_phase: bool,
+    /// in AssignStack::tick
+    pub(crate) last_assign: usize,
+    // moving average of phase(-1/1)
+    pub(crate) entropy: Ema2,
+}
+
+#[allow(dead_code)]
+impl Spin {
+    // call after assignment to var
+    pub fn update(&mut self, phase: bool, tick: usize) {
+        if phase != self.last_phase {
+            let span: usize = tick - self.last_assign + 1; // 1 for conflicing situation
+            let moment: f64 = (phase as usize as f64) / span as f64;
+            self.entropy.update(moment);
+            self.last_phase = phase;
+            self.last_assign = tick;
+        }
+    }
+    pub fn ema(&self) -> EmaView {
+        EmaView {
+            fast: self.entropy.get_fast(),
+            slow: self.entropy.get_slow(),
+        }
+    }
+}
+
 /// Object representing a variable.
 #[derive(Clone, Debug)]
 pub struct Var {
@@ -21,7 +51,8 @@ pub struct Var {
     pub(super) flags: FlagVar,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
     pub(super) activity: f64,
-    // reward_ema: Ema2,
+    /// phase transition frequency
+    pub(super) spin: Spin,
     #[cfg(feature = "boundary_check")]
     pub propagated_at: usize,
     #[cfg(feature = "boundary_check")]
@@ -38,6 +69,7 @@ impl Default for Var {
             reason: AssignReason::None,
             flags: FlagVar::empty(),
             activity: 0.0,
+            spin: Spin::default(),
             // reward_ema: Ema2::new(200).with_slow(4_000),
             #[cfg(feature = "boundary_check")]
             propagated_at: 0,
