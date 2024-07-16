@@ -7,16 +7,25 @@ use {
     },
 };
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub(crate) struct Spin {
     /// the values are updated at every assignment
     pub(crate) last_phase: bool,
     /// in AssignStack::tick
     pub(crate) last_assign: usize,
     // moving average of phase(-1/1)
-    pub(crate) entropy: Ema2,
+    pub(crate) probability: Ema2,
 }
 
+impl Default for Spin {
+    fn default() -> Self {
+        Spin {
+            last_phase: bool::default(),
+            last_assign: usize::default(),
+            probability: Ema2::new(256).with_slow(8192),
+        }
+    }
+}
 #[allow(dead_code)]
 impl Spin {
     // call after assignment to var
@@ -24,16 +33,21 @@ impl Spin {
         if phase != self.last_phase {
             let span: usize = tick - self.last_assign + 1; // 1 for conflicing situation
             let moment: f64 = (phase as usize as f64) / span as f64;
-            self.entropy.update(moment);
+            self.probability.update(moment);
             self.last_phase = phase;
-            self.last_assign = tick;
         }
+        self.last_assign = tick;
     }
     pub fn ema(&self) -> EmaView {
         EmaView {
-            fast: self.entropy.get_fast(),
-            slow: self.entropy.get_slow(),
+            fast: self.probability.get_fast(),
+            slow: self.probability.get_slow(),
         }
+    }
+    pub fn energy(&self) -> (f64, f64) {
+        let p = self.probability.get_fast();
+        let q = self.probability.get_slow();
+        (1.0 - p.abs(), 1.0 - q.abs())
     }
 }
 
