@@ -41,10 +41,13 @@ pub struct App {
     state: SearchState,
     counter: i16,
     asg_stats: [u64; 10],
-    vah_stats: [u64; 21],
     #[allow(dead_code)]
     start: Instant,
     var_act_hist: HashMap<usize, f64>,
+    vah_stats: [u64; 21],
+    var_spin_hist: HashMap<usize, f64>,
+    spin_stats: [u64; 10],
+    vsh_stats: [u64; 21],
 }
 
 impl App {
@@ -57,6 +60,9 @@ impl App {
             vah_stats: [0; 21],
             start: Instant::now(),
             var_act_hist: HashMap::new(),
+            spin_stats: [0; 10],
+            var_spin_hist: HashMap::new(),
+            vsh_stats: [0; 21],
         }
     }
     fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<(), Box<dyn Error>> {
@@ -79,7 +85,7 @@ impl App {
                 solver.search_stage(ss)
             };
             // build stats data
-            let dist: Vec<f64> = {
+            let activity_distribution: Vec<f64> = {
                 let mut h: [usize; 10] = [0; 10];
                 let mut num_var: usize = 0;
                 self.solver.asg.var_iter().for_each(|v| {
@@ -92,7 +98,7 @@ impl App {
                     .map(|c| (*c as f64) / (num_var as f64))
                     .collect::<Vec<f64>>()
             };
-            for (i, d) in dist.iter().enumerate().take(10) {
+            for (i, d) in activity_distribution.iter().enumerate().take(10) {
                 self.asg_stats[i] = (d * 100.0) as u64;
             }
             // make history histogram
@@ -102,31 +108,81 @@ impl App {
                 .var_iter()
                 .map(|v| v.activity())
                 .collect::<Vec<_>>();
-            let shift: Vec<f64> = va
+            let activity_transition: Vec<f64> = va
                 .iter()
                 .enumerate()
                 .map(|(vi, val)| {
                     (*val - *self.var_act_hist.get(&vi).unwrap_or(&0.0)).clamp(-1.0, 1.0)
                 })
                 .collect::<Vec<_>>();
-            shift.iter().enumerate().for_each(|(i, v)| {
+            va.iter().enumerate().for_each(|(i, v)| {
                 self.var_act_hist.insert(i, *v);
             });
-            let hist: Vec<f64> = {
+            let activity_histogram: Vec<f64> = {
                 let mut h: [usize; 21] = [0; 21];
                 let mut num_var: usize = 0;
                 self.solver.asg.var_iter().enumerate().for_each(|(va, v)| {
                     if 0 < va && !v.is(FlagVar::ELIMINATED) && !v.is_fixed(root_level) {
                         num_var += 1;
-                        h[((1.0 + shift[va]) / 0.1) as usize] += 1;
+                        h[((1.0 + activity_transition[va]) / 0.1) as usize] += 1;
                     }
                 });
                 h.iter()
                     .map(|c| (*c as f64) / (num_var as f64))
                     .collect::<Vec<f64>>()
             };
-            for (i, d) in hist.iter().enumerate().take(21) {
+            for (i, d) in activity_histogram.iter().enumerate().take(21) {
                 self.vah_stats[i] = (d * 100.0) as u64;
+            }
+            // build spin stats data
+            let spin_distribution: Vec<f64> = {
+                let mut h: [usize; 10] = [0; 10];
+                let mut num_var: usize = 0;
+                self.solver.asg.var_iter().for_each(|v| {
+                    if !v.is(FlagVar::ELIMINATED) && !v.is_fixed(root_level) {
+                        num_var += 1;
+                        h[(v.spin_energy().0.clamp(0.0, 0.99) / 0.1) as usize] += 1;
+                    }
+                });
+                h.iter()
+                    .map(|c| (*c as f64) / (num_var as f64))
+                    .collect::<Vec<f64>>()
+            };
+            for (i, d) in spin_distribution.iter().enumerate().take(10) {
+                self.spin_stats[i] = (d * 100.0) as u64;
+            }
+            // make spin history histogram
+            let spins: Vec<f64> = self
+                .solver
+                .asg
+                .var_iter()
+                .map(|v| v.spin_energy().0.clamp(0.0, 0.99))
+                .collect::<Vec<_>>();
+            let spin_transition: Vec<f64> = spins
+                .iter()
+                .enumerate()
+                .map(|(vi, val)| {
+                    (*val - *self.var_spin_hist.get(&vi).unwrap_or(&0.0)).clamp(-1.0, 0.99)
+                })
+                .collect::<Vec<_>>();
+            spins.iter().enumerate().for_each(|(i, v)| {
+                self.var_spin_hist.insert(i, *v);
+            });
+            let spin_histogram: Vec<f64> = {
+                let mut h: [usize; 21] = [0; 21];
+                let mut num_var: usize = 0;
+                self.solver.asg.var_iter().enumerate().for_each(|(va, v)| {
+                    if 0 < va && !v.is(FlagVar::ELIMINATED) && !v.is_fixed(root_level) {
+                        num_var += 1;
+                        h[(1.0 + spin_transition[va] / 0.1) as usize] += 1;
+                    }
+                });
+                h.iter()
+                    .map(|c| (*c as f64) / (num_var as f64))
+                    .collect::<Vec<f64>>()
+            };
+            for (i, d) in spin_histogram.iter().enumerate().take(21) {
+                self.vsh_stats[i] = (d * 100.0) as u64;
             }
             // draw them
             terminal.draw(|f| self.render_frame(f))?;
@@ -157,39 +213,48 @@ impl App {
     fn render_frame(&self, frame: &mut Frame) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(5), Constraint::Min(5)])
+            .constraints([
+                Constraint::Min(5),
+                Constraint::Min(5),
+                Constraint::Min(5),
+                Constraint::Min(5),
+            ])
             .split(frame.size());
-        let d1: f64 = 0.1 + (self.counter as f64).log2();
-        let d2: f64 = 1.0;
-        let v1 = (1isize..50)
-            .map(|n| {
-                let x = (n as f64 / 25.0) - 1.0;
-                (x, ((x * d2 + d1) * 6.0).sin())
-            })
-            .collect::<Vec<_>>();
-        let v2 = (1isize..50)
-            .map(|n| {
-                let x = (n as f64 / 25.0) - 1.0;
-                (x, ((x * d2 + d1) * 6.0).cos())
-            })
-            .collect::<Vec<_>>();
-        let _dataset: Vec<Dataset> = vec![
-            Dataset::default()
-                .name("sin() wave")
-                .marker(symbols::Marker::Dot)
-                .style(Style::default().fg(Color::Cyan))
-                .data(&v1),
-            Dataset::default()
-                .name("cosine() wave")
-                .marker(symbols::Marker::Dot)
-                .style(Style::default().fg(Color::Red))
-                .data(&v2),
-        ];
+        // let d1: f64 = 0.1 + (self.counter as f64).log2();
+        // let d2: f64 = 1.0;
+        // let v1 = (1isize..50)
+        //     .map(|n| {
+        //         let x = (n as f64 / 25.0) - 1.0;
+        //         (x, ((x * d2 + d1) * 6.0).sin())
+        //     })
+        //     .collect::<Vec<_>>();
+        // let v2 = (1isize..50)
+        //     .map(|n| {
+        //         let x = (n as f64 / 25.0) - 1.0;
+        //         (x, ((x * d2 + d1) * 6.0).cos())
+        //     })
+        //     .collect::<Vec<_>>();
+        // let _dataset: Vec<Dataset> = vec![
+        //     Dataset::default()
+        //         .name("sin() wave")
+        //         .marker(symbols::Marker::Dot)
+        //         .style(Style::default().fg(Color::Cyan))
+        //         .data(&v1),
+        //     Dataset::default()
+        //         .name("cosine() wave")
+        //         .marker(symbols::Marker::Dot)
+        //         .style(Style::default().fg(Color::Red))
+        //         .data(&v2),
+        // ];
         // let chart = self.chart(dataset);
         let bar_chart1 = self.var_activity_bar_chart();
         let bar_chart2 = self.va_history_bar_chart();
+        let bar_chart3 = self.var_spin_bar_chart();
+        let bar_chart4 = self.vs_history_bar_chart();
         frame.render_widget(bar_chart1, chunks[0]);
         frame.render_widget(bar_chart2, chunks[1]);
+        frame.render_widget(bar_chart3, chunks[2]);
+        frame.render_widget(bar_chart4, chunks[3]);
     }
     fn handle_events(&mut self) -> io::Result<bool> {
         if let Event::Key(key_event) = event::read()? {
@@ -267,6 +332,59 @@ impl App {
         ];
         let barchart = BarChart::default()
             .block(Block::bordered().title("Var Activity Moving History"))
+            .data(&b)
+            .bar_width(4)
+            .bar_style(Style::default().fg(Color::Red))
+            .value_style(Style::default().fg(Color::White).bg(Color::Blue));
+        barchart
+    }
+    fn var_spin_bar_chart(&self) -> BarChart<'_> {
+        let b = vec![
+            ("0.0", self.spin_stats[0]),
+            ("0.1", self.spin_stats[1]),
+            ("0.2", self.spin_stats[2]),
+            ("0.3", self.spin_stats[3]),
+            ("0.4", self.spin_stats[4]),
+            ("0.5", self.spin_stats[5]),
+            ("0.6", self.spin_stats[6]),
+            ("0.7", self.spin_stats[7]),
+            ("0.8", self.spin_stats[8]),
+            ("0.9", self.spin_stats[9]),
+        ];
+        let barchart = BarChart::default()
+            .block(Block::bordered().title("Var Spin Energy Histogram"))
+            .data(&b)
+            .bar_width(7)
+            .bar_style(Style::default().fg(Color::Red))
+            .value_style(Style::default().fg(Color::White).bg(Color::Blue));
+        barchart
+    }
+    fn vs_history_bar_chart(&self) -> BarChart<'_> {
+        let b = vec![
+            ("-1.0", self.vsh_stats[0]),
+            ("-0.9", self.vsh_stats[1]),
+            ("-0.8", self.vsh_stats[2]),
+            ("-0.7", self.vsh_stats[3]),
+            ("-0.6", self.vsh_stats[4]),
+            ("-0.5", self.vsh_stats[5]),
+            ("-0.4", self.vsh_stats[6]),
+            ("-0.3", self.vsh_stats[7]),
+            ("-0.2", self.vsh_stats[8]),
+            ("-0.1", self.vsh_stats[9]),
+            ("0.0", self.vsh_stats[10]),
+            ("0.1", self.vsh_stats[11]),
+            ("0.2", self.vsh_stats[12]),
+            ("0.3", self.vsh_stats[13]),
+            ("0.4", self.vsh_stats[14]),
+            ("0.5", self.vsh_stats[15]),
+            ("0.6", self.vsh_stats[16]),
+            ("0.7", self.vsh_stats[17]),
+            ("0.8", self.vsh_stats[18]),
+            ("0.9", self.vsh_stats[19]),
+            ("1.0", self.vsh_stats[20]),
+        ];
+        let barchart = BarChart::default()
+            .block(Block::bordered().title("Var Spin Transition Histogram"))
             .data(&b)
             .bar_width(4)
             .bar_style(Style::default().fg(Color::Red))
