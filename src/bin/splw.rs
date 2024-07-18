@@ -84,7 +84,7 @@ impl App {
             };
             // build stats data
             let activity_distribution: Vec<f64> = {
-                let mut h: [usize; 10] = [0; 10];
+                let mut h: [usize; 11] = [0; 11];
                 let mut num_var: usize = 0;
                 self.solver.asg.var_iter().for_each(|v| {
                     if !v.is(FlagVar::ELIMINATED) && !v.is_fixed(root_level) {
