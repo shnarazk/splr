@@ -35,6 +35,36 @@ pub trait ClauseIF {
 }
 
 /// A representation of 'clause'
+#[cfg(feature = "clause_rewarding")]
+#[derive(Clone, Debug)]
+pub struct Clause {
+    /// links. Note: watch0 is also used as freelist
+    pub(super) link: [WatchLiteralIndexRef; 2],
+    /// The literals in a clause.
+    pub(super) lits: Vec<Lit>,
+    /// Flags (8 bits)
+    pub(super) flags: FlagClause,
+    /// A static clause evaluation criterion like LBD, NDD, or something.
+    pub rank: u16,
+    /// A record of the rank at previos stage.
+    pub rank_old: u16,
+    /// the index from which `propagate` starts searching an un-falsified literal.
+    /// Since it's just a hint, we don't need u32 or usize.
+    pub search_from: u16,
+
+    /// the number of conflicts at which this clause was used in `conflict_analyze`
+    pub(super) timestamp: usize,
+
+    /// A dynamic clause evaluation criterion based on the number of references.
+    pub(super) activity: f64,
+
+    #[cfg(feature = "boundary_check")]
+    pub birth: usize,
+    #[cfg(feature = "boundary_check")]
+    pub moved_at: Propagate,
+}
+
+#[cfg(not(feature = "clause_rewarding"))]
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct Clause {
     /// links. Note: watch0 is also used as freelist
@@ -51,13 +81,9 @@ pub struct Clause {
     /// Since it's just a hint, we don't need u32 or usize.
     pub search_from: u16,
 
-    #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
+    #[cfg(feature = "boundary_check")]
     /// the number of conflicts at which this clause was used in `conflict_analyze`
-    timestamp: usize,
-
-    #[cfg(feature = "clause_rewarding")]
-    /// A dynamic clause evaluation criterion based on the number of references.
-    reward: f64,
+    pub(super) timestamp: usize,
 
     #[cfg(feature = "boundary_check")]
     pub birth: usize,
@@ -82,7 +108,7 @@ impl Default for Clause {
             timestamp: 0,
 
             #[cfg(feature = "clause_rewarding")]
-            reward: 0.0,
+            activity: 0.0,
 
             #[cfg(feature = "boundary_check")]
             birth: 0,

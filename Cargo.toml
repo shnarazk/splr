@@ -37,6 +37,7 @@ default = [
         # "reward_annealing",
         # "stochastic_local_search",
         "two_mode_reduction",
+        # "just_used",
         "trail_saving",
 
         ### Logic formula processor
