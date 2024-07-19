@@ -7,7 +7,7 @@ use {
 impl ActivityIF<VarId> for AssignStack {
     #[inline]
     fn activity(&self, vi: VarId) -> f64 {
-        self.var[vi].activity
+        self.var[vi].activity()
     }
     // fn activity_slow(&self, vi: VarId) -> f64 {
     //     self.var[vi].reward_ema.get()
