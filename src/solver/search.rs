@@ -469,6 +469,9 @@ impl SolveIF for Solver {
                     {
                         state.exploration_rate_ema.update(1.0);
                         if cfg!(feature = "two_mode_reduction") {
+                            #[cfg(feature = "just_used")]
+                            cdb.reduce(asg, ReductionType::ClauseUsed);
+                            #[cfg(not(feature = "just_used"))]
                             cdb.reduce(
                                 asg,
                                 ReductionType::LBDonALL(
