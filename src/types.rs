@@ -584,7 +584,7 @@ bitflags! {
     pub struct FlagVar: u8 {
         /// * the previous assigned value of a Var.
         const PHASE        = 0b0000_0001;
-        /// used in conflict analyze
+        /// used in conflict analyze and a metrix for clause reduction
         const USED         = 0b0000_0010;
         /// a var is eliminated and managed by eliminator.
         const ELIMINATED   = 0b0000_0100;
