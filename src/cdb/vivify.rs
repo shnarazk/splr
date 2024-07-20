@@ -346,7 +346,7 @@ impl Clause {
             (!self.is_dead()
                 && self.rank * 2 <= self.rank_old
                 && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
-            .then(|| self.reward)
+            .then(|| self.activity)
         }
     }
     #[cfg(not(feature = "clause_rewarding"))]

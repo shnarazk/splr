@@ -1,23 +1,19 @@
-#![cfg(feature = "clause_rewarding")]
-use {super::ClauseId, crate::types::*, std::num::NonZeroU32};
+use {super::ClauseIndex, crate::types::*};
 
 /// clause activity
 /// Note: vivifier has its own conflict analyzer, which never call reward functions.
 
-impl ActivityIF<ClauseId> for ClauseDB {
-    fn activity(&self, _cid: ClauseId) -> f64 {
+#[cfg(feature = "clause_rewarding")]
+impl ActivityIF<ClauseIndex> for ClauseDB {
+    fn activity(&self, _cid: ClauseIndex) -> f64 {
         unreachable!()
     }
-    fn set_activity(&mut self, cid: ClauseId, val: f64) {
-        self[cid].reward = val;
+    fn set_activity(&mut self, cid: ClauseIndex, val: f64) {
+        self[cid].activity = val;
     }
     #[inline]
-    fn reward_at_analysis(&mut self, cid: ClauseId) {
-        self.clause[NonZeroU32::get(cid.ordinal) as usize].update_activity(
-            self.tick,
-            self.activity_decay,
-            self.activity_anti_decay,
-        );
+    fn reward_at_analysis(&mut self, cid: ClauseIndex) {
+        self.clause[cid].update_activity(self.tick, self.activity_decay, self.activity_anti_decay);
     }
     fn update_activity_tick(&mut self) {
         self.tick += 1;
@@ -28,14 +24,27 @@ impl ActivityIF<ClauseId> for ClauseDB {
     }
 }
 
+#[cfg(not(feature = "clause_rewarding"))]
+impl ActivityIF<ClauseIndex> for ClauseDB {
+    #[inline]
+    fn activity(&self, _cid: ClauseIndex) -> f64 {
+        unreachable!()
+    }
+    fn set_activity(&mut self, _cid: ClauseIndex, _val: f64) {}
+    fn reward_at_analysis(&mut self, _cid: ClauseIndex) {}
+    fn update_activity_tick(&mut self) {}
+    fn update_activity_decay(&mut self, _decay: f64) {}
+}
+
+#[cfg(feature = "clause_rewarding")]
 impl Clause {
     #[inline]
     pub fn update_activity(&mut self, t: usize, decay: f64, reward: f64) -> f64 {
         if self.timestamp < t {
-            self.reward *= decay.powi(t as i32 - self.timestamp as i32);
-            self.reward += reward;
+            self.activity *= decay.powi(t as i32 - self.timestamp as i32);
+            self.activity += reward;
             self.timestamp = t;
         }
-        self.reward
+        self.activity
     }
 }

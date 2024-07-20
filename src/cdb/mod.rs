@@ -46,6 +46,7 @@ pub trait ClauseDBIF:
     + ClauseWeaverIF
     + PropertyDereference<property::Tusize, usize>
     + PropertyDereference<property::Tf64, f64>
+    + ActivityIF<ClauseIndex>
 {
     #[cfg(feature = "boundary_check")]
     fn check_chains(&self, ci: ClauseIndex);
@@ -287,8 +288,12 @@ impl ClauseDBIF for ClauseDB {
 
         #[cfg(feature = "clause_rewarding")]
         {
-            self[ci].reward = 0.0;
-            self[ci].timestamp = *tick;
+            self[ci].activity = 0.0;
+            self[ci].timestamp = self.tick;
+        }
+        #[cfg(feature = "just_used")]
+        {
+            self[ci].turn_on(FlagClause::USED);
         }
         RefClause::Clause(ci)
     }
@@ -325,7 +330,7 @@ impl ClauseDBIF for ClauseDB {
 
         #[cfg(feature = "clause_rewarding")]
         {
-            self[ci].timestamp = *tick;
+            self[ci].timestamp = self.tick;
         }
 
         RefClause::Clause(ci)
@@ -564,7 +569,36 @@ impl ClauseDBIF for ClauseDB {
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
+    #[allow(unreachable_code, unused_variables)]
     fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
+        #[cfg(feature = "just_used")]
+        {
+            let mut alives = 0;
+            let mut keep = 0;
+            for ci in 1..self.clause.len() {
+                if self.clause[ci].is_dead() {
+                    continue;
+                }
+                alives += 1;
+                keep += 1;
+                if self.clause[ci].is(FlagClause::USED) {
+                    self.clause[ci].turn_off(FlagClause::USED);
+                    continue;
+                }
+                if self.clause[ci].is(FlagClause::LEARNT) {
+                    let ClauseDB {
+                        clause, lbd_temp, ..
+                    } = self;
+                    clause[ci].update_lbd(asg, lbd_temp);
+                    if 5 < self.clause[ci].rank {
+                        keep -= 1;
+                        self.delete_clause(ci);
+                    }
+                }
+            }
+            self.reduction_threshold = keep as f64 / alives as f64;
+            return;
+        }
         impl Clause {
             fn reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
                 self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
@@ -593,6 +627,10 @@ impl ClauseDBIF for ClauseDB {
             ReductionType::RASonALL(_, _) => true,
             ReductionType::LBDonADD(_) => false,
             ReductionType::LBDonALL(_, _) => true,
+            #[cfg(feature = "clause_rewarding")]
+            ReductionType::ClauseActivity => false,
+            #[cfg(feature = "just_used")]
+            ReductionType::ClauseUsed => false,
         };
         for (ci, c) in clause
             .iter_mut()
@@ -604,11 +642,11 @@ impl ClauseDBIF for ClauseDB {
                 c.update_lbd(asg, lbd_temp);
             }
 
-            #[cfg(feature = "clause_rewarding")]
-            c.update_activity(*tick, *activity_decay, 0.0);
             if !c.is(FlagClause::LEARNT) {
                 continue;
             }
+            #[cfg(feature = "clause_rewarding")]
+            c.update_activity(*tick, *activity_decay, 0.0);
             alives += 1;
             match setting {
                 ReductionType::RASonADD(_) => {
@@ -629,6 +667,10 @@ impl ClauseDBIF for ClauseDB {
                         perm.push(OrderedProxy::new(ci, value as f64));
                     }
                 }
+                #[cfg(feature = "clause_rewarding")]
+                ReductionType::ClauseActivity => perm.push(OrderedProxy::new(ci, -c.activity)),
+                #[cfg(feature = "just_used")]
+                ReductionType::ClauseUsed => unreachable!(),
             }
         }
         let keep = match setting {
@@ -636,7 +678,14 @@ impl ClauseDBIF for ClauseDB {
             ReductionType::RASonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
             ReductionType::LBDonADD(size) => perm.len().saturating_sub(size),
             ReductionType::LBDonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
+            #[cfg(feature = "clause_rewarding")]
+            ReductionType::ClauseActivity => (perm.len() as f64).powf(0.75) as usize,
+            #[cfg(feature = "just_used")]
+            ReductionType::ClauseUsed => unreachable!(),
         };
+        if perm.is_empty() {
+            return;
+        }
         self.reduction_threshold = match setting {
             ReductionType::RASonADD(_) | ReductionType::RASonALL(_, _) => {
                 keep as f64 / alives as f64
@@ -644,10 +693,11 @@ impl ClauseDBIF for ClauseDB {
             ReductionType::LBDonADD(_) | ReductionType::LBDonALL(_, _) => {
                 -(keep as f64) / alives as f64
             }
+            #[cfg(feature = "clause_rewarding")]
+            ReductionType::ClauseActivity => keep as f64 / alives as f64,
+            #[cfg(feature = "just_used")]
+            ReductionType::ClauseUsed => unreachable!(),
         };
-        if perm.is_empty() {
-            return;
-        }
         perm.sort();
         let threshold = perm[keep.min(perm.len() - 1)].value();
         for i in perm.iter().skip(keep) {
@@ -1185,6 +1235,10 @@ pub enum ReductionType {
     LBDonADD(usize),
     /// weight by Literal Block Distance over all learnt clauses
     LBDonALL(u16, f64),
+    #[cfg(feature = "clause_rewarding")]
+    ClauseActivity,
+    #[cfg(feature = "just_used")]
+    ClauseUsed,
 }
 
 pub mod property {
@@ -1315,7 +1369,7 @@ mod tests {
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
-        assert!(!c.is(Flag::USED));
+        assert!(!c.is(FlagClause::USED));
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
             .as_ci();
@@ -1323,7 +1377,7 @@ mod tests {
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
-        assert!(!c.is(Flag::USED));
+        assert!(!c.is(FlagClause::USED));
     }
     #[test]
     fn test_clause_equality() {

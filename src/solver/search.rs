@@ -469,6 +469,9 @@ impl SolveIF for Solver {
                     {
                         state.exploration_rate_ema.update(1.0);
                         if cfg!(feature = "two_mode_reduction") {
+                            #[cfg(feature = "just_used")]
+                            cdb.reduce(asg, ReductionType::ClauseUsed);
+                            #[cfg(not(feature = "just_used"))]
                             cdb.reduce(
                                 asg,
                                 ReductionType::LBDonALL(
@@ -559,6 +562,18 @@ impl SolveIF for Solver {
                             state.restart.set_segment_parameters(max_scale);
                         }
                     }
+                    #[cfg(all(
+                        not(feature = "two_mode_reduction"),
+                        feature = "clause_rewarding",
+                        not(feature = "just_used")
+                    ))]
+                    cdb.reduce(asg, ReductionType::ClauseActivity);
+                    #[cfg(all(
+                        not(feature = "two_mode_reduction"),
+                        not(feature = "clause_rewarding"),
+                        feature = "just_used"
+                    ))]
+                    cdb.reduce(asg, ReductionType::LBDonALL(0, 0.0));
                 } else {
                     {
                         if cfg!(feature = "two_mode_reduction") {
@@ -571,16 +586,15 @@ impl SolveIF for Solver {
                         }
                     }
                 }
-                {
-                    if !cfg!(feature = "two_mode_reduction") {
-                        cdb.reduce(
-                            asg,
-                            ReductionType::RASonADD(
-                                state.stm.num_reducible(state.config.cls_rdc_rm1),
-                            ),
-                        );
-                    }
-                }
+                #[cfg(all(
+                    not(feature = "two_mode_reduction"),
+                    not(feature = "clause_rewarding"),
+                    not(feature = "just_used")
+                ))]
+                cdb.reduce(
+                    asg,
+                    ReductionType::RASonADD(state.stm.num_reducible(state.config.cls_rdc_rm1)),
+                );
                 state.progress(asg, cdb);
                 asg.handle(SolverEvent::Stage(scale));
                 state.restart.set_stage_parameters(scale);
