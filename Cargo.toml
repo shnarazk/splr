@@ -31,13 +31,13 @@ default = [
         # "bi_clause_completion",
         # "clause_rewarding",
         # "dynamic_restart_threshold",
+        # "just_used",
         "LRB_rewarding",
         "reason_side_rewarding",
         "rephase",
         # "reward_annealing",
         # "stochastic_local_search",
         "two_mode_reduction",
-        # "just_used",
         "trail_saving",
 
         ### Logic formula processor
