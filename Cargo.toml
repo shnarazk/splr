@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.18.0-dev3"
+version = "0.18.0-dev3-spin"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2021"
@@ -49,6 +49,7 @@ default = [
 
         ### For SAT researcher
         "graph_view",
+        "spin",
 
         ### platform dependency
         # "platform_wasm"
@@ -83,6 +84,7 @@ rephase = [                     # search around the best-so-far candidate repeat
         "best_phases_tracking",
         ]
 reward_annealing = []           # use bigger and smaller decay rates cycliclly
+spin = []
 stochastic_local_search = [     # since 0.17
         # "reward_annealing",
         "rephase",

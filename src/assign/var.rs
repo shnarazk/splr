@@ -7,6 +7,48 @@ use {
     },
 };
 
+#[derive(Clone, Debug)]
+pub(crate) struct Spin {
+    /// the values are updated at every assignment
+    pub(crate) last_phase: bool,
+    /// in AssignStack::tick
+    pub(crate) last_assign: usize,
+    // moving average of phase(-1/1)
+    pub(crate) probability: Ema2,
+}
+
+impl Default for Spin {
+    fn default() -> Self {
+        Spin {
+            last_phase: bool::default(),
+            last_assign: usize::default(),
+            probability: Ema2::new(256).with_slow(4096),
+        }
+    }
+}
+#[allow(dead_code)]
+impl Spin {
+    // call after assignment to var
+    pub fn update(&mut self, phase: bool, tick: usize) {
+        let span: usize = (tick - self.last_assign).max(1); // 1 for conflicing situation
+        let moment: f64 = (if phase { 1.0 } else { -1.0 }) / span as f64;
+        self.probability.update(moment);
+        self.last_assign = tick;
+        self.last_phase = phase;
+    }
+    pub fn ema(&self) -> EmaView {
+        EmaView {
+            fast: self.probability.get_fast(),
+            slow: self.probability.get_slow(),
+        }
+    }
+    pub fn energy(&self) -> (f64, f64) {
+        let p = self.probability.get_fast();
+        let q = self.probability.get_slow();
+        (1.0 - p.abs(), 1.0 - q.abs())
+    }
+}
+
 /// Object representing a variable.
 #[derive(Clone, Debug)]
 pub struct Var {
@@ -21,7 +63,8 @@ pub struct Var {
     pub(super) flags: FlagVar,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
     pub(super) activity: f64,
-    // reward_ema: Ema2,
+    /// phase transition frequency
+    pub(super) spin: Spin,
     #[cfg(feature = "boundary_check")]
     pub propagated_at: usize,
     #[cfg(feature = "boundary_check")]
@@ -38,6 +81,7 @@ impl Default for Var {
             reason: AssignReason::None,
             flags: FlagVar::empty(),
             activity: 0.0,
+            spin: Spin::default(),
             // reward_ema: Ema2::new(200).with_slow(4_000),
             #[cfg(feature = "boundary_check")]
             propagated_at: 0,
@@ -67,6 +111,9 @@ impl Var {
     /// return `true` if var is fixed.
     pub fn is_fixed(&self, root_level: DecisionLevel) -> bool {
         self.assign.is_some() && self.level == root_level
+    }
+    pub fn spin_energy(&self) -> (f64, f64) {
+        self.spin.energy()
     }
 }
 

@@ -7,7 +7,7 @@ use {
 impl ActivityIF<VarId> for AssignStack {
     #[inline]
     fn activity(&self, vi: VarId) -> f64 {
-        self.var[vi].activity
+        self.var[vi].activity()
     }
     // fn activity_slow(&self, vi: VarId) -> f64 {
     //     self.var[vi].reward_ema.get()
@@ -19,7 +19,12 @@ impl ActivityIF<VarId> for AssignStack {
         self.var[vi].turn_on(FlagVar::USED);
     }
     #[inline]
-    fn reward_at_assign(&mut self, _vi: VarId) {}
+    fn reward_at_assign(&mut self, vi: VarId) {
+        #[cfg(feature = "spin")]
+        if let Some(b) = self.var[vi].assign {
+            self.var[vi].spin.update(b, self.tick);
+        }
+    }
     #[inline]
     fn reward_at_propagation(&mut self, _vi: VarId) {}
     #[inline]

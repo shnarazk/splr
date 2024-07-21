@@ -40,10 +40,10 @@ pub trait EmaMutIF: EmaIF {
     fn set_value(&mut self, _x: f64) {}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct EmaView {
-    fast: f64,
-    slow: f64,
+    pub fast: f64,
+    pub slow: f64,
 }
 
 impl EmaIF for EmaView {
@@ -65,6 +65,17 @@ pub struct Ema {
     #[cfg(feature = "EMA_calibration")]
     cal: f64,
     sca: f64,
+}
+
+impl Default for Ema {
+    fn default() -> Self {
+        Ema {
+            val: EmaView::default(),
+            #[cfg(feature = "EMA_calibration")]
+            cal: 1.0,
+            sca: 1.0,
+        }
+    }
 }
 
 impl EmaIF for Ema {
@@ -134,6 +145,20 @@ pub struct Ema2 {
     cals: f64,
     fe: f64,
     se: f64,
+}
+
+impl Default for Ema2 {
+    fn default() -> Self {
+        Ema2 {
+            ema: EmaView::default(),
+            #[cfg(feature = "EMA_calibration")]
+            calf: 1.0,
+            #[cfg(feature = "EMA_calibration")]
+            cals: 1.0,
+            fe: 1.0,
+            se: 1.0,
+        }
+    }
 }
 
 impl EmaIF for Ema2 {
