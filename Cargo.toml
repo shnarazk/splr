@@ -13,6 +13,9 @@ categories = ["science", "mathematics"]
 default-run = "splr"
 rust-version = "1.79"
 
+[build]
+rustflags = ["-C", "target-cpu=native"]
+
 [dependencies]
 bitflags = "^2.6"
 
