@@ -276,16 +276,16 @@ impl App {
     }
     fn va_history_bar_chart(&self) -> BarChart<'_> {
         let b = vec![
-            ("-1.0", self.var_act_shift_stats[0]),
-            ("-0.9", self.var_act_shift_stats[1]),
-            ("-0.8", self.var_act_shift_stats[2]),
-            ("-0.7", self.var_act_shift_stats[3]),
-            ("-0.6", self.var_act_shift_stats[4]),
-            ("-0.5", self.var_act_shift_stats[5]),
-            ("-0.4", self.var_act_shift_stats[6]),
-            ("-0.3", self.var_act_shift_stats[7]),
-            ("-0.2", self.var_act_shift_stats[8]),
-            ("-0.1", self.var_act_shift_stats[9]),
+            ("-1.", self.var_act_shift_stats[0]),
+            ("-.9", self.var_act_shift_stats[1]),
+            ("-.8", self.var_act_shift_stats[2]),
+            ("-.7", self.var_act_shift_stats[3]),
+            ("-.6", self.var_act_shift_stats[4]),
+            ("-.5", self.var_act_shift_stats[5]),
+            ("-.4", self.var_act_shift_stats[6]),
+            ("-.3", self.var_act_shift_stats[7]),
+            ("-.2", self.var_act_shift_stats[8]),
+            ("-.1", self.var_act_shift_stats[9]),
             ("0.0", self.var_act_shift_stats[10]),
             ("0.1", self.var_act_shift_stats[11]),
             ("0.2", self.var_act_shift_stats[12]),
@@ -301,7 +301,7 @@ impl App {
         let barchart = BarChart::default()
             .block(Block::bordered().title("Var Activity Moving History"))
             .data(&b)
-            .bar_width(4)
+            .bar_width(3)
             .bar_style(Style::default().fg(Color::Red))
             .value_style(Style::default().fg(Color::White).bg(Color::Blue));
         barchart
@@ -330,16 +330,16 @@ impl App {
     }
     fn vs_history_bar_chart(&self) -> BarChart<'_> {
         let b = vec![
-            ("-1.0", self.var_spin_shift_stats[0]),
-            ("-0.9", self.var_spin_shift_stats[1]),
-            ("-0.8", self.var_spin_shift_stats[2]),
-            ("-0.7", self.var_spin_shift_stats[3]),
-            ("-0.6", self.var_spin_shift_stats[4]),
-            ("-0.5", self.var_spin_shift_stats[5]),
-            ("-0.4", self.var_spin_shift_stats[6]),
-            ("-0.3", self.var_spin_shift_stats[7]),
-            ("-0.2", self.var_spin_shift_stats[8]),
-            ("-0.1", self.var_spin_shift_stats[9]),
+            ("-1.", self.var_spin_shift_stats[0]),
+            ("-.9", self.var_spin_shift_stats[1]),
+            ("-.8", self.var_spin_shift_stats[2]),
+            ("-.7", self.var_spin_shift_stats[3]),
+            ("-.6", self.var_spin_shift_stats[4]),
+            ("-.5", self.var_spin_shift_stats[5]),
+            ("-.4", self.var_spin_shift_stats[6]),
+            ("-.3", self.var_spin_shift_stats[7]),
+            ("-.2", self.var_spin_shift_stats[8]),
+            ("-.1", self.var_spin_shift_stats[9]),
             ("0.0", self.var_spin_shift_stats[10]),
             ("0.1", self.var_spin_shift_stats[11]),
             ("0.2", self.var_spin_shift_stats[12]),
@@ -355,7 +355,7 @@ impl App {
         let barchart = BarChart::default()
             .block(Block::bordered().title("Var Spin Transition Histogram"))
             .data(&b)
-            .bar_width(4)
+            .bar_width(3)
             .bar_style(Style::default().fg(Color::Red))
             .value_style(Style::default().fg(Color::White).bg(Color::Blue));
         barchart
