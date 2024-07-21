@@ -67,9 +67,10 @@ dynamic_restart_threshold = []  # control restart spans like Glucose
 EMA_calibration = []            # each exponential moving average has a calbration value
 EVSIDS = []                     # Eponential Variable State Independent Decaying Sum
 graph_view = [
+        "crossterm",
         "interleave",
         "ratatui",
-        "crossterm",
+        "spin"
 ]
 incremental_solver = []         # for all solution SAT sover; requires no cluse_elimination
 interleave = []                 # switch to multi-step search IF
