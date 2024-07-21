@@ -74,7 +74,6 @@ pub trait ClauseDBIF:
     /// This returns `true` if the clause became a unit clause.
     /// And this is called only from `Eliminator::strengthen_clause`.
     fn new_clause(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
-    fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>) -> RefClause;
     fn delete_clause(&mut self, ci: ClauseIndex);
     fn transform_by_elimination(&mut self, ci: ClauseIndex, p: Lit) -> RefClause;
     /// generic clause transformer (not in use)
@@ -295,44 +294,6 @@ impl ClauseDBIF for ClauseDB {
         {
             self[ci].turn_on(FlagClause::USED);
         }
-        RefClause::Clause(ci)
-    }
-
-    fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, vec: &mut Vec<Lit>) -> RefClause {
-        debug_assert!(1 < vec.len());
-        let len2 = vec.len() == 2;
-        if len2 {
-            if let Some(ci) = self.link_to_cid(vec[0], vec[1]) {
-                return RefClause::RegisteredClause(ci);
-            }
-        }
-        let ci = self.get_free_index();
-        // let c = &mut self[ci];
-        self[ci].flags = FlagClause::empty();
-        std::mem::swap(&mut self[ci].lits, vec);
-        self.weave(ci);
-        let l0 = self[ci].lits[0];
-        let l1 = self[ci].lits[1];
-        if len2 {
-            self[ci].rank = 1;
-            self.binary_link.add(l0, l1, ci);
-        } else {
-            let ClauseDB {
-                ref mut clause,
-                ref mut lbd_temp,
-                ..
-            } = self;
-            clause[ci].search_from = 0;
-            clause[ci].turn_on(FlagClause::LEARNT);
-            clause[ci].update_lbd(asg, lbd_temp);
-        }
-        self[ci].rank_old = self[ci].rank;
-
-        #[cfg(feature = "clause_rewarding")]
-        {
-            self[ci].timestamp = self.tick;
-        }
-
         RefClause::Clause(ci)
     }
     fn delete_clause(&mut self, ci: ClauseIndex) {
