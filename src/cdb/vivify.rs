@@ -18,7 +18,7 @@ impl VivifyIF for ClauseDB {
     fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent {
         const NUM_TARGETS: Option<usize> = Some(VIVIFY_LIMIT);
         if asg.remains() {
-            asg.propagate_sandbox(self).map_err(|cc| {
+            asg.propagate(self, true).map_err(|cc| {
                 state.log(None, "By vivifier");
                 SolverError::RootLevelConflict(cc)
             })?;
@@ -42,7 +42,7 @@ impl VivifyIF for ClauseDB {
             asg.backtrack_sandbox();
             debug_assert_eq!(asg.decision_level(), asg.root_level());
             if asg.remains() {
-                asg.propagate_sandbox(self)
+                asg.propagate(self, true)
                     .map_err(SolverError::RootLevelConflict)?;
             }
 
@@ -78,7 +78,7 @@ impl VivifyIF for ClauseDB {
                         decisions.push(!lit);
                         asg.assign_by_decision(!lit);
                         //## Rule 3
-                        if let Err(cc) = asg.propagate_sandbox(self) {
+                        if let Err(cc) = asg.propagate(self, true) {
                             let mut vec: Vec<Lit>;
                             match cc.1 {
                                 AssignReason::BinaryLink(l) => {
@@ -159,7 +159,7 @@ impl VivifyIF for ClauseDB {
         }
         asg.backtrack_sandbox();
         if asg.remains() {
-            asg.propagate_sandbox(self)
+            asg.propagate(self, true)
                 .map_err(SolverError::RootLevelConflict)?;
         }
         asg.clear_asserted_literals(self)?;

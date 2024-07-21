@@ -219,7 +219,7 @@ impl EliminateIF for Eliminator {
             // self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
             self.eliminate(asg, cdb, state)?;
         } else {
-            asg.propagate_sandbox(cdb)
+            asg.propagate(cdb, true)
                 .map_err(SolverError::RootLevelConflict)?;
         }
         if self.mode != EliminatorMode::Dormant {
@@ -422,7 +422,7 @@ impl Eliminator {
             }
         }
         if asg.remains() {
-            asg.propagate_sandbox(cdb)
+            asg.propagate(cdb, true)
                 .map_err(SolverError::RootLevelConflict)?;
         }
         Ok(())
@@ -442,7 +442,7 @@ impl Eliminator {
         loop {
             let na = asg.stack_len();
             self.eliminate_main(asg, cdb, state)?;
-            asg.propagate_sandbox(cdb)
+            asg.propagate(cdb, true)
                 .map_err(SolverError::RootLevelConflict)?;
             if na == asg.stack_len()
                 && (!self.is_running()
@@ -485,7 +485,7 @@ impl Eliminator {
             }
             self.backward_subsumption_check(asg, cdb)?;
             debug_assert!(self.clause_queue.is_empty());
-            asg.propagate_sandbox(cdb)
+            asg.propagate(cdb, true)
                 .map_err(SolverError::RootLevelConflict)?;
         }
         self.clear_clause_queue(cdb);

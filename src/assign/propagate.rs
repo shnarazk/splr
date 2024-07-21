@@ -41,9 +41,9 @@ pub trait PropagateIF {
     /// execute backjump in vivification sandbox
     fn backtrack_sandbox(&mut self);
     /// execute *boolean constraint propagation* or *unit propagation*.
-    fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
-    /// `propagate` for vivification, which allows dead clauses.
-    fn propagate_sandbox(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
+    fn propagate(&mut self, cdb: &mut impl ClauseDBIF, sandbox: bool) -> PropagationResult;
+    // /// `propagate` for vivification, which allows dead clauses.
+    // fn propagate_sandbox(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
     /// propagate then clear asserted literals
     fn clear_asserted_literals(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent;
 }
@@ -272,7 +272,7 @@ impl PropagateIF for AssignStack {
     ///    So Eliminator should call `garbage_collect` before me.
     ///  - The order of literals in binary clauses will be modified to hold
     ///    propagation order.
-    fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
+    fn propagate(&mut self, cdb: &mut impl ClauseDBIF, sandbox: bool) -> PropagationResult {
         #[cfg(feature = "boundary_check")]
         macro_rules! check_in {
             ($cid: expr, $tag :expr) => {
@@ -285,9 +285,11 @@ impl PropagateIF for AssignStack {
         }
         macro_rules! conflict_path {
             ($lit: expr, $reason: expr) => {
-                self.dpc_ema.update(self.num_decision);
-                self.ppc_ema.update(self.num_propagation);
-                self.num_conflict += 1;
+                if !sandbox {
+                    self.dpc_ema.update(self.num_decision);
+                    self.ppc_ema.update(self.num_propagation);
+                    self.num_conflict += 1;
+                }
                 return Err(($lit, $reason));
             };
         }
@@ -311,13 +313,15 @@ impl PropagateIF for AssignStack {
         #[cfg(feature = "trail_saving")]
         macro_rules! from_saved_trail {
             () => {
-                if let cc @ Err(_) = self.reuse_saved_trail(cdb) {
-                    self.num_propagation += 1;
-                    self.num_conflict += 1;
-                    self.num_reconflict += 1;
-                    self.dpc_ema.update(self.num_decision);
-                    self.ppc_ema.update(self.num_propagation);
-                    return cc;
+                if !sandbox {
+                    if let cc @ Err(_) = self.reuse_saved_trail(cdb) {
+                        self.num_propagation += 1;
+                        self.num_conflict += 1;
+                        self.num_reconflict += 1;
+                        self.dpc_ema.update(self.num_decision);
+                        self.ppc_ema.update(self.num_propagation);
+                        return cc;
+                    }
                 }
             };
         }
@@ -329,13 +333,15 @@ impl PropagateIF for AssignStack {
         let dl = self.decision_level();
         from_saved_trail!();
         while let Some(p) = self.trail.get(self.q_head) {
-            self.num_propagation += 1;
-            self.q_head += 1;
+            if !sandbox {
+                self.num_propagation += 1;
+            }
             #[cfg(feature = "debug_propagation")]
             {
                 assert!(!self.var[p.vi()].is(FlagVar::PROPAGATED));
                 self.var[p.vi()].turn_on(FlagVar::PROPAGATED);
             }
+            self.q_head += 1;
             let propagating = Lit::from(usize::from(*p));
             let false_lit = !*p;
 
@@ -390,7 +396,14 @@ impl PropagateIF for AssignStack {
                     }
                 }
                 if other_value == Some(false) {
-                    check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
+                    check_in!(
+                        ci,
+                        if sandbox {
+                            Propagate::SandboxEmitConflict(self.num_conflict, propagating)
+                        } else {
+                            Propagate::EmitConflict(self.num_conflict + 1, other)
+                        }
+                    );
                     conflict_path!(
                         other,
                         if len == 0 {
@@ -419,19 +432,31 @@ impl PropagateIF for AssignStack {
                         #[cfg(feature = "chrono_BT")]
                         dl,
                     );
-                    check_in!(cid, Propagate::BecameUnit(self.num_conflict, cached));
+                    check_in!(
+                        cid,
+                        if sandbox {
+                            Propagate::SandboxBecameUnit(self.num_conflict)
+                        } else {
+                            Propagate::BecameUnit(self.num_conflict, cached)
+                        }
+                    );
                     wli = c.next_watch(false_index);
                 }
             }
-            from_saved_trail!();
+            if !sandbox {
+                from_saved_trail!();
+            }
         }
-        let na: usize = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
-        if self.num_best_assign <= na && 0 < dl {
-            self.best_assign = true;
-            self.num_best_assign = na;
+        if !sandbox {
+            let na: usize = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
+            if self.num_best_assign <= na && 0 < dl {
+                self.best_assign = true;
+                self.num_best_assign = na;
+            }
         }
         Ok(())
     }
+    /*
     //
     //## How to generate propagate_sandbox from propagate
     //
@@ -442,7 +467,6 @@ impl PropagateIF for AssignStack {
     // 1. delete codes about trail_saving
     // 1. delete codes about stat counters: num_*, ema_*
     // 1. delete comments
-    // 1. (allow dead clauses)
     // 1. (allow eliminated vars)
     //
     fn propagate_sandbox(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
@@ -487,18 +511,17 @@ impl PropagateIF for AssignStack {
                     wli = c.next_watch(false_index);
                     continue 'next_clause;
                 }
-                let start = c.search_from as usize;
                 let len = c.len() - 2;
+                let start = c.search_from as usize;
                 for i in 0..c.len() - 2 {
                     let k = (i + start) % len + 2;
                     let lk = c[k];
                     if lit_assign!(self.var[lk.vi()], lk) != Some(false) {
-                        let next = cdb.transform_by_updating_watch(wli, k);
                         check_in!(
                             ci,
                             Propagate::SandboxFindNewWatch(self.num_conflict, false_lit, !lk)
                         );
-                        wli = next;
+                        wli = cdb.transform_by_updating_watch(wli, k);
                         continue 'next_clause;
                     }
                 }
@@ -530,16 +553,17 @@ impl PropagateIF for AssignStack {
         }
         Ok(())
     }
+    */
     fn clear_asserted_literals(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
         debug_assert_eq!(self.decision_level(), self.root_level);
         loop {
             if self.remains() {
-                self.propagate_sandbox(cdb)
+                self.propagate(cdb, true)
                     .map_err(SolverError::RootLevelConflict)?;
             }
             self.propagate_at_root_level(cdb)?;
             if self.remains() {
-                self.propagate_sandbox(cdb)
+                self.propagate(cdb, true)
                     .map_err(SolverError::RootLevelConflict)?;
             } else {
                 break;

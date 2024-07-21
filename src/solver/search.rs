@@ -425,7 +425,7 @@ impl SolveIF for Solver {
                 let lit = asg.select_decision_literal();
                 asg.assign_by_decision(lit);
             }
-            let Err(cc) = asg.propagate(cdb) else {
+            let Err(cc) = asg.propagate(cdb, false) else {
                 continue;
             };
             if asg.decision_level() == asg.root_level() {
