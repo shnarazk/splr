@@ -299,16 +299,14 @@ impl ClauseDBIF for ClauseDB {
     fn delete_clause(&mut self, ci: ClauseIndex) {
         debug_assert_ne!(Lit::default(), self.clause[ci].lit1());
         let len2 = self.clause[ci].len() == 2;
-        if !self.clause[ci].is(FlagClause::SANDBOX) {
-            let c = &self.clause[ci];
-            self.certification_store.delete_clause(&c.lits);
-            self.num_clause -= 1;
-            if c.is(FlagClause::LEARNT) {
-                self.num_learnt -= 1;
-            }
-            if len2 {
-                self.num_bi_clause -= 1;
-            }
+        let c = &self.clause[ci];
+        self.certification_store.delete_clause(&c.lits);
+        self.num_clause -= 1;
+        if c.is(FlagClause::LEARNT) {
+            self.num_learnt -= 1;
+        }
+        if len2 {
+            self.num_bi_clause -= 1;
         }
         if len2 {
             self.binary_link

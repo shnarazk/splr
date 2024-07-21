@@ -573,8 +573,6 @@ bitflags! {
         const OCCUR_LINKED = 0b0000_1000;
         /// a given clause derived a learnt which LBD is smaller than 20.
         const DERIVE20     = 0b0001_0000;
-        /// a temporal clause for logical processing.
-        const SANDBOX      = 0b0010_0000;
     }
 }
 
