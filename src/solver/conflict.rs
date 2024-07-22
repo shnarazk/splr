@@ -264,6 +264,8 @@ fn conflict_analyze(
     let dl = asg.decision_level();
     let mut path_cnt = 0;
     let (mut p, mut reason) = cc;
+    let mut deep_path_cnt = 0;
+    let mut reason_side_lits: Vec<Lit> = Vec::new();
 
     macro_rules! conflict_level {
         ($vi: expr) => {
@@ -334,6 +336,10 @@ fn conflict_analyze(
         } else {
             debug_assert_ne!(root_level, lvl);
             learnt.push(p);
+            if asg.decision_vi(lvl) != vi {
+                deep_path_cnt += 1;
+                reason_side_lits.push(p);
+            }
         }
     }
     let mut trail_index = asg.stack_len() - 1;
@@ -411,6 +417,10 @@ fn conflict_analyze(
                         } else {
                             trace_lit!(q, " -- push to learnt");
                             learnt.push(*q);
+                            if asg.decision_vi(lvl) != vi {
+                                deep_path_cnt += 1;
+                                reason_side_lits.push(*q);
+                            }
                         }
                     } else {
                         trace!("{:?} -- ignore flagged already", q);
@@ -481,6 +491,14 @@ fn conflict_analyze(
         "appending {}, the final (but not minimized) learnt is {:?}",
         learnt[0],
         learnt
+    );
+    dbg!(
+        deep_path_cnt,
+        &reason_side_lits,
+        &reason_side_lits
+            .iter()
+            .map(|l| asg.reason(l.vi()))
+            .collect::<Vec<_>>(),
     );
     minimize_learnt(&mut state.new_learnt, asg, cdb)
 }
