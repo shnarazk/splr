@@ -590,10 +590,11 @@ bitflags! {
         const ENQUEUED     = 0b0000_1000;
         /// a var is checked during in the current conflict analysis.
         const CA_SEEN      = 0b0001_0000;
+        const CA_SEEN2     = 0b0010_0000;
 
         #[cfg(feature = "debug_propagation")]
         /// check propagation
-        const PROPAGATED   = 0b0010_0000;
+        const PROPAGATED   = 0b0100_0000;
     }
 }
 

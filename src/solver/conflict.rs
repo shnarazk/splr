@@ -267,7 +267,7 @@ fn conflict_analyze(
     let mut deep_path_cnt = 0;
     let mut reason_side_lits: Vec<Lit> = Vec::new();
 
-    macro_rules! conflict_level {
+    macro_rules! new_depend_on_conflict_level {
         ($vi: expr) => {
             path_cnt += 1;
             //## Conflict-Side Rewarding
@@ -332,7 +332,7 @@ fn conflict_analyze(
         set_seen!(vi);
         let lvl = asg.level(vi);
         if dl == lvl {
-            conflict_level!(vi);
+            new_depend_on_conflict_level!(vi);
         } else {
             debug_assert_ne!(root_level, lvl);
             learnt.push(p);
@@ -357,7 +357,7 @@ fn conflict_analyze(
                     // if root_level == asg.level(vi) { continue; }
                     set_seen!(vi);
                     trace_lit!(l, " - binary linked");
-                    conflict_level!(vi);
+                    new_depend_on_conflict_level!(vi);
                 }
             }
             AssignReason::Implication(wli) => {
@@ -367,7 +367,7 @@ fn conflict_analyze(
                     i32::from(cdb[wli.as_ci()].lit0()),
                     p
                 );
-                debug_assert!(!cdb[wli.as_ci()].is_dead() && 2 < cdb[wli.as_ci()].len());
+                debug_assert!(2 < cdb[wli.as_ci()].len());
                 // if !cdb.update_at_analysis(asg, cid) {
                 let ci = wli.as_ci();
                 if !cdb[ci].is(FlagClause::LEARNT) {
@@ -413,11 +413,11 @@ fn conflict_analyze(
                         set_seen!(vi);
                         if dl == lvl {
                             trace_lit!(q, " -- found another path");
-                            conflict_level!(vi);
+                            new_depend_on_conflict_level!(vi);
                         } else {
                             trace_lit!(q, " -- push to learnt");
                             learnt.push(*q);
-                            if asg.decision_vi(lvl) != vi {
+                            if asg.decision_vi(lvl) != vi && !reason_side_lits.contains(q) {
                                 deep_path_cnt += 1;
                                 reason_side_lits.push(*q);
                             }
@@ -492,14 +492,93 @@ fn conflict_analyze(
         learnt[0],
         learnt
     );
-    dbg!(
+    /* dbg!(
         deep_path_cnt,
         &reason_side_lits,
         &reason_side_lits
             .iter()
             .map(|l| asg.reason(l.vi()))
             .collect::<Vec<_>>(),
-    );
+    ); */
+    // deep_trace
+    if reason_side_lits.is_empty() {
+        macro_rules! set_seen2 {
+            ($vi: expr) => {
+                debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN2));
+                asg.var_mut($vi).turn_on(FlagVar::CA_SEEN2);
+            };
+        }
+        reason_side_lits.iter().for_each(|l| {
+            /* assert!(0 < asg.level(l.vi()));
+            assert!(
+                !asg.var(l.vi()).is(FlagVar::CA_SEEN),
+                "l:{} in {:?}\n{:?}\nlevel: {}\n{:?}",
+                l,
+                asg.var(l.vi()),
+                reason_side_lits,
+                asg.decision_level(),
+                asg.stack_iter().collect::<Vec<_>>(),
+            ); */
+            set_seen2!(l.vi());
+        });
+        // assert_eq!(deep_path_cnt, reason_side_lits.len());
+        for ti in (asg.len_upto(root_level)..trail_index).rev() {
+            let p: Lit = asg.stack(ti);
+            let vi = p.vi();
+            if !asg.var(vi).is(FlagVar::CA_SEEN2) {
+                continue;
+            }
+            asg.var_mut(p.vi()).turn_off(FlagVar::CA_SEEN2);
+            match asg.reason(p.vi()) {
+                AssignReason::BinaryLink(l) => {
+                    let vi = l.vi();
+                    if !asg.var(vi).is(FlagVar::CA_SEEN2) && root_level < asg.level(vi) {
+                        // validate_vi!(vi);
+                        set_seen2!(vi);
+                        deep_path_cnt += 1;
+                    }
+                }
+                AssignReason::Implication(wli) => {
+                    let (ci, skip) = wli.indices();
+                    for (i, q) in cdb[ci].iter().enumerate() {
+                        if i == skip {
+                            continue;
+                        }
+                        let vi = q.vi();
+                        // validate_vi!(vi);
+                        if !asg.var(vi).is(FlagVar::CA_SEEN2) && root_level < asg.level(vi) {
+                            set_seen2!(vi);
+                            deep_path_cnt += 1;
+                        }
+                    }
+                }
+                AssignReason::Decision(lv) => {
+                    if 0 < lv {
+                        let vi = asg.decision_vi(lv);
+                        asg.reward_at_analysis(vi);
+                    }
+                }
+                AssignReason::None => unreachable!(),
+            }
+            deep_path_cnt -= 1;
+            if deep_path_cnt == 0 {
+                break;
+            }
+        }
+        // assert_eq!(0, deep_path_cnt);
+        // for i in 0..asg.len_upto(root_level) {
+        //     assert!(!asg.var(asg.stack(i).vi()).is(FlagVar::CA_SEEN2));
+        // }
+        /* for i in 0..asg.stack_len() {
+            assert!(
+                !asg.var(asg.stack(i).vi()).is(FlagVar::CA_SEEN),
+                "{} at {}: level: {} is CA_SEEN",
+                asg.stack(i),
+                i,
+                asg.level(asg.stack(i).vi())
+            );
+        } */
+    }
     minimize_learnt(&mut state.new_learnt, asg, cdb)
 }
 
