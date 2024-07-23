@@ -1328,7 +1328,7 @@ mod tests {
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
-        assert!(!c.is(FlagClause::USED));
+        assert!(c.is(FlagClause::USED)); // `new_clause` sets this flag since 0.18
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
             .as_ci();
@@ -1336,7 +1336,7 @@ mod tests {
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
-        assert!(!c.is(FlagClause::USED));
+        assert!(c.is(FlagClause::USED));
     }
     #[test]
     fn test_clause_equality() {
