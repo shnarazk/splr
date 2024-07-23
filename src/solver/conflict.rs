@@ -157,7 +157,13 @@ pub fn handle_conflict(
                     }
                 }
             }
-            AssignReason::Decision(_) => (),
+            AssignReason::Decision(lv) => {
+                let vi = asg.decision_vi(lv);
+                if !bumped.contains(&vi) {
+                    asg.reward_at_analysis(vi);
+                    bumped.push(vi);
+                }
+            }
             AssignReason::None => unreachable!("handle_conflict"),
         }
     }
@@ -327,6 +333,7 @@ fn conflict_analyze(
     {
         trace_lit!(p, "- handle conflicting literal");
         let vi = p.vi();
+        asg.reward_at_analysis(vi);
         debug_assert_ne!(asg.assign(vi), None);
         validate_vi!(vi);
         set_seen!(vi);
@@ -492,16 +499,8 @@ fn conflict_analyze(
         learnt[0],
         learnt
     );
-    /* dbg!(
-        deep_path_cnt,
-        &reason_side_lits,
-        &reason_side_lits
-            .iter()
-            .map(|l| asg.reason(l.vi()))
-            .collect::<Vec<_>>(),
-    ); */
     // deep_trace
-    if reason_side_lits.is_empty() {
+    if false && reason_side_lits.is_empty() {
         macro_rules! set_seen2 {
             ($vi: expr) => {
                 debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN2));
