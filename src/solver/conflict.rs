@@ -269,7 +269,6 @@ fn conflict_analyze(
     let root_level = asg.root_level();
     let dl = asg.decision_level();
     let mut path_cnt = 0;
-    let (mut p, mut reason) = cc;
     let mut _deep_path_cnt = 0;
 
     macro_rules! new_depend_on_conflict_level {
@@ -315,22 +314,48 @@ fn conflict_analyze(
         };
     }
 
-    {
-        trace_lit!(p, "- handle conflicting literal");
-        let vi = p.vi();
-        asg.reward_at_analysis(vi);
-        debug_assert_ne!(asg.assign(vi), None);
-        validate_vi!(vi);
-        assert_eq!(dl, asg.level(vi));
-        set_seen1!(vi);
-        new_depend_on_conflict_level!(vi);
-    }
-    let mut trail_index = asg.stack_len() - 1;
+    // let mut trail_index = asg.stack_len() - 1;
     let mut max_lbd: u16 = 0;
     let mut ci_with_max_lbd: Option<ClauseIndex> = None;
     #[cfg(feature = "trace_analysis")]
     println!("##################");
-    loop {
+    for ti in (asg.len_upto(root_level)..=asg.stack_len()).rev() {
+        let p: Lit;
+        let vi: VarId;
+        let reason: AssignReason;
+        if ti == asg.stack_len() {
+            p = cc.0;
+            vi = p.vi();
+            reason = cc.1;
+            trace_lit!(p, "- handle conflicting literal");
+            asg.reward_at_analysis(vi);
+            debug_assert_ne!(asg.assign(vi), None);
+            validate_vi!(vi);
+            assert_eq!(dl, asg.level(vi));
+            set_seen1!(vi);
+            new_depend_on_conflict_level!(vi);
+        } else {
+            p = asg.stack(ti);
+            vi = p.vi();
+            if !asg.var(vi).is(FlagVar::CA_SEEN1) {
+                continue;
+            }
+            asg.var_mut(vi).turn_off(FlagVar::CA_SEEN1);
+            if path_cnt == 0 {
+                // debug_assert!(learnt.iter().all(|l| *l != !p));
+                debug_assert_eq!(asg.level(p.vi()), dl);
+                learnt[0] = !p;
+                trace!(
+                    "appending {}, the final (but not minimized) learnt is {:?}",
+                    learnt[0],
+                    learnt
+                );
+                break;
+            }
+            // debug_assert!(0 < trail_index);
+            // trail_index -= 1;
+            reason = asg.reason(p.vi());
+        }
         match reason {
             AssignReason::BinaryLink(l) => {
                 let vi = l.vi();
@@ -413,30 +438,11 @@ fn conflict_analyze(
             }
             AssignReason::Decision(_) | AssignReason::None => {}
         }
-        while !asg.var(asg.stack(trail_index).vi()).is(FlagVar::CA_SEEN1) {
-            trail_index -= 1;
-        }
-        p = asg.stack(trail_index);
-        asg.var_mut(p.vi()).turn_off(FlagVar::CA_SEEN1);
         path_cnt -= 1;
-        if path_cnt == 0 {
-            break;
-        }
-        debug_assert!(0 < trail_index);
-        trail_index -= 1;
-        reason = asg.reason(p.vi());
     }
     if let Some(cid) = ci_with_max_lbd {
         cdb.update_at_analysis(asg, cid);
     }
-    // debug_assert!(learnt.iter().all(|l| *l != !p));
-    debug_assert_eq!(asg.level(p.vi()), dl);
-    learnt[0] = !p;
-    trace!(
-        "appending {}, the final (but not minimized) learnt is {:?}",
-        learnt[0],
-        learnt
-    );
     minimize_learnt(&mut state.new_learnt, asg, cdb)
 }
 
