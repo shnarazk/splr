@@ -204,7 +204,7 @@ impl Instantiate for AssignStack {
     #[inline]
     fn handle(&mut self, e: SolverEvent) {
         match e {
-            // called only by assertion on chronoBT
+            // called only by assertion on chrono_BT
             // So execute everything of `assign_by_unitclause` but cancel_until(root_level)
             SolverEvent::Conflict => (),
             SolverEvent::Eliminate(vi) => {

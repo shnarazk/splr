@@ -55,8 +55,10 @@ pub trait EliminateIF: Instantiate {
     /// enqueue a var into eliminator's var queue.
     fn enqueue_var(&mut self, asg: &mut impl AssignIF, vi: VarId, upward: bool);
     /// simplify database by:
+    ///
     /// * removing satisfiable clauses
     /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.
+    ///
     /// Note: `force_run` is used only at the beginning of `solve' for simple satisfiability check
     ///
     /// # Errors

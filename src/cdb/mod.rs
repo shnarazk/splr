@@ -495,7 +495,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
     }
-    // used in `propagate`, `propagate_sandbox`, and `handle_conflict` for chronoBT
+    // used in `propagate`, `propagate_sandbox`, and `handle_conflict` for chrono_BT
     #[inline]
     fn transform_by_updating_watch(
         &mut self,
@@ -519,7 +519,7 @@ impl ClauseDBIF for ClauseDB {
         if learnt {
             #[cfg(feature = "just_used")]
             c.turn_on(FlagClause::USED);
-            #[cfg(feature = "clause_rewading")]
+            #[cfg(feature = "clause_rewarding")]
             self.reward_at_analysis(ci);
         }
         if 1 < rank {

@@ -30,7 +30,7 @@ pub fn handle_conflict(
 
     // we need a catch here for handling the possibility of level zero conflict
     // at higher level due to the incoherence between the current level and conflicting
-    // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
+    // level in chrono_BT. This leads to UNSAT solution. No need to update misc stats.
     {
         if let AssignReason::Implication(wli) = cc.1 {
             if cdb[wli.as_ci()].iter().all(|l| asg.level(l.vi()) == 0) {
@@ -82,7 +82,7 @@ pub fn handle_conflict(
     let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
     if learnt_len == 0 {
-        #[cfg(debug)]
+        #[cfg(feature = "boundary_check")]
         {
             println!(
                 "empty learnt at {}({}) by {:?}",
@@ -500,7 +500,7 @@ fn conflict_analyze(
         learnt
     );
     // deep_trace
-    if false && reason_side_lits.is_empty() {
+    if false {
         macro_rules! set_seen2 {
             ($vi: expr) => {
                 debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN2));

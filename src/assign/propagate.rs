@@ -95,7 +95,7 @@ impl PropagateIF for AssignStack {
     ) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be enqueued");
         debug_assert!(l.vi() < self.var.len());
-        // The following doesn't hold anymore by using chronoBT.
+        // The following doesn't hold anymore by using chrono_BT.
         // assert!(self.trail_lim.is_empty() || !cid.is_none());
         let vi = l.vi();
         // debug_assert!([Some(bool::from(l)), None].contains(&self.var[vi].assign));
@@ -224,7 +224,7 @@ impl PropagateIF for AssignStack {
         // debug_assert!(self.trail.iter().all(|l| self.var[l.vi()].assign.is_some()));
         // debug_assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
         self.trail_lim.truncate(lv as usize);
-        // assert!(lim < self.q_head) doesn't hold sometimes in chronoBT.
+        // assert!(lim < self.q_head) doesn't hold sometimes in chrono_BT.
         if lv == self.root_level {
             self.num_restart += 1;
             self.cpr_ema.update(self.num_conflict);

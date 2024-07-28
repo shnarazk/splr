@@ -108,8 +108,8 @@ pub struct State {
     /// hold conflicting user-defined *assumed* literals for UNSAT problems
     pub conflicts: Vec<Lit>,
 
-    #[cfg(feature = "chronoBT")]
-    /// chronoBT threshold
+    #[cfg(feature = "chrono_BT")]
+    /// chrono_BT threshold
     pub chrono_bt_threshold: DecisionLevel,
 
     /// hold the previous number of non-conflicting assignment
@@ -152,7 +152,7 @@ impl Default for State {
             #[cfg(feature = "support_user_assumption")]
             conflicts: Vec::new(),
 
-            #[cfg(feature = "chronoBT")]
+            #[cfg(feature = "chrono_BT")]
             chrono_bt_threshold: 100,
 
             last_asg: 0,
