@@ -303,7 +303,7 @@ fn conflict_analyze(
             debug_assert!(asg.level($vi) <= dl);
         };
     }
-    macro_rules! set_seen {
+    macro_rules! set_seen1 {
         ($vi: expr) => {
             debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN1));
             asg.var_mut($vi).turn_on(FlagVar::CA_SEEN1);
@@ -336,7 +336,7 @@ fn conflict_analyze(
         asg.reward_at_analysis(vi);
         debug_assert_ne!(asg.assign(vi), None);
         validate_vi!(vi);
-        set_seen!(vi);
+        set_seen1!(vi);
         let lvl = asg.level(vi);
         if dl == lvl {
             new_depend_on_conflict_level!(vi);
@@ -362,7 +362,7 @@ fn conflict_analyze(
                     validate_vi!(vi);
                     debug_assert_eq!(asg.level(vi), dl, "strange level binary clause");
                     // if root_level == asg.level(vi) { continue; }
-                    set_seen!(vi);
+                    set_seen1!(vi);
                     trace_lit!(l, " - binary linked");
                     new_depend_on_conflict_level!(vi);
                 }
@@ -417,7 +417,7 @@ fn conflict_analyze(
                             trace_lit!(q, " -- ignore");
                             continue;
                         }
-                        set_seen!(vi);
+                        set_seen1!(vi);
                         if dl == lvl {
                             trace_lit!(q, " -- found another path");
                             new_depend_on_conflict_level!(vi);
