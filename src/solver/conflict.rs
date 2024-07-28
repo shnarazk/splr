@@ -270,7 +270,7 @@ fn conflict_analyze(
     let dl = asg.decision_level();
     let mut path_cnt = 0;
     let (mut p, mut reason) = cc;
-    let mut deep_path_cnt = 0;
+    let mut _deep_path_cnt = 0;
     let mut reason_side_lits: Vec<Lit> = Vec::new();
 
     macro_rules! new_depend_on_conflict_level {
@@ -336,19 +336,9 @@ fn conflict_analyze(
         asg.reward_at_analysis(vi);
         debug_assert_ne!(asg.assign(vi), None);
         validate_vi!(vi);
-        let lvl = asg.level(vi);
-        if dl == lvl {
-            set_seen1!(vi);
-            new_depend_on_conflict_level!(vi);
-        } else {
-            panic!();
-            /* debug_assert_ne!(root_level, lvl);
-            learnt.push(p);
-            if asg.decision_vi(lvl) != vi {
-                deep_path_cnt += 1;
-                reason_side_lits.push(p);
-            } */
-        }
+        assert_eq!(dl, asg.level(vi));
+        set_seen1!(vi);
+        new_depend_on_conflict_level!(vi);
     }
     let mut trail_index = asg.stack_len() - 1;
     let mut max_lbd: u16 = 0;
@@ -427,7 +417,7 @@ fn conflict_analyze(
                             set_seen1!(vi);
                             learnt.push(*q);
                             if asg.decision_vi(lvl) != vi && !reason_side_lits.contains(q) {
-                                deep_path_cnt += 1;
+                                _deep_path_cnt += 1;
                                 reason_side_lits.push(*q);
                             }
                         }
@@ -451,37 +441,11 @@ fn conflict_analyze(
                 );
             }
         }
-        //
-        // set the index of the next literal to trail_index
-        //
-        #[allow(clippy::blocks_in_conditions)]
-        while {
-            let vi = asg.stack(trail_index).vi();
-            boundary_check!(
-                0 < vi && vi < asg.level_ref().len(),
-                "trail[{}] has an invalid var index {}",
-                trail_index,
-                asg.stack(trail_index)
-            );
-            let lvl = asg.level(vi);
-            let v = asg.var(vi);
-            !v.is(FlagVar::CA_SEEN1) || lvl != dl
-        } {
-            trace_lit!(asg.stack(trail_index), "skip, not flagged");
-            boundary_check!(
-                0 < trail_index,
-                "Broke the bottom:: path_cnt {} scanned to {}",
-                path_cnt,
-                asg.stack_len() - trail_index
-            );
+        while !asg.var(asg.stack(trail_index).vi()).is(FlagVar::CA_SEEN1) {
             trail_index -= 1;
         }
         p = asg.stack(trail_index);
-        trace!("move to flagged {}; num path: {}", p.vi(), path_cnt - 1);
-
         asg.var_mut(p.vi()).turn_off(FlagVar::CA_SEEN1);
-        // since the trail can contain a literal which level is under `dl` after
-        // the `dl`-th decision var, we must skip it.
         path_cnt -= 1;
         if path_cnt == 0 {
             break;
@@ -501,85 +465,6 @@ fn conflict_analyze(
         learnt[0],
         learnt
     );
-    // deep_trace
-    if false {
-        macro_rules! set_seen2 {
-            ($vi: expr) => {
-                debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN2));
-                asg.var_mut($vi).turn_on(FlagVar::CA_SEEN2);
-            };
-        }
-        reason_side_lits.iter().for_each(|l| {
-            /* assert!(0 < asg.level(l.vi()));
-            assert!(
-                !asg.var(l.vi()).is(FlagVar::CA_SEEN),
-                "l:{} in {:?}\n{:?}\nlevel: {}\n{:?}",
-                l,
-                asg.var(l.vi()),
-                reason_side_lits,
-                asg.decision_level(),
-                asg.stack_iter().collect::<Vec<_>>(),
-            ); */
-            set_seen2!(l.vi());
-        });
-        // assert_eq!(deep_path_cnt, reason_side_lits.len());
-        for ti in (asg.len_upto(root_level)..trail_index).rev() {
-            let p: Lit = asg.stack(ti);
-            let vi = p.vi();
-            if !asg.var(vi).is(FlagVar::CA_SEEN2) {
-                continue;
-            }
-            asg.var_mut(p.vi()).turn_off(FlagVar::CA_SEEN2);
-            match asg.reason(p.vi()) {
-                AssignReason::BinaryLink(l) => {
-                    let vi = l.vi();
-                    if !asg.var(vi).is(FlagVar::CA_SEEN2) && root_level < asg.level(vi) {
-                        // validate_vi!(vi);
-                        set_seen2!(vi);
-                        deep_path_cnt += 1;
-                    }
-                }
-                AssignReason::Implication(wli) => {
-                    let (ci, skip) = wli.indices();
-                    for (i, q) in cdb[ci].iter().enumerate() {
-                        if i == skip {
-                            continue;
-                        }
-                        let vi = q.vi();
-                        // validate_vi!(vi);
-                        if !asg.var(vi).is(FlagVar::CA_SEEN2) && root_level < asg.level(vi) {
-                            set_seen2!(vi);
-                            deep_path_cnt += 1;
-                        }
-                    }
-                }
-                AssignReason::Decision(lv) => {
-                    if 0 < lv {
-                        let vi = asg.decision_vi(lv);
-                        asg.reward_at_analysis(vi);
-                    }
-                }
-                AssignReason::None => unreachable!(),
-            }
-            deep_path_cnt -= 1;
-            if deep_path_cnt == 0 {
-                break;
-            }
-        }
-        // assert_eq!(0, deep_path_cnt);
-        // for i in 0..asg.len_upto(root_level) {
-        //     assert!(!asg.var(asg.stack(i).vi()).is(FlagVar::CA_SEEN2));
-        // }
-        /* for i in 0..asg.stack_len() {
-            assert!(
-                !asg.var(asg.stack(i).vi()).is(FlagVar::CA_SEEN),
-                "{} at {}: level: {} is CA_SEEN",
-                asg.stack(i),
-                i,
-                asg.level(asg.stack(i).vi())
-            );
-        } */
-    }
     minimize_learnt(&mut state.new_learnt, asg, cdb)
 }
 
