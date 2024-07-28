@@ -271,7 +271,6 @@ fn conflict_analyze(
     let mut path_cnt = 0;
     let (mut p, mut reason) = cc;
     let mut _deep_path_cnt = 0;
-    let mut reason_side_lits: Vec<Lit> = Vec::new();
 
     macro_rules! new_depend_on_conflict_level {
         ($vi: expr) => {
@@ -309,24 +308,10 @@ fn conflict_analyze(
             asg.var_mut($vi).turn_on(FlagVar::CA_SEEN1);
         };
     }
-    macro_rules! boundary_check {
-        ($condition: expr, $($arg: expr),+) => {
-            #[cfg(feature = "boundary_check")]
-            {
-                if !$condition {
-                    dbg!(cc);
-                    dbg!(dl);
-                    tracer(asg, cdb);
-                    println!("Learnt clause so far: {}",
-                             learnt.report(asg)
-                             .iter()
-                             .map(|r| format!("  {:?}", r))
-                             .collect::<Vec<String>>()
-                             .join("\n")
-                    );
-                    panic!($($arg),*);
-                }
-            }
+    macro_rules! set_seen2 {
+        ($vi: expr) => {
+            debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN2));
+            asg.var_mut($vi).turn_on(FlagVar::CA_SEEN2);
         };
     }
 
@@ -400,46 +385,33 @@ fn conflict_analyze(
                     if i == skip {
                         continue;
                     }
-                    let vi = q.vi();
-                    validate_vi!(vi);
-                    if !asg.var(vi).is(FlagVar::CA_SEEN1) {
-                        let lvl = asg.level(vi);
+                    let wi = q.vi();
+                    validate_vi!(wi);
+                    if !asg.var(wi).is(FlagVar::CA_SEEN1) {
+                        let lvl = asg.level(wi);
                         if root_level == lvl {
                             trace_lit!(q, " -- ignore");
                             continue;
                         }
                         if dl == lvl {
                             trace_lit!(q, " -- found another path");
-                            set_seen1!(vi);
-                            new_depend_on_conflict_level!(vi);
-                        } else {
+                            set_seen1!(wi);
+                            new_depend_on_conflict_level!(wi);
+                        } else
+                        /* if !asg.var(wi).is(FlagVar::CA_SEEN2) */
+                        {
                             trace_lit!(q, " -- push to learnt");
-                            set_seen1!(vi);
+                            set_seen1!(wi);
+                            set_seen2!(wi);
                             learnt.push(*q);
-                            if asg.decision_vi(lvl) != vi && !reason_side_lits.contains(q) {
-                                _deep_path_cnt += 1;
-                                reason_side_lits.push(*q);
-                            }
+                            _deep_path_cnt += 1;
                         }
                     } else {
                         trace!("{:?} -- ignore flagged already", q);
                     }
                 }
             }
-            AssignReason::Decision(_) | AssignReason::None => {
-                boundary_check!(
-                    false,
-                    "found a strange var {:?}:: path_cnt {}\nDecisionMap\n{}",
-                    reason,
-                    path_cnt,
-                    asg.stack_iter()
-                        .skip(trail_index)
-                        .filter(|l| matches!(asg.reason(l.vi()), AssignReason::Decision(_)))
-                        .map(|l| format!("{:?}", l.report(asg)))
-                        .collect::<Vec<String>>()
-                        .join("\n")
-                );
-            }
+            AssignReason::Decision(_) | AssignReason::None => {}
         }
         while !asg.var(asg.stack(trail_index).vi()).is(FlagVar::CA_SEEN1) {
             trail_index -= 1;
