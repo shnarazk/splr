@@ -314,7 +314,6 @@ fn conflict_analyze(
         };
     }
 
-    // let mut trail_index = asg.stack_len() - 1;
     let mut max_lbd: u16 = 0;
     let mut ci_with_max_lbd: Option<ClauseIndex> = None;
     #[cfg(feature = "trace_analysis")]
@@ -331,7 +330,7 @@ fn conflict_analyze(
             asg.reward_at_analysis(vi);
             debug_assert_ne!(asg.assign(vi), None);
             validate_vi!(vi);
-            assert_eq!(dl, asg.level(vi));
+            debug_assert_eq!(dl, asg.level(vi));
             set_seen1!(vi);
             new_depend_on_conflict_level!(vi);
         } else {
@@ -341,9 +340,8 @@ fn conflict_analyze(
                 continue;
             }
             asg.var_mut(vi).turn_off(FlagVar::CA_SEEN1);
+            // Don't move this code to AssignReason::Decision! It's a waste of time.
             if path_cnt == 0 {
-                // debug_assert!(learnt.iter().all(|l| *l != !p));
-                debug_assert_eq!(asg.level(p.vi()), dl);
                 learnt[0] = !p;
                 trace!(
                     "appending {}, the final (but not minimized) learnt is {:?}",
@@ -352,8 +350,6 @@ fn conflict_analyze(
                 );
                 break;
             }
-            // debug_assert!(0 < trail_index);
-            // trail_index -= 1;
             reason = asg.reason(p.vi());
         }
         match reason {
@@ -361,8 +357,6 @@ fn conflict_analyze(
                 let vi = l.vi();
                 if !asg.var(vi).is(FlagVar::CA_SEEN1) {
                     validate_vi!(vi);
-                    debug_assert_eq!(asg.level(vi), dl, "strange level binary clause");
-                    // if root_level == asg.level(vi) { continue; }
                     trace_lit!(l, " - binary linked");
                     set_seen1!(vi);
                     new_depend_on_conflict_level!(vi);
@@ -436,7 +430,7 @@ fn conflict_analyze(
                     }
                 }
             }
-            AssignReason::Decision(_) | AssignReason::None => {}
+            AssignReason::Decision(_) | AssignReason::None => unreachable!(),
         }
         path_cnt -= 1;
     }
