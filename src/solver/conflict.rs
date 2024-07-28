@@ -336,17 +336,18 @@ fn conflict_analyze(
         asg.reward_at_analysis(vi);
         debug_assert_ne!(asg.assign(vi), None);
         validate_vi!(vi);
-        set_seen1!(vi);
         let lvl = asg.level(vi);
         if dl == lvl {
+            set_seen1!(vi);
             new_depend_on_conflict_level!(vi);
         } else {
-            debug_assert_ne!(root_level, lvl);
+            panic!();
+            /* debug_assert_ne!(root_level, lvl);
             learnt.push(p);
             if asg.decision_vi(lvl) != vi {
                 deep_path_cnt += 1;
                 reason_side_lits.push(p);
-            }
+            } */
         }
     }
     let mut trail_index = asg.stack_len() - 1;
@@ -362,8 +363,8 @@ fn conflict_analyze(
                     validate_vi!(vi);
                     debug_assert_eq!(asg.level(vi), dl, "strange level binary clause");
                     // if root_level == asg.level(vi) { continue; }
-                    set_seen1!(vi);
                     trace_lit!(l, " - binary linked");
+                    set_seen1!(vi);
                     new_depend_on_conflict_level!(vi);
                 }
             }
@@ -417,12 +418,13 @@ fn conflict_analyze(
                             trace_lit!(q, " -- ignore");
                             continue;
                         }
-                        set_seen1!(vi);
                         if dl == lvl {
                             trace_lit!(q, " -- found another path");
+                            set_seen1!(vi);
                             new_depend_on_conflict_level!(vi);
                         } else {
                             trace_lit!(q, " -- push to learnt");
+                            set_seen1!(vi);
                             learnt.push(*q);
                             if asg.decision_vi(lvl) != vi && !reason_side_lits.contains(q) {
                                 deep_path_cnt += 1;
