@@ -495,7 +495,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
     }
-    // used in `propagate`, `propagate_sandbox`, and `handle_conflict` for chronoBT
+    // used in `propagate`, `propagate_sandbox`, and `handle_conflict` for chrono_BT
     #[inline]
     fn transform_by_updating_watch(
         &mut self,
@@ -519,7 +519,7 @@ impl ClauseDBIF for ClauseDB {
         if learnt {
             #[cfg(feature = "just_used")]
             c.turn_on(FlagClause::USED);
-            #[cfg(feature = "clause_rewading")]
+            #[cfg(feature = "clause_rewarding")]
             self.reward_at_analysis(ci);
         }
         if 1 < rank {
@@ -1328,7 +1328,7 @@ mod tests {
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
-        assert!(!c.is(FlagClause::USED));
+        assert!(c.is(FlagClause::USED));
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
             .as_ci();
@@ -1336,7 +1336,7 @@ mod tests {
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
         #[cfg(feature = "just_used")]
-        assert!(!c.is(FlagClause::USED));
+        assert!(c.is(FlagClause::USED));
     }
     #[test]
     fn test_clause_equality() {

@@ -9,7 +9,7 @@ pub struct Config {
     //
     //## solver configuration
     //
-    /// Dec. lvl to use chronoBT
+    /// Dec. lvl to use chrono_BT
     pub c_cbt_thr: DecisionLevel,
 
     /// Soft limit of #clauses (6MC/GB)
@@ -428,21 +428,21 @@ pub mod property {
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tf64 {
-        #[cfg(feature = "clase_rewarding")]
+        #[cfg(feature = "clause_rewarding")]
         ClauseRewardDecayRate,
         VarRewardDecayRate,
     }
 
-    #[cfg(not(feature = "clase_rewarding"))]
+    #[cfg(not(feature = "clause_rewarding"))]
     pub const F64S: [Tf64; 1] = [Tf64::VarRewardDecayRate];
-    #[cfg(feature = "clase_rewarding")]
+    #[cfg(feature = "clause_rewarding")]
     pub const F64S: [Tf64; 2] = [Tf64::ClauseRewardDecayRate, Tf64::VarRewardDecayRate];
 
     impl PropertyDereference<Tf64, f64> for Config {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
-                #[cfg(feature = "clase_rewarding")]
+                #[cfg(feature = "clause_rewarding")]
                 Tf64::ClauseRewardDecayRate => self.crw_dcy_rat,
                 Tf64::VarRewardDecayRate => self.vrw_dcy_rat,
             }

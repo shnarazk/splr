@@ -100,9 +100,9 @@
 ## 0.10.0, 2021-07-10
 
 ### Fix critical bugs
-- fix bugs on chronoBT implementation, which have affected Splr from version 0.3.1 to 0.7.0.
-   - `AssignStack::q_head` had a wrong index after backtrack if chronoBT was used.
-   - Non-chronoBT was broken if the number of the highest literal in conflicting clauses is one.
+- fix bugs on chrono_BT implementation, which have affected Splr from version 0.3.1 to 0.7.0.
+   - `AssignStack::q_head` had a wrong index after backtrack if chrono_BT was used.
+   - Non-chrono_BT was broken if the number of the highest literal in conflicting clauses is one.
 - fix a bug which has been rarely occurred by eliminator.
    - `AssignIF::propagate` skipped clause-level satisfiability checking,
      if its `blocker` held an eliminated var, which was never falsified.
@@ -226,7 +226,7 @@ functions more rigidly.
 - delete dependencies on 'libc' and 'structopt'
 - make Splr deterministic or *monotonous*, by removing timer based decision makers. Monotonous means that if a solver solves a problem within T timeout, it solves the problem within any timeout longer than T.
 - Solver::restart provides both of `restart` and `stabilize`
-- fix a bug in chronoBT, that occurred if a conflicting clause has just a single literal at the conflicting level.
+- fix a bug in chrono_BT, that occurred if a conflicting clause has just a single literal at the conflicting level.
 - revise command line option parser to handle the last option better
 - stabilization span and restart blocking levels are controlled with Luby sequence
 - add an extra reward to vars involved in best phase

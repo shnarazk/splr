@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.18.0-dev4"
+version = "0.18.0-dev5"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2021"
@@ -11,7 +11,10 @@ homepage = "https://github.com/shnarazk/splr"
 keywords = ["SAT", "SAT-solver", "logic", "satisfiability"]
 categories = ["science", "mathematics"]
 default-run = "splr"
-rust-version = "1.79"
+rust-version = "1.80"
+
+[build]
+rustflags = ["-C", "target-cpu=native"]
 
 [dependencies]
 bitflags = "^2.6"
@@ -30,7 +33,7 @@ default = [
         # "bi_clause_completion",
         # "clause_rewarding",
         # "dynamic_restart_threshold",
-        # "just_used",
+        "just_used",
         "LRB_rewarding",
         "reason_side_rewarding",
         "rephase",

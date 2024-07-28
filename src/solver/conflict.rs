@@ -30,7 +30,7 @@ pub fn handle_conflict(
 
     // we need a catch here for handling the possibility of level zero conflict
     // at higher level due to the incoherence between the current level and conflicting
-    // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
+    // level in chrono_BT. This leads to UNSAT solution. No need to update misc stats.
     {
         if let AssignReason::Implication(wli) = cc.1 {
             if cdb[wli.as_ci()].iter().all(|l| asg.level(l.vi()) == 0) {
@@ -82,7 +82,7 @@ pub fn handle_conflict(
     let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
     if learnt_len == 0 {
-        #[cfg(debug)]
+        #[cfg(feature = "boundary_check")]
         {
             println!(
                 "empty learnt at {}({}) by {:?}",
@@ -157,7 +157,13 @@ pub fn handle_conflict(
                     }
                 }
             }
-            AssignReason::Decision(_) => (),
+            AssignReason::Decision(lv) => {
+                let vi = asg.decision_vi(lv);
+                if !bumped.contains(&vi) {
+                    asg.reward_at_analysis(vi);
+                    bumped.push(vi);
+                }
+            }
             AssignReason::None => unreachable!("handle_conflict"),
         }
     }
@@ -263,29 +269,27 @@ fn conflict_analyze(
     let root_level = asg.root_level();
     let dl = asg.decision_level();
     let mut path_cnt = 0;
-    let (mut p, mut reason) = cc;
 
-    macro_rules! conflict_level {
+    macro_rules! new_conflict_level_literal {
         ($vi: expr) => {
+            debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN));
+            asg.var_mut($vi).turn_on(FlagVar::CA_SEEN);
             path_cnt += 1;
             //## Conflict-Side Rewarding
             asg.reward_at_analysis($vi);
+        };
+    }
+    macro_rules! new_depending_literal {
+        ($vi: expr, $lit: expr) => {
+            debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN));
+            asg.var_mut($vi).turn_on(FlagVar::CA_SEEN);
+            learnt.push($lit);
         };
     }
     macro_rules! trace {
         ($($arg: expr),*) => {
             #[cfg(feature = "trace_analysis")]
             println!($($arg),*);
-        };
-    }
-    macro_rules! trace_lit {
-        ($lit: expr, $message: expr) => {
-            #[cfg(feature = "trace_analysis")]
-            {
-                let vi = $lit.vi();
-                let lv = asg.level(vi);
-                println!("{}: literal {} at level {}", $message, i32::from($lit), lv);
-            }
         };
     }
     macro_rules! validate_vi {
@@ -295,63 +299,42 @@ fn conflict_analyze(
             debug_assert!(asg.level($vi) <= dl);
         };
     }
-    macro_rules! set_seen {
-        ($vi: expr) => {
-            debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN));
-            asg.var_mut($vi).turn_on(FlagVar::CA_SEEN);
-        };
-    }
-    macro_rules! boundary_check {
-        ($condition: expr, $($arg: expr),+) => {
-            #[cfg(feature = "boundary_check")]
-            {
-                if !$condition {
-                    dbg!(cc);
-                    dbg!(dl);
-                    tracer(asg, cdb);
-                    println!("Learnt clause so far: {}",
-                             learnt.report(asg)
-                             .iter()
-                             .map(|r| format!("  {:?}", r))
-                             .collect::<Vec<String>>()
-                             .join("\n")
-                    );
-                    panic!($($arg),*);
-                }
-            }
-        };
-    }
 
-    {
-        trace_lit!(p, "- handle conflicting literal");
-        let vi = p.vi();
-        debug_assert_ne!(asg.assign(vi), None);
-        validate_vi!(vi);
-        set_seen!(vi);
-        let lvl = asg.level(vi);
-        if dl == lvl {
-            conflict_level!(vi);
-        } else {
-            debug_assert_ne!(root_level, lvl);
-            learnt.push(p);
-        }
-    }
-    let mut trail_index = asg.stack_len() - 1;
     let mut max_lbd: u16 = 0;
     let mut ci_with_max_lbd: Option<ClauseIndex> = None;
     #[cfg(feature = "trace_analysis")]
     println!("##################");
-    loop {
+    for ti in (asg.len_upto(root_level)..=asg.stack_len()).rev() {
+        let p: Lit;
+        let vi: VarId;
+        let reason: AssignReason;
+        if ti == asg.stack_len() {
+            p = cc.0;
+            vi = p.vi();
+            reason = cc.1;
+            asg.reward_at_analysis(vi);
+            validate_vi!(vi);
+            new_conflict_level_literal!(vi);
+        } else {
+            p = asg.stack(ti);
+            vi = p.vi();
+            if !asg.var(vi).is(FlagVar::CA_SEEN) {
+                continue;
+            }
+            asg.var_mut(vi).turn_off(FlagVar::CA_SEEN);
+            // Don't move this code to AssignReason::Decision! It's a waste of time.
+            if path_cnt == 0 {
+                learnt[0] = !p;
+                break;
+            }
+            reason = asg.reason(p.vi());
+        }
         match reason {
             AssignReason::BinaryLink(l) => {
                 let vi = l.vi();
                 if !asg.var(vi).is(FlagVar::CA_SEEN) {
                     validate_vi!(vi);
-                    debug_assert_eq!(asg.level(vi), dl, "strange level binary clause");
-                    // if root_level == asg.level(vi) { continue; }
-                    set_seen!(vi);
-                    trace_lit!(l, " - binary linked");
-                    conflict_level!(vi);
+                    new_conflict_level_literal!(vi);
                 }
             }
             AssignReason::Implication(wli) => {
@@ -361,9 +344,9 @@ fn conflict_analyze(
                     i32::from(cdb[wli.as_ci()].lit0()),
                     p
                 );
-                debug_assert!(!cdb[wli.as_ci()].is_dead() && 2 < cdb[wli.as_ci()].len());
+                debug_assert!(2 < cdb[wli.as_ci()].len());
                 // if !cdb.update_at_analysis(asg, cid) {
-                let ci = wli.as_ci();
+                let (ci, skip) = wli.indices();
                 if !cdb[ci].is(FlagClause::LEARNT) {
                     state.derive20.push(ci);
                 }
@@ -381,7 +364,6 @@ fn conflict_analyze(
                     wli,
                     &cdb[wli],
                 );
-                let skip = wli.as_wi();
                 #[cfg(feature = "trace_analysis")]
                 if skip == 1 {
                     trace!(
@@ -396,92 +378,28 @@ fn conflict_analyze(
                     if i == skip {
                         continue;
                     }
-                    let vi = q.vi();
-                    validate_vi!(vi);
-                    if !asg.var(vi).is(FlagVar::CA_SEEN) {
-                        let lvl = asg.level(vi);
+                    let wi = q.vi();
+                    validate_vi!(wi);
+                    if !asg.var(wi).is(FlagVar::CA_SEEN) {
+                        let lvl = asg.level(wi);
                         if root_level == lvl {
-                            trace_lit!(q, " -- ignore");
                             continue;
                         }
-                        set_seen!(vi);
                         if dl == lvl {
-                            trace_lit!(q, " -- found another path");
-                            conflict_level!(vi);
+                            new_conflict_level_literal!(wi);
                         } else {
-                            trace_lit!(q, " -- push to learnt");
-                            learnt.push(*q);
+                            new_depending_literal!(wi, *q);
                         }
-                    } else {
-                        trace!("{:?} -- ignore flagged already", q);
                     }
                 }
             }
-            AssignReason::Decision(_) | AssignReason::None => {
-                boundary_check!(
-                    false,
-                    "found a strange var {:?}:: path_cnt {}\nDecisionMap\n{}",
-                    reason,
-                    path_cnt,
-                    asg.stack_iter()
-                        .skip(trail_index)
-                        .filter(|l| matches!(asg.reason(l.vi()), AssignReason::Decision(_)))
-                        .map(|l| format!("{:?}", l.report(asg)))
-                        .collect::<Vec<String>>()
-                        .join("\n")
-                );
-            }
+            AssignReason::Decision(_) | AssignReason::None => unreachable!(),
         }
-        //
-        // set the index of the next literal to trail_index
-        //
-        #[allow(clippy::blocks_in_conditions)]
-        while {
-            let vi = asg.stack(trail_index).vi();
-            boundary_check!(
-                0 < vi && vi < asg.level_ref().len(),
-                "trail[{}] has an invalid var index {}",
-                trail_index,
-                asg.stack(trail_index)
-            );
-            let lvl = asg.level(vi);
-            let v = asg.var(vi);
-            !v.is(FlagVar::CA_SEEN) || lvl != dl
-        } {
-            trace_lit!(asg.stack(trail_index), "skip, not flagged");
-            boundary_check!(
-                0 < trail_index,
-                "Broke the bottom:: path_cnt {} scanned to {}",
-                path_cnt,
-                asg.stack_len() - trail_index
-            );
-            trail_index -= 1;
-        }
-        p = asg.stack(trail_index);
-        trace!("move to flagged {}; num path: {}", p.vi(), path_cnt - 1);
-
-        asg.var_mut(p.vi()).turn_off(FlagVar::CA_SEEN);
-        // since the trail can contain a literal which level is under `dl` after
-        // the `dl`-th decision var, we must skip it.
         path_cnt -= 1;
-        if path_cnt == 0 {
-            break;
-        }
-        debug_assert!(0 < trail_index);
-        trail_index -= 1;
-        reason = asg.reason(p.vi());
     }
     if let Some(cid) = ci_with_max_lbd {
         cdb.update_at_analysis(asg, cid);
     }
-    // debug_assert!(learnt.iter().all(|l| *l != !p));
-    debug_assert_eq!(asg.level(p.vi()), dl);
-    learnt[0] = !p;
-    trace!(
-        "appending {}, the final (but not minimized) learnt is {:?}",
-        learnt[0],
-        learnt
-    );
     minimize_learnt(&mut state.new_learnt, asg, cdb)
 }
 
