@@ -269,13 +269,14 @@ fn conflict_analyze(
     let root_level = asg.root_level();
     let dl = asg.decision_level();
     let mut path_cnt = 0;
-    let mut _deep_path_cnt = 0;
 
-    macro_rules! new_depend_on_conflict_level {
+    macro_rules! new_conflict_level_literal {
         ($vi: expr) => {
             path_cnt += 1;
             //## Conflict-Side Rewarding
             asg.reward_at_analysis($vi);
+            debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN));
+            asg.var_mut($vi).turn_on(FlagVar::CA_SEEN);
         };
     }
     macro_rules! trace {
@@ -301,16 +302,10 @@ fn conflict_analyze(
             debug_assert!(asg.level($vi) <= dl);
         };
     }
-    macro_rules! set_seen1 {
+    macro_rules! set_seen {
         ($vi: expr) => {
-            debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN1));
-            asg.var_mut($vi).turn_on(FlagVar::CA_SEEN1);
-        };
-    }
-    macro_rules! set_seen2 {
-        ($vi: expr) => {
-            debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN2));
-            asg.var_mut($vi).turn_on(FlagVar::CA_SEEN2);
+            debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN));
+            asg.var_mut($vi).turn_on(FlagVar::CA_SEEN);
         };
     }
 
@@ -331,15 +326,14 @@ fn conflict_analyze(
             debug_assert_ne!(asg.assign(vi), None);
             validate_vi!(vi);
             debug_assert_eq!(dl, asg.level(vi));
-            set_seen1!(vi);
-            new_depend_on_conflict_level!(vi);
+            new_conflict_level_literal!(vi);
         } else {
             p = asg.stack(ti);
             vi = p.vi();
-            if !asg.var(vi).is(FlagVar::CA_SEEN1) {
+            if !asg.var(vi).is(FlagVar::CA_SEEN) {
                 continue;
             }
-            asg.var_mut(vi).turn_off(FlagVar::CA_SEEN1);
+            asg.var_mut(vi).turn_off(FlagVar::CA_SEEN);
             // Don't move this code to AssignReason::Decision! It's a waste of time.
             if path_cnt == 0 {
                 learnt[0] = !p;
@@ -355,11 +349,10 @@ fn conflict_analyze(
         match reason {
             AssignReason::BinaryLink(l) => {
                 let vi = l.vi();
-                if !asg.var(vi).is(FlagVar::CA_SEEN1) {
+                if !asg.var(vi).is(FlagVar::CA_SEEN) {
                     validate_vi!(vi);
                     trace_lit!(l, " - binary linked");
-                    set_seen1!(vi);
-                    new_depend_on_conflict_level!(vi);
+                    new_conflict_level_literal!(vi);
                 }
             }
             AssignReason::Implication(wli) => {
@@ -406,7 +399,7 @@ fn conflict_analyze(
                     }
                     let wi = q.vi();
                     validate_vi!(wi);
-                    if !asg.var(wi).is(FlagVar::CA_SEEN1) {
+                    if !asg.var(wi).is(FlagVar::CA_SEEN) {
                         let lvl = asg.level(wi);
                         if root_level == lvl {
                             trace_lit!(q, " -- ignore");
@@ -414,16 +407,13 @@ fn conflict_analyze(
                         }
                         if dl == lvl {
                             trace_lit!(q, " -- found another path");
-                            set_seen1!(wi);
-                            new_depend_on_conflict_level!(wi);
+                            new_conflict_level_literal!(wi);
                         } else
                         /* if !asg.var(wi).is(FlagVar::CA_SEEN2) */
                         {
                             trace_lit!(q, " -- push to learnt");
-                            set_seen1!(wi);
-                            set_seen2!(wi);
+                            set_seen!(wi);
                             learnt.push(*q);
-                            _deep_path_cnt += 1;
                         }
                     } else {
                         trace!("{:?} -- ignore flagged already", q);
@@ -472,7 +462,7 @@ fn minimize_learnt(
         new_learnt.swap(1, max_i);
     }
     for l in &to_clear {
-        asg.var_mut(l.vi()).turn_off(FlagVar::CA_SEEN1);
+        asg.var_mut(l.vi()).turn_off(FlagVar::CA_SEEN);
     }
     level_to_return
 }
@@ -497,20 +487,20 @@ impl Lit {
                 AssignReason::BinaryLink(l) => {
                     let vi = l.vi();
                     let lv = asg.level(vi);
-                    if 0 < lv && !asg.var(vi).is(FlagVar::CA_SEEN1) {
+                    if 0 < lv && !asg.var(vi).is(FlagVar::CA_SEEN) {
                         // if asg.reason(vi) != AssignReason::Decision(_) && levels[lv as usize] {
                         if matches!(
                             asg.reason(vi),
                             AssignReason::Implication(_) | AssignReason::BinaryLink(_)
                         ) && levels[lv as usize]
                         {
-                            asg.var_mut(vi).turn_on(FlagVar::CA_SEEN1);
+                            asg.var_mut(vi).turn_on(FlagVar::CA_SEEN);
                             stack.push(l);
                             clear.push(l);
                         } else {
                             // one of the roots is a decision var at an unchecked level.
                             for l in &clear[top..] {
-                                asg.var_mut(l.vi()).turn_off(FlagVar::CA_SEEN1);
+                                asg.var_mut(l.vi()).turn_off(FlagVar::CA_SEEN);
                             }
                             clear.truncate(top);
                             return false;
@@ -526,20 +516,20 @@ impl Lit {
                         }
                         let vi = q.vi();
                         let lv = asg.level(vi);
-                        if 0 < lv && !asg.var(vi).is(FlagVar::CA_SEEN1) {
+                        if 0 < lv && !asg.var(vi).is(FlagVar::CA_SEEN) {
                             // if asg.reason(vi) != AssignReason::default() && levels[lv as usize] {
                             if matches!(
                                 asg.reason(vi),
                                 AssignReason::BinaryLink(_) | AssignReason::Implication(_)
                             ) && levels[lv as usize]
                             {
-                                asg.var_mut(vi).turn_on(FlagVar::CA_SEEN1);
+                                asg.var_mut(vi).turn_on(FlagVar::CA_SEEN);
                                 stack.push(*q);
                                 clear.push(*q);
                             } else {
                                 // one of the roots is a decision var at an unchecked level.
                                 for l in &clear[top..] {
-                                    asg.var_mut(l.vi()).turn_off(FlagVar::CA_SEEN1);
+                                    asg.var_mut(l.vi()).turn_off(FlagVar::CA_SEEN);
                                 }
                                 clear.truncate(top);
                                 return false;
