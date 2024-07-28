@@ -272,11 +272,18 @@ fn conflict_analyze(
 
     macro_rules! new_conflict_level_literal {
         ($vi: expr) => {
+            debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN));
+            asg.var_mut($vi).turn_on(FlagVar::CA_SEEN);
             path_cnt += 1;
             //## Conflict-Side Rewarding
             asg.reward_at_analysis($vi);
+        };
+    }
+    macro_rules! new_depending_literal {
+        ($vi: expr, $lit: expr) => {
             debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN));
             asg.var_mut($vi).turn_on(FlagVar::CA_SEEN);
+            learnt.push($lit);
         };
     }
     macro_rules! trace {
@@ -285,27 +292,11 @@ fn conflict_analyze(
             println!($($arg),*);
         };
     }
-    macro_rules! trace_lit {
-        ($lit: expr, $message: expr) => {
-            #[cfg(feature = "trace_analysis")]
-            {
-                let vi = $lit.vi();
-                let lv = asg.level(vi);
-                println!("{}: literal {} at level {}", $message, i32::from($lit), lv);
-            }
-        };
-    }
     macro_rules! validate_vi {
         ($vi: expr) => {
             debug_assert!(!asg.var($vi).is(FlagVar::ELIMINATED));
             debug_assert!(asg.assign($vi).is_some());
             debug_assert!(asg.level($vi) <= dl);
-        };
-    }
-    macro_rules! set_seen {
-        ($vi: expr) => {
-            debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN));
-            asg.var_mut($vi).turn_on(FlagVar::CA_SEEN);
         };
     }
 
@@ -321,11 +312,8 @@ fn conflict_analyze(
             p = cc.0;
             vi = p.vi();
             reason = cc.1;
-            trace_lit!(p, "- handle conflicting literal");
             asg.reward_at_analysis(vi);
-            debug_assert_ne!(asg.assign(vi), None);
             validate_vi!(vi);
-            debug_assert_eq!(dl, asg.level(vi));
             new_conflict_level_literal!(vi);
         } else {
             p = asg.stack(ti);
@@ -337,11 +325,6 @@ fn conflict_analyze(
             // Don't move this code to AssignReason::Decision! It's a waste of time.
             if path_cnt == 0 {
                 learnt[0] = !p;
-                trace!(
-                    "appending {}, the final (but not minimized) learnt is {:?}",
-                    learnt[0],
-                    learnt
-                );
                 break;
             }
             reason = asg.reason(p.vi());
@@ -351,7 +334,6 @@ fn conflict_analyze(
                 let vi = l.vi();
                 if !asg.var(vi).is(FlagVar::CA_SEEN) {
                     validate_vi!(vi);
-                    trace_lit!(l, " - binary linked");
                     new_conflict_level_literal!(vi);
                 }
             }
@@ -364,7 +346,7 @@ fn conflict_analyze(
                 );
                 debug_assert!(2 < cdb[wli.as_ci()].len());
                 // if !cdb.update_at_analysis(asg, cid) {
-                let ci = wli.as_ci();
+                let (ci, skip) = wli.indices();
                 if !cdb[ci].is(FlagClause::LEARNT) {
                     state.derive20.push(ci);
                 }
@@ -382,7 +364,6 @@ fn conflict_analyze(
                     wli,
                     &cdb[wli],
                 );
-                let skip = wli.as_wi();
                 #[cfg(feature = "trace_analysis")]
                 if skip == 1 {
                     trace!(
@@ -402,21 +383,13 @@ fn conflict_analyze(
                     if !asg.var(wi).is(FlagVar::CA_SEEN) {
                         let lvl = asg.level(wi);
                         if root_level == lvl {
-                            trace_lit!(q, " -- ignore");
                             continue;
                         }
                         if dl == lvl {
-                            trace_lit!(q, " -- found another path");
                             new_conflict_level_literal!(wi);
-                        } else
-                        /* if !asg.var(wi).is(FlagVar::CA_SEEN2) */
-                        {
-                            trace_lit!(q, " -- push to learnt");
-                            set_seen!(wi);
-                            learnt.push(*q);
+                        } else {
+                            new_depending_literal!(wi, *q);
                         }
-                    } else {
-                        trace!("{:?} -- ignore flagged already", q);
                     }
                 }
             }
