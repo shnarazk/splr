@@ -507,6 +507,8 @@ impl ClauseDBIF for ClauseDB {
         // self.check_weave(wli.as_ci(), &[0, 1]);
         ret
     }
+    /// Note: no code about rewarding; this function will be called once in
+    ///  a conflict analysis
     fn update_at_analysis(&mut self, asg: &impl AssignIF, ci: ClauseIndex) -> bool {
         let ClauseDB {
             ref mut clause,
@@ -516,48 +518,60 @@ impl ClauseDBIF for ClauseDB {
         let c = &mut clause[ci];
         let rank = c.update_lbd(asg, lbd_temp);
         let learnt = c.is(FlagClause::LEARNT);
-        if learnt {
-            #[cfg(feature = "just_used")]
-            c.turn_on(FlagClause::USED);
-            #[cfg(feature = "clause_rewading")]
-            self.reward_at_analysis(ci);
-        }
         if 1 < rank {
             self.lb_entanglement.update(rank as f64);
         }
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
+
+    #[cfg(feature = "just_used")]
     #[allow(unreachable_code, unused_variables)]
-    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
-        #[cfg(feature = "just_used")]
-        {
-            let mut alives = 0;
-            let mut keep = 0;
-            for ci in 1..self.clause.len() {
-                if self.clause[ci].is_dead() {
-                    continue;
-                }
-                alives += 1;
-                keep += 1;
-                if self.clause[ci].is(FlagClause::USED) {
-                    self.clause[ci].turn_off(FlagClause::USED);
-                    continue;
-                }
-                if self.clause[ci].is(FlagClause::LEARNT) {
-                    let ClauseDB {
-                        clause, lbd_temp, ..
-                    } = self;
-                    clause[ci].update_lbd(asg, lbd_temp);
-                    if 5 < self.clause[ci].rank {
-                        keep -= 1;
-                        self.delete_clause(ci);
-                    }
+    fn reduce(&mut self, asg: &mut impl AssignIF, _: ReductionType) {
+        let mut alives = 0;
+        let mut keep = 0;
+        // let mut perm: Vec<OrderedProxy<ClauseIndex>> = Vec::new();
+        for ci in 1..self.clause.len() {
+            if self.clause[ci].is_dead() {
+                continue;
+            }
+            alives += 1;
+            keep += 1;
+            if self.clause[ci].is(FlagClause::USED) {
+                self.clause[ci].turn_off(FlagClause::USED);
+                continue;
+            }
+            if self.clause[ci].is(FlagClause::LEARNT) {
+                let ClauseDB {
+                    clause, lbd_temp, ..
+                } = self;
+                clause[ci].update_lbd(asg, lbd_temp);
+                if 5 < self.clause[ci].rank {
+                    keep -= 1;
+                    self.delete_clause(ci);
+                    // perm.push(OrderedProxy::new(ci, self.clause[ci].rank as f64));
                 }
             }
-            self.reduction_threshold = keep as f64 / alives as f64;
+        }
+        /* if perm.is_empty() {
             return;
         }
+        perm.sort();
+        let keep = perm.len() / 2;
+        let threshold = perm[keep.min(perm.len() - 1)].value();
+        for i in perm.iter().skip(keep) {
+            // Being clause-position-independent, we keep or delete
+            // all clauses that have a same value as a unit.
+            if i.value() == threshold {
+                continue;
+            }
+            self.delete_clause(i.to());
+        }*/
+        self.reduction_threshold = keep as f64 / alives as f64;
+    }
+    #[cfg(not(feature = "just_used"))]
+    #[allow(unreachable_code, unused_variables)]
+    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
         impl Clause {
             fn reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
                 self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()

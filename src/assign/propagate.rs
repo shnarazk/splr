@@ -42,8 +42,6 @@ pub trait PropagateIF {
     fn backtrack_sandbox(&mut self);
     /// execute *boolean constraint propagation* or *unit propagation*.
     fn propagate(&mut self, cdb: &mut impl ClauseDBIF, sandbox: bool) -> PropagationResult;
-    // /// `propagate` for vivification, which allows dead clauses.
-    // fn propagate_sandbox(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
     /// propagate then clear asserted literals
     fn clear_asserted_literals(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent;
 }
@@ -395,6 +393,8 @@ impl PropagateIF for AssignStack {
                         continue 'next_clause;
                     }
                 }
+                // #[cfg(feature = "just_used")]
+                // c.turn_on(FlagClause::USED);
                 if other_value == Some(false) {
                     check_in!(
                         ci,
@@ -456,104 +456,6 @@ impl PropagateIF for AssignStack {
         }
         Ok(())
     }
-    /*
-    //
-    //## How to generate propagate_sandbox from propagate
-    //
-    // 1. copy it
-    // 1. delete codes about reward
-    // 1. delete codes about best-phases
-    // 1. delete codes about search_from
-    // 1. delete codes about trail_saving
-    // 1. delete codes about stat counters: num_*, ema_*
-    // 1. delete comments
-    // 1. (allow eliminated vars)
-    //
-    fn propagate_sandbox(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
-        #[cfg(feature = "boundary_check")]
-        macro_rules! check_in {
-            ($cid: expr, $tag :expr) => {
-                cdb[$cid].moved_at = $tag;
-            };
-        }
-        #[cfg(not(feature = "boundary_check"))]
-        macro_rules! check_in {
-            ($cid: expr, $tag :expr) => {};
-        }
-        macro_rules! conflict_path {
-            ($lit: expr, $reason: expr) => {
-                return Err(($lit, $reason))
-            };
-        }
-        while let Some(p) = self.trail.get(self.q_head) {
-            #[cfg(feature = "debug_propagation")]
-            debug_assert!(!self.var[p.vi()].is(Flag::PROPAGATED));
-            #[cfg(feature = "debug_propagation")]
-            self.var[p.vi()].turn_on(Flag::PROPAGATED);
-
-            self.q_head += 1;
-            let propagating = Lit::from(usize::from(*p));
-            let false_lit = !*p;
-
-            #[cfg(feature = "boundary_check")]
-            {
-                self.var[p.vi()].propagated_at = self.num_conflict;
-                self.var[p.vi()].state = VarState::Propagated(self.num_conflict);
-            }
-            let mut wli = cdb.get_first_watch(propagating);
-            'next_clause: while !wli.is_none() {
-                let (ci, false_index) = wli.indices();
-                let c = &mut cdb[ci];
-                let other: Lit = c[!wli];
-                let ovi = other.vi();
-                let other_value = lit_assign!(self.var[ovi], other);
-                if other_value == Some(true) {
-                    wli = c.next_watch(false_index);
-                    continue 'next_clause;
-                }
-                let len = c.len() - 2;
-                let start = c.search_from as usize;
-                for i in 0..c.len() - 2 {
-                    let k = (i + start) % len + 2;
-                    let lk = c[k];
-                    if lit_assign!(self.var[lk.vi()], lk) != Some(false) {
-                        check_in!(
-                            ci,
-                            Propagate::SandboxFindNewWatch(self.num_conflict, false_lit, !lk)
-                        );
-                        wli = cdb.transform_by_updating_watch(wli, k);
-                        continue 'next_clause;
-                    }
-                }
-                if other_value == Some(false) {
-                    check_in!(
-                        ci,
-                        Propagate::SandboxEmitConflict(self.num_conflict, propagating)
-                    );
-                    conflict_path!(
-                        other,
-                        if c.len() == 2 {
-                            AssignReason::BinaryLink(propagating)
-                        } else {
-                            AssignReason::Implication(!wli)
-                        }
-                    );
-                }
-                self.assign_by_implication(
-                    other,
-                    if c.len() == 2 {
-                        AssignReason::BinaryLink(false_lit)
-                    } else {
-                        AssignReason::Implication(!wli)
-                    },
-                );
-                check_in!(cid, Propagate::SandboxBecameUnit(self.num_conflict));
-                wli = c.next_watch(false_index);
-            }
-        }
-        Ok(())
-    }
-    */
     fn clear_asserted_literals(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
         debug_assert_eq!(self.decision_level(), self.root_level);
         loop {

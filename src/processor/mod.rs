@@ -57,6 +57,7 @@ pub trait EliminateIF: Instantiate {
     /// simplify database by:
     /// * removing satisfiable clauses
     /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.
+    ///
     /// Note: `force_run` is used only at the beginning of `solve' for simple satisfiability check
     ///
     /// # Errors

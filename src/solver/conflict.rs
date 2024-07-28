@@ -82,7 +82,7 @@ pub fn handle_conflict(
     let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
     if learnt_len == 0 {
-        #[cfg(debug)]
+        #[cfg(feature = "trace_analysis")]
         {
             println!(
                 "empty learnt at {}({}) by {:?}",
@@ -268,32 +268,25 @@ fn conflict_analyze(
     let learnt = &mut state.new_learnt;
     learnt.clear();
     learnt.push(Lit::from(u32::MAX));
-    // debug_assert!(learnt.iter().all(|l| *l != !p));
-    // debug_assert_eq!(asg.level(p.vi()), dl);
     let mut path_cnt: usize = 0;
+    #[allow(unused_variables)]
     let mut deep_path_cnt: usize = 0;
-    let mut reason_side_lits: Vec<Lit> = Vec::new();
 
-    macro_rules! new_depend_on_conflict_level {
+    macro_rules! new_conflict_level_literal {
         ($vi: expr) => {
-            path_cnt += 1;
             //## Conflict-Side Rewarding
             asg.reward_at_analysis($vi);
+            debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN1));
+            asg.var_mut($vi).turn_on(FlagVar::CA_SEEN1);
+            path_cnt += 1;
         };
     }
-    macro_rules! trace {
-        ($($arg: expr),*) => {
-            #[cfg(feature = "trace_analysis")]
-            println!($($arg),*);
-        };
-    }
-    macro_rules! trace_lit {
-        ($lit: expr, $message: expr) => {
-            #[cfg(feature = "trace_analysis")]
-            {
-                let vi = $lit.vi();
-                let lv = asg.level(vi);
-                println!("{}: literal {} at level {}", $message, i32::from($lit), lv);
+    macro_rules! new_depending_level_literal {
+        ($vi: expr) => {
+            if root_level < asg.level($vi) {
+                debug_assert!(asg.var($vi).is(FlagVar::CA_SEEN2));
+                asg.var_mut($vi).turn_on(FlagVar::CA_SEEN2);
+                deep_path_cnt += 1;
             }
         };
     }
@@ -304,390 +297,154 @@ fn conflict_analyze(
             debug_assert!(asg.level($vi) <= dl);
         };
     }
-    macro_rules! set_seen {
-        ($vi: expr) => {
-            debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN));
-            asg.var_mut($vi).turn_on(FlagVar::CA_SEEN);
-        };
-    }
-    macro_rules! boundary_check {
-        ($condition: expr, $($arg: expr),+) => {
-            #[cfg(feature = "boundary_check")]
-            {
-                if !$condition {
-                    dbg!(cc);
-                    dbg!(dl);
-                    tracer(asg, cdb);
-                    println!("Learnt clause so far: {}",
-                             learnt.report(asg)
-                             .iter()
-                             .map(|r| format!("  {:?}", r))
-                             .collect::<Vec<String>>()
-                             .join("\n")
-                    );
-                    panic!($($arg),*);
-                }
-            }
-        };
-    }
+
     let mut max_lbd: u16 = 0;
     let mut ci_with_max_lbd: Option<ClauseIndex> = None;
     #[cfg(feature = "trace_analysis")]
     println!("##################");
-    assert!(0 < dl);
+    debug_assert!(0 < dl);
+    debug_assert!(asg
+        .stack_iter()
+        .all(|l| !asg.var(l.vi()).is(FlagVar::CA_SEEN1)));
+    debug_assert!(asg
+        .stack_iter()
+        .all(|l| !asg.var(l.vi()).is(FlagVar::CA_SEEN2)));
     for ti in (0..=asg.stack_len()).rev() {
         let p: Lit;
         let reason: AssignReason;
         if ti == asg.stack_len() {
             p = cc.0;
             reason = cc.1;
-            trace_lit!(p, "- handle conflicting literal");
             let vi = p.vi();
-            asg.reward_at_analysis(vi);
-            debug_assert_ne!(asg.assign(vi), None);
+            debug_assert_eq!(asg.level(vi), dl);
             validate_vi!(vi);
-            set_seen!(vi);
-            new_depend_on_conflict_level!(vi);
+            new_conflict_level_literal!(vi);
+            if let AssignReason::Implication(wli) = reason {
+                if let AssignReason::Implication(wli2) = asg.reason(vi) {
+                    let ci = if cdb[wli.as_ci()].rank <= cdb[wli2.as_ci()].rank {
+                        wli.as_ci()
+                    } else {
+                        wli2.as_ci()
+                    };
+                    // #[cfg(feature = "just_used")]
+                    // cdb[ci].turn_on(FlagClause::USED);
+                    #[cfg(feature = "clause_rewarding")]
+                    self.reward_at_analysis(ci);
+                } else {
+                    let ci = wli.as_ci();
+                    #[cfg(feature = "just_used")]
+                    cdb[ci].turn_on(FlagClause::USED);
+                    #[cfg(feature = "clause_rewarding")]
+                    self.reward_at_analysis(ci);
+                }
+            }
         } else {
             p = asg.stack(ti);
             let vi = p.vi();
-            if !asg.var(vi).is(FlagVar::CA_SEEN) {
+            if !asg.var(vi).is(FlagVar::CA_SEEN1) {
                 continue;
             }
-            asg.var_mut(p.vi()).turn_off(FlagVar::CA_SEEN);
-            if path_cnt == 0 {
-                learnt.retain(|l| *l != !p);
-                learnt[0] = !p;
-                // dbg!(&learnt, dl, asg.level(vi));
-                // assert_ne!(dl, asg.level(vi));
-                break;
-            }
+            asg.var_mut(vi).turn_off(FlagVar::CA_SEEN1);
             reason = asg.reason(vi);
         }
         match reason {
             AssignReason::BinaryLink(l) => {
                 let vi = l.vi();
-                if !asg.var(vi).is(FlagVar::CA_SEEN) {
+                if !asg.var(vi).is(FlagVar::CA_SEEN1) {
                     validate_vi!(vi);
-                    debug_assert_eq!(asg.level(vi), dl, "strange level binary clause");
-                    // if root_level == asg.level(vi) { continue; }
-                    set_seen!(vi);
-                    trace_lit!(l, " - binary linked");
-                    new_depend_on_conflict_level!(vi);
+                    new_conflict_level_literal!(vi);
                 }
             }
             AssignReason::Implication(wli) => {
-                trace!(
-                    "analyze clause {}(first literal: {}) for {}",
-                    cid,
-                    i32::from(cdb[wli.as_ci()].lit0()),
-                    p
-                );
-                debug_assert!(2 < cdb[wli.as_ci()].len());
-                // if !cdb.update_at_analysis(asg, cid) {
-                let ci = wli.as_ci();
-                if !cdb[ci].is(FlagClause::LEARNT) {
+                let (ci, skip) = wli.indices();
+                if cdb[ci].is(FlagClause::LEARNT) {
+                    // #[cfg(feature = "just_used")]
+                    // cdb[ci].turn_on(FlagClause::USED);
+                    #[cfg(feature = "clause_rewarding")]
+                    self.reward_at_analysis(ci);
+                } else {
                     state.derive20.push(ci);
                 }
                 if max_lbd < cdb[ci].rank {
                     max_lbd = cdb[ci].rank;
                     ci_with_max_lbd = Some(ci);
                 }
-                assert_eq!(
-                    p,
-                    cdb[wli],
-                    "At level {}, broken implication chain from {:?}@{} to {:?}{:?}",
-                    asg.decision_level(),
-                    p,
-                    asg.level(p.vi()),
-                    wli,
-                    &cdb[wli],
-                );
-                let skip = wli.as_wi();
-                #[cfg(feature = "trace_analysis")]
-                if skip == 1 {
-                    trace!(
-                        "AMEND: analyze disordered clause {}{:?}(second literal: {}) for {}",
-                        ci,
-                        cdb[ci],
-                        i32::from(cdb[ci].lit1()),
-                        p
-                    );
-                }
-                for (i, q) in cdb[ci].iter().enumerate() {
-                    if i == skip {
+                for q in cdb[ci]
+                    .iter()
+                    .enumerate()
+                    .filter(|k| k.0 != skip)
+                    .map(|k| k.1)
+                {
+                    let wi: VarId = q.vi();
+                    if asg.var(wi).is(FlagVar::CA_SEEN1) {
                         continue;
                     }
-                    let vi = q.vi();
-                    validate_vi!(vi);
-                    if !asg.var(vi).is(FlagVar::CA_SEEN) {
-                        let lvl = asg.level(vi);
-                        if root_level == lvl {
-                            trace_lit!(q, " -- ignore");
-                            continue;
-                        }
-                        set_seen!(vi);
-                        if dl == lvl {
-                            trace_lit!(q, " -- found another path");
-                            new_depend_on_conflict_level!(vi);
-                        } else {
-                            trace_lit!(q, " -- push to learnt");
-                            learnt.push(*q);
-                            if asg.decision_vi(lvl) != vi && !reason_side_lits.contains(q) {
-                                deep_path_cnt += 1;
-                                reason_side_lits.push(*q);
-                            }
-                        }
-                    } else {
-                        trace!("{:?} -- ignore flagged already", q);
-                    }
-                }
-            }
-            AssignReason::Decision(_) | AssignReason::None => {
-                boundary_check!(
-                    false,
-                    "found a strange var {:?}:: path_cnt {}\nDecisionMap\n{}",
-                    reason,
-                    path_cnt,
-                    asg.stack_iter()
-                        .skip(ti)
-                        .filter(|l| matches!(asg.reason(l.vi()), AssignReason::Decision(_)))
-                        .map(|l| format!("{:?}", l.report(asg)))
-                        .collect::<Vec<String>>()
-                        .join("\n")
-                );
-            }
-        }
-        trace!("move to flagged {}; num path: {}", p.vi(), path_cnt - 1);
-        path_cnt -= 1;
-    }
-    assert_eq!(0, path_cnt);
-    /*
-    loop {
-        match reason {
-            AssignReason::BinaryLink(l) => {
-                let vi = l.vi();
-                if !asg.var(vi).is(FlagVar::CA_SEEN) {
-                    validate_vi!(vi);
-                    debug_assert_eq!(asg.level(vi), dl, "strange level binary clause");
-                    // if root_level == asg.level(vi) { continue; }
-                    set_seen!(vi);
-                    trace_lit!(l, " - binary linked");
-                    new_depend_on_conflict_level!(vi);
-                }
-            }
-            AssignReason::Implication(wli) => {
-                trace!(
-                    "analyze clause {}(first literal: {}) for {}",
-                    cid,
-                    i32::from(cdb[wli.as_ci()].lit0()),
-                    p
-                );
-                debug_assert!(2 < cdb[wli.as_ci()].len());
-                // if !cdb.update_at_analysis(asg, cid) {
-                let ci = wli.as_ci();
-                if !cdb[ci].is(FlagClause::LEARNT) {
-                    state.derive20.push(ci);
-                }
-                if max_lbd < cdb[ci].rank {
-                    max_lbd = cdb[ci].rank;
-                    ci_with_max_lbd = Some(ci);
-                }
-                assert_eq!(
-                    p,
-                    cdb[wli],
-                    "At level {}, broken implication chain from {:?}@{} to {:?}{:?}",
-                    asg.decision_level(),
-                    p,
-                    asg.level(p.vi()),
-                    wli,
-                    &cdb[wli],
-                );
-                let skip = wli.as_wi();
-                #[cfg(feature = "trace_analysis")]
-                if skip == 1 {
-                    trace!(
-                        "AMEND: analyze disordered clause {}{:?}(second literal: {}) for {}",
-                        ci,
-                        cdb[ci],
-                        i32::from(cdb[ci].lit1()),
-                        p
-                    );
-                }
-                for (i, q) in cdb[ci].iter().enumerate() {
-                    if i == skip {
+                    validate_vi!(wi);
+                    let lvl = asg.level(wi);
+                    if root_level == lvl {
                         continue;
                     }
-                    let vi = q.vi();
-                    validate_vi!(vi);
-                    if !asg.var(vi).is(FlagVar::CA_SEEN) {
-                        let lvl = asg.level(vi);
-                        if root_level == lvl {
-                            trace_lit!(q, " -- ignore");
-                            continue;
-                        }
-                        set_seen!(vi);
-                        if dl == lvl {
-                            trace_lit!(q, " -- found another path");
-                            new_depend_on_conflict_level!(vi);
-                        } else {
-                            trace_lit!(q, " -- push to learnt");
-                            learnt.push(*q);
-                            if asg.decision_vi(lvl) != vi && !reason_side_lits.contains(q) {
-                                deep_path_cnt += 1;
-                                reason_side_lits.push(*q);
-                            }
-                        }
-                    } else {
-                        trace!("{:?} -- ignore flagged already", q);
+                    if dl == lvl {
+                        new_conflict_level_literal!(wi);
+                    } else if !asg.var(wi).is(FlagVar::CA_SEEN2) {
+                        learnt.push(*q);
+                        new_depending_level_literal!(wi);
                     }
                 }
             }
-            AssignReason::Decision(_) | AssignReason::None => {
-                boundary_check!(
-                    false,
-                    "found a strange var {:?}:: path_cnt {}\nDecisionMap\n{}",
-                    reason,
-                    path_cnt,
-                    asg.stack_iter()
-                        .skip(trail_index)
-                        .filter(|l| matches!(asg.reason(l.vi()), AssignReason::Decision(_)))
-                        .map(|l| format!("{:?}", l.report(asg)))
-                        .collect::<Vec<String>>()
-                        .join("\n")
-                );
-            }
-        }
-        //
-        // set the index of the next literal to trail_index
-        //
-        #[allow(clippy::blocks_in_conditions)]
-        while {
-            let vi = asg.stack(trail_index).vi();
-            boundary_check!(
-                0 < vi && vi < asg.level_ref().len(),
-                "trail[{}] has an invalid var index {}",
-                trail_index,
-                asg.stack(trail_index)
-            );
-            let lvl = asg.level(vi);
-            let v = asg.var(vi);
-            !v.is(FlagVar::CA_SEEN) || lvl != dl
-        } {
-            trace_lit!(asg.stack(trail_index), "skip, not flagged");
-            boundary_check!(
-                0 < trail_index,
-                "Broke the bottom:: path_cnt {} scanned to {}",
-                path_cnt,
-                asg.stack_len() - trail_index
-            );
-            trail_index -= 1;
-        }
-        p = asg.stack(trail_index);
-        trace!("move to flagged {}; num path: {}", p.vi(), path_cnt - 1);
-
-        asg.var_mut(p.vi()).turn_off(FlagVar::CA_SEEN);
-        // since the trail can contain a literal which level is under `dl` after
-        // the `dl`-th decision var, we must skip it.
-        path_cnt -= 1;
-        if path_cnt == 0 {
-            break;
-        }
-        debug_assert!(0 < trail_index);
-        trail_index -= 1;
-        reason = asg.reason(p.vi());
-    }
-    */
-    if let Some(cid) = ci_with_max_lbd {
-        cdb.update_at_analysis(asg, cid);
-    }
-    // deep_trace
-    if false && reason_side_lits.is_empty() {
-        macro_rules! set_seen2 {
-            ($vi: expr) => {
-                debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN2));
-                asg.var_mut($vi).turn_on(FlagVar::CA_SEEN2);
-            };
-        }
-        reason_side_lits.iter().for_each(|l| {
-            /* assert!(0 < asg.level(l.vi()));
-            assert!(
-                !asg.var(l.vi()).is(FlagVar::CA_SEEN),
-                "l:{} in {:?}\n{:?}\nlevel: {}\n{:?}",
-                l,
-                asg.var(l.vi()),
-                reason_side_lits,
-                asg.decision_level(),
-                asg.stack_iter().collect::<Vec<_>>(),
-            ); */
-            set_seen2!(l.vi());
-        });
-        // assert_eq!(deep_path_cnt, reason_side_lits.len());
-        for ti in (asg.len_upto(root_level)..asg.len_upto(dl - 1)).rev() {
-            let p: Lit = asg.stack(ti);
-            let vi = p.vi();
-            if !asg.var(vi).is(FlagVar::CA_SEEN2) {
-                continue;
-            }
-            asg.var_mut(p.vi()).turn_off(FlagVar::CA_SEEN2);
-            match asg.reason(p.vi()) {
-                AssignReason::BinaryLink(l) => {
-                    let vi = l.vi();
-                    if !asg.var(vi).is(FlagVar::CA_SEEN2) && root_level < asg.level(vi) {
-                        // validate_vi!(vi);
-                        set_seen2!(vi);
-                        deep_path_cnt += 1;
-                    }
-                }
-                AssignReason::Implication(wli) => {
-                    let (ci, skip) = wli.indices();
-                    for (i, q) in cdb[ci].iter().enumerate() {
-                        if i == skip {
-                            continue;
-                        }
-                        let vi = q.vi();
-                        // validate_vi!(vi);
-                        if !asg.var(vi).is(FlagVar::CA_SEEN2) && root_level < asg.level(vi) {
-                            set_seen2!(vi);
-                            deep_path_cnt += 1;
-                        }
-                    }
-                }
-                AssignReason::Decision(lv) => {
-                    if 0 < lv {
-                        let vi = asg.decision_vi(lv);
-                        asg.reward_at_analysis(vi);
-                    }
-                }
-                AssignReason::None => unreachable!(),
-            }
-            deep_path_cnt -= 1;
-            if deep_path_cnt == 0 {
+            AssignReason::Decision(lv) => {
+                debug_assert_eq!(lv, dl);
+                debug_assert_eq!(path_cnt, 0);
+                learnt.retain(|l| *l != !p);
+                learnt[0] = !p;
                 break;
             }
+            AssignReason::None => unreachable!(),
         }
-        // assert_eq!(0, deep_path_cnt);
-        // for i in 0..asg.len_upto(root_level) {
-        //     assert!(!asg.var(asg.stack(i).vi()).is(FlagVar::CA_SEEN2));
-        // }
-        /* for i in 0..asg.stack_len() {
-            assert!(
-                !asg.var(asg.stack(i).vi()).is(FlagVar::CA_SEEN),
-                "{} at {}: level: {} is CA_SEEN",
-                asg.stack(i),
-                i,
-                asg.level(asg.stack(i).vi())
-            );
-        } */
+        path_cnt -= 1;
     }
-    minimize_learnt(&mut state.new_learnt, asg, cdb)
+    debug_assert!(asg
+        .stack_iter()
+        .all(|l| !asg.var(l.vi()).is(FlagVar::CA_SEEN1)));
+    debug_assert_eq!(0, path_cnt);
+    if let Some(cid) = ci_with_max_lbd {
+        cdb.update_at_analysis(asg, cid);
+        // #[cfg(feature = "just_used")]
+        // cdb[ci].turn_on(FlagClause::USED);
+        // #[cfg(feature = "clause_rewarding")]
+        // self.reward_at_analysis(ci);
+    }
+
+    minimize_learnt(&mut state.new_learnt, asg, cdb);
+    // If you don't call `minimize_learnt`, activate the block below to clear flags.
+    // for ti in (asg.len_upto(root_level)..asg.len_upto(dl - 1)).rev() {
+    //     let p = asg.stack(ti);
+    //     let vi = p.vi();
+    //     if asg.var(vi).is(FlagVar::CA_SEEN2) {
+    //         asg.var_mut(vi).turn_off(FlagVar::CA_SEEN2);
+    //     }
+    // }
+    backtrack_target(&mut state.new_learnt, asg)
 }
 
-fn minimize_learnt(
-    new_learnt: &mut Vec<Lit>,
-    asg: &mut AssignStack,
-    cdb: &mut ClauseDB,
-) -> DecisionLevel {
+/// find correct backtrack level from remaining literals
+fn backtrack_target(learnt: &mut Vec<Lit>, asg: &mut AssignStack) -> DecisionLevel {
+    learnt
+        .iter()
+        .enumerate()
+        .skip(1)
+        .map(|(i, l)| (asg.level(l.vi()), i))
+        .max()
+        .map_or_else(
+            || asg.root_level(),
+            |(level, i)| {
+                learnt.swap(1, i);
+                level
+            },
+        )
+}
+
+fn minimize_learnt(new_learnt: &mut Vec<Lit>, asg: &mut AssignStack, cdb: &mut ClauseDB) {
     let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
     debug_assert!(asg.assign(new_learnt[0].vi()).is_some());
     let mut levels = vec![false; asg.decision_level() as usize + 1];
@@ -700,24 +457,12 @@ fn minimize_learnt(
     if 1 < new_learnt.len() {
         cdb.minimize_with_bi_clauses(asg, new_learnt);
     }
-    // find correct backtrack level from remaining literals
-    let mut level_to_return = 0;
-    if 1 < new_learnt.len() {
-        let mut max_i = 1;
-        level_to_return = asg.level(new_learnt[max_i].vi());
-        for (i, l) in new_learnt.iter().enumerate().skip(2) {
-            let lv = asg.level(l.vi());
-            if level_to_return < lv {
-                level_to_return = lv;
-                max_i = i;
-            }
-        }
-        new_learnt.swap(1, max_i);
-    }
     for l in &to_clear {
-        asg.var_mut(l.vi()).turn_off(FlagVar::CA_SEEN);
+        asg.var_mut(l.vi()).turn_off(FlagVar::CA_SEEN2);
     }
-    level_to_return
+    debug_assert!(asg
+        .stack_iter()
+        .all(|l| !asg.var(l.vi()).is(FlagVar::CA_SEEN2)));
 }
 
 /// return `true` if the `lit` is redundant, which is defined by
@@ -740,20 +485,20 @@ impl Lit {
                 AssignReason::BinaryLink(l) => {
                     let vi = l.vi();
                     let lv = asg.level(vi);
-                    if 0 < lv && !asg.var(vi).is(FlagVar::CA_SEEN) {
+                    if 0 < lv && !asg.var(vi).is(FlagVar::CA_SEEN2) {
                         // if asg.reason(vi) != AssignReason::Decision(_) && levels[lv as usize] {
                         if matches!(
                             asg.reason(vi),
                             AssignReason::Implication(_) | AssignReason::BinaryLink(_)
                         ) && levels[lv as usize]
                         {
-                            asg.var_mut(vi).turn_on(FlagVar::CA_SEEN);
+                            asg.var_mut(vi).turn_on(FlagVar::CA_SEEN2);
                             stack.push(l);
                             clear.push(l);
                         } else {
                             // one of the roots is a decision var at an unchecked level.
                             for l in &clear[top..] {
-                                asg.var_mut(l.vi()).turn_off(FlagVar::CA_SEEN);
+                                asg.var_mut(l.vi()).turn_off(FlagVar::CA_SEEN2);
                             }
                             clear.truncate(top);
                             return false;
@@ -769,20 +514,20 @@ impl Lit {
                         }
                         let vi = q.vi();
                         let lv = asg.level(vi);
-                        if 0 < lv && !asg.var(vi).is(FlagVar::CA_SEEN) {
+                        if 0 < lv && !asg.var(vi).is(FlagVar::CA_SEEN2) {
                             // if asg.reason(vi) != AssignReason::default() && levels[lv as usize] {
                             if matches!(
                                 asg.reason(vi),
                                 AssignReason::BinaryLink(_) | AssignReason::Implication(_)
                             ) && levels[lv as usize]
                             {
-                                asg.var_mut(vi).turn_on(FlagVar::CA_SEEN);
+                                asg.var_mut(vi).turn_on(FlagVar::CA_SEEN2);
                                 stack.push(*q);
                                 clear.push(*q);
                             } else {
                                 // one of the roots is a decision var at an unchecked level.
                                 for l in &clear[top..] {
-                                    asg.var_mut(l.vi()).turn_off(FlagVar::CA_SEEN);
+                                    asg.var_mut(l.vi()).turn_off(FlagVar::CA_SEEN2);
                                 }
                                 clear.truncate(top);
                                 return false;
