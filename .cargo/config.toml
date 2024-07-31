@@ -1,3 +1,6 @@
+[build]
+rustflags = ["-C", "target-cpu=native"]
+
 [profile.profiling]
 inherits = "release"
 lto = "thin" # "fat"

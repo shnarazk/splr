@@ -528,36 +528,66 @@ impl ClauseDBIF for ClauseDB {
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    #[allow(unreachable_code, unused_variables)]
-    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
-        #[cfg(feature = "just_used")]
-        {
-            let mut alives = 0;
-            let mut keep = 0;
-            for ci in 1..self.clause.len() {
-                if self.clause[ci].is_dead() {
+    #[cfg(feature = "just_used")]
+    fn reduce(&mut self, asg: &mut impl AssignIF, _setting: ReductionType) {
+        // let ClauseDB {
+        //     ref mut clause,
+        //     ref mut lbd_temp,
+        //     ref mut num_reduction,
+
+        //     #[cfg(feature = "clause_rewarding")]
+        //     ref tick,
+        //     #[cfg(feature = "clause_rewarding")]
+        //     ref activity_decay,
+        //     ..
+        // } = self;
+        self.num_reduction += 1;
+        let mut keep: usize = 0;
+        let mut alives: usize = 0;
+        // let mut perm: Vec<OrderedProxy<ClauseIndex>> = Vec::with_capacity(clause.len());
+        for ci in 1..self.clause.len() {
+            if self.clause[ci].is_dead() {
+                continue;
+            }
+            alives += 1;
+            keep += 1;
+            if self.clause[ci].is(FlagClause::USED) {
+                self.clause[ci].turn_off(FlagClause::USED);
+                continue;
+            }
+            if self.clause[ci].is(FlagClause::LEARNT) {
+                let ClauseDB {
+                    ref mut clause,
+                    ref mut lbd_temp,
+                    ..
+                } = self;
+                if 5 < clause[ci].update_lbd(asg, lbd_temp) {
+                    keep -= 1;
+                    // perm.push(OrderedProxy::new(ci, c.rank as f64));
+                    self.delete_clause(ci);
                     continue;
-                }
-                alives += 1;
-                keep += 1;
-                if self.clause[ci].is(FlagClause::USED) {
-                    self.clause[ci].turn_off(FlagClause::USED);
-                    continue;
-                }
-                if self.clause[ci].is(FlagClause::LEARNT) {
-                    let ClauseDB {
-                        clause, lbd_temp, ..
-                    } = self;
-                    clause[ci].update_lbd(asg, lbd_temp);
-                    if 5 < self.clause[ci].rank {
-                        keep -= 1;
-                        self.delete_clause(ci);
-                    }
                 }
             }
-            self.reduction_threshold = keep as f64 / alives as f64;
-            return;
         }
+        // let keep = perm.len().max(alives);
+        self.reduction_threshold = keep as f64 / alives as f64;
+        // if perm.is_empty() {
+        //     return;
+        // }
+        // perm.sort();
+        // let threshold = perm[keep.min(perm.len() - 1)].value();
+        // for i in perm.iter().skip(keep) {
+        //     // Being clause-position-independent, we keep or delete
+        //     // all clauses that have a same value as a unit.
+        //     if i.value() == threshold {
+        //         continue;
+        //     }
+        //     self.delete_clause(i.to());
+        // }
+    }
+    #[cfg(not(feature = "just_used"))]
+    #[allow(unreachable_code, unused_variables)]
+    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
         impl Clause {
             fn reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
                 self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()

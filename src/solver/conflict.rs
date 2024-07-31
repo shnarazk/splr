@@ -149,6 +149,8 @@ pub fn handle_conflict(
                 }
             }
             AssignReason::Implication(r) => {
+                #[cfg(feature = "just_used")]
+                cdb[r.as_ci()].turn_on(FlagClause::USED);
                 for l in cdb[r.as_ci()].iter() {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
@@ -349,6 +351,9 @@ fn conflict_analyze(
                 let (ci, skip) = wli.indices();
                 if !cdb[ci].is(FlagClause::LEARNT) {
                     state.derive20.push(ci);
+                } else {
+                    #[cfg(feature = "just_used")]
+                    cdb[ci].turn_on(FlagClause::USED);
                 }
                 if max_lbd < cdb[ci].rank {
                     max_lbd = cdb[ci].rank;
