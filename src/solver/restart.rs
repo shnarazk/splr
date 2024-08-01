@@ -11,8 +11,7 @@ pub trait RestartIF: Instantiate {
     fn set_segment_parameters(&mut self, segment_scale: usize);
 }
 
-const FUEL: f64 = 2.0;
-const SCALE: f64 = 64.0;
+const FUEL: f64 = 1.0;
 
 /// `RestartManager` provides restart API and holds data about restart conditions.
 #[derive(Clone, Debug, Default)]
@@ -20,7 +19,6 @@ pub struct RestartManager {
     penetration_energy: f64,
     pub penetration_energy_charged: f64,
     penetration_energy_unit: f64,
-    field_scale: f64,
 }
 
 impl Instantiate for RestartManager {
@@ -29,7 +27,6 @@ impl Instantiate for RestartManager {
             penetration_energy: FUEL,
             penetration_energy_charged: FUEL,
             penetration_energy_unit: FUEL,
-            field_scale: 1.0 / SCALE,
         }
     }
     fn handle(&mut self, e: SolverEvent) {
@@ -41,14 +38,11 @@ impl Instantiate for RestartManager {
 
 impl RestartIF for RestartManager {
     fn restart(&mut self, lbd: &EmaView, ent: &EmaView) -> bool {
-        let gscale = |x: f64| self.field_scale * (x - 1.0) + 1.0;
-        self.penetration_energy -= (lbd.trend() + gscale(ent.trend())) - 2.0;
+        self.penetration_energy -= 0.125 * (lbd.trend() / ent.trend());
         self.penetration_energy < 0.0
     }
-    fn set_segment_parameters(&mut self, segment_scale: usize) {
-        let factor = 0.5 * (segment_scale.trailing_zeros() + 1) as f64;
-        self.field_scale = 1.0 / (SCALE - factor);
-        self.penetration_energy_unit *= 10.0_f64.powf(-0.1);
+    fn set_segment_parameters(&mut self, _segment_scale: usize) {
+        // self.penetration_energy_unit *= 10.0_f64.powf(-0.1);
     }
     fn set_stage_parameters(&mut self, stage_scale: usize) {
         let e = self.penetration_energy_unit * (stage_scale as f64);
