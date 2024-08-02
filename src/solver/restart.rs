@@ -37,15 +37,24 @@ impl Instantiate for RestartManager {
 }
 
 impl RestartIF for RestartManager {
-    fn restart(&mut self, lbd: &EmaView, ent: &EmaView) -> bool {
-        self.penetration_energy -= 0.1 * (lbd.trend() / ent.trend());
-        self.penetration_energy < 0.0
+    fn restart(&mut self, lbd: &EmaView, _env: &EmaView) -> bool {
+        if 0.1 < self.penetration_energy {
+            // self.penetration_energy -= env.trend();
+            self.penetration_energy -= 1.0 / 16.0;
+            false
+        } else {
+            1.2 < lbd.trend()
+        }
+        /* self.penetration_energy = (self.penetration_energy - 0.3 * (lbd.trend() - 0.9))
+            .min(self.penetration_energy_charged);
+        self.penetration_energy < 0.0 */
     }
     fn set_segment_parameters(&mut self, _segment_scale: usize) {
         // self.penetration_energy_unit *= 10.0_f64.powf(-0.1);
     }
     fn set_stage_parameters(&mut self, stage_scale: usize) {
-        let e = self.penetration_energy_unit * (stage_scale as f64);
+        // let e = self.penetration_energy_unit * (1.0 + stage_scale as f64).log2();
+        let e = self.penetration_energy_unit * stage_scale as f64;
         self.penetration_energy_charged = e;
         self.penetration_energy = e;
     }

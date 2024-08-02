@@ -33,7 +33,7 @@ default = [
         "just_used",
         "LRB_rewarding",
         "reason_side_rewarding",
-        "rephase",
+        # "rephase",
         # "reward_annealing",
         # "stochastic_local_search",
         "two_mode_reduction",
