@@ -239,14 +239,14 @@ impl ClauseDBIF for ClauseDB {
         self.certification_store.add_clause(vec);
         let ci = self.get_free_index();
         debug_assert_ne!(0, ci);
-        self[ci].flags = FlagClause::empty();
+        self.clause[ci].flags = FlagClause::empty();
         std::mem::swap(&mut self[ci].lits, vec);
         self.weave(ci);
-        let len2 = self[ci].lits.len() == 2;
-        let l0 = self[ci].lits[0];
-        let l1 = self[ci].lits[1];
+        let len2 = self.clause[ci].lits.len() == 2;
+        let l0 = self.clause[ci].lits[0];
+        let l1 = self.clause[ci].lits[1];
         if len2 {
-            self[ci].rank = 1;
+            self.clause[ci].rank = 1;
             // A binary clause consumes one clause without watchers
             self.num_bi_clause += 1;
             self.binary_link.add(l0, l1, ci);
@@ -269,17 +269,17 @@ impl ClauseDBIF for ClauseDB {
             debug_assert_eq!(l0, self[ci].lits[0]);
             debug_assert_eq!(l1, self[ci].lits[1]);
         }
-        self[ci].search_from = 0;
-        self[ci].rank_old = self[ci].rank;
+        self.clause[ci].search_from = 0;
+        self.clause[ci].rank_old = self[ci].rank;
         self.lbd.update(self[ci].rank);
         self.num_clause += 1;
         if learnt {
             if len2 {
                 self.num_bi_learnt += 1;
             } else {
-                self[ci].turn_on(FlagClause::LEARNT);
+                self.clause[ci].turn_on(FlagClause::LEARNT);
                 self.num_learnt += 1;
-                if self[ci].rank <= 2 {
+                if self.clause[ci].rank <= 2 {
                     self.num_lbd2 += 1;
                 }
             }
@@ -287,13 +287,14 @@ impl ClauseDBIF for ClauseDB {
 
         #[cfg(feature = "clause_rewarding")]
         {
-            self[ci].activity = 0.0;
-            self[ci].timestamp = self.tick;
+            self.clause[ci].activity = 0.0;
+            self.clause[ci].timestamp = self.tick;
         }
         #[cfg(feature = "just_used")]
         {
-            self[ci].turn_on(FlagClause::USED);
+            self.clause[ci].turn_on(FlagClause::USED);
         }
+        // assert_ne!(self.clause[ci].lit0(), self.clause[ci].lit1());
         RefClause::Clause(ci)
     }
     fn delete_clause(&mut self, ci: ClauseIndex) {
@@ -1145,6 +1146,21 @@ impl ClauseWeaverIF for ClauseDB {
             next.as_ci()
         }
     }
+    // Check whether a zombi exists
+    /* fn check(&self) {
+        let mut deads: HashSet<ClauseIndex> = HashSet::new();
+        let mut wli = self.watch[FREE_LIT].next;
+        while !wli.is_none() {
+            deads.insert(wli.as_ci());
+            wli = self.clause[wli.as_ci()].link[wli.as_wi()].next;
+        }
+        assert!(self
+            .clause
+            .iter()
+            .enumerate()
+            .skip(1)
+            .all(|(ci, c)| c.is_dead() || deads.contains(&ci)));
+    } */
 }
 
 impl ClauseDB {

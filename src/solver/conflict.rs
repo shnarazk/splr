@@ -362,12 +362,12 @@ fn conflict_analyze(
                 assert_eq!(
                     p,
                     cdb[wli],
-                    "At level {}, broken implication chain from {:?}@{} to {:?}{:?}",
+                    "At level {}, broken implication chain(wli does not point propagating lit) from {:?}@{} to {:?} => {:?}",
                     asg.decision_level(),
                     p,
                     asg.level(p.vi()),
                     wli,
-                    &cdb[wli],
+                    &cdb[wli.as_ci()],
                 );
                 #[cfg(feature = "trace_analysis")]
                 if skip == 1 {

@@ -21,8 +21,8 @@ pub struct StageManager {
 }
 
 impl Instantiate for StageManager {
-    fn instantiate(_: &Config, cnf: &CNFDescription) -> StageManager {
-        let unit_size = (cnf.num_of_variables as f64).sqrt() as usize;
+    fn instantiate(_: &Config, _cnf: &CNFDescription) -> StageManager {
+        let unit_size = 1;
         StageManager {
             unit_size,
             max_scale_of_segment: 1,
@@ -52,12 +52,12 @@ impl StageManager {
             segment_starting_cycle: 0,
         }
     }
-    pub fn initialize(&mut self, unit_size: usize) {
+    pub fn initialize(&mut self, _unit_size: usize) {
         self.cycle = 0;
-        self.unit_size = unit_size;
+        self.unit_size = 1;
         self.scale = 1;
         self.max_scale_of_segment = 1;
-        self.end_of_stage = unit_size;
+        self.end_of_stage = self.unit_size;
         self.next_is_new_segment = true;
     }
     pub fn reset(&mut self) {
@@ -103,7 +103,8 @@ impl StageManager {
     /// Note: we need not to make a strong correlation between this value and
     /// scale defined by Luby series. So this is fine.
     pub fn current_span(&self) -> usize {
-        self.cycle * self.unit_size
+        (self.scale * self.unit_size).ilog2() as usize * 16
+        // (self.scale * self.unit_size) as usize
     }
     pub fn current_stage(&self) -> usize {
         self.stage
@@ -144,7 +145,7 @@ impl StageManager {
     pub fn segment_starting_stage(&self) -> usize {
         self.segment_starting_stage
     }
-    pub fn set_unit_size(&mut self, size: usize) {
-        self.unit_size = size;
+    pub fn set_unit_size(&mut self, _size: usize) {
+        // self.unit_size = size;
     }
 }

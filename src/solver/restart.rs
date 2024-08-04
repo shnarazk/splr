@@ -38,13 +38,14 @@ impl Instantiate for RestartManager {
 
 impl RestartIF for RestartManager {
     fn restart(&mut self, lbd: &EmaView, _env: &EmaView) -> bool {
-        if 0.1 < self.penetration_energy {
+        1.15 < lbd.trend()
+        /* if 0.1 < self.penetration_energy {
             // self.penetration_energy -= env.trend();
             self.penetration_energy -= 1.0 / 16.0;
             false
         } else {
             1.2 < lbd.trend()
-        }
+        } */
         /* self.penetration_energy = (self.penetration_energy - 0.3 * (lbd.trend() - 0.9))
             .min(self.penetration_energy_charged);
         self.penetration_energy < 0.0 */
