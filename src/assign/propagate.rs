@@ -362,86 +362,82 @@ impl PropagateIF for AssignStack {
                 let other: Lit = c[!wli];
                 let ovi: usize = other.vi();
                 let other_value = lit_assign!(self.var[ovi], other);
-                if other_value == Some(true) {
-                    wli = c.next_watch(false_index);
-                    continue 'next_clause;
-                }
                 let len = c.len() - 2;
-                if other_value == Some(false)
-                    && (len == 0 || self.var[ovi].level < self.rebuild_base_level)
-                {
-                    debug_assert_eq!(other, c[1 - false_index]);
-                    check_in!(ci, Propagate::EmitConflict(self.num_conflict + 1, other));
-                    conflict_path!(
-                        other,
-                        if len == 0 {
-                            AssignReason::BinaryLink(propagating)
-                        } else {
-                            AssignReason::Implication(!wli)
+                for snd_phase in [len == 0, true] {
+                    match other_value {
+                        None if snd_phase => {
+                            #[cfg(feature = "chrono_BT")]
+                            let dl = cdb[cid]
+                                .iter()
+                                .skip(1)
+                                .map(|l| self.level[l.vi()])
+                                .max()
+                                .unwrap_or(self.root_level);
+
+                            debug_assert_eq!(self.assigned(other), None);
+                            self.assign_by_implication(
+                                other,
+                                if len == 0 {
+                                    AssignReason::BinaryLink(propagating)
+                                } else {
+                                    AssignReason::Implication(!wli)
+                                },
+                                #[cfg(feature = "chrono_BT")]
+                                dl,
+                            );
+                            check_in!(
+                                cid,
+                                if sandbox {
+                                    Propagate::SandboxBecameUnit(self.num_conflict)
+                                } else {
+                                    Propagate::BecameUnit(self.num_conflict, cached)
+                                }
+                            );
+                            break;
                         }
-                    );
-                }
-                let start = c.search_from as usize;
-                for i in 0..len {
-                    let k: usize = (i + start) % len + 2;
-                    let lk: Lit = c[k];
-                    if lit_assign!(self.var[lk.vi()], lk) != Some(false) {
-                        debug_assert_ne!(self.assigned(!lk), Some(true));
-                        check_in!(
-                            ci,
-                            Propagate::FindNewWatch(self.num_conflict, propagating, !lk)
-                        );
-                        wli = cdb.transform_by_updating_watch(wli, k);
-                        continue 'next_clause;
+                        Some(false)
+                            if snd_phase || self.var[ovi].level < self.rebuild_base_level =>
+                        {
+                            check_in!(
+                                ci,
+                                match sandbox {
+                                    false => Propagate::EmitConflict(self.num_conflict + 1, other),
+                                    true => Propagate::SandboxEmitConflict(
+                                        self.num_conflict + 1,
+                                        propagating
+                                    ),
+                                }
+                            );
+                            // debug_assert_eq!(other, c[1 - false_index]);
+                            conflict_path!(
+                                other,
+                                if len == 0 {
+                                    AssignReason::BinaryLink(propagating)
+                                } else {
+                                    AssignReason::Implication(!wli)
+                                }
+                            );
+                        }
+                        Some(true) => break,
+                        _ => (),
+                    }
+                    let start = c.search_from as usize;
+                    for i in 0..len {
+                        let k: usize = (i + start) % len + 2;
+                        let lk: Lit = c[k];
+                        if lit_assign!(self.var[lk.vi()], lk) != Some(false) {
+                            debug_assert_ne!(self.assigned(!lk), Some(true));
+                            check_in!(
+                                ci,
+                                Propagate::FindNewWatch(self.num_conflict, propagating, !lk)
+                            );
+                            wli = cdb.transform_by_updating_watch(wli, k);
+                            continue 'next_clause;
+                        }
                     }
                 }
-                if other_value == Some(false) {
-                    check_in!(
-                        ci,
-                        if sandbox {
-                            Propagate::SandboxEmitConflict(self.num_conflict, propagating)
-                        } else {
-                            Propagate::EmitConflict(self.num_conflict + 1, other)
-                        }
-                    );
-                    conflict_path!(
-                        other,
-                        if len == 0 {
-                            AssignReason::BinaryLink(propagating)
-                        } else {
-                            AssignReason::Implication(!wli)
-                        }
-                    );
-                } else {
-                    #[cfg(feature = "chrono_BT")]
-                    let dl = cdb[cid]
-                        .iter()
-                        .skip(1)
-                        .map(|l| self.level[l.vi()])
-                        .max()
-                        .unwrap_or(self.root_level);
-
-                    debug_assert_eq!(self.assigned(other), None);
-                    self.assign_by_implication(
-                        other,
-                        if len == 0 {
-                            AssignReason::BinaryLink(propagating)
-                        } else {
-                            AssignReason::Implication(!wli)
-                        },
-                        #[cfg(feature = "chrono_BT")]
-                        dl,
-                    );
-                    check_in!(
-                        cid,
-                        if sandbox {
-                            Propagate::SandboxBecameUnit(self.num_conflict)
-                        } else {
-                            Propagate::BecameUnit(self.num_conflict, cached)
-                        }
-                    );
-                    wli = c.next_watch(false_index);
-                }
+                wli = c.next_watch(false_index);
+                continue 'next_clause;
             }
             if !sandbox {
                 from_saved_trail!();
