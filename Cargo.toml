@@ -19,7 +19,7 @@ bitflags = "^2.6"
 instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
 
 crossterm = { version = "^0.27", optional = true }
-ratatui = { version = "^0.27", features = ["all-widgets"], optional = true }
+ratatui = { version = "^0.28", features = ["all-widgets"], optional = true }
 
 [features]
 default = [

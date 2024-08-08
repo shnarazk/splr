@@ -217,7 +217,7 @@ impl App {
                 Constraint::Min(5),
                 Constraint::Min(5),
             ])
-            .split(frame.size());
+            .split(frame.area());
         frame.render_widget(self.var_activity_bar_chart(), chunks[0]);
         frame.render_widget(self.va_history_bar_chart(), chunks[1]);
         frame.render_widget(self.var_spin_bar_chart(), chunks[2]);
