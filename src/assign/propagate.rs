@@ -332,37 +332,37 @@ impl PropagateIF for AssignStack {
 
         let dl = self.decision_level();
         from_saved_trail!();
-        while let Some(p) = self.trail.get(self.q_head) {
+        while let Some(&propagating) = self.trail.get(self.q_head) {
+            self.q_head += 1;
             if !sandbox {
                 self.num_propagation += 1;
             }
+
             #[cfg(feature = "debug_propagation")]
             {
-                assert!(!self.var[p.vi()].is(FlagVar::PROPAGATED));
-                self.var[p.vi()].turn_on(FlagVar::PROPAGATED);
+                assert!(!self.var[propagiting.vi()].is(FlagVar::PROPAGATED));
+                self.var[propagating.vi()].turn_on(FlagVar::PROPAGATED);
             }
-            self.q_head += 1;
-            let propagating = Lit::from(usize::from(*p));
-            let false_lit = !*p;
 
             #[cfg(feature = "boundary_check")]
             {
-                self.var[p.vi()].propagated_at = self.num_conflict;
-                self.var[p.vi()].state = VarState::Propagated(self.num_conflict);
+                self.var[propagating.vi()].propagated_at = self.num_conflict;
+                self.var[propagating.vi()].state = VarState::Propagated(self.num_conflict);
             }
-            // we have to drop `p` here to use self as a mutable reference again later.
+
             let mut wli = cdb.get_first_watch(propagating);
             'next_clause: while !wli.is_none() {
                 let (ci, false_index) = wli.indices();
-                let c = &mut cdb[ci];
+                let c: &Clause = &mut cdb[ci];
                 debug_assert!(
-                    c.lit0() == false_lit || c.lit1() == false_lit,
-                    "Clause{ci}:{c:?} does not have {false_lit}"
+                    c.lit0() == !propagating || c.lit1() == !propagating,
+                    "Clause{ci}:{c:?} does not have {}",
+                    !propagating
                 );
                 let other: Lit = c[!wli];
                 let ovi: usize = other.vi();
-                let other_value = lit_assign!(self.var[ovi], other);
-                let len = c.len() - 2;
+                let other_value: Option<bool> = lit_assign!(self.var[ovi], other);
+                let len: usize = c.len() - 2;
                 for snd_phase in [len == 0, true] {
                     match other_value {
                         None if snd_phase => {
@@ -408,7 +408,7 @@ impl PropagateIF for AssignStack {
                                     ),
                                 }
                             );
-                            // debug_assert_eq!(other, c[1 - false_index]);
+                            debug_assert_eq!(other, c[1 - false_index]);
                             conflict_path!(
                                 other,
                                 if len == 0 {
