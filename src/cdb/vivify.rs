@@ -234,7 +234,7 @@ impl AssignStack {
     /// negated literals of `lits`
     fn analyze_sandbox(
         &self,
-        cdb: &ClauseDB,
+        cdb: &mut ClauseDB,
         decisions: &[Lit],
         conflicting: &[Lit],
         seen: &mut [usize],
@@ -284,6 +284,8 @@ impl AssignStack {
                     seen[bil.vi()] = key;
                 }
                 AssignReason::Implication(wli) => {
+                    #[cfg(feature = "just_used")]
+                    cdb.clause[wli.as_ci()].turn_on(FlagClause::USED);
                     for (i, r) in cdb[wli.as_ci()].iter().enumerate() {
                         if i == wli.as_wi() {
                             continue;
