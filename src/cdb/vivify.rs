@@ -49,7 +49,6 @@ impl VivifyIF for ClauseDB {
             debug_assert!(asg.stack_is_empty() || !asg.remains());
             debug_assert_eq!(asg.root_level(), asg.decision_level());
             let ci = cp.to();
-            // assert!(!ci.is_lifted());
             let c = &mut self[ci];
             if c.is_dead() {
                 continue;
@@ -194,7 +193,6 @@ fn select_targets(
             if c.is_dead() {
                 continue;
             }
-            // assert!(!ci.is_lifted());
             if let Some(rank) = c.to_vivify(true) {
                 let p = &mut seen[usize::from(c.lit0())];
                 if p.as_ref().map_or(0.0, |r| r.value()) < rank {
