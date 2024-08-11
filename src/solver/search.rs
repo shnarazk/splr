@@ -450,9 +450,6 @@ impl SolveIF for Solver {
             let trend: f64 = cdb.refer(cdb::property::TEma::LBD).trend();
             let w = state.stm.current_span() as f64;
             let t = ss.from_segment_beginning as f64;
-            let _ca = -1.0 / w.ln();
-            let _cb = 1.0 - _ca / w;
-            let _thr = _ca / t + _cb;
             let with_restart = 1.0 < trend;
             if w < t {
                 if with_restart {
