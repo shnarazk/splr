@@ -78,77 +78,75 @@ impl VivifyIF for ClauseDB {
                         decisions.push(!lit);
                         asg.assign_by_decision(!lit);
                         //## Rule 3
-                        if let Err(cc) = asg.propagate(self, true) {
-                            let mut vec: Vec<Lit>;
-                            match cc.1 {
-                                AssignReason::BinaryLink(l) => {
-                                    let cnfl_lits = vec![cc.0, !l];
-                                    // vec = asg.analyze_sandbox(self, &decisions, &cnfl_lits, &mut seen);
-                                    // asg.backtrack_sandbox();
-                                    if clits.len() == 2
-                                        && cnfl_lits.contains(&clits[0])
-                                        && cnfl_lits.contains(&clits[1])
-                                    {
-                                        asg.backtrack_sandbox();
-                                        continue 'next_clause;
-                                    } else {
-                                        debug_assert!(clits.len() != 2 || decisions.len() != 2);
-                                        seen[0] = num_check;
-                                        vec = asg.analyze_sandbox(
-                                            self, &decisions, &cnfl_lits, &mut seen,
-                                        );
-                                        asg.backtrack_sandbox();
-                                    }
-                                }
-                                AssignReason::Implication(wli) => {
-                                    if wli.as_ci() == ci && clits.len() == decisions.len() {
-                                        asg.backtrack_sandbox();
-                                        continue 'next_clause;
-                                    } else {
-                                        let cnfl_lits = &self[wli.as_ci()]
-                                            .iter()
-                                            .copied()
-                                            .collect::<Vec<Lit>>();
-                                        seen[0] = num_check;
-                                        vec = asg.analyze_sandbox(
-                                            self, &decisions, cnfl_lits, &mut seen,
-                                        );
-                                        asg.backtrack_sandbox();
-                                    }
-                                }
-                                AssignReason::Decision(_) | AssignReason::None => {
-                                    unreachable!("vivify")
+                        let Err(cc) = asg.propagate(self, true) else {
+                            continue;
+                        };
+                        let mut vec: Vec<Lit>;
+                        match cc.1 {
+                            AssignReason::BinaryLink(l) => {
+                                let cnfl_lits = vec![cc.0, !l];
+                                // vec = asg.analyze_sandbox(self, &decisions, &cnfl_lits, &mut seen);
+                                // asg.backtrack_sandbox();
+                                if clits.len() == 2
+                                    && cnfl_lits.contains(&clits[0])
+                                    && cnfl_lits.contains(&clits[1])
+                                {
+                                    asg.backtrack_sandbox();
+                                    continue 'next_clause;
+                                } else {
+                                    debug_assert!(clits.len() != 2 || decisions.len() != 2);
+                                    seen[0] = num_check;
+                                    vec = asg
+                                        .analyze_sandbox(self, &decisions, &cnfl_lits, &mut seen);
+                                    asg.backtrack_sandbox();
                                 }
                             }
-                            match vec.len() {
-                                0 => {
-                                    state.flush("");
-                                    state[Stat::VivifiedClause] += num_shrink;
-                                    state[Stat::VivifiedVar] += num_assert;
-                                    state.log(None, "RootLevelConflict By vivify");
-                                    return Err(SolverError::EmptyClause);
-                                }
-                                1 => {
-                                    self.certificate_add_assertion(vec[0]);
-                                    asg.assign_at_root_level(vec[0])?;
-                                    num_assert += 1;
-                                }
-                                _ => {
-                                    #[cfg(feature = "clause_rewarding")]
-                                    if let Some(ci) =
-                                        self.new_clause(asg, &mut vec, is_learnt).is_new()
-                                    {
-                                        self.set_activity(ci, cp.value());
-                                    }
-                                    #[cfg(not(feature = "clause_rewarding"))]
-                                    self.new_clause(asg, &mut vec, is_learnt);
-                                    // propage_sandbox can't handle dead watchers correctly
-                                    self.delete_clause(ci);
-                                    num_shrink += 1;
+                            AssignReason::Implication(wli) => {
+                                if wli.as_ci() == ci && clits.len() == decisions.len() {
+                                    #[cfg(feature = "just_used")]
+                                    self.clause[wli.as_ci()].turn_on(FlagClause::USED);
+                                    asg.backtrack_sandbox();
+                                    continue 'next_clause;
+                                } else {
+                                    let cnfl_lits =
+                                        &self[wli.as_ci()].iter().copied().collect::<Vec<Lit>>();
+                                    seen[0] = num_check;
+                                    vec =
+                                        asg.analyze_sandbox(self, &decisions, cnfl_lits, &mut seen);
+                                    asg.backtrack_sandbox();
                                 }
                             }
-                            continue 'next_clause;
+                            AssignReason::Decision(_) | AssignReason::None => {
+                                unreachable!("vivify")
+                            }
                         }
+                        match vec.len() {
+                            0 => {
+                                state.flush("");
+                                state[Stat::VivifiedClause] += num_shrink;
+                                state[Stat::VivifiedVar] += num_assert;
+                                state.log(None, "RootLevelConflict By vivify");
+                                return Err(SolverError::EmptyClause);
+                            }
+                            1 => {
+                                self.certificate_add_assertion(vec[0]);
+                                asg.assign_at_root_level(vec[0])?;
+                                num_assert += 1;
+                            }
+                            _ => {
+                                #[cfg(feature = "clause_rewarding")]
+                                if let Some(ci) = self.new_clause(asg, &mut vec, is_learnt).is_new()
+                                {
+                                    self.set_activity(ci, cp.value());
+                                }
+                                #[cfg(not(feature = "clause_rewarding"))]
+                                self.new_clause(asg, &mut vec, is_learnt);
+                                // propage_sandbox can't handle dead watchers correctly
+                                self.delete_clause(ci);
+                                num_shrink += 1;
+                            }
+                        }
+                        continue 'next_clause;
                         //## Rule 4
                     }
                 }

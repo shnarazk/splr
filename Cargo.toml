@@ -36,7 +36,6 @@ default = [
         # "rephase",
         # "reward_annealing",
         # "stochastic_local_search",
-        "two_mode_reduction",
         "trail_saving",
 
         ### Logic formula processor
@@ -96,7 +95,6 @@ trace_analysis = []             # for debug
 trace_elimination = []          # for debug
 trace_equivalency = []          # for debug
 trail_saving = []               # reduce propagation cost by reusing propagation chain
-two_mode_reduction = []         # exploration mode and exploitation mode since 0.17
 
 [profile.release]
 lto = "fat"

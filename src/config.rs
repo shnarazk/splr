@@ -287,8 +287,6 @@ impl Config {
                 "stage-based re-phasing",
                 #[cfg(feature = "suppress_reason_chain")]
                 "suppress reason chain",
-                #[cfg(feature = "two_mode_reduction")]
-                "two-mode reduction",
                 #[cfg(feature = "trail_saving")]
                 "trail saving",
             ];
@@ -340,7 +338,7 @@ FLAGS:
   -V, --version             Prints version information
 OPTIONS:
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
-{}{}{}{}      --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
+{}      --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
       --evo <elm-var-occ>   Max #cls for var elimination   {:>10}
   -o, --dir <io-outdir>     Output directory                {:>10}
@@ -356,21 +354,6 @@ OPTIONS:
             "clause_rewarding",
             config.crw_dcy_rat,
             "      --cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}\n"
-        ),
-        OPTION!(
-            "two_mode_reduction",
-            config.cls_rdc_lbd,
-            "      --crl <cls-rdc-lbd>   Clause reduction LBD threshold {:>10}\n"
-        ),
-        OPTION!(
-            "two_mode_reduction",
-            config.cls_rdc_rm1,
-            "      --cr1 <cls-rdc-rm1>   Clause reduction ratio for mode1  {:>10.2}\n"
-        ),
-        OPTION!(
-            "two_mode_reduction",
-            config.cls_rdc_rm2,
-            "      --cr2 <cls-rdc-rm2>   Clause reduction ratio for mode2  {:>10.2}\n"
         ),
         config.elm_cls_lim,
         config.elm_grw_lim,

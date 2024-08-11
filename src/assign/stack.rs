@@ -136,9 +136,9 @@ impl Default for AssignStack {
             num_conflict: 0,
             num_restart: 0,
             assign_rate: ProgressASG::default(),
-            dpc_ema: EmaSU::new(100),
-            ppc_ema: EmaSU::new(100),
-            cpr_ema: EmaSU::new(100),
+            dpc_ema: EmaSU::new(16),
+            ppc_ema: EmaSU::new(16),
+            cpr_ema: EmaSU::new(16),
 
             tick: 0,
             var: Vec::new(),

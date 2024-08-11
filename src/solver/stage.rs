@@ -4,13 +4,33 @@
 /// And it also define the interval of clause reduction.
 use crate::types::*;
 
+trait NaturalNumberGenerator: Clone + Default {
+    fn next_number(&mut self) -> usize;
+}
+
+impl NaturalNumberGenerator for LubySeries {
+    fn next_number(&mut self) -> usize {
+        self.next_unchecked()
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, PartialOrd, Ord)]
+struct CountTrailingOnes(u64);
+
+impl NaturalNumberGenerator for CountTrailingOnes {
+    fn next_number(&mut self) -> usize {
+        self.0 += 1;
+        self.0.trailing_ones() as usize
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct StageManager {
     cycle: usize,
     stage: usize,
     segment: usize,
     unit_size: usize,
-    luby_iter: LubySeries,
+    generator: LubySeries,
     max_scale_of_segment: usize,
     scale: usize,
     end_of_stage: usize,
@@ -22,7 +42,7 @@ pub struct StageManager {
 
 impl Instantiate for StageManager {
     fn instantiate(_: &Config, _cnf: &CNFDescription) -> StageManager {
-        let unit_size = 1;
+        let unit_size = 8;
         StageManager {
             unit_size,
             max_scale_of_segment: 1,
@@ -36,13 +56,14 @@ impl Instantiate for StageManager {
 }
 
 impl StageManager {
-    pub fn new(unit_size: usize) -> Self {
+    pub fn new(_unit_size: usize) -> Self {
+        let unit_size: usize = 8;
         StageManager {
             cycle: 0,
             stage: 0,
             segment: 0,
             unit_size,
-            luby_iter: LubySeries::default(),
+            generator: LubySeries::default(),
             max_scale_of_segment: 1,
             scale: 1,
             end_of_stage: unit_size,
@@ -54,7 +75,7 @@ impl StageManager {
     }
     pub fn initialize(&mut self, _unit_size: usize) {
         self.cycle = 0;
-        self.unit_size = 1;
+        self.unit_size = 8;
         self.scale = 1;
         self.max_scale_of_segment = 1;
         self.end_of_stage = self.unit_size;
@@ -74,7 +95,7 @@ impl StageManager {
     pub fn prepare_new_stage(&mut self, now: usize) -> Option<bool> {
         let mut new_cycle = false;
         let mut new_segment = false;
-        self.scale = self.luby_iter.next_unchecked();
+        self.scale = self.generator.next_number();
         self.stage += 1;
         if self.scale == 1 {
             self.cycle += 1;
@@ -92,19 +113,21 @@ impl StageManager {
         if self.max_scale_of_segment == self.scale {
             self.next_is_new_segment = true;
         }
-        let span = self.current_span();
-        self.end_of_stage = now + span;
+        self.end_of_stage = now + self.current_span();
         new_cycle.then_some(new_segment)
     }
     pub fn stage_ended(&self, now: usize) -> bool {
         self.end_of_stage <= now
     }
+    pub fn to_stage_end(&self, now: usize) -> i32 {
+        self.end_of_stage as i32 - now as i32
+    }
     /// returns the number of conflicts in the current stage
     /// Note: we need not to make a strong correlation between this value and
     /// scale defined by Luby series. So this is fine.
     pub fn current_span(&self) -> usize {
-        (self.scale * self.unit_size).ilog2() as usize * 16
-        // (self.scale * self.unit_size) as usize
+        // 2 * self.scale
+        8 * (1 + self.scale).ilog2() as usize
     }
     pub fn current_stage(&self) -> usize {
         self.stage
