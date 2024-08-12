@@ -34,6 +34,9 @@ impl SearchState {
     pub fn current_core(&self) -> usize {
         self.current_core
     }
+    pub fn current_span(&self) -> usize {
+        self.current_span
+    }
 }
 
 /// API to [`solve`](`crate::solver::SolveIF::solve`) SAT problems.

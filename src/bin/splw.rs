@@ -35,6 +35,96 @@ use {
     },
 };
 
+mod restart {
+    use {
+        ratatui::{
+            prelude::*,
+            style::Color,
+            widgets::{block::*, *},
+        },
+        splr::{
+            assign,
+            solver::{SearchState, Solver as Splr},
+            EmaIF, PropertyReference,
+        },
+        std::collections::VecDeque,
+    };
+
+    const LEN: usize = 80;
+
+    #[derive(Debug, Default)]
+    pub(super) struct Observer {
+        hist: VecDeque<(usize, f64)>,
+        cpr: Vec<(f64, f64)>,
+        spans: Vec<(f64, f64)>,
+    }
+
+    impl Observer {
+        pub(super) fn reflect(&mut self, solver: &Splr, state: &SearchState) {
+            let span = state.current_span();
+            let result = solver
+                .asg
+                .refer(assign::property::TEma::ConflictPerRestart)
+                .get();
+            self.hist.push_back((span, result));
+            if LEN < self.hist.len() {
+                self.hist.pop_front();
+            }
+        }
+        pub(super) fn build_chart<'a>(&'a mut self) -> Chart<'a> {
+            self.spans = self
+                .hist
+                .iter()
+                .enumerate()
+                .map(|(i, d)| (i as f64, d.0 as f64))
+                .collect::<Vec<_>>();
+            self.cpr = self
+                .hist
+                .iter()
+                .enumerate()
+                .map(|(i, d)| (i as f64, d.1.log2().clamp(0.0, 8.0)))
+                .collect::<Vec<_>>();
+            let x_labels = vec![
+                Span::styled(format!("-{}", LEN), Style::default()),
+                Span::styled(format!("-{}", 3 * LEN / 4), Style::default()),
+                Span::styled(format!("-{}", LEN / 2), Style::default()),
+                Span::styled(format!("-{}", LEN / 4), Style::default()),
+            ];
+            let y_labels = vec![
+                Span::styled("0.0", Style::default()),
+                Span::styled("2.0", Style::default()),
+                Span::styled("4.0", Style::default()),
+                Span::styled("6.0", Style::default()),
+                Span::styled("8.0", Style::default()),
+            ];
+            let chart = Chart::new(vec![
+                // Dataset::default().data(&self.spans),
+                Dataset::default().data(&self.cpr),
+            ])
+            .block(
+                Block::bordered()
+                    .title(" Log-scaled restart gaps ".cyan().bold())
+                    .title_alignment(Alignment::Center),
+            )
+            .x_axis(
+                Axis::default()
+                    .title("Restart")
+                    .style(Style::default().fg(Color::Gray))
+                    .labels(x_labels)
+                    .bounds([0.0, LEN as f64]),
+            )
+            .y_axis(
+                Axis::default()
+                    .title("Restart gaps")
+                    .style(Style::default().fg(Color::Gray))
+                    .labels(y_labels)
+                    .bounds([0.0, 8.0]),
+            );
+            chart
+        }
+    }
+}
+
 #[cfg(feature = "spin")]
 mod spin {
     use {
@@ -52,12 +142,12 @@ mod spin {
     };
 
     #[derive(Debug, Default)]
-    pub(super) struct SpinObserver {
+    pub(super) struct Observer {
         var_spin_hist: HashMap<usize, f64>,
         spin_stats: [u64; 11],
         var_spin_shift_stats: [u64; 21],
     }
-    impl SpinObserver {
+    impl Observer {
         pub fn reflect(&mut self, solver: &Splr) {
             let root_level = solver.asg.root_level();
             // build spin stats data
@@ -172,9 +262,10 @@ pub struct App {
     solver: Splr,
     state: SearchState,
     counter: i16,
+    restart_view: restart::Observer,
 
     #[cfg(feature = "spin")]
-    spin_view: spin::SpinObserver,
+    spin_view: spin::Observer,
 
     var_act_hist: HashMap<usize, f64>,
     act_stats: [u64; 11],
@@ -190,9 +281,10 @@ impl App {
             act_stats: [0; 11],
             var_act_shift_stats: [0; 21],
             var_act_hist: HashMap::new(),
+            restart_view: restart::Observer::default(),
 
             #[cfg(feature = "spin")]
-            spin_view: spin::SpinObserver::default(),
+            spin_view: spin::Observer::default(),
         }
     }
     fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<(), Box<dyn Error>> {
@@ -265,6 +357,7 @@ impl App {
                 self.var_act_shift_stats[i] = (d * 100.0) as u64;
             }
 
+            self.restart_view.reflect(&self.solver, &self.state);
             #[cfg(feature = "spin")]
             self.spin_view.reflect(&self.solver);
 
@@ -294,22 +387,29 @@ impl App {
             }
         }
     }
-    fn render_frame(&self, frame: &mut Frame) {
+    fn render_frame(&mut self, frame: &mut Frame) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(5),
-                Constraint::Min(5),
-                Constraint::Min(5),
-                Constraint::Min(5),
-            ])
+            .constraints(
+                #[cfg(feature = "spin")]
+                [
+                    Constraint::Min(5),
+                    Constraint::Min(5),
+                    Constraint::Min(5),
+                    Constraint::Min(5),
+                    Constraint::Min(5),
+                ],
+                #[cfg(not(feature = "spin"))]
+                [Constraint::Min(5), Constraint::Min(5), Constraint::Min(5)],
+            )
             .split(frame.area());
         frame.render_widget(self.var_activity_bar_chart(), chunks[0]);
         frame.render_widget(self.va_history_bar_chart(), chunks[1]);
+        frame.render_widget(self.restart_view.build_chart(), chunks[2]);
         #[cfg(feature = "spin")]
         {
-            frame.render_widget(self.spin_view.build_bar_chart1(), chunks[2]);
-            frame.render_widget(self.spin_view.build_bar_chart2(), chunks[3]);
+            frame.render_widget(self.spin_view.build_bar_chart1(), chunks[3]);
+            frame.render_widget(self.spin_view.build_bar_chart2(), chunks[4]);
         }
     }
     fn handle_events(&mut self) -> io::Result<bool> {

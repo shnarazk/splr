@@ -48,7 +48,7 @@ default = [
 
         ### For SAT researcher
         "graph_view",
-        "spin",
+        # "spin",
 
         ### platform dependency
         # "platform_wasm"
@@ -69,7 +69,7 @@ graph_view = [
         "crossterm",
         "interleave",
         "ratatui",
-        "spin"
+        # "spin"
 ]
 incremental_solver = []         # for all solution SAT sover; requires no cluse_elimination
 interleave = []                 # switch to multi-step search IF

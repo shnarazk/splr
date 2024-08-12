@@ -19,6 +19,7 @@ impl ActivityIF<VarId> for AssignStack {
         self.var[vi].turn_on(FlagVar::USED);
     }
     #[inline]
+    #[allow(unused_variables)]
     fn reward_at_assign(&mut self, vi: VarId) {
         #[cfg(feature = "spin")]
         if let Some(b) = self.var[vi].assign {
