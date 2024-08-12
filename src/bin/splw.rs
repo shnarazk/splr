@@ -76,46 +76,56 @@ mod restart {
                 .hist
                 .iter()
                 .enumerate()
-                .map(|(i, d)| (i as f64, d.0 as f64))
+                .map(|(i, d)| (i as f64, (d.0 as f64).log2().clamp(2.0, 6.0)))
                 .collect::<Vec<_>>();
             self.cpr = self
                 .hist
                 .iter()
                 .enumerate()
-                .map(|(i, d)| (i as f64, d.1.log2().clamp(0.0, 8.0)))
+                .map(|(i, d)| (i as f64, d.1.log2().clamp(2.0, 6.0)))
                 .collect::<Vec<_>>();
             let x_labels = vec![
                 Span::styled(format!("-{}", LEN), Style::default()),
                 Span::styled(format!("-{}", 3 * LEN / 4), Style::default()),
                 Span::styled(format!("-{}", LEN / 2), Style::default()),
                 Span::styled(format!("-{}", LEN / 4), Style::default()),
+                Span::styled(" 0", Style::default()),
             ];
             let y_labels = vec![
-                Span::styled("0.0", Style::default()),
-                Span::styled("2.0", Style::default()),
-                Span::styled("4.0", Style::default()),
-                Span::styled("6.0", Style::default()),
-                Span::styled("8.0", Style::default()),
+                Span::styled(" lg(4)", Style::default()),
+                Span::styled(" lg(8)", Style::default()),
+                Span::styled("lg(16)", Style::default()),
+                Span::styled("lg(32)", Style::default()),
+                Span::styled("lg(64)", Style::default()),
             ];
             let chart = Chart::new(vec![
-                // Dataset::default().data(&self.spans),
-                Dataset::default().data(&self.cpr),
+                // Dataset::default()
+                //     .data(&self.spans)
+                //     .style(Style::default().fg(Color::LightBlue))
+                //     .marker(symbols::Marker::HalfBlock),
+                Dataset::default()
+                    .data(&self.cpr)
+                    .style(Style::default().fg(Color::LightRed))
+                    .marker(symbols::Marker::Braille),
+                // .marker(symbols::Marker::Dot),
             ])
             .block(
-                Block::bordered()
-                    .title(" Log-scaled restart gaps ".cyan().bold())
-                    .title_alignment(Alignment::Center),
+                Block::bordered().title(
+                    "Log-scaled Restart Gap (conflicts per restart)"
+                        .cyan()
+                        .bold(),
+                ), // .title_alignment(Alignment::Center),
             )
             .x_axis(
                 Axis::default()
-                    .title("Restart")
+                    .title("restart")
                     .style(Style::default().fg(Color::Gray))
                     .labels(x_labels)
                     .bounds([0.0, LEN as f64]),
             )
             .y_axis(
                 Axis::default()
-                    .title("Restart gaps")
+                    .title("gap")
                     .style(Style::default().fg(Color::Gray))
                     .labels(y_labels)
                     .bounds([0.0, 8.0]),
