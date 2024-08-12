@@ -106,8 +106,7 @@ mod restart {
                 Dataset::default()
                     .data(&self.cpr)
                     .style(Style::default().fg(Color::LightRed))
-                    .marker(symbols::Marker::Braille),
-                // .marker(symbols::Marker::Dot),
+                    .marker(symbols::Marker::Dot),
             ])
             .block(
                 Block::bordered().title(
