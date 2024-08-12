@@ -60,8 +60,9 @@ mod restart {
     }
 
     impl Observer {
-        pub(super) fn reflect(&mut self, solver: &Splr, state: &SearchState) {
-            let span = state.current_span();
+        pub(super) fn reflect(&mut self, solver: &Splr, state: &mut SearchState) {
+            let span = *state.span_history.iter().max().unwrap_or(&1);
+            state.span_history.clear();
             let result = solver
                 .asg
                 .refer(assign::property::TEma::ConflictPerRestart)
@@ -99,10 +100,10 @@ mod restart {
                 Span::styled("lg(64)", Style::default()),
             ];
             let chart = Chart::new(vec![
-                // Dataset::default()
-                //     .data(&self.spans)
-                //     .style(Style::default().fg(Color::LightBlue))
-                //     .marker(symbols::Marker::HalfBlock),
+                Dataset::default()
+                    .data(&self.spans)
+                    .style(Style::default().fg(Color::Blue))
+                    .marker(symbols::Marker::Braille),
                 Dataset::default()
                     .data(&self.cpr)
                     .style(Style::default().fg(Color::LightRed))
@@ -366,7 +367,7 @@ impl App {
                 self.var_act_shift_stats[i] = (d * 100.0) as u64;
             }
 
-            self.restart_view.reflect(&self.solver, &self.state);
+            self.restart_view.reflect(&self.solver, &mut self.state);
             #[cfg(feature = "spin")]
             self.spin_view.reflect(&self.solver);
 
@@ -599,7 +600,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         Ok(solver) => solver,
     };
-    let Ok(sc) = splr.prepare() else {
+    let Ok(ss) = splr.prepare() else {
         return Err("failed to start SAT preproecss".into());
     };
     enable_raw_mode()?;
@@ -608,7 +609,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = App::solver(splr, sc);
+    let mut app = App::solver(splr, ss);
     let result = app.run(&mut terminal);
 
     disable_raw_mode()?;

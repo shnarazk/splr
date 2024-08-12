@@ -26,8 +26,11 @@ pub struct SearchState {
     core_was_rebuilt: Option<usize>,
     previous_stage: Option<bool>,
     elapsed_time: f64,
+
     #[cfg(feature = "rephase")]
     sls_core: usize,
+    #[cfg(feature = "graph_view")]
+    pub span_history: Vec<usize>,
 }
 
 impl SearchState {
@@ -423,6 +426,8 @@ impl SolveIF for Solver {
             elapsed_time: 0.0,
             #[cfg(feature = "rephase")]
             sls_core: cdb.derefer(cdb::property::Tusize::NumClause),
+            #[cfg(feature = "graph_view")]
+            span_history: Vec::new(),
         })
     }
     fn search_stage(&mut self, ss: &mut SearchState) -> Result<Option<bool>, SolverError> {
@@ -465,6 +470,10 @@ impl SolveIF for Solver {
                     cdb.check_consistency(asg, "before simplify");
                 }
                 ss.from_segment_beginning = 0;
+
+                #[cfg(feature = "graph_view")]
+                ss.span_history.push(ss.current_span);
+
                 let next_stage: Option<bool> = state
                     .stm
                     .prepare_new_stage(asg.derefer(assign::Tusize::NumConflict));
