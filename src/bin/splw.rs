@@ -102,7 +102,7 @@ mod restart {
             let chart = Chart::new(vec![
                 Dataset::default()
                     .data(&self.spans)
-                    .style(Style::default().fg(Color::Blue))
+                    .style(Style::default().fg(Color::Black))
                     .marker(symbols::Marker::Braille),
                 Dataset::default()
                     .data(&self.cpr)
