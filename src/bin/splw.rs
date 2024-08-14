@@ -72,7 +72,7 @@ mod restart {
                 self.hist.pop_front();
             }
         }
-        pub(super) fn build_chart<'a>(&'a mut self) -> Chart<'a> {
+        pub(super) fn build_chart(&mut self) -> Chart<'_> {
             self.spans = self
                 .hist
                 .iter()
