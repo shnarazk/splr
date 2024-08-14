@@ -50,7 +50,7 @@ mod restart {
         std::collections::VecDeque,
     };
 
-    const LEN: usize = 80;
+    const LEN: usize = 200;
 
     #[derive(Debug, Default)]
     pub(super) struct Observer {
@@ -103,11 +103,11 @@ mod restart {
                 Dataset::default()
                     .data(&self.spans)
                     .style(Style::default().fg(Color::Black))
-                    .marker(symbols::Marker::Braille),
+                    .marker(symbols::Marker::Dot),
                 Dataset::default()
                     .data(&self.cpr)
-                    .style(Style::default().fg(Color::LightRed))
-                    .marker(symbols::Marker::Dot),
+                    .style(Style::default().fg(Color::Red))
+                    .marker(symbols::Marker::Braille),
             ])
             .block(
                 Block::bordered().title(
