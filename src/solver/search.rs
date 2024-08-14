@@ -476,7 +476,7 @@ impl SolveIF for Solver {
 
                 let next_stage: Option<bool> = state
                     .stm
-                    .prepare_new_stage(asg.derefer(assign::Tusize::NumConflict));
+                    .prepare_new_stage(asg.derefer(assign::Tusize::NumConflict), ss.current_core);
                 ss.current_span = state.stm.current_span();
                 let scale = state.stm.current_scale();
                 asg.handle(SolverEvent::Stage(scale));

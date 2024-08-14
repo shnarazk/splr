@@ -38,6 +38,7 @@ pub struct StageManager {
     cycle_starting_stage: usize,
     segment_starting_stage: usize,
     segment_starting_cycle: usize,
+    span_base: usize,
 }
 
 impl Instantiate for StageManager {
@@ -71,6 +72,7 @@ impl StageManager {
             cycle_starting_stage: 0,
             segment_starting_stage: 0,
             segment_starting_cycle: 0,
+            span_base: 0,
         }
     }
     pub fn initialize(&mut self, _unit_size: usize) {
@@ -92,7 +94,7 @@ impl StageManager {
     /// - Some(true): it's a beginning of a new cycle and a new segment, a 2nd-level group.
     /// - Some(false): a beginning of a new cycle.
     /// - None: the other case.
-    pub fn prepare_new_stage(&mut self, now: usize) -> Option<bool> {
+    pub fn prepare_new_stage(&mut self, now: usize, span_base: usize) -> Option<bool> {
         let mut new_cycle = false;
         let mut new_segment = false;
         self.scale = self.generator.next_number();
@@ -113,6 +115,7 @@ impl StageManager {
         if self.max_scale_of_segment == self.scale {
             self.next_is_new_segment = true;
         }
+        self.span_base = span_base.ilog2() as usize;
         self.end_of_stage = now + self.current_span();
         new_cycle.then_some(new_segment)
     }
@@ -126,7 +129,7 @@ impl StageManager {
     /// Note: we need not to make a strong correlation between this value and
     /// scale defined by Luby series. So this is fine.
     pub fn current_span(&self) -> usize {
-        3 + self.scale.ilog2() as usize
+        self.span_base + self.scale.ilog2() as usize
     }
     pub fn current_stage(&self) -> usize {
         self.stage
