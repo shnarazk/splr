@@ -457,8 +457,8 @@ impl SolveIF for Solver {
 
             handle_conflict(asg, cdb, state, &cc)?;
             ss.from_segment_beginning += 1;
-            let with_restart = 1.0 < cdb.refer(cdb::property::TEma::LBD).trend();
             if ss.current_span <= ss.from_segment_beginning {
+                let with_restart = 1.0 < cdb.refer(cdb::property::TEma::LBD).trend();
                 if with_restart {
                     RESTART!(asg, cdb, state);
                     #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
@@ -491,61 +491,7 @@ impl SolveIF for Solver {
                     dump_stage(asg, cdb, state, &ss.previous_stage);
                     #[cfg(feature = "rephase")]
                     if with_restart {
-                        if cfg!(feature = "stochastic_local_search") {
-                            use cdb::StochasticLocalSearchIF;
-                            macro_rules! sls {
-                                ($assign: expr, $limit: expr) => {
-                                    state.sls_index += 1;
-                                    state.flush(format!(
-                                        "SLS(#{}, core: {}, steps: {})",
-                                        state.sls_index, ss.sls_core, $limit
-                                    ));
-                                    let cls =
-                                        cdb.stochastic_local_search(asg, &mut $assign, $limit);
-                                    asg.override_rephasing_target(&$assign);
-                                    ss.sls_core = ss.sls_core.min(cls.1);
-                                };
-                                ($assign: expr, $improved: expr, $limit: expr) => {
-                                    state.sls_index += 1;
-                                    state.flush(format!(
-                                        "SLS(#{}, core: {}, steps: {})",
-                                        state.sls_index, sls_core, $limit
-                                    ));
-                                    let cls =
-                                        cdb.stochastic_local_search(asg, &mut $assign, $limit);
-                                    asg.reward_by_sls(&$assign);
-                                    if $improved(cls) {
-                                        asg.override_rephasing_target(&$assign);
-                                    }
-                                    sls_core = sls_core.min(cls.1);
-                                };
-                            }
-                            macro_rules! scale {
-                                ($a: expr, $b: expr) => {
-                                    ($a.saturating_sub($b.next_power_of_two().trailing_zeros())
-                                        as f64)
-                                        .powf(1.75) as usize
-                                        + 1
-                                };
-                            }
-                            let ent = cdb.refer(cdb::property::TEma::Entanglement).get() as usize;
-                            let n = cdb.derefer(cdb::property::Tusize::NumClause);
-                            if let Some(c) = ss.core_was_rebuilt {
-                                ss.core_was_rebuilt = None;
-                                if c < ss.current_core {
-                                    let steps = scale!(27_u32, c) * scale!(24_u32, n) / ent;
-                                    let mut assignment = asg.best_phases_ref(Some(false));
-                                    sls!(assignment, steps);
-                                }
-                            } else if new_segment {
-                                let n = cdb.derefer(cdb::property::Tusize::NumClause);
-                                let steps =
-                                    scale!(27_u32, ss.current_core) * scale!(24_u32, n) / ent;
-                                let mut assignment = asg.best_phases_ref(Some(false));
-                                sls!(assignment, steps);
-                            }
-                        }
-                        asg.select_rephasing_target();
+                        rephase(asg, cdb, state, ss);
                     }
                     let num_restart = asg.derefer(assign::Tusize::NumRestart);
                     if with_restart && ss.next_reduce <= num_restart {
@@ -554,26 +500,24 @@ impl SolveIF for Solver {
                         ss.reduce_step += 1;
                         ss.next_reduce = ss.reduce_step + num_restart;
 
-                        if with_restart {
-                            if cfg!(feature = "clause_vivification") {
-                                cdb.vivify(asg, state)?;
-                            }
+                        if cfg!(feature = "clause_vivification") {
+                            cdb.vivify(asg, state)?;
+                        }
 
-                            if cfg!(feature = "clause_elimination")
-                                && !cfg!(feature = "incremental_solver")
-                                && ss.num_reduction % 8 == 0
-                            {
-                                let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-                                state.flush("clause subsumption, ");
-                                elim.simplify(asg, cdb, state, false)?;
-                                asg.eliminated.append(elim.eliminated_lits());
-                                state[Stat::Simplify] += 1;
-                                state[Stat::SubsumedClause] = elim.num_subsumed;
-                            }
+                        if cfg!(feature = "clause_elimination")
+                            && !cfg!(feature = "incremental_solver")
+                            && ss.num_reduction % 8 == 0
+                        {
+                            let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+                            state.flush("clause subsumption, ");
+                            elim.simplify(asg, cdb, state, false)?;
+                            asg.eliminated.append(elim.eliminated_lits());
+                            state[Stat::Simplify] += 1;
+                            state[Stat::SubsumedClause] = elim.num_subsumed;
+                        }
 
-                            if cfg!(feature = "dynamic_restart_threshold") {
-                                state.restart.set_segment_parameters(max_scale);
-                            }
+                        if cfg!(feature = "dynamic_restart_threshold") {
+                            state.restart.set_segment_parameters(max_scale);
                         }
                     }
                     if new_segment {
@@ -601,7 +545,6 @@ impl SolveIF for Solver {
                     } else {
                         return Err(SolverError::UndescribedError);
                     }
-                    // return Ok(None);
                 }
             }
             if let Some(na) = asg.best_assigned() {
@@ -721,6 +664,61 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: &
         },
         format!("{span:>7}, fuel:{fuel:>9.2}, cpr:{cpr:>8.2}, vdr:{vdr:>3.2}, cdt:{cdt:>5.2}"),
     );
+}
+
+#[cfg(feature = "rephase")]
+fn rephase(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State, ss: &mut SearchState) {
+    if cfg!(feature = "stochastic_local_search") {
+        use cdb::StochasticLocalSearchIF;
+        macro_rules! sls {
+            ($assign: expr, $limit: expr) => {
+                state.sls_index += 1;
+                state.flush(format!(
+                    "SLS(#{}, core: {}, steps: {})",
+                    state.sls_index, ss.sls_core, $limit
+                ));
+                let cls = cdb.stochastic_local_search(asg, &mut $assign, $limit);
+                asg.override_rephasing_target(&$assign);
+                ss.sls_core = ss.sls_core.min(cls.1);
+            };
+            ($assign: expr, $improved: expr, $limit: expr) => {
+                state.sls_index += 1;
+                state.flush(format!(
+                    "SLS(#{}, core: {}, steps: {})",
+                    state.sls_index, sls_core, $limit
+                ));
+                let cls = cdb.stochastic_local_search(asg, &mut $assign, $limit);
+                asg.reward_by_sls(&$assign);
+                if $improved(cls) {
+                    asg.override_rephasing_target(&$assign);
+                }
+                sls_core = sls_core.min(cls.1);
+            };
+        }
+        macro_rules! scale {
+            ($a: expr, $b: expr) => {
+                ($a.saturating_sub($b.next_power_of_two().trailing_zeros()) as f64).powf(1.75)
+                    as usize
+                    + 1
+            };
+        }
+        let ent = cdb.refer(cdb::property::TEma::Entanglement).get() as usize;
+        let n = cdb.derefer(cdb::property::Tusize::NumClause);
+        if let Some(c) = ss.core_was_rebuilt {
+            ss.core_was_rebuilt = None;
+            if c < ss.current_core {
+                let steps = scale!(27_u32, c) * scale!(24_u32, n) / ent;
+                let mut assignment = asg.best_phases_ref(Some(false));
+                sls!(assignment, steps);
+            }
+        } else if new_segment {
+            let n = cdb.derefer(cdb::property::Tusize::NumClause);
+            let steps = scale!(27_u32, ss.current_core) * scale!(24_u32, n) / ent;
+            let mut assignment = asg.best_phases_ref(Some(false));
+            sls!(assignment, steps);
+        }
+    }
+    asg.select_rephasing_target();
 }
 
 #[cfg(feature = "boundary_check")]
