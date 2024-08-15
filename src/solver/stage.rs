@@ -115,7 +115,7 @@ impl StageManager {
         if self.max_scale_of_segment == self.scale {
             self.next_is_new_segment = true;
         }
-        self.span_base = span_base.ilog2() as usize;
+        self.span_base = span_base;
         self.end_of_stage = now + self.current_span();
         new_cycle.then_some(new_segment)
     }
@@ -129,7 +129,7 @@ impl StageManager {
     /// Note: we need not to make a strong correlation between this value and
     /// scale defined by Luby series. So this is fine.
     pub fn current_span(&self) -> usize {
-        self.span_base + self.scale.ilog2() as usize
+        (self.span_base + self.scale).ilog2() as usize
     }
     pub fn current_stage(&self) -> usize {
         self.stage
