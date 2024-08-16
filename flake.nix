@@ -1,7 +1,8 @@
 {
   description = "A modern SAT solver in Rust";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs";
-  outputs = { self, nixpkgs }:
+  inputs.sat-bench.url = "github:shnarazk/SAT-bench";
+  outputs = { self, nixpkgs, sat-bench }:
   {
     packages = builtins.listToAttrs
       (map
@@ -43,6 +44,7 @@
                   tokei
                   # cargo-watch
                   # nixpkgs.lldb_18
+                  sat-bench.packages.${system}.default
                 ];
             };
           }
