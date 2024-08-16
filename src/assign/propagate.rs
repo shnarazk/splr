@@ -353,7 +353,7 @@ impl PropagateIF for AssignStack {
             let mut wli = cdb.get_first_watch(propagating);
             'next_clause: while !wli.is_none() {
                 let (ci, false_index) = wli.indices();
-                let c: &Clause = &mut cdb[ci];
+                let c: &mut Clause = &mut cdb[ci];
                 debug_assert!(
                     c.lit0() == !propagating || c.lit1() == !propagating,
                     "Clause{ci}:{c:?} does not have {}",
@@ -375,6 +375,8 @@ impl PropagateIF for AssignStack {
                                 .unwrap_or(self.root_level);
 
                             debug_assert_eq!(self.assigned(other), None);
+                            #[cfg(feature = "just_used")]
+                            c.turn_on(FlagClause::USED);
                             self.assign_by_implication(
                                 other,
                                 if len == 0 {

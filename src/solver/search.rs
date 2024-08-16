@@ -476,7 +476,7 @@ impl SolveIF for Solver {
 
                 let next_stage: Option<bool> = state
                     .stm
-                    .prepare_new_stage(asg.derefer(assign::Tusize::NumConflict), ss.current_core);
+                    .prepare_new_stage(asg.derefer(assign::Tusize::NumConflict));
                 ss.current_span = state.stm.current_span();
                 let scale = state.stm.current_scale();
                 asg.handle(SolverEvent::Stage(scale));
@@ -488,6 +488,10 @@ impl SolveIF for Solver {
                 }
                 if let Some(new_segment) = next_stage {
                     // a beginning of a new cycle
+                    let demon: f64 = state.c_lvl.get_slow() - state.b_lvl.get_slow();
+                    state
+                        .stm
+                        .set_span_base(if demon.is_nan() { 1.0 } else { demon });
                     dump_stage(asg, cdb, state, &ss.previous_stage);
                     #[cfg(feature = "rephase")]
                     if with_restart {

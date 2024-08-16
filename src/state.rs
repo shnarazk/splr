@@ -96,9 +96,9 @@ pub struct State {
     //## MISC
     //
     /// EMA of backjump levels
-    pub b_lvl: Ema,
+    pub b_lvl: Ema2,
     /// EMA of conflicting levels
-    pub c_lvl: Ema,
+    pub c_lvl: Ema2,
     /// EMA of c_lbd - b_lbd, or Exploration vs. Eploitation
     pub e_mode: Ema2,
     pub e_mode_threshold: f64,
@@ -143,8 +143,8 @@ impl Default for State {
             target: CNFDescription::default(),
             reflection_interval: 10_000,
 
-            b_lvl: Ema::new(5_000),
-            c_lvl: Ema::new(5_000),
+            b_lvl: Ema2::new(16).with_slow(4_000),
+            c_lvl: Ema2::new(16).with_slow(4_000),
             e_mode: Ema2::new(40).with_slow(4_000).with_value(10.0),
             e_mode_threshold: 1.20,
             exploration_rate_ema: Ema::new(1000),
