@@ -459,7 +459,15 @@ impl SolveIF for Solver {
             ss.from_segment_beginning += 1;
             if ss.current_span <= ss.from_segment_beginning {
                 let with_restart = 1.0 < cdb.refer(cdb::property::TEma::LBD).trend();
-                if with_restart {
+                ss.from_segment_beginning = 0;
+
+                #[cfg(feature = "graph_view")]
+                ss.span_history.push(ss.current_span);
+
+                let next_stage: Option<bool> = state
+                    .stm
+                    .prepare_new_stage(asg.derefer(assign::Tusize::NumConflict));
+                if with_restart || next_stage.is_some() {
                     RESTART!(asg, cdb, state);
                     #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
                     asg.select_rephasing_target();
@@ -469,45 +477,34 @@ impl SolveIF for Solver {
                     #[cfg(feature = "trace_equivalency")]
                     cdb.check_consistency(asg, "before simplify");
                 }
-                ss.from_segment_beginning = 0;
-
-                #[cfg(feature = "graph_view")]
-                ss.span_history.push(ss.current_span);
-
-                let next_stage: Option<bool> = state
-                    .stm
-                    .prepare_new_stage(asg.derefer(assign::Tusize::NumConflict));
                 ss.current_span = state.stm.current_span();
                 let scale = state.stm.current_scale();
                 asg.handle(SolverEvent::Stage(scale));
                 let max_scale = state.stm.max_scale();
-                if with_restart && cfg!(feature = "reward_annealing") {
-                    let base = state.stm.current_stage() - state.stm.cycle_starting_stage();
-                    let decay_index: f64 = (20 + 2 * base) as f64;
-                    asg.update_activity_decay((decay_index - 1.0) / decay_index);
-                }
                 if let Some(new_segment) = next_stage {
                     // a beginning of a new cycle
-                    let demon: f64 = state.c_lvl.get_slow() - state.b_lvl.get_slow();
                     state
                         .stm
-                        .set_span_base(if demon.is_nan() { 1.0 } else { demon });
+                        .set_span_base(state.c_lvl.get_slow() - state.b_lvl.get_slow());
                     dump_stage(asg, cdb, state, &ss.previous_stage);
-                    #[cfg(feature = "rephase")]
-                    if with_restart {
-                        rephase(asg, cdb, state, ss);
+
+                    if cfg!(feature = "reward_annealing") {
+                        let base = state.stm.current_stage() - state.stm.cycle_starting_stage();
+                        let decay_index: f64 = (20 + 2 * base) as f64;
+                        asg.update_activity_decay((decay_index - 1.0) / decay_index);
                     }
+                    #[cfg(feature = "rephase")]
+                    rephase(asg, cdb, state, ss);
+
                     let num_restart = asg.derefer(assign::Tusize::NumRestart);
-                    if with_restart && ss.next_reduce <= num_restart {
+                    if ss.next_reduce <= num_restart {
                         cdb.reduce(asg, ReductionType::ClauseUsed);
                         ss.num_reduction += 1;
                         ss.reduce_step += 1;
                         ss.next_reduce = ss.reduce_step + num_restart;
-
                         if cfg!(feature = "clause_vivification") {
                             cdb.vivify(asg, state)?;
                         }
-
                         if cfg!(feature = "clause_elimination")
                             && !cfg!(feature = "incremental_solver")
                             && ss.num_reduction % 8 == 0
@@ -519,20 +516,12 @@ impl SolveIF for Solver {
                             state[Stat::Simplify] += 1;
                             state[Stat::SubsumedClause] = elim.num_subsumed;
                         }
-
                         if cfg!(feature = "dynamic_restart_threshold") {
                             state.restart.set_segment_parameters(max_scale);
                         }
                     }
                     if new_segment {
                         state.exploration_rate_ema.update(1.0);
-
-                        #[cfg(feature = "reward_annealing")]
-                        {
-                            let base = state.stm.current_segment();
-                            let decay_index: f64 = (20 + 2 * base) as f64;
-                            asg.update_activity_decay((decay_index - 1.0) / decay_index);
-                        }
                     }
                     if let Some(p) = state.elapsed() {
                         if ss.elapsed_time + 0.5 / state.config.c_timeout < p {
