@@ -54,9 +54,8 @@ impl Instantiate for StageManager {
         }
     }
     fn handle(&mut self, e: SolverEvent) {
-        match e {
-            SolverEvent::Assert(_) => self.reset(),
-            _ => (),
+        if let SolverEvent::Assert(_) = e {
+            self.reset()
         }
     }
 }
