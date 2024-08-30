@@ -53,7 +53,12 @@ impl Instantiate for StageManager {
             ..StageManager::default()
         }
     }
-    fn handle(&mut self, _: SolverEvent) {}
+    fn handle(&mut self, e: SolverEvent) {
+        match e {
+            SolverEvent::Assert(_) => self.reset(),
+            _ => (),
+        }
+    }
 }
 
 impl StageManager {

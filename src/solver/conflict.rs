@@ -114,6 +114,7 @@ pub fn handle_conflict(
                 }
                 let vi = l0.vi();
                 state.restart.handle(SolverEvent::Assert(vi));
+                state.stm.handle(SolverEvent::Assert(vi));
                 cdb.handle(SolverEvent::Assert(vi));
                 return Ok(0);
             }

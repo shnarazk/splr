@@ -554,7 +554,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|vivC:{}, xplr:{}, core:{}, /ppc:{}",
+            "\x1B[2K        misc|vivC:{}, vdcy:{}, core:{}, /ppc:{}",
             im!(
                 "{:>9}",
                 self,
@@ -566,7 +566,8 @@ impl StateIF for State {
                 self,
                 LogF64Id::ExExTrend,
                 // self.e_mode.trend(),
-                self.exploration_rate_ema.get() // , self.e_mode_threshold
+                // self.exploration_rate_ema.get() // , self.e_mode_threshold
+                asg.derefer(assign::Tf64::VarDecayRate)
             ),
             im!(
                 "{:>9}",

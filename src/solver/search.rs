@@ -469,10 +469,15 @@ impl SolveIF for Solver {
                     .prepare_new_stage(asg.derefer(assign::Tusize::NumConflict));
                 if with_restart || next_stage.is_some() {
                     RESTART!(asg, cdb, state);
-                    #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
-                    asg.select_rephasing_target();
 
-                    asg.clear_asserted_literals(cdb)?;
+                    #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
+                    if ss.with_rephase {
+                        asg.select_rephasing_target();
+                        asg.clear_asserted_literals(cdb)?;
+                        if next_stage == Some(true) {
+                            ss.with_rephase = false;
+                        }
+                    }
 
                     #[cfg(feature = "trace_equivalency")]
                     cdb.check_consistency(asg, "before simplify");
@@ -483,16 +488,38 @@ impl SolveIF for Solver {
                 let max_scale = state.stm.max_scale();
                 if let Some(new_segment) = next_stage {
                     // a beginning of a new cycle
+                    if cfg!(feature = "reward_annealing") {
+                        let segment_len: usize =
+                            state.stm.current_stage() - state.stm.segment_starting_stage();
+                        let r0: f64 = 1.0 / (1.0 + state.stm.current_segment() as f64).log2();
+                        let rk: f64 = 1.0 / (2.0 + state.stm.current_segment() as f64).log2();
+                        let n: f64 = (2.0 + (segment_len as f64) * rk).sqrt();
+                        let d = r0 + (1.0 - r0) * (1.0 - 1.0 / n);
+                        asg.update_activity_decay(d);
+                    }
                     state
                         .stm
                         .set_span_base(state.c_lvl.get_slow() - state.b_lvl.get_slow());
                     dump_stage(asg, cdb, state, &ss.previous_stage);
 
-                    if cfg!(feature = "reward_annealing") {
-                        let base = state.stm.current_stage() - state.stm.cycle_starting_stage();
-                        let decay_index: f64 = (20 + 2 * base) as f64;
-                        asg.update_activity_decay((decay_index - 1.0) / decay_index);
-                    }
+                    /* if cfg!(feature = "reward_annealing") {
+                        // let base = state.stm.current_stage() - state.stm.cycle_starting_stage();
+                        // let decay_index: f64 = (20 + 2 * base) as f64;
+                        // asg.update_activity_decay((decay_index - 1.0) / decay_index);
+                        let alives = asg.derefer(assign::Tusize::NumUnassertedVar) as f64;
+                        let core = (ss.current_core as f64).sqrt();
+                        let nconf = asg.derefer(assign::Tusize::NumConflict) as f64;
+                        let lvl = state.c_lvl.get_slow().sqrt();
+                        // let r = (core / alives).powf(0.5) / nconf.log2();
+                        let _r = 1.0 / ((alives / core).log2() * nconf.log2()).sqrt();
+                        let _r = 1.0 / (lvl * nconf.log2()).sqrt();
+                        // let r = 1.0 / (lvl + nconf.log2());
+                        // let r = 1.0 / ((nconf as f64) / core).log2();
+                        // let r = 1.0 / (nconf * core / alives).log2();
+                        // let r = lvl.log2() / core.log2();
+                        let r = 1.0 / (state.stm.current_segment()) as f64;
+                        asg.update_activity_decay(1.0 - r); // .clamp(0.5, 1.0));
+                    } */
                     #[cfg(feature = "rephase")]
                     rephase(asg, cdb, state, ss);
 
@@ -704,7 +731,7 @@ fn rephase(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State, ss: &mu
                 let mut assignment = asg.best_phases_ref(Some(false));
                 sls!(assignment, steps);
             }
-        } else if new_segment {
+        } else {
             let n = cdb.derefer(cdb::property::Tusize::NumClause);
             let steps = scale!(27_u32, ss.current_core) * scale!(24_u32, n) / ent;
             let mut assignment = asg.best_phases_ref(Some(false));
