@@ -489,13 +489,11 @@ impl SolveIF for Solver {
                 if let Some(new_segment) = next_stage {
                     // a beginning of a new cycle
                     if cfg!(feature = "reward_annealing") {
-                        let segment_len: usize =
-                            state.stm.current_stage() - state.stm.segment_starting_stage();
-                        let r0: f64 = 1.0 / (1.0 + state.stm.current_segment() as f64).log2();
-                        let rk: f64 = 1.0 / (2.0 + state.stm.current_segment() as f64).log2();
-                        let n: f64 = (2.0 + (segment_len as f64) * rk).sqrt();
-                        let d = r0 + (1.0 - r0) * (1.0 - 1.0 / n);
-                        asg.update_activity_decay(d);
+                        let stm = &state.stm;
+                        let l: f64 = (stm.current_stage() - stm.segment_starting_stage()) as f64;
+                        let k: f64 = 1.0 / (2.0 + stm.current_segment() as f64).log2();
+                        let n: f64 = (1.0 + l * k).sqrt();
+                        asg.update_activity_decay(1.0 - k / n);
                     }
                     state
                         .stm
