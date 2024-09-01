@@ -490,34 +490,21 @@ impl SolveIF for Solver {
                     // a beginning of a new cycle
                     if cfg!(feature = "reward_annealing") {
                         let stm = &state.stm;
-                        let l: f64 = (stm.current_stage() - stm.segment_starting_stage()) as f64;
-                        let k: f64 = 1.0 / (2.0 + stm.current_segment() as f64).log2();
-                        let n: f64 = (1.0 + l * k).sqrt();
-                        asg.update_activity_decay(1.0 - k / n);
+                        let _sigma = |x: f64| 1.0 / (1.0 + (-x).exp());
+                        let sgm = |x: f64| x / (1.0 + x.abs());
+                        let b: f64 = stm.segment_starting_cycle() as f64;
+                        let n: f64 = stm.current_cycle() as f64 - b;
+                        let m: f64 = 0.5 * b;
+                        let k: f64 = (stm.current_segment() as f64).log2();
+                        let w: f64 = 16.0 + k;
+                        let x: f64 = (1.0 + k) * (n - m) / m;
+                        asg.update_activity_decay(1.0 + (sgm(x) - 1.0) / w);
                     }
                     state
                         .stm
                         .set_span_base(state.c_lvl.get_slow() - state.b_lvl.get_slow());
                     dump_stage(asg, cdb, state, &ss.previous_stage);
 
-                    /* if cfg!(feature = "reward_annealing") {
-                        // let base = state.stm.current_stage() - state.stm.cycle_starting_stage();
-                        // let decay_index: f64 = (20 + 2 * base) as f64;
-                        // asg.update_activity_decay((decay_index - 1.0) / decay_index);
-                        let alives = asg.derefer(assign::Tusize::NumUnassertedVar) as f64;
-                        let core = (ss.current_core as f64).sqrt();
-                        let nconf = asg.derefer(assign::Tusize::NumConflict) as f64;
-                        let lvl = state.c_lvl.get_slow().sqrt();
-                        // let r = (core / alives).powf(0.5) / nconf.log2();
-                        let _r = 1.0 / ((alives / core).log2() * nconf.log2()).sqrt();
-                        let _r = 1.0 / (lvl * nconf.log2()).sqrt();
-                        // let r = 1.0 / (lvl + nconf.log2());
-                        // let r = 1.0 / ((nconf as f64) / core).log2();
-                        // let r = 1.0 / (nconf * core / alives).log2();
-                        // let r = lvl.log2() / core.log2();
-                        let r = 1.0 / (state.stm.current_segment()) as f64;
-                        asg.update_activity_decay(1.0 - r); // .clamp(0.5, 1.0));
-                    } */
                     #[cfg(feature = "rephase")]
                     rephase(asg, cdb, state, ss);
 
