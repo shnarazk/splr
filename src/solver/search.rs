@@ -496,7 +496,7 @@ impl SolveIF for Solver {
                         let n: f64 = stm.current_cycle() as f64 - b;
                         let m: f64 = 0.5 * b;
                         let k: f64 = (stm.current_segment() as f64).log2();
-                        let w: f64 = 16.0 + k;
+                        let w: f64 = 17.0 + k;
                         let x: f64 = (1.0 + k) * (n - m) / m;
                         asg.update_activity_decay(1.0 + (sgm(x) - 1.0) / w);
                     }
