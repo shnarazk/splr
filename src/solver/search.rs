@@ -496,9 +496,18 @@ impl SolveIF for Solver {
                         let n: f64 = stm.current_cycle() as f64 - b;
                         let m: f64 = 0.5 * b;
                         let k: f64 = (stm.current_segment() as f64).log2();
-                        let w: f64 = 28.0 + k;
+                        let _w: f64 = k + 8.0;
+                        const R: (f64, f64) = (0.86, 0.995);
+                        let d: f64 = {
+                            let o: f64 = 8.0;
+                            // ((k - 1.0) * R.0 + R.1) / k
+                            // (o * R.0 + R.1) / (o + 1.0)
+                            R.1 - (R.1 - R.0) * o / (k + o)
+                        };
+                        assert_eq!(d, d.clamp(R.0, R.1));
                         let x: f64 = (1.0 + k) * (n - m) / m;
-                        asg.update_activity_decay(1.0 + (sgm(x) - 1.0) / w);
+                        // asg.update_activity_decay(1.0 + (sgm(x) - 1.0) / w);
+                        asg.update_activity_decay(1.0 + 0.5 * (sgm(x) - 1.0) * (1.0 - d));
                     }
                     state
                         .stm
