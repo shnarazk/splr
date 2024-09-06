@@ -14,16 +14,6 @@ impl NaturalNumberGenerator for LubySeries {
     }
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, PartialOrd, Ord)]
-struct CountTrailingOnes(u64);
-
-impl NaturalNumberGenerator for CountTrailingOnes {
-    fn next_number(&mut self) -> usize {
-        self.0 += 1;
-        self.0.trailing_ones() as usize
-    }
-}
-
 #[derive(Clone, Debug, Default)]
 pub struct StageManager {
     cycle: usize,
