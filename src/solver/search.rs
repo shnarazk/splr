@@ -489,7 +489,7 @@ impl SolveIF for Solver {
                 if let Some(new_segment) = next_stage {
                     // a beginning of a new cycle
                     if cfg!(feature = "reward_annealing") {
-                        const SLOP: f64 = 8.0;
+                        const SLOP: f64 = 2.0;
                         let stm = &state.stm;
                         // let sigma = |x: f64| 1.0 / (1.0 + (-x).exp());
                         let sgm = |x: f64| x / (1.0 + x.abs());
