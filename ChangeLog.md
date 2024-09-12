@@ -19,6 +19,9 @@ Now 0.18 uses Luby sequence to decide when solver checks restart conditions.
 Furthermore, the same sequence also controls var activity decay rate directly
 to archive both of deep search mode and exploration mode.
 
+- `Solver` has `search_stage` method to investigate its internal periodically, without modifing solver code.
+- Splr becomes a deterministic solver again
+
 ## 0.17.3, 2024-03-26
 
 - resolve #232, an incorrect debug assertion
