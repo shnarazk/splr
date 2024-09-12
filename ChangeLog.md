@@ -1,3 +1,24 @@
+## 0.18.0, 202X-XX-XX
+
+### Big changes
+
+#### Clauses are linked each other directly like Knuth's dancing links
+
+Splr so far used a "watch cache" struct to link clauses which have a same
+watching literal. This structure is based on Minisat or Glucose.
+Now 0.18 links clauses directly by using two `(clause, watch_literal_index)` pairs to
+travese a list forward and backward. With this double-linked list structure, moving
+a clause from a list to another, or deleting a clause at any place in a list are
+O(1) operations.
+
+#### Luby sequence controls restart points and var activity decay rate
+
+0.17 uses state model and dynamic restart controller simultaneously. But it's not in a harmonic way.
+Now 0.18 uses Luby sequence to decide when solver checks restart conditions.
+
+Furthermore, the same sequence also controls var activity decay rate directly
+to archive both of deep search mode and exploration mode.
+
 ## 0.17.3, 2024-03-26
 
 - resolve #232, an incorrect debug assertion
