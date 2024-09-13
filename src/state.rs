@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use {
     crate::{
         assign, cdb,
-        solver::{RestartManager, SolverEvent, StageManager},
+        solver::{SolverEvent, StageManager},
         types::*,
     },
     std::{
@@ -83,8 +83,8 @@ pub struct State {
     pub cnf: CNFDescription,
     /// collection of statistics data
     pub stats: [usize; Stat::EndOfStatIndex as usize],
-    // Restart
-    pub restart: RestartManager,
+    // // Restart
+    // pub restart: RestartManager,
     /// StageManager
     pub stm: StageManager,
     /// problem description
@@ -138,7 +138,7 @@ impl Default for State {
             config: Config::default(),
             cnf: CNFDescription::default(),
             stats: [0; Stat::EndOfStatIndex as usize],
-            restart: RestartManager::default(),
+            // restart: RestartManager::default(),
             stm: StageManager::default(),
             target: CNFDescription::default(),
             reflection_interval: 10_000,
@@ -188,7 +188,7 @@ impl Instantiate for State {
         State {
             config: config.clone(),
             cnf: cnf.clone(),
-            restart: RestartManager::instantiate(config, cnf),
+            // restart: RestartManager::instantiate(config, cnf),
             stm: StageManager::instantiate(config, cnf),
             target: cnf.clone(),
             time_limit: config.c_timeout,
@@ -207,7 +207,7 @@ impl Instantiate for State {
             SolverEvent::Reinitialize => (),
             SolverEvent::Restart => {
                 self[Stat::Restart] += 1;
-                self.restart.handle(SolverEvent::Restart);
+                // self.restart.handle(SolverEvent::Restart);
             }
             SolverEvent::Stage(_) => (),
 
@@ -446,7 +446,7 @@ impl StateIF for State {
         let rst_num_rst: usize = self[Stat::Restart];
         let rst_asg: &EmaView = asg.refer(assign::property::TEma::AssignRate);
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
-        let rst_eng: f64 = self.restart.penetration_energy_charged;
+        let rst_eng: f64 = 0.0; // self.restart.penetration_energy_charged;
         let stg_segment: usize = self.stm.current_segment();
 
         if self.config.use_log {

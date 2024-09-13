@@ -29,8 +29,7 @@ default = [
         ### Heuristics
         # "bi_clause_completion",
         # "clause_rewarding",
-        # "dynamic_restart_threshold",
-        "just_used",
+        "keep_just_used_clauses",
         "LRB_rewarding",
         "reason_side_rewarding",
         # "rephase",
@@ -62,7 +61,6 @@ clause_elimination = []         # pre(in)-processor setting
 clause_rewarding = []           # clauses have activities w/ decay rate
 clause_vivification = []        # pre(in)-processor setting
 debug_propagation = []          # for debug
-dynamic_restart_threshold = []  # control restart spans like Glucose
 EMA_calibration = []            # each exponential moving average has a calbration value
 EVSIDS = []                     # Eponential Variable State Independent Decaying Sum
 graph_view = [
@@ -73,7 +71,7 @@ graph_view = [
 ]
 incremental_solver = []         # for all solution SAT sover; requires no cluse_elimination
 interleave = []                 # switch to multi-step search IF
-just_used = []                  # Var and clause have 'just_used' flags
+keep_just_used_clauses = []     # Var and clause have 'just_used' flags
 LRB_rewarding = []              # Vearning Rate Based rewarding, a new var activity criteria
 no_IO = []                      # to embed Splr into non-std environments
 platform_wasm = [
@@ -84,7 +82,7 @@ rephase = [                     # search around the best-so-far candidate repeat
         "best_phases_tracking",
         ]
 reward_annealing = []           # use bigger and smaller decay rates cycliclly
-spin = []
+spin = []                       # [experimental] a sort of criteria for var categorization
 stochastic_local_search = [     # since 0.17
         # "reward_annealing",
         "rephase",

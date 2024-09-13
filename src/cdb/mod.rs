@@ -290,7 +290,7 @@ impl ClauseDBIF for ClauseDB {
             self.clause[ci].activity = 0.0;
             self.clause[ci].timestamp = self.tick;
         }
-        #[cfg(feature = "just_used")]
+        #[cfg(feature = "keep_just_used_clauses")]
         {
             self.clause[ci].turn_on(FlagClause::USED);
         }
@@ -518,7 +518,7 @@ impl ClauseDBIF for ClauseDB {
         let rank = c.update_lbd(asg, lbd_temp);
         let learnt = c.is(FlagClause::LEARNT);
         if learnt {
-            #[cfg(feature = "just_used")]
+            #[cfg(feature = "keep_just_used_clauses")]
             c.turn_on(FlagClause::USED);
             #[cfg(feature = "clause_rewarding")]
             self.reward_at_analysis(ci);
@@ -529,7 +529,7 @@ impl ClauseDBIF for ClauseDB {
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    #[cfg(feature = "just_used")]
+    #[cfg(feature = "keep_just_used_clauses")]
     fn reduce(&mut self, asg: &mut impl AssignIF, _setting: ReductionType) {
         // let ClauseDB {
         //     ref mut clause,
@@ -586,7 +586,7 @@ impl ClauseDBIF for ClauseDB {
         //     self.delete_clause(i.to());
         // }
     }
-    #[cfg(not(feature = "just_used"))]
+    #[cfg(not(feature = "keep_just_used_clauses"))]
     #[allow(unreachable_code, unused_variables)]
     fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
         impl Clause {
@@ -619,7 +619,7 @@ impl ClauseDBIF for ClauseDB {
             ReductionType::LBDonALL(_, _) => true,
             #[cfg(feature = "clause_rewarding")]
             ReductionType::ClauseActivity => false,
-            #[cfg(feature = "just_used")]
+            #[cfg(feature = "keep_just_used_clauses")]
             ReductionType::ClauseUsed => false,
         };
         for (ci, c) in clause
@@ -659,7 +659,7 @@ impl ClauseDBIF for ClauseDB {
                 }
                 #[cfg(feature = "clause_rewarding")]
                 ReductionType::ClauseActivity => perm.push(OrderedProxy::new(ci, -c.activity)),
-                #[cfg(feature = "just_used")]
+                #[cfg(feature = "keep_just_used_clauses")]
                 ReductionType::ClauseUsed => unreachable!(),
             }
         }
@@ -670,7 +670,7 @@ impl ClauseDBIF for ClauseDB {
             ReductionType::LBDonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
             #[cfg(feature = "clause_rewarding")]
             ReductionType::ClauseActivity => (perm.len() as f64).powf(0.75) as usize,
-            #[cfg(feature = "just_used")]
+            #[cfg(feature = "keep_just_used_clauses")]
             ReductionType::ClauseUsed => unreachable!(),
         };
         if perm.is_empty() {
@@ -685,7 +685,7 @@ impl ClauseDBIF for ClauseDB {
             }
             #[cfg(feature = "clause_rewarding")]
             ReductionType::ClauseActivity => keep as f64 / alives as f64,
-            #[cfg(feature = "just_used")]
+            #[cfg(feature = "keep_just_used_clauses")]
             ReductionType::ClauseUsed => unreachable!(),
         };
         perm.sort();
@@ -1242,7 +1242,7 @@ pub enum ReductionType {
     LBDonALL(u16, f64),
     #[cfg(feature = "clause_rewarding")]
     ClauseActivity,
-    #[cfg(feature = "just_used")]
+    #[cfg(feature = "keep_just_used_clauses")]
     ClauseUsed,
 }
 
@@ -1373,7 +1373,7 @@ mod tests {
 
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
-        #[cfg(feature = "just_used")]
+        #[cfg(feature = "keep_just_used_clauses")]
         assert!(c.is(FlagClause::USED));
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
@@ -1381,7 +1381,7 @@ mod tests {
         let c = &cdb[c2];
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
-        #[cfg(feature = "just_used")]
+        #[cfg(feature = "keep_just_used_clauses")]
         assert!(c.is(FlagClause::USED));
     }
     #[test]

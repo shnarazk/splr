@@ -1,9 +1,6 @@
 //! Conflict-Driven Clause Learning Search engine
 use {
-    super::{
-        conflict::handle_conflict, restart::RestartIF, Certificate, Solver, SolverEvent,
-        SolverResult,
-    },
+    super::{conflict::handle_conflict, Certificate, Solver, SolverEvent, SolverResult},
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
         cdb::{self, ClauseDB, ClauseDBIF, ReductionType, VivifyIF},
@@ -485,7 +482,6 @@ impl SolveIF for Solver {
                 ss.current_span = state.stm.current_span();
                 let scale = state.stm.current_scale();
                 asg.handle(SolverEvent::Stage(scale));
-                let max_scale = state.stm.max_scale();
                 if let Some(new_segment) = next_stage {
                     // a beginning of a new cycle
                     if cfg!(feature = "reward_annealing") {
@@ -534,9 +530,6 @@ impl SolveIF for Solver {
                             state[Stat::Simplify] += 1;
                             state[Stat::SubsumedClause] = elim.num_subsumed;
                         }
-                        if cfg!(feature = "dynamic_restart_threshold") {
-                            state.restart.set_segment_parameters(max_scale);
-                        }
                     }
                     if new_segment {
                         state.exploration_rate_ema.update(1.0);
@@ -547,7 +540,6 @@ impl SolveIF for Solver {
                                 return Err(SolverError::TimeOut);
                             }
                             state.progress(asg, cdb);
-                            state.restart.set_stage_parameters(scale);
                             ss.previous_stage = next_stage;
                             ss.elapsed_time = p;
                             return Ok(None);
@@ -654,7 +646,6 @@ impl SolveIF for Solver {
 
 /// display the current stats. before updating stabiliation parameters
 fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: &Option<bool>) {
-    let active = true; // state.rst.enable;
     let cycle = state.stm.current_cycle();
     let span = state.stm.current_span();
     let stage = state.stm.current_stage();
@@ -662,18 +653,13 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: &
     let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
     let vdr = asg.derefer(assign::property::Tf64::VarDecayRate);
     let cdt = cdb.derefer(cdb::property::Tf64::ReductionThreshold);
-    let fuel = if active {
-        state.restart.penetration_energy_charged
-    } else {
-        f64::NAN
-    };
     state.log(
         match shift {
             None => Some((None, None, stage)),
             Some(false) => Some((None, Some(cycle), stage)),
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
-        format!("{span:>7}, fuel:{fuel:>9.2}, cpr:{cpr:>8.2}, vdr:{vdr:>3.2}, cdt:{cdt:>5.2}"),
+        format!("{span:>7}, cpr:{cpr:>8.2}, vdr:{vdr:>3.2}, cdt:{cdt:>5.2}"),
     );
 }
 

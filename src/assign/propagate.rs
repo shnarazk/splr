@@ -375,7 +375,7 @@ impl PropagateIF for AssignStack {
                                 .unwrap_or(self.root_level);
 
                             debug_assert_eq!(self.assigned(other), None);
-                            #[cfg(feature = "just_used")]
+                            #[cfg(feature = "keep_just_used_clauses")]
                             c.turn_on(FlagClause::USED);
                             self.assign_by_implication(
                                 other,

@@ -3,8 +3,6 @@
 mod build;
 /// Module 'conflict' handles conflicts.
 mod conflict;
-/// Module `restart` provides restart heuristics.
-pub mod restart;
 /// CDCL search engine
 mod search;
 /// Stage manger (was Stabilizer)
@@ -14,7 +12,6 @@ mod validate;
 
 pub use self::{
     build::SatSolverIF,
-    restart::{RestartIF, RestartManager},
     search::{SearchState, SolveIF},
     stage::StageManager,
     validate::ValidateIF,

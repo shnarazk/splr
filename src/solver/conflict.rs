@@ -113,7 +113,6 @@ pub fn handle_conflict(
                     unreachable!("handle_conflict::root_level_conflict_by_assertion");
                 }
                 let vi = l0.vi();
-                state.restart.handle(SolverEvent::Assert(vi));
                 state.stm.handle(SolverEvent::Assert(vi));
                 cdb.handle(SolverEvent::Assert(vi));
                 return Ok(0);
@@ -150,7 +149,7 @@ pub fn handle_conflict(
                 }
             }
             AssignReason::Implication(r) => {
-                #[cfg(feature = "just_used")]
+                #[cfg(feature = "keep_just_used_clauses")]
                 cdb[r.as_ci()].turn_on(FlagClause::USED);
                 for l in cdb[r.as_ci()].iter() {
                     let vi = l.vi();
@@ -353,7 +352,7 @@ fn conflict_analyze(
                 if !cdb[ci].is(FlagClause::LEARNT) {
                     state.derive20.push(ci);
                 } else {
-                    #[cfg(feature = "just_used")]
+                    #[cfg(feature = "keep_just_used_clauses")]
                     cdb[ci].turn_on(FlagClause::USED);
                 }
                 if max_lbd < cdb[ci].rank {

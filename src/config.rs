@@ -267,8 +267,6 @@ impl Config {
                 "stage-based clause elimination",
                 #[cfg(feature = "clause_vivification")]
                 "stage-based clause vivification",
-                #[cfg(feature = "dynamic_restart_threshold")]
-                "stage-based dynamic restart threshold",
                 #[cfg(feature = "EMA_calibration")]
                 "EMA calibration",
                 #[cfg(feature = "EVSIDS")]
@@ -277,8 +275,8 @@ impl Config {
                 "incremental solver",
                 #[cfg(feature = "interleave")]
                 "interleaving slover",
-                #[cfg(feature = "just_used")]
-                "use 'just used' flag",
+                #[cfg(feature = "keep_just_used_clauses")]
+                "keep clauses used in the last cycle",
                 #[cfg(feature = "LRB_rewarding")]
                 "Learning-Rate Based rewarding",
                 #[cfg(feature = "reason_side_rewarding")]
