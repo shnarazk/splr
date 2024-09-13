@@ -122,8 +122,7 @@ impl StageManager {
     /// Note: we need not to make a strong correlation between this value and
     /// scale defined by Luby series. So this is fine.
     pub fn current_span(&self) -> usize {
-        // (self.span_base.ilog2() * self.scale.ilog2()) as usize
-        ((1.70 + self.span_base) * (1 + self.scale.ilog2()) as f64) as usize
+        5 + (self.scale as f64).sqrt() as usize
     }
     pub fn current_stage(&self) -> usize {
         self.stage
