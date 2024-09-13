@@ -143,8 +143,6 @@ impl StageManager {
     /// the length of span.
     pub fn num_reducible(&self, reducing_factor: f64) -> usize {
         let span = self.current_span();
-        // let scale = (self.current_scale() as f64).powf(0.6);
-        // let keep = scale * self.unit_size as f64;
         let keep = (span as f64).powf(1.0 - reducing_factor) as usize;
         span.saturating_sub(keep)
     }
