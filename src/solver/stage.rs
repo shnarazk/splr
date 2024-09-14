@@ -29,6 +29,7 @@ pub struct StageManager {
     segment_starting_stage: usize,
     segment_starting_cycle: usize,
     span_base: f64,
+    span_ema: Ema,
 }
 
 impl Instantiate for StageManager {
@@ -40,6 +41,7 @@ impl Instantiate for StageManager {
             scale: 1,
             end_of_stage: unit_size,
             next_is_new_segment: false,
+            span_ema: Ema::new(4).with_value(1.0),
             ..StageManager::default()
         }
     }
@@ -67,6 +69,7 @@ impl StageManager {
             segment_starting_stage: 0,
             segment_starting_cycle: 0,
             span_base: 0.0,
+            span_ema: Ema::new(4).with_value(1.0),
         }
     }
     pub fn initialize(&mut self, _unit_size: usize) {
@@ -92,6 +95,7 @@ impl StageManager {
         let mut new_cycle = false;
         let mut new_segment = false;
         self.scale = self.generator.next_number();
+        self.span_ema.update(4.0 + (self.scale as f64).powf(0.4));
         self.stage += 1;
         if self.scale == 1 {
             self.cycle += 1;
@@ -122,7 +126,7 @@ impl StageManager {
     /// Note: we need not to make a strong correlation between this value and
     /// scale defined by Luby series. So this is fine.
     pub fn current_span(&self) -> usize {
-        (3.5 + (self.scale as f64).sqrt()) as usize
+        self.span_ema.get() as usize
     }
     pub fn current_stage(&self) -> usize {
         self.stage
