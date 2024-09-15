@@ -14,6 +14,8 @@ impl NaturalNumberGenerator for LubySeries {
     }
 }
 
+const SPAN_EMA: (usize, f64) = (4, 4.0);
+
 #[derive(Clone, Debug, Default)]
 pub struct StageManager {
     cycle: usize,
@@ -41,7 +43,7 @@ impl Instantiate for StageManager {
             scale: 1,
             end_of_stage: unit_size,
             next_is_new_segment: false,
-            span_ema: Ema::new(4).with_value(1.0),
+            span_ema: Ema::new(SPAN_EMA.0).with_value(SPAN_EMA.1),
             ..StageManager::default()
         }
     }
@@ -69,7 +71,7 @@ impl StageManager {
             segment_starting_stage: 0,
             segment_starting_cycle: 0,
             span_base: 0.0,
-            span_ema: Ema::new(4).with_value(1.0),
+            span_ema: Ema::new(SPAN_EMA.0).with_value(SPAN_EMA.1),
         }
     }
     pub fn initialize(&mut self, _unit_size: usize) {
