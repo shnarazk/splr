@@ -165,7 +165,6 @@ impl Default for ClauseDB {
             num_reduction: 0,
             num_reregistration: 0,
             lb_entanglement: Ema2::new(1_000).with_slow(80_000).with_value(2.0),
-            reduction_threshold: 128,
 
             #[cfg(all(feature = "clause_elimination", not(feature = "incremental_solver")))]
             eliminated_permanent: Vec::new(),
@@ -272,7 +271,6 @@ impl ClauseDBIF for ClauseDB {
         self.clause[ci].search_from = 0;
         self.clause[ci].rank_old = self[ci].rank;
         self.lbd.update(self[ci].rank);
-        self.reduction_threshold = self.reduction_threshold.min(self[ci].rank);
         self.num_clause += 1;
         if learnt {
             if len2 {
@@ -573,7 +571,6 @@ impl ClauseDBIF for ClauseDB {
                 }
             }
         }
-        self.reduction_threshold = 128;
         // let keep = perm.len().max(alives);
         // if perm.is_empty() {
         //     return;

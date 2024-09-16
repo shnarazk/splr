@@ -78,8 +78,6 @@ pub struct ClauseDB {
     /// Literal Block Entanglement
     /// EMA of LBD of clauses used in conflict analysis (dependency graph)
     pub(super) lb_entanglement: Ema2,
-    /// cutoff value will be used in the next `reduce`
-    pub(super) reduction_threshold: DecisionLevel,
 
     //
     //## incremental solving
@@ -149,7 +147,6 @@ impl Instantiate for ClauseDB {
             activity_anti_decay: 1.0 - config.crw_dcy_rat,
 
             lbd_temp: vec![0; nv + 1],
-            reduction_threshold: 128,
             ..ClauseDB::default()
         }
     }
