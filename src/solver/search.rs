@@ -479,7 +479,7 @@ impl SolveIF for Solver {
                     #[cfg(feature = "trace_equivalency")]
                     cdb.check_consistency(asg, "before simplify");
                 }
-                ss.current_span = state.stm.current_span();
+                ss.current_span = state.stm.current_span() as usize;
                 let scale = state.stm.current_scale();
                 asg.handle(SolverEvent::Stage(scale));
                 if let Some(new_segment) = next_stage {
@@ -645,21 +645,20 @@ impl SolveIF for Solver {
 }
 
 /// display the current stats. before updating stabiliation parameters
-fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: &Option<bool>) {
+fn dump_stage(asg: &AssignStack, _cdb: &mut ClauseDB, state: &mut State, shift: &Option<bool>) {
     let cycle = state.stm.current_cycle();
     let span = state.stm.current_span();
     let stage = state.stm.current_stage();
     let segment = state.stm.current_segment();
     let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
     let vdr = asg.derefer(assign::property::Tf64::VarDecayRate);
-    let cdt = cdb.derefer(cdb::property::Tf64::ReductionThreshold);
     state.log(
         match shift {
             None => Some((None, None, stage)),
             Some(false) => Some((None, Some(cycle), stage)),
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
-        format!("{span:>7}, cpr:{cpr:>8.2}, vdr:{vdr:>3.2}, cdt:{cdt:>5.2}"),
+        format!("{span:>7}, cpr:{cpr:>8.2}, vdr:{vdr:>3.2}"),
     );
 }
 

@@ -150,7 +150,7 @@ impl PropagateIF for AssignStack {
         debug_assert!(self.q_head < self.trail.len());
     }
     fn cancel_until(&mut self, lv: DecisionLevel) {
-        if self.trail_lim.len() as u32 <= lv {
+        if self.trail_lim.len() as DecisionLevel <= lv {
             return;
         }
         if self.best_assign {

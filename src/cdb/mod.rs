@@ -165,7 +165,7 @@ impl Default for ClauseDB {
             num_reduction: 0,
             num_reregistration: 0,
             lb_entanglement: Ema2::new(1_000).with_slow(80_000).with_value(2.0),
-            reduction_threshold: 0.0,
+            reduction_threshold: 128,
 
             #[cfg(all(feature = "clause_elimination", not(feature = "incremental_solver")))]
             eliminated_permanent: Vec::new(),
@@ -272,6 +272,7 @@ impl ClauseDBIF for ClauseDB {
         self.clause[ci].search_from = 0;
         self.clause[ci].rank_old = self[ci].rank;
         self.lbd.update(self[ci].rank);
+        self.reduction_threshold = self.reduction_threshold.min(self[ci].rank);
         self.num_clause += 1;
         if learnt {
             if len2 {
@@ -543,15 +544,17 @@ impl ClauseDBIF for ClauseDB {
         //     ..
         // } = self;
         self.num_reduction += 1;
-        let mut keep: usize = 0;
-        let mut alives: usize = 0;
+        // let mut keep: usize = 0;
+        // let mut alives: usize = 0;
         // let mut perm: Vec<OrderedProxy<ClauseIndex>> = Vec::with_capacity(clause.len());
+        // let reduction_threshold = self.reduction_threshold + 4;
+        let reduction_threshold = 4 + self.reduction_threshold.ilog2();
         for ci in 1..self.clause.len() {
             if self.clause[ci].is_dead() {
                 continue;
             }
-            alives += 1;
-            keep += 1;
+            // alives += 1;
+            // keep += 1;
             if self.clause[ci].is(FlagClause::USED) {
                 self.clause[ci].turn_off(FlagClause::USED);
                 continue;
@@ -562,16 +565,16 @@ impl ClauseDBIF for ClauseDB {
                     ref mut lbd_temp,
                     ..
                 } = self;
-                if 5 < clause[ci].update_lbd(asg, lbd_temp) {
-                    keep -= 1;
+                if reduction_threshold < clause[ci].update_lbd(asg, lbd_temp) {
+                    // keep -= 1;
                     // perm.push(OrderedProxy::new(ci, c.rank as f64));
                     self.delete_clause(ci);
                     continue;
                 }
             }
         }
+        self.reduction_threshold = 128;
         // let keep = perm.len().max(alives);
-        self.reduction_threshold = keep as f64 / alives as f64;
         // if perm.is_empty() {
         //     return;
         // }
@@ -1300,14 +1303,9 @@ pub mod property {
     pub enum Tf64 {
         LiteralBlockDistance,
         LiteralBlockEntanglement,
-        ReductionThreshold,
     }
 
-    pub const F64: [Tf64; 3] = [
-        Tf64::LiteralBlockDistance,
-        Tf64::LiteralBlockEntanglement,
-        Tf64::ReductionThreshold,
-    ];
+    pub const F64: [Tf64; 2] = [Tf64::LiteralBlockDistance, Tf64::LiteralBlockEntanglement];
 
     impl PropertyDereference<Tf64, f64> for ClauseDB {
         #[inline]
@@ -1315,7 +1313,6 @@ pub mod property {
             match k {
                 Tf64::LiteralBlockDistance => self.lbd.get(),
                 Tf64::LiteralBlockEntanglement => self.lb_entanglement.get(),
-                Tf64::ReductionThreshold => self.reduction_threshold,
             }
         }
     }

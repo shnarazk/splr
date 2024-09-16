@@ -22,7 +22,7 @@ pub fn handle_conflict(
     cdb: &mut ClauseDB,
     state: &mut State,
     cc: &ConflictContext,
-) -> Result<u16, SolverError> {
+) -> Result<DecisionLevel, SolverError> {
     #[cfg(feature = "chrono_BT")]
     let mut conflicting_level = asg.decision_level();
     #[cfg(not(feature = "chrono_BT"))]
@@ -179,7 +179,7 @@ pub fn handle_conflict(
         new_learnt.iter().skip(1).map(|l| asg.level(l.vi())).max(),
         Some(assign_level)
     );
-    let rank: u16;
+    let rank: DecisionLevel;
     match cdb.new_clause(asg, new_learnt, true) {
         RefClause::Clause(cid) if learnt_len == 2 => {
             #[cfg(feature = "boundary_check")]
@@ -267,7 +267,7 @@ fn conflict_analyze(
 ) -> DecisionLevel {
     let learnt = &mut state.new_learnt;
     learnt.clear();
-    learnt.push(Lit::from(u32::MAX));
+    learnt.push(Lit::from(u32::MAX)); // u32 is the base type of Lit
     let root_level = asg.root_level();
     let dl = asg.decision_level();
     let mut path_cnt = 0;
@@ -302,7 +302,7 @@ fn conflict_analyze(
         };
     }
 
-    let mut max_lbd: u16 = 0;
+    let mut max_lbd: DecisionLevel = 0;
     let mut ci_with_max_lbd: Option<ClauseIndex> = None;
     #[cfg(feature = "trace_analysis")]
     println!("##################");

@@ -43,7 +43,7 @@ impl EmaIF for ProgressLBD {
 }
 
 impl EmaMutIF for ProgressLBD {
-    type Input = u16;
+    type Input = DecisionLevel;
     fn update(&mut self, d: Self::Input) {
         self.num += 1;
         self.sum += d as usize;

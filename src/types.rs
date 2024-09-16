@@ -98,6 +98,7 @@ pub type VarId = usize;
 
 /// Decision Level Representation.
 pub type DecisionLevel = u32;
+pub type ClauseSize = u32;
 
 /// Literal encoded on `u32` as:
 ///

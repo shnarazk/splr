@@ -45,12 +45,12 @@ pub struct Clause {
     /// Flags (8 bits)
     pub(super) flags: FlagClause,
     /// A static clause evaluation criterion like LBD, NDD, or something.
-    pub rank: u16,
+    pub rank: DecisionLevel,
     /// A record of the rank at previos stage.
-    pub rank_old: u16,
+    pub rank_old: DecisionLevel,
     /// the index from which `propagate` starts searching an un-falsified literal.
     /// Since it's just a hint, we don't need u32 or usize.
-    pub search_from: u16,
+    pub search_from: ClauseSize,
 
     /// the number of conflicts at which this clause was used in `conflict_analyze`
     pub(super) timestamp: usize,
@@ -74,12 +74,12 @@ pub struct Clause {
     /// Flags (8 bits)
     pub(super) flags: FlagClause,
     /// A static clause evaluation criterion like LBD, NDD, or something.
-    pub rank: u16,
+    pub rank: DecisionLevel,
     /// A record of the rank at previos stage.
-    pub rank_old: u16,
+    pub rank_old: DecisionLevel,
     /// the index from which `propagate` starts searching an un-falsified literal.
     /// Since it's just a hint, we don't need u32 or usize.
-    pub search_from: u16,
+    pub search_from: ClauseSize,
 
     #[cfg(feature = "boundary_check")]
     /// the number of conflicts at which this clause was used in `conflict_analyze`
@@ -306,15 +306,15 @@ impl WatcherLinkIF for Clause {
 impl Clause {
     /// update rank field with the present LBD.
     // If it's big enough, skip the loop.
-    pub fn update_lbd(&mut self, asg: &impl AssignIF, lbd_temp: &mut [usize]) -> usize {
-        if 8192 <= self.lits.len() {
-            self.rank = u16::MAX;
-            return u16::MAX as usize;
-        }
-        let base_level = asg.root_level();
+    pub fn update_lbd(&mut self, asg: &impl AssignIF, lbd_temp: &mut [usize]) -> DecisionLevel {
+        // if 8192 <= self.lits.len() {
+        //     self.rank = u16::MAX;
+        //     return u16::MAX as usize;
+        // }
+        let base_level: DecisionLevel = asg.root_level();
         let key: usize = lbd_temp[0] + 1;
         lbd_temp[0] = key;
-        let mut cnt: u16 = 0;
+        let mut cnt: ClauseSize = 0;
         for l in &self.lits {
             let lv = asg.level(l.vi());
             if lv == base_level {
@@ -328,6 +328,6 @@ impl Clause {
             }
         }
         self.rank = cnt;
-        cnt as usize
+        cnt
     }
 }

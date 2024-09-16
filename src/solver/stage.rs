@@ -113,7 +113,7 @@ impl StageManager {
         if self.max_scale_of_segment == self.scale {
             self.next_is_new_segment = true;
         }
-        self.end_of_stage = now + self.current_span();
+        self.end_of_stage = now + self.span_ema.get() as usize;
         new_cycle.then_some(new_segment)
     }
     pub fn stage_ended(&self, now: usize) -> bool {
@@ -125,8 +125,8 @@ impl StageManager {
     /// returns the number of conflicts in the current stage
     /// Note: we need not to make a strong correlation between this value and
     /// scale defined by Luby series. So this is fine.
-    pub fn current_span(&self) -> usize {
-        self.span_ema.get() as usize
+    pub fn current_span(&self) -> f64 {
+        self.span_ema.get()
     }
     pub fn current_stage(&self) -> usize {
         self.stage
@@ -145,9 +145,9 @@ impl StageManager {
     /// returns a recommending number of redicible learnt clauses, based on
     /// the length of span.
     pub fn num_reducible(&self, reducing_factor: f64) -> usize {
-        let span = self.current_span();
-        let keep = (span as f64).powf(1.0 - reducing_factor) as usize;
-        span.saturating_sub(keep)
+        let span: f64 = self.span_ema.get();
+        let keep = span.powf(1.0 - reducing_factor) as usize;
+        (span as usize).saturating_sub(keep)
     }
     /// returns the maximum factor so far.
     /// None: `luby_iter.max_value` holds the maximum value so far.
