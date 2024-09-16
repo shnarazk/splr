@@ -87,7 +87,7 @@ pub trait ClauseDBIF:
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType);
+    fn reduce(&mut self, asg: &mut impl AssignIF, threshold: DecisionLevel);
     /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.
@@ -529,7 +529,7 @@ impl ClauseDBIF for ClauseDB {
     }
     /// reduce the number of 'learnt' or *removable* clauses.
     #[cfg(feature = "keep_just_used_clauses")]
-    fn reduce(&mut self, asg: &mut impl AssignIF, _setting: ReductionType) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, threshold: DecisionLevel) {
         // let ClauseDB {
         //     ref mut clause,
         //     ref mut lbd_temp,
@@ -546,7 +546,12 @@ impl ClauseDBIF for ClauseDB {
         // let mut alives: usize = 0;
         // let mut perm: Vec<OrderedProxy<ClauseIndex>> = Vec::with_capacity(clause.len());
         // let reduction_threshold = self.reduction_threshold + 4;
-        let reduction_threshold = 4 + self.reduction_threshold.ilog2();
+        /* let reduction_threshold: DecisionLevel = 4
+        + ((self
+            .reduction_threshold
+            .saturating_sub(self.lb_entanglement.get() as u32)
+            + 1) as f64)
+            .sqrt() as u32; */
         for ci in 1..self.clause.len() {
             if self.clause[ci].is_dead() {
                 continue;
@@ -563,7 +568,7 @@ impl ClauseDBIF for ClauseDB {
                     ref mut lbd_temp,
                     ..
                 } = self;
-                if reduction_threshold < clause[ci].update_lbd(asg, lbd_temp) {
+                if threshold < clause[ci].update_lbd(asg, lbd_temp) {
                     // keep -= 1;
                     // perm.push(OrderedProxy::new(ci, c.rank as f64));
                     self.delete_clause(ci);

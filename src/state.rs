@@ -554,13 +554,14 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|vivC:{}, vdcy:{}, core:{}, /ppc:{}",
-            im!(
+            "\x1B[2K        misc|span:{}, vdcy:{}, core:{}, /ppc:{}",
+            /* im!(
                 "{:>9}",
                 self,
                 LogUsizeId::VivifiedClause,
                 self[Stat::VivifiedClause]
-            ),
+            ), */
+            fm!("{:>9.4}", self, LogF64Id::End, self.stm.current_span()),
             fm!(
                 "{:>9.4}",
                 self,
