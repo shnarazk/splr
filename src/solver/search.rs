@@ -412,10 +412,17 @@ impl SolveIF for Solver {
             state[Stat::SubsumedClause] = elim.num_subsumed;
         }
         state.stm.initialize(STAGE_SIZE);
+        let nv: u32 = asg.derefer(assign::Tusize::NumUnassertedVar).ilog2();
+        let nc: u32 = cdb
+            .iter()
+            .filter(|c| !c.is_dead() && 2 < c.len())
+            .count()
+            .ilog2();
+
         Ok(SearchState {
             num_reduction: 0,
-            reduce_step: 256,
-            next_reduce: 16,
+            reduce_step: (nv + nc) as usize,
+            next_reduce: 64,
             from_segment_beginning: 0,
             current_core: asg.derefer(assign::property::Tusize::NumUnassertedVar),
             current_span: 1,
@@ -454,7 +461,15 @@ impl SolveIF for Solver {
             #[cfg(feature = "clause_rewarding")]
             cdb.update_activity_tick();
 
-            handle_conflict(asg, cdb, state, &cc)?;
+            if asg.root_level() == handle_conflict(asg, cdb, state, &cc)? {
+                // let nv: u32 = asg.derefer(assign::Tusize::NumUnassertedVar).ilog2();
+                // let nc: u32 = cdb
+                //     .iter()
+                //     .filter(|c| !c.is_dead() && 2 < c.len())
+                //     .count()
+                //     .ilog2();
+                // ss.reduce_step = ((nv + nc) as usize + ss.reduce_step) / 2;
+            }
             ss.from_segment_beginning += 1;
             if ss.current_span <= ss.from_segment_beginning {
                 let with_restart = 1.0 < cdb.refer(cdb::property::TEma::LBD).trend();
@@ -514,22 +529,17 @@ impl SolveIF for Solver {
 
                     let num_restart = asg.derefer(assign::Tusize::NumRestart);
                     if ss.next_reduce <= num_restart {
-                        const SLOP: f64 = 2.0;
                         let stm = &state.stm;
-                        let sgm = |x: f64| x / (1.0 + x.abs());
                         let b: f64 = stm.segment_starting_cycle() as f64;
-                        let n: f64 = stm.current_cycle() as f64 - b;
-                        let m: f64 = 0.5 * b;
-                        let k: f64 = (stm.current_segment() as f64).sqrt();
-                        const R: (f64, f64) = (0.01, 0.995);
-                        let d: f64 = {
-                            let o: f64 = SLOP;
-                            R.1 - (R.1 - R.0) * o / (k + o)
-                        };
-                        let x: f64 = (1.0 + k) * (n - m) / m;
-                        let lbd: f64 = 4.0;
-                        let thr: f64 = 1.0 + 0.5 * (sgm(x) - 1.0) * (1.0 - d);
-                        cdb.reduce(asg, (lbd / thr) as DecisionLevel);
+                        let n: f64 = 1.0 + stm.current_cycle() as f64 - b;
+                        let ent: f64 = cdb.refer(cdb::property::TEma::Entanglement).get_slow();
+                        let lbd: f64 = cdb.refer(cdb::property::TEma::LBD).get_slow();
+                        // let val: f64 = 2.5 + 2.0 * (ent + lbd) / n.log2();
+                        let min: f64 = ent.min(lbd);
+                        let max: f64 = ent.max(lbd);
+                        let val: f64 = 0.5 * min + max / n.sqrt();
+                        state.extra_f64 = val;
+                        cdb.reduce(asg, (val) as DecisionLevel);
                         /* ss.reduce_threshold = if state.stm.current_segment() < 8 {
                             40.0 - state.stm.current_segment() as f64
                         } else {

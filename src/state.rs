@@ -130,6 +130,8 @@ pub struct State {
     pub time_limit: f64,
     /// logging facility.
     log_messages: Vec<String>,
+    /// extra
+    pub extra_f64: f64,
 }
 
 impl Default for State {
@@ -164,6 +166,7 @@ impl Default for State {
             start: Instant::now(),
             time_limit: 0.0,
             log_messages: Vec::new(),
+            extra_f64: 0.0,
         }
     }
 }
@@ -554,14 +557,15 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|span:{}, vdcy:{}, core:{}, /ppc:{}",
+            "\x1B[2K        misc|temp:{}, vdcy:{}, core:{}, /ppc:{}",
             /* im!(
                 "{:>9}",
                 self,
                 LogUsizeId::VivifiedClause,
                 self[Stat::VivifiedClause]
             ), */
-            fm!("{:>9.4}", self, LogF64Id::End, self.stm.current_span()),
+            // fm!("{:>9.4}", self, LogF64Id::End, self.stm.current_span()),
+            fm!("{:>9.4}", self, LogF64Id::End, self.extra_f64),
             fm!(
                 "{:>9.4}",
                 self,
