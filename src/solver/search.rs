@@ -412,11 +412,12 @@ impl SolveIF for Solver {
             state[Stat::SubsumedClause] = elim.num_subsumed;
         }
         state.stm.initialize(STAGE_SIZE);
-        let nv: u32 = asg.derefer(assign::Tusize::NumUnassertedVar).ilog2();
+        let nv: u32 = asg.derefer(assign::Tusize::NumUnassertedVar).max(1).ilog2();
         let nc: u32 = cdb
             .iter()
             .filter(|c| !c.is_dead() && 2 < c.len())
             .count()
+            .max(1)
             .ilog2();
 
         Ok(SearchState {
