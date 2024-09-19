@@ -164,7 +164,7 @@ impl Default for ClauseDB {
             num_learnt: 0,
             num_reduction: 0,
             num_reregistration: 0,
-            lb_entanglement: Ema2::new(1_000).with_slow(80_000).with_value(2.0),
+            lb_entanglement: Ema2::new(1_000).with_slow(80_000).with_value(16.0),
 
             #[cfg(all(feature = "clause_elimination", not(feature = "incremental_solver")))]
             eliminated_permanent: Vec::new(),
@@ -514,7 +514,7 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         let c = &mut clause[ci];
-        let rank = c.update_lbd(asg, lbd_temp);
+        let rank: DecisionLevel = c.update_lbd(asg, lbd_temp);
         let learnt = c.is(FlagClause::LEARNT);
         if learnt {
             #[cfg(feature = "keep_just_used_clauses")]

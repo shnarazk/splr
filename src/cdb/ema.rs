@@ -14,7 +14,7 @@ pub struct ProgressLBD {
 impl Default for ProgressLBD {
     fn default() -> ProgressLBD {
         ProgressLBD {
-            ema: Ewa2::new(0.0),
+            ema: Ewa2::new(0.0).with_value(16.0),
             num: 0,
             sum: 0,
         }
@@ -24,7 +24,7 @@ impl Default for ProgressLBD {
 impl Instantiate for ProgressLBD {
     fn instantiate(_config: &Config, _: &CNFDescription) -> Self {
         ProgressLBD {
-            ema: Ewa2::new(0.0).with_slow(LBD_EWA_SLOW),
+            ema: Ewa2::new(0.0).with_slow(LBD_EWA_SLOW).with_value(16.0),
             ..ProgressLBD::default()
         }
     }

@@ -437,4 +437,9 @@ impl<const N: usize> Ewa2<N> {
         self.sx = 1.0 - self.se;
         self
     }
+    pub fn with_value(mut self, val: f64) -> Self {
+        self.ema.fast = val;
+        self.ema.slow = val;
+        self
+    }
 }
