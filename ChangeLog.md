@@ -11,13 +11,14 @@ travese a list forward and backward. With this double-linked list structure, mov
 a clause from a list to another, or deleting a clause at any place in a list are
 O(1) operations.
 
-#### Luby sequence controls restart points and var activity decay rate
+#### Use Luby sequence in more various modules
 
 0.17 uses state model and dynamic restart controller simultaneously. But it's not in a harmonic way.
 Now 0.18 uses Luby sequence to decide when solver checks restart conditions.
 
-Furthermore, the same sequence also controls var activity decay rate directly
-to archive both of deep search mode and exploration mode.
+Furthermore, the same sequence also controls var activity decay rate
+directly to archive both of deep search mode and exploration mode.
+And clause reduction uses a cutoff value based on Luby value.
 
 - `Solver` has `search_stage` method to investigate its internal periodically, without modifing solver code.
 - Splr becomes a deterministic solver again
