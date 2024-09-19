@@ -79,7 +79,7 @@ impl LubySeries {
     pub fn max_value(&self) -> usize {
         self.max_value
     }
-    pub fn reset(&mut self) {
+    pub fn reset_values(&mut self) {
         self.index = 0;
         self.seq = 0;
         self.size = 1;

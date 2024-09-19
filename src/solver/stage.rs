@@ -6,11 +6,15 @@ use crate::types::*;
 
 trait NaturalNumberGenerator: Clone + Default {
     fn next_number(&mut self) -> usize;
+    fn reset(&mut self);
 }
 
 impl NaturalNumberGenerator for LubySeries {
     fn next_number(&mut self) -> usize {
         self.next_unchecked()
+    }
+    fn reset(&mut self) {
+        self.reset_values()
     }
 }
 
@@ -47,7 +51,7 @@ impl Instantiate for StageManager {
     }
     fn handle(&mut self, e: SolverEvent) {
         if let SolverEvent::Assert(_) = e {
-            self.reset()
+            self.reset();
         }
     }
 }
@@ -73,16 +77,22 @@ impl StageManager {
         }
     }
     pub fn initialize(&mut self, _unit_size: usize) {
-        self.cycle = 0;
-        self.unit_size = 8;
+        // self.generator.reset();
         self.scale = 1;
+        self.stage = 0;
+        self.cycle = 0;
+        self.segment = 0;
+        self.unit_size = 8;
         self.max_scale_of_segment = 1;
         self.end_of_stage = self.unit_size;
         self.next_is_new_segment = true;
     }
     pub fn reset(&mut self) {
-        self.cycle = 0;
+        self.generator.reset();
         self.scale = 1;
+        self.stage = 0;
+        self.cycle = 0;
+        self.segment = 0;
         self.max_scale_of_segment = 1;
         self.end_of_stage = self.unit_size;
         self.next_is_new_segment = true;
