@@ -131,7 +131,7 @@ pub struct State {
     /// logging facility.
     log_messages: Vec<String>,
     /// extra
-    pub extra_f64: f64,
+    pub reduction_threshold: f64,
 }
 
 impl Default for State {
@@ -166,7 +166,7 @@ impl Default for State {
             start: Instant::now(),
             time_limit: 0.0,
             log_messages: Vec::new(),
-            extra_f64: 0.0,
+            reduction_threshold: 0.0,
         }
     }
 }
@@ -557,15 +557,15 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|temp:{}, vdcy:{}, core:{}, /ppc:{}",
-            /* im!(
-                "{:>9}",
+            // "\x1B[2K        misc|ccut:{}, vdcy:{}, core:{}, /ppc:{}",
+            "\x1B[2K{:>12}|ccut:{}, vdcy:{}, core:{}, /ppc:{}",
+            format!("Luby{}", self.stm.current_segment(),),
+            fm!(
+                "{:>9.4}",
                 self,
-                LogUsizeId::VivifiedClause,
-                self[Stat::VivifiedClause]
-            ), */
-            // fm!("{:>9.4}", self, LogF64Id::End, self.stm.current_span()),
-            fm!("{:>9.4}", self, LogF64Id::End, self.extra_f64),
+                LogF64Id::ClauseReductionCutThreshold,
+                self.reduction_threshold
+            ),
             fm!(
                 "{:>9.4}",
                 self,
@@ -591,6 +591,7 @@ impl StateIF for State {
                 asg_ppc_ema.get()
             ),
         );
+        self[LogUsizeId::VivifiedClause] = self[Stat::VivifiedClause];
         self[LogUsizeId::Stage] = self.stm.current_stage();
         self[LogUsizeId::StageCycle] = self.stm.current_cycle();
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
@@ -884,6 +885,7 @@ pub enum LogF64Id {
     PropagationPerConflict,
     LiteralBlockEntanglement,
     RestartEnergy,
+    ClauseReductionCutThreshold,
 
     End,
 }

@@ -505,7 +505,6 @@ impl SolveIF for Solver {
                     if cfg!(feature = "reward_annealing") {
                         const SLOP: f64 = 2.0;
                         let stm = &state.stm;
-                        // let sigma = |x: f64| 1.0 / (1.0 + (-x).exp());
                         let sgm = |x: f64| x / (1.0 + x.abs());
                         let b: f64 = stm.segment_starting_cycle() as f64;
                         let n: f64 = stm.current_cycle() as f64 - b;
@@ -516,7 +515,6 @@ impl SolveIF for Solver {
                             let o: f64 = SLOP;
                             R.1 - (R.1 - R.0) * o / (k + o)
                         };
-                        // assert_eq!(d, d.clamp(R.0, R.1));
                         let x: f64 = (1.0 + k) * (n - m) / m;
                         asg.update_activity_decay(1.0 + 0.5 * (sgm(x) - 1.0) * (1.0 - d));
                     }
@@ -539,15 +537,8 @@ impl SolveIF for Solver {
                         let min: f64 = ent.min(lbd);
                         let max: f64 = ent.max(lbd);
                         let val: f64 = 0.5 * min + max / n.sqrt();
-                        state.extra_f64 = val;
-                        cdb.reduce(asg, (val) as DecisionLevel);
-                        /* ss.reduce_threshold = if state.stm.current_segment() < 8 {
-                            40.0 - state.stm.current_segment() as f64
-                        } else {
-                            ss.reduce_threshold
-                                .min(cdb.refer(cdb::property::TEma::Entanglement).get())
-                        };
-                        cdb.reduce(asg, ss.reduce_threshold as DecisionLevel / 2); */
+                        state.reduction_threshold = val;
+                        cdb.reduce(asg, val as DecisionLevel);
                         ss.num_reduction += 1;
                         ss.reduce_step += 1;
                         ss.next_reduce = ss.reduce_step + num_restart;
