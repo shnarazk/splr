@@ -87,7 +87,7 @@ pub trait ClauseDBIF:
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, threshold: DecisionLevel);
+    fn reduce(&mut self, asg: &mut impl AssignIF, threshold: f64);
     /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.
@@ -164,7 +164,8 @@ impl Default for ClauseDB {
             num_learnt: 0,
             num_reduction: 0,
             num_reregistration: 0,
-            lb_entanglement: Ema2::new(1_000).with_slow(80_000).with_value(16.0),
+            // lb_entanglement: Ema2::new(1_000).with_slow(80_000).with_value(16.0),
+            lb_entanglement: Ema2::new(16).with_slow(8192).with_value(16.0),
 
             #[cfg(all(feature = "clause_elimination", not(feature = "incremental_solver")))]
             eliminated_permanent: Vec::new(),
@@ -529,7 +530,14 @@ impl ClauseDBIF for ClauseDB {
     }
     /// reduce the number of 'learnt' or *removable* clauses.
     #[cfg(feature = "keep_just_used_clauses")]
-    fn reduce(&mut self, asg: &mut impl AssignIF, threshold: DecisionLevel) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, threshold: f64) {
+        impl Clause {
+            fn extended_lbd(&self) -> f64 {
+                let l: f64 = self.len() as f64;
+                let r: f64 = self.rank as f64;
+                r + (l - r) / (l - r + 1.0)
+            }
+        }
         // let ClauseDB {
         //     ref mut clause,
         //     ref mut lbd_temp,
@@ -568,7 +576,8 @@ impl ClauseDBIF for ClauseDB {
                     ref mut lbd_temp,
                     ..
                 } = self;
-                if threshold < clause[ci].update_lbd(asg, lbd_temp) {
+                clause[ci].update_lbd(asg, lbd_temp);
+                if threshold < clause[ci].extended_lbd() {
                     // keep -= 1;
                     // perm.push(OrderedProxy::new(ci, c.rank as f64));
                     self.delete_clause(ci);
