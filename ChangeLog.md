@@ -22,6 +22,7 @@ And clause reduction uses a cutoff value based on Luby value.
 
 - `Solver` has `search_stage` method to investigate its internal periodically, without modifing solver code.
 - Splr becomes a deterministic solver again
+- Extend LBD to float values by weighting number of literals (only in clause reduction phase)
 
 ## 0.17.3, 2024-03-26
 
