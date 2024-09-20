@@ -526,7 +526,7 @@ impl SolveIF for Solver {
                             let ent: f64 = cdb.refer(cdb::property::TEma::Entanglement).get_slow();
                             let lbd: f64 = cdb.refer(cdb::property::TEma::LBD).get_slow();
                             // Note: val can be inf. It got better results.
-                            let val: f64 = 0.5 * ent.min(lbd) + ent.max(lbd) / n.sqrt();
+                            let val: f64 = 0.5 * ent.min(lbd) + ent.max(lbd) / (1.0 + n).log2();
                             state.reduction_threshold = val;
                             cdb.reduce(asg, val);
                             ss.num_reduction += 1;
