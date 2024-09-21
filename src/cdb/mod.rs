@@ -270,7 +270,6 @@ impl ClauseDBIF for ClauseDB {
             debug_assert_eq!(l1, self[ci].lits[1]);
         }
         self.clause[ci].search_from = 0;
-        self.clause[ci].rank_old = self[ci].rank;
         self.lbd.update(self[ci].rank);
         self.num_clause += 1;
         if learnt {
@@ -1157,7 +1156,10 @@ impl ClauseWeaverIF for ClauseDB {
             );
             debug_assert_ne!(next, self.watch[FREE_LIT].next);
             debug_assert_ne!(0, next.as_ci());
-            next.as_ci()
+            let ci = next.as_ci();
+            self.clause[ci].rank = u32::MAX;
+            self.clause[ci].rank_old = u32::MAX;
+            ci
         }
     }
     // Check whether a zombi exists

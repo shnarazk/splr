@@ -100,8 +100,8 @@ impl Default for Clause {
             ],
             lits: vec![Lit::default(), Lit::default()],
             flags: FlagClause::empty(),
-            rank: 0,
-            rank_old: 0,
+            rank: u32::MAX,
+            rank_old: u32::MAX,
             search_from: 2,
 
             #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
@@ -327,7 +327,10 @@ impl Clause {
                 cnt += 1;
             }
         }
-        self.rank = cnt;
-        cnt
+        if cnt < self.rank {
+            self.rank_old = self.rank;
+            self.rank = cnt;
+        }
+        self.rank
     }
 }
