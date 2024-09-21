@@ -575,6 +575,9 @@ impl ClauseDBIF for ClauseDB {
                     ref mut lbd_temp,
                     ..
                 } = self;
+                if clause[ci].rank < threshold as DecisionLevel {
+                    continue;
+                }
                 clause[ci].update_lbd(asg, lbd_temp);
                 if threshold < clause[ci].extended_lbd() {
                     // keep -= 1;
