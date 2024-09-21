@@ -17,13 +17,6 @@ pub trait EmaIF {
     }
 }
 
-pub trait EmaSingleIF: EmaIF {
-    /// return the current value.
-    fn get(&self) -> f64 {
-        self.get_fast()
-    }
-}
-
 /// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
 pub trait EmaMutIF: EmaIF {
     /// the type of the argument of `update`.
@@ -435,11 +428,6 @@ impl<const N: usize> Ewa2<N> {
     pub fn with_slow(mut self, s: usize) -> Self {
         self.se = 1.0 / (s as f64);
         self.sx = 1.0 - self.se;
-        self
-    }
-    pub fn with_value(mut self, val: f64) -> Self {
-        self.ema.fast = val;
-        self.ema.slow = val;
         self
     }
 }

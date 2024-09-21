@@ -152,19 +152,17 @@ impl StageManager {
     pub fn current_segment(&self) -> usize {
         self.segment
     }
-    /// returns a recommending number of redicible learnt clauses, based on
-    /// the length of span.
-    pub fn num_reducible(&self, reducing_factor: f64) -> usize {
-        let span: f64 = self.span_ema.get();
-        let keep = span.powf(1.0 - reducing_factor) as usize;
-        (span as usize).saturating_sub(keep)
-    }
     /// returns the maximum factor so far.
     /// None: `luby_iter.max_value` holds the maximum value so far.
     /// This means it is the value found at the last segment.
     /// So the current value should be the next value, which is the double.
     pub fn max_scale(&self) -> usize {
         self.max_scale_of_segment
+    }
+    /// returns (0, 1]
+    pub fn segment_progress_ratio(&self) -> f64 {
+        (2 * (self.cycle - self.segment_starting_cycle + 1)) as f64
+            / self.max_scale_of_segment as f64
     }
     pub fn cycle_starting_stage(&self) -> usize {
         self.cycle_starting_stage
@@ -180,5 +178,12 @@ impl StageManager {
     }
     pub fn set_span_base(&mut self, span_base: f64) {
         self.span_base = span_base;
+    }
+    /// returns a recommending number of redicible learnt clauses, based on
+    /// the length of span.
+    pub fn num_reducible(&self, reducing_factor: f64) -> usize {
+        let span: f64 = self.span_ema.get();
+        let keep = span.powf(1.0 - reducing_factor) as usize;
+        (span as usize).saturating_sub(keep)
     }
 }

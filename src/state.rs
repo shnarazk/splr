@@ -559,7 +559,11 @@ impl StateIF for State {
         println!(
             // "\x1B[2K        misc|ccut:{}, vdcy:{}, core:{}, /ppc:{}",
             "\x1B[2K{:>12}|ccut:{}, vdcy:{}, core:{}, /ppc:{}",
-            format!("Luby{}", self.stm.current_segment(),),
+            format!(
+                "Luby{},{:>4.2}",
+                self.stm.current_segment(),
+                self.stm.segment_progress_ratio(),
+            ),
             fm!(
                 "{:>9.4}",
                 self,
