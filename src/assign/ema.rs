@@ -1,18 +1,18 @@
 use crate::types::*;
 
-const ASG_EWA_LEN: usize = 16;
-const ASG_EWA_SLOW: usize = 8192;
+const ASG_EMA_LEN: usize = 16;
+const ASG_EMA_SLOW: usize = 8192;
 
 /// An assignment history used for blocking restart.
 #[derive(Clone, Debug)]
 pub struct ProgressASG {
-    ema: Ewa2<ASG_EWA_LEN>,
+    ema: Ema2,
 }
 
 impl Default for ProgressASG {
     fn default() -> ProgressASG {
         ProgressASG {
-            ema: Ewa2::<ASG_EWA_LEN>::new(0.0),
+            ema: Ema2::new(ASG_EMA_LEN).with_slow(ASG_EMA_SLOW),
         }
     }
 }
@@ -20,7 +20,7 @@ impl Default for ProgressASG {
 impl Instantiate for ProgressASG {
     fn instantiate(_config: &Config, _cnf: &CNFDescription) -> Self {
         ProgressASG {
-            ema: Ewa2::new(0.0).with_slow(ASG_EWA_SLOW),
+            ema: Ema2::new(ASG_EMA_LEN).with_slow(ASG_EMA_SLOW),
         }
     }
 }

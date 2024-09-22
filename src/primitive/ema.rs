@@ -89,6 +89,12 @@ impl EmaIF for Ema {
 }
 
 impl EmaMutIF for Ema {
+    fn reset_to(&mut self, val: f64) {
+        self.val.fast = val;
+    }
+    fn reset_fast(&mut self) {
+        self.val.fast = 0.0;
+    }
     type Input = f64;
     #[cfg(not(feature = "EMA_calibration"))]
     fn update(&mut self, x: Self::Input) {
@@ -197,6 +203,7 @@ impl EmaMutIF for Ema2 {
     }
     fn reset_to(&mut self, val: f64) {
         self.ema.fast = val;
+        self.ema.slow = val;
     }
     #[cfg(not(feature = "EMA_calibration"))]
     fn reset_fast(&mut self) {
@@ -303,6 +310,7 @@ impl EmaSU {
     }
 }
 
+/*
 /// Equally-Weighted-Average, namely, Average
 #[derive(Clone, Debug)]
 pub struct Ewa<const N: usize = 32> {
@@ -386,6 +394,7 @@ impl<const N: usize> EmaMutIF for Ewa2<N> {
     }
     fn reset_to(&mut self, val: f64) {
         self.ema.fast = val;
+        self.ema.slow = val;
     }
     #[cfg(not(feature = "EMA_calibration"))]
     fn reset_fast(&mut self) {
@@ -431,3 +440,4 @@ impl<const N: usize> Ewa2<N> {
         self
     }
 }
+*/
