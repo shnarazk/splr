@@ -565,10 +565,31 @@ impl ClauseDBIF for ClauseDB {
             }
             // alives += 1;
             // keep += 1;
-            if self.clause[ci].is(FlagClause::USED) {
-                self.clause[ci].turn_off(FlagClause::USED);
+            self.clause[ci].turn_off(FlagClause::NEW_CLAUSE);
+            // if self.clause[ci].is(FlagClause::FORWD_LINK)
+            //     || self.clause[ci].is(FlagClause::BCKWD_LINK)
+            // {
+            //     self.clause[ci].turn_off(FlagClause::FORWD_LINK);
+            //     self.clause[ci].turn_off(FlagClause::BCKWD_LINK);
+            //     continue;
+            // }
+            /* let fwd: bool = self.clause[ci].is(FlagClause::FORWD_LINK);
+            self.clause[ci].turn_off(FlagClause::FORWD_LINK);
+            if self.clause[ci].is(FlagClause::BCKWD_LINK) {
+                self.clause[ci].turn_off(FlagClause::BCKWD_LINK);
+                continue;
+            } */
+            if self.clause[ci].is(FlagClause::FORWD_LINK)
+                || self.clause[ci].is(FlagClause::BCKWD_LINK)
+            {
+                self.clause[ci].turn_off(FlagClause::FORWD_LINK);
+                self.clause[ci].turn_off(FlagClause::BCKWD_LINK);
                 continue;
             }
+            /* let bwd: bool = self.clause[ci].is(FlagClause::BCKWD_LINK);
+            if bwd {
+                self.clause[ci].turn_off(FlagClause::BCKWD_LINK);
+            } */
             if self.clause[ci].is(FlagClause::LEARNT) {
                 let ClauseDB {
                     ref mut clause,

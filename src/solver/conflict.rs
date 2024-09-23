@@ -148,10 +148,18 @@ pub fn handle_conflict(
                     bumped.push(vi);
                 }
             }
-            AssignReason::Implication(r) => {
+            AssignReason::Implication(wli) => {
+                let ci = wli.as_ci();
                 #[cfg(feature = "keep_just_used_clauses")]
-                cdb[r.as_ci()].turn_on(FlagClause::USED);
-                for l in cdb[r.as_ci()].iter() {
+                {
+                    if !cdb[ci].is(FlagClause::BCKWD_LINK) {
+                        state
+                            .clause_generation_shift
+                            .update(cdb[ci].is(FlagClause::NEW_CLAUSE) as u8 as f64);
+                    }
+                    cdb[ci].turn_on(FlagClause::BCKWD_LINK);
+                }
+                for l in cdb[ci].iter() {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
                         asg.reward_at_analysis(vi);
@@ -333,6 +341,7 @@ fn conflict_analyze(
         }
         match reason {
             AssignReason::BinaryLink(l) => {
+                state.clause_generation_shift.update(0.0);
                 let vi = l.vi();
                 if !asg.var(vi).is(FlagVar::CA_SEEN) {
                     validate_vi!(vi);
