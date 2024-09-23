@@ -98,12 +98,13 @@ pub fn handle_conflict(
         //
         //## A NEW ASSERTION by UNIT LEARNT CLAUSE GENERATION
         //
+        let root_level = asg.root_level();
         match asg.assigned(l0) {
-            Some(true) if asg.root_level() < asg.level(l0.vi()) => {
-                panic!("double assignment occured");
-                // asg.lift_to_asserted(l0.vi());
+            Some(true) if asg.level(l0.vi()) == root_level => {
+                // dbg!("double assignment occured");
+                return Ok(root_level);
             }
-            Some(false) if asg.level(l0.vi()) == asg.root_level() => {
+            Some(false) if asg.level(l0.vi()) == root_level => {
                 return Err(SolverError::RootLevelConflict((l0, asg.reason(l0.vi()))));
             }
             _ => {
@@ -115,7 +116,7 @@ pub fn handle_conflict(
                 let vi = l0.vi();
                 state.stm.handle(SolverEvent::Assert(vi));
                 cdb.handle(SolverEvent::Assert(vi));
-                return Ok(0);
+                return Ok(asg.root_level());
             }
         }
     }
