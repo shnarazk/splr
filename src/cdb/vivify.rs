@@ -102,8 +102,8 @@ impl VivifyIF for ClauseDB {
                             }
                             AssignReason::Implication(wli) => {
                                 if wli.as_ci() == ci && clits.len() == decisions.len() {
-                                    #[cfg(feature = "keep_just_used_clauses")]
-                                    self.clause[wli.as_ci()].turn_on(FlagClause::USED);
+                                    // #[cfg(feature = "keep_just_used_clauses")]
+                                    // self.clause[ci].turn_on(FlagClause::??);
                                     asg.backtrack_sandbox();
                                     continue 'next_clause;
                                 } else {
@@ -280,8 +280,8 @@ impl AssignStack {
                     seen[bil.vi()] = key;
                 }
                 AssignReason::Implication(wli) => {
-                    #[cfg(feature = "keep_just_used_clauses")]
-                    cdb.clause[wli.as_ci()].turn_on(FlagClause::USED);
+                    // #[cfg(feature = "keep_just_used_clauses")]
+                    // cdb.clause[wli.as_ci()].turn_on(FlagClause::USED);
                     for (i, r) in cdb[wli.as_ci()].iter().enumerate() {
                         if i == wli.as_wi() {
                             continue;
