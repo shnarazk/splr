@@ -112,6 +112,8 @@ pub struct State {
     /// chrono_BT threshold
     pub chrono_bt_threshold: DecisionLevel,
 
+    /// for clause reduction
+    pub clause_generation_shift: Ema,
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
     /// working place to build learnt clauses
@@ -157,6 +159,7 @@ impl Default for State {
             #[cfg(feature = "chrono_BT")]
             chrono_bt_threshold: 100,
 
+            clause_generation_shift: Ema::new(12000),
             last_asg: 0,
             new_learnt: Vec::new(),
             derive20: Vec::new(),
@@ -560,9 +563,9 @@ impl StateIF for State {
             // "\x1B[2K        misc|ccut:{}, vdcy:{}, core:{}, /ppc:{}",
             "\x1B[2K{:>12}|ccut:{}, vdcy:{}, core:{}, /ppc:{}",
             format!(
-                "Luby{},{:>4.2}",
+                "Luby{}.{:0>2}",
                 self.stm.current_segment(),
-                self.stm.segment_progress_ratio(),
+                ((self.stm.segment_progress_ratio() * 100.0) as usize - 1).clamp(0, 99),
             ),
             fm!(
                 "{:>9.4}",
