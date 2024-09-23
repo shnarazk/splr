@@ -552,6 +552,8 @@ impl SolveIF for Solver {
                     state
                         .stm
                         .set_span_base(state.c_lvl.get_slow() - state.b_lvl.get_slow());
+
+                    asg.clear_asserted_literals(cdb)?;
                     dump_stage(asg, cdb, state, &ss.previous_stage);
 
                     #[cfg(feature = "rephase")]
