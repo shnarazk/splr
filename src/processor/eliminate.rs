@@ -94,6 +94,15 @@ pub fn eliminate_var(
                             // the merged clause might be a duplicated clause.
                             elim.add_cid_occur(asg, ci, &mut cdb[ci], true);
 
+                            for flg in [
+                                FlagClause::NEW_CLAUSE,
+                                FlagClause::FORWD_LINK,
+                                FlagClause::BCKWD_LINK,
+                            ] {
+                                let val: bool = cdb[*p].is(flg) || cdb[*n].is(flg);
+                                cdb[ci].set(flg, val);
+                            }
+
                             #[cfg(feature = "trace_elimination")]
                             println!(
                                 " - eliminate_var {}: X {} from {} and {}",

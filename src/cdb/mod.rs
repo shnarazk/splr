@@ -291,7 +291,7 @@ impl ClauseDBIF for ClauseDB {
         }
         #[cfg(feature = "keep_just_used_clauses")]
         {
-            self.clause[ci].turn_on(FlagClause::USED);
+            self.clause[ci].turn_on(FlagClause::NEW_CLAUSE);
         }
         // assert_ne!(self.clause[ci].lit0(), self.clause[ci].lit1());
         RefClause::Clause(ci)
@@ -518,7 +518,7 @@ impl ClauseDBIF for ClauseDB {
         let learnt = c.is(FlagClause::LEARNT);
         if learnt {
             #[cfg(feature = "keep_just_used_clauses")]
-            c.turn_on(FlagClause::USED);
+            c.turn_on(FlagClause::NEW_CLAUSE);
             #[cfg(feature = "clause_rewarding")]
             self.reward_at_analysis(ci);
         }
@@ -1387,7 +1387,7 @@ mod tests {
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
         #[cfg(feature = "keep_just_used_clauses")]
-        assert!(c.is(FlagClause::USED));
+        assert!(c.is(FlagClause::NEW_CLAUSE));
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
             .as_ci();
@@ -1395,7 +1395,7 @@ mod tests {
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
         #[cfg(feature = "keep_just_used_clauses")]
-        assert!(c.is(FlagClause::USED));
+        assert!(c.is(FlagClause::NEW_CLAUSE));
     }
     #[test]
     fn test_clause_equality() {

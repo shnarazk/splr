@@ -376,7 +376,13 @@ impl PropagateIF for AssignStack {
 
                             debug_assert_eq!(self.assigned(other), None);
                             #[cfg(feature = "keep_just_used_clauses")]
-                            c.turn_on(FlagClause::USED);
+                            {
+                                if !c.is(FlagClause::FORWD_LINK) {
+                                    let b = c.is(FlagClause::NEW_CLAUSE);
+                                    self.clause_generation_shift.update(b as u8 as f64);
+                                }
+                                c.turn_on(FlagClause::FORWD_LINK);
+                            }
                             self.assign_by_implication(
                                 other,
                                 if len == 0 {

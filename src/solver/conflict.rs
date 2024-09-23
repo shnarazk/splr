@@ -353,8 +353,11 @@ fn conflict_analyze(
                     state.derive20.push(ci);
                 } else {
                     #[cfg(feature = "keep_just_used_clauses")]
-                    cdb[ci].turn_on(FlagClause::USED);
+                    cdb[ci].turn_on(FlagClause::FORWD_LINK);
                 }
+                state
+                    .clause_generation_shift
+                    .update(cdb[ci].is(FlagClause::FORWD_LINK) as u8 as f64);
                 if max_lbd < cdb[ci].rank {
                     max_lbd = cdb[ci].rank;
                     ci_with_max_lbd = Some(ci);
