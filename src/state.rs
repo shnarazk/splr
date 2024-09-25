@@ -89,8 +89,6 @@ pub struct State {
     pub stm: StageManager,
     /// problem description
     pub target: CNFDescription,
-    /// strategy adjustment interval in conflict
-    pub reflection_interval: usize,
 
     //
     //## MISC
@@ -113,7 +111,7 @@ pub struct State {
     pub chrono_bt_threshold: DecisionLevel,
 
     /// for clause reduction
-    pub clause_generation_shift: Ema,
+    pub clause_generation_shift: Ema2,
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
     /// working place to build learnt clauses
@@ -145,11 +143,10 @@ impl Default for State {
             // restart: RestartManager::default(),
             stm: StageManager::default(),
             target: CNFDescription::default(),
-            reflection_interval: 10_000,
 
-            b_lvl: Ema2::new(16).with_slow(4_000),
-            c_lvl: Ema2::new(16).with_slow(4_000),
-            e_mode: Ema2::new(40).with_slow(4_000).with_value(10.0),
+            b_lvl: Ema2::new(16).with_slow(4096),
+            c_lvl: Ema2::new(16).with_slow(4096),
+            e_mode: Ema2::new(32).with_slow(4096).with_value(10.0),
             e_mode_threshold: 1.20,
             exploration_rate_ema: Ema::new(1000),
 
@@ -159,7 +156,7 @@ impl Default for State {
             #[cfg(feature = "chrono_BT")]
             chrono_bt_threshold: 100,
 
-            clause_generation_shift: Ema::new(12000),
+            clause_generation_shift: Ema2::new(8 * 8192).with_slow(32 * 8129),
             last_asg: 0,
             new_learnt: Vec::new(),
             derive20: Vec::new(),

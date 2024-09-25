@@ -377,7 +377,7 @@ impl PropagateIF for AssignStack {
                             debug_assert_eq!(self.assigned(other), None);
                             #[cfg(feature = "keep_just_used_clauses")]
                             {
-                                if !c.is(FlagClause::FORWD_LINK) {
+                                if 0 < len {
                                     let b = c.is(FlagClause::NEW_CLAUSE);
                                     self.clause_generation_shift.update(b as u8 as f64);
                                 }
@@ -417,6 +417,14 @@ impl PropagateIF for AssignStack {
                                 }
                             );
                             debug_assert_eq!(other, c[1 - false_index]);
+                            #[cfg(feature = "keep_just_used_clauses")]
+                            {
+                                if 0 < len {
+                                    let b = c.is(FlagClause::NEW_CLAUSE);
+                                    self.clause_generation_shift.update(b as u8 as f64);
+                                }
+                                c.turn_on(FlagClause::FORWD_LINK);
+                            }
                             conflict_path!(
                                 other,
                                 if len == 0 {

@@ -47,7 +47,7 @@ pub struct AssignStack {
     //
     //## Stage
     //
-    pub clause_generation_shift: Ema,
+    pub clause_generation_shift: Ema2,
     pub stage_scale: usize,
 
     //## Elimanated vars
@@ -126,7 +126,7 @@ impl Default for AssignStack {
             #[cfg(feature = "rephase")]
             phase_age: 0,
 
-            clause_generation_shift: Ema::new(12000),
+            clause_generation_shift: Ema2::new(8 * 8192).with_slow(32 * 8192),
             stage_scale: 1,
             eliminated: Vec::new(),
 
