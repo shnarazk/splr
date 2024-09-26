@@ -560,9 +560,9 @@ impl StateIF for State {
             // "\x1B[2K        misc|ccut:{}, vdcy:{}, core:{}, /ppc:{}",
             "\x1B[2K{:>12}|ccut:{}, vdcy:{}, core:{}, /ppc:{}",
             format!(
-                "Luby{}.{:0>2}",
+                "Luby{:>2}.{:0>2}",
                 self.stm.current_segment(),
-                ((self.stm.segment_progress_ratio() * 100.0) as usize - 1).clamp(0, 99),
+                ((self.stm.segment_progress_ratio() * 100.0) as usize).clamp(0, 99),
             ),
             fm!(
                 "{:>9.4}",
