@@ -34,10 +34,10 @@ impl VivifyIF for ClauseDB {
         // the key is the number of invocation
         let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
         let display_step: usize = 1000;
-        let mut num_check = 0;
-        let mut num_shrink = 0;
-        let mut num_assert = 0;
-        let mut to_display = 0;
+        let mut num_checked: usize = 0;
+        let mut num_shrink: usize = 0;
+        let mut num_assert: usize = 0;
+        let mut to_display: usize = 0;
         'next_clause: while let Some(cp) = clauses.pop() {
             asg.backtrack_sandbox();
             debug_assert_eq!(asg.decision_level(), asg.root_level());
@@ -56,17 +56,17 @@ impl VivifyIF for ClauseDB {
             let is_learnt = c.is(FlagClause::LEARNT);
             c.vivified();
             let clits = c.iter().copied().collect::<Vec<Lit>>();
-            if to_display <= num_check {
+            if to_display <= num_checked {
                 state.flush("");
                 state.flush(format!(
-                    "clause vivifying(assert:{num_assert} shorten:{num_shrink}, check:{num_check}/{num_target})..."
+                    "clause vivifying(assert:{num_assert} shorten:{num_shrink}, check:{num_checked}/{num_target})..."
                 ));
-                to_display = num_check + display_step;
+                to_display = num_checked + display_step;
             }
-            num_check += 1;
             // debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
             let mut decisions: Vec<Lit> = Vec::new();
             for lit in clits.iter().copied() {
+                num_checked += 1;
                 // assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
                 match asg.assigned(!lit) {
                     //## Rule 1
@@ -94,7 +94,7 @@ impl VivifyIF for ClauseDB {
                                     continue 'next_clause;
                                 } else {
                                     debug_assert!(clits.len() != 2 || decisions.len() != 2);
-                                    seen[0] = num_check;
+                                    seen[0] = num_checked;
                                     vec = asg
                                         .analyze_sandbox(self, &decisions, &cnfl_lits, &mut seen);
                                     asg.backtrack_sandbox();
@@ -109,7 +109,7 @@ impl VivifyIF for ClauseDB {
                                 } else {
                                     let cnfl_lits =
                                         &self[wli.as_ci()].iter().copied().collect::<Vec<Lit>>();
-                                    seen[0] = num_check;
+                                    seen[0] = num_checked;
                                     vec =
                                         asg.analyze_sandbox(self, &decisions, cnfl_lits, &mut seen);
                                     asg.backtrack_sandbox();
@@ -150,7 +150,7 @@ impl VivifyIF for ClauseDB {
                     }
                 }
             }
-            if VIVIFY_LIMIT < num_check {
+            if VIVIFY_LIMIT < num_checked {
                 break;
             }
         }
