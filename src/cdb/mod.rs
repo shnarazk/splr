@@ -92,7 +92,7 @@ pub trait ClauseDBIF:
     fn reset(&mut self);
     /// update flags.
     /// return `true` if it's learnt.
-    fn update_at_analysis(&mut self, asg: &impl AssignIF, ci: ClauseIndex) -> bool;
+    fn update_entanglement(&mut self, asg: &impl AssignIF, ci: ClauseIndex);
     /// record an asserted literal to unsat certification.
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.
@@ -507,7 +507,9 @@ impl ClauseDBIF for ClauseDB {
         // self.check_weave(wli.as_ci(), &[0, 1]);
         ret
     }
-    fn update_at_analysis(&mut self, asg: &impl AssignIF, ci: ClauseIndex) -> bool {
+    /// This function is called only on the learnt clause which has the highest LBD in
+    /// an analysis.
+    fn update_entanglement(&mut self, asg: &impl AssignIF, ci: ClauseIndex) {
         let ClauseDB {
             ref mut clause,
             ref mut lbd_temp,

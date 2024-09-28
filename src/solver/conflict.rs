@@ -205,9 +205,6 @@ pub fn handle_conflict(
                 assign_level,
             );
             // || check_graph(asg, cdb, l0, "biclause");
-            for cid in &state.derive20 {
-                cdb[*cid].turn_on(FlagClause::DERIVE20);
-            }
             rank = 1;
             #[cfg(feature = "bi_clause_completion")]
             cdb.complete_bi_clauses(asg);
@@ -218,6 +215,14 @@ pub fn handle_conflict(
 
             debug_assert_eq!(cdb[cid].lit0(), l0);
             debug_assert_eq!(asg.assigned(l0), None);
+
+            #[cfg(feature = "keep_just_used_clauses")]
+            {
+                let b = cdb[cid].is(FlagClause::NEW_CLAUSE);
+                asg.clause_generation_shift.update(b as u8 as f64);
+                cdb[cid].turn_on(FlagClause::FORWD_LINK);
+            }
+
             asg.assign_by_implication(
                 l0,
                 AssignReason::Implication(WatchLiteralIndex::new(cid, 0)),
@@ -359,6 +364,10 @@ fn conflict_analyze(
                 if !cdb[ci].is(FlagClause::LEARNT) {
                     state.derive20.push(ci);
                 }
+
+                #[cfg(feature = "clause_rewarding")]
+                cdb.reward_at_analysis(ci);
+
                 #[cfg(feature = "keep_just_used_clauses")]
                 {
                     state
@@ -366,7 +375,7 @@ fn conflict_analyze(
                         .update(cdb[ci].is(FlagClause::NEW_CLAUSE) as u8 as f64);
                     cdb[ci].turn_on(FlagClause::BCKWD_LINK);
                 }
-                if max_lbd < cdb[ci].rank {
+                if cdb[ci].is(FlagClause::LEARNT) && max_lbd < cdb[ci].rank {
                     max_lbd = cdb[ci].rank;
                     ci_with_max_lbd = Some(ci);
                 }
@@ -414,7 +423,7 @@ fn conflict_analyze(
         path_cnt -= 1;
     }
     if let Some(cid) = ci_with_max_lbd {
-        cdb.update_at_analysis(asg, cid);
+        cdb.update_entanglement(asg, cid);
     }
     minimize_learnt(&mut state.new_learnt, asg, cdb)
 }
