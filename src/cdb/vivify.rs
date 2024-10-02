@@ -7,7 +7,7 @@ use crate::{
     types::*,
 };
 
-const VIVIFY_LIMIT: usize = 80_000;
+const VIVIFY_LIMIT: usize = 128 * 1024;
 
 pub trait VivifyIF {
     fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent;
@@ -33,9 +33,10 @@ impl VivifyIF for ClauseDB {
         // This is a reusable vector to reduce memory consumption,
         // the key is the number of invocation
         let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
-        let display_step: usize = 1000;
+        let display_step: usize = 2500;
         let mut num_checked: usize = 0;
         let mut num_shrink: usize = 0;
+        let mut num_subsumed: usize = 0;
         let mut num_assert: usize = 0;
         let mut to_display: usize = 0;
         'next_clause: while let Some(cp) = clauses.pop() {
@@ -54,12 +55,13 @@ impl VivifyIF for ClauseDB {
                 continue;
             }
             let is_learnt = c.is(FlagClause::LEARNT);
+            let labor_pain = c.labor_pain;
             c.vivified();
             let clits = c.iter().copied().collect::<Vec<Lit>>();
             if to_display <= num_checked {
                 state.flush("");
                 state.flush(format!(
-                    "clause vivifying(assert:{num_assert} shorten:{num_shrink}, check:{num_checked}/{num_target})..."
+                    "vivifying(assert:{num_assert} subsume:{num_subsumed}, shorten:{num_shrink}, check:{num_checked}/{num_target})..."
                 ));
                 to_display = num_checked + display_step;
             }
@@ -92,6 +94,12 @@ impl VivifyIF for ClauseDB {
                                 {
                                     asg.backtrack_sandbox();
                                     continue 'next_clause;
+                                }
+                                if is_learnt {
+                                    asg.backtrack_sandbox();
+                                    self.delete_clause(ci);
+                                    num_subsumed += 1;
+                                    continue 'next_clause;
                                 } else {
                                     debug_assert!(clits.len() != 2 || decisions.len() != 2);
                                     seen[0] = num_checked;
@@ -101,6 +109,23 @@ impl VivifyIF for ClauseDB {
                                 }
                             }
                             AssignReason::Implication(wli) => {
+                                if wli.as_ci() != ci && is_learnt && decisions.len() <= clits.len()
+                                {
+                                    assert!(!self.clause[wli.as_ci()].is_dead());
+                                    assert!(!self.clause[ci].is_dead());
+                                    asg.backtrack_sandbox();
+                                    // println!(
+                                    //     "\n{}\n{}\n",
+                                    //     self.clause[wli.as_ci()],
+                                    //     self.clause[ci]
+                                    // );
+                                    self.delete_clause(ci);
+                                    num_subsumed += 1;
+                                    if self.clause[wli.as_ci()].is(FlagClause::LEARNT) {
+                                        self.clause[wli.as_ci()].labor_pain += labor_pain;
+                                    }
+                                    continue 'next_clause;
+                                }
                                 if wli.as_ci() == ci && clits.len() == decisions.len() {
                                     // #[cfg(feature = "keep_just_used_clauses")]
                                     // self.clause[ci].turn_on(FlagClause::??);
@@ -139,7 +164,11 @@ impl VivifyIF for ClauseDB {
                                     self.set_activity(ci, cp.value());
                                 }
                                 #[cfg(not(feature = "clause_rewarding"))]
-                                self.new_clause(asg, &mut vec, is_learnt);
+                                if let RefClause::Clause(ci) =
+                                    self.new_clause(asg, &mut vec, is_learnt)
+                                {
+                                    self[ci].labor_pain = labor_pain;
+                                }
                                 // propage_sandbox can't handle dead watchers correctly
                                 self.delete_clause(ci);
                                 num_shrink += 1;
@@ -163,7 +192,7 @@ impl VivifyIF for ClauseDB {
         debug_assert!(asg.stack_is_empty() || !asg.remains());
         state.flush("");
         state.flush(format!(
-            "vivification(assert:{num_assert} shorten:{num_shrink}), "
+            "vivified(assert:{num_assert} subsume:{num_subsumed}, shorten:{num_shrink}), "
         ));
         // state.log(
         //     asg.num_conflict,
@@ -213,7 +242,7 @@ fn select_targets(
             .iter()
             .enumerate()
             .skip(1)
-            .filter_map(|(i, c)| c.to_vivify(false).map(|r| OrderedProxy::new_invert(i, r)))
+            .filter_map(|(i, c)| c.to_vivify(false).map(|r| OrderedProxy::new(i, r)))
             .collect::<Vec<_>>();
         if let Some(max_len) = len {
             if max_len < clauses.len() {
@@ -355,7 +384,7 @@ impl Clause {
             (!self.is_dead()
                 && self.rank * 2 <= self.rank_old
                 && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
-            .then(|| -((self.rank_old - self.rank) as f64 / self.rank as f64))
+            .then(|| (self.rank - self.rank_old) as f64 / self.rank as f64)
         }
     }
     /// clear flags about vivification
