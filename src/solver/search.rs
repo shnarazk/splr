@@ -11,19 +11,19 @@ use {
 };
 
 const STAGE_SIZE: usize = 32;
+const INPROCESSOR_TRIGGER: usize = 1 << 13;
 
 #[derive(Debug, Default, PartialEq, PartialOrd)]
 pub struct SearchState {
     num_reduction: usize,
-    reduce_step: usize,
-    next_reduce: usize,
+    num_unasserted: usize,
     current_core: usize,
     current_span: usize,
     from_segment_beginning: usize,
     core_was_rebuilt: Option<usize>,
     previous_stage: Option<bool>,
     elapsed_time: f64,
-    reduce_threshold: f64,
+    reduction_bounds: (f64, f64),
 
     #[cfg(feature = "rephase")]
     sls_core: usize,
@@ -270,6 +270,7 @@ impl SolveIF for Solver {
             Ok(ss) => ss,
             Err(e) => return e,
         };
+        self.cdb.reduce(&mut self.asg, 5.0, 0.0);
         self.progress();
         loop {
             match self.search_stage(&mut ss) {
@@ -412,29 +413,21 @@ impl SolveIF for Solver {
             state[Stat::SubsumedClause] = elim.num_subsumed;
         }
         state.stm.initialize(STAGE_SIZE);
-        let nv: u32 = asg.derefer(assign::Tusize::NumUnassertedVar).max(1).ilog2();
-        let nc: u32 = cdb
-            .iter()
-            .filter(|c| !c.is_dead() && 2 < c.len())
-            .count()
-            .max(1)
-            .ilog2();
 
         Ok(SearchState {
             num_reduction: 0,
-            reduce_step: (nv + nc) as usize,
-            next_reduce: 64,
+            num_unasserted: usize::MAX,
             from_segment_beginning: 0,
             current_core: asg.derefer(assign::property::Tusize::NumUnassertedVar),
             current_span: 1,
             core_was_rebuilt: None,
             previous_stage: None,
             elapsed_time: 0.0,
-            reduce_threshold: 10000.0,
             #[cfg(feature = "rephase")]
             sls_core: cdb.derefer(cdb::property::Tusize::NumClause),
             #[cfg(feature = "graph_view")]
             span_history: Vec::new(),
+            reduction_bounds: (1.0e10, 1.0e-10),
         })
     }
     fn search_stage(&mut self, ss: &mut SearchState) -> Result<Option<bool>, SolverError> {
@@ -462,19 +455,13 @@ impl SolveIF for Solver {
             #[cfg(feature = "clause_rewarding")]
             cdb.update_activity_tick();
 
-            if asg.root_level() == handle_conflict(asg, cdb, state, &cc)? {
-                // let nv: u32 = asg.derefer(assign::Tusize::NumUnassertedVar).ilog2();
-                // let nc: u32 = cdb
-                //     .iter()
-                //     .filter(|c| !c.is_dead() && 2 < c.len())
-                //     .count()
-                //     .ilog2();
-                // ss.reduce_step = ((nv + nc) as usize + ss.reduce_step) / 2;
-            }
+            handle_conflict(asg, cdb, state, &cc)?;
             ss.from_segment_beginning += 1;
             if ss.current_span <= ss.from_segment_beginning {
-                let with_restart = 1.0 < cdb.refer(cdb::property::TEma::LBD).trend();
+                let rth = state.stm.segment_progress_ratio();
+                let with_restart = 1.0 + rth < cdb.refer(cdb::property::TEma::LBD).trend();
                 ss.from_segment_beginning = 0;
+                let last_scale = state.stm.current_scale();
 
                 #[cfg(feature = "graph_view")]
                 ss.span_history.push(ss.current_span);
@@ -498,56 +485,82 @@ impl SolveIF for Solver {
                     cdb.check_consistency(asg, "before simplify");
                 }
                 ss.current_span = state.stm.current_span() as usize;
-                let scale = state.stm.current_scale();
+                let scale: usize = state.stm.current_scale();
                 asg.handle(SolverEvent::Stage(scale));
+                #[allow(dead_code, unused_variables)]
                 if let Some(new_segment) = next_stage {
                     // a beginning of a new cycle
+                    let stm = &state.stm;
+                    let _ent: f64 = cdb.refer(cdb::property::TEma::Entanglement).get();
+                    let _lbd: f64 = cdb.refer(cdb::property::TEma::LBD).get();
+                    let ents: f64 = cdb.refer(cdb::property::TEma::Entanglement).get_slow();
+                    let lbds: f64 = cdb.refer(cdb::property::TEma::LBD).get_slow();
+                    if new_segment {
+                        ss.reduction_bounds = (f64::INFINITY, f64::INFINITY);
+                    } else {
+                        ss.reduction_bounds.0 = ss.reduction_bounds.0.min(ents);
+                        ss.reduction_bounds.1 = ss.reduction_bounds.1.min(lbds);
+                    }
+                    let k: f64 = (stm.current_segment() as f64).log2();
+                    let ratio: f64 = stm.segment_progress_ratio();
+                    if cfg!(feature = "reward_annealing") {
+                        const SLOP: f64 = 8.0;
+                        const R: (f64, f64) = (0.84, 0.995);
+                        let d: f64 = R.1 - (R.1 - R.0) * SLOP / (k + SLOP);
+                        let x: f64 = k * (2.0 * ratio - 1.0);
+                        let _r1 = {
+                            let sgm1 = |x: f64| x.tanh();
+                            let _sgm1 = |x: f64| x / (1.0 + x.abs());
+                            1.0 + 0.5 * (sgm1(x) - 1.0) * (1.0 - d)
+                        };
+                        let r = {
+                            let sgm = |x: f64| 1.0 / (1.0 + (-x).exp());
+                            d + sgm(x) * (1.0 - d)
+                        };
+                        asg.update_activity_decay(r);
+                    }
+                    let su: f64 = asg.clause_generation_shift.trend();
+                    let sc: f64 = state.clause_generation_shift.trend();
+                    // state.reduction_threshold = su.min(sc);
+                    state.reduction_threshold = state.clause_generation_shift.get();
+                    // if INPROCESSOR_TRIGGER <= last_scale && state.reduction_threshold <= 1.5 {
+                    if INPROCESSOR_TRIGGER <= last_scale
+                    /* && 0.33 < state.reduction_threshold */
                     {
-                        let stm = &state.stm;
-                        let b: f64 = stm.segment_starting_cycle() as f64;
-                        let n: f64 = stm.current_cycle() as f64 - b;
-
-                        if cfg!(feature = "reward_annealing") {
-                            const SLOP: f64 = 2.0;
-                            let sgm = |x: f64| x / (1.0 + x.abs());
-                            let m: f64 = 0.5 * b;
-                            let k: f64 = (stm.current_segment() as f64).log2();
-                            const R: (f64, f64) = (0.86, 0.995);
-                            let d: f64 = {
-                                let o: f64 = SLOP;
-                                R.1 - (R.1 - R.0) * o / (k + o)
-                            };
-                            let x: f64 = (1.0 + k) * (n - m) / m;
-                            asg.update_activity_decay(1.0 + 0.5 * (sgm(x) - 1.0) * (1.0 - d));
+                        // let _r: f64 = 0.5 * (1.0 + sgm2(4.0 * (2.0 * ratio.sqrt() - 1.0)));
+                        // let _val: f64 = 1.0 + ss.reduction_bounds.1.sqrt();
+                        // dbg!(asg.clause_generation_shift.get());
+                        cdb.reduce(asg, ents, ratio);
+                        // 0.75 * ss.reduction_bounds.0 + (0.25 * r) * ss.reduction_bounds.1;
+                        // r * ss.reduction_bounds.0 + (1.0 - r) * ss.reduction_bounds.1;
+                        // let val: f64 = r * (1.0 + ss.reduction_bounds.1.log2());
+                        // 1.25 * (ss.reduction_bounds.1 + ss.reduction_bounds.0 * (1.0 - r));
+                        // cdb.reduce(asg, if val.is_nan() { f64::INFINITY } else { val });
+                        asg.clause_generation_shift.reset_to(0.0);
+                        state.clause_generation_shift.reset_to(0.0);
+                        ss.num_reduction += 1;
+                        if cfg!(feature = "clause_vivification") {
+                            cdb.vivify(asg, state)?;
                         }
-
-                        let num_restart = asg.derefer(assign::Tusize::NumRestart);
-                        if ss.next_reduce <= num_restart {
-                            let ent: f64 = cdb.refer(cdb::property::TEma::Entanglement).get_slow();
-                            let lbd: f64 = cdb.refer(cdb::property::TEma::LBD).get_slow();
-                            // Note: val can be inf. It got better results.
-                            let val: f64 = 0.5 * ent.min(lbd) + ent.max(lbd) / (1.0 + n).log2();
-                            state.reduction_threshold = val;
-                            cdb.reduce(asg, val);
-                            ss.num_reduction += 1;
-                            ss.reduce_step += 1;
-                            ss.next_reduce = ss.reduce_step + num_restart;
-
-                            if cfg!(feature = "clause_vivification") {
-                                cdb.vivify(asg, state)?;
-                            }
-                            if cfg!(feature = "clause_elimination")
-                                && !cfg!(feature = "incremental_solver")
-                                && ss.num_reduction % 8 == 0
-                            {
-                                let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-                                state.flush("clause subsumption, ");
-                                elim.simplify(asg, cdb, state, false)?;
-                                asg.eliminated.append(elim.eliminated_lits());
-                                state[Stat::Simplify] += 1;
-                                state[Stat::SubsumedClause] = elim.num_subsumed;
-                            }
+                        // if ss.num_reduction % 8 == 1 {
+                        // if ratio < 0.1 {
+                        if cfg!(feature = "clause_elimination")
+                            && !cfg!(feature = "incremental_solver")
+                        // && ss.num_reduction % 8 == 0
+                        {
+                            let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+                            state.flush("clause subsumption, ");
+                            elim.simplify(asg, cdb, state, false)?;
+                            asg.eliminated.append(elim.eliminated_lits());
+                            state[Stat::Simplify] += 1;
+                            state[Stat::SubsumedClause] = elim.num_subsumed;
                         }
+                    }
+                    let num_unasserted: usize =
+                        asg.derefer(assign::property::Tusize::NumUnassertedVar);
+                    if num_unasserted < ss.num_unasserted {
+                        ss.num_unasserted = num_unasserted;
+                        state.stm.reset();
                     }
                     state
                         .stm
