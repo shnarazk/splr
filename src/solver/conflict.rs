@@ -150,13 +150,13 @@ pub fn handle_conflict(
             }
             AssignReason::Implication(wli) => {
                 let ci = wli.as_ci();
-                #[cfg(feature = "keep_just_used_clauses")]
+                /* #[cfg(feature = "keep_just_used_clauses")]
                 {
                     state
                         .clause_generation_shift
                         .update(cdb[ci].is(FlagClause::NEW_CLAUSE) as u8 as f64);
                     cdb[ci].turn_on(FlagClause::BCKWD_LINK);
-                }
+                } */
                 for l in cdb[ci].iter() {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
@@ -215,6 +215,12 @@ pub fn handle_conflict(
 
             debug_assert_eq!(cdb[cid].lit0(), l0);
             debug_assert_eq!(asg.assigned(l0), None);
+
+            {
+                if let AssignReason::Implication(wli) = cc.1 {
+                    cdb[wli.as_ci()].labor_pain = cdb[cid].rank / cdb[wli.as_ci()].rank;
+                }
+            }
 
             #[cfg(feature = "keep_just_used_clauses")]
             {
@@ -313,6 +319,16 @@ fn conflict_analyze(
         };
     }
 
+    #[cfg(feature = "keep_just_used_clauses")]
+    {
+        if let AssignReason::Implication(wli) = cc.1 {
+            state
+                .clause_generation_shift
+                .update(cdb[wli.as_ci()].is(FlagClause::NEW_CLAUSE) as u8 as f64);
+            cdb[wli.as_ci()].turn_on(FlagClause::BCKWD_LINK);
+        }
+    }
+
     let mut max_lbd: DecisionLevel = 0;
     let mut ci_with_max_lbd: Option<ClauseIndex> = None;
     #[cfg(feature = "trace_analysis")]
@@ -344,7 +360,6 @@ fn conflict_analyze(
         }
         match reason {
             AssignReason::BinaryLink(l) => {
-                state.clause_generation_shift.update(0.0);
                 let vi = l.vi();
                 if !asg.var(vi).is(FlagVar::CA_SEEN) {
                     validate_vi!(vi);
@@ -375,6 +390,7 @@ fn conflict_analyze(
                         .update(cdb[ci].is(FlagClause::NEW_CLAUSE) as u8 as f64);
                     cdb[ci].turn_on(FlagClause::BCKWD_LINK);
                 }
+
                 if cdb[ci].is(FlagClause::LEARNT) && max_lbd < cdb[ci].rank {
                     max_lbd = cdb[ci].rank;
                     ci_with_max_lbd = Some(ci);
@@ -418,7 +434,8 @@ fn conflict_analyze(
                     }
                 }
             }
-            AssignReason::Decision(_) | AssignReason::None => unreachable!(),
+            AssignReason::Decision(_) => unreachable!(),
+            AssignReason::None => unreachable!(),
         }
         path_cnt -= 1;
     }
