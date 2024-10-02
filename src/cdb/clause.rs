@@ -80,6 +80,8 @@ pub struct Clause {
     /// the index from which `propagate` starts searching an un-falsified literal.
     /// Since it's just a hint, we don't need u32 or usize.
     pub search_from: ClauseSize,
+    /// estimated cost to generate this clause again
+    pub labor_pain: DecisionLevel,
 
     #[cfg(feature = "boundary_check")]
     /// the number of conflicts at which this clause was used in `conflict_analyze`
@@ -103,6 +105,7 @@ impl Default for Clause {
             rank: u32::MAX,
             rank_old: u32::MAX,
             search_from: 2,
+            labor_pain: 0,
 
             #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
             timestamp: 0,
