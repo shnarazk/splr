@@ -87,7 +87,7 @@ pub trait ClauseDBIF:
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, threshold: f64);
+    fn reduce(&mut self, asg: &mut impl AssignIF, threshold: f64, extra: f64);
     /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.
@@ -517,113 +517,63 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         let c = &mut clause[ci];
         let rank: DecisionLevel = c.update_lbd(asg, lbd_temp);
-        let learnt = c.is(FlagClause::LEARNT);
-        if learnt {
-            #[cfg(feature = "keep_just_used_clauses")]
-            c.turn_on(FlagClause::NEW_CLAUSE);
-            #[cfg(feature = "clause_rewarding")]
-            self.reward_at_analysis(ci);
-        }
-        if 1 < rank {
-            self.lb_entanglement.update(rank as f64);
-        }
-        learnt
+        assert!(c.is(FlagClause::LEARNT));
+        self.lb_entanglement.update(rank as f64);
     }
     /// reduce the number of 'learnt' or *removable* clauses.
     #[cfg(feature = "keep_just_used_clauses")]
-    fn reduce(&mut self, asg: &mut impl AssignIF, threshold: f64) {
+    #[allow(unused_variables, dead_code)]
+    fn reduce(&mut self, asg: &mut impl AssignIF, threshold: f64, phase: f64) {
         impl Clause {
             fn extended_lbd(&self) -> f64 {
                 let l: f64 = self.len() as f64;
                 let r: f64 = self.rank as f64;
                 r + (l - r) / (l - r + 1.0)
             }
+            fn weighed_lbd2(&self, asg: &impl AssignIF) -> f64 {
+                let w: f64 = self
+                    .lits
+                    .iter()
+                    .map(|l| asg.activity(l.vi()).powf(1.25))
+                    .sum();
+                (1.0 - w / self.len() as f64) * self.extended_lbd()
+            }
+            fn weighed_lbd(&self, asg: &impl AssignIF) -> f64 {
+                let w: f64 = self
+                    .lits
+                    .iter()
+                    .fold(0.0, |acc, l| asg.activity(l.vi()).max(acc));
+                (1.0 - w) * self.extended_lbd()
+            }
         }
-        // let ClauseDB {
-        //     ref mut clause,
-        //     ref mut lbd_temp,
-        //     ref mut num_reduction,
-
-        //     #[cfg(feature = "clause_rewarding")]
-        //     ref tick,
-        //     #[cfg(feature = "clause_rewarding")]
-        //     ref activity_decay,
-        //     ..
-        // } = self;
         self.num_reduction += 1;
-        // let mut keep: usize = 0;
-        // let mut alives: usize = 0;
-        // let mut perm: Vec<OrderedProxy<ClauseIndex>> = Vec::with_capacity(clause.len());
-        // let reduction_threshold = self.reduction_threshold + 4;
-        /* let reduction_threshold: DecisionLevel = 4
-        + ((self
-            .reduction_threshold
-            .saturating_sub(self.lb_entanglement.get() as u32)
-            + 1) as f64)
-            .sqrt() as u32; */
+        let thr: f64 = threshold.log(2.0);
         for ci in 1..self.clause.len() {
             if self.clause[ci].is_dead() {
                 continue;
             }
-            // alives += 1;
-            // keep += 1;
+            let new: bool = self.clause[ci].is(FlagClause::NEW_CLAUSE);
+            let fwd: bool = self.clause[ci].is(FlagClause::FORWD_LINK);
+            let bck: bool = self.clause[ci].is(FlagClause::BCKWD_LINK);
+            // The below is a wrong assumption; subsumption can generate new & !fwd clauses?
+            // assert!(!new || fwd, "{:?}", self.clause[ci]);
             self.clause[ci].turn_off(FlagClause::NEW_CLAUSE);
-            // if self.clause[ci].is(FlagClause::FORWD_LINK)
-            //     || self.clause[ci].is(FlagClause::BCKWD_LINK)
-            // {
-            //     self.clause[ci].turn_off(FlagClause::FORWD_LINK);
-            //     self.clause[ci].turn_off(FlagClause::BCKWD_LINK);
-            //     continue;
-            // }
-            /* let fwd: bool = self.clause[ci].is(FlagClause::FORWD_LINK);
             self.clause[ci].turn_off(FlagClause::FORWD_LINK);
-            if self.clause[ci].is(FlagClause::BCKWD_LINK) {
-                self.clause[ci].turn_off(FlagClause::BCKWD_LINK);
-                continue;
-            } */
-            if self.clause[ci].is(FlagClause::FORWD_LINK)
-                || self.clause[ci].is(FlagClause::BCKWD_LINK)
-            {
-                self.clause[ci].turn_off(FlagClause::FORWD_LINK);
-                self.clause[ci].turn_off(FlagClause::BCKWD_LINK);
+            self.clause[ci].turn_off(FlagClause::BCKWD_LINK);
+            let ClauseDB {
+                ref mut clause,
+                ref mut lbd_temp,
+                ..
+            } = self;
+            if !clause[ci].is(FlagClause::LEARNT) {
                 continue;
             }
-            /* let bwd: bool = self.clause[ci].is(FlagClause::BCKWD_LINK);
-            if bwd {
-                self.clause[ci].turn_off(FlagClause::BCKWD_LINK);
-            } */
-            if self.clause[ci].is(FlagClause::LEARNT) {
-                let ClauseDB {
-                    ref mut clause,
-                    ref mut lbd_temp,
-                    ..
-                } = self;
-                if clause[ci].rank < threshold as DecisionLevel {
-                    continue;
-                }
-                clause[ci].update_lbd(asg, lbd_temp);
-                if threshold < clause[ci].extended_lbd() {
-                    // keep -= 1;
-                    // perm.push(OrderedProxy::new(ci, c.rank as f64));
-                    self.delete_clause(ci);
-                    continue;
-                }
+            clause[ci].update_lbd(asg, lbd_temp);
+            if clause[ci].rank <= 3 {
+                continue;
             }
+            self.delete_clause(ci);
         }
-        // let keep = perm.len().max(alives);
-        // if perm.is_empty() {
-        //     return;
-        // }
-        // perm.sort();
-        // let threshold = perm[keep.min(perm.len() - 1)].value();
-        // for i in perm.iter().skip(keep) {
-        //     // Being clause-position-independent, we keep or delete
-        //     // all clauses that have a same value as a unit.
-        //     if i.value() == threshold {
-        //         continue;
-        //     }
-        //     self.delete_clause(i.to());
-        // }
     }
     #[cfg(not(feature = "keep_just_used_clauses"))]
     #[allow(unreachable_code, unused_variables)]
