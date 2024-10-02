@@ -527,7 +527,6 @@ impl ClauseDBIF for ClauseDB {
         if 1 < rank {
             self.lb_entanglement.update(rank as f64);
         }
-        learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
     #[cfg(feature = "keep_just_used_clauses")]
