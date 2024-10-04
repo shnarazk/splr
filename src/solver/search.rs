@@ -11,7 +11,7 @@ use {
 };
 
 const STAGE_SIZE: usize = 32;
-const INPROCESSOR_TRIGGER: usize = 1 << 13;
+const INPROCESSOR_TRIGGER: usize = 1 << 12;
 
 #[derive(Debug, Default, PartialEq, PartialOrd)]
 pub struct SearchState {
@@ -24,7 +24,11 @@ pub struct SearchState {
     previous_stage: Option<bool>,
     elapsed_time: f64,
     reduction_bounds: (f64, f64),
+    restart_trigger_init: usize,
+    restart_trigger: usize,
 
+    #[cfg(feature = "rephase")]
+    with_rephase: bool,
     #[cfg(feature = "rephase")]
     sls_core: usize,
     #[cfg(feature = "graph_view")]
@@ -424,10 +428,14 @@ impl SolveIF for Solver {
             previous_stage: None,
             elapsed_time: 0.0,
             #[cfg(feature = "rephase")]
+            with_rephase: false,
+            #[cfg(feature = "rephase")]
             sls_core: cdb.derefer(cdb::property::Tusize::NumClause),
             #[cfg(feature = "graph_view")]
             span_history: Vec::new(),
             reduction_bounds: (1.0e10, 1.0e-10),
+            restart_trigger_init: INPROCESSOR_TRIGGER,
+            restart_trigger: INPROCESSOR_TRIGGER,
         })
     }
     fn search_stage(&mut self, ss: &mut SearchState) -> Result<Option<bool>, SolverError> {
@@ -497,6 +505,8 @@ impl SolveIF for Solver {
                     let lbds: f64 = cdb.refer(cdb::property::TEma::LBD).get_slow();
                     if new_segment {
                         ss.reduction_bounds = (f64::INFINITY, f64::INFINITY);
+                        // ss.restart_trigger_init = INPROCESSOR_TRIGGER;
+                        ss.restart_trigger = ss.restart_trigger_init;
                     } else {
                         ss.reduction_bounds.0 = ss.reduction_bounds.0.min(ents);
                         ss.reduction_bounds.1 = ss.reduction_bounds.1.min(lbds);
@@ -522,11 +532,13 @@ impl SolveIF for Solver {
                     let su: f64 = asg.clause_generation_shift.trend();
                     let sc: f64 = state.clause_generation_shift.trend();
                     // state.reduction_threshold = su.min(sc);
-                    state.reduction_threshold = state.clause_generation_shift.get();
-                    // if INPROCESSOR_TRIGGER <= last_scale && state.reduction_threshold <= 1.5 {
-                    if INPROCESSOR_TRIGGER <= last_scale
-                    /* && 0.33 < state.reduction_threshold */
-                    {
+                    state.reduction_threshold = sc; // state.clause_generation_shift.get();
+                    if ss.restart_trigger <= last_scale {
+                        if 4.0 < su {
+                            ss.restart_trigger = (ss.restart_trigger * 8) / 5;
+                        } else if su < 2.0 {
+                            ss.restart_trigger = (ss.restart_trigger * 5) / 8;
+                        }
                         // let _r: f64 = 0.5 * (1.0 + sgm2(4.0 * (2.0 * ratio.sqrt() - 1.0)));
                         // let _val: f64 = 1.0 + ss.reduction_bounds.1.sqrt();
                         // dbg!(asg.clause_generation_shift.get());

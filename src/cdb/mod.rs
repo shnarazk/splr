@@ -569,7 +569,7 @@ impl ClauseDBIF for ClauseDB {
                 continue;
             }
             clause[ci].update_lbd(asg, lbd_temp);
-            if clause[ci].rank <= 3 {
+            if clause[ci].rank <= 5 || bck {
                 continue;
             }
             self.delete_clause(ci);

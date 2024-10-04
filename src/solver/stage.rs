@@ -103,7 +103,7 @@ impl StageManager {
         let mut new_cycle = false;
         let mut new_segment = false;
         self.scale = self.generator.next_number();
-        self.span_ema.update(4.0 + (self.scale as f64).powf(0.4));
+        self.span_ema.update(4.0 + (self.scale as f64).powf(0.75));
         self.stage += 1;
         if self.scale == 1 {
             self.cycle += 1;
