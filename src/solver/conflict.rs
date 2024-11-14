@@ -359,7 +359,6 @@ fn conflict_analyze(
                     p
                 );
                 debug_assert!(2 < cdb[wli.as_ci()].len());
-                // if !cdb.update_at_analysis(asg, cid) {
                 let (ci, skip) = wli.indices();
                 if !cdb[ci].is(FlagClause::LEARNT) {
                     state.derive20.push(ci);
@@ -375,7 +374,8 @@ fn conflict_analyze(
                         .update(cdb[ci].is(FlagClause::NEW_CLAUSE) as u8 as f64);
                     cdb[ci].turn_on(FlagClause::BCKWD_LINK);
                 }
-                if cdb[ci].is(FlagClause::LEARNT) && max_lbd < cdb[ci].rank {
+
+                if max_lbd < cdb[ci].rank {
                     max_lbd = cdb[ci].rank;
                     ci_with_max_lbd = Some(ci);
                 }

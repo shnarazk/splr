@@ -164,8 +164,7 @@ impl Default for ClauseDB {
             num_learnt: 0,
             num_reduction: 0,
             num_reregistration: 0,
-            // lb_entanglement: Ema2::new(1_000).with_slow(80_000).with_value(16.0),
-            lb_entanglement: Ema2::new(16).with_slow(8192).with_value(16.0),
+            lb_entanglement: Ema2::new(256).with_slow(8192).with_value(16.0),
 
             #[cfg(all(feature = "clause_elimination", not(feature = "incremental_solver")))]
             eliminated_permanent: Vec::new(),
@@ -507,8 +506,8 @@ impl ClauseDBIF for ClauseDB {
         // self.check_weave(wli.as_ci(), &[0, 1]);
         ret
     }
-    /// This function is called only on the learnt clause which has the highest LBD in
-    /// an analysis.
+    // The entanglement is defined as the average on max LBDs
+    // of which clauses are used conflict analysis
     fn update_entanglement(&mut self, asg: &impl AssignIF, ci: ClauseIndex) {
         let ClauseDB {
             ref mut clause,
@@ -517,16 +516,7 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         let c = &mut clause[ci];
         let rank: DecisionLevel = c.update_lbd(asg, lbd_temp);
-        let learnt = c.is(FlagClause::LEARNT);
-        if learnt {
-            #[cfg(feature = "keep_just_used_clauses")]
-            c.turn_on(FlagClause::NEW_CLAUSE);
-            #[cfg(feature = "clause_rewarding")]
-            self.reward_at_analysis(ci);
-        }
-        if 1 < rank {
-            self.lb_entanglement.update(rank as f64);
-        }
+        self.lb_entanglement.update(rank as f64);
     }
     /// reduce the number of 'learnt' or *removable* clauses.
     #[cfg(feature = "keep_just_used_clauses")]
@@ -554,12 +544,6 @@ impl ClauseDBIF for ClauseDB {
         // let mut alives: usize = 0;
         // let mut perm: Vec<OrderedProxy<ClauseIndex>> = Vec::with_capacity(clause.len());
         // let reduction_threshold = self.reduction_threshold + 4;
-        /* let reduction_threshold: DecisionLevel = 4
-        + ((self
-            .reduction_threshold
-            .saturating_sub(self.lb_entanglement.get() as u32)
-            + 1) as f64)
-            .sqrt() as u32; */
         for ci in 1..self.clause.len() {
             if self.clause[ci].is_dead() {
                 continue;
