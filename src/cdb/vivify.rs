@@ -36,6 +36,7 @@ impl VivifyIF for ClauseDB {
         let display_step: usize = 1000;
         let mut num_checked: usize = 0;
         let mut num_shrink: usize = 0;
+        let mut num_subsumed: usize = 0;
         let mut num_assert: usize = 0;
         let mut to_display: usize = 0;
         'next_clause: while let Some(cp) = clauses.pop() {
@@ -59,7 +60,7 @@ impl VivifyIF for ClauseDB {
             if to_display <= num_checked {
                 state.flush("");
                 state.flush(format!(
-                    "clause vivifying(assert:{num_assert} shorten:{num_shrink}, check:{num_checked}/{num_target})..."
+                    "vivifying(assert:{num_assert} subsume:{num_subsumed}, shorten:{num_shrink}, check:{num_checked}/{num_target})..."
                 ));
                 to_display = num_checked + display_step;
             }
@@ -101,6 +102,18 @@ impl VivifyIF for ClauseDB {
                                 }
                             }
                             AssignReason::Implication(wli) => {
+                                if wli.as_ci() != ci
+                                    && is_learnt
+                                    && decisions.len() <= clits.len()
+                                    && self.clause[wli.as_ci()].len() <= clits.len()
+                                {
+                                    assert!(!self.clause[wli.as_ci()].is_dead());
+                                    assert!(!self.clause[ci].is_dead());
+                                    asg.backtrack_sandbox();
+                                    self.delete_clause(ci);
+                                    num_subsumed += 1;
+                                    continue 'next_clause;
+                                }
                                 if wli.as_ci() == ci && clits.len() == decisions.len() {
                                     // #[cfg(feature = "keep_just_used_clauses")]
                                     // self.clause[ci].turn_on(FlagClause::??);
@@ -163,7 +176,7 @@ impl VivifyIF for ClauseDB {
         debug_assert!(asg.stack_is_empty() || !asg.remains());
         state.flush("");
         state.flush(format!(
-            "vivification(assert:{num_assert} shorten:{num_shrink}), "
+            "vivified(assert:{num_assert}, subsume:{num_subsumed}, shorten:{num_shrink}), "
         ));
         // state.log(
         //     asg.num_conflict,
@@ -355,7 +368,7 @@ impl Clause {
             (!self.is_dead()
                 && self.rank * 2 <= self.rank_old
                 && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
-            .then(|| -((self.rank_old - self.rank) as f64 / self.rank as f64))
+            .then(|| (self.rank_old - self.rank) as f64 / self.rank as f64)
         }
     }
     /// clear flags about vivification
