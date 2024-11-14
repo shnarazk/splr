@@ -39,7 +39,6 @@
             value = mkShell {
                 packages = [
                   bashInteractive
-                  libiconv
                   samply
                   tokei
                   # cargo-watch
