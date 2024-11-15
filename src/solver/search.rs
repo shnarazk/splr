@@ -508,17 +508,17 @@ impl SolveIF for Solver {
                         let n: f64 = stm.current_cycle() as f64 - b;
 
                         if cfg!(feature = "reward_annealing") {
-                            const SLOP: f64 = 2.0;
-                            let sgm = |x: f64| x / (1.0 + x.abs());
-                            let m: f64 = 0.5 * b;
                             let k: f64 = (stm.current_segment() as f64).log2();
-                            const R: (f64, f64) = (0.86, 0.995);
-                            let d: f64 = {
-                                let o: f64 = SLOP;
-                                R.1 - (R.1 - R.0) * o / (k + o)
+                            let ratio: f64 = stm.segment_progress_ratio();
+                            const SLOP: f64 = 8.0;
+                            const R: (f64, f64) = (0.84, 0.995);
+                            let d: f64 = R.1 - (R.1 - R.0) * SLOP / (k + SLOP);
+                            let x: f64 = k * (2.0 * ratio - 1.0);
+                            let r = {
+                                let sgm = |x: f64| 1.0 / (1.0 + (-x).exp());
+                                d + sgm(x) * (1.0 - d)
                             };
-                            let x: f64 = (1.0 + k) * (n - m) / m;
-                            asg.update_activity_decay(1.0 + 0.5 * (sgm(x) - 1.0) * (1.0 - d));
+                            asg.update_activity_decay(r);
                         }
 
                         let num_restart = asg.derefer(assign::Tusize::NumRestart);
