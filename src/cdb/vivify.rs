@@ -102,15 +102,17 @@ impl VivifyIF for ClauseDB {
                                 }
                             }
                             AssignReason::Implication(wli) => {
-                                if wli.as_ci() != ci
-                                    && is_learnt
-                                    && decisions.len() <= clits.len()
-                                    && self.clause[wli.as_ci()].len() <= clits.len()
+                                if wli.as_ci() != ci && decisions.len() <= clits.len()
+                                // && self.clause[wli.as_ci()].len() <= clits.len()
                                 {
-                                    assert!(!self.clause[wli.as_ci()].is_dead());
-                                    assert!(!self.clause[ci].is_dead());
+                                    debug_assert!(!self.clause[wli.as_ci()].is_dead());
+                                    debug_assert!(!self.clause[ci].is_dead());
                                     asg.backtrack_sandbox();
                                     self.delete_clause(ci);
+                                    if !is_learnt && self.clause[wli.as_ci()].is(FlagClause::LEARNT)
+                                    {
+                                        self.clause[wli.as_ci()].turn_off(FlagClause::LEARNT);
+                                    }
                                     num_subsumed += 1;
                                     continue 'next_clause;
                                 }
