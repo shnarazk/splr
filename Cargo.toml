@@ -32,7 +32,7 @@ default = [
         "keep_just_used_clauses",
         "LRB_rewarding",
         "reason_side_rewarding",
-        # "rephase",
+        "rephase",
         "reward_annealing",
         # "stochastic_local_search",
         "trail_saving",

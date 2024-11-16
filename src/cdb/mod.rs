@@ -87,12 +87,14 @@ pub trait ClauseDBIF:
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, threshold: f64);
+    fn reduce(&mut self, threshold: f64);
     /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.
     /// return `true` if it's learnt.
     fn update_entanglement(&mut self, asg: &impl AssignIF, ci: ClauseIndex);
+    /// update LBD and return the new value
+    fn update_lbd(&mut self, asg: &impl AssignIF, ci: ClauseIndex) -> DecisionLevel;
     /// record an asserted literal to unsat certification.
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.
@@ -518,21 +520,29 @@ impl ClauseDBIF for ClauseDB {
         let rank: DecisionLevel = c.update_lbd(asg, lbd_temp);
         self.lb_entanglement.update(rank as f64);
     }
+    fn update_lbd(&mut self, asg: &impl AssignIF, ci: ClauseIndex) -> DecisionLevel {
+        let ClauseDB {
+            ref mut clause,
+            ref mut lbd_temp,
+            ..
+        } = self;
+        let c = &mut clause[ci];
+        c.update_lbd(asg, lbd_temp)
+    }
     /// reduce the number of 'learnt' or *removable* clauses.
     #[cfg(feature = "keep_just_used_clauses")]
-    fn reduce(&mut self, asg: &mut impl AssignIF, threshold: f64) {
-        impl Clause {
-            fn extended_lbd(&self) -> f64 {
-                let l: f64 = self.len() as f64;
-                let r: f64 = self.rank as f64;
-                r + (l - r) / (l - r + 1.0)
-            }
-        }
+    fn reduce(&mut self, threshold: f64) {
+        // impl Clause {
+        //     fn extended_lbd(&self) -> f64 {
+        //         let l: f64 = self.len() as f64;
+        //         let r: f64 = self.rank as f64;
+        //         r + (l - r) / (l - r + 1.0)
+        //     }
+        // }
         // let ClauseDB {
         //     ref mut clause,
         //     ref mut lbd_temp,
         //     ref mut num_reduction,
-
         //     #[cfg(feature = "clause_rewarding")]
         //     ref tick,
         //     #[cfg(feature = "clause_rewarding")]
@@ -542,71 +552,38 @@ impl ClauseDBIF for ClauseDB {
         self.num_reduction += 1;
         // let mut keep: usize = 0;
         // let mut alives: usize = 0;
-        // let mut perm: Vec<OrderedProxy<ClauseIndex>> = Vec::with_capacity(clause.len());
         // let reduction_threshold = self.reduction_threshold + 4;
         for ci in 1..self.clause.len() {
             if self.clause[ci].is_dead() {
                 continue;
             }
+            let fwd = self.clause[ci].is(FlagClause::FORWD_LINK);
+            if fwd {
+                self.clause[ci].turn_off(FlagClause::FORWD_LINK);
+            }
+            let bck = self.clause[ci].is(FlagClause::BCKWD_LINK);
+            if bck {
+                self.clause[ci].turn_off(FlagClause::BCKWD_LINK);
+            }
+            let new = self.clause[ci].is(FlagClause::NEW_CLAUSE);
+            if new {
+                self.clause[ci].turn_off(FlagClause::NEW_CLAUSE);
+            }
+            if !self.clause[ci].is(FlagClause::LEARNT) {
+                continue;
+            }
+            if bck {
+                continue;
+            }
             // alives += 1;
             // keep += 1;
-            self.clause[ci].turn_off(FlagClause::NEW_CLAUSE);
-            // if self.clause[ci].is(FlagClause::FORWD_LINK)
-            //     || self.clause[ci].is(FlagClause::BCKWD_LINK)
-            // {
-            //     self.clause[ci].turn_off(FlagClause::FORWD_LINK);
-            //     self.clause[ci].turn_off(FlagClause::BCKWD_LINK);
-            //     continue;
-            // }
-            /* let fwd: bool = self.clause[ci].is(FlagClause::FORWD_LINK);
-            self.clause[ci].turn_off(FlagClause::FORWD_LINK);
-            if self.clause[ci].is(FlagClause::BCKWD_LINK) {
-                self.clause[ci].turn_off(FlagClause::BCKWD_LINK);
-                continue;
-            } */
-            if self.clause[ci].is(FlagClause::FORWD_LINK)
-                || self.clause[ci].is(FlagClause::BCKWD_LINK)
+            if (threshold as DecisionLevel) < self.clause[ci].rank
+            /* extended_lbd() */
             {
-                self.clause[ci].turn_off(FlagClause::FORWD_LINK);
-                self.clause[ci].turn_off(FlagClause::BCKWD_LINK);
-                continue;
-            }
-            /* let bwd: bool = self.clause[ci].is(FlagClause::BCKWD_LINK);
-            if bwd {
-                self.clause[ci].turn_off(FlagClause::BCKWD_LINK);
-            } */
-            if self.clause[ci].is(FlagClause::LEARNT) {
-                let ClauseDB {
-                    ref mut clause,
-                    ref mut lbd_temp,
-                    ..
-                } = self;
-                if clause[ci].rank < threshold as DecisionLevel {
-                    continue;
-                }
-                clause[ci].update_lbd(asg, lbd_temp);
-                if threshold < clause[ci].extended_lbd() {
-                    // keep -= 1;
-                    // perm.push(OrderedProxy::new(ci, c.rank as f64));
-                    self.delete_clause(ci);
-                    continue;
-                }
+                // keep -= 1;
+                self.delete_clause(ci);
             }
         }
-        // let keep = perm.len().max(alives);
-        // if perm.is_empty() {
-        //     return;
-        // }
-        // perm.sort();
-        // let threshold = perm[keep.min(perm.len() - 1)].value();
-        // for i in perm.iter().skip(keep) {
-        //     // Being clause-position-independent, we keep or delete
-        //     // all clauses that have a same value as a unit.
-        //     if i.value() == threshold {
-        //         continue;
-        //     }
-        //     self.delete_clause(i.to());
-        // }
     }
     #[cfg(not(feature = "keep_just_used_clauses"))]
     #[allow(unreachable_code, unused_variables)]

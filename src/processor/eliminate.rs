@@ -167,6 +167,7 @@ pub fn eliminate_var(
     */
     elim[vi].clear();
     asg.handle(SolverEvent::Eliminate(vi));
+    state.stm.handle(SolverEvent::Eliminate(vi));
     elim.backward_subsumption_check(asg, cdb)
 }
 

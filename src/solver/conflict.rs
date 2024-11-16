@@ -376,8 +376,11 @@ fn conflict_analyze(
                 }
 
                 if max_lbd < cdb[ci].rank {
-                    max_lbd = cdb[ci].rank;
-                    ci_with_max_lbd = Some(ci);
+                    let r = cdb.update_lbd(asg, ci);
+                    if max_lbd < r {
+                        max_lbd = r;
+                        ci_with_max_lbd = Some(ci);
+                    }
                 }
                 assert_eq!(
                     p,

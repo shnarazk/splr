@@ -212,6 +212,10 @@ impl Instantiate for AssignStack {
             SolverEvent::Eliminate(vi) => {
                 self.make_var_eliminated(vi);
             }
+            SolverEvent::Restart => {
+                #[cfg(feature = "trail_saving")]
+                self.clear_saved_trail();
+            }
             SolverEvent::Stage(scale) => {
                 self.stage_scale = scale;
                 #[cfg(feature = "trail_saving")]

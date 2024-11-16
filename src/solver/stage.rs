@@ -49,8 +49,11 @@ impl Instantiate for StageManager {
             ..StageManager::default()
         }
     }
-    fn handle(&mut self, _: SolverEvent) {
-        unimplemented!();
+    fn handle(&mut self, e: SolverEvent) {
+        match e {
+            SolverEvent::Assert(_) | SolverEvent::Eliminate(_) => self.reset(),
+            _ => (),
+        }
     }
 }
 

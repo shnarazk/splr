@@ -145,6 +145,7 @@ impl VivifyIF for ClauseDB {
                             1 => {
                                 self.certificate_add_assertion(vec[0]);
                                 asg.assign_at_root_level(vec[0])?;
+                                state.stm.handle(SolverEvent::Assert(vec[0].vi()));
                                 num_assert += 1;
                             }
                             _ => {
