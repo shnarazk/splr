@@ -87,7 +87,7 @@ pub trait ClauseDBIF:
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, threshold: f64);
+    fn reduce(&mut self, asg: &impl AssignIF, threshold: f64, new_assertion: bool);
     /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.
@@ -531,7 +531,7 @@ impl ClauseDBIF for ClauseDB {
     }
     /// reduce the number of 'learnt' or *removable* clauses.
     #[cfg(feature = "keep_just_used_clauses")]
-    fn reduce(&mut self, threshold: f64) {
+    fn reduce(&mut self, asg: &impl AssignIF, threshold: f64, new_assertion: bool) {
         // impl Clause {
         //     fn extended_lbd(&self) -> f64 {
         //         let l: f64 = self.len() as f64;
@@ -569,10 +569,14 @@ impl ClauseDBIF for ClauseDB {
             if new {
                 self.clause[ci].turn_off(FlagClause::NEW_CLAUSE);
             }
-            if !self.clause[ci].is(FlagClause::LEARNT) {
+            if bck {
                 continue;
             }
-            if bck {
+            if new_assertion && self.clause[ci].is_satisfied_under(asg) {
+                self.delete_clause(ci);
+                continue;
+            }
+            if !self.clause[ci].is(FlagClause::LEARNT) {
                 continue;
             }
             // alives += 1;

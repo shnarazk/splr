@@ -15,6 +15,7 @@ const STAGE_SIZE: usize = 32;
 #[derive(Debug, Default, PartialEq, PartialOrd)]
 pub struct SearchState {
     num_reduction: usize,
+    new_assertion: bool,
     reduce_step: usize,
     next_restart: usize,
     next_reduce: usize,
@@ -424,6 +425,7 @@ impl SolveIF for Solver {
 
         Ok(SearchState {
             num_reduction: 0,
+            new_assertion: false,
             reduce_step: (nv + nc) as usize,
             next_reduce: 64,
             next_restart: 1024,
@@ -465,20 +467,17 @@ impl SolveIF for Solver {
             #[cfg(feature = "clause_rewarding")]
             cdb.update_activity_tick();
 
-            if asg.root_level() == handle_conflict(asg, cdb, state, &cc)? {
-                state.stm.handle(SolverEvent::Assert(0));
-                // let nv: u32 = asg.derefer(assign::Tusize::NumUnassertedVar).ilog2();
-                // let nc: u32 = cdb
-                //     .iter()
-                //     .filter(|c| !c.is_dead() && 2 < c.len())
-                //     .count()
-                //     .ilog2();
-                // ss.reduce_step = ((nv + nc) as usize + ss.reduce_step) / 2;
+            match handle_conflict(asg, cdb, state, &cc)? {
+                0 => {
+                    state.stm.handle(SolverEvent::Assert(0));
+                    ss.new_assertion = true;
+                }
+                1 => (), // ss.next_reduce = 0,
+                _ => (),
             }
             let num_conflict = asg.derefer(assign::Tusize::NumConflict);
             let with_restart = ss.next_restart <= num_conflict
                 && 1.0 <= cdb.refer(cdb::property::TEma::LBD).trend();
-            // && (ents + 1.0 < lbd || 1.0 <= cdb.refer(cdb::property::TEma::LBD).trend())
             if with_restart {
                 RESTART!(asg, cdb, state);
                 asg.clear_asserted_literals(cdb)?;
@@ -490,7 +489,6 @@ impl SolveIF for Solver {
                 // let sgm = |x: f64| 1.0 / (1.0 + (-x).exp());
                 // ss.next_restart = num_conflict + (((ent + lbd) * sgm(x)) as usize).max(6);
                 ss.next_restart = num_conflict + 9;
-
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
             }
@@ -508,11 +506,41 @@ impl SolveIF for Solver {
                 let scale = state.stm.current_scale();
                 asg.handle(SolverEvent::Stage(scale));
                 if let Some(new_segment) = next_stage {
-                    // a beginning of a new cycle
-                    if new_segment && !with_restart {
-                        RESTART!(asg, cdb, state);
-                        asg.clear_asserted_literals(cdb)?;
+                    let num_restart = asg.derefer(assign::Tusize::NumRestart);
+                    if ss.next_reduce <= num_restart {
+                        if !with_restart {
+                            RESTART!(asg, cdb, state);
+                            asg.clear_asserted_literals(cdb)?;
+                        }
+                        let _lbd = cdb.refer(cdb::property::TEma::LBD).get();
+                        let ents: f64 = cdb.refer(cdb::property::TEma::Entanglement).get_slow();
+                        // let threshold = 12.0 / (state.stm.current_segment() as f64).sqrt();
+                        let threshold = (2.0 / state.stm.segment_progress_ratio()).min(ents.sqrt());
+                        state.reduction_threshold = threshold;
+                        cdb.reduce(asg, threshold, ss.new_assertion);
+                        ss.new_assertion = false;
+                        ss.num_reduction += 1;
+                        ss.reduce_step += ss.current_core.ilog2() as usize;
+                        ss.next_reduce = ss.reduce_step + num_restart;
+                        if cfg!(feature = "clause_vivification") && ss.num_reduction % 8 == 0 {
+                            cdb.vivify(asg, state)?;
+                        }
+                        if cfg!(feature = "clause_elimination")
+                            && !cfg!(feature = "incremental_solver")
+                            && ss.num_reduction % 24 == 0
+                        {
+                            let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+                            state.flush("clause subsumption, ");
+                            elim.simplify(asg, cdb, state, false)?;
+                            let el = elim.eliminated_lits();
+                            if !el.is_empty() {
+                                asg.eliminated.append(el);
+                            }
+                            state[Stat::Simplify] += 1;
+                            state[Stat::SubsumedClause] = elim.num_subsumed;
+                        }
                     }
+                    // a beginning of a new cycle
                     let stm = &state.stm;
                     if cfg!(feature = "reward_annealing") {
                         let k: f64 = (stm.current_segment() as f64).log2();
@@ -526,35 +554,6 @@ impl SolveIF for Solver {
                             d + sgm(x) * (1.0 - d)
                         };
                         asg.update_activity_decay(r);
-                    }
-                    let num_restart = asg.derefer(assign::Tusize::NumRestart);
-                    if new_segment && ss.next_reduce <= num_restart {
-                        let lbd = cdb.refer(cdb::property::TEma::LBD).get();
-                        let ents: f64 = cdb.refer(cdb::property::TEma::Entanglement).get_slow();
-                        let val = (ents + lbd).sqrt().max(5.0);
-                        state.reduction_threshold = val;
-                        cdb.reduce(val);
-                        ss.num_reduction += 1;
-                        ss.reduce_step += ss.current_core.ilog2() as usize;
-                        ss.next_reduce = ss.reduce_step + num_restart;
-
-                        if cfg!(feature = "clause_vivification") {
-                            cdb.vivify(asg, state)?;
-                        }
-                        if cfg!(feature = "clause_elimination")
-                            && !cfg!(feature = "incremental_solver")
-                            && ss.num_reduction % 8 == 0
-                        {
-                            let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-                            state.flush("clause subsumption, ");
-                            elim.simplify(asg, cdb, state, false)?;
-                            let el = elim.eliminated_lits();
-                            if 0 < el.len() {
-                                asg.eliminated.append(el);
-                            }
-                            state[Stat::Simplify] += 1;
-                            state[Stat::SubsumedClause] = elim.num_subsumed;
-                        }
                     }
                     state
                         .stm
