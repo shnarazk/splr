@@ -102,7 +102,7 @@ pub fn handle_conflict(
         match asg.assigned(l0) {
             Some(true) if asg.level(l0.vi()) == root_level => {
                 // dbg!("double assignment occured");
-                return Ok(root_level);
+                return Ok(0);
             }
             Some(false) if asg.level(l0.vi()) == root_level => {
                 return Err(SolverError::RootLevelConflict((l0, asg.reason(l0.vi()))));
@@ -115,7 +115,7 @@ pub fn handle_conflict(
                 }
                 let vi = l0.vi();
                 cdb.handle(SolverEvent::Assert(vi));
-                return Ok(asg.root_level());
+                return Ok(0);
             }
         }
     }
