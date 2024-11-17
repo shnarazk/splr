@@ -102,18 +102,21 @@ impl VivifyIF for ClauseDB {
                                 }
                             }
                             AssignReason::Implication(wli) => {
-                                if wli.as_ci() != ci && decisions.len() <= clits.len()
-                                // && self.clause[wli.as_ci()].len() <= clits.len()
-                                {
-                                    debug_assert!(!self.clause[wli.as_ci()].is_dead());
-                                    debug_assert!(!self.clause[ci].is_dead());
+                                if wli.as_ci() != ci {
                                     asg.backtrack_sandbox();
-                                    self.delete_clause(ci);
-                                    if !is_learnt && self.clause[wli.as_ci()].is(FlagClause::LEARNT)
+                                    if decisions.len() < clits.len()
+                                        && self.clause[wli.as_ci()]
+                                            .iter()
+                                            .all(|l| decisions.contains(l))
                                     {
-                                        self.clause[wli.as_ci()].turn_off(FlagClause::LEARNT);
+                                        self.delete_clause(ci);
+                                        if !is_learnt
+                                            && self.clause[wli.as_ci()].is(FlagClause::LEARNT)
+                                        {
+                                            self.clause[wli.as_ci()].turn_off(FlagClause::LEARNT);
+                                        }
+                                        num_subsumed += 1;
                                     }
-                                    num_subsumed += 1;
                                     continue 'next_clause;
                                 }
                                 if wli.as_ci() == ci && clits.len() == decisions.len() {
@@ -156,7 +159,7 @@ impl VivifyIF for ClauseDB {
                                 }
                                 #[cfg(not(feature = "clause_rewarding"))]
                                 self.new_clause(asg, &mut vec, is_learnt);
-                                // propage_sandbox can't handle dead watchers correctly
+                                // propagate_sandbox can't handle dead watchers correctly
                                 self.delete_clause(ci);
                                 num_shrink += 1;
                             }

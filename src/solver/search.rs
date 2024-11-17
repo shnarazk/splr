@@ -481,7 +481,7 @@ impl SolveIF for Solver {
             // && (ents + 1.0 < lbd || 1.0 <= cdb.refer(cdb::property::TEma::LBD).trend())
             if with_restart {
                 RESTART!(asg, cdb, state);
-                // asg.clear_asserted_literals(cdb)?;
+                asg.clear_asserted_literals(cdb)?;
                 // let lbd = cdb.refer(cdb::property::TEma::LBD).get();
                 // let ent: f64 = cdb.refer(cdb::property::TEma::Entanglement).get_slow();
                 // let k: f64 = (state.stm.current_segment() as f64).log2();
@@ -489,12 +489,10 @@ impl SolveIF for Solver {
                 // let x: f64 = k * (2.0 * ratio - 1.0);
                 // let sgm = |x: f64| 1.0 / (1.0 + (-x).exp());
                 // ss.next_restart = num_conflict + (((ent + lbd) * sgm(x)) as usize).max(6);
-                ss.next_restart = num_conflict + 10;
+                ss.next_restart = num_conflict + 9;
 
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
-
-                asg.clear_asserted_literals(cdb)?;
             }
             ss.from_segment_beginning += 1;
             if ss.current_span <= ss.from_segment_beginning {
@@ -510,36 +508,30 @@ impl SolveIF for Solver {
                 let scale = state.stm.current_scale();
                 asg.handle(SolverEvent::Stage(scale));
                 if let Some(new_segment) = next_stage {
+                    // a beginning of a new cycle
                     if new_segment && !with_restart {
                         RESTART!(asg, cdb, state);
-                        ss.next_restart += 10;
+                        asg.clear_asserted_literals(cdb)?;
                     }
-                    // a beginning of a new cycle
-                    {
-                        let stm = &state.stm;
-                        if cfg!(feature = "reward_annealing") {
-                            let k: f64 = (stm.current_segment() as f64).log2();
-                            let ratio: f64 = stm.segment_progress_ratio();
-                            const SLOP: f64 = 8.0;
-                            const R: (f64, f64) = (0.88, 0.995);
-                            let d: f64 = R.1 - (R.1 - R.0) * SLOP / (k + SLOP);
-                            let x: f64 = k * (2.0 * ratio - 1.0);
-                            let r = {
-                                let sgm = |x: f64| 1.0 / (1.0 + (-x).exp());
-                                d + sgm(x) * (1.0 - d)
-                            };
-                            asg.update_activity_decay(r);
-                        }
+                    let stm = &state.stm;
+                    if cfg!(feature = "reward_annealing") {
+                        let k: f64 = (stm.current_segment() as f64).log2();
+                        let ratio: f64 = stm.segment_progress_ratio();
+                        const SLOP: f64 = 8.0;
+                        const R: (f64, f64) = (0.88, 0.995);
+                        let d: f64 = R.1 - (R.1 - R.0) * SLOP / (k + SLOP);
+                        let x: f64 = k * (2.0 * ratio - 1.0);
+                        let r = {
+                            let sgm = |x: f64| 1.0 / (1.0 + (-x).exp());
+                            d + sgm(x) * (1.0 - d)
+                        };
+                        asg.update_activity_decay(r);
                     }
                     let num_restart = asg.derefer(assign::Tusize::NumRestart);
                     if new_segment && ss.next_reduce <= num_restart {
                         let lbd = cdb.refer(cdb::property::TEma::LBD).get();
-                        let b: f64 = state.stm.segment_starting_cycle() as f64;
-                        let _n: f64 = state.stm.current_cycle() as f64 - b;
                         let ents: f64 = cdb.refer(cdb::property::TEma::Entanglement).get_slow();
-                        // Note: val can be inf. It got better results.
-                        // let val: f64 = 0.5 * ent.min(lbd) + ent.max(lbd) / (1.0 + n).log2();
-                        let val = (ents + lbd).sqrt().min(1.0);
+                        let val = (ents + lbd).sqrt().max(5.0);
                         state.reduction_threshold = val;
                         cdb.reduce(val);
                         ss.num_reduction += 1;
@@ -567,9 +559,7 @@ impl SolveIF for Solver {
                     state
                         .stm
                         .set_span_base(state.c_lvl.get_slow() - state.b_lvl.get_slow());
-
                     dump_stage(asg, cdb, state, &ss.previous_stage);
-
                     if new_segment {
                         state.exploration_rate_ema.update(1.0);
                     }
