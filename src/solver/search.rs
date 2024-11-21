@@ -17,6 +17,7 @@ pub struct SearchState {
     num_reduction: usize,
     new_assertion: bool,
     reduce_step: usize,
+    restart_span: usize,
     next_restart: usize,
     next_reduce: usize,
     current_core: usize,
@@ -427,6 +428,7 @@ impl SolveIF for Solver {
             num_reduction: 0,
             new_assertion: false,
             reduce_step: (nv + nc) as usize,
+            restart_span: 4,
             next_reduce: 64,
             next_restart: 1024,
             from_segment_beginning: 0,
@@ -477,7 +479,7 @@ impl SolveIF for Solver {
             }
             let num_conflict = asg.derefer(assign::Tusize::NumConflict);
             let with_restart = ss.next_restart <= num_conflict
-                && 1.0 <= cdb.refer(cdb::property::TEma::LBD).trend();
+                && 0.8 <= cdb.refer(cdb::property::TEma::LBD).trend();
             if with_restart {
                 RESTART!(asg, cdb, state);
                 asg.clear_asserted_literals(cdb)?;
@@ -488,9 +490,15 @@ impl SolveIF for Solver {
                 // let x: f64 = k * (2.0 * ratio - 1.0);
                 // let sgm = |x: f64| 1.0 / (1.0 + (-x).exp());
                 // ss.next_restart = num_conflict + (((ent + lbd) * sgm(x)) as usize).max(6);
-                ss.next_restart = num_conflict + 9;
+                ss.restart_span = 8;
+                ss.next_restart = num_conflict + ss.restart_span;
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
+            } else if ss.next_restart <= num_conflict
+                && cdb.refer(cdb::property::TEma::LBD).trend() <= 0.5
+            {
+                ss.restart_span *= 2;
+                ss.next_restart = num_conflict + ss.restart_span;
             }
             ss.from_segment_beginning += 1;
             if ss.current_span <= ss.from_segment_beginning {
@@ -545,13 +553,11 @@ impl SolveIF for Solver {
                     if cfg!(feature = "reward_annealing") {
                         let k: f64 = (stm.current_segment() as f64).log2();
                         let ratio: f64 = stm.segment_progress_ratio();
-                        const SLOP: f64 = 8.0;
-                        const R: (f64, f64) = (0.88, 0.995);
-                        let d: f64 = R.1 - (R.1 - R.0) * SLOP / (k + SLOP);
+                        const R: (f64, f64) = (0.9, 0.98);
                         let x: f64 = k * (2.0 * ratio - 1.0);
                         let r = {
-                            let sgm = |x: f64| 1.0 / (1.0 + (-x).exp());
-                            d + sgm(x) * (1.0 - d)
+                            let sgm = 1.0 / (1.0 + (-x).exp());
+                            (1.0 - sgm) * R.0 + sgm * R.1
                         };
                         asg.update_activity_decay(r);
                     }
