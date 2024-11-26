@@ -569,7 +569,7 @@ impl ClauseDBIF for ClauseDB {
             if new {
                 self.clause[ci].turn_off(FlagClause::NEW_CLAUSE);
             }
-            if bck {
+            if fwd {
                 continue;
             }
             if new_assertion && self.clause[ci].is_satisfied_under(asg) {
