@@ -164,7 +164,9 @@ impl Instantiate for ClauseDB {
                 self.watch.push(WatchLiteralIndexRef::default());
                 self.lbd_temp.push(0);
             }
-            SolverEvent::Restart => (),
+            SolverEvent::Restart => {
+                self.lbd.reset_fast();
+            }
             _ => (),
         }
     }

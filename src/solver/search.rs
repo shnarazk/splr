@@ -476,12 +476,12 @@ impl SolveIF for Solver {
                 _ => (),
             }
             let num_conflict = asg.derefer(assign::Tusize::NumConflict);
-            let with_restart = ss.next_restart <= num_conflict
-                && 1.0 <= cdb.refer(cdb::property::TEma::LBD).trend();
+            let with_restart = /* ss.next_restart <= num_conflict
+                && */ 1.2 <= cdb.refer(cdb::property::TEma::LBD).trend();
             if with_restart {
                 RESTART!(asg, cdb, state);
                 asg.clear_asserted_literals(cdb)?;
-                ss.next_restart = num_conflict + 12;
+                // ss.next_restart = num_conflict + 12;
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
             } else if ss.next_restart <= num_conflict
@@ -519,7 +519,7 @@ impl SolveIF for Solver {
                         ss.num_reduction += 1;
                         ss.reduce_step += ss.current_core.ilog2() as usize;
                         ss.next_reduce = ss.reduce_step + num_restart;
-                        if cfg!(feature = "clause_vivification") && ss.num_reduction % 8 == 0 {
+                        if cfg!(feature = "clause_vivification") && ss.num_reduction % 6 == 0 {
                             cdb.vivify(asg, state)?;
                         }
                         if cfg!(feature = "clause_elimination")
@@ -543,7 +543,7 @@ impl SolveIF for Solver {
                         // let k: f64 = (stm.current_segment() as f64).log2();
                         let k: f64 = (stm.current_segment() as f64).sqrt();
                         let ratio: f64 = stm.segment_progress_ratio();
-                        const R: (f64, f64) = (0.94, 0.97);
+                        const R: (f64, f64) = (0.95, 0.99);
                         let x: f64 = k * (2.0 * ratio - 1.0);
                         let r = {
                             let sgm = 1.0 / (1.0 + (-x).exp());

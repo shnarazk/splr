@@ -49,6 +49,9 @@ impl EmaMutIF for ProgressLBD {
         self.sum += d as usize;
         self.ema.update(d as f64);
     }
+    fn reset_fast(&mut self) {
+        self.ema.reset_fast();
+    }
     fn reset_to(&mut self, val: f64) {
         self.ema.reset_to(val);
     }
