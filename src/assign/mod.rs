@@ -1,6 +1,6 @@
 /// Module `assign` implements Boolean Constraint Propagation and decision var selection.
 /// This version can handle Chronological and Non Chronological Backtrack.
-
+///
 /// Ema
 mod ema;
 /// Heap
@@ -54,7 +54,7 @@ pub trait AssignIF:
 {
     /// return root level.
     fn root_level(&self) -> DecisionLevel;
-    /// return a literal in the stack.
+    /// return the `i`-th literal in the stack.
     fn stack(&self, i: usize) -> Lit;
     /// return literals in the range of stack.
     fn stack_range(&self, r: Range<usize>) -> &[Lit];

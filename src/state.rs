@@ -97,6 +97,8 @@ pub struct State {
     pub b_lvl: Ema2,
     /// EMA of conflicting levels
     pub c_lvl: Ema2,
+    /// EMA of a sort of refinement
+    pub refinement_ema: Ema2,
     /// EMA of c_lbd - b_lbd, or Exploration vs. Eploitation
     pub e_mode: Ema2,
     pub e_mode_threshold: f64,
@@ -146,6 +148,7 @@ impl Default for State {
 
             b_lvl: Ema2::new(16).with_slow(4096),
             c_lvl: Ema2::new(16).with_slow(4096),
+            refinement_ema: Ema2::new(16).with_slow(4096),
             e_mode: Ema2::new(32).with_slow(4096).with_value(10.0),
             e_mode_threshold: 1.20,
             exploration_rate_ema: Ema::new(1000),

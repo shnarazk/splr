@@ -17,7 +17,9 @@ pub struct SearchState {
     num_reduction: usize,
     new_assertion: bool,
     reduce_step: usize,
+    last_restart: usize,
     next_restart: usize,
+    restart_threshold: f64,
     next_reduce: usize,
     current_core: usize,
     current_span: usize,
@@ -428,7 +430,9 @@ impl SolveIF for Solver {
             new_assertion: false,
             reduce_step: (nv + nc) as usize,
             next_reduce: 64,
+            last_restart: 0,
             next_restart: 1024,
+            restart_threshold: 1.25,
             from_segment_beginning: 0,
             current_core: asg.derefer(assign::property::Tusize::NumUnassertedVar),
             current_span: 1,
@@ -443,6 +447,9 @@ impl SolveIF for Solver {
         })
     }
     fn search_stage(&mut self, ss: &mut SearchState) -> Result<Option<bool>, SolverError> {
+        fn sgm(x: f64) -> f64 {
+            1.0 / (1.0 + (-x).exp())
+        }
         // main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
         let Solver {
             ref mut asg,
@@ -467,27 +474,38 @@ impl SolveIF for Solver {
             #[cfg(feature = "clause_rewarding")]
             cdb.update_activity_tick();
 
-            match handle_conflict(asg, cdb, state, &cc)? {
+            let _last_activity: Option<f64> = match handle_conflict(asg, cdb, state, &cc)? {
                 0 => {
                     state.stm.handle(SolverEvent::Assert(0));
                     ss.new_assertion = true;
+                    None
                 }
-                1 => (), // ss.next_reduce = 0,
-                _ => (),
-            }
+                _ => {
+                    let act: f64 = asg.var(asg.stack(asg.stack_len() - 1).vi()).activity();
+                    state.refinement_ema.update(act);
+                    Some(act)
+                }
+            };
             let num_conflict = asg.derefer(assign::Tusize::NumConflict);
-            let with_restart = /* ss.next_restart <= num_conflict
-                && */ 1.2 <= cdb.refer(cdb::property::TEma::LBD).trend();
+            let _dist = (num_conflict - ss.last_restart).ilog10() as f64;
+            let lbd_trend = cdb.refer(cdb::property::TEma::LBD).trend();
+            // let with_restart = 0.95 + 0.25 / (dist + 1.0) <= lbd_trend;
+            // let with_restart = ss.restart_threshold <= lbd_trend;
+            let ref_trend = state.refinement_ema.trend();
+            let with_restart =
+                ss.restart_threshold < lbd_trend && ref_trend.clamp(0.75, 1.25) == ref_trend;
+            /* ss.restart_threshold <= lbd_trend || */
+            // state.refinement_ema.trend() > 1.15;
+            // && last_activity.map_or(false, |a| a < state.refinement_ema.get());
             if with_restart {
                 RESTART!(asg, cdb, state);
+                ss.last_restart = num_conflict;
+                ss.restart_threshold = 1.25;
                 asg.clear_asserted_literals(cdb)?;
-                // ss.next_restart = num_conflict + 12;
                 #[cfg(feature = "trace_equivalency")]
                 cdb.check_consistency(asg, "before simplify");
-            } else if ss.next_restart <= num_conflict
-                && cdb.refer(cdb::property::TEma::LBD).trend() <= 0.75
-            {
-                // ss.next_restart = num_conflict + 4;
+            } else {
+                ss.restart_threshold *= 0.99;
             }
             ss.from_segment_beginning += 1;
             if ss.current_span <= ss.from_segment_beginning {
@@ -509,7 +527,6 @@ impl SolveIF for Solver {
                             RESTART!(asg, cdb, state);
                             asg.clear_asserted_literals(cdb)?;
                         }
-                        let _lbd = cdb.refer(cdb::property::TEma::LBD).get();
                         let ents: f64 = cdb.refer(cdb::property::TEma::Entanglement).get_slow();
                         // let threshold = 12.0 / (state.stm.current_segment() as f64).sqrt();
                         let threshold = (2.0 / state.stm.segment_progress_ratio()).min(ents.sqrt());
@@ -543,11 +560,11 @@ impl SolveIF for Solver {
                         // let k: f64 = (stm.current_segment() as f64).log2();
                         let k: f64 = (stm.current_segment() as f64).sqrt();
                         let ratio: f64 = stm.segment_progress_ratio();
-                        const R: (f64, f64) = (0.95, 0.99);
+                        const R: (f64, f64) = (0.96, 1.0);
                         let x: f64 = k * (2.0 * ratio - 1.0);
                         let r = {
-                            let sgm = 1.0 / (1.0 + (-x).exp());
-                            (1.0 - sgm) * R.0 + sgm * R.1
+                            let s = sgm(x);
+                            (1.0 - s) * R.0 + s * R.1
                         };
                         asg.update_activity_decay(r);
                     }

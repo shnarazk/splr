@@ -513,7 +513,7 @@ impl Eliminator {
     ///
     /// clause queue operations
     ///
-
+    ///
     /// enqueue a clause into eliminator's clause queue.
     pub fn enqueue_clause(&mut self, ci: ClauseIndex, c: &mut Clause) {
         if self.mode != EliminatorMode::Running
@@ -540,7 +540,7 @@ impl Eliminator {
     ///
     /// var queue operations
     ///
-
+    ///
     /// clear eliminator's var queue
     fn clear_var_queue(&mut self, asg: &mut impl AssignIF) {
         self.var_queue.clear(asg);
