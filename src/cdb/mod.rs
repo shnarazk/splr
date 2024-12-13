@@ -48,8 +48,6 @@ pub trait ClauseDBIF:
     + PropertyDereference<property::Tf64, f64>
     + ActivityIF<ClauseIndex>
 {
-    #[cfg(feature = "boundary_check")]
-    fn check_chains(&self, ci: ClauseIndex);
     /// return the length of `clause`.
     fn len(&self) -> usize;
     /// return true if it's empty.
@@ -120,14 +118,6 @@ pub trait ClauseDBIF:
     //
     //## for debug
     //
-    #[cfg(feature = "boundary_check")]
-    /// return true if cid is included in watching literals
-    fn watch_cache_contains(&self, lit: Lit, cid: ClauseId) -> bool;
-    #[cfg(feature = "boundary_check")]
-    /// return a clause's watches
-    fn watch_caches(&self, cid: ClauseId, message: &str) -> (Vec<Lit>, Vec<Lit>);
-    #[cfg(feature = "boundary_check")]
-    fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool>;
     #[cfg(not(feature = "no_IO"))]
     /// dump all active clauses and assertions as a CNF file.
     fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);
@@ -174,42 +164,6 @@ impl Default for ClauseDB {
 }
 
 impl ClauseDBIF for ClauseDB {
-    #[cfg(feature = "boundary_check")]
-    fn check_chains(&self, ci: ClauseIndex) {
-        for (_l, h) in self.watch.iter().enumerate().skip(2) {
-            let mut nr: WatchLiteralIndex = h.next;
-            while !nr.is_none() {
-                assert!(!self[nr.as_ci()].is_dead());
-                nr = self[nr.as_ci()].next_watch(nr.as_wi());
-            }
-        }
-        if ci != 0 {
-            assert!(!self[ci].lits.is_empty());
-            let l0 = !self[ci].lits[0];
-            let l1 = !self[ci].lits[1];
-            let mut nr = self.watch[usize::from(l0)].next;
-            let mut found = false;
-            while !nr.is_none() {
-                if nr.as_ci() == ci {
-                    found = true;
-                    break;
-                }
-                nr = self[nr.as_ci()].next_watch(nr.as_wi());
-            }
-            assert_eq!(2 < self[ci].lits.len(), found);
-
-            nr = self.watch[usize::from(l1)].next;
-            found = false;
-            while !nr.is_none() {
-                if nr.as_ci() == ci {
-                    found = true;
-                    break;
-                }
-                nr = self[nr.as_ci()].next_watch(nr.as_wi());
-            }
-            assert_eq!(2 < self[ci].lits.len(), found);
-        }
-    }
     fn len(&self) -> usize {
         self.clause.len()
     }
@@ -770,81 +724,6 @@ impl ClauseDBIF for ClauseDB {
                 .lits
                 .clone(),
         );
-    }
-    #[cfg(feature = "boundary_check")]
-    fn watch_cache_contains(&self, lit: Lit, cid: ClauseId) -> bool {
-        self.watch_cache[lit].iter().any(|w| w.0 == cid)
-    }
-    #[cfg(feature = "boundary_check")]
-    fn watch_caches(&self, cid: ClauseId, mes: &str) -> (Vec<Lit>, Vec<Lit>) {
-        // let mut _found = None;
-        debug_assert!(!cid.is_lifted_lit());
-        let c = &self[cid];
-        debug_assert!(1 < c.len());
-        let l0 = c.lits[0];
-        let l1 = c.lits[1];
-        if 2 == c.lits.len() {
-            assert!(
-                self.binary_link.search(l0, l1).is_some(),
-                "(watch_cache health check: binary clause l0 not found){}, cid{}{:?}",
-                mes,
-                cid,
-                c
-            );
-            assert!(
-                self.binary_link.search(l1, l0).is_some(),
-                "(watch_cache health check: binary clause l1 not found){}, cid{}{:?}",
-                mes,
-                cid,
-                c
-            );
-            assert!(
-                !self.watch_cache[!l0].iter().any(|wc| wc.0 == cid),
-                "(watch_cache health check: binary clause l0 found in watch_cache){}, cid{}{:?}",
-                mes,
-                cid,
-                c
-            );
-            assert!(
-                !self.watch_cache[!l1].iter().any(|wc| wc.0 == cid),
-                "(watch_cache health check: binary clause l1 found in watch cache){}, cid{}{:?}",
-                mes,
-                cid,
-                c
-            );
-            (vec![l1], vec![l0])
-        } else {
-            assert!(
-                self.watch_cache[!l0].iter().any(|wc| wc.0 == cid),
-                "(watch_cache health check: clause l0 not found){}, cid{}{:?}",
-                mes,
-                cid,
-                c
-            );
-            assert!(
-                self.watch_cache[!l1].iter().any(|wc| wc.0 == cid),
-                "(watch_cache health check: clause l1 not found){}, cid{}{:?}",
-                mes,
-                cid,
-                c
-            );
-            (
-                self.watch_cache[!l0]
-                    .iter()
-                    .filter(|w| w.0 == cid)
-                    .map(|w| w.1)
-                    .collect(),
-                self.watch_cache[!l1]
-                    .iter()
-                    .filter(|w| w.0 == cid)
-                    .map(|w| w.1)
-                    .collect(),
-            )
-        }
-    }
-    #[cfg(feature = "boundary_check")]
-    fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool> {
-        self[cid].is_dead().then(|| self.freelist.contains(&cid))
     }
     #[cfg(not(feature = "no_IO"))]
     /// dump all active clauses and assertions as a CNF file.

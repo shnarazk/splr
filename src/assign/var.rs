@@ -65,12 +65,6 @@ pub struct Var {
     pub(super) activity: f64,
     /// phase transition frequency
     pub(super) spin: Spin,
-    #[cfg(feature = "boundary_check")]
-    pub propagated_at: usize,
-    #[cfg(feature = "boundary_check")]
-    pub timestamp: usize,
-    #[cfg(feature = "boundary_check")]
-    pub state: VarState,
 }
 
 impl Default for Var {
@@ -83,12 +77,6 @@ impl Default for Var {
             activity: 0.0,
             spin: Spin::default(),
             // reward_ema: Ema2::new(200).with_slow(4_000),
-            #[cfg(feature = "boundary_check")]
-            propagated_at: 0,
-            #[cfg(feature = "boundary_check")]
-            timestamp: 0,
-            #[cfg(feature = "boundary_check")]
-            state: VarState::Unassigned(0),
         }
     }
 }

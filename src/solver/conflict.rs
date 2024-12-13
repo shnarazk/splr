@@ -1,8 +1,5 @@
 //! Conflict Analysis
 
-#[cfg(feature = "boundary_check")]
-use crate::assign::DebugReportIF;
-
 use {
     super::State,
     crate::{
@@ -82,15 +79,6 @@ pub fn handle_conflict(
     let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
     if learnt_len == 0 {
-        #[cfg(feature = "boundary_check")]
-        {
-            println!(
-                "empty learnt at {}({}) by {:?}",
-                cl,
-                asg.reason(asg.decision_vi(cl)).is_none(),
-                asg.dump(asg, &cdb[ci]),
-            );
-        }
         return Err(SolverError::EmptyClause);
     }
     let l0 = new_learnt[0];
@@ -182,9 +170,6 @@ pub fn handle_conflict(
     let rank: u16;
     match cdb.new_clause(asg, new_learnt, true) {
         RefClause::Clause(cid) if learnt_len == 2 => {
-            #[cfg(feature = "boundary_check")]
-            cdb[cid].set_birth(asg.num_conflict);
-
             debug_assert_ne!(l0, Lit::default());
             debug_assert_ne!(l1, Lit::default());
             debug_assert_eq!(l0, cdb[cid].lit0());
@@ -207,9 +192,6 @@ pub fn handle_conflict(
             cdb.complete_bi_clauses(asg);
         }
         RefClause::Clause(cid) => {
-            #[cfg(feature = "boundary_check")]
-            cdb[cid].set_birth(asg.num_conflict);
-
             debug_assert_eq!(cdb[cid].lit0(), l0);
             debug_assert_eq!(asg.assigned(l0), None);
             asg.assign_by_implication(
@@ -600,41 +582,4 @@ fn dumper(asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
         .unwrap();
     }
     s
-}
-
-#[cfg(feature = "boundary_check")]
-fn tracer(asg: &AssignStack, cdb: &ClauseDB) {
-    use std::io::{self, Write};
-    loop {
-        let mut input = String::new();
-        print!("cid(or 0 for quit): ");
-        std::io::stdout().flush().expect("IO error");
-        io::stdin().read_line(&mut input).expect("IO error");
-        if input.is_empty() {
-            break;
-        }
-        let Ok(cid) = input.trim().parse::<usize>() else {
-            continue;
-        };
-        if cid == 0 {
-            break;
-        }
-        println!(
-            "{}",
-            cdb[ClauseId::from(cid)]
-                .report(asg)
-                .iter()
-                .map(|r| format!(
-                    " {}{:?}",
-                    asg.var(Lit::from(r.lit).vi())
-                        .is(FlagVar::CA_SEEN)
-                        .then(|| "S")
-                        .unwrap_or(" "),
-                    r
-                ))
-                .collect::<Vec<String>>()
-                .join("\n"),
-        );
-    }
-    panic!("done");
 }

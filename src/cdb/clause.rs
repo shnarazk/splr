@@ -26,12 +26,6 @@ pub trait ClauseIF {
     fn len(&self) -> usize;
     /// just for cargo clippy
     fn is_empty(&self) -> usize;
-
-    #[cfg(feature = "boundary_check")]
-    /// return timestamp.
-    fn timestamp(&self) -> usize;
-    #[cfg(feature = "boundary_check")]
-    fn set_birth(&mut self, time: usize);
 }
 
 /// A representation of 'clause'
@@ -57,11 +51,6 @@ pub struct Clause {
 
     /// A dynamic clause evaluation criterion based on the number of references.
     pub(super) activity: f64,
-
-    #[cfg(feature = "boundary_check")]
-    pub birth: usize,
-    #[cfg(feature = "boundary_check")]
-    pub moved_at: Propagate,
 }
 
 #[cfg(not(feature = "clause_rewarding"))]
@@ -80,15 +69,6 @@ pub struct Clause {
     /// the index from which `propagate` starts searching an un-falsified literal.
     /// Since it's just a hint, we don't need u32 or usize.
     pub search_from: u16,
-
-    #[cfg(feature = "boundary_check")]
-    /// the number of conflicts at which this clause was used in `conflict_analyze`
-    pub(super) timestamp: usize,
-
-    #[cfg(feature = "boundary_check")]
-    pub birth: usize,
-    #[cfg(feature = "boundary_check")]
-    pub moved_at: Propagate,
 }
 
 impl Default for Clause {
@@ -104,16 +84,8 @@ impl Default for Clause {
             rank_old: 0,
             search_from: 2,
 
-            #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
-            timestamp: 0,
-
             #[cfg(feature = "clause_rewarding")]
             activity: 0.0,
-
-            #[cfg(feature = "boundary_check")]
-            birth: 0,
-            #[cfg(feature = "boundary_check")]
-            moved_at: Propagate::None,
         }
     }
 }
@@ -224,16 +196,6 @@ impl ClauseIF for Clause {
     fn is_empty(&self) -> usize {
         unimplemented!()
     }
-
-    #[cfg(feature = "boundary_check")]
-    /// return timestamp.
-    fn timestamp(&self) -> usize {
-        self.timestamp
-    }
-    #[cfg(feature = "boundary_check")]
-    fn set_birth(&mut self, time: usize) {
-        self.birth = time;
-    }
 }
 
 impl FlagIF for Clause {
@@ -262,29 +224,14 @@ impl FlagIF for Clause {
 
 impl fmt::Display for Clause {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        #[cfg(feature = "boundary_check")]
-        {
-            let st = |flag, mes| if self.is(flag) { mes } else { "" };
-            write!(
-                f,
-                "{{{:?}b{}{}{}}}",
-                i32s(&self.lits),
-                self.birth,
-                st(FlagClause::LEARNT, ", learnt"),
-                st(FlagClause::ENQUEUED, ", enqueued"),
-            )
-        }
-        #[cfg(not(feature = "boundary_check"))]
-        {
-            let st = |flag, mes| if self.is(flag) { mes } else { "" };
-            write!(
-                f,
-                "{{{:?}{}{}}}",
-                i32s(&self.lits),
-                st(FlagClause::LEARNT, ", learnt"),
-                st(FlagClause::ENQUEUED, ", enqueued"),
-            )
-        }
+        let st = |flag, mes| if self.is(flag) { mes } else { "" };
+        write!(
+            f,
+            "{{{:?}{}{}}}",
+            i32s(&self.lits),
+            st(FlagClause::LEARNT, ", learnt"),
+            st(FlagClause::ENQUEUED, ", enqueued"),
+        )
     }
 }
 

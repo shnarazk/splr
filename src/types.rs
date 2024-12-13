@@ -680,30 +680,6 @@ impl<T: Clone + Default + Sized + Ord> OrderedProxy<T> {
     }
 }
 
-#[cfg(feature = "boundary_check")]
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub enum Propagate {
-    None,
-    CacheSatisfied(usize),
-    FindNewWatch(usize, Lit, Lit),
-    BecameUnit(usize, Lit),
-    EmitConflict(usize, Lit),
-    SandboxCacheSatisfied(usize),
-    SandboxFindNewWatch(usize, Lit, Lit),
-    SandboxBecameUnit(usize),
-    SandboxEmitConflict(usize, Lit),
-}
-
-#[cfg(feature = "boundary_check")]
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum VarState {
-    AssertedSandbox(usize),
-    Assigned(usize),
-    AssignedSandbox(usize),
-    Propagated(usize),
-    Unassigned(usize),
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

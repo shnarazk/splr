@@ -20,6 +20,7 @@ instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
 
 crossterm = { version = "^0.27", optional = true }
 ratatui = { version = "^0.28", features = ["all-widgets"], optional = true }
+rustc_data_structures = "^0.1"
 
 [features]
 default = [
@@ -44,7 +45,6 @@ default = [
         "clause_vivification",
 
         ### For DEBUG
-        # "boundary_check",
         # "trace_analysis",
 
         ### For SAT researcher
@@ -57,7 +57,6 @@ default = [
 assign_rate = []                # for debug and study
 best_phases_tracking = []       # save the best-so-far assignment, used by 'rephase'
 bi_clause_completion = []       # this will increase memory pressure
-boundary_check = []             # for debug
 chrono_BT = []                  # NOT WORK
 clause_elimination = []         # pre(in)-processor setting
 clause_rewarding = []           # clauses have activities w/ decay rate

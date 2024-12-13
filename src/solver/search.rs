@@ -209,13 +209,7 @@ impl SolveIF for Solver {
                 // As a preparation for incremental solving, we need to backtrack to the
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
-                #[cfg(feature = "boundary_check")]
-                check(asg, cdb, true, "Before extending the model");
-
                 let model = asg.extend_model(cdb);
-
-                #[cfg(feature = "boundary_check")]
-                check(asg, cdb, true, "After extending the model");
 
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
@@ -643,13 +637,7 @@ impl SolveIF for Solver {
                 // As a preparation for incremental solving, we need to backtrack to the
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
-                #[cfg(feature = "boundary_check")]
-                check(asg, cdb, true, "Before extending the model");
-
                 let model = asg.extend_model(cdb);
-
-                #[cfg(feature = "boundary_check")]
-                check(asg, cdb, true, "After extending the model");
 
                 // Run validator on the extended model.
                 if cdb.validate(&model, false).is_some() {
@@ -722,81 +710,6 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: &
         },
         format!("{span:>7}, fuel:{fuel:>9.2}, cpr:{cpr:>8.2}, vdr:{vdr:>3.2}, cdt:{cdt:>5.2}"),
     );
-}
-
-#[cfg(feature = "boundary_check")]
-#[allow(dead_code)]
-fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
-    if let Some(cid) = cdb.validate(asg.assign_ref(), all) {
-        println!("{}", message);
-        println!(
-            "falsifies by {} at level {}, NumConf {}",
-            cid,
-            asg.decision_level(),
-            asg.derefer(assign::property::Tusize::NumConflict),
-        );
-        assert!(asg.stack_iter().all(|l| asg.assigned(*l) == Some(true)));
-        let (c0, c1) = cdb.watch_caches(cid, "check (search 441)");
-        println!(
-            " which was born at {}, and used in conflict analysis at {}",
-            cdb[cid].birth,
-            cdb[cid].timestamp(),
-        );
-        println!(
-            " which was moved among watch caches at {:?}",
-            cdb[cid].moved_at
-        );
-        println!("Its literals: {}", &cdb[cid]);
-        println!(" |   pos |   time | level |   literal  |  assignment |               reason |");
-        let l0 = i32::from(cdb[cid].lit0());
-        let l1 = i32::from(cdb[cid].lit1());
-        use crate::assign::DebugReportIF;
-
-        for assign::Assign {
-            lit,
-            val,
-            pos,
-            lvl,
-            by: reason,
-            at,
-            state,
-        } in cdb[cid].report(asg).iter()
-        {
-            println!(
-                " |{:>6} | {:>6} |{:>6} | {:9}{} | {:11} | {:20} | {:?}",
-                pos.unwrap_or(0),
-                at,
-                lvl,
-                lit,
-                if *lit == l0 || *lit == l1 { '*' } else { ' ' },
-                format!("{:?}", val),
-                format!("{}", reason),
-                state,
-            );
-        }
-        println!(
-            " - L0 {} has complements {:?} in its cache",
-            cdb[cid].lit0(),
-            c0
-        );
-        println!(
-            " - L1 {} has complements {:?} in its cache",
-            cdb[cid].lit1(),
-            c1
-        );
-        println!("The last assigned literal in stack:");
-        let last_lit = asg.stack(asg.stack_len() - 1);
-        println!(
-            " |{:>6} | {:>6} |{:>6} | {:9}  | {:11} | {:20} |",
-            asg.stack_len() - 1,
-            asg.var(last_lit.vi()).propagated_at,
-            asg.level(last_lit.vi()),
-            i32::from(last_lit),
-            format!("{:?}", asg.assigned(last_lit),),
-            format!("{}", asg.reason(last_lit.vi())),
-        );
-        panic!();
-    }
 }
 
 #[cfg(feature = "support_user_assumption")]

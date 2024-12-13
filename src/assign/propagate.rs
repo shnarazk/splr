@@ -75,9 +75,6 @@ impl PropagateIF for AssignStack {
                 Ok(())
             }
             Some(x) if x == bool::from(l) => {
-                #[cfg(feature = "boundary_check")]
-                panic!("double assignment(assertion)");
-                #[cfg(not(feature = "boundary_check"))]
                 // Vivification tries to assign a var by propagation then can assert it.
                 // To make sure the var is asserted, we need to nullify its reason.
                 // || self.reason[vi] = AssignReason::None;
@@ -117,12 +114,6 @@ impl PropagateIF for AssignStack {
         self.trail.push(l);
         if self.root_level == lv {
             self.make_var_asserted(vi);
-        }
-
-        #[cfg(feature = "boundary_check")]
-        {
-            self.var[vi].propagated_at = self.num_conflict;
-            self.var[vi].state = VarState::Assigned(self.num_conflict);
         }
     }
     fn assign_by_decision(&mut self, l: Lit) {
@@ -197,13 +188,6 @@ impl PropagateIF for AssignStack {
             #[cfg(feature = "debug_propagation")]
             var.turn_off(FlagVar::PROPAGATED);
             var.set(FlagVar::PHASE, var.assign.unwrap());
-
-            #[cfg(feature = "boundary_check")]
-            {
-                var.propagated_at = self.num_conflict;
-                var.state = VarState::Unassigned(self.num_conflict);
-            }
-
             var.assign = None;
             var.reason = AssignReason::None;
 
@@ -273,13 +257,6 @@ impl PropagateIF for AssignStack {
     ///  - The order of literals in binary clauses will be modified to hold
     ///    propagation order.
     fn propagate(&mut self, cdb: &mut impl ClauseDBIF, sandbox: bool) -> PropagationResult {
-        #[cfg(feature = "boundary_check")]
-        macro_rules! check_in {
-            ($cid: expr, $tag :expr) => {
-                cdb[$cid].moved_at = $tag;
-            };
-        }
-        #[cfg(not(feature = "boundary_check"))]
         macro_rules! check_in {
             ($cid: expr, $tag :expr) => {};
         }
@@ -342,12 +319,6 @@ impl PropagateIF for AssignStack {
             {
                 assert!(!self.var[propagiting.vi()].is(FlagVar::PROPAGATED));
                 self.var[propagating.vi()].turn_on(FlagVar::PROPAGATED);
-            }
-
-            #[cfg(feature = "boundary_check")]
-            {
-                self.var[propagating.vi()].propagated_at = self.num_conflict;
-                self.var[propagating.vi()].state = VarState::Propagated(self.num_conflict);
             }
 
             let mut wli = cdb.get_first_watch(propagating);
