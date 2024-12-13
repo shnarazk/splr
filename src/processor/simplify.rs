@@ -510,9 +510,9 @@ impl Eliminator {
         self.enqueue_var(asg, l.vi(), true);
     }
 
-    ///
-    /// clause queue operations
-    ///
+    //
+    // clause queue operations
+    //
 
     /// enqueue a clause into eliminator's clause queue.
     pub fn enqueue_clause(&mut self, ci: ClauseIndex, c: &mut Clause) {
@@ -537,9 +537,9 @@ impl Eliminator {
         self.clause_queue.len()
     }
 
-    ///
-    /// var queue operations
-    ///
+    //
+    // var queue operations
+    //
 
     /// clear eliminator's var queue
     fn clear_var_queue(&mut self, asg: &mut impl AssignIF) {
