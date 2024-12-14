@@ -16,8 +16,8 @@ rust-version = "1.80"
 [dependencies]
 bitflags = "^2.6"
 instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
-crossterm = { version = "^0.27", optional = true }
-ratatui = { version = "^0.28", features = ["all-widgets"], optional = true }
+crossterm = { version = "^0.28", optional = true }
+ratatui = { version = "^0.29", features = ["all-widgets"], optional = true }
 rustc_data_structures = "^0.1"
 
 [features]
@@ -46,8 +46,8 @@ default = [
         # "trace_analysis",
 
         ### For SAT researcher
-        "graph_view",
-        "spin",
+        # "graph_view",
+        # "spin",
 
         ### platform dependency
         # "platform_wasm"
@@ -65,12 +65,10 @@ EMA_calibration = []            # each exponential moving average has a calbrati
 EVSIDS = []                     # Eponential Variable State Independent Decaying Sum
 graph_view = [
         "crossterm",
-        "interleave",
         "ratatui",
         "spin"
 ]
 incremental_solver = []         # for all solution SAT sover; requires no cluse_elimination
-interleave = []                 # switch to multi-step search IF
 just_used = []                  # Var and clause have 'just_used' flags
 LRB_rewarding = []              # Vearning Rate Based rewarding, a new var activity criteria
 no_IO = []                      # to embed Splr into non-std environments

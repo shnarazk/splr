@@ -1,3 +1,9 @@
+#[cfg(not(feature = "graph_view"))]
+fn main() {
+    panic!("Not compiled with required features.");
+}
+
+#[cfg(feature = "graph_view")]
 #[allow(unused_imports)]
 use {
     crossterm::{
@@ -34,6 +40,7 @@ use {
     },
 };
 
+#[cfg(feature = "graph_view")]
 #[derive(Debug)]
 pub struct App {
     solver: Splr,
@@ -49,6 +56,7 @@ pub struct App {
     var_spin_shift_stats: [u64; 21],
 }
 
+#[cfg(feature = "graph_view")]
 impl App {
     fn solver(solver: Splr, state: SearchState) -> Self {
         App {
@@ -250,6 +258,7 @@ impl App {
     }
 }
 
+#[cfg(feature = "graph_view")]
 impl App {
     /// var activity histogram
     fn var_activity_bar_chart(&self) -> BarChart<'_> {
@@ -400,6 +409,7 @@ impl App {
     }
 }
 
+#[cfg(feature = "graph_view")]
 fn main() -> Result<(), Box<dyn Error>> {
     let mut config = Config::default();
     config.inject_from_args();
@@ -478,12 +488,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-const RED: &str = "\x1B[001m\x1B[031m";
-const GREEN: &str = "\x1B[001m\x1B[032m";
-const BLUE: &str = "\x1B[001m\x1B[034m";
-const RESET: &str = "\x1B[000m";
-
+#[cfg(feature = "graph_view")]
 fn colored(v: Result<bool, &SolverError>, no_color: bool) -> Cow<'static, str> {
+    const RED: &str = "\x1B[001m\x1B[031m";
+    const GREEN: &str = "\x1B[001m\x1B[032m";
+    const BLUE: &str = "\x1B[001m\x1B[034m";
+    const RESET: &str = "\x1B[000m";
+
     if no_color {
         match v {
             Ok(false) => Cow::Borrowed("s UNSATISFIABLE"),
@@ -498,6 +509,8 @@ fn colored(v: Result<bool, &SolverError>, no_color: bool) -> Cow<'static, str> {
         }
     }
 }
+
+#[cfg(feature = "graph_view")]
 fn save_result<S: AsRef<str> + std::fmt::Display>(
     s: &mut Splr,
     res: &SolverResult,
@@ -616,6 +629,7 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
     }
 }
 
+#[cfg(feature = "graph_view")]
 fn report(s: &Splr, out: &mut dyn io::Write) -> std::io::Result<()> {
     let state = &s.state;
     let elapsed: Duration = s.state.start.elapsed();

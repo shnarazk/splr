@@ -18,13 +18,16 @@ impl ActivityIF<VarId> for AssignStack {
     fn reward_at_analysis(&mut self, vi: VarId) {
         self.var[vi].turn_on(FlagVar::USED);
     }
+    #[cfg(feature = "spin")]
     #[inline]
     fn reward_at_assign(&mut self, vi: VarId) {
-        #[cfg(feature = "spin")]
         if let Some(b) = self.var[vi].assign {
             self.var[vi].spin.update(b, self.tick);
         }
     }
+    #[cfg(not(feature = "spin"))]
+    #[inline]
+    fn reward_at_assign(&mut self, _vi: VarId) {}
     #[inline]
     fn reward_at_propagation(&mut self, _vi: VarId) {}
     #[inline]
