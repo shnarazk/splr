@@ -521,13 +521,6 @@ impl ClauseDBIF for ClauseDB {
     /// reduce the number of 'learnt' or *removable* clauses.
     #[cfg(feature = "keep_just_used_clauses")]
     fn reduce(&mut self, asg: &mut impl AssignIF, threshold: f64) {
-        impl Clause {
-            fn extended_lbd(&self) -> f64 {
-                let l: f64 = self.len() as f64;
-                let r: f64 = self.rank as f64;
-                r + (l - r) / (l - r + 1.0)
-            }
-        }
         // let ClauseDB {
         //     ref mut clause,
         //     ref mut lbd_temp,

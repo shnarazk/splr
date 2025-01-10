@@ -333,4 +333,9 @@ impl Clause {
         }
         self.rank
     }
+    pub fn extended_lbd(&self) -> f64 {
+        let l: f64 = self.len() as f64;
+        let r: f64 = self.rank as f64;
+        r + (l - r) / (l - r + 1.0)
+    }
 }

@@ -41,7 +41,7 @@ use {
 /// use crate::{splr::config::Config, splr::types::*};
 /// use crate::splr::processor::{Eliminator, EliminateIF};
 /// use crate::splr::solver::Solver;
-
+///
 /// let mut s = Solver::instantiate(&Config::default(), &CNFDescription::default());
 /// let mut elim = Eliminator::instantiate(&s.state.config, &s.state.cnf);
 /// assert_eq!(elim.is_running(), false);
