@@ -22,7 +22,7 @@ use std::{fs::File, io::Write, path::Path};
 ///
 ///```
 /// use crate::{splr::config::Config, splr::types::*};
-/// use crate::splr::cdb::ClauseDB;
+/// use crate::splr::cdb::db::ClauseDB;
 /// let cdb = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
 ///```
 #[derive(Clone, Debug)]

@@ -77,7 +77,7 @@ pub trait ActivityIF<Ix> {
 ///
 /// ```
 /// use crate::{splr::config::Config, splr::types::*};
-/// use splr::{cdb::ClauseDB, solver::Solver};
+/// use splr::{cdb::db::ClauseDB, solver::Solver};
 /// let _ = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
 /// let _ = Solver::instantiate(&Config::default(), &CNFDescription::default());
 ///```
