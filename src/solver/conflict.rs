@@ -83,7 +83,7 @@ pub fn handle_conflict(
     let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
     if learnt_len == 0 {
-        #[cfg(debug)]
+        #[cfg(feature = "boundary_check")]
         {
             println!(
                 "empty learnt at {}({}) by {:?}",
@@ -407,7 +407,7 @@ fn conflict_analyze(
         //
         // set the index of the next literal to trail_index
         //
-        #[allow(clippy::blocks_in_if_conditions)]
+        #[allow(clippy::blocks_in_conditions)]
         while {
             let vi = asg.stack(trail_index).vi();
             boundary_check!(

@@ -257,4 +257,7 @@ impl Clause {
         self.rank = cnt;
         cnt as usize
     }
+    pub fn reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
+        self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
+    }
 }

@@ -1,4 +1,4 @@
-/// Decision var selection
+// Decision var selection
 
 #[cfg(feature = "rephase")]
 use super::property;

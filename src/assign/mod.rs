@@ -1,5 +1,5 @@
-/// Module `assign` implements Boolean Constraint Propagation and decision var selection.
-/// This version can handle Chronological and Non Chronological Backtrack.
+// Module `assign` implements Boolean Constraint Propagation and decision var selection.
+// This version can handle Chronological and Non Chronological Backtrack.
 
 /// Ema
 mod ema;

@@ -10,6 +10,7 @@ pub trait VarOrderIF {
     fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upward: bool);
     fn is_empty(&self) -> bool;
     fn select_var(&mut self, occur: &[LitOccurs], asg: &impl AssignIF) -> Option<VarId>;
+    #[allow(dead_code)]
     fn rebuild(&mut self, asg: &impl AssignIF, occur: &[LitOccurs]);
 }
 
@@ -37,7 +38,7 @@ impl LitOccurs {
     }
     pub fn activity(&self) -> usize {
         if self.aborted {
-            std::usize::MAX
+            usize::MAX
         } else {
             self.pos_occurs.len().min(self.neg_occurs.len())
         }

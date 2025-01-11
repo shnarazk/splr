@@ -765,7 +765,7 @@ impl AssignStack {
         assert_ne!(self.assigned(b0), Some(false));
         assert_ne!(self.assigned(b1), Some(false));
     }
-    ///
+    /// a specialized `propagate` to clean up the stack
     fn propagate_at_root_level(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
         let mut num_propagated = 0;
         while num_propagated < self.trail.len() {
