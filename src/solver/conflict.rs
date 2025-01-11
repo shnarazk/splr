@@ -7,7 +7,7 @@ use {
     super::State,
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-        cdb::{ClauseDB, ClauseDBIF},
+        cdb::{db::ClauseDB, ClauseDBIF},
         types::*,
     },
 };

@@ -2,10 +2,48 @@ use {
     crate::{assign::AssignIF, types::*},
     std::{
         fmt,
+        num::NonZeroU32,
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::Iter,
     },
 };
+
+/// Clause identifier, or clause index, starting with one.
+/// Note: ids are re-used after 'garbage collection'.
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ClauseId {
+    /// a sequence number.
+    pub ordinal: NonZeroU32,
+}
+
+/// A representation of 'clause'
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
+pub struct Clause {
+    /// The literals in a clause.
+    pub(super) lits: Vec<Lit>,
+    /// Flags (8 bits)
+    pub(crate) flags: FlagClause,
+    /// A static clause evaluation criterion like LBD, NDD, or something.
+    pub rank: u16,
+    /// A record of the rank at previos stage.
+    pub rank_old: u16,
+    /// the index from which `propagate` starts searching an un-falsified literal.
+    /// Since it's just a hint, we don't need u32 or usize.
+    pub(crate) search_from: u16,
+
+    #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
+    /// the number of conflicts at which this clause was used in `conflict_analyze`
+    timestamp: usize,
+
+    #[cfg(feature = "clause_rewarding")]
+    /// A dynamic clause evaluation criterion based on the number of references.
+    reward: f64,
+
+    #[cfg(feature = "boundary_check")]
+    pub birth: usize,
+    #[cfg(feature = "boundary_check")]
+    pub moved_at: Propagate,
+}
 
 impl Default for Clause {
     fn default() -> Clause {

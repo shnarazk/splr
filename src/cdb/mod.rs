@@ -5,9 +5,9 @@ mod binary;
 /// methods on `ClauseId`
 mod cid;
 /// methods on `Clause`
-mod clause;
+pub mod clause;
 /// methods on `ClauseDB`
-mod db;
+pub mod db;
 /// EMA
 mod ema;
 /// methods for Stochastic Local Search
@@ -29,10 +29,10 @@ pub use self::{
 };
 
 use {
-    self::ema::ProgressLBD,
     crate::{assign::AssignIF, types::*},
+    clause::{Clause, ClauseId},
+    db::ClauseDB,
     std::{
-        num::NonZeroU32,
         ops::IndexMut,
         slice::{Iter, IterMut},
     },
@@ -182,128 +182,11 @@ pub trait ClauseDBIF:
     fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);
 }
 
-/// Clause identifier, or clause index, starting with one.
-/// Note: ids are re-used after 'garbage collection'.
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct ClauseId {
-    /// a sequence number.
-    pub ordinal: NonZeroU32,
-}
-
-/// A representation of 'clause'
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct Clause {
-    /// The literals in a clause.
-    lits: Vec<Lit>,
-    /// Flags (8 bits)
-    flags: FlagClause,
-    /// A static clause evaluation criterion like LBD, NDD, or something.
-    pub rank: u16,
-    /// A record of the rank at previos stage.
-    pub rank_old: u16,
-    /// the index from which `propagate` starts searching an un-falsified literal.
-    /// Since it's just a hint, we don't need u32 or usize.
-    pub search_from: u16,
-
-    #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
-    /// the number of conflicts at which this clause was used in `conflict_analyze`
-    timestamp: usize,
-
-    #[cfg(feature = "clause_rewarding")]
-    /// A dynamic clause evaluation criterion based on the number of references.
-    reward: f64,
-
-    #[cfg(feature = "boundary_check")]
-    pub birth: usize,
-    #[cfg(feature = "boundary_check")]
-    pub moved_at: Propagate,
-}
-
-/// Clause database
-///
-///```
-/// use crate::{splr::config::Config, splr::types::*};
-/// use crate::splr::cdb::ClauseDB;
-/// let cdb = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
-///```
-#[derive(Clone, Debug)]
-pub struct ClauseDB {
-    /// container of clauses
-    clause: Vec<Clause>,
-    /// hashed representation of binary clauses.
-    ///## Note
-    /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
-    ///
-    binary_link: BinaryLinkDB,
-    /// container of watch literals
-    watch_cache: Vec<WatchCache>,
-    /// collected free clause ids.
-    freelist: Vec<ClauseId>,
-    /// see unsat_certificate.rs
-    certification_store: CertificationStore,
-    /// a number of clauses to emit out-of-memory exception
-    soft_limit: usize,
-    /// 'small' clause threshold
-    co_lbd_bound: u16,
-    // not in use
-    // lbd_frozen_clause: usize,
-
-    // bi-clause completion
-    bi_clause_completion_queue: Vec<Lit>,
-    num_bi_clause_completion: usize,
-
-    //
-    //## clause rewarding
-    //
-    /// an index for counting elapsed time
-    #[cfg(feature = "clause_rewarding")]
-    tick: usize,
-    #[cfg(feature = "clause_rewarding")]
-    activity_decay: f64,
-    #[cfg(feature = "clause_rewarding")]
-    activity_anti_decay: f64,
-
-    //
-    //## LBD
-    //
-    /// a working buffer for LBD calculation
-    lbd_temp: Vec<usize>,
-    lbd: ProgressLBD,
-
-    //
-    //## statistics
-    //
-    /// the number of active (not DEAD) clauses.
-    num_clause: usize,
-    /// the number of binary clauses.
-    num_bi_clause: usize,
-    /// the number of binary learnt clauses.
-    num_bi_learnt: usize,
-    /// the number of clauses which LBDs are 2.
-    num_lbd2: usize,
-    /// the present number of learnt clauses.
-    num_learnt: usize,
-    /// the number of reductions.
-    num_reduction: usize,
-    /// the number of reregistration of a bi-clause
-    num_reregistration: usize,
-    /// Literal Block Entanglement
-    /// EMA of LBD of clauses used in conflict analysis (dependency graph)
-    lb_entanglement: Ema2,
-    /// cutoff value used in the last `reduce`
-    reduction_threshold: f64,
-
-    //
-    //## incremental solving
-    //
-    pub eliminated_permanent: Vec<Vec<Lit>>,
-}
-
 #[derive(Clone, Debug)]
 pub enum ReductionType {
     /// weight by Reverse Activity Sum over the added clauses
     RASonADD(usize),
-    /// weight by Reverse Activito Sum over all learnt clauses
+    /// weight by Reverse Activity Sum over all learnt clauses
     RASonALL(f64, f64),
     /// weight by Literal Block Distance over the added clauses
     LBDonADD(usize),
@@ -406,6 +289,8 @@ pub mod property {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroU32;
+
     use super::*;
     use crate::assign::{AssignStack, PropagateIF};
 

@@ -334,7 +334,7 @@ mod tests {
     use super::*;
     use crate::{
         assign::VarManipulateIF,
-        cdb::{Clause, ClauseDB},
+        cdb::{clause::Clause, db::ClauseDB},
         processor::EliminateIF,
         solver::Solver,
     };

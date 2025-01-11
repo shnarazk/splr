@@ -2,7 +2,11 @@
 /// some common traits.
 pub use crate::{
     assign::AssignReason,
-    cdb::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
+    cdb::{
+        clause::{Clause, ClauseId},
+        db::ClauseDB,
+        ClauseIF, ClauseIdIF,
+    },
     config::Config,
     primitive::{ema::*, luby::*},
     solver::SolverEvent,

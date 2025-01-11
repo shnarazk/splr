@@ -20,7 +20,7 @@ pub use self::{
     validate::ValidateIF,
 };
 
-use crate::{assign::AssignStack, cdb::ClauseDB, state::*, types::*};
+use crate::{assign::AssignStack, cdb::db::ClauseDB, state::*, types::*};
 
 /// Normal results returned by Solver.
 #[derive(Debug, Eq, PartialEq)]

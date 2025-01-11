@@ -3,7 +3,7 @@ use {
     super::{Certificate, Solver, SolverEvent, SolverResult, State, StateIF},
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-        cdb::{ClauseDB, ClauseDBIF},
+        cdb::{db::ClauseDB, ClauseDBIF},
         types::*,
     },
 };
