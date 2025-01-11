@@ -497,48 +497,58 @@ impl SolveIF for Solver {
                     #[cfg(feature = "trace_equivalency")]
                     cdb.check_consistency(asg, "before simplify");
                 }
-                ss.current_span = state.stm.current_span() as usize;
+                let ent: f64 = cdb.refer(cdb::property::TEma::Entanglement).get_slow();
+                let lbd: f64 = cdb.refer(cdb::property::TEma::LBD).get_slow();
+                ss.current_span = ent.max(lbd) as usize;
+                // ss.current_span = state.stm.current_span() as usize;
                 let scale = state.stm.current_scale();
                 asg.handle(SolverEvent::Stage(scale));
                 if let Some(new_segment) = next_stage {
                     // a beginning of a new cycle
                     {
-                        let stm = &state.stm;
-                        let b: f64 = stm.segment_starting_cycle() as f64;
-                        let n: f64 = stm.current_cycle() as f64 - b;
+                        // let stm = &state.stm;
+                        // let b: f64 = stm.segment_starting_cycle() as f64;
+                        // let n: f64 = stm.current_cycle() as f64 - b;
 
                         if cfg!(feature = "reward_annealing") {
+                            // const_R: (f64, f64) = (0.94, 0.99);
+                            // let k = stm.current_segment().ilog2() as f64;
+                            // let ratio = k / (k + 1.0);
+                            // let _ratio: f64 = stm.segment_progress_ratio();
+
+                            // let _r = R.0 + ratio * (R.1 - R.0);
+                            /*
                             let k: f64 = (stm.current_segment() as f64).log2();
-                            let ratio: f64 = stm.segment_progress_ratio();
                             const SLOP: f64 = 8.0;
-                            const R: (f64, f64) = (0.84, 0.995);
                             let d: f64 = R.1 - (R.1 - R.0) * SLOP / (k + SLOP);
                             let x: f64 = k * (2.0 * ratio - 1.0);
                             let r = {
                                 let sgm = |x: f64| 1.0 / (1.0 + (-x).exp());
                                 d + sgm(x) * (1.0 - d)
                             };
-                            asg.update_activity_decay(r);
+                            */
+                            asg.update_activity_decay(0.98);
                         }
 
                         let num_restart = asg.derefer(assign::Tusize::NumRestart);
                         if ss.next_reduce <= num_restart {
-                            let ent: f64 = cdb.refer(cdb::property::TEma::Entanglement).get_slow();
-                            let lbd: f64 = cdb.refer(cdb::property::TEma::LBD).get_slow();
-                            // Note: val can be inf. It got better results.
-                            let val: f64 = 0.5 * ent.min(lbd) + ent.max(lbd) / (1.0 + n).log2();
+                            // let ent: f64 = cdb.refer(cdb::property::TEma::Entanglement).get_slow();
+                            // let lbd: f64 = cdb.refer(cdb::property::TEma::LBD).get_slow();
+                            // // Note: val can be inf. It got better results.
+                            // let val: f64 = 0.75 * ent.min(lbd) + ent.max(lbd) / (1.0 + n).log2();
+                            let val = 5.0;
                             state.reduction_threshold = val;
                             cdb.reduce(asg, val);
                             ss.num_reduction += 1;
                             ss.reduce_step += 1;
                             ss.next_reduce = ss.reduce_step + num_restart;
 
-                            if cfg!(feature = "clause_vivification") {
+                            if cfg!(feature = "clause_vivification") && ss.num_reduction % 8 == 0 {
                                 cdb.vivify(asg, state)?;
                             }
                             if cfg!(feature = "clause_elimination")
                                 && !cfg!(feature = "incremental_solver")
-                                && ss.num_reduction % 8 == 0
+                                && ss.num_reduction % 15 == 0
                             {
                                 let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                                 state.flush("clause subsumption, ");

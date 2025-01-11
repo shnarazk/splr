@@ -543,7 +543,10 @@ impl ClauseDBIF for ClauseDB {
             }
             // alives += 1;
             // keep += 1;
-            self.clause[ci].turn_off(FlagClause::NEW_CLAUSE);
+            if self.clause[ci].is(FlagClause::NEW_CLAUSE) {
+                self.clause[ci].turn_off(FlagClause::NEW_CLAUSE);
+                // continue;
+            }
             // if self.clause[ci].is(FlagClause::FORWD_LINK)
             //     || self.clause[ci].is(FlagClause::BCKWD_LINK)
             // {

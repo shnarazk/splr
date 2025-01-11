@@ -45,7 +45,7 @@ impl Instantiate for StageManager {
             scale: 1,
             end_of_stage: unit_size,
             next_is_new_segment: false,
-            span_ema: Ema::new(4).with_value(1.0),
+            span_ema: Ema::new(64).with_value(1.0),
             ..StageManager::default()
         }
     }
@@ -71,7 +71,7 @@ impl StageManager {
             segment_starting_stage: 0,
             segment_starting_cycle: 0,
             span_base: 0.0,
-            span_ema: Ema::new(4).with_value(1.0),
+            span_ema: Ema::new(64).with_value(1.0),
         }
     }
     pub fn initialize(&mut self, _unit_size: usize) {
@@ -103,7 +103,8 @@ impl StageManager {
         let mut new_cycle = false;
         let mut new_segment = false;
         self.scale = self.generator.next_number();
-        self.span_ema.update(4.0 + (self.scale as f64).powf(0.4));
+        // self.span_ema.update(4.0 + (self.scale as f64).powf(0.4));
+        self.span_ema.update(self.scale as f64);
         self.stage += 1;
         if self.scale == 1 {
             self.cycle += 1;
@@ -131,22 +132,29 @@ impl StageManager {
         self.end_of_stage as i32 - now as i32
     }
     /// returns the number of conflicts in the current stage
+    /// that was used as the number of conflicts that corresponds to the current stage
     /// Note: we need not to make a strong correlation between this value and
     /// scale defined by Luby series. So this is fine.
+    /// stage -> cycle -> segment
     pub fn current_span(&self) -> f64 {
         self.span_ema.get()
     }
-    pub fn current_stage(&self) -> usize {
-        self.stage
-    }
-    pub fn current_cycle(&self) -> usize {
-        self.cycle
-    }
-    /// returns the scaling factor used in the current span
+    /// returns the scaling factor, or length corresponding to the current stage
+    /// stage -> cycle -> segment
     pub fn current_scale(&self) -> usize {
         self.scale
     }
+    /// return the index of the current stage    /// stage -> cycle -> segment
+    pub fn current_stage(&self) -> usize {
+        self.stage
+    }
+    /// return the index of the current cycle
+    /// stage -> cycle -> segment
+    pub fn current_cycle(&self) -> usize {
+        self.cycle
+    }
     /// returns the current index for the level 2 segments
+    /// stage -> cycle -> segment
     pub fn current_segment(&self) -> usize {
         self.segment
     }
