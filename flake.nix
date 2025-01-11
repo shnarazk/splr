@@ -1,6 +1,6 @@
 {
   description = "A modern SAT solver in Rust";
-  inputs.nixpkgs.url = github:NixOS/nixpkgs;
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs";
   outputs = { self, nixpkgs }:
   {
     packages = builtins.listToAttrs
