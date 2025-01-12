@@ -3,9 +3,7 @@ use {
         binary::{BinaryLinkIF, BinaryLinkList},
         clause::{Clause, ClauseId},
         ema::ProgressLBD,
-        property,
-        watch_cache::*,
-        BinaryLinkDB, CertificationStore, ClauseDBIF, ReductionType, RefClause,
+        property, BinaryLinkDB, CertificationStore, ClauseDBIF, ReductionType, RefClause,
     },
     crate::{assign::AssignIF, types::*},
     std::{
