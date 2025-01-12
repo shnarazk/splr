@@ -35,7 +35,7 @@ pub struct ClauseDB {
     ///
     pub(super) binary_link: BinaryLinkDB,
     /// container of watch literals
-    pub(crate) watch_cache: Vec<WatchCache>,
+    pub(crate) lit_to_clauses: Vec<Vec<ClauseId>>,
     /// collected free clause ids.
     pub(super) freelist: Vec<ClauseId>,
     /// see unsat_certificate.rs
@@ -103,7 +103,7 @@ impl Default for ClauseDB {
         ClauseDB {
             clause: Vec::new(),
             binary_link: BinaryLinkDB::default(),
-            watch_cache: Vec::new(),
+            lit_to_clauses: Vec::new(),
             freelist: Vec::new(),
             certification_store: CertificationStore::default(),
             soft_limit: 0, // 248_000_000
@@ -252,7 +252,7 @@ impl Instantiate for ClauseDB {
         ClauseDB {
             clause,
             binary_link: BinaryLinkDB::instantiate(config, cnf),
-            watch_cache: watcher,
+            lit_to_clauses: watcher,
             certification_store: CertificationStore::instantiate(config, cnf),
             soft_limit: config.c_cls_lim,
             lbd: ProgressLBD::instantiate(config, cnf),
@@ -275,9 +275,9 @@ impl Instantiate for ClauseDB {
             SolverEvent::NewVar => {
                 self.binary_link.add_new_var();
                 // for negated literal
-                self.watch_cache.push(WatchCache::new());
+                self.lit_to_clauses.push(WatchCache::new());
                 // for positive literal
-                self.watch_cache.push(WatchCache::new());
+                self.lit_to_clauses.push(WatchCache::new());
                 self.lbd_temp.push(0);
             }
             SolverEvent::Restart => {
