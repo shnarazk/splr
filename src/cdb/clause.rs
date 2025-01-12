@@ -204,6 +204,9 @@ impl ClauseIF for Clause {
         }
         false
     }
+    fn watches(&self, lit: Lit) -> bool {
+        self.lits[0] == lit || self.lits[1] == lit
+    }
     fn len(&self) -> usize {
         self.lits.len()
     }

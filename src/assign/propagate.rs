@@ -433,6 +433,7 @@ impl PropagateIF for AssignStack {
             //
             //## normal clause loop
             //
+            // TODO: check whether dead clauses exists. If so, run `retain()` after propagation.
             let mut source = cdb.watch_cache_iter(propagating);
             'next_clause: while let Some((cid, mut cached)) = source
                 .next()
@@ -444,6 +445,9 @@ impl PropagateIF for AssignStack {
                     "dead clause in propagation: {:?}",
                     cdb.is_garbage_collected(cid),
                 );
+                if cdb[cid].watches(propagating) {
+                    continue;
+                }
                 debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
                 #[cfg(feature = "maintain_watch_cache")]
                 debug_assert!(

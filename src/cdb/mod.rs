@@ -56,6 +56,8 @@ pub trait ClauseIF {
     fn contains(&self, lit: Lit) -> bool;
     /// check clause satisfiability
     fn is_satisfied_under(&self, asg: &impl AssignIF) -> bool;
+    /// return `true` if the clause is watching the literal
+    fn watches(&self, lit: Lit) -> bool;
     /// return an iterator over its literals.
     fn iter(&self) -> Iter<'_, Lit>;
     /// return the number of literals.
