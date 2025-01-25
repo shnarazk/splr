@@ -17,6 +17,7 @@ pub struct ClauseId {
 }
 
 /// A representation of 'clause'
+/// 24 + 8 + 1 + 2 + 2
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct Clause {
     /// The literals in a clause.
@@ -27,9 +28,9 @@ pub struct Clause {
     pub rank: u16,
     /// A record of the rank at previos stage.
     pub rank_old: u16,
-    /// the index from which `propagate` starts searching an un-falsified literal.
-    /// Since it's just a hint, we don't need u32 or usize.
-    pub(crate) search_from: u16,
+    /// the index at which the last `propagate` found a satisfiable literal
+    /// this becomes `lit1` automatically and at the next `propagate` search starts from here.
+    pub(super) watch1: usize,
 
     #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
     /// the number of conflicts at which this clause was used in `conflict_analyze`
@@ -52,7 +53,7 @@ impl Default for Clause {
             flags: FlagClause::empty(),
             rank: 0,
             rank_old: 0,
-            search_from: 2,
+            watch1: 1,
 
             #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
             timestamp: 0,
@@ -176,7 +177,7 @@ impl ClauseIF for Clause {
         self.lits.iter()
     }
     #[inline]
-    fn lit0(&self) -> Lit {
+    fn watch0(&self) -> Lit {
         #[cfg(feature = "unsafe_access")]
         unsafe {
             *self.lits.get_unchecked(0)
@@ -185,13 +186,19 @@ impl ClauseIF for Clause {
         self.lits[0]
     }
     #[inline]
-    fn lit1(&self) -> Lit {
+    fn watch1(&self) -> Lit {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            *self.lits.get_unchecked(1)
+            *self.lits.get_unchecked(self.watch1)
         }
         #[cfg(not(feature = "unsafe_access"))]
-        self.lits[1]
+        self.lits[self.search_from]
+    }
+    fn watch1_pos(&self) -> usize {
+        self.watch1
+    }
+    fn swap_watches(&mut self) {
+        self.lits.swap(0, self.watch1);
     }
     fn contains(&self, lit: Lit) -> bool {
         self.lits.contains(&lit)
@@ -205,10 +212,24 @@ impl ClauseIF for Clause {
         false
     }
     fn watches(&self, lit: Lit) -> bool {
-        self.lits[0] == lit || self.lits[1] == lit
+        // assert!(
+        //     self.watch1 < self.lits.len(),
+        //     "{}-L{}: {:?}",
+        //     file!(),
+        //     line!(),
+        //     self
+        // );
+        self.lits[0] == !lit || self.lits[self.watch1] == !lit
     }
     fn len(&self) -> usize {
         self.lits.len()
+    }
+
+    fn transform_by_updating_watch(&mut self, watch_pos: usize) {
+        // self.lits.swap(0, watch_pos);
+        // self.lits.swap(self.watch1, watch_pos);
+        debug_assert!(watch_pos < self.lits.len());
+        self.watch1 = watch_pos;
     }
 
     #[cfg(feature = "boundary_check")]

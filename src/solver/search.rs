@@ -272,6 +272,7 @@ fn search(
                 return Err(SolverError::UndescribedError);
             }
             RESTART!(asg, cdb, state);
+            #[cfg(feature = "rephase")]
             asg.select_rephasing_target();
             asg.clear_asserted_literals(cdb)?;
 

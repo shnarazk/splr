@@ -190,7 +190,7 @@ fn select_targets(
         let mut seen: Vec<Option<OrderedProxy<ClauseId>>> = vec![None; 2 * (asg.num_vars + 1)];
         for (i, c) in cdb.iter().enumerate().skip(1) {
             if let Some(rank) = c.to_vivify(true) {
-                let p = &mut seen[usize::from(c.lit0())];
+                let p = &mut seen[usize::from(c.watch0())];
                 if p.as_ref().map_or(0.0, |r| r.value()) < rank {
                     *p = Some(OrderedProxy::new(ClauseId::from(i), rank));
                 }

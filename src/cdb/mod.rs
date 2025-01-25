@@ -6,6 +6,8 @@ mod binary;
 mod cid;
 /// methods on `Clause`
 pub mod clause;
+/// methods on `ClauseIdVector`
+pub mod clause_vector;
 /// methods on `ClauseDB`
 pub mod db;
 /// EMA
@@ -45,20 +47,33 @@ pub trait ClauseIF {
     fn is_empty(&self) -> bool;
     /// return true if it contains no literals; a clause after unit propagation.
     fn is_dead(&self) -> bool;
-    /// return 1st watch
-    fn lit0(&self) -> Lit;
-    /// return 2nd watch
-    fn lit1(&self) -> Lit;
+    /// return 1st watch literal, the negation of an assigned literal
+    fn watch0(&self) -> Lit;
+    /// return 2nd watch, the negation 0f an assigned literal
+    fn watch1(&self) -> Lit;
+    /// return the positon (index) for watch1
+    fn watch1_pos(&self) -> usize;
+    /// swap two watches
+    fn swap_watches(&mut self);
     /// return `true` if the clause contains the literal
     fn contains(&self, lit: Lit) -> bool;
     /// check clause satisfiability
     fn is_satisfied_under(&self, asg: &impl AssignIF) -> bool;
-    /// return `true` if the clause is watching the literal
+    /// return `true` if the clause is watching the literal.
+    /// So:
+    ///
+    /// - `c[1,3,6].watches(-3) == true`
+    /// - `c[1,3,6].watches(1) == false`
+    /// - `c[1,3,6].watches(-6) == false`
+    /// - `c[1,3,6].watches(6) == true`
+    ///
     fn watches(&self, lit: Lit) -> bool;
     /// return an iterator over its literals.
     fn iter(&self) -> Iter<'_, Lit>;
     /// return the number of literals.
     fn len(&self) -> usize;
+    /// transform a clause by updating watches.
+    fn transform_by_updating_watch(&mut self, watch_pos: usize);
 
     #[cfg(feature = "boundary_check")]
     /// return timestamp.
@@ -91,9 +106,31 @@ pub trait ClauseDBIF:
     fn binary_links(&self, l: Lit) -> &BinaryLinkList;
 
     //
+    // #lit-to-clause
+    //
+
+    /// remove `cid` from `self.lit_to_clauses[l]`
+    /// and remove `l` from `self.clause[cid]`
+    /// Note: removing `l` is done by substituting `l` with `0`.
+    fn detch_lit_from_clause(&mut self, l: Lit, cid: ClauseId);
+    /// return the list of clauses including `l`.
+    fn lit_to_clauses(&self, l: Lit) -> &[ClauseId];
+    /// return a mutable iterator over the list of clauses including `l`.
+    fn lit_to_clauses_iter(&self, l: Lit) -> Iter<ClauseId>;
+    /// lift the order of `cid` in `self.lit_to_clauses[l][cid]`
+    fn lift_clause_order(&mut self, l: Lit, index: usize);
+
+    //
     //## abstraction to watch_cache
     //
 
+    //
+    // clause vector, a new scheme to access clauses
+    //
+
+    fn clause_vector(&mut self, l: Lit, index: usize) -> (ClauseId, &mut Clause);
+    fn clause_vector_len(&self, l: Lit) -> usize;
+    /*
     // get mutable reference to a watch_cache
     fn fetch_watch_cache_entry(&self, lit: Lit, index: WatchCacheProxy) -> (ClauseId, Lit);
     /// replace the mutable watcher list with an empty one, and return the list
@@ -104,20 +141,12 @@ pub trait ClauseDBIF:
     fn merge_watch_cache(&mut self, l: Lit, wc: WatchCache);
     /// swap the first two literals in a clause.
     fn swap_watch(&mut self, cid: ClauseId);
+    */
 
     //
     //## clause transformation
     //
 
-    /// push back a watch literal cache by adjusting the iterator for `lit`
-    fn transform_by_restoring_watch_cache(
-        &mut self,
-        l: Lit,
-        iter: &mut WatchCacheIterator,
-        p: Option<Lit>,
-    );
-    /// swap i-th watch with j-th literal then update watch caches correctly
-    fn transform_by_updating_watch(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool);
     /// allocate a new clause and return its id.
     /// Note this removes an eliminated Lit `p` from a clause. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
@@ -130,8 +159,6 @@ pub trait ClauseDBIF:
     fn remove_clause_sandbox(&mut self, cid: ClauseId);
     /// update watches of the clause
     fn transform_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause;
-    /// generic clause transformer (not in use)
-    fn transform_by_replacement(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause;
     /// check satisfied and nullified literals in a clause
     fn transform_by_simplification(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> RefClause;
     /// reduce learnt clauses
@@ -304,9 +331,9 @@ mod tests {
             println!("skip checking watches of an empty clause");
             return;
         }
-        assert!(c.lits[0..2]
+        assert!(c.lits.iter().all(|l| cdb.lit_to_clauses[usize::from(!*l)]
             .iter()
-            .all(|l| cdb.watch_cache[!*l].iter().any(|(c, _)| *c == cid)));
+            .any(|c| *c == cid)));
         println!("pass to check watches");
     }
 

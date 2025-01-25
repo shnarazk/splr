@@ -84,7 +84,7 @@ impl TrailSavingIF for AssignStack {
                     return self.truncate_trail_saved(i + 1);
                 }
                 (None, AssignReason::Implication(cid)) => {
-                    debug_assert_eq!(cdb[cid].lit0(), lit);
+                    debug_assert_eq!(cdb[cid].watch0(), lit);
                     debug_assert!(cdb[cid]
                         .iter()
                         .skip(1)
@@ -109,7 +109,7 @@ impl TrailSavingIF for AssignStack {
                     debug_assert!(cdb[cid].iter().all(|l| self.assigned(*l) == Some(false)));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_saved_trail();
-                    return Err((cdb[cid].lit0(), AssignReason::Implication(cid)));
+                    return Err((cdb[cid].watch0(), AssignReason::Implication(cid)));
                 }
                 (_, AssignReason::Decision(lvl)) => {
                     debug_assert_ne!(0, lvl);

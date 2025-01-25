@@ -327,6 +327,53 @@ impl LitIF for Lit {
     }
 }
 
+//
+// Clause
+//
+
+pub type ClauseIndex = usize;
+
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+pub struct WatchLiteralIndex(usize);
+
+pub trait WatchLiteralIndexIf {
+    fn new(ci: ClauseIndex, wi: usize) -> Self;
+    fn set(&mut self, ci: ClauseIndex, wi: usize);
+    fn is_none(&self) -> bool;
+    fn indices(&self) -> (ClauseIndex, usize);
+    fn as_ci(&self) -> ClauseIndex;
+    fn as_wi(&self) -> usize;
+}
+
+impl WatchLiteralIndexIf for WatchLiteralIndex {
+    fn new(ci: ClauseIndex, wi: usize) -> Self {
+        WatchLiteralIndex(ci * 2 + wi)
+    }
+    fn set(&mut self, ci: ClauseIndex, wi: usize) {
+        self.0 = ci * 2 + wi;
+    }
+    fn is_none(&self) -> bool {
+        self.0 == 0
+    }
+    fn indices(&self) -> (ClauseIndex, usize) {
+        (self.0 >> 1, self.0 & 1)
+    }
+    fn as_ci(&self) -> ClauseIndex {
+        self.0 >> 1
+    }
+    fn as_wi(&self) -> usize {
+        self.0 & 1
+    }
+}
+
+impl Not for WatchLiteralIndex {
+    type Output = WatchLiteralIndex;
+    #[inline]
+    fn not(self) -> Self {
+        WatchLiteralIndex(self.0 ^ 1)
+    }
+}
+
 /// Capture a conflict
 pub type ConflictContext = (Lit, AssignReason);
 
@@ -659,14 +706,18 @@ impl<T: Clone + Default + PartialEq + Ord> PartialOrd for OrderedProxy<T> {
 }
 
 impl<T: Clone + Default + PartialEq + Ord> Ord for OrderedProxy<T> {
-    fn cmp(&self, other: &OrderedProxy<T>) -> Ordering {
-        if (self.index - other.index).abs() < f64::EPSILON {
-            self.body.cmp(&other.body)
-        } else if self.index < other.index {
-            Ordering::Less
-        } else {
-            Ordering::Greater
-        }
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.index.partial_cmp(&other.index).unwrap_or_else(|| {
+            if self.index.is_nan() {
+                if other.index.is_nan() {
+                    Ordering::Equal
+                } else {
+                    Ordering::Greater
+                }
+            } else {
+                Ordering::Less
+            }
+        })
     }
 }
 

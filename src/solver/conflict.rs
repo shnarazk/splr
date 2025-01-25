@@ -178,8 +178,8 @@ pub fn handle_conflict(
             #[cfg(feature = "boundary_check")]
             cdb[cid].set_birth(asg.num_conflict);
 
-            debug_assert_eq!(l0, cdb[cid].lit0());
-            debug_assert_eq!(l1, cdb[cid].lit1());
+            debug_assert_eq!(l0, cdb[cid].watch0());
+            debug_assert_eq!(l1, cdb[cid].watch1());
             debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
 
@@ -201,7 +201,7 @@ pub fn handle_conflict(
             #[cfg(feature = "boundary_check")]
             cdb[cid].set_birth(asg.num_conflict);
 
-            debug_assert_eq!(cdb[cid].lit0(), l0);
+            debug_assert_eq!(cdb[cid].watch0(), l0);
             debug_assert_eq!(asg.assigned(l0), None);
             asg.assign_by_implication(
                 l0,
@@ -220,8 +220,8 @@ pub fn handle_conflict(
         RefClause::RegisteredClause(cid) => {
             debug_assert_eq!(learnt_len, 2);
             debug_assert!(
-                (l0 == cdb[cid].lit0() && l1 == cdb[cid].lit1())
-                    || (l0 == cdb[cid].lit1() && l1 == cdb[cid].lit0())
+                (l0 == cdb[cid].watch0() && l1 == cdb[cid].watch1())
+                    || (l0 == cdb[cid].watch1() && l1 == cdb[cid].watch0())
             );
             debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
@@ -594,10 +594,10 @@ fn lit_level(
         AssignReason::Decision(lvl) => lvl,
         AssignReason::Implication(cid) => {
             assert_eq!(
-                cdb[cid].lit0(),
+                cdb[cid].watch0(),
                 lit,
                 "lit0 {} != lit{}, cid {}, {}",
-                cdb[cid].lit0(),
+                cdb[cid].watch0(),
                 lit,
                 cid,
                 &cdb[cid]
