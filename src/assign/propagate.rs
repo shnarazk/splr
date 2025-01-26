@@ -1,5 +1,5 @@
-/// implement boolean constraint propagation, backjump
-/// This version can handle Chronological and Non Chronological Backtrack.
+// implement boolean constraint propagation, backjump
+// This version can handle Chronological and Non Chronological Backtrack.
 use {
     super::{AssignIF, AssignStack, VarHeapIF, VarManipulateIF},
     crate::{cdb::ClauseDBIF, types::*},
@@ -765,7 +765,7 @@ impl AssignStack {
         assert_ne!(self.assigned(b0), Some(false));
         assert_ne!(self.assigned(b1), Some(false));
     }
-    ///
+    /// simplify clauses by propagating literals at root level.
     fn propagate_at_root_level(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
         let mut num_propagated = 0;
         while num_propagated < self.trail.len() {
