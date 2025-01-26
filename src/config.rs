@@ -112,7 +112,7 @@ impl Default for Config {
             cls_rdc_rm1: 0.2,
             cls_rdc_rm2: 0.05,
 
-            enable_eliminator: !cfg!(feature = "no_clause_elimination"),
+            enable_eliminator: cfg!(feature = "clause_elimination"),
             elm_cls_lim: 64,
             elm_grw_lim: 0,
             elm_var_occ: 20000,
@@ -262,7 +262,7 @@ impl Config {
                 "binary clause completion",
                 #[cfg(feature = "chrono_BT")]
                 "chrono BT",
-                #[cfg(not(feature = "no_clause_elimination"))]
+                #[cfg(feature = "clause_elimination")]
                 "stage-based clause elimination",
                 #[cfg(feature = "clause_vivification")]
                 "stage-based clause vivification",

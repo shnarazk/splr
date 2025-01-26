@@ -249,7 +249,7 @@ impl SatSolverIF for Solver {
         cdb.handle(SolverEvent::Reinitialize);
         state.handle(SolverEvent::Reinitialize);
 
-        #[cfg(not(feature = "no_clause_elimination"))]
+        #[cfg(feature = "clause_elimination")]
         {
             let mut tmp = Vec::new();
             std::mem::swap(&mut tmp, &mut cdb.eliminated_permanent);
