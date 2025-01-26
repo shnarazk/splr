@@ -434,52 +434,47 @@ impl PropagateIF for AssignStack {
             //
             'next_clause: for index in 0..cdb.clause_vector_len(false_lit) {
                 let (cid, c) = cdb.clause_vector(false_lit, index);
-                if !c.watches(propagating) {
+                // if c.is_dead() {
+                //     continue;
+                // }
+                debug_assert!(!c.is_dead());
+                let Some(watch0) = c.update_watches(false_lit) else {
+                    continue;
+                };
+                /*
+                if !c.watches(false_lit) {
                     continue;
                 }
-                let lit0 = c.watch0();
-                debug_assert!(lit0 == false_lit || c.watch1() == false_lit);
-                let other_watch = if lit0 == false_lit { c.watch1() } else { lit0 };
-                let other_watch_value = lit_assign!(self, other_watch);
-                if Some(true) == other_watch_value {
+                if c.watch0() == false_lit {
+                    c.swap_watches();
+                }
+                let watch0 = c.watch0();
+                */
+                let watch0_value = lit_assign!(self, watch0);
+                if Some(true) == watch0_value {
                     check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
                     continue 'next_clause;
                 }
-                // place lit1, the not-falsified wacth at lits[0].
-                if lit0 == false_lit {
-                    c.swap_watches();
-                }
                 // Search an un-falsified literal
-                //
-                // TODO: encapsulate `search_from` somehow.
-                // Or ditch `lit1()` interface.
-                let start = c.watch1_pos() + 1;
+                let start = c.watch1_pos();
                 for (k, lk) in c
                     .iter()
                     .enumerate()
-                    .skip(start)
-                    .chain(c.iter().enumerate().skip(1).take(start - 1))
+                    .skip(start + 1)
+                    .chain(c.iter().enumerate().take(start).skip(1))
                 {
                     if lit_assign!(self, *lk) != Some(false) {
                         check_in!(
                             cid,
                             Propagate::FindNewWatch(self.num_conflict, propagating, !*lk)
                         );
-                        // watch management
-                        // - c.lits.swap(0, k) (new watch should be placed at 0)
-                        // - c.lits.swap(c.start_from, k) (place another watch at better place)
-                        // - c.start_from = k (and point there by `start_from`)
-                        // cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
                         c.transform_by_updating_watch(k);
                         continue 'next_clause;
                     }
                 }
-                let lit0 = c.watch0();
-                debug_assert_eq!(lit_assign!(self, lit0), other_watch_value);
-                debug_assert!(lit_assign!(self, lit0) != Some(true));
-                if other_watch_value == Some(false) {
-                    check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, lit1));
-                    conflict_path!(lit0, AssignReason::Implication(cid));
+                if watch0_value == Some(false) {
+                    check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, lit0));
+                    conflict_path!(watch0, AssignReason::Implication(cid));
                 }
 
                 #[cfg(feature = "chrono_BT")]
@@ -490,14 +485,14 @@ impl PropagateIF for AssignStack {
                     .max()
                     .unwrap_or(self.root_level);
 
-                debug_assert_eq!(lit_assign!(self, lit0), None);
+                debug_assert_eq!(lit_assign!(self, watch0), None);
                 self.assign_by_implication(
-                    lit0,
+                    watch0,
                     AssignReason::Implication(cid),
                     #[cfg(feature = "chrono_BT")]
                     dl,
                 );
-                check_in!(cid, Propagate::BecameUnit(self.num_conflict, lit1));
+                check_in!(cid, Propagate::BecameUnit(self.num_conflict, lit0));
                 cdb.lift_clause_order(false_lit, index);
             }
             from_saved_trail!();
@@ -581,7 +576,7 @@ impl PropagateIF for AssignStack {
             }
             'next_clause: for index in 0..cdb.clause_vector_len(false_lit) {
                 let (cid, c) = cdb.clause_vector(false_lit, index);
-                if c.is_dead() || !c.watches(propagating) {
+                if c.is_dead() || !c.watches(false_lit) {
                     continue;
                 }
                 let lit0 = c.watch0();
@@ -594,12 +589,12 @@ impl PropagateIF for AssignStack {
                 if lit0 == false_lit {
                     c.swap_watches();
                 }
-                let start = c.watch1_pos() + 1;
+                let start = c.watch1_pos();
                 for (k, lk) in c
                     .iter()
                     .enumerate()
-                    .skip(start)
-                    .chain(c.iter().enumerate().skip(1).take(start - 1))
+                    .skip(start + 1)
+                    .chain(c.iter().enumerate().take(start).skip(1))
                 {
                     if lit_assign!(self, *lk) != Some(false) {
                         check_in!(

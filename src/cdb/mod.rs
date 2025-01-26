@@ -68,6 +68,8 @@ pub trait ClauseIF {
     /// - `c[1,3,6].watches(6) == true`
     ///
     fn watches(&self, lit: Lit) -> bool;
+    /// update watches and return anohther watch.
+    fn update_watches(&mut self, lit: Lit) -> Option<Lit>;
     /// return an iterator over its literals.
     fn iter(&self) -> Iter<'_, Lit>;
     /// return the number of literals.
@@ -354,7 +356,8 @@ mod tests {
 
         asg.assign_by_decision(lit(-2)); // at level 1
         asg.assign_by_decision(lit(1)); // at level 2
-                                        // Now `asg.level` = [_, 2, 1, 3, 4, 5, 6].
+
+        // Now `asg.level` = [_, 2, 1, 3, 4, 5, 6].
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();

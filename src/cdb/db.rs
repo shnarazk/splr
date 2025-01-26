@@ -29,7 +29,8 @@ pub struct ClauseDB {
     pub(crate) clause: Vec<Clause>,
     /// hashed representation of binary clauses.
     ///## Note
-    /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
+    /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\]
+    /// instead of bi_clause\[!l0\].
     ///
     pub(super) binary_link: BinaryLinkDB,
     /// container of watch literals
@@ -317,8 +318,13 @@ impl ClauseDBIF for ClauseDB {
         self.lit_to_clauses[usize::from(l)].iter()
     }
     fn lift_clause_order(&mut self, l: Lit, index: usize) {
+        if index < 8 {
+            return;
+        }
         let cv = &mut self.lit_to_clauses[usize::from(l)];
-        if self.clause[usize::from(cv[index])].rank < self.clause[usize::from(cv[index / 2])].rank {
+        let c1 = usize::from(cv[index]);
+        let c2 = usize::from(cv[index / 2]);
+        if self.clause[c1].rank <= self.clause[c2].rank {
             cv.swap(index / 2, index);
         }
         // if 8 <= index {
@@ -459,10 +465,10 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         c.watch1 = 1;
-        let l0 = c.watch0();
-        let l1 = c.watch1();
         if len2 {
             *num_bi_clause += 1;
+            let l0 = c.watch0();
+            let l1 = c.watch1();
             binary_link.add(l0, l1, cid);
         } else {
             for l in &c.lits {
@@ -520,9 +526,9 @@ impl ClauseDBIF for ClauseDB {
             c.turn_on(FlagClause::LEARNT);
         }
         c.watch1 = 1;
-        let l0 = c.watch0();
-        let l1 = c.watch1();
         if len2 {
+            let l0 = c.watch0();
+            let l1 = c.watch1();
             binary_link.add(l0, l1, cid);
         } else {
             for l in &c.lits {
@@ -551,6 +557,7 @@ impl ClauseDBIF for ClauseDB {
             ),
             (cid, c),
         );
+        self.freelist.push(cid);
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
     }
     fn remove_clause_sandbox(&mut self, cid: ClauseId) {
@@ -569,6 +576,7 @@ impl ClauseDBIF for ClauseDB {
             (&mut dummy1, &mut dummy2, &mut dummy3),
             (cid, c),
         );
+        self.freelist.push(cid);
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
     }
     // return a Lit if the clause becomes a unit clause.
@@ -617,22 +625,27 @@ impl ClauseDBIF for ClauseDB {
             .copied()
             .collect::<Vec<Lit>>();
         if new_lits.len() == 2 {
+            for l in lits.iter() {
+                lit_to_clauses[usize::from(*l)].retain(|ci| ci != &cid);
+            }
+            std::mem::swap(lits, &mut new_lits);
+            *num_bi_clause += 1;
+            // TODO: use biclause shortcut?
+
+            c.watch1 = 1;
             if let Some(&reg) = binary_link.search(new_lits[0], new_lits[1]) {
                 //
                 //## Case:3-0
                 //
+                // self.remove_clause(cid);
+                // TODO: update counters
                 return RefClause::RegisteredClause(reg);
             }
             //
             //## Case:3-2
             //
-            std::mem::swap(lits, &mut new_lits);
-            // TODO: use biclause shortcut?
-            for l in lits.iter() {
-                lit_to_clauses[usize::from(*l)].retain(|ci| ci != &cid);
-            }
             binary_link.add(lits[0], lits[1], cid);
-            *num_bi_clause += 1;
+
             // self.watches(cid, "after strengthen_by_elimination case:3-2");
         } else {
             //
@@ -703,9 +716,13 @@ impl ClauseDBIF for ClauseDB {
             1 => RefClause::UnitClause(new_lits[0]), //## Case:1
             2 => {
                 //## Case:2
+
+                debug_assert!(2 < c.lits.len());
+                for l in c.iter() {
+                    lit_to_clauses[usize::from(*l)].retain(|ci| ci != &cid);
+                }
                 let l0 = new_lits[0];
                 let l1 = new_lits[1];
-                debug_assert!(2 < c.lits.len());
                 if let Some(&bid) = binary_link.search(l0, l1) {
                     //
                     //## Case:3-0
@@ -716,10 +733,9 @@ impl ClauseDBIF for ClauseDB {
                 //
                 //## Case:3-2
                 //
-                lit_to_clauses[usize::from(c.watch0())].retain(|ci| *ci != cid);
-                lit_to_clauses[usize::from(c.watch1())].retain(|ci| *ci != cid);
                 binary_link.add(l0, l1, cid);
                 std::mem::swap(&mut c.lits, &mut new_lits);
+                c.watch1 = 1;
                 self.num_bi_clause += 1;
                 if c.is(FlagClause::LEARNT) {
                     self.num_learnt -= 1;
@@ -1078,6 +1094,15 @@ fn remove_clause_fn(
 ) {
     debug_assert!(!c.is_dead());
     if c.len() == 2 {
+        // for l in c.iter() {
+        //     assert!(
+        //         lit_to_clauses[usize::from(*l)].iter().all(|ci| ci != &cid),
+        //         "lit_to_clauses[{}] contains {:?}:{:?}",
+        //         l,
+        //         cid,
+        //         c
+        //     );
+        // }
         let l0 = c.lits[0];
         let l1 = c.lits[1];
         binary_link

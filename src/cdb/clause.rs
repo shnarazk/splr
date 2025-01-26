@@ -219,17 +219,37 @@ impl ClauseIF for Clause {
         //     line!(),
         //     self
         // );
-        self.lits[0] == !lit || self.lits[self.watch1] == !lit
+        self.lits[0] == lit || self.lits[self.watch1] == lit
     }
     fn len(&self) -> usize {
         self.lits.len()
+    }
+    fn update_watches(&mut self, lit: Lit) -> Option<Lit> {
+        let w0 = self.lits[0];
+        let w1 = self.lits[self.watch1];
+        if w0 == lit {
+            self.lits.swap(0, self.watch1);
+            Some(w1)
+        } else if w1 == lit {
+            Some(w0)
+        } else {
+            None
+        }
     }
 
     fn transform_by_updating_watch(&mut self, watch_pos: usize) {
         // self.lits.swap(0, watch_pos);
         // self.lits.swap(self.watch1, watch_pos);
         debug_assert!(watch_pos < self.lits.len());
-        self.watch1 = watch_pos;
+        let w1 = self.watch1 + 1;
+        if w1 < watch_pos {
+            // let we = self.lits.len() - 1;
+            // self.lits.swap(w1, we);
+            self.lits.swap(w1, watch_pos);
+            self.watch1 = w1;
+        } else {
+            self.watch1 = watch_pos;
+        }
     }
 
     #[cfg(feature = "boundary_check")]
