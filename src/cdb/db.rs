@@ -935,7 +935,7 @@ impl ClauseDBIF for ClauseDB {
         if learnt {
             #[cfg(feature = "just_used")]
             c.turn_on(FlagClause::USED);
-            #[cfg(feature = "clause_rewading")]
+            #[cfg(feature = "clause_rewarding")]
             self.reward_at_analysis(cid);
         }
         if 1 < rank {
@@ -945,14 +945,6 @@ impl ClauseDBIF for ClauseDB {
     }
     /// reduce the number of 'learnt' or *removable* clauses.
     fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
-        impl Clause {
-            fn reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
-                self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
-            }
-            fn lbd(&self) -> f64 {
-                self.rank as f64
-            }
-        }
         let ClauseDB {
             ref mut clause,
             ref mut lbd_temp,
@@ -1331,5 +1323,11 @@ impl Clause {
             }
         }
         falsified
+    }
+    fn reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
+        self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
+    }
+    fn lbd(&self) -> f64 {
+        self.rank as f64
     }
 }

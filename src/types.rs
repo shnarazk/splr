@@ -46,22 +46,22 @@ pub trait ActivityIF<Ix> {
     fn set_activity(&mut self, ix: Ix, val: f64);
     /// modify one's activity at conflict analysis in `conflict_analyze` in [`solver`](`crate::solver`).
     fn reward_at_analysis(&mut self, _ix: Ix) {
-        #[cfg(debug)]
+        #[cfg(feature = "boundary_check")]
         todo!()
     }
     /// modify one's activity at value assignment in assign.
     fn reward_at_assign(&mut self, _ix: Ix) {
-        #[cfg(debug)]
+        #[cfg(feature = "boundary_check")]
         todo!()
     }
     /// modify one's activity at value assignment in unit propagation.
     fn reward_at_propagation(&mut self, _ix: Ix) {
-        #[cfg(debug)]
+        #[cfg(feature = "boundary_check")]
         todo!()
     }
     /// modify one's activity at value un-assignment in [`cancel_until`](`crate::assign::PropagateIF::cancel_until`).
     fn reward_at_unassign(&mut self, _ix: Ix) {
-        #[cfg(debug)]
+        #[cfg(feature = "boundary_check")]
         todo!()
     }
     /// update reward decay.

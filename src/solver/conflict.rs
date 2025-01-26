@@ -83,7 +83,7 @@ pub fn handle_conflict(
     let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
     if learnt_len == 0 {
-        #[cfg(debug)]
+        #[cfg(feature = "boundary_check")]
         {
             println!(
                 "empty learnt at {}({}) by {:?}",
