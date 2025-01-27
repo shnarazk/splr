@@ -136,7 +136,7 @@ impl PropagateIF for AssignStack {
                 // self.make_var_asserted(vi);
                 Ok(())
             }
-            _ => Err(SolverError::RootLevelConflict((l, self.reason[l.vi()]))),
+            _ => Err(SolverError::RootLevelConflict((l, self.var[l.vi()].reason))),
         }
     }
     fn assign_by_implication(
@@ -155,7 +155,7 @@ impl PropagateIF for AssignStack {
             var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
         );
         debug_assert_eq!(self.var[vi].assign, None);
-        debug_assert_eq!(self.reason[vi], AssignReason::None);
+        debug_assert_eq!(self.var[vi].reason, AssignReason::None);
         debug_assert!(self.trail.iter().all(|rl| *rl != l));
         set_assign!(self, l);
 
@@ -163,7 +163,7 @@ impl PropagateIF for AssignStack {
         let lv = self.decision_level();
 
         self.var[vi].level = lv;
-        self.reason[vi] = reason;
+        self.var[vi].reason = reason;
         self.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
@@ -195,9 +195,9 @@ impl PropagateIF for AssignStack {
         v.level = dl;
         debug_assert!(!v.is(FlagVar::ELIMINATED));
         debug_assert_eq!(self.var[vi].assign, None);
-        debug_assert_eq!(self.reason[vi], AssignReason::None);
+        debug_assert_eq!(self.var[vi].reason, AssignReason::None);
         set_assign!(self, l);
-        self.reason[vi] = AssignReason::Decision(self.decision_level());
+        self.var[vi].reason = AssignReason::Decision(self.decision_level());
         self.reward_at_assign(vi);
         self.trail.push(l);
         self.num_decision += 1;
@@ -259,7 +259,7 @@ impl PropagateIF for AssignStack {
             }
 
             unset_assign!(self, vi);
-            self.reason[vi] = AssignReason::None;
+            self.var[vi].reason = AssignReason::None;
 
             #[cfg(not(feature = "trail_saving"))]
             {
@@ -313,7 +313,7 @@ impl PropagateIF for AssignStack {
             let vi = l.vi();
             debug_assert!(self.root_level < self.var[vi].level);
             unset_assign!(self, vi);
-            self.reason[vi] = AssignReason::None;
+            self.var[vi].reason = AssignReason::None;
             self.insert_heap(vi);
         }
         self.trail.truncate(lim);
@@ -807,7 +807,7 @@ impl AssignStack {
             for l in self.trail.iter().skip(self.len_upto(self.root_level)) {
                 let vi = l.vi();
                 if let Some(b) = self.var[vi].assign {
-                    self.best_phases.insert(vi, (b, self.reason[vi]));
+                    self.best_phases.insert(vi, (b, self.var[vi].reason));
                 }
             }
         }

@@ -17,8 +17,6 @@ use super::TrailSavingIF;
 /// A record of assignment. It's called 'trail' in Glucose.
 #[derive(Clone, Debug)]
 pub struct AssignStack {
-    /// reason of assignment
-    pub(super) reason: Vec<AssignReason>,
     /// record of assignment
     pub(super) trail: Vec<Lit>,
     pub(super) trail_lim: Vec<usize>,
@@ -104,7 +102,6 @@ pub struct AssignStack {
 impl Default for AssignStack {
     fn default() -> AssignStack {
         AssignStack {
-            reason: Vec::new(),
             trail: Vec::new(),
             trail_lim: Vec::new(),
             q_head: 0,
@@ -178,7 +175,6 @@ impl Instantiate for AssignStack {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
-            reason: vec![AssignReason::None; nv + 1],
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv),
 
@@ -221,7 +217,6 @@ impl Instantiate for AssignStack {
                 self.clear_saved_trail();
             }
             SolverEvent::NewVar => {
-                self.reason.push(AssignReason::None);
                 self.expand_heap();
                 self.num_vars += 1;
                 self.var.push(Var::default());

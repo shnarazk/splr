@@ -13,8 +13,13 @@ use {
 pub struct Var {
     /// assignment
     pub(crate) assign: Option<bool>,
-    /// levels of vars
+    /// decision level
     pub(super) level: DecisionLevel,
+    /// assign Reason
+    pub(super) reason: AssignReason,
+    /// last reason for assignment.
+    #[cfg(feature = "trail_saving")]
+    pub(super) reason_saved: AssignReason,
     /// the `Flag`s (8 bits)
     pub(crate) flags: FlagVar,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
@@ -33,6 +38,9 @@ impl Default for Var {
         Var {
             assign: None,
             level: 0,
+            reason: AssignReason::None,
+            #[cfg(feature = "trail_saving")]
+            reason_saved: AssignReason::None,
             flags: FlagVar::empty(),
             reward: 0.0,
             // reward_ema: Ema2::new(200).with_slow(4_000),
@@ -147,7 +155,7 @@ impl VarManipulateIF for AssignStack {
     fn reason(&self, vi: VarId) -> AssignReason {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            *self.reason.get_unchecked(vi)
+            self.var.get_unchecked(vi).reason
         }
         #[cfg(not(feature = "unsafe_access"))]
         self.reason[vi]
@@ -177,7 +185,7 @@ impl VarManipulateIF for AssignStack {
         self.var.iter_mut()
     }
     fn make_var_asserted(&mut self, vi: VarId) {
-        self.reason[vi] = AssignReason::Decision(0);
+        self.var[vi].reason = AssignReason::Decision(0);
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
 
