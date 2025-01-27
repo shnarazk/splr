@@ -56,7 +56,7 @@ impl VarSelectIF for AssignStack {
             .iter()
             .enumerate()
             .filter_map(|(vi, v)| {
-                if self.level[vi] == self.root_level || self.var[vi].is(FlagVar::ELIMINATED) {
+                if v.level == self.root_level || v.is(FlagVar::ELIMINATED) {
                     default_value.map(|b| (vi, b))
                 } else {
                     Some((

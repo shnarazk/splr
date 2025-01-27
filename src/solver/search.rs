@@ -552,10 +552,9 @@ fn analyze_final(asg: &mut AssignStack, state: &mut State, c: &Clause) {
             if let AssignReason::Decision(_) = asg.reason(vi) {
                 state.conflicts.push(!*l);
             } else {
-                let level = asg.level_ref();
                 for l in &c[(c.len() != 2) as usize..] {
                     let vj = l.vi();
-                    if 0 < level[vj] {
+                    if 0 < asg.level(vj) {
                         seen[vj] = true;
                     }
                 }

@@ -117,7 +117,7 @@ impl PropagateIF for AssignStack {
         debug_assert!(vi < self.var.len());
         debug_assert!(!self.var[vi].is(FlagVar::ELIMINATED));
         debug_assert!(self.trail_lim.is_empty());
-        self.level[vi] = self.root_level;
+        self.var[vi].level = self.root_level;
         match var_assign!(self, vi) {
             None => {
                 set_assign!(self, l);
@@ -162,7 +162,7 @@ impl PropagateIF for AssignStack {
         #[cfg(not(feature = "chrono_BT"))]
         let lv = self.decision_level();
 
-        self.level[vi] = lv;
+        self.var[vi].level = lv;
         self.reason[vi] = reason;
         self.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
@@ -191,8 +191,8 @@ impl PropagateIF for AssignStack {
         self.level_up();
         let dl = self.trail_lim.len() as DecisionLevel;
         let vi = l.vi();
-        self.level[vi] = dl;
         let v = &mut self.var[vi];
+        v.level = dl;
         debug_assert!(!v.is(FlagVar::ELIMINATED));
         debug_assert_eq!(self.var[vi].assign, None);
         debug_assert_eq!(self.reason[vi], AssignReason::None);
@@ -311,7 +311,7 @@ impl PropagateIF for AssignStack {
         for i in lim..self.trail.len() {
             let l = self.trail[i];
             let vi = l.vi();
-            debug_assert!(self.root_level < self.level[vi]);
+            debug_assert!(self.root_level < self.var[vi].level);
             unset_assign!(self, vi);
             self.reason[vi] = AssignReason::None;
             self.insert_heap(vi);

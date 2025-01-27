@@ -8,28 +8,13 @@ use {
     },
 };
 
-impl Default for Var {
-    fn default() -> Var {
-        Var {
-            assign: None,
-            flags: FlagVar::empty(),
-            reward: 0.0,
-            // reward_ema: Ema2::new(200).with_slow(4_000),
-            #[cfg(feature = "boundary_check")]
-            propagated_at: 0,
-            #[cfg(feature = "boundary_check")]
-            timestamp: 0,
-            #[cfg(feature = "boundary_check")]
-            state: VarState::Unassigned(0),
-        }
-    }
-}
-
 /// Object representing a variable.
 #[derive(Clone, Debug)]
 pub struct Var {
     /// assignment
     pub(crate) assign: Option<bool>,
+    /// levels of vars
+    pub(super) level: DecisionLevel,
     /// the `Flag`s (8 bits)
     pub(crate) flags: FlagVar,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
@@ -43,6 +28,24 @@ pub struct Var {
     pub state: VarState,
 }
 
+impl Default for Var {
+    fn default() -> Var {
+        Var {
+            assign: None,
+            level: 0,
+            flags: FlagVar::empty(),
+            reward: 0.0,
+            // reward_ema: Ema2::new(200).with_slow(4_000),
+            #[cfg(feature = "boundary_check")]
+            propagated_at: 0,
+            #[cfg(feature = "boundary_check")]
+            timestamp: 0,
+            #[cfg(feature = "boundary_check")]
+            state: VarState::Unassigned(0),
+        }
+    }
+}
+
 impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
@@ -53,7 +56,14 @@ impl fmt::Display for Var {
 impl Var {
     /// return a new vector of $n$ `Var`s.
     pub fn new_vars(n: usize) -> Vec<Var> {
-        vec![Var::default(); n + 1]
+        (0..n as u32 + 1)
+            .map(|n| {
+                Var {
+                    level: n, // each literal occupies a single level.
+                    ..Default::default()
+                }
+            })
+            .collect::<Vec<_>>()
     }
     pub fn activity(&self) -> f64 {
         self.reward
@@ -128,7 +138,7 @@ impl VarManipulateIF for AssignStack {
     fn level(&self, vi: VarId) -> DecisionLevel {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            *self.level.get_unchecked(vi)
+            self.var.get_unchecked(vi).level
         }
         #[cfg(not(feature = "unsafe_access"))]
         self.level[vi]
@@ -226,7 +236,7 @@ impl AssignStack {
         if let Some((b, _)) = self.best_phases.get(&vi) {
             debug_assert!(self.var[vi].assign.is_some());
             if self.var[vi].assign != Some(*b) {
-                if self.root_level == self.level[vi] {
+                if self.root_level == self.var[vi].level {
                     self.best_phases.clear();
                     self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
                 }

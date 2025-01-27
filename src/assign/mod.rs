@@ -73,8 +73,6 @@ pub trait AssignIF:
     fn remains(&self) -> bool;
     /// return a reference to `assign`.
     fn assign_ref(&self) -> Vec<Option<bool>>;
-    /// return a reference to `level`.
-    fn level_ref(&self) -> &[DecisionLevel];
     fn best_assigned(&mut self) -> Option<usize>;
     /// return `true` if no best_phases
     #[cfg(feature = "rephase")]
