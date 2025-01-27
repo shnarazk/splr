@@ -332,12 +332,7 @@ fn make_eliminated_clause(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        assign::VarManipulateIF,
-        cdb::{Clause, ClauseDB},
-        processor::EliminateIF,
-        solver::Solver,
-    };
+    use crate::{assign::VarManipulateIF, cdb::ClauseDB, processor::EliminateIF, solver::Solver};
     use ::std::path::Path;
 
     impl Clause {

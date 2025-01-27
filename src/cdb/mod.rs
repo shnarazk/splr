@@ -22,165 +22,15 @@ mod watch_cache;
 pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
     cid::ClauseIdIF,
+    clause::{Clause, ClauseIF},
+    db::{ClauseDB, ClauseDBIF},
     property::*,
     sls::StochasticLocalSearchIF,
     unsat_certificate::CertificationStore,
     vivify::VivifyIF,
 };
 
-use {
-    self::ema::ProgressLBD,
-    crate::{assign::AssignIF, types::*},
-    std::{
-        num::NonZeroU32,
-        ops::IndexMut,
-        slice::{Iter, IterMut},
-    },
-    watch_cache::*,
-};
-
-#[cfg(not(feature = "no_IO"))]
-use std::path::Path;
-
-/// API for Clause, providing literal accessors.
-pub trait ClauseIF {
-    /// return true if it contains no literals; a clause after unit propagation.
-    fn is_empty(&self) -> bool;
-    /// return true if it contains no literals; a clause after unit propagation.
-    fn is_dead(&self) -> bool;
-    /// return 1st watch
-    fn lit0(&self) -> Lit;
-    /// return 2nd watch
-    fn lit1(&self) -> Lit;
-    /// return `true` if the clause contains the literal
-    fn contains(&self, lit: Lit) -> bool;
-    /// check clause satisfiability
-    fn is_satisfied_under(&self, asg: &impl AssignIF) -> bool;
-    /// return an iterator over its literals.
-    fn iter(&self) -> Iter<'_, Lit>;
-    /// return the number of literals.
-    fn len(&self) -> usize;
-
-    #[cfg(feature = "boundary_check")]
-    /// return timestamp.
-    fn timestamp(&self) -> usize;
-    #[cfg(feature = "boundary_check")]
-    fn set_birth(&mut self, time: usize);
-}
-
-/// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`remove_clause`](`crate::cdb::ClauseDBIF::remove_clause`), and so on.
-pub trait ClauseDBIF:
-    Instantiate
-    + IndexMut<ClauseId, Output = Clause>
-    + PropertyDereference<property::Tusize, usize>
-    + PropertyDereference<property::Tf64, f64>
-{
-    /// return the length of `clause`.
-    fn len(&self) -> usize;
-    /// return true if it's empty.
-    fn is_empty(&self) -> bool;
-    /// return an iterator.
-    fn iter(&self) -> Iter<'_, Clause>;
-    /// return a mutable iterator.
-    fn iter_mut(&mut self) -> IterMut<'_, Clause>;
-
-    //
-    //## interface to binary links
-    //
-
-    /// return binary links: `BinaryLinkList` connected with a `Lit`.
-    fn binary_links(&self, l: Lit) -> &BinaryLinkList;
-
-    //
-    //## abstraction to watch_cache
-    //
-
-    // get mutable reference to a watch_cache
-    fn fetch_watch_cache_entry(&self, lit: Lit, index: WatchCacheProxy) -> (ClauseId, Lit);
-    /// replace the mutable watcher list with an empty one, and return the list
-    fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator;
-    /// detach the watch_cache referred by the head of a watch_cache iterator
-    fn detach_watch_cache(&mut self, l: Lit, iter: &mut WatchCacheIterator);
-    /// Merge two watch cache
-    fn merge_watch_cache(&mut self, l: Lit, wc: WatchCache);
-    /// swap the first two literals in a clause.
-    fn swap_watch(&mut self, cid: ClauseId);
-
-    //
-    //## clause transformation
-    //
-
-    /// push back a watch literal cache by adjusting the iterator for `lit`
-    fn transform_by_restoring_watch_cache(
-        &mut self,
-        l: Lit,
-        iter: &mut WatchCacheIterator,
-        p: Option<Lit>,
-    );
-    /// swap i-th watch with j-th literal then update watch caches correctly
-    fn transform_by_updating_watch(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool);
-    /// allocate a new clause and return its id.
-    /// Note this removes an eliminated Lit `p` from a clause. This is an O(n) function!
-    /// This returns `true` if the clause became a unit clause.
-    /// And this is called only from `Eliminator::strengthen_clause`.
-    fn new_clause(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
-    fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>) -> RefClause;
-    /// un-register a clause `cid` from clause database and make the clause dead.
-    fn remove_clause(&mut self, cid: ClauseId);
-    /// un-register a clause `cid` from clause database and make the clause dead.
-    fn remove_clause_sandbox(&mut self, cid: ClauseId);
-    /// update watches of the clause
-    fn transform_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause;
-    /// generic clause transformer (not in use)
-    fn transform_by_replacement(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause;
-    /// check satisfied and nullified literals in a clause
-    fn transform_by_simplification(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> RefClause;
-    /// reduce learnt clauses
-    /// # CAVEAT
-    /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType);
-    /// remove all learnt clauses.
-    fn reset(&mut self);
-    /// update flags.
-    /// return `true` if it's learnt.
-    fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool;
-    /// record an asserted literal to unsat certification.
-    fn certificate_add_assertion(&mut self, lit: Lit);
-    /// save the certification record to a file.
-    fn certificate_save(&mut self);
-    /// check the number of clauses
-    /// * `Err(SolverError::OutOfMemory)` -- the db size is over the limit.
-    /// * `Ok(true)` -- enough small
-    /// * `Ok(false)` -- close to the limit
-    fn check_size(&self) -> Result<bool, SolverError>;
-    /// returns None if the given assignment is a model of a problem.
-    /// Otherwise returns a clause which is not satisfiable under a given assignment.
-    /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
-    fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId>;
-    /// minimize a clause.
-    fn minimize_with_bi_clauses(&mut self, asg: &impl AssignIF, vec: &mut Vec<Lit>);
-    /// complete bi-clause network
-    fn complete_bi_clauses(&mut self, asg: &mut impl AssignIF);
-
-    #[cfg(feature = "incremental_solver")]
-    /// save an eliminated permanent clause to an extra space for incremental solving.
-    fn make_permanent_immortal(&mut self, cid: ClauseId);
-
-    //
-    //## for debug
-    //
-    #[cfg(feature = "boundary_check")]
-    /// return true if cid is included in watching literals
-    fn watch_cache_contains(&self, lit: Lit, cid: ClauseId) -> bool;
-    #[cfg(feature = "boundary_check")]
-    /// return a clause's watches
-    fn watch_caches(&self, cid: ClauseId, message: &str) -> (Vec<Lit>, Vec<Lit>);
-    #[cfg(feature = "boundary_check")]
-    fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool>;
-    #[cfg(not(feature = "no_IO"))]
-    /// dump all active clauses and assertions as a CNF file.
-    fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);
-}
+use {crate::types::*, std::num::NonZeroU32};
 
 /// Clause identifier, or clause index, starting with one.
 /// Note: ids are re-used after 'garbage collection'.
@@ -188,115 +38,6 @@ pub trait ClauseDBIF:
 pub struct ClauseId {
     /// a sequence number.
     pub ordinal: NonZeroU32,
-}
-
-/// A representation of 'clause'
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct Clause {
-    /// The literals in a clause.
-    lits: Vec<Lit>,
-    /// Flags (8 bits)
-    flags: FlagClause,
-    /// A static clause evaluation criterion like LBD, NDD, or something.
-    pub rank: u16,
-    /// A record of the rank at previos stage.
-    pub rank_old: u16,
-    /// the index from which `propagate` starts searching an un-falsified literal.
-    /// Since it's just a hint, we don't need u32 or usize.
-    pub search_from: u16,
-
-    #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
-    /// the number of conflicts at which this clause was used in `conflict_analyze`
-    timestamp: usize,
-
-    #[cfg(feature = "clause_rewarding")]
-    /// A dynamic clause evaluation criterion based on the number of references.
-    reward: f64,
-
-    #[cfg(feature = "boundary_check")]
-    pub birth: usize,
-    #[cfg(feature = "boundary_check")]
-    pub moved_at: Propagate,
-}
-
-/// Clause database
-///
-///```
-/// use crate::{splr::config::Config, splr::types::*};
-/// use crate::splr::cdb::ClauseDB;
-/// let cdb = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
-///```
-#[derive(Clone, Debug)]
-pub struct ClauseDB {
-    /// container of clauses
-    clause: Vec<Clause>,
-    /// hashed representation of binary clauses.
-    ///## Note
-    /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
-    ///
-    binary_link: BinaryLinkDB,
-    /// container of watch literals
-    watch_cache: Vec<WatchCache>,
-    /// collected free clause ids.
-    freelist: Vec<ClauseId>,
-    /// see unsat_certificate.rs
-    certification_store: CertificationStore,
-    /// a number of clauses to emit out-of-memory exception
-    soft_limit: usize,
-    /// 'small' clause threshold
-    co_lbd_bound: u16,
-    // not in use
-    // lbd_frozen_clause: usize,
-
-    // bi-clause completion
-    bi_clause_completion_queue: Vec<Lit>,
-    num_bi_clause_completion: usize,
-
-    //
-    //## clause rewarding
-    //
-    /// an index for counting elapsed time
-    #[cfg(feature = "clause_rewarding")]
-    tick: usize,
-    #[cfg(feature = "clause_rewarding")]
-    activity_decay: f64,
-    #[cfg(feature = "clause_rewarding")]
-    activity_anti_decay: f64,
-
-    //
-    //## LBD
-    //
-    /// a working buffer for LBD calculation
-    lbd_temp: Vec<usize>,
-    lbd: ProgressLBD,
-
-    //
-    //## statistics
-    //
-    /// the number of active (not DEAD) clauses.
-    num_clause: usize,
-    /// the number of binary clauses.
-    num_bi_clause: usize,
-    /// the number of binary learnt clauses.
-    num_bi_learnt: usize,
-    /// the number of clauses which LBDs are 2.
-    num_lbd2: usize,
-    /// the present number of learnt clauses.
-    num_learnt: usize,
-    /// the number of reductions.
-    num_reduction: usize,
-    /// the number of reregistration of a bi-clause
-    num_reregistration: usize,
-    /// Literal Block Entanglement
-    /// EMA of LBD of clauses used in conflict analysis (dependency graph)
-    lb_entanglement: Ema2,
-    /// cutoff value used in the last `reduce`
-    reduction_threshold: f64,
-
-    //
-    //## incremental solving
-    //
-    pub eliminated_permanent: Vec<Vec<Lit>>,
 }
 
 #[derive(Clone, Debug)]
@@ -406,7 +147,7 @@ pub mod property {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{clause::ClauseIF, *};
     use crate::assign::{AssignStack, PropagateIF};
 
     fn lit(i: i32) -> Lit {
