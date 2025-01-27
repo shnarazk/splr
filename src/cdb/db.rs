@@ -325,6 +325,22 @@ impl ClauseDBIF for ClauseDB {
         //     cv.swap(index / 2, index);
         // }
     }
+    fn clause_vector_lens(&mut self, l: Lit) -> Vec<(ClauseId, Clause)> {
+        let mut indices = self.lit_to_clauses[usize::from(l)]
+            .iter()
+            .filter(|cid| self.clause[usize::from(**cid)].watches(l))
+            .map(|cid| (*cid, Clause::default()))
+            .collect::<Vec<_>>();
+        indices.iter_mut().for_each(|(cid, c)| {
+            std::mem::swap(&mut self.clause[usize::from(*cid)], c);
+        });
+        indices
+    }
+    fn clause_vector_unlens(&mut self, mut lens: Vec<(ClauseId, Clause)>) {
+        lens.iter_mut().for_each(|(cid, c)| {
+            std::mem::swap(&mut self.clause[usize::from(*cid)], c);
+        });
+    }
     fn clause_vector(&mut self, l: Lit, index: usize) -> (ClauseId, &mut Clause) {
         let cid = self.lit_to_clauses[usize::from(l)][index];
         (cid, &mut self.clause[usize::from(cid)])

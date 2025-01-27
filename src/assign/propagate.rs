@@ -3,6 +3,7 @@
 use {
     super::{AssignIF, AssignStack, VarHeapIF, VarManipulateIF},
     crate::{cdb::ClauseDBIF, types::*},
+    rayon::prelude::*,
 };
 
 #[cfg(feature = "trail_saving")]
@@ -108,6 +109,13 @@ macro_rules! unset_assign {
     ($asg: expr, $var: expr) => {
         $asg.assign[$var] = None;
     };
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum Propagate {
+    None,
+    Conflict(ClauseId, Lit),
+    UnitPropagation(ClauseId, Lit),
 }
 
 impl PropagateIF for AssignStack {
@@ -432,73 +440,140 @@ impl PropagateIF for AssignStack {
             //
             //## normal clause loop
             //
-            'next_clause: for index in 0..cdb.clause_vector_len(false_lit) {
-                let (cid, c) = cdb.clause_vector(false_lit, index);
-                if !c.watches(propagating) {
-                    continue;
-                }
-                let lit0 = c.watch0();
-                debug_assert!(lit0 == false_lit || c.watch1() == false_lit);
-                let other_watch = if lit0 == false_lit { c.watch1() } else { lit0 };
-                let other_watch_value = lit_assign!(self, other_watch);
-                if Some(true) == other_watch_value {
-                    check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
-                    continue 'next_clause;
-                }
-                // place lit1, the not-falsified wacth at lits[0].
-                if lit0 == false_lit {
-                    c.swap_watches();
-                }
-                // Search an un-falsified literal
-                //
-                // TODO: encapsulate `search_from` somehow.
-                // Or ditch `lit1()` interface.
-                let start = c.watch1_pos() + 1;
-                for (k, lk) in c
-                    .iter()
-                    .enumerate()
-                    .skip(start)
-                    .chain(c.iter().enumerate().skip(1).take(start - 1))
-                {
-                    if lit_assign!(self, *lk) != Some(false) {
-                        check_in!(
-                            cid,
-                            Propagate::FindNewWatch(self.num_conflict, propagating, !*lk)
-                        );
-                        // watch management
-                        // - c.lits.swap(0, k) (new watch should be placed at 0)
-                        // - c.lits.swap(c.start_from, k) (place another watch at better place)
-                        // - c.start_from = k (and point there by `start_from`)
-                        // cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
-                        c.transform_by_updating_watch(k);
-                        continue 'next_clause;
+            let results = if 400 < cdb.clause_vector_len(false_lit) {
+                let mut lens = cdb.clause_vector_lens(false_lit);
+                let chunk_len = (lens.len() / 8).max(20);
+                let ret = lens
+                    // .par_iter_mut()
+                    .par_chunks_mut(chunk_len)
+                    // .par_iter_mut()
+                    // .map(|(cid, c)| {
+                    .flat_map(|v| {
+                        v.iter_mut()
+                            .map(|(cid, c)| {
+                                // let (cid, c) = cdb.clause_vector(false_lit, *index);
+                                // if !c.watches(false_lit) { return Propagate::None; }
+                                let lit0 = c.watch0();
+                                debug_assert!(lit0 == false_lit || c.watch1() == false_lit);
+                                let other_watch = if lit0 == false_lit { c.watch1() } else { lit0 };
+                                let other_watch_value = lit_assign!(self, other_watch);
+                                if Some(true) == other_watch_value {
+                                    // check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
+                                    return Propagate::None;
+                                }
+                                // place lit1, the not-falsified wacth at lits[0].
+                                if lit0 == false_lit {
+                                    c.swap_watches();
+                                }
+                                // Search an un-falsified literal
+                                let start = c.watch1_pos() + 1;
+                                for (k, lk) in c
+                                    .iter()
+                                    .enumerate()
+                                    .skip(start)
+                                    .chain(c.iter().enumerate().skip(1).take(start - 1))
+                                {
+                                    if lit_assign!(self, *lk) != Some(false) {
+                                        // check_in!( cid, Propagate::FindNewWatch(self.num_conflict, propagating, !*lk) );
+                                        // cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
+                                        c.transform_by_updating_watch(k);
+                                        return Propagate::None;
+                                    }
+                                }
+                                let lit0 = c.watch0();
+                                debug_assert_eq!(lit_assign!(self, lit0), other_watch_value);
+                                debug_assert!(lit_assign!(self, lit0) != Some(true));
+                                if other_watch_value == Some(false) {
+                                    // check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, lit1));
+                                    // conflict_path!(lit0, AssignReason::Implication(cid));
+                                    return Propagate::Conflict(*cid, lit0);
+                                }
+                                #[cfg(feature = "chrono_BT")]
+                                let dl = cdb[cid]
+                                    .iter()
+                                    .skip(1)
+                                    .map(|l| self.level[l.vi()])
+                                    .max()
+                                    .unwrap_or(self.root_level);
+                                debug_assert_eq!(lit_assign!(self, lit0), None);
+                                // check_in!(cid, Propagate::BecameUnit(self.num_conflict, lit1));
+                                // cdb.lift_clause_order(false_lit, index);
+                                Propagate::UnitPropagation(*cid, lit0)
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
+                cdb.clause_vector_unlens(lens);
+                ret
+            } else {
+                (0..cdb.clause_vector_len(false_lit))
+                    .map(|index| {
+                        let (cid, c) = cdb.clause_vector(false_lit, index);
+                        // let (cid, c) = cdb.clause_vector(false_lit, *index);
+                        // if !c.watches(false_lit) { return Propagate::None; }
+                        let lit0 = c.watch0();
+                        debug_assert!(lit0 == false_lit || c.watch1() == false_lit);
+                        let other_watch = if lit0 == false_lit { c.watch1() } else { lit0 };
+                        let other_watch_value = lit_assign!(self, other_watch);
+                        if Some(true) == other_watch_value {
+                            // check_in!(cid, Propagate::CacheSatisfied(self.num_conflict));
+                            return Propagate::None;
+                        }
+                        // place lit1, the not-falsified wacth at lits[0].
+                        if lit0 == false_lit {
+                            c.swap_watches();
+                        }
+                        // Search an un-falsified literal
+                        let start = c.watch1_pos() + 1;
+                        for (k, lk) in c
+                            .iter()
+                            .enumerate()
+                            .skip(start)
+                            .chain(c.iter().enumerate().skip(1).take(start - 1))
+                        {
+                            if lit_assign!(self, *lk) != Some(false) {
+                                // check_in!( cid, Propagate::FindNewWatch(self.num_conflict, propagating, !*lk) );
+                                // cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
+                                c.transform_by_updating_watch(k);
+                                return Propagate::None;
+                            }
+                        }
+                        let lit0 = c.watch0();
+                        debug_assert_eq!(lit_assign!(self, lit0), other_watch_value);
+                        debug_assert!(lit_assign!(self, lit0) != Some(true));
+                        if other_watch_value == Some(false) {
+                            // check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, lit1));
+                            // conflict_path!(lit0, AssignReason::Implication(cid));
+                            return Propagate::Conflict(cid, lit0);
+                        }
+                        #[cfg(feature = "chrono_BT")]
+                        let dl = cdb[cid]
+                            .iter()
+                            .skip(1)
+                            .map(|l| self.level[l.vi()])
+                            .max()
+                            .unwrap_or(self.root_level);
+                        debug_assert_eq!(lit_assign!(self, lit0), None);
+                        // check_in!(cid, Propagate::BecameUnit(self.num_conflict, lit1));
+                        // cdb.lift_clause_order(false_lit, index);
+                        Propagate::UnitPropagation(cid, lit0)
+                    })
+                    .collect::<Vec<_>>()
+            };
+            for result in results.into_iter() {
+                match result {
+                    Propagate::Conflict(cid, lit) => {
+                        conflict_path!(lit, AssignReason::Implication(cid));
                     }
+                    Propagate::UnitPropagation(cid, lit) => match lit_assign!(self, lit) {
+                        None => self.assign_by_implication(lit, AssignReason::Implication(cid)),
+                        Some(false) => {
+                            conflict_path!(lit, AssignReason::Implication(cid));
+                        }
+                        Some(true) => (),
+                    },
+                    Propagate::None => (),
                 }
-                let lit0 = c.watch0();
-                debug_assert_eq!(lit_assign!(self, lit0), other_watch_value);
-                debug_assert!(lit_assign!(self, lit0) != Some(true));
-                if other_watch_value == Some(false) {
-                    check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, lit1));
-                    conflict_path!(lit0, AssignReason::Implication(cid));
-                }
-
-                #[cfg(feature = "chrono_BT")]
-                let dl = cdb[cid]
-                    .iter()
-                    .skip(1)
-                    .map(|l| self.level[l.vi()])
-                    .max()
-                    .unwrap_or(self.root_level);
-
-                debug_assert_eq!(lit_assign!(self, lit0), None);
-                self.assign_by_implication(
-                    lit0,
-                    AssignReason::Implication(cid),
-                    #[cfg(feature = "chrono_BT")]
-                    dl,
-                );
-                check_in!(cid, Propagate::BecameUnit(self.num_conflict, lit1));
-                cdb.lift_clause_order(false_lit, index);
             }
             from_saved_trail!();
         }
@@ -581,7 +656,7 @@ impl PropagateIF for AssignStack {
             }
             'next_clause: for index in 0..cdb.clause_vector_len(false_lit) {
                 let (cid, c) = cdb.clause_vector(false_lit, index);
-                if c.is_dead() || !c.watches(propagating) {
+                if c.is_dead() || !c.watches(false_lit) {
                     continue;
                 }
                 let lit0 = c.watch0();

@@ -16,6 +16,7 @@ rust-version = "1.84"
 [dependencies]
 bitflags = "^2.4"
 instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
+rayon = "1.10.0"
 
 [features]
 default = [
@@ -38,7 +39,7 @@ default = [
 
         ### Logic formula processor
         # "no_clause_elimination",
-        "clause_vivification",
+        # "clause_vivification",
 
         ### For DEBUG
         # "boundary_check",

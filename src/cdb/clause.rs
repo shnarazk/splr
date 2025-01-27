@@ -219,7 +219,7 @@ impl ClauseIF for Clause {
         //     line!(),
         //     self
         // );
-        self.lits[0] == !lit || self.lits[self.watch1] == !lit
+        self.lits[0] == lit || self.lits[self.watch1] == lit
     }
     fn len(&self) -> usize {
         self.lits.len()

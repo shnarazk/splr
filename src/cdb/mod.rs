@@ -128,6 +128,8 @@ pub trait ClauseDBIF:
     // clause vector, a new scheme to access clauses
     //
 
+    fn clause_vector_lens(&mut self, l: Lit) -> Vec<(ClauseId, Clause)>;
+    fn clause_vector_unlens(&mut self, lens: Vec<(ClauseId, Clause)>);
     fn clause_vector(&mut self, l: Lit, index: usize) -> (ClauseId, &mut Clause);
     fn clause_vector_len(&self, l: Lit) -> usize;
     /*
