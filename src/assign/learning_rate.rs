@@ -1,6 +1,6 @@
 /// Var Rewarding based on Learning Rate Rewarding and Reason Side Rewarding
 use {
-    super::{AssignStack, Var},
+    super::{stack::AssignStack, var::Var},
     crate::types::*,
 };
 

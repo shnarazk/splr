@@ -4,7 +4,7 @@
 use super::property;
 
 use {
-    super::{AssignStack, VarHeapIF},
+    super::{heap::VarHeapIF, stack::AssignStack},
     crate::types::*,
     std::collections::HashMap,
 };

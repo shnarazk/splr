@@ -1,6 +1,6 @@
 /// Var struct and Database management API
 use {
-    super::{AssignIF, AssignStack, Var, VarHeapIF},
+    super::{heap::VarHeapIF, stack::AssignStack, AssignIF},
     crate::types::*,
     std::{
         fmt,
@@ -22,6 +22,22 @@ impl Default for Var {
             state: VarState::Unassigned(0),
         }
     }
+}
+
+/// Object representing a variable.
+#[derive(Clone, Debug)]
+pub struct Var {
+    /// the `Flag`s (8 bits)
+    pub(crate) flags: FlagVar,
+    /// a dynamic evaluation criterion like EVSIDS or ACID.
+    pub(super) reward: f64,
+    // reward_ema: Ema2,
+    #[cfg(feature = "boundary_check")]
+    pub propagated_at: usize,
+    #[cfg(feature = "boundary_check")]
+    pub timestamp: usize,
+    #[cfg(feature = "boundary_check")]
+    pub state: VarState,
 }
 
 impl fmt::Display for Var {

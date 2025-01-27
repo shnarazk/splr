@@ -1,7 +1,7 @@
 /// main struct AssignStack
 use {
     super::{
-        ema::ProgressASG, AssignIF, AssignStack, PropagateIF, Var, VarHeapIF, VarIdHeap,
+        ema::ProgressASG, heap::VarHeapIF, heap::VarIdHeap, AssignIF, PropagateIF, Var,
         VarManipulateIF,
     },
     crate::{cdb::ClauseDBIF, types::*},
@@ -13,6 +13,97 @@ use std::collections::HashMap;
 
 #[cfg(feature = "trail_saving")]
 use super::TrailSavingIF;
+
+/// A record of assignment. It's called 'trail' in Glucose.
+#[derive(Clone, Debug)]
+pub struct AssignStack {
+    /// assigns of vars
+    pub(super) assign: Vec<Option<bool>>,
+    /// levels of vars
+    pub(super) level: Vec<DecisionLevel>,
+    /// reason of assignment
+    pub(super) reason: Vec<AssignReason>,
+    /// record of assignment
+    pub(super) trail: Vec<Lit>,
+    pub(super) trail_lim: Vec<usize>,
+    /// the-number-of-assigned-and-propagated-vars + 1
+    pub(super) q_head: usize,
+    pub root_level: DecisionLevel,
+    pub(super) var_order: VarIdHeap, // Variable Order
+
+    #[cfg(feature = "trail_saving")]
+    pub(super) reason_saved: Vec<AssignReason>,
+    #[cfg(feature = "trail_saving")]
+    pub(super) trail_saved: Vec<Lit>,
+    pub(super) num_reconflict: usize,
+    pub(super) num_repropagation: usize,
+
+    //
+    //## Phase handling
+    //
+    pub(super) best_assign: bool,
+    pub(super) build_best_at: usize,
+    pub(super) num_best_assign: usize,
+    pub(super) num_rephase: usize,
+    pub(super) bp_divergence_ema: Ema,
+
+    #[cfg(feature = "best_phases_tracking")]
+    pub(super) best_phases: HashMap<VarId, (bool, AssignReason)>,
+    #[cfg(feature = "rephase")]
+    pub(super) phase_age: usize,
+
+    //
+    //## Stage
+    //
+    pub stage_scale: usize,
+
+    //## Elimanated vars
+    //
+    pub eliminated: Vec<Lit>,
+
+    //
+    //## Statistics
+    //
+    /// the number of vars.
+    pub num_vars: usize,
+    /// the number of asserted vars.
+    pub num_asserted_vars: usize,
+    /// the number of eliminated vars.
+    pub num_eliminated_vars: usize,
+    pub(super) num_decision: usize,
+    pub(super) num_propagation: usize,
+    pub num_conflict: usize,
+    pub(super) num_restart: usize,
+    /// Assign rate EMA
+    pub(super) assign_rate: ProgressASG,
+    /// Decisions Per Conflict
+    pub(super) dpc_ema: EmaSU,
+    /// Propagations Per Conflict
+    pub(super) ppc_ema: EmaSU,
+    /// Conflicts Per Restart
+    pub(super) cpr_ema: EmaSU,
+
+    //
+    //## Var DB
+    //
+    /// an index for counting elapsed time
+    pub(super) tick: usize,
+    /// vars
+    pub(super) var: Vec<Var>,
+
+    //
+    //## Var Rewarding
+    //
+    /// var activity decay
+    pub(super) activity_decay: f64,
+    /// the default value of var activity decay in configuration
+    #[cfg(feature = "EVSIDS")]
+    activity_decay_default: f64,
+    /// its diff
+    pub(super) activity_anti_decay: f64,
+    #[cfg(feature = "EVSIDS")]
+    activity_decay_step: f64,
+}
 
 impl Default for AssignStack {
     fn default() -> AssignStack {
