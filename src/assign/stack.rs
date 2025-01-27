@@ -17,8 +17,6 @@ use super::TrailSavingIF;
 /// A record of assignment. It's called 'trail' in Glucose.
 #[derive(Clone, Debug)]
 pub struct AssignStack {
-    /// assigns of vars
-    pub(super) assign: Vec<Option<bool>>,
     /// levels of vars
     pub(super) level: Vec<DecisionLevel>,
     /// reason of assignment
@@ -108,7 +106,6 @@ pub struct AssignStack {
 impl Default for AssignStack {
     fn default() -> AssignStack {
         AssignStack {
-            assign: Vec::new(),
             level: Vec::new(),
             reason: Vec::new(),
             trail: Vec::new(),
@@ -184,7 +181,6 @@ impl Instantiate for AssignStack {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
-            assign: vec![None; 1 + nv],
             level: (0..nv as u32 + 1).collect::<Vec<_>>(), // each literal occupies a single level.
             reason: vec![AssignReason::None; nv + 1],
             trail: Vec::with_capacity(nv),
@@ -229,7 +225,6 @@ impl Instantiate for AssignStack {
                 self.clear_saved_trail();
             }
             SolverEvent::NewVar => {
-                self.assign.push(None);
                 self.level.push(DecisionLevel::default());
                 self.reason.push(AssignReason::None);
                 self.expand_heap();
@@ -286,8 +281,8 @@ impl AssignIF for AssignStack {
     fn remains(&self) -> bool {
         self.q_head < self.trail.len()
     }
-    fn assign_ref(&self) -> &[Option<bool>] {
-        &self.assign
+    fn assign_ref(&self) -> Vec<Option<bool>> {
+        self.var.iter().map(|v| v.assign).collect::<Vec<_>>()
     }
     fn level_ref(&self) -> &[DecisionLevel] {
         &self.level
@@ -318,7 +313,7 @@ impl AssignIF for AssignStack {
                 })
                 .collect::<Vec<_>>(),
         );
-        let mut extended_model: Vec<Option<bool>> = self.assign.clone();
+        let mut extended_model: Vec<Option<bool>> = self.assign_ref();
         if lits.is_empty() {
             return extended_model;
         }

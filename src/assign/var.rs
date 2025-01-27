@@ -11,6 +11,7 @@ use {
 impl Default for Var {
     fn default() -> Var {
         Var {
+            assign: None,
             flags: FlagVar::empty(),
             reward: 0.0,
             // reward_ema: Ema2::new(200).with_slow(4_000),
@@ -27,6 +28,8 @@ impl Default for Var {
 /// Object representing a variable.
 #[derive(Clone, Debug)]
 pub struct Var {
+    /// assignment
+    pub(crate) assign: Option<bool>,
     /// the `Flag`s (8 bits)
     pub(crate) flags: FlagVar,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
@@ -107,7 +110,7 @@ pub trait VarManipulateIF {
 
 impl VarManipulateIF for AssignStack {
     fn assigned(&self, l: Lit) -> Option<bool> {
-        match self.assign[l.vi()] {
+        match self.var[l.vi()].assign {
             Some(x) if !bool::from(l) => Some(!x),
             x => x,
         }
@@ -116,7 +119,7 @@ impl VarManipulateIF for AssignStack {
     fn assign(&self, vi: VarId) -> Option<bool> {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            *self.assign.get_unchecked(vi)
+            self.var.get_unchecked(vi).assign
         }
         #[cfg(not(feature = "unsafe_access"))]
         self.assign[vi]
@@ -221,8 +224,8 @@ impl AssignStack {
     /// return `true` if the current best phase got invalid.
     fn check_best_phase(&mut self, vi: VarId) -> bool {
         if let Some((b, _)) = self.best_phases.get(&vi) {
-            debug_assert!(self.assign[vi].is_some());
-            if self.assign[vi] != Some(*b) {
+            debug_assert!(self.var[vi].assign.is_some());
+            if self.var[vi].assign != Some(*b) {
                 if self.root_level == self.level[vi] {
                     self.best_phases.clear();
                     self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;

@@ -15,7 +15,7 @@ use {
 #[cfg(feature = "unsafe_access")]
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
-        unsafe { *$asg.assign.get_unchecked($var) }
+        unsafe { $asg.var.get_unchecked($var).assign }
     };
 }
 #[cfg(not(feature = "unsafe_access"))]
@@ -62,7 +62,7 @@ impl VarSelectIF for AssignStack {
                     Some((
                         vi,
                         self.best_phases.get(&vi).map_or(
-                            self.assign[vi].unwrap_or_else(|| v.is(FlagVar::PHASE)),
+                            self.var[vi].assign.unwrap_or_else(|| v.is(FlagVar::PHASE)),
                             |(b, _)| *b,
                         ),
                     ))
@@ -108,7 +108,7 @@ impl VarSelectIF for AssignStack {
         debug_assert!(self
             .best_phases
             .iter()
-            .all(|(vi, b)| self.assign[*vi] != Some(!b.0)));
+            .all(|(vi, b)| self.var[*vi].assign != Some(!b.0)));
         self.num_rephase += 1;
         for (vi, (b, _)) in self.best_phases.iter() {
             let v = &mut self.var[*vi];
@@ -120,7 +120,7 @@ impl VarSelectIF for AssignStack {
         if self
             .best_phases
             .iter()
-            .any(|(vi, b)| self.assign[*vi] == Some(!b.0))
+            .any(|(vi, b)| self.var[*vi].assign == Some(!b.0))
         {
             self.best_phases.clear();
             self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;

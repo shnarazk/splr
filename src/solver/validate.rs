@@ -65,7 +65,7 @@ impl ValidateIF for Solver {
     ///
     fn validate(&self) -> Option<Vec<i32>> {
         self.cdb
-            .validate(self.asg.assign_ref(), true)
+            .validate(&self.asg.assign_ref(), true)
             .map(|cid| Vec::<i32>::from(&self.cdb[cid]))
     }
 }

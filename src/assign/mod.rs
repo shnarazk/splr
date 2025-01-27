@@ -72,7 +72,7 @@ pub trait AssignIF:
     /// return `true` if there are un-propagated assignments.
     fn remains(&self) -> bool;
     /// return a reference to `assign`.
-    fn assign_ref(&self) -> &[Option<bool>];
+    fn assign_ref(&self) -> Vec<Option<bool>>;
     /// return a reference to `level`.
     fn level_ref(&self) -> &[DecisionLevel];
     fn best_assigned(&mut self) -> Option<usize>;
