@@ -1,10 +1,10 @@
-/// Decision var selection
+// Decision var selection
 
 #[cfg(feature = "rephase")]
 use super::property;
 
 use {
-    super::{AssignStack, VarHeapIF},
+    super::{heap::VarHeapIF, stack::AssignStack},
     crate::types::*,
     std::collections::HashMap,
 };
@@ -15,7 +15,7 @@ use {
 #[cfg(feature = "unsafe_access")]
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
-        unsafe { *$asg.assign.get_unchecked($var) }
+        unsafe { $asg.var.get_unchecked($var).assign }
     };
 }
 #[cfg(not(feature = "unsafe_access"))]
@@ -56,13 +56,13 @@ impl VarSelectIF for AssignStack {
             .iter()
             .enumerate()
             .filter_map(|(vi, v)| {
-                if self.level[vi] == self.root_level || self.var[vi].is(FlagVar::ELIMINATED) {
+                if v.level == self.root_level || v.is(FlagVar::ELIMINATED) {
                     default_value.map(|b| (vi, b))
                 } else {
                     Some((
                         vi,
                         self.best_phases.get(&vi).map_or(
-                            self.assign[vi].unwrap_or_else(|| v.is(FlagVar::PHASE)),
+                            self.var[vi].assign.unwrap_or_else(|| v.is(FlagVar::PHASE)),
                             |(b, _)| *b,
                         ),
                     ))
@@ -74,7 +74,7 @@ impl VarSelectIF for AssignStack {
     fn override_rephasing_target(&mut self, assignment: &HashMap<VarId, bool>) -> usize {
         let mut num_flipped = 0;
         for (vi, b) in assignment.iter() {
-            if !self.best_phases.get(vi).map_or(false, |(p, _)| *p == *b) {
+            if self.best_phases.get(vi).is_none_or(|(p, _)| *p != *b) {
                 num_flipped += 1;
                 self.best_phases.insert(*vi, (*b, AssignReason::None));
             }
@@ -108,7 +108,7 @@ impl VarSelectIF for AssignStack {
         debug_assert!(self
             .best_phases
             .iter()
-            .all(|(vi, b)| self.assign[*vi] != Some(!b.0)));
+            .all(|(vi, b)| self.var[*vi].assign != Some(!b.0)));
         self.num_rephase += 1;
         for (vi, (b, _)) in self.best_phases.iter() {
             let v = &mut self.var[*vi];
@@ -120,7 +120,7 @@ impl VarSelectIF for AssignStack {
         if self
             .best_phases
             .iter()
-            .any(|(vi, b)| self.assign[*vi] == Some(!b.0))
+            .any(|(vi, b)| self.var[*vi].assign == Some(!b.0))
         {
             self.best_phases.clear();
             self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;

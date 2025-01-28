@@ -2,7 +2,7 @@
 /// implement boolean constraint propagation, backjump
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{AssignStack, PropagateIF, VarHeapIF, VarManipulateIF},
+    super::{heap::VarHeapIF, AssignStack, PropagateIF, VarManipulateIF},
     crate::{cdb::ClauseDBIF, types::*},
 };
 
@@ -39,7 +39,7 @@ impl TrailSavingIF for AssignStack {
                 // }
 
                 self.trail_saved.push(l);
-                self.reason_saved[vi] = self.reason[vi];
+                self.var[vi].reason_saved = self.var[vi].reason;
                 self.reward_at_unassign(vi);
                 if activity_threshold <= self.var[vi].reward {
                     self.insert_heap(vi);
@@ -63,7 +63,7 @@ impl TrailSavingIF for AssignStack {
         for i in (0..self.trail_saved.len()).rev() {
             let lit = self.trail_saved[i];
             let vi = lit.vi();
-            let old_reason = self.reason_saved[vi];
+            let old_reason = self.var[vi].reason_saved;
             match (self.assigned(lit), old_reason) {
                 (Some(true), _) => (),
                 (None, AssignReason::BinaryLink(link)) => {

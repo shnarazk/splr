@@ -1,7 +1,7 @@
 /// main struct AssignStack
 use {
     super::{
-        ema::ProgressASG, AssignIF, AssignStack, PropagateIF, Var, VarHeapIF, VarIdHeap,
+        ema::ProgressASG, heap::VarHeapIF, heap::VarIdHeap, AssignIF, PropagateIF, Var,
         VarManipulateIF,
     },
     crate::{cdb::ClauseDBIF, types::*},
@@ -14,12 +14,93 @@ use std::collections::HashMap;
 #[cfg(feature = "trail_saving")]
 use super::TrailSavingIF;
 
+/// A record of assignment. It's called 'trail' in Glucose.
+#[derive(Clone, Debug)]
+pub struct AssignStack {
+    /// record of assignment
+    pub(super) trail: Vec<Lit>,
+    pub(super) trail_lim: Vec<usize>,
+    /// the-number-of-assigned-and-propagated-vars + 1
+    pub(super) q_head: usize,
+    pub root_level: DecisionLevel,
+    pub(super) var_order: VarIdHeap, // Variable Order
+
+    #[cfg(feature = "trail_saving")]
+    pub(super) trail_saved: Vec<Lit>,
+
+    pub(super) num_reconflict: usize,
+    pub(super) num_repropagation: usize,
+
+    //
+    //## Phase handling
+    //
+    pub(super) best_assign: bool,
+    pub(super) build_best_at: usize,
+    pub(super) num_best_assign: usize,
+    pub(super) num_rephase: usize,
+    pub(super) bp_divergence_ema: Ema,
+
+    #[cfg(feature = "best_phases_tracking")]
+    pub(super) best_phases: HashMap<VarId, (bool, AssignReason)>,
+    #[cfg(feature = "rephase")]
+    pub(super) phase_age: usize,
+
+    //
+    //## Stage
+    //
+    pub stage_scale: usize,
+
+    //## Elimanated vars
+    //
+    pub eliminated: Vec<Lit>,
+
+    //
+    //## Statistics
+    //
+    /// the number of vars.
+    pub num_vars: usize,
+    /// the number of asserted vars.
+    pub num_asserted_vars: usize,
+    /// the number of eliminated vars.
+    pub num_eliminated_vars: usize,
+    pub(super) num_decision: usize,
+    pub(super) num_propagation: usize,
+    pub num_conflict: usize,
+    pub(super) num_restart: usize,
+    /// Assign rate EMA
+    pub(super) assign_rate: ProgressASG,
+    /// Decisions Per Conflict
+    pub(super) dpc_ema: EmaSU,
+    /// Propagations Per Conflict
+    pub(super) ppc_ema: EmaSU,
+    /// Conflicts Per Restart
+    pub(super) cpr_ema: EmaSU,
+
+    //
+    //## Var DB
+    //
+    /// an index for counting elapsed time
+    pub(super) tick: usize,
+    /// vars
+    pub(super) var: Vec<Var>,
+
+    //
+    //## Var Rewarding
+    //
+    /// var activity decay
+    pub(super) activity_decay: f64,
+    /// the default value of var activity decay in configuration
+    #[cfg(feature = "EVSIDS")]
+    activity_decay_default: f64,
+    /// its diff
+    pub(super) activity_anti_decay: f64,
+    #[cfg(feature = "EVSIDS")]
+    activity_decay_step: f64,
+}
+
 impl Default for AssignStack {
     fn default() -> AssignStack {
         AssignStack {
-            assign: Vec::new(),
-            level: Vec::new(),
-            reason: Vec::new(),
             trail: Vec::new(),
             trail_lim: Vec::new(),
             q_head: 0,
@@ -28,8 +109,7 @@ impl Default for AssignStack {
 
             #[cfg(feature = "trail_saving")]
             trail_saved: Vec::new(),
-            #[cfg(feature = "trail_saving")]
-            reason_saved: Vec::new(),
+
             num_reconflict: 0,
             num_repropagation: 0,
 
@@ -93,16 +173,11 @@ impl Instantiate for AssignStack {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
-            assign: vec![None; 1 + nv],
-            level: (0..nv as u32 + 1).collect::<Vec<_>>(), // each literal occupies a single level.
-            reason: vec![AssignReason::None; nv + 1],
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv),
 
             #[cfg(feature = "trail_saving")]
             trail_saved: Vec::with_capacity(nv),
-            #[cfg(feature = "trail_saving")]
-            reason_saved: vec![AssignReason::None; nv + 1],
 
             num_vars: cnf.num_of_variables,
             assign_rate: ProgressASG::instantiate(config, cnf),
@@ -138,14 +213,9 @@ impl Instantiate for AssignStack {
                 self.clear_saved_trail();
             }
             SolverEvent::NewVar => {
-                self.assign.push(None);
-                self.level.push(DecisionLevel::default());
-                self.reason.push(AssignReason::None);
                 self.expand_heap();
                 self.num_vars += 1;
                 self.var.push(Var::default());
-                #[cfg(feature = "trail_saving")]
-                self.reason_saved.push(AssignReason::None);
             }
             SolverEvent::Reinitialize => {
                 self.cancel_until(self.root_level);
@@ -195,11 +265,8 @@ impl AssignIF for AssignStack {
     fn remains(&self) -> bool {
         self.q_head < self.trail.len()
     }
-    fn assign_ref(&self) -> &[Option<bool>] {
-        &self.assign
-    }
-    fn level_ref(&self) -> &[DecisionLevel] {
-        &self.level
+    fn assign_ref(&self) -> Vec<Option<bool>> {
+        self.var.iter().map(|v| v.assign).collect::<Vec<_>>()
     }
     fn best_assigned(&mut self) -> Option<usize> {
         (self.build_best_at == self.num_propagation).then_some(self.num_vars - self.num_best_assign)
@@ -227,7 +294,7 @@ impl AssignIF for AssignStack {
                 })
                 .collect::<Vec<_>>(),
         );
-        let mut extended_model: Vec<Option<bool>> = self.assign.clone();
+        let mut extended_model: Vec<Option<bool>> = self.assign_ref();
         if lits.is_empty() {
             return extended_model;
         }
@@ -395,7 +462,7 @@ mod tests {
         // [1, 2, 3] => [1, 2, 3, 4]
         asg.assign_by_decision(lit(4));
         assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
-        assert_eq!(asg.level[lit(4).vi()], 2);
+        assert_eq!(asg.var[lit(4).vi()].level, 2);
         assert_eq!(asg.trail_lim, vec![2, 3]);
 
         // [1, 2, 3, 4] => [1, 2, -4]

@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.17.3"
+version = "0.17.4"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2021"
@@ -11,10 +11,10 @@ homepage = "https://github.com/shnarazk/splr"
 keywords = ["SAT", "SAT-solver", "logic", "satisfiability"]
 categories = ["science", "mathematics"]
 default-run = "splr"
-rust-version = "1.65"
+rust-version = "1.84"
 
 [dependencies]
-bitflags = "^2.4"
+bitflags = "^2.8"
 instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
 
 [features]
@@ -37,7 +37,7 @@ default = [
         "trail_saving",
 
         ### Logic formula processor
-        # "no_clause_elimination",
+        "clause_elimination",
         "clause_vivification",
 
         ### For DEBUG
@@ -52,16 +52,14 @@ best_phases_tracking = []       # save the best-so-far assignment, used by 'reph
 bi_clause_completion = []       # this will increase memory pressure
 boundary_check = []             # for debug
 chrono_BT = []                  # NOT WORK
-no_clause_elimination = []      # pre(in)-processor setting
+clause_elimination = []         # pre(in)-processor setting
 clause_rewarding = []           # clauses have activities w/ decay rate
 clause_vivification = []        # pre(in)-processor setting
 debug_propagation = []          # for debug
 dynamic_restart_threshold = []  # control restart spans like Glucose
 EMA_calibration = []            # each exponential moving average has a calbration value
 EVSIDS = []                     # Eponential Variable State Independent Decaying Sum
-incremental_solver = [          # for all solution SAT sover
-        "no_clause_elimination",
-]
+incremental_solver = []         # for all solution SAT sover, you can't use this with clause_elimination
 just_used = []                  # Var and clause have 'just_used' flags
 LRB_rewarding = []              # Vearning Rate Based rewarding, a new var activity criteria
 maintain_watch_cache = []       # for DEBUG

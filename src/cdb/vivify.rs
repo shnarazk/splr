@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 use crate::{
     assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-    cdb::{ClauseDB, ClauseDBIF, ClauseIF},
+    cdb::{clause::ClauseIF, ClauseDB, ClauseDBIF},
     state::{Stat, State, StateIF},
     types::*,
 };

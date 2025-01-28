@@ -7,6 +7,61 @@ use {
     },
 };
 
+/// A representation of 'clause'
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
+pub struct Clause {
+    /// The literals in a clause.
+    pub(super) lits: Vec<Lit>,
+    /// Flags (8 bits)
+    pub(crate) flags: FlagClause,
+    /// A static clause evaluation criterion like LBD, NDD, or something.
+    pub rank: u16,
+    /// A record of the rank at previos stage.
+    pub rank_old: u16,
+    /// the index from which `propagate` starts searching an un-falsified literal.
+    /// Since it's just a hint, we don't need u32 or usize.
+    pub search_from: u16,
+
+    #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
+    /// the number of conflicts at which this clause was used in `conflict_analyze`
+    timestamp: usize,
+
+    #[cfg(feature = "clause_rewarding")]
+    /// A dynamic clause evaluation criterion based on the number of references.
+    reward: f64,
+
+    #[cfg(feature = "boundary_check")]
+    pub birth: usize,
+    #[cfg(feature = "boundary_check")]
+    pub moved_at: Propagate,
+}
+
+/// API for Clause, providing literal accessors.
+pub trait ClauseIF {
+    /// return true if it contains no literals; a clause after unit propagation.
+    fn is_empty(&self) -> bool;
+    /// return true if it contains no literals; a clause after unit propagation.
+    fn is_dead(&self) -> bool;
+    /// return 1st watch
+    fn lit0(&self) -> Lit;
+    /// return 2nd watch
+    fn lit1(&self) -> Lit;
+    /// return `true` if the clause contains the literal
+    fn contains(&self, lit: Lit) -> bool;
+    /// check clause satisfiability
+    fn is_satisfied_under(&self, asg: &impl AssignIF) -> bool;
+    /// return an iterator over its literals.
+    fn iter(&self) -> Iter<'_, Lit>;
+    /// return the number of literals.
+    fn len(&self) -> usize;
+
+    #[cfg(feature = "boundary_check")]
+    /// return timestamp.
+    fn timestamp(&self) -> usize;
+    #[cfg(feature = "boundary_check")]
+    fn set_birth(&mut self, time: usize);
+}
+
 impl Default for Clause {
     fn default() -> Clause {
         Clause {
@@ -239,12 +294,11 @@ impl Clause {
             self.rank = u16::MAX;
             return u16::MAX as usize;
         }
-        let level = asg.level_ref();
         let key: usize = lbd_temp[0] + 1;
         lbd_temp[0] = key;
         let mut cnt = 0;
         for l in &self.lits {
-            let lv = level[l.vi()];
+            let lv = asg.level(l.vi());
             if lv == 0 {
                 continue;
             }

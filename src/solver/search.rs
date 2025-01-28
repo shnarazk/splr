@@ -86,7 +86,7 @@ impl SolveIF for Solver {
                 return Ok(Certificate::UNSAT);
             }
 
-            #[cfg(not(feature = "no_clause_elimination"))]
+            #[cfg(feature = "clause_elimination")]
             {
                 const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
 
@@ -364,7 +364,7 @@ fn search(
                         let decay_index: f64 = (20 + 2 * base) as f64;
                         asg.update_activity_decay((decay_index - 1.0) / decay_index);
                     }
-                    if !cfg!(feature = "no_clause_elimination") {
+                    if cfg!(feature = "clause_elimination") {
                         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                         state.flush("clause subsumption, ");
                         elim.simplify(asg, cdb, state, false)?;
@@ -552,10 +552,9 @@ fn analyze_final(asg: &mut AssignStack, state: &mut State, c: &Clause) {
             if let AssignReason::Decision(_) = asg.reason(vi) {
                 state.conflicts.push(!*l);
             } else {
-                let level = asg.level_ref();
                 for l in &c[(c.len() != 2) as usize..] {
                     let vj = l.vi();
-                    if 0 < level[vj] {
+                    if 0 < asg.level(vj) {
                         seen[vj] = true;
                     }
                 }

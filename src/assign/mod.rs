@@ -1,5 +1,5 @@
-/// Module `assign` implements Boolean Constraint Propagation and decision var selection.
-/// This version can handle Chronological and Non Chronological Backtrack.
+// Module `assign` implements Boolean Constraint Propagation and decision var selection.
+// This version can handle Chronological and Non Chronological Backtrack.
 
 /// Ema
 mod ema;
@@ -20,21 +20,20 @@ mod trail_saving;
 /// var struct and its methods
 mod var;
 
-pub use self::{propagate::PropagateIF, property::*, select::VarSelectIF, var::VarManipulateIF};
+pub use self::{
+    propagate::PropagateIF,
+    property::*,
+    select::VarSelectIF,
+    stack::AssignStack,
+    var::{Var, VarManipulateIF},
+};
 use {
-    self::{
-        ema::ProgressASG,
-        heap::{VarHeapIF, VarIdHeap},
-    },
     crate::{cdb::ClauseDBIF, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
 
 #[cfg(feature = "trail_saving")]
 pub use self::trail_saving::TrailSavingIF;
-
-#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
-use std::collections::HashMap;
 
 /// API about assignment like
 /// [`decision_level`](`crate::assign::AssignIF::decision_level`),
@@ -73,9 +72,8 @@ pub trait AssignIF:
     /// return `true` if there are un-propagated assignments.
     fn remains(&self) -> bool;
     /// return a reference to `assign`.
-    fn assign_ref(&self) -> &[Option<bool>];
-    /// return a reference to `level`.
-    fn level_ref(&self) -> &[DecisionLevel];
+    fn assign_ref(&self) -> Vec<Option<bool>>;
+    /// return the largest number of assigned vars.
     fn best_assigned(&mut self) -> Option<usize>;
     /// return `true` if no best_phases
     #[cfg(feature = "rephase")]
@@ -109,113 +107,6 @@ impl fmt::Display for AssignReason {
             AssignReason::None => write!(f, "Not assigned"),
         }
     }
-}
-
-/// Object representing a variable.
-#[derive(Clone, Debug)]
-pub struct Var {
-    /// the `Flag`s (8 bits)
-    flags: FlagVar,
-    /// a dynamic evaluation criterion like EVSIDS or ACID.
-    reward: f64,
-    // reward_ema: Ema2,
-    #[cfg(feature = "boundary_check")]
-    pub propagated_at: usize,
-    #[cfg(feature = "boundary_check")]
-    pub timestamp: usize,
-    #[cfg(feature = "boundary_check")]
-    pub state: VarState,
-}
-
-/// A record of assignment. It's called 'trail' in Glucose.
-#[derive(Clone, Debug)]
-pub struct AssignStack {
-    /// assigns of vars
-    assign: Vec<Option<bool>>,
-    /// levels of vars
-    level: Vec<DecisionLevel>,
-    /// reason of assignment
-    reason: Vec<AssignReason>,
-    /// record of assignment
-    trail: Vec<Lit>,
-    trail_lim: Vec<usize>,
-    /// the-number-of-assigned-and-propagated-vars + 1
-    q_head: usize,
-    root_level: DecisionLevel,
-    var_order: VarIdHeap, // Variable Order
-
-    #[cfg(feature = "trail_saving")]
-    reason_saved: Vec<AssignReason>,
-    #[cfg(feature = "trail_saving")]
-    trail_saved: Vec<Lit>,
-    num_reconflict: usize,
-    num_repropagation: usize,
-
-    //
-    //## Phase handling
-    //
-    best_assign: bool,
-    build_best_at: usize,
-    num_best_assign: usize,
-    num_rephase: usize,
-    bp_divergence_ema: Ema,
-
-    #[cfg(feature = "best_phases_tracking")]
-    best_phases: HashMap<VarId, (bool, AssignReason)>,
-    #[cfg(feature = "rephase")]
-    phase_age: usize,
-
-    //
-    //## Stage
-    //
-    pub stage_scale: usize,
-
-    //## Elimanated vars
-    //
-    pub eliminated: Vec<Lit>,
-
-    //
-    //## Statistics
-    //
-    /// the number of vars.
-    pub num_vars: usize,
-    /// the number of asserted vars.
-    pub num_asserted_vars: usize,
-    /// the number of eliminated vars.
-    pub num_eliminated_vars: usize,
-    num_decision: usize,
-    num_propagation: usize,
-    pub num_conflict: usize,
-    num_restart: usize,
-    /// Assign rate EMA
-    assign_rate: ProgressASG,
-    /// Decisions Per Conflict
-    dpc_ema: EmaSU,
-    /// Propagations Per Conflict
-    ppc_ema: EmaSU,
-    /// Conflicts Per Restart
-    cpr_ema: EmaSU,
-
-    //
-    //## Var DB
-    //
-    /// an index for counting elapsed time
-    tick: usize,
-    /// vars
-    var: Vec<Var>,
-
-    //
-    //## Var Rewarding
-    //
-    /// var activity decay
-    activity_decay: f64,
-    /// the default value of var activity decay in configuration
-    #[cfg(feature = "EVSIDS")]
-    activity_decay_default: f64,
-    /// its diff
-    activity_anti_decay: f64,
-    #[cfg(feature = "EVSIDS")]
-    activity_decay_step: f64,
 }
 
 #[cfg(feature = "boundary_check")]
@@ -285,7 +176,7 @@ impl DebugReportIF for Clause {
 }
 
 pub mod property {
-    use super::AssignStack;
+    use super::stack::AssignStack;
     use crate::types::*;
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]

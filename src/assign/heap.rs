@@ -1,7 +1,7 @@
 ///
 /// Heap struct for selecting decision vars
 ///
-use {super::AssignStack, crate::types::*, std::fmt};
+use {super::stack::AssignStack, crate::types::*, std::fmt};
 
 #[cfg(feature = "trail_saving")]
 use super::TrailSavingIF;

@@ -1,6 +1,6 @@
 /// Var struct and Database management API
 use {
-    super::{AssignIF, AssignStack, Var, VarHeapIF},
+    super::{heap::VarHeapIF, stack::AssignStack, AssignIF},
     crate::types::*,
     std::{
         fmt,
@@ -8,9 +8,39 @@ use {
     },
 };
 
+/// Object representing a variable.
+#[derive(Clone, Debug)]
+pub struct Var {
+    /// assignment
+    pub(crate) assign: Option<bool>,
+    /// decision level
+    pub(super) level: DecisionLevel,
+    /// assign Reason
+    pub(super) reason: AssignReason,
+    /// last reason for assignment.
+    #[cfg(feature = "trail_saving")]
+    pub(super) reason_saved: AssignReason,
+    /// the `Flag`s (8 bits)
+    pub(crate) flags: FlagVar,
+    /// a dynamic evaluation criterion like EVSIDS or ACID.
+    pub(super) reward: f64,
+    // reward_ema: Ema2,
+    #[cfg(feature = "boundary_check")]
+    pub propagated_at: usize,
+    #[cfg(feature = "boundary_check")]
+    pub timestamp: usize,
+    #[cfg(feature = "boundary_check")]
+    pub state: VarState,
+}
+
 impl Default for Var {
     fn default() -> Var {
         Var {
+            assign: None,
+            level: 0,
+            reason: AssignReason::None,
+            #[cfg(feature = "trail_saving")]
+            reason_saved: AssignReason::None,
             flags: FlagVar::empty(),
             reward: 0.0,
             // reward_ema: Ema2::new(200).with_slow(4_000),
@@ -34,7 +64,14 @@ impl fmt::Display for Var {
 impl Var {
     /// return a new vector of $n$ `Var`s.
     pub fn new_vars(n: usize) -> Vec<Var> {
-        vec![Var::default(); n + 1]
+        (0..n as u32 + 1)
+            .map(|n| {
+                Var {
+                    level: n, // each literal occupies a single level.
+                    ..Default::default()
+                }
+            })
+            .collect::<Vec<_>>()
     }
     pub fn activity(&self) -> f64 {
         self.reward
@@ -91,7 +128,7 @@ pub trait VarManipulateIF {
 
 impl VarManipulateIF for AssignStack {
     fn assigned(&self, l: Lit) -> Option<bool> {
-        match self.assign[l.vi()] {
+        match self.var[l.vi()].assign {
             Some(x) if !bool::from(l) => Some(!x),
             x => x,
         }
@@ -100,7 +137,7 @@ impl VarManipulateIF for AssignStack {
     fn assign(&self, vi: VarId) -> Option<bool> {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            *self.assign.get_unchecked(vi)
+            self.var.get_unchecked(vi).assign
         }
         #[cfg(not(feature = "unsafe_access"))]
         self.assign[vi]
@@ -109,7 +146,7 @@ impl VarManipulateIF for AssignStack {
     fn level(&self, vi: VarId) -> DecisionLevel {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            *self.level.get_unchecked(vi)
+            self.var.get_unchecked(vi).level
         }
         #[cfg(not(feature = "unsafe_access"))]
         self.level[vi]
@@ -118,7 +155,7 @@ impl VarManipulateIF for AssignStack {
     fn reason(&self, vi: VarId) -> AssignReason {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            *self.reason.get_unchecked(vi)
+            self.var.get_unchecked(vi).reason
         }
         #[cfg(not(feature = "unsafe_access"))]
         self.reason[vi]
@@ -148,7 +185,7 @@ impl VarManipulateIF for AssignStack {
         self.var.iter_mut()
     }
     fn make_var_asserted(&mut self, vi: VarId) {
-        self.reason[vi] = AssignReason::Decision(0);
+        self.var[vi].reason = AssignReason::Decision(0);
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
 
@@ -205,9 +242,9 @@ impl AssignStack {
     /// return `true` if the current best phase got invalid.
     fn check_best_phase(&mut self, vi: VarId) -> bool {
         if let Some((b, _)) = self.best_phases.get(&vi) {
-            debug_assert!(self.assign[vi].is_some());
-            if self.assign[vi] != Some(*b) {
-                if self.root_level == self.level[vi] {
+            debug_assert!(self.var[vi].assign.is_some());
+            if self.var[vi].assign != Some(*b) {
+                if self.root_level == self.var[vi].level {
                     self.best_phases.clear();
                     self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
                 }

@@ -112,7 +112,7 @@ impl Default for Config {
             cls_rdc_rm1: 0.2,
             cls_rdc_rm2: 0.05,
 
-            enable_eliminator: !cfg!(feature = "no_clause_elimination"),
+            enable_eliminator: cfg!(feature = "clause_elimination"),
             elm_cls_lim: 64,
             elm_grw_lim: 0,
             elm_var_occ: 20000,
@@ -262,7 +262,7 @@ impl Config {
                 "binary clause completion",
                 #[cfg(feature = "chrono_BT")]
                 "chrono BT",
-                #[cfg(not(feature = "no_clause_elimination"))]
+                #[cfg(feature = "clause_elimination")]
                 "stage-based clause elimination",
                 #[cfg(feature = "clause_vivification")]
                 "stage-based clause vivification",
@@ -427,21 +427,21 @@ pub mod property {
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tf64 {
-        #[cfg(feature = "clase_rewarding")]
+        #[cfg(feature = "clause_rewarding")]
         ClauseRewardDecayRate,
         VarRewardDecayRate,
     }
 
-    #[cfg(not(feature = "clase_rewarding"))]
+    #[cfg(not(feature = "clause_rewarding"))]
     pub const F64S: [Tf64; 1] = [Tf64::VarRewardDecayRate];
-    #[cfg(feature = "clase_rewarding")]
+    #[cfg(feature = "clause_rewarding")]
     pub const F64S: [Tf64; 2] = [Tf64::ClauseRewardDecayRate, Tf64::VarRewardDecayRate];
 
     impl PropertyDereference<Tf64, f64> for Config {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
-                #[cfg(feature = "clase_rewarding")]
+                #[cfg(feature = "clause_rewarding")]
                 Tf64::ClauseRewardDecayRate => self.crw_dcy_rat,
                 Tf64::VarRewardDecayRate => self.vrw_dcy_rat,
             }

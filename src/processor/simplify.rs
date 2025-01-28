@@ -19,7 +19,7 @@ use {
 impl Default for Eliminator {
     fn default() -> Eliminator {
         Eliminator {
-            enable: !cfg!(feature = "no_clause_elimination"),
+            enable: cfg!(feature = "clause_elimination"),
             mode: EliminatorMode::Dormant,
             var_queue: VarOccHeap::new(0, 0),
             clause_queue: Vec::new(),
@@ -594,9 +594,9 @@ impl Eliminator {
         self.enqueue_var(asg, l.vi(), true);
     }
 
-    ///
-    /// clause queue operations
-    ///
+    //
+    // clause queue operations
+    //
 
     /// enqueue a clause into eliminator's clause queue.
     pub fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause) {
@@ -621,9 +621,9 @@ impl Eliminator {
         self.clause_queue.len()
     }
 
-    ///
-    /// var queue operations
-    ///
+    //
+    // var queue operations
+    //
 
     /// clear eliminator's var queue
     fn clear_var_queue(&mut self, asg: &mut impl AssignIF) {

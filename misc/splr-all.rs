@@ -24,6 +24,10 @@ fn run(_cnf_file: &Path) -> Vec<Vec<i32>> {
 fn run(cnf_file: &Path) -> Vec<Vec<i32>> {
     use splr::cnf::*;
     use splr::*;
+    #[cfg(feature = "clause_elimination")]
+    {
+        panic?("You can't build incremental_solver with feature clause_elimination.")
+    }
     let mut solutions = Vec::new();
     let name = cnf_file.file_stem().expect("It seems a strange filename");
     let mut cnf = match CNF::load(cnf_file) {
