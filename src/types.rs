@@ -660,12 +660,15 @@ impl<T: Clone + Default + PartialEq + Ord> PartialOrd for OrderedProxy<T> {
 
 impl<T: Clone + Default + PartialEq + Ord> Ord for OrderedProxy<T> {
     fn cmp(&self, other: &OrderedProxy<T>) -> Ordering {
-        if (self.index - other.index).abs() < f64::EPSILON {
-            self.body.cmp(&other.body)
-        } else if self.index < other.index {
-            Ordering::Less
+        if let Some(ord) = self.index.partial_cmp(&other.index) {
+            ord
         } else {
-            Ordering::Greater
+            match (self.index.is_nan(), self.index.is_nan()) {
+                (true, true) => Ordering::Equal,
+                (true, false) => Ordering::Greater,
+                (false, true) => Ordering::Less,
+                (false, false) => unreachable!(),
+            }
         }
     }
 }
@@ -674,6 +677,7 @@ impl<T: Clone + Default + Sized + Ord> OrderedProxy<T> {
     pub fn new(body: T, index: f64) -> Self {
         OrderedProxy { index, body }
     }
+    /// TODO: just use std::cmp::Reverse?
     pub fn new_invert(body: T, rindex: f64) -> Self {
         OrderedProxy {
             index: -rindex,
