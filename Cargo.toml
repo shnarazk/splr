@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.17.4"
+version = "0.18.0-dev0"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2021"
