@@ -1,6 +1,16 @@
+## 0.17.4, 2025-01-28
+
+- Rename feature 'no_clause_elimination' to 'clause_elimination'
+- Move ClauseIF to clause.rs
+- Move ClauseDb to db.rs
+- Move Var to var.rs
+- Move AssignStack to stack.rs
+- Move AssignStack::{assign, level, reason, reason_saved} to Var
+- Fix to recycle dead clauses
+
 ## 0.17.3, 2024-03-26
 
-- resolve #232, an incorrect debug assertion
+- Resolve #232, an incorrect debug assertion
 
 ## 0.17.2, 2024-02-04
 
@@ -8,7 +18,7 @@
 
 ## 0.17.1, 2023-07-07
 
-- fix compilation errors with feature 'no_IO'
+- Fix compilation errors with feature 'no_IO'
 
 ## 0.17.0, 2023-01-30
 
