@@ -1182,14 +1182,6 @@ impl ClauseDBIF for ClauseDB {
             self.complete_bi_clauses_with(asg, lit);
         }
     }
-    #[cfg(feature = "incremental_solver")]
-    fn make_permanent_immortal(&mut self, cid: ClauseId) {
-        self.eliminated_permanent.push(
-            self.clause[NonZeroU32::get(cid.ordinal) as usize]
-                .lits
-                .clone(),
-        );
-    }
     #[cfg(feature = "boundary_check")]
     fn watch_cache_contains(&self, lit: Lit, cid: ClauseId) -> bool {
         self.watch_cache[lit].iter().any(|w| w.0 == cid)

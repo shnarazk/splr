@@ -308,21 +308,6 @@ impl AssignIF for AssignStack {
             let last_lit_index = i - 1;
             let reason_literals = target_index + 1..=last_lit_index;
             i = target_index;
-
-            // #[cfg(feature = "incremental_solver")]
-            // {
-            //     if target_index < last_lit_index {
-            //         cdb.new_clause(
-            //             self,
-            //             &mut lits[target_index..=last_lit_index].to_vec(),
-            //             false,
-            //         );
-            //     } else if target_index == last_lit_index {
-            //         self.assumption.push(lits[target_index]);
-            //         dbg!(lits[target_index]);
-            //     }
-            // }
-
             debug_assert!(
                 lits[reason_literals.clone()]
                     .iter()

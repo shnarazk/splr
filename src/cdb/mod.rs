@@ -157,10 +157,6 @@ pub trait ClauseDBIF:
     /// complete bi-clause network
     fn complete_bi_clauses(&mut self, asg: &mut impl AssignIF);
 
-    #[cfg(feature = "incremental_solver")]
-    /// save an eliminated permanent clause to an extra space for incremental solving.
-    fn make_permanent_immortal(&mut self, cid: ClauseId);
-
     //
     //## for debug
     //

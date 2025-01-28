@@ -272,8 +272,6 @@ impl Config {
                 "EMA calibration",
                 #[cfg(feature = "EVSIDS")]
                 "EVSIDS rewarding",
-                #[cfg(feature = "incremental_solver")]
-                "incremental solver",
                 #[cfg(feature = "just_used")]
                 "use 'just used' flag",
                 #[cfg(feature = "LRB_rewarding")]

@@ -20,7 +20,6 @@ instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
 [features]
 default = [
         ### Essential
-        # "incremental_solver",
         "unsafe_access",
 
         ### Heuristics
@@ -59,7 +58,6 @@ debug_propagation = []          # for debug
 dynamic_restart_threshold = []  # control restart spans like Glucose
 EMA_calibration = []            # each exponential moving average has a calbration value
 EVSIDS = []                     # Eponential Variable State Independent Decaying Sum
-incremental_solver = []         # for all solution SAT sover, you can't use this with clause_elimination
 just_used = []                  # Var and clause have 'just_used' flags
 LRB_rewarding = []              # Vearning Rate Based rewarding, a new var activity criteria
 maintain_watch_cache = []       # for DEBUG

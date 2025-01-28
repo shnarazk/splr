@@ -53,11 +53,6 @@ impl SolveIF for Solver {
         if cdb.check_size().is_err() {
             return Err(SolverError::OutOfMemory);
         }
-        #[cfg(feature = "incremental_solver")]
-        {
-            // Reinitialize AssignStack::var_order with respect for assignments.
-            asg.rebuild_order();
-        }
         state.progress_header();
         state.progress(asg, cdb);
         state.flush("");
@@ -108,22 +103,19 @@ impl SolveIF for Solver {
                         // We can't call `asg.assign_at_root_level(l)` even if p or m == 0.
                         // This means we can't pick `!l`.
                         // This becomes a problem in the case of incremental solving.
-                        #[cfg(not(feature = "incremental_solver"))]
-                        {
-                            if m == 0 {
-                                let l = Lit::from((vi, true));
-                                debug_assert!(asg.assigned(l).is_none());
-                                cdb.certificate_add_assertion(l);
-                                if asg.assign_at_root_level(l).is_err() {
-                                    return Ok(Certificate::UNSAT);
-                                }
-                            } else if p == 0 {
-                                let l = Lit::from((vi, false));
-                                debug_assert!(asg.assigned(l).is_none());
-                                cdb.certificate_add_assertion(l);
-                                if asg.assign_at_root_level(l).is_err() {
-                                    return Ok(Certificate::UNSAT);
-                                }
+                        if m == 0 {
+                            let l = Lit::from((vi, true));
+                            debug_assert!(asg.assigned(l).is_none());
+                            cdb.certificate_add_assertion(l);
+                            if asg.assign_at_root_level(l).is_err() {
+                                return Ok(Certificate::UNSAT);
+                            }
+                        } else if p == 0 {
+                            let l = Lit::from((vi, false));
+                            debug_assert!(asg.assigned(l).is_none());
+                            cdb.certificate_add_assertion(l);
+                            if asg.assign_at_root_level(l).is_err() {
+                                return Ok(Certificate::UNSAT);
                             }
                         }
                         asg.var_mut(vi).set(FlagVar::PHASE, m < p);

@@ -119,24 +119,12 @@ pub fn eliminate_var(
         if cdb[*cid].is_dead() {
             continue;
         }
-        #[cfg(feature = "incremental_solver")]
-        {
-            if !cdb[*cid].is(FlagClause::LEARNT) {
-                cdb.make_permanent_immortal(*cid);
-            }
-        }
         elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
         cdb.remove_clause(*cid);
     }
     for cid in neg.iter() {
         if cdb[*cid].is_dead() {
             continue;
-        }
-        #[cfg(feature = "incremental_solver")]
-        {
-            if !cdb[*cid].is(FlagClause::LEARNT) {
-                cdb.make_permanent_immortal(*cid);
-            }
         }
         elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
         cdb.remove_clause(*cid);
