@@ -89,7 +89,3 @@ codegen-units = 1
 opt-level = 3
 panic = "abort"
 strip = true
-
-[[example]]
-name = "all-solutions"
-path = "misc/splr-all.rs"
