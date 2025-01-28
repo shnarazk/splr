@@ -73,6 +73,7 @@ pub trait AssignIF:
     fn remains(&self) -> bool;
     /// return a reference to `assign`.
     fn assign_ref(&self) -> Vec<Option<bool>>;
+    /// return the largest number of assigned vars.
     fn best_assigned(&mut self) -> Option<usize>;
     /// return `true` if no best_phases
     #[cfg(feature = "rephase")]

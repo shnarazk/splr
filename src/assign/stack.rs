@@ -26,9 +26,8 @@ pub struct AssignStack {
     pub(super) var_order: VarIdHeap, // Variable Order
 
     #[cfg(feature = "trail_saving")]
-    pub(super) reason_saved: Vec<AssignReason>,
-    #[cfg(feature = "trail_saving")]
     pub(super) trail_saved: Vec<Lit>,
+
     pub(super) num_reconflict: usize,
     pub(super) num_repropagation: usize,
 
@@ -110,8 +109,7 @@ impl Default for AssignStack {
 
             #[cfg(feature = "trail_saving")]
             trail_saved: Vec::new(),
-            #[cfg(feature = "trail_saving")]
-            reason_saved: Vec::new(),
+
             num_reconflict: 0,
             num_repropagation: 0,
 
@@ -180,8 +178,6 @@ impl Instantiate for AssignStack {
 
             #[cfg(feature = "trail_saving")]
             trail_saved: Vec::with_capacity(nv),
-            #[cfg(feature = "trail_saving")]
-            reason_saved: vec![AssignReason::None; nv + 1],
 
             num_vars: cnf.num_of_variables,
             assign_rate: ProgressASG::instantiate(config, cnf),
@@ -220,8 +216,6 @@ impl Instantiate for AssignStack {
                 self.expand_heap();
                 self.num_vars += 1;
                 self.var.push(Var::default());
-                #[cfg(feature = "trail_saving")]
-                self.reason_saved.push(AssignReason::None);
             }
             SolverEvent::Reinitialize => {
                 self.cancel_until(self.root_level);
