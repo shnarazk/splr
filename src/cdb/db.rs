@@ -516,6 +516,7 @@ impl ClauseDBIF for ClauseDB {
             cid,
             c,
         );
+        self.freelist.push(cid);
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
     }
     fn remove_clause_sandbox(&mut self, cid: ClauseId) {
@@ -537,6 +538,7 @@ impl ClauseDBIF for ClauseDB {
             cid,
             c,
         );
+        self.freelist.push(cid);
         // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
     }
     //
