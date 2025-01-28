@@ -17,7 +17,7 @@
                    name = "splr-${version}";
                    pname = "splr";
                    src = self;
-                   cargoHash = "sha256-VEnunp6Y7dZQZllNIaq3DYs3c5eTZ1qVy5ggNdNnFoM=";
+                   cargoHash = "sha256-Mbd15EIej0903yh6LWUmegpfujZScKMXedqgNBjjM30=";
                    buildInputs = rustc.buildInputs ++ lib.optional stdenv.isDarwin [ libiconv ];
                    buildPhase = "cargo build --release";
                    installPhase = ''
