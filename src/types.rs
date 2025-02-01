@@ -663,7 +663,7 @@ impl<T: Clone + Default + PartialEq + Ord> Ord for OrderedProxy<T> {
         if let Some(ord) = self.index.partial_cmp(&other.index) {
             ord
         } else {
-            match (self.index.is_nan(), self.index.is_nan()) {
+            match (self.index.is_nan(), other.index.is_nan()) {
                 (true, true) => Ordering::Equal,
                 (true, false) => Ordering::Greater,
                 (false, true) => Ordering::Less,
