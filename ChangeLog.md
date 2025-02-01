@@ -1,3 +1,11 @@
+## 0.17.6, 2025-02-01
+
+- Fix `Ord::cmp` for `OrderedProxy<T>` again
+
+## 0.17.5, 2025-01-28
+
+- Fix a crash by `Ord::cmp` for `OrderedProxy<T>`
+
 ## 0.17.4, 2025-01-28
 
 - Rename feature 'no_clause_elimination' to 'clause_elimination'
