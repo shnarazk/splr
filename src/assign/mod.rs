@@ -17,15 +17,12 @@ mod select;
 mod stack;
 /// trail saving
 mod trail_saving;
-/// var struct and its methods
-mod var;
 
 pub use self::{
     propagate::PropagateIF,
     property::*,
     select::VarSelectIF,
-    stack::AssignStack,
-    var::{Var, VarManipulateIF},
+    stack::{AssignStack, VarManipulateIF},
 };
 use {
     crate::{cdb::ClauseDBIF, types::*},
