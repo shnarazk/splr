@@ -736,10 +736,10 @@ impl ClauseDBIF for ClauseDB {
             //## Case:2
             //
             let old_l0 = c.lit0();
-            let old_l1 = c.lit0();
+            let old_l1 = c.lit1();
             std::mem::swap(&mut c.lits, new_lits);
             let l0 = c.lit0();
-            let l1 = c.lit0();
+            let l1 = c.lit1();
             watch_cache[!old_l0].remove_watch(&cid);
             watch_cache[!old_l1].remove_watch(&cid);
             binary_link.add(l0, l1, cid);
@@ -760,10 +760,10 @@ impl ClauseDBIF for ClauseDB {
             //## Case:3
             //
             let old_l0 = c.lit0();
-            let old_l1 = c.lit0();
+            let old_l1 = c.lit1();
             std::mem::swap(&mut c.lits, new_lits);
             let l0 = c.lit0();
-            let l1 = c.lit0();
+            let l1 = c.lit1();
 
             if (l0 == old_l0 && l1 == old_l1) || (l0 == old_l1 && l1 == old_l0) {
             } else if l0 == old_l0 {
