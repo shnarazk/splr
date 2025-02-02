@@ -54,8 +54,6 @@ pub mod cdb;
 pub mod cnf;
 /// Module `config` provides solver's configuration and CLI.
 pub mod config;
-/// Module `primitive` provides some fundamental data structures.
-pub mod primitive;
 /// Module `processor` implements a simplifier: clause subsumption and var elimination.
 pub mod processor;
 /// Module `solver` provides the top-level API as a SAT solver.
@@ -67,9 +65,8 @@ pub mod types;
 
 pub use {
     config::Config,
-    primitive::{ema::*, luby::*},
     solver::{Certificate, SatSolverIF, SolveIF, Solver, ValidateIF},
-    types::{PropertyDereference, PropertyReference, SolverError},
+    types::*,
 };
 
 /// Splr version number.

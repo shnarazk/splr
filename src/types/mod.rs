@@ -1,10 +1,17 @@
-/// Module `types' provides various building blocks, including
-/// some common traits.
+//! Module `types' provides various building blocks, including
+//! some common traits.
+
+/// methods on clause activity
+pub mod ema;
+/// methods on binary link, namely binary clause
+pub mod luby;
+
+pub use self::{ema::*, luby::*};
+
 pub use crate::{
     assign::AssignReason,
     cdb::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
     config::Config,
-    primitive::{ema::*, luby::*},
     solver::SolverEvent,
 };
 
