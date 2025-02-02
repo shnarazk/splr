@@ -254,3 +254,63 @@ impl VarIdHeap {
         println!(" - pass var_order test at {s}");
     }
 }
+impl<'a> AssignStack<'a> {
+    pub(crate) fn make_var_asserted(
+        &'a mut self,
+        heap: &'a mut BinaryHeap<OrderedProxy<&'a Var<'a>>>,
+        v: &'a mut Var<'a>,
+    ) {
+        v.make_asserted();
+        heap.remove_from_heap(vi);
+
+        #[cfg(feature = "boundary_check")]
+        {
+            self.var[vi].timestamp = self.tick;
+        }
+
+        #[cfg(feature = "best_phases_tracking")]
+        self.check_best_phase(v.id);
+    }
+    pub(crate) fn make_var_eliminated(
+        &'a mut self,
+        vars: &'a mut [Var],
+        vam: &'a mut VarActivityManager,
+        vi: VarId,
+    ) {
+        let v = &mut vars[vi];
+        if !v.is(FlagVar::ELIMINATED) {
+            v.make_eliminated();
+            vam.remove_from_heap(vi);
+            debug_assert_eq!(self.decision_level(), self.root_level);
+            self.trail.retain(|l| l.var.id != self.id);
+            self.num_eliminated_vars += 1;
+
+            #[cfg(feature = "boundary_check")]
+            {
+                self.var[vi].timestamp = self.tick;
+            }
+
+            #[cfg(feature = "trace_elimination")]
+            {
+                let lv = self.level[vi];
+                if self.root_level == self.level[vi] && self.assign[vi].is_some() {
+                    panic!("v:{}, dl:{}", self.var[vi], self.decision_level());
+                }
+                if !(self.root_level < self.level[vi] || self.assign[vi].is_none()) {
+                    panic!(
+                        "v:{}, lvl:{} => {}, dl:{}, assign:{:?} ",
+                        self.var[vi],
+                        lv,
+                        self.level[vi],
+                        self.decision_level(),
+                        self.assign[vi],
+                    );
+                }
+                debug_assert!(self.root_level < self.level[vi] || self.assign[vi].is_none());
+            }
+        } else {
+            #[cfg(feature = "boundary_check")]
+            panic!("double elimination");
+        }
+    }
+}

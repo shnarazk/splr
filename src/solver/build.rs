@@ -1,8 +1,12 @@
 //! Solver Builder
+
 use {
-    super::{Certificate, Solver, SolverEvent, SolverResult, State, StateIF},
+    super::{
+        propagate::*, Certificate, Solver, SolverEvent, SolverResult, State, StateIF,
+        VarActivityManager,
+    },
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
+        assign::{AssignIF, AssignStack},
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
     },
@@ -16,7 +20,7 @@ use std::{
 };
 
 /// API for SAT solver creation and modification.
-pub trait SatSolverIF: Instantiate {
+pub trait SatSolverIF<'a>: Instantiate {
     /// add an assignment to Solver.
     ///
     /// # Errors
@@ -44,7 +48,7 @@ pub trait SatSolverIF: Instantiate {
     /// assert!(matches!(s.add_assignment(0), Err(SolverError::InvalidLiteral)));
     /// assert_eq!(s.solve(), Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8])));
     /// ```
-    fn add_assignment(&mut self, val: i32) -> Result<&mut Solver, SolverError>;
+    fn add_assignment(&'a mut self, val: i32) -> Result<&'a mut Solver<'a>, SolverError>;
     /// add a literal to Solver.
     ///
     /// # Errors
@@ -69,7 +73,7 @@ pub trait SatSolverIF: Instantiate {
     /// assert!(matches!(s.add_clause(vec![0, 8]), Err(SolverError::InvalidLiteral)));
     /// assert_eq!(s.solve(), Ok(Certificate::UNSAT));
     ///```
-    fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver, SolverError>
+    fn add_clause<V>(&'a mut self, vec: V) -> Result<&'a mut Solver<'a>, SolverError>
     where
         V: AsRef<[i32]>;
     /// add a var to solver and return the number of vars.
@@ -92,7 +96,7 @@ pub trait SatSolverIF: Instantiate {
     /// assert!(s.add_assignment(-9).is_ok());
     /// assert_eq!(s.solve(), Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8, -9])));
     /// ```
-    fn add_var(&mut self) -> VarId;
+    fn add_var(&'a mut self) -> VarId;
     #[cfg(not(feature = "no_IO"))]
     /// make a solver and load a CNF into it.
     ///
@@ -101,7 +105,7 @@ pub trait SatSolverIF: Instantiate {
     /// * `SolverError::IOError` if it failed to load a CNF file.
     /// * `SolverError::Inconsistent` if the CNF is conflicting.
     /// * `SolverError::InvalidLiteral` if any literal used in the CNF is out of range for var index.
-    fn build(config: &Config) -> Result<Solver, SolverError>;
+    fn build(config: &Config) -> Result<Solver<'static>, SolverError>;
     #[cfg(not(feature = "no_IO"))]
     /// dump an UNSAT certification file
     fn save_certification(&mut self);
@@ -110,14 +114,16 @@ pub trait SatSolverIF: Instantiate {
     fn dump_cnf(&self, fname: &Path);
 }
 
-impl Instantiate for Solver {
+impl Instantiate for Solver<'_> {
     /// ```
     /// use crate::{splr::config::Config, splr::types::*};
     /// use splr::solver::Solver;
     /// let s = Solver::instantiate(&Config::default(), &CNFDescription::default());
     ///```
-    fn instantiate(config: &Config, cnf: &CNFDescription) -> Solver {
+    fn instantiate(config: &Config, cnf: &CNFDescription) -> Solver<'static> {
         Solver {
+            vars: Var::new_vars(cnf.num_of_variables),
+            vam: VarActivityManager::default(),
             asg: AssignStack::instantiate(config, cnf),
             cdb: ClauseDB::instantiate(config, cnf),
             state: State::instantiate(config, cnf),
@@ -139,7 +145,7 @@ impl Instantiate for Solver {
 ///     Err(Err(SolverError::InvalidLiteral))
 /// ));
 ///```
-impl<V> TryFrom<(Config, &[V])> for Solver
+impl<V> TryFrom<(Config, &[V])> for Solver<'_>
 where
     V: AsRef<[i32]>,
 {
@@ -147,7 +153,7 @@ where
     fn try_from((config, vec): (Config, &[V])) -> Result<Self, Self::Error> {
         let cnf = CNFDescription::from(vec);
         match Solver::instantiate(&config, &cnf).inject_from_vec(vec) {
-            Err(SolverError::RootLevelConflict(_)) => Err(Ok(Certificate::UNSAT)),
+            Err(SolverError::RootLevelConflict) => Err(Ok(Certificate::UNSAT)),
             Err(e) => Err(Err(e)),
             Ok(s) => Ok(s),
         }
@@ -155,7 +161,7 @@ where
 }
 
 #[cfg(not(feature = "no_IO"))]
-impl TryFrom<&Path> for Solver {
+impl TryFrom<&Path> for Solver<'_> {
     type Error = SolverError;
     /// return a new solver build for a CNF file.
     ///
@@ -172,23 +178,35 @@ impl TryFrom<&Path> for Solver {
     }
 }
 
-impl SatSolverIF for Solver {
-    fn add_assignment(&mut self, val: i32) -> Result<&mut Solver, SolverError> {
-        if val == 0 || self.asg.num_vars < val.unsigned_abs() as usize {
+impl<'a> SatSolverIF<'a> for Solver<'a> {
+    fn add_assignment(&'a mut self, val: i32) -> Result<&'a mut Solver<'a>, SolverError> {
+        // let Solver {
+        //     ref mut vars,
+        //     ref mut asg,
+        //     ref mut vam,
+        //     ref mut cdb,
+        //     ..
+        // } = self;
+        let vars: &'a mut Vec<Var<'a>> = &mut self.vars;
+        let asg: &'a mut AssignStack<'a> = &mut self.asg;
+        let vam: &'a mut VarActivityManager = &mut self.vam;
+        let cdb: &'a mut ClauseDB<'a> = &mut self.cdb;
+        if val == 0 || asg.num_vars < val.unsigned_abs() as usize {
             return Err(SolverError::InvalidLiteral);
         }
-        let lit = Lit::from(val);
-        self.cdb.certificate_add_assertion(lit);
-        match self.asg.assigned(lit) {
-            None => self.asg.assign_at_root_level(lit).map(|_| self),
+        let v: &'a Var<'a> = &vars[val.unsigned_abs() as usize];
+        let vc = v.clone();
+        let vr: &'a Var<'a> = &vc;
+        let lit: Lit<'a> = Lit::from((vr, val < 0));
+        cdb.certificate_add_assertion(lit);
+        let v: &'a mut Var<'a> = &mut vars[val.unsigned_abs() as usize];
+        match lit.assigned() {
+            None => assign_at_root_level(asg, vam, lit, v).map(|_| self),
             Some(true) => Ok(self),
-            Some(false) => Err(SolverError::RootLevelConflict((
-                lit,
-                self.asg.reason(lit.vi()),
-            ))),
+            Some(false) => Err(SolverError::RootLevelConflict),
         }
     }
-    fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver, SolverError>
+    fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver<'a>, SolverError>
     where
         V: AsRef<[i32]>,
     {
@@ -200,7 +218,7 @@ impl SatSolverIF for Solver {
         let mut clause = vec
             .as_ref()
             .iter()
-            .map(|i| Lit::from(*i))
+            .map(|i| Lit::from((&self.vars[i.unsigned_abs() as usize], *i < 0)))
             .collect::<Vec<Lit>>();
 
         if clause.is_empty() {
@@ -233,7 +251,7 @@ impl SatSolverIF for Solver {
     /// assert!(Solver::build(&config).is_ok());
     ///```
     #[cfg(not(feature = "no_IO"))]
-    fn build(config: &Config) -> Result<Solver, SolverError> {
+    fn build(config: &Config) -> Result<Solver<'static>, SolverError> {
         let CNFReader { cnf, reader } = CNFReader::try_from(Path::new(&config.cnf_file))?;
         Solver::instantiate(config, &cnf).inject(reader)
     }
@@ -250,7 +268,7 @@ impl SatSolverIF for Solver {
     }
 }
 
-impl Solver {
+impl<'a> Solver<'a> {
     // renamed from clause_new
     fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> RefClause {
         let Solver {
@@ -267,7 +285,7 @@ impl Solver {
         let mut l_: Option<Lit> = None; // last literal; [x, x.negate()] means tautology.
         for i in 0..lits.len() {
             let li = lits[i];
-            let sat = asg.assigned(li);
+            let sat = li.assigned();
             if sat == Some(true) || Some(!li) == l_ {
                 return RefClause::Dead;
             } else if sat != Some(false) && Some(li) != l_ {
@@ -285,11 +303,11 @@ impl Solver {
                 asg.assign_at_root_level(l0)
                     .map_or(RefClause::EmptyClause, |_| RefClause::UnitClause(l0))
             }
-            _ => cdb.new_clause(asg, lits, false),
+            _ => cdb.new_clause(lits, false),
         }
     }
     #[cfg(not(feature = "no_IO"))]
-    fn inject(mut self, mut reader: BufReader<File>) -> Result<Solver, SolverError> {
+    fn inject(mut self, mut reader: BufReader<File>) -> Result<Solver<'a>, SolverError> {
         self.state.progress_header();
         self.state.progress(&self.asg, &self.cdb);
         self.state.flush("Initialization phase: loading...");
@@ -309,7 +327,10 @@ impl Solver {
                                 ends_zero = true;
                                 break;
                             }
-                            Ok(val) => v.push(Lit::from(val)),
+                            Ok(val) => v.push(Lit::from((
+                                &self.vars[val.unsigned_abs() as usize],
+                                val < 0,
+                            ))),
                             Err(_) => (),
                         }
                     }
@@ -329,7 +350,7 @@ impl Solver {
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
         Ok(self)
     }
-    fn inject_from_vec<V>(mut self, v: &[V]) -> Result<Solver, SolverError>
+    fn inject_from_vec<V>(mut self, v: &[V]) -> Result<Solver<'a>, SolverError>
     where
         V: AsRef<[i32]>,
     {
@@ -342,11 +363,11 @@ impl Solver {
                     return Err(SolverError::InvalidLiteral);
                 }
             }
-            let mut lits = ints
+            let mut lits: Vec<Lit<'a>> = ints
                 .as_ref()
                 .iter()
-                .map(|i| Lit::from(*i))
-                .collect::<Vec<Lit>>();
+                .map(|i| Lit::from((&self.vars[i.unsigned_abs() as usize], *i < 0)))
+                .collect::<Vec<Lit<'a>>>();
             if v.is_empty() {
                 return Err(SolverError::EmptyClause);
             }

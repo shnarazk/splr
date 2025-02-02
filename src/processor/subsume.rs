@@ -40,7 +40,7 @@ impl Eliminator {
                 #[cfg(feature = "trace_elimination")]
                 println!("BackSubC subsumes {} from {} and {}", l, cid, did);
                 strengthen_clause(asg, cdb, self, did, !l)?;
-                self.enqueue_var(asg, l.vi(), true);
+                self.enqueue_var(asg, l.var.id, true);
             }
             Subsumable::None => (),
         }
@@ -112,10 +112,10 @@ fn strengthen_clause(
             cdb.certificate_add_assertion(l0);
             elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
             cdb.remove_clause(cid);
-            match asg.assigned(l0) {
+            match l0.assigned() {
                 None => asg.assign_at_root_level(l0),
                 Some(true) => Ok(()),
-                Some(false) => Err(SolverError::RootLevelConflict((l0, asg.reason(l0.vi())))),
+                Some(false) => Err(SolverError::RootLevelConflict),
             }
         }
         RefClause::Dead | RefClause::EmptyClause => unreachable!("strengthen_clause"),

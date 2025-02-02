@@ -3,6 +3,8 @@
 mod build;
 /// Module 'conflict' handles conflicts.
 mod conflict;
+// Module `propagate` provides unit propagation.
+mod propagate;
 /// Module `restart` provides restart heuristics.
 pub mod restart;
 /// CDCL search engine
@@ -11,6 +13,8 @@ mod search;
 mod stage;
 /// Module `validate` implements a model checker.
 mod validate;
+/// implementation of clause vivification
+mod vivify;
 
 pub use self::{
     build::SatSolverIF,
@@ -20,7 +24,7 @@ pub use self::{
     validate::ValidateIF,
 };
 
-use crate::{assign::AssignStack, cdb::ClauseDB, state::*, types::*};
+use crate::{assign::AssignStack, cdb::ClauseDB, state::*, types::*, var_activity::*};
 
 /// Normal results returned by Solver.
 #[derive(Debug, Eq, PartialEq)]
@@ -45,14 +49,10 @@ pub enum SolverEvent {
     Assert(VarId),
     /// conflict by unit propagation.
     Conflict,
-    /// eliminating a var.
-    Eliminate(VarId),
     /// Not in use
     Instantiate,
     /// increment the number of vars.
     NewVar,
-    /// re-initialization for incremental solving.
-    Reinitialize,
     /// restart
     Restart,
     /// start a new stage of Luby stabilization. It holds new scale.
@@ -82,13 +82,17 @@ pub enum SolverEvent {
 /// assert_eq!(Solver::try_from(Path::new("cnfs/unsat.cnf")).expect("can't load").solve(), Ok(Certificate::UNSAT));
 /// ```
 #[derive(Clone, Debug, Default)]
-pub struct Solver {
+pub struct Solver<'a> {
+    /// var container
+    pub vars: Vec<Var<'a>>,
     /// assignment management
-    pub asg: AssignStack,
+    pub asg: AssignStack<'a>,
     /// clause container
-    pub cdb: ClauseDB,
+    pub cdb: ClauseDB<'a>,
+    /// variable activity manager
+    pub vam: VarActivityManager,
     /// misc data holder
-    pub state: State,
+    pub state: State<'a>,
 }
 
 /// Example

@@ -1,7 +1,7 @@
 // implement boolean constraint propagation, backjump
 // This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{heap::VarHeapIF, AssignIF, AssignStack, VarManipulateIF},
+    super::{AssignIF, AssignStack},
     crate::{cdb::ClauseDBIF, types::*},
 };
 
@@ -18,21 +18,22 @@ pub trait PropagateIF {
     /// # Errors
     ///
     /// emit `SolverError::Inconsistent` exception if solver becomes inconsistent.
-    fn assign_at_root_level(&mut self, l: Lit) -> MaybeInconsistent;
+    fn assign_at_root_level<'a>(&'a mut self, l: Lit<'a>) -> MaybeInconsistent;
     /// unsafe enqueue (assign by implication); doesn't emit an exception.
     ///
     /// ## Warning
     /// Callers must assure the consistency after this assignment.
-    fn assign_by_implication(
-        &mut self,
-        l: Lit,
-        reason: AssignReason,
+    fn assign_by_implication<'a>(
+        &'a mut self,
+        vars: &'mut [Var],
+        l: Lit<'a>,
+        reason: AssignReason<'a>,
         #[cfg(feature = "chrono_BT")] lv: DecisionLevel,
     );
     /// unsafe assume (assign by decision); doesn't emit an exception.
     /// ## Caveat
     /// Callers have to assure the consistency after this assignment.
-    fn assign_by_decision(&mut self, l: Lit);
+    fn assign_by_decision<'a>(&'a mut self, l: Lit<'a>);
     /// execute *backjump*.
     fn cancel_until(&mut self, lv: DecisionLevel);
     /// execute backjump in vivification sandbox
@@ -45,35 +46,16 @@ pub trait PropagateIF {
     fn clear_asserted_literals(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent;
 }
 
-#[cfg(feature = "unsafe_access")]
-macro_rules! var_assign {
+ macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
         unsafe { $asg.var.get_unchecked($var).assign }
     };
 }
-#[cfg(not(feature = "unsafe_access"))]
-macro_rules! var_assign {
-    ($asg: expr, $var: expr) => {
-        $asg.assign[$var]
-    };
-}
 
-#[cfg(feature = "unsafe_access")]
 macro_rules! lit_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
-            l => match unsafe { $asg.var.get_unchecked(l.vi()).assign } {
-                Some(x) if !bool::from(l) => Some(!x),
-                x => x,
-            },
-        }
-    };
-}
-#[cfg(not(feature = "unsafe_access"))]
-macro_rules! lit_assign {
-    ($asg: expr, $lit: expr) => {
-        match $lit {
-            l => match $asg.assign[l.vi()] {
+            l => match l.var.assign {
                 Some(x) if !bool::from(l) => Some(!x),
                 x => x,
             },
@@ -81,37 +63,19 @@ macro_rules! lit_assign {
     };
 }
 
-#[cfg(feature = "unsafe_access")]
-macro_rules! set_assign {
-    ($asg: expr, $lit: expr) => {
+ macro_rules! set_assign {
+    ($vars: expr, $lit: expr) => {
         match $lit {
             l => unsafe {
-                let vi = l.vi();
-                $asg.var.get_unchecked_mut(vi).assign = Some(bool::from(l));
+                let vi = l.var.id;
+                $vars.get_unchecked_mut(vi).assign = Some(l.possitive);
             },
         }
-    };
-}
-#[cfg(not(feature = "unsafe_access"))]
-macro_rules! set_assign {
-    ($asg: expr, $lit: expr) => {
-        match $lit {
-            l => {
-                let vi = l.vi();
-                $asg.assign[vi] = Some(bool::from(l));
-            }
-        }
-    };
-}
-
-macro_rules! unset_assign {
-    ($asg: expr, $var: expr) => {
-        $asg.var[$var].assign = None;
     };
 }
 
 impl PropagateIF for AssignStack {
-    fn assign_at_root_level(&mut self, l: Lit) -> MaybeInconsistent {
+    fn assign_at_root_level<'a>(&'a mut self, l: Lit<'a>) -> MaybeInconsistent {
         self.cancel_until(self.root_level);
         let vi = l.vi();
         debug_assert!(vi < self.var.len());
@@ -136,13 +100,14 @@ impl PropagateIF for AssignStack {
                 // self.make_var_asserted(vi);
                 Ok(())
             }
-            _ => Err(SolverError::RootLevelConflict((l, self.var[l.vi()].reason))),
+            _ => Err(SolverError::RootLevelConflict((l, l.var.reason))),
         }
     }
-    fn assign_by_implication(
-        &mut self,
-        l: Lit,
-        reason: AssignReason,
+    fn assign_by_implication<'a>(
+        &'a mut self,
+        vars: &'a mut [Var],
+        l: Lit<'a>,
+        reason: AssignReason<'a>,
         #[cfg(feature = "chrono_BT")] lv: DecisionLevel,
     ) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be enqueued");
@@ -154,8 +119,8 @@ impl PropagateIF for AssignStack {
         debug_assert!(
             var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
         );
-        debug_assert_eq!(self.var[vi].assign, None);
-        debug_assert_eq!(self.var[vi].reason, AssignReason::None);
+        debug_assert_eq!(l.var.assign, None);
+        debug_assert_eq!(l.var.reason, AssignReason::None);
         debug_assert!(self.trail.iter().all(|rl| *rl != l));
         set_assign!(self, l);
 
@@ -178,9 +143,10 @@ impl PropagateIF for AssignStack {
             self.var[vi].state = VarState::Assigned(self.num_conflict);
         }
     }
-    fn assign_by_decision(&mut self, l: Lit) {
+    fn assign_by_decision<'a>(&'a mut self, l: Lit<'a>) {
         debug_assert!(
-            var_assign!(self, l.vi()) == Some(bool::from(l)) || var_assign!(self, l.vi()).is_none()
+            var_assign!(self, l.var.id) == Some(bool::from(l))
+                || var_assign!(self, l.vi()).is_none()
         );
         debug_assert!(l.vi() < self.var.len());
         debug_assert!(!self.trail.contains(&l));
@@ -190,12 +156,12 @@ impl PropagateIF for AssignStack {
         );
         self.level_up();
         let dl = self.trail_lim.len() as DecisionLevel;
-        let vi = l.vi();
+        let vi = l.var.id;
         let v = &mut self.var[vi];
         v.level = dl;
         debug_assert!(!v.is(FlagVar::ELIMINATED));
-        debug_assert_eq!(self.var[vi].assign, None);
-        debug_assert_eq!(self.var[vi].reason, AssignReason::None);
+        debug_assert_eq!(v.assign, None);
+        debug_assert_eq!(v.reason, AssignReason::None);
         set_assign!(self, l);
         self.var[vi].reason = AssignReason::Decision(self.decision_level());
         self.reward_at_assign(vi);
@@ -203,7 +169,7 @@ impl PropagateIF for AssignStack {
         self.num_decision += 1;
         debug_assert!(self.q_head < self.trail.len());
     }
-    fn cancel_until(&mut self, lv: DecisionLevel) {
+    fn cancel_until<'a>(&'a mut self, lv: DecisionLevel) {
         if self.trail_lim.len() as u32 <= lv {
             return;
         }
@@ -213,7 +179,7 @@ impl PropagateIF for AssignStack {
         }
 
         #[cfg(feature = "chrono_BT")]
-        let mut unpropagated: Vec<Lit> = Vec::new();
+        let mut unpropagated: Vec<Lit<'a>> = Vec::new();
 
         // We assume that backtrack is never happened in level zero.
         let lim = self.trail_lim[lv as usize];
@@ -224,9 +190,9 @@ impl PropagateIF for AssignStack {
         for i in lim..self.trail.len() {
             let l = self.trail[i];
             debug_assert!(
-                self.var[l.vi()].assign.is_some(),
+                l.var.assign.is_some(),
                 "cancel_until found unassigned var in trail {}{:?}",
-                l.vi(),
+                l.var.id,
                 &self.var[l.vi()],
             );
             let vi = l.vi();
@@ -310,8 +276,8 @@ impl PropagateIF for AssignStack {
         let lim = self.trail_lim[self.root_level as usize];
         for i in lim..self.trail.len() {
             let l = self.trail[i];
-            let vi = l.vi();
-            debug_assert!(self.root_level < self.var[vi].level);
+            let vi = l.var.id;
+            debug_assert!(self.root_level < l.var.level);
             unset_assign!(self, vi);
             self.var[vi].reason = AssignReason::None;
             self.insert_heap(vi);
@@ -412,7 +378,7 @@ impl PropagateIF for AssignStack {
             //
             for (blocker, cid) in cdb.binary_links(false_lit).iter().copied() {
                 debug_assert!(!cdb[cid].is_dead());
-                debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
+                debug_assert!(!blocker.var.is(FlagVar::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
                 debug_assert_eq!(cdb[cid].len(), 2);
                 match lit_assign!(self, blocker) {
@@ -446,7 +412,7 @@ impl PropagateIF for AssignStack {
                     "dead clause in propagation: {:?}",
                     cdb.is_garbage_collected(cid),
                 );
-                debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
+                debug_assert!(!cached.var.is(FlagVar::ELIMINATED));
                 #[cfg(feature = "maintain_watch_cache")]
                 debug_assert!(
                     cached == cdb[cid].lit0() || cached == cdb[cid].lit1(),
@@ -484,7 +450,7 @@ impl PropagateIF for AssignStack {
                         cached = other;
                         other_watch_value = lit_assign!(self, other);
                         if Some(true) == other_watch_value {
-                            debug_assert!(!self.var[other.vi()].is(FlagVar::ELIMINATED));
+                            debug_assert!(!other.var.is(FlagVar::ELIMINATED));
                             // In this path, we use only `AssignStack::assign`.
                             cdb.transform_by_restoring_watch_cache(
                                 propagating,
@@ -514,7 +480,7 @@ impl PropagateIF for AssignStack {
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
                             cdb[cid].search_from = (k + 1) as u16;
-                            debug_assert_ne!(self.assigned(new_watch), Some(true));
+                            debug_assert_ne!(new_watch.assigned(), Some(true));
                             check_in!(
                                 cid,
                                 Propagate::FindNewWatch(self.num_conflict, propagating, new_watch)
@@ -541,7 +507,7 @@ impl PropagateIF for AssignStack {
                     .unwrap_or(self.root_level);
 
                 debug_assert_eq!(cdb[cid].lit0(), cached);
-                debug_assert_eq!(self.assigned(cached), None);
+                debug_assert_eq!(cached.assigned(), None);
                 debug_assert!(other_watch_value.is_none());
                 self.assign_by_implication(
                     cached,
@@ -608,7 +574,7 @@ impl PropagateIF for AssignStack {
             //
             for (blocker, cid) in cdb.binary_links(false_lit).iter().copied() {
                 debug_assert!(!cdb[cid].is_dead());
-                debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
+                debug_assert!(!blocker.var.is(FlagVar::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
 
                 #[cfg(feature = "boundary_check")]
@@ -641,7 +607,7 @@ impl PropagateIF for AssignStack {
                     cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
                     continue;
                 }
-                debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
+                debug_assert!(!cached.var.is(FlagVar::ELIMINATED));
                 let mut other_watch_value = lit_assign!(self, cached);
                 let mut updated_cache: Option<Lit> = None;
                 if matches!(other_watch_value, Some(true)) {
@@ -663,7 +629,7 @@ impl PropagateIF for AssignStack {
                         cached = other;
                         other_watch_value = lit_assign!(self, other);
                         if Some(true) == other_watch_value {
-                            debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
+                            debug_assert!(!cached.var.is(FlagVar::ELIMINATED));
                             cdb.transform_by_restoring_watch_cache(
                                 propagating,
                                 &mut source,
@@ -724,7 +690,7 @@ impl PropagateIF for AssignStack {
                     .max()
                     .unwrap_or(self.root_level);
                 debug_assert_eq!(cdb[cid].lit0(), cached);
-                debug_assert_eq!(self.assigned(cached), None);
+                debug_assert_eq!(cached.assigned(), None);
                 debug_assert!(other_watch_value.is_none());
 
                 self.assign_by_implication(
@@ -764,8 +730,8 @@ impl PropagateIF for AssignStack {
 impl AssignStack {
     #[allow(dead_code)]
     fn check(&self, (b0, b1): (Lit, Lit)) {
-        assert_ne!(self.assigned(b0), Some(false));
-        assert_ne!(self.assigned(b1), Some(false));
+        assert_ne!(b0.assigned(), Some(false));
+        assert_ne!(b1.assigned(), Some(false));
     }
     /// simplify clauses by propagating literals at root level.
     fn propagate_at_root_level(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
@@ -777,16 +743,14 @@ impl AssignStack {
                 if cdb[cid].is_dead() {
                     continue;
                 }
-                debug_assert!(cdb[cid]
-                    .iter()
-                    .all(|l| !self.var[l.vi()].is(FlagVar::ELIMINATED)));
+                debug_assert!(cdb[cid].iter().all(|l| !l.var.is(FlagVar::ELIMINATED)));
                 match cdb.transform_by_simplification(self, cid) {
                     RefClause::Clause(_) => (),
                     RefClause::Dead => (), // was a satisfied clause
                     RefClause::EmptyClause => return Err(SolverError::EmptyClause),
                     RefClause::RegisteredClause(_) => (),
                     RefClause::UnitClause(lit) => {
-                        debug_assert!(self.assigned(lit).is_none());
+                        debug_assert!(lit.assigned().is_none());
                         cdb.certificate_add_assertion(lit);
                         self.assign_at_root_level(lit)?;
                         cdb.remove_clause(cid);
@@ -805,9 +769,9 @@ impl AssignStack {
         {
             self.best_phases.clear();
             for l in self.trail.iter().skip(self.len_upto(self.root_level)) {
-                let vi = l.vi();
-                if let Some(b) = self.var[vi].assign {
-                    self.best_phases.insert(vi, (b, self.var[vi].reason));
+                let vi = l.var.id;
+                if let Some(b) = l.var.assign {
+                    self.best_phases.insert(vi, (b, l.var.reason));
                 }
             }
         }

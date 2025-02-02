@@ -3,25 +3,14 @@
 #[cfg(feature = "rephase")]
 use super::property;
 
-use {
-    super::{heap::VarHeapIF, stack::AssignStack},
-    crate::types::*,
-    std::collections::HashMap,
-};
+use {super::stack::AssignStack, crate::types::*, std::collections::HashMap};
 
 /// ```ignore
 /// let x: Option<bool> = var_assign!(self, lit.vi());
 /// ```
-#[cfg(feature = "unsafe_access")]
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
-        unsafe { $asg.var.get_unchecked($var).assign }
-    };
-}
-#[cfg(not(feature = "unsafe_access"))]
-macro_rules! var_assign {
-    ($asg: expr, $var: expr) => {
-        $asg.assign[$var]
+        $var.assign
     };
 }
 
@@ -29,7 +18,11 @@ macro_rules! var_assign {
 pub trait VarSelectIF {
     #[cfg(feature = "rephase")]
     /// return best phases
-    fn best_phases_ref(&mut self, default_value: Option<bool>) -> HashMap<VarId, bool>;
+    fn best_phases_ref(
+        &mut self,
+        vars: &[Var],
+        default_value: Option<bool>,
+    ) -> HashMap<VarId, bool>;
     #[cfg(feature = "rephase")]
     /// force an assignment obtained by SLS
     fn override_rephasing_target(&mut self, assignment: &HashMap<VarId, bool>) -> usize;
@@ -42,27 +35,30 @@ pub trait VarSelectIF {
     /// check the consistency
     fn check_consistency_of_best_phases(&mut self);
     /// select a new decision variable.
-    fn select_decision_literal(&mut self) -> Lit;
+    fn select_decision_literal<'a>(&'a mut self) -> Lit<'a>;
     /// update the internal heap on var order.
     fn update_order(&mut self, v: VarId);
     /// rebuild the internal var_order
     fn rebuild_order(&mut self);
 }
 
-impl VarSelectIF for AssignStack {
+impl VarSelectIF for AssignStack<'_> {
     #[cfg(feature = "rephase")]
-    fn best_phases_ref(&mut self, default_value: Option<bool>) -> HashMap<VarId, bool> {
-        self.var
-            .iter()
-            .enumerate()
-            .filter_map(|(vi, v)| {
+    fn best_phases_ref<'a>(
+        &'a mut self,
+        vars: &'a [Var],
+        default_value: Option<bool>,
+    ) -> HashMap<VarId, bool> {
+        vars.iter()
+            .skip(1)
+            .filter_map(|v| {
                 if v.level == self.root_level || v.is(FlagVar::ELIMINATED) {
-                    default_value.map(|b| (vi, b))
+                    default_value.map(|b| (v.id, b))
                 } else {
                     Some((
-                        vi,
-                        self.best_phases.get(&vi).map_or(
-                            self.var[vi].assign.unwrap_or_else(|| v.is(FlagVar::PHASE)),
+                        v.id,
+                        self.best_phases.get(&v.id).map_or(
+                            v.assign.unwrap_or_else(|| v.is(FlagVar::PHASE)),
                             |(b, _)| *b,
                         ),
                     ))
@@ -126,7 +122,7 @@ impl VarSelectIF for AssignStack {
             self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
         }
     }
-    fn select_decision_literal(&mut self) -> Lit {
+    fn select_decision_literal<'a>(&'a mut self) -> Lit<'a> {
         let vi = self.select_var();
         Lit::from((vi, self.var[vi].is(FlagVar::PHASE)))
     }
@@ -143,7 +139,7 @@ impl VarSelectIF for AssignStack {
     }
 }
 
-impl AssignStack {
+impl AssignStack<'_> {
     /// select a decision var
     fn select_var(&mut self) -> VarId {
         loop {

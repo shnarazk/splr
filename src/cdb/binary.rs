@@ -8,12 +8,12 @@ use {
 };
 
 /// storage of binary links
-pub type BinaryLinkList = Vec<(Lit, ClauseId)>;
+pub type BinaryLinkList<'a> = Vec<(Lit<'a>, ClauseId)>;
 
-impl Index<Lit> for Vec<BinaryLinkList> {
-    type Output = BinaryLinkList;
+impl<'a> Index<Lit<'a>> for Vec<BinaryLinkList<'a>> {
+    type Output = BinaryLinkList<'a>;
     #[inline]
-    fn index(&self, l: Lit) -> &Self::Output {
+    fn index(&self, l: Lit<'a>) -> &Self::Output {
         #[cfg(feature = "unsafe_access")]
         unsafe {
             self.get_unchecked(usize::from(l))
@@ -23,9 +23,9 @@ impl Index<Lit> for Vec<BinaryLinkList> {
     }
 }
 
-impl IndexMut<Lit> for Vec<BinaryLinkList> {
+impl<'a> IndexMut<Lit<'a>> for Vec<BinaryLinkList<'a>> {
     #[inline]
-    fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
+    fn index_mut(&mut self, l: Lit<'a>) -> &mut Self::Output {
         #[cfg(feature = "unsafe_access")]
         unsafe {
             self.get_unchecked_mut(usize::from(l))
@@ -37,12 +37,12 @@ impl IndexMut<Lit> for Vec<BinaryLinkList> {
 
 /// storage with mapper to `ClauseId` of binary links
 #[derive(Clone, Debug, Default)]
-pub struct BinaryLinkDB {
-    hash: HashMap<(Lit, Lit), ClauseId>,
-    list: Vec<BinaryLinkList>,
+pub struct BinaryLinkDB<'a> {
+    hash: HashMap<(Lit<'a>, Lit<'a>), ClauseId>,
+    list: Vec<BinaryLinkList<'a>>,
 }
 
-impl Instantiate for BinaryLinkDB {
+impl Instantiate for BinaryLinkDB<'_> {
     fn instantiate(_conf: &Config, cnf: &CNFDescription) -> Self {
         let num_lit = 2 * (cnf.num_of_variables + 1);
         BinaryLinkDB {
@@ -53,31 +53,31 @@ impl Instantiate for BinaryLinkDB {
     fn handle(&mut self, _e: SolverEvent) {}
 }
 
-pub trait BinaryLinkIF {
+pub trait BinaryLinkIF<'a> {
     /// add a mapping from a pair of Lit to a `ClauseId`
-    fn add(&mut self, lit0: Lit, lit1: Lit, cid: ClauseId);
+    fn add(&'a mut self, lit0: Lit<'a>, lit1: Lit<'a>, cid: ClauseId);
     /// remove a pair of `Lit`s
-    fn remove(&mut self, lit0: Lit, lit1: Lit) -> MaybeInconsistent;
+    fn remove(&'a mut self, lit0: Lit<'a>, lit1: Lit<'a>) -> MaybeInconsistent;
     /// return 'ClauseId` linked from a pair of `Lit`s
-    fn search(&self, lit0: Lit, lit1: Lit) -> Option<&ClauseId>;
+    fn search(&'a self, lit0: Lit<'a>, lit1: Lit<'a>) -> Option<&'a ClauseId>;
     /// return the all links that include `Lit`.
     /// Note this is not a `watch_list`. The other literal has an opposite phase.
-    fn connect_with(&self, lit: Lit) -> &BinaryLinkList;
+    fn connect_with(&'a self, lit: Lit<'a>) -> &'a BinaryLinkList<'a>;
     /// add new var
-    fn add_new_var(&mut self);
+    fn add_new_var(&'a mut self);
     // /// sort links based on var activities
     // fn reorder(&mut self, asg: &impl AssignIF);
 }
 
-impl BinaryLinkIF for BinaryLinkDB {
-    fn add(&mut self, lit0: Lit, lit1: Lit, cid: ClauseId) {
+impl<'a> BinaryLinkIF<'a> for BinaryLinkDB<'a> {
+    fn add(&'a mut self, lit0: Lit<'a>, lit1: Lit<'a>, cid: ClauseId) {
         let l0 = lit0.min(lit1);
         let l1 = lit0.max(lit1);
         self.hash.insert((l0, l1), cid);
         self.list[lit0].push((lit1, cid));
         self.list[lit1].push((lit0, cid));
     }
-    fn remove(&mut self, lit0: Lit, lit1: Lit) -> MaybeInconsistent {
+    fn remove(&'a mut self, lit0: Lit<'a>, lit1: Lit<'a>) -> MaybeInconsistent {
         let l0 = lit0.min(lit1);
         let l1 = lit0.max(lit1);
         self.hash.remove(&(l0, l1));
@@ -85,15 +85,15 @@ impl BinaryLinkIF for BinaryLinkDB {
         self.list[lit1].delete_unstable(|p| p.0 == lit0);
         Ok(())
     }
-    fn search(&self, lit0: Lit, lit1: Lit) -> Option<&ClauseId> {
+    fn search(&'a self, lit0: Lit<'a>, lit1: Lit<'a>) -> Option<&'a ClauseId> {
         let l0 = lit0.min(lit1);
         let l1 = lit0.max(lit1);
         self.hash.get(&(l0, l1))
     }
-    fn connect_with(&self, lit: Lit) -> &BinaryLinkList {
+    fn connect_with(&'a self, lit: Lit<'a>) -> &'a BinaryLinkList<'a> {
         &self.list[lit]
     }
-    fn add_new_var(&mut self) {
+    fn add_new_var(&'a mut self) {
         for _ in 0..2 {
             self.list.push(Vec::new());
         }

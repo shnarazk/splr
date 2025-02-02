@@ -23,8 +23,8 @@ impl CertificationStore {
     pub fn is_active(&self) -> bool {
         false
     }
-    pub fn add_clause(&mut self, _clause: &[Lit]) {}
-    pub fn delete_clause(&mut self, _vec: &[Lit]) {}
+    pub fn add_clause<'a>(&'a mut self, _clause: &[Lit<'a>]) {}
+    pub fn delete_clause<'a>(&'a mut self, _vec: &[Lit<'a>]) {}
     pub fn close(&mut self) {}
 }
 
@@ -70,7 +70,7 @@ impl CertificationStore {
     pub fn is_active(&self) -> bool {
         self.buffer.is_some()
     }
-    pub fn add_clause(&mut self, clause: &[Lit]) {
+    pub fn add_clause<'a>(&'a mut self, clause: &[Literal]) {
         self.queue.push(clause.len() as i32);
         for l in clause.iter() {
             self.queue.push(i32::from(*l));
@@ -79,7 +79,7 @@ impl CertificationStore {
             self.dump_to_file();
         }
     }
-    pub fn delete_clause(&mut self, clause: &[Lit]) {
+    pub fn delete_clause<'a>(&'a mut self, clause: &[Literal]) {
         self.queue.push((clause.len() as i32).neg());
         for l in clause.iter() {
             self.queue.push(i32::from(*l));

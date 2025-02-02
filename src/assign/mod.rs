@@ -3,29 +3,22 @@
 
 /// Ema
 mod ema;
-/// Heap
-mod heap;
-/// Boolean constraint propagation
-mod propagate;
-/// Var rewarding
-#[cfg_attr(feature = "EVSIDS", path = "evsids.rs")]
-#[cfg_attr(feature = "LRB_rewarding", path = "learning_rate.rs")]
-mod reward;
-/// Decision var selection
-mod select;
+// /// Heap
+// mod heap;
+// /// Boolean constraint propagation
+// mod propagate;
+// /// Decision var selection
+// mod select;
 /// assignment management
 mod stack;
 /// trail saving
 mod trail_saving;
-/// var struct and its methods
-mod var;
 
 pub use self::{
-    propagate::PropagateIF,
+    // propagate::PropagateIF,
     property::*,
-    select::VarSelectIF,
+    // select::VarSelectIF,
     stack::AssignStack,
-    var::{Var, VarManipulateIF},
 };
 use {
     crate::{cdb::ClauseDBIF, types::*},
@@ -39,20 +32,18 @@ pub use self::trail_saving::TrailSavingIF;
 /// [`decision_level`](`crate::assign::AssignIF::decision_level`),
 /// [`stack`](`crate::assign::AssignIF::stack`),
 /// [`best_assigned`](`crate::assign::AssignIF::best_assigned`), and so on.
-pub trait AssignIF:
-    ActivityIF<VarId>
-    + Instantiate
-    + PropagateIF
-    + VarManipulateIF
+pub trait AssignIF<'a>:
+    // ActivityIF<VarId>
+     Instantiate
     + PropertyDereference<property::Tusize, usize>
     + PropertyReference<property::TEma, EmaView>
 {
     /// return root level.
     fn root_level(&self) -> DecisionLevel;
     /// return a literal in the stack.
-    fn stack(&self, i: usize) -> Lit;
+    fn stack(&'a self, i: usize) -> Lit<'a>;
     /// return literals in the range of stack.
-    fn stack_range(&self, r: Range<usize>) -> &[Lit];
+    fn stack_range(&'a self, r: Range<usize>) -> &'a [Lit<'a>];
     /// return the number of assignments.
     fn stack_len(&self) -> usize;
     /// return the number of assignments at a given decision level `u`.
@@ -64,31 +55,31 @@ pub trait AssignIF:
     /// return `true` if there's no assignment.
     fn stack_is_empty(&self) -> bool;
     /// return an iterator over assignment stack.
-    fn stack_iter(&self) -> Iter<'_, Lit>;
+    fn stack_iter(&'a self) -> Iter<'a, Lit<'a>>;
     /// return the current decision level.
     fn decision_level(&self) -> DecisionLevel;
     ///return the decision var's id at that level.
     fn decision_vi(&self, lv: DecisionLevel) -> VarId;
     /// return `true` if there are un-propagated assignments.
     fn remains(&self) -> bool;
-    /// return a reference to `assign`.
-    fn assign_ref(&self) -> Vec<Option<bool>>;
+    /// increment decision level.
+    fn level_up(&mut self);
+    // /// return a reference to `assign`.
+    // fn assign_ref(&self) -> Vec<Option<bool>>;
     /// return the largest number of assigned vars.
-    fn best_assigned(&mut self) -> Option<usize>;
+    fn best_assigned(&self) -> Option<usize>;
     /// return `true` if no best_phases
     #[cfg(feature = "rephase")]
     fn best_phases_invalid(&self) -> bool;
-    /// inject assignments for eliminated vars.
-    fn extend_model(&mut self, c: &mut impl ClauseDBIF) -> Vec<Option<bool>>;
     /// return `true` if the set of literals is satisfiable under the current assignment.
-    fn satisfies(&self, c: &[Lit]) -> bool;
+    fn satisfies(&'a self, c: &'a [Lit<'a>]) -> bool;
 }
 
 /// Reasons of assignments
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum AssignReason {
+pub enum AssignReason<'a> {
     /// Implication by binary clause
-    BinaryLink(Lit),
+    BinaryLink(Lit<'a>),
     /// Assigned by decision
     Decision(DecisionLevel),
     /// Assigned by a non-binary clause.
@@ -97,7 +88,7 @@ pub enum AssignReason {
     None,
 }
 
-impl fmt::Display for AssignReason {
+impl fmt::Display for AssignReason<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             &AssignReason::BinaryLink(_) => write!(f, "Implied by a binary clause"),
@@ -111,13 +102,13 @@ impl fmt::Display for AssignReason {
 
 #[cfg(feature = "boundary_check")]
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct Assign {
+pub struct Assign<'a> {
     pub at: usize,
     pub pos: Option<usize>,
     pub lvl: DecisionLevel,
     pub lit: i32,
     pub val: Option<bool>,
-    pub by: AssignReason,
+    pub by: AssignReason<'a>,
     pub state: VarState,
 }
 
@@ -134,12 +125,12 @@ pub trait DebugReportIF {
 }
 
 #[cfg(feature = "boundary_check")]
-fn make_lit_report(asg: &AssignStack, lit: &Lit) -> Assign {
-    let vi = lit.vi();
+fn make_lit_report<'a>(asg: &'a AssignStack, lit: &'a Lit<'a>) -> Assign {
+    let vi = lit.var.id;
     Assign {
         lit: i32::from(lit),
         val: asg.assigned(*lit),
-        pos: asg.trail.iter().position(|l| vi == l.vi()),
+        pos: asg.trail.iter().position(|l| vi == l.var.id),
         lvl: asg.level(vi),
         by: asg.reason(vi),
         at: asg.var(vi).propagated_at,
@@ -148,14 +139,14 @@ fn make_lit_report(asg: &AssignStack, lit: &Lit) -> Assign {
 }
 
 #[cfg(feature = "boundary_check")]
-impl DebugReportIF for Lit {
+impl DebugReportIF for Lit<'_> {
     fn report(&self, asg: &AssignStack) -> Vec<Assign> {
         vec![make_lit_report(asg, self)]
     }
 }
 
 #[cfg(feature = "boundary_check")]
-impl DebugReportIF for [Lit] {
+impl DebugReportIF for [Lit<'_>] {
     fn report(&self, asg: &AssignStack) -> Vec<Assign> {
         self.iter()
             .map(|l| make_lit_report(asg, l))
@@ -218,7 +209,7 @@ pub mod property {
         Tusize::RootLevel,
     ];
 
-    impl PropertyDereference<Tusize, usize> for AssignStack {
+    impl PropertyDereference<Tusize, usize> for AssignStack<'_> {
         #[inline]
         fn derefer(&self, k: Tusize) -> usize {
             match k {
@@ -251,22 +242,16 @@ pub mod property {
     pub enum Tf64 {
         AverageVarActivity,
         CurrentWorkingSetSize,
-        VarDecayRate,
     }
 
-    pub const F64S: [Tf64; 3] = [
-        Tf64::AverageVarActivity,
-        Tf64::CurrentWorkingSetSize,
-        Tf64::VarDecayRate,
-    ];
+    pub const F64S: [Tf64; 2] = [Tf64::AverageVarActivity, Tf64::CurrentWorkingSetSize];
 
-    impl PropertyDereference<Tf64, f64> for AssignStack {
+    impl PropertyDereference<Tf64, f64> for AssignStack<'_> {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
                 Tf64::AverageVarActivity => 0.0,    // self.activity_averaged,
                 Tf64::CurrentWorkingSetSize => 0.0, // self.cwss,
-                Tf64::VarDecayRate => self.activity_decay,
             }
         }
     }
@@ -290,7 +275,7 @@ pub mod property {
         TEma::BestPhaseDivergenceRate,
     ];
 
-    impl PropertyReference<TEma, EmaView> for AssignStack {
+    impl PropertyReference<TEma, EmaView> for AssignStack<'_> {
         #[inline]
         fn refer(&self, k: TEma) -> &EmaView {
             match k {

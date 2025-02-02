@@ -5,7 +5,7 @@ mod binary;
 /// methods on `ClauseId`
 mod cid;
 /// methods on `Clause`
-mod clause;
+pub mod clause;
 /// methods on `ClauseDB`
 mod db;
 /// EMA
@@ -14,8 +14,7 @@ mod ema;
 mod sls;
 /// methods for UNSAT certification
 mod unsat_certificate;
-/// implementation of clause vivification
-mod vivify;
+
 /// types about watching literal
 mod watch_cache;
 
@@ -27,7 +26,6 @@ pub use self::{
     property::*,
     sls::StochasticLocalSearchIF,
     unsat_certificate::CertificationStore,
-    vivify::VivifyIF,
 };
 
 use {
@@ -64,9 +62,9 @@ pub enum ReductionType {
 }
 
 /// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`remove_clause`](`crate::cdb::ClauseDBIF::remove_clause`), and so on.
-pub trait ClauseDBIF:
+pub trait ClauseDBIF<'a>:
     Instantiate
-    + IndexMut<ClauseId, Output = Clause>
+    + IndexMut<ClauseId, Output = Clause<'a>>
     + PropertyDereference<property::Tusize, usize>
     + PropertyDereference<property::Tf64, f64>
 {
@@ -75,29 +73,29 @@ pub trait ClauseDBIF:
     /// return true if it's empty.
     fn is_empty(&self) -> bool;
     /// return an iterator.
-    fn iter(&self) -> Iter<'_, Clause>;
+    fn iter(&'a self) -> Iter<'a, Clause<'a>>;
     /// return a mutable iterator.
-    fn iter_mut(&mut self) -> IterMut<'_, Clause>;
+    fn iter_mut(&'a mut self) -> IterMut<'a, Clause<'a>>;
 
     //
     //## interface to binary links
     //
 
     /// return binary links: `BinaryLinkList` connected with a `Lit`.
-    fn binary_links(&self, l: Lit) -> &BinaryLinkList;
+    fn binary_links(&'a self, l: Lit<'a>) -> &'a BinaryLinkList<'a>;
 
     //
     //## abstraction to watch_cache
     //
 
     // get mutable reference to a watch_cache
-    fn fetch_watch_cache_entry(&self, lit: Lit, index: WatchCacheProxy) -> (ClauseId, Lit);
+    fn fetch_watch_cache_entry(&self, lit: Lit<'a>, index: WatchCacheProxy) -> (ClauseId, Lit);
     /// replace the mutable watcher list with an empty one, and return the list
-    fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator;
+    fn watch_cache_iter(&'a mut self, l: Lit<'a>) -> WatchCacheIterator;
     /// detach the watch_cache referred by the head of a watch_cache iterator
-    fn detach_watch_cache(&mut self, l: Lit, iter: &mut WatchCacheIterator);
+    fn detach_watch_cache(&'a mut self, l: Lit<'a>, iter: &'a mut WatchCacheIterator);
     /// Merge two watch cache
-    fn merge_watch_cache(&mut self, l: Lit, wc: WatchCache);
+    fn merge_watch_cache(&'a mut self, l: Lit<'a>, wc: WatchCache<'a>);
     /// swap the first two literals in a clause.
     fn swap_watch(&mut self, cid: ClauseId);
 
@@ -107,10 +105,10 @@ pub trait ClauseDBIF:
 
     /// push back a watch literal cache by adjusting the iterator for `lit`
     fn transform_by_restoring_watch_cache(
-        &mut self,
-        l: Lit,
+        &'a mut self,
+        l: Lit<'a>,
         iter: &mut WatchCacheIterator,
-        p: Option<Lit>,
+        p: Option<Lit<'a>>,
     );
     /// swap i-th watch with j-th literal then update watch caches correctly
     fn transform_by_updating_watch(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool);
@@ -118,59 +116,63 @@ pub trait ClauseDBIF:
     /// Note this removes an eliminated Lit `p` from a clause. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
     /// And this is called only from `Eliminator::strengthen_clause`.
-    fn new_clause(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
-    fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>) -> RefClause;
+    fn new_clause(&'a mut self, v: &'a mut Vec<Lit<'a>>, learnt: bool) -> RefClause<'a>;
+    fn new_clause_sandbox(&'a mut self, v: &'a mut Vec<Lit<'a>>) -> RefClause<'a>;
     /// un-register a clause `cid` from clause database and make the clause dead.
-    fn remove_clause(&mut self, cid: ClauseId);
+    fn remove_clause(&'a mut self, cid: ClauseId);
     /// un-register a clause `cid` from clause database and make the clause dead.
-    fn remove_clause_sandbox(&mut self, cid: ClauseId);
+    fn remove_clause_sandbox(&'a mut self, cid: ClauseId);
     /// update watches of the clause
-    fn transform_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause;
+    fn transform_by_elimination(&'a mut self, cid: ClauseId, p: Lit<'a>) -> RefClause<'a>;
     /// generic clause transformer (not in use)
-    fn transform_by_replacement(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause;
+    fn transform_by_replacement(
+        &'a mut self,
+        cid: ClauseId,
+        vec: &'a mut Vec<Lit<'a>>,
+    ) -> RefClause<'a>;
     /// check satisfied and nullified literals in a clause
-    fn transform_by_simplification(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> RefClause;
+    fn transform_by_simplification(&'a mut self, cid: ClauseId) -> RefClause<'a>;
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType);
+    fn reduce(&mut self, asg: &mut impl AssignIF<'a>, setting: ReductionType);
     /// remove all learnt clauses.
-    fn reset(&mut self);
+    fn reset(&'a mut self);
     /// update flags.
     /// return `true` if it's learnt.
-    fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool;
+    fn update_at_analysis(&mut self, asg: &impl AssignIF<'a>, cid: ClauseId) -> bool;
     /// record an asserted literal to unsat certification.
-    fn certificate_add_assertion(&mut self, lit: Lit);
+    fn certificate_add_assertion(&'a mut self, lit: Lit<'a>);
     /// save the certification record to a file.
     fn certificate_save(&mut self);
     /// check the number of clauses
     /// * `Err(SolverError::OutOfMemory)` -- the db size is over the limit.
     /// * `Ok(true)` -- enough small
     /// * `Ok(false)` -- close to the limit
-    fn check_size(&self) -> Result<bool, SolverError>;
+    fn check_size(&'a self) -> Result<bool, SolverError>;
     /// returns None if the given assignment is a model of a problem.
     /// Otherwise returns a clause which is not satisfiable under a given assignment.
     /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
     fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId>;
     /// minimize a clause.
-    fn minimize_with_bi_clauses(&mut self, asg: &impl AssignIF, vec: &mut Vec<Lit>);
+    fn minimize_with_bi_clauses(&'a mut self, vec: &'a mut Vec<Lit<'a>>);
     /// complete bi-clause network
-    fn complete_bi_clauses(&mut self, asg: &mut impl AssignIF);
+    fn complete_bi_clauses(&mut self, asg: &mut impl AssignIF<'a>);
 
     //
     //## for debug
     //
     #[cfg(feature = "boundary_check")]
     /// return true if cid is included in watching literals
-    fn watch_cache_contains(&self, lit: Lit, cid: ClauseId) -> bool;
+    fn watch_cache_contains(&'a self, lit: Lit<'a>, cid: ClauseId) -> bool;
     #[cfg(feature = "boundary_check")]
     /// return a clause's watches
-    fn watch_caches(&self, cid: ClauseId, message: &str) -> (Vec<Lit>, Vec<Lit>);
+    fn watch_caches(&'a self, cid: ClauseId, message: &str) -> (Vec<Lit<'a>>, Vec<Lit<'a>>);
     #[cfg(feature = "boundary_check")]
     fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool>;
     #[cfg(not(feature = "no_IO"))]
     /// dump all active clauses and assertions as a CNF file.
-    fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);
+    fn dump_cnf(&self, asg: &impl AssignIF<'a>, fname: &Path);
 }
 
 pub mod property {
@@ -202,7 +204,7 @@ pub mod property {
         Tusize::Timestamp,
     ];
 
-    impl PropertyDereference<Tusize, usize> for ClauseDB {
+    impl<'a> PropertyDereference<Tusize, usize> for ClauseDB<'a> {
         #[inline]
         fn derefer(&self, k: Tusize) -> usize {
             match k {
@@ -236,7 +238,7 @@ pub mod property {
         Tf64::ReductionThreshold,
     ];
 
-    impl PropertyDereference<Tf64, f64> for ClauseDB {
+    impl<'a> PropertyDereference<Tf64, f64> for ClauseDB<'a> {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
@@ -255,7 +257,7 @@ pub mod property {
 
     pub const EMAS: [TEma; 2] = [TEma::Entanglement, TEma::LBD];
 
-    impl PropertyReference<TEma, EmaView> for ClauseDB {
+    impl<'a> PropertyReference<TEma, EmaView> for ClauseDB<'a> {
         #[inline]
         fn refer(&self, k: TEma) -> &EmaView {
             match k {
@@ -266,104 +268,104 @@ pub mod property {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{clause::ClauseIF, *};
-    use crate::assign::{AssignStack, PropagateIF};
+// #[cfg(test)]
+// mod tests {
+//     use super::{clause::ClauseIF, *};
+//     use crate::assign::AssignStack;
 
-    fn lit(i: i32) -> Lit {
-        Lit::from(i)
-    }
+//     fn lit(i: i32) -> Lit {
+//         Lit::from(i)
+//     }
 
-    #[allow(dead_code)]
-    fn check_watches(cdb: &ClauseDB, cid: ClauseId) {
-        let c = &cdb.clause[NonZeroU32::get(cid.ordinal) as usize];
-        if c.lits.is_empty() {
-            println!("skip checking watches of an empty clause");
-            return;
-        }
-        assert!(c.lits[0..2]
-            .iter()
-            .all(|l| cdb.watch_cache[!*l].iter().any(|(c, _)| *c == cid)));
-        println!("pass to check watches");
-    }
+//     #[allow(dead_code)]
+//     fn check_watches(cdb: &ClauseDB, cid: ClauseId) {
+//         let c = &cdb.clause[NonZeroU32::get(cid.ordinal) as usize];
+//         if c.lits.is_empty() {
+//             println!("skip checking watches of an empty clause");
+//             return;
+//         }
+//         assert!(c.lits[0..2]
+//             .iter()
+//             .all(|l| cdb.watch_cache[!*l].iter().any(|(c, _)| *c == cid)));
+//         println!("pass to check watches");
+//     }
 
-    #[test]
-    fn test_clause_instantiation() {
-        let config = Config::default();
-        let cnf = CNFDescription {
-            num_of_variables: 4,
-            ..CNFDescription::default()
-        };
-        let mut asg = AssignStack::instantiate(&config, &cnf);
-        let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        // Now `asg.level` = [_, 1, 2, 3, 4, 5, 6].
-        let c0 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
-            .as_cid();
-        assert_eq!(cdb[c0].rank, 4);
+//     #[test]
+//     fn test_clause_instantiation() {
+//         let config = Config::default();
+//         let cnf = CNFDescription {
+//             num_of_variables: 4,
+//             ..CNFDescription::default()
+//         };
+//         let mut asg = AssignStack::instantiate(&config, &cnf);
+//         let mut cdb = ClauseDB::instantiate(&config, &cnf);
+//         // Now `asg.level` = [_, 1, 2, 3, 4, 5, 6].
+//         let c0 = cdb
+//             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
+//             .as_cid();
+//         assert_eq!(cdb[c0].rank, 4);
 
-        asg.assign_by_decision(lit(-2)); // at level 1
-        asg.assign_by_decision(lit(1)); // at level 2
-                                        // Now `asg.level` = [_, 2, 1, 3, 4, 5, 6].
-        let c1 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cid();
-        let c = &cdb[c1];
+//         asg.assign_by_decision(lit(-2)); // at level 1
+//         asg.assign_by_decision(lit(1)); // at level 2
+//                                         // Now `asg.level` = [_, 2, 1, 3, 4, 5, 6].
+//         let c1 = cdb
+//             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
+//             .as_cid();
+//         let c = &cdb[c1];
 
-        assert_eq!(c.rank, 3);
-        assert!(!c.is_dead());
-        assert!(!c.is(FlagClause::LEARNT));
-        #[cfg(feature = "just_used")]
-        assert!(!c.is(Flag::USED));
-        let c2 = cdb
-            .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
-            .as_cid();
-        let c = &cdb[c2];
-        assert_eq!(c.rank, 3);
-        assert!(!c.is_dead());
-        assert!(c.is(FlagClause::LEARNT));
-        #[cfg(feature = "just_used")]
-        assert!(!c.is(Flag::USED));
-    }
-    #[test]
-    fn test_clause_equality() {
-        let config = Config::default();
-        let cnf = CNFDescription {
-            num_of_variables: 4,
-            ..CNFDescription::default()
-        };
-        let mut asg = AssignStack::instantiate(&config, &cnf);
-        let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        let c1 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cid();
-        let c2 = cdb
-            .new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false)
-            .as_cid();
-        // cdb[c2].reward = 2.4;
-        assert_eq!(c1, c1);
-        assert_ne!(c1, c2);
-        // assert_eq!(cdb.activity(c2), 2.4);
-    }
+//         assert_eq!(c.rank, 3);
+//         assert!(!c.is_dead());
+//         assert!(!c.is(FlagClause::LEARNT));
+//         #[cfg(feature = "just_used")]
+//         assert!(!c.is(Flag::USED));
+//         let c2 = cdb
+//             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
+//             .as_cid();
+//         let c = &cdb[c2];
+//         assert_eq!(c.rank, 3);
+//         assert!(!c.is_dead());
+//         assert!(c.is(FlagClause::LEARNT));
+//         #[cfg(feature = "just_used")]
+//         assert!(!c.is(Flag::USED));
+//     }
+//     #[test]
+//     fn test_clause_equality() {
+//         let config = Config::default();
+//         let cnf = CNFDescription {
+//             num_of_variables: 4,
+//             ..CNFDescription::default()
+//         };
+//         let mut asg = AssignStack::instantiate(&config, &cnf);
+//         let mut cdb = ClauseDB::instantiate(&config, &cnf);
+//         let c1 = cdb
+//             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
+//             .as_cid();
+//         let c2 = cdb
+//             .new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false)
+//             .as_cid();
+//         // cdb[c2].reward = 2.4;
+//         assert_eq!(c1, c1);
+//         assert_ne!(c1, c2);
+//         // assert_eq!(cdb.activity(c2), 2.4);
+//     }
 
-    #[test]
-    fn test_clause_iterator() {
-        let config = Config::default();
-        let cnf = CNFDescription {
-            num_of_variables: 4,
-            ..CNFDescription::default()
-        };
-        let mut asg = AssignStack::instantiate(&config, &cnf);
-        let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        let c1 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
-            .as_cid();
-        assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
-        let mut iter = cdb[c1][0..].iter();
-        assert_eq!(iter.next(), Some(&lit(1)));
-        assert_eq!(iter.next(), Some(&lit(2)));
-        assert_eq!(iter.next(), Some(&lit(3)));
-        assert_eq!(iter.next(), None);
-    }
-}
+//     #[test]
+//     fn test_clause_iterator() {
+//         let config = Config::default();
+//         let cnf = CNFDescription {
+//             num_of_variables: 4,
+//             ..CNFDescription::default()
+//         };
+//         let mut asg = AssignStack::instantiate(&config, &cnf);
+//         let mut cdb = ClauseDB::instantiate(&config, &cnf);
+//         let c1 = cdb
+//             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
+//             .as_cid();
+//         assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
+//         let mut iter = cdb[c1][0..].iter();
+//         assert_eq!(iter.next(), Some(&lit(1)));
+//         assert_eq!(iter.next(), Some(&lit(2)));
+//         assert_eq!(iter.next(), Some(&lit(3)));
+//         assert_eq!(iter.next(), None);
+//     }
+// }

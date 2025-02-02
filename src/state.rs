@@ -88,7 +88,7 @@ impl IndexMut<Stat> for [usize] {
 
 /// Data storage for [`Solver`](`crate::solver::Solver`).
 #[derive(Clone, Debug)]
-pub struct State {
+pub struct State<'a> {
     /// solver configuration
     pub config: Config,
     /// the problem.
@@ -116,10 +116,9 @@ pub struct State {
     pub e_mode_threshold: f64,
     pub exploration_rate_ema: Ema,
 
-    #[cfg(feature = "support_user_assumption")]
-    /// hold conflicting user-defined *assumed* literals for UNSAT problems
-    pub conflicts: Vec<Lit>,
-
+    // #[cfg(feature = "support_user_assumption")]
+    // /// hold conflicting user-defined *assumed* literals for UNSAT problems
+    // pub conflicts: Vec<Lit<'a>>,
     #[cfg(feature = "chrono_BT")]
     /// chronoBT threshold
     pub chrono_bt_threshold: DecisionLevel,
@@ -127,7 +126,7 @@ pub struct State {
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
     /// working place to build learnt clauses
-    pub new_learnt: Vec<Lit>,
+    pub new_learnt: Vec<Lit<'a>>,
     /// working place to store given clauses' ids which is used to derive a good learnt
     pub derive20: Vec<ClauseId>,
     /// `progress` invocation counter
@@ -144,8 +143,8 @@ pub struct State {
     log_messages: Vec<String>,
 }
 
-impl Default for State {
-    fn default() -> State {
+impl Default for State<'_> {
+    fn default() -> State<'static> {
         State {
             config: Config::default(),
             cnf: CNFDescription::default(),
@@ -180,7 +179,7 @@ impl Default for State {
     }
 }
 
-impl Index<Stat> for State {
+impl Index<Stat> for State<'_> {
     type Output = usize;
     #[inline]
     fn index(&self, i: Stat) -> &usize {
@@ -193,7 +192,7 @@ impl Index<Stat> for State {
     }
 }
 
-impl IndexMut<Stat> for State {
+impl IndexMut<Stat> for State<'_> {
     #[inline]
     fn index_mut(&mut self, i: Stat) -> &mut usize {
         #[cfg(feature = "unsafe_access")]
@@ -205,8 +204,8 @@ impl IndexMut<Stat> for State {
     }
 }
 
-impl Instantiate for State {
-    fn instantiate(config: &Config, cnf: &CNFDescription) -> State {
+impl Instantiate for State<'_> {
+    fn instantiate(config: &Config, cnf: &CNFDescription) -> State<'static> {
         State {
             config: config.clone(),
             cnf: cnf.clone(),
@@ -224,9 +223,7 @@ impl Instantiate for State {
             }
             SolverEvent::Assert(_) => (),
             SolverEvent::Conflict => (),
-            SolverEvent::Eliminate(_) => (),
             SolverEvent::Instantiate => (),
-            SolverEvent::Reinitialize => (),
             SolverEvent::Restart => {
                 self[Stat::Restart] += 1;
                 self.restart.handle(SolverEvent::Restart);
@@ -368,7 +365,7 @@ macro_rules! f {
     };
 }
 
-impl StateIF for State {
+impl StateIF for State<'_> {
     fn is_timeout(&self) -> bool {
         Duration::from_secs(self.config.c_timeout as u64) < self.start.elapsed()
     }
@@ -614,7 +611,7 @@ impl StateIF for State {
     }
 }
 
-impl State {
+impl State<'_> {
     #[allow(clippy::cognitive_complexity)]
     fn record_stats<A, C>(&mut self, asg: &A, cdb: &C)
     where
@@ -674,7 +671,7 @@ impl State {
     }
 }
 
-impl fmt::Display for State {
+impl fmt::Display for State<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let tm: f64 = (self.start.elapsed().as_millis() as f64) / 1_000.0;
         let vc = format!(
@@ -700,7 +697,7 @@ impl fmt::Display for State {
     }
 }
 
-impl Index<LogUsizeId> for State {
+impl Index<LogUsizeId> for State<'_> {
     type Output = usize;
     #[inline]
     fn index(&self, i: LogUsizeId) -> &Self::Output {
@@ -713,7 +710,7 @@ impl Index<LogUsizeId> for State {
     }
 }
 
-impl IndexMut<LogUsizeId> for State {
+impl IndexMut<LogUsizeId> for State<'_> {
     #[inline]
     fn index_mut(&mut self, i: LogUsizeId) -> &mut Self::Output {
         #[cfg(feature = "unsafe_access")]
@@ -725,7 +722,7 @@ impl IndexMut<LogUsizeId> for State {
     }
 }
 
-impl Index<LogF64Id> for State {
+impl Index<LogF64Id> for State<'_> {
     type Output = f64;
     #[inline]
     fn index(&self, i: LogF64Id) -> &Self::Output {
@@ -738,7 +735,7 @@ impl Index<LogF64Id> for State {
     }
 }
 
-impl IndexMut<LogF64Id> for State {
+impl IndexMut<LogF64Id> for State<'_> {
     #[inline]
     fn index_mut(&mut self, i: LogF64Id) -> &mut Self::Output {
         #[cfg(feature = "unsafe_access")]
@@ -750,7 +747,7 @@ impl IndexMut<LogF64Id> for State {
     }
 }
 
-impl State {
+impl State<'_> {
     #[allow(dead_code)]
     fn dump_header_details(&self) {
         println!(
@@ -1021,7 +1018,7 @@ pub mod property {
         Tusize::IntervalScaleMax,
     ];
 
-    impl PropertyDereference<Tusize, usize> for State {
+    impl<'a> PropertyDereference<Tusize, usize> for State<'a> {
         #[inline]
         fn derefer(&self, k: Tusize) -> usize {
             match k {
@@ -1044,7 +1041,7 @@ pub mod property {
 
     pub const EMAS: [TEma; 2] = [TEma::BackjumpLevel, TEma::ConflictLevel];
 
-    impl PropertyReference<TEma, EmaView> for State {
+    impl<'a> PropertyReference<TEma, EmaView> for State<'a> {
         #[inline]
         fn refer(&self, k: TEma) -> &EmaView {
             match k {
