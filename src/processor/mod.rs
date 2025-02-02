@@ -47,11 +47,11 @@ use {
 /// assert_eq!(elim.is_running(), false);
 /// assert_eq!(elim.simplify(&mut s.asg, &mut s.cdb, &mut s.state, false), Ok(()));
 ///```
-pub trait EliminateIF: Instantiate {
+pub trait EliminateIF<'a>: Instantiate {
     /// check if the eliminator is running.
     fn is_running(&self) -> bool;
     /// rebuild occur lists.
-    fn prepare(&mut self, asg: &mut impl AssignIF, cdb: &mut impl ClauseDBIF, force: bool);
+    fn prepare(&mut self, asg: &mut impl AssignIF, cdb: &mut ClauseDB<'a>, force: bool);
     /// enqueue a var into eliminator's var queue.
     fn enqueue_var(&mut self, asg: &mut impl AssignIF, vi: VarId, upward: bool);
     /// simplify database by:
@@ -66,7 +66,7 @@ pub trait EliminateIF: Instantiate {
     fn simplify(
         &mut self,
         asg: &mut impl AssignIF,
-        cdb: &mut impl ClauseDBIF,
+        cdb: &mut impl ClauseDBIF<'a>,
         state: &mut State,
         force_run: bool,
     ) -> MaybeInconsistent;
@@ -86,14 +86,14 @@ enum EliminatorMode {
 
 /// Literal eliminator
 #[derive(Clone, Debug)]
-pub struct Eliminator {
+pub struct Eliminator<'a> {
     enable: bool,
     mode: EliminatorMode,
     clause_queue: Vec<ClauseId>,
     var_queue: VarOccHeap,
     bwdsub_assigns: usize,
     /// constraints on eliminated var. It is used by `extend_model`.
-    elim_lits: Vec<Lit>,
+    elim_lits: Vec<Lit<'a>>,
     /// Maximum number of clauses to try to eliminate a var
     eliminate_var_occurrence_limit: usize,
     /// Stop elimination if the increase of clauses is over this
@@ -111,7 +111,7 @@ pub struct Eliminator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{assign::VarManipulateIF, processor::EliminateIF, solver::Solver};
+    use crate::{processor::EliminateIF, solver::Solver};
     use std::path::Path;
 
     #[test]
@@ -123,6 +123,7 @@ mod tests {
         config.quiet_mode = true;
         let mut s = Solver::try_from(Path::new("cnfs/sample.cnf")).expect("failed to load");
         let Solver {
+            ref mut vars,
             ref mut asg,
             ref mut cdb,
             ref mut state,
@@ -131,25 +132,27 @@ mod tests {
         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
         assert!(elim.enable);
         elim.simplify(asg, cdb, state, false).expect("");
-        assert!(!asg.var_iter().skip(1).all(|v| v.is(FlagVar::ELIMINATED)));
+        assert!(!vars.iter().skip(1).all(|v| v.is(FlagVar::ELIMINATED)));
         assert!(0 < asg.num_eliminated_vars);
         assert_eq!(
             asg.num_eliminated_vars,
-            asg.var_iter().filter(|v| v.is(FlagVar::ELIMINATED)).count()
+            vars.iter()
+                .skip(1)
+                .filter(|v| v.is(FlagVar::ELIMINATED))
+                .count()
         );
-        let elim_vars = asg
-            .var_iter()
-            .enumerate()
+        let elim_vars = vars
+            .iter()
             .skip(1)
-            .filter(|(_, v)| v.is(FlagVar::ELIMINATED))
-            .map(|(vi, _)| vi)
+            .filter(|v| v.is(FlagVar::ELIMINATED))
+            .map(|v| v.id)
             .collect::<Vec<_>>();
         assert_eq!(
             0,
             cdb.iter()
                 .skip(1)
                 .filter(|c| !c.is_dead())
-                .filter(|c| c.iter().any(|l| elim_vars.contains(&l.vi())))
+                .filter(|c| c.iter().any(|l| elim_vars.contains(&l.var.id)))
                 .count()
         );
     }

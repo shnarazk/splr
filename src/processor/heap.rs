@@ -10,8 +10,6 @@ pub trait VarOrderIF {
     fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upward: bool);
     fn is_empty(&self) -> bool;
     fn select_var(&mut self, occur: &[LitOccurs], asg: &impl AssignIF) -> Option<VarId>;
-    #[allow(dead_code)]
-    fn rebuild(&mut self, asg: &impl AssignIF, occur: &[LitOccurs]);
 }
 
 /// Mapping from Literal to Clauses.
@@ -118,14 +116,6 @@ impl VarOrderIF for VarOccHeap {
             }
             if !asg.var(vi).is(FlagVar::ELIMINATED) {
                 return Some(vi);
-            }
-        }
-    }
-    fn rebuild(&mut self, asg: &impl AssignIF, occur: &[LitOccurs]) {
-        self.reset();
-        for (vi, v) in asg.var_iter().enumerate().skip(1) {
-            if asg.assign(vi).is_none() && !v.is(FlagVar::ELIMINATED) {
-                self.insert(occur, vi, true);
             }
         }
     }

@@ -4,23 +4,23 @@ use {
     std::collections::HashMap,
 };
 
-pub trait StochasticLocalSearchIF {
+pub trait StochasticLocalSearchIF<'a> {
     /// returns the decision level of the given assignment and the one of the final assignment.
     /// Note: the lower level a set of clauses make a conflict at,
     /// the higher learning rate a solver can keep and the better learnt clauses we will have.
     /// This would be a better criteria that can be used in CDCL solvers.
     fn stochastic_local_search(
         &mut self,
-        asg: &impl AssignIF,
+        asg: &impl AssignIF<'a>,
         start: &mut HashMap<VarId, bool>,
         limit: usize,
     ) -> (usize, usize);
 }
 
-impl StochasticLocalSearchIF for ClauseDB {
+impl<'a> StochasticLocalSearchIF<'a> for ClauseDB<'a> {
     fn stochastic_local_search(
         &mut self,
-        _asg: &impl AssignIF,
+        _asg: &impl AssignIF<'a>,
         assignment: &mut HashMap<VarId, bool>,
         limit: usize,
     ) -> (usize, usize) {
@@ -38,13 +38,13 @@ impl StochasticLocalSearchIF for ClauseDB {
                 if c.is_falsified(assignment, &mut flip_target) {
                     unsat_clauses += 1;
                     // for l in c.lits.iter() {
-                    //     cls_lvl = cls_lvl.max(asg.level(l.vi()));
+                    //     cls_lvl = cls_lvl.max(l.var.level);
                     // }
                     // level = level.max(cls_lvl);
                     if target_clause.is_none() || unsat_clauses == step {
                         target_clause = Some(c);
                         for l in c.lits.iter() {
-                            flip_target.entry(l.vi()).or_insert(0);
+                            flip_target.entry(l.var.id).or_insert(0);
                         }
                     }
                 }
@@ -65,7 +65,7 @@ impl StochasticLocalSearchIF for ClauseDB {
                 let beta: f64 = 3.2 - 2.1 / (1.0 + unsat_clauses as f64).log(2.0);
                 // let beta: f64 = if unsat_clauses <= 3 { 1.0 } else { 3.0 };
                 let factor = |vi| beta.powf(-(*flip_target.get(vi).unwrap() as f64));
-                let vars = c.lits.iter().map(|l| l.vi()).collect::<Vec<_>>();
+                let vars = c.lits.iter().map(|l| l.var.id).collect::<Vec<_>>();
                 let index = ((seed % 100) as f64 / 100.0) * vars.iter().map(factor).sum::<f64>();
                 let mut sum: f64 = 0.0;
                 for vi in vars.iter() {
@@ -84,7 +84,7 @@ impl StochasticLocalSearchIF for ClauseDB {
     }
 }
 
-impl Clause {
+impl Clause<'_> {
     fn is_falsified(
         &self,
         assignment: &HashMap<VarId, bool>,
@@ -93,9 +93,9 @@ impl Clause {
         let mut num_sat = 0;
         let mut sat_vi = 0;
         for l in self.iter() {
-            let vi = l.vi();
+            let vi = l.var.id;
             match assignment.get(&vi) {
-                Some(b) if *b == l.as_bool() => {
+                Some(b) if *b == l.possitive => {
                     if num_sat == 1 {
                         return false;
                     }

@@ -16,8 +16,8 @@ use {
     },
 };
 
-impl Default for Eliminator {
-    fn default() -> Eliminator {
+impl Default for Eliminator<'_> {
+    fn default() -> Eliminator<'static> {
         Eliminator {
             enable: cfg!(feature = "clause_elimination"),
             mode: EliminatorMode::Dormant,
@@ -35,7 +35,7 @@ impl Default for Eliminator {
     }
 }
 
-impl Index<VarId> for Eliminator {
+impl Index<VarId> for Eliminator<'_> {
     type Output = LitOccurs;
     #[inline]
     fn index(&self, i: VarId) -> &Self::Output {
@@ -48,7 +48,7 @@ impl Index<VarId> for Eliminator {
     }
 }
 
-impl IndexMut<VarId> for Eliminator {
+impl IndexMut<VarId> for Eliminator<'_> {
     #[inline]
     fn index_mut(&mut self, i: VarId) -> &mut Self::Output {
         #[cfg(feature = "unsafe_access")]
@@ -60,7 +60,7 @@ impl IndexMut<VarId> for Eliminator {
     }
 }
 
-impl Index<&VarId> for Eliminator {
+impl Index<&VarId> for Eliminator<'_> {
     type Output = LitOccurs;
     #[inline]
     fn index(&self, i: &VarId) -> &Self::Output {
@@ -73,7 +73,7 @@ impl Index<&VarId> for Eliminator {
     }
 }
 
-impl IndexMut<&VarId> for Eliminator {
+impl IndexMut<&VarId> for Eliminator<'_> {
     #[inline]
     fn index_mut(&mut self, i: &VarId) -> &mut Self::Output {
         #[cfg(feature = "unsafe_access")]
@@ -85,57 +85,57 @@ impl IndexMut<&VarId> for Eliminator {
     }
 }
 
-impl Index<Lit> for Eliminator {
+impl Index<Lit<'_>> for Eliminator<'_> {
     type Output = LitOccurs;
     #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            self.var.get_unchecked(l.vi())
+            self.var.get_unchecked(l.var.id)
         }
         #[cfg(not(feature = "unsafe_access"))]
-        &self.var[l.vi()]
+        &self.var[l.var.id]
     }
 }
 
-impl IndexMut<Lit> for Eliminator {
+impl IndexMut<Lit<'_>> for Eliminator<'_> {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            self.var.get_unchecked_mut(l.vi())
+            self.var.get_unchecked_mut(l.var.id)
         }
         #[cfg(not(feature = "unsafe_access"))]
-        &mut self.var[l.vi()]
+        &mut self.var[l.var.id]
     }
 }
 
-impl Index<&Lit> for Eliminator {
+impl<'a> Index<&Lit<'a>> for Eliminator<'a> {
     type Output = LitOccurs;
     #[inline]
-    fn index(&self, l: &Lit) -> &Self::Output {
+    fn index(&self, l: &Lit<'a>) -> &Self::Output {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            self.var.get_unchecked(l.vi())
+            self.var.get_unchecked(l.var.id)
         }
         #[cfg(not(feature = "unsafe_access"))]
-        &self.var[l.vi()]
+        &self.var[l.var.id]
     }
 }
 
-impl IndexMut<&Lit> for Eliminator {
+impl<'a> IndexMut<&Lit<'a>> for Eliminator<'a> {
     #[inline]
-    fn index_mut(&mut self, l: &Lit) -> &mut Self::Output {
+    fn index_mut(&mut self, l: &Lit<'a>) -> &mut Self::Output {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            self.var.get_unchecked_mut(l.vi())
+            self.var.get_unchecked_mut(l.var.id)
         }
         #[cfg(not(feature = "unsafe_access"))]
-        &mut self.var[l.vi()]
+        &mut self.var[l.var.id]
     }
 }
 
-impl Index<Range<usize>> for Eliminator {
+impl Index<Range<usize>> for Eliminator<'_> {
     type Output = [LitOccurs];
     #[inline]
     fn index(&self, r: Range<usize>) -> &Self::Output {
@@ -148,7 +148,7 @@ impl Index<Range<usize>> for Eliminator {
     }
 }
 
-impl Index<RangeFrom<usize>> for Eliminator {
+impl Index<RangeFrom<usize>> for Eliminator<'_> {
     type Output = [LitOccurs];
     #[inline]
     fn index(&self, r: RangeFrom<usize>) -> &Self::Output {
@@ -161,7 +161,7 @@ impl Index<RangeFrom<usize>> for Eliminator {
     }
 }
 
-impl IndexMut<Range<usize>> for Eliminator {
+impl IndexMut<Range<usize>> for Eliminator<'_> {
     #[inline]
     fn index_mut(&mut self, r: Range<usize>) -> &mut Self::Output {
         #[cfg(feature = "unsafe_access")]
@@ -173,7 +173,7 @@ impl IndexMut<Range<usize>> for Eliminator {
     }
 }
 
-impl IndexMut<RangeFrom<usize>> for Eliminator {
+impl IndexMut<RangeFrom<usize>> for Eliminator<'_> {
     #[inline]
     fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut Self::Output {
         #[cfg(feature = "unsafe_access")]
@@ -185,8 +185,8 @@ impl IndexMut<RangeFrom<usize>> for Eliminator {
     }
 }
 
-impl Instantiate for Eliminator {
-    fn instantiate(config: &Config, cnf: &CNFDescription) -> Eliminator {
+impl Instantiate for Eliminator<'_> {
+    fn instantiate<'a>(config: &'a Config, cnf: &'a CNFDescription) -> Eliminator<'static> {
         let nv = cnf.num_of_variables;
         Eliminator {
             enable: config.enable_eliminator,
@@ -215,11 +215,11 @@ impl Instantiate for Eliminator {
     }
 }
 
-impl EliminateIF for Eliminator {
+impl EliminateIF for Eliminator<'_> {
     fn is_running(&self) -> bool {
         self.enable && self.mode == EliminatorMode::Running
     }
-    fn prepare(&mut self, asg: &mut impl AssignIF, cdb: &mut impl ClauseDBIF, force: bool) {
+    fn prepare<'a>(&mut self, asg: &mut impl AssignIF, cdb: &mut impl ClauseDBIF<'a>, force: bool) {
         if !self.enable {
             return;
         }
@@ -260,7 +260,7 @@ impl EliminateIF for Eliminator {
     fn simplify(
         &mut self,
         asg: &mut impl AssignIF,
-        cdb: &mut impl ClauseDBIF,
+        cdb: &mut impl ClauseDBIF<'a>,
         state: &mut State,
         force_run: bool,
     ) -> MaybeInconsistent {
@@ -315,15 +315,16 @@ impl EliminateIF for Eliminator {
             Some((w.pos_occurs.len(), w.neg_occurs.len()))
         }
     }
-    fn eliminated_lits(&mut self) -> &mut Vec<Lit> {
+    fn eliminated_lits<'a>(&'a mut self) -> &'a mut Vec<Lit<'a>> {
         &mut self.elim_lits
     }
 }
 
-impl Eliminator {
+impl<'a> Eliminator<'a> {
     /// register a clause id to all corresponding occur lists.
     pub fn add_cid_occur(
         &mut self,
+        vars: &mut [Var<'a>],
         asg: &mut impl AssignIF,
         cid: ClauseId,
         c: &mut Clause,
@@ -335,14 +336,14 @@ impl Eliminator {
         let evo = self.eliminate_var_occurrence_limit;
         let mut checked: Vec<VarId> = Vec::new();
         for l in c.iter() {
-            let vi = l.vi();
-            let v = &mut asg.var_mut(vi);
+            let vi = l.var.id;
+            let v = &mut vars[vi];
             debug_assert!(
                 !checked.contains(&vi),
                 "eliminator::add_cid_occur356: {c:?}"
             );
             checked.push(vi);
-            let w = &mut self[l.vi()];
+            let w = &mut self[l.var.id];
             let pl = w.pos_occurs.len();
             let nl = w.neg_occurs.len();
             if evo < pl * nl {
@@ -371,7 +372,7 @@ impl Eliminator {
                     );
                     w.neg_occurs.push(cid);
                 }
-                self.enqueue_var(asg, l.vi(), false);
+                self.enqueue_var(asg, l.var.id, false);
             }
         }
         c.turn_on(FlagClause::OCCUR_LINKED);
@@ -380,15 +381,15 @@ impl Eliminator {
         }
     }
     /// remove a clause id from all corresponding occur lists.
-    pub fn remove_cid_occur(&mut self, asg: &mut impl AssignIF, cid: ClauseId, c: &mut Clause) {
+    pub fn remove_cid_occur(&mut self, asg: &mut impl AssignIF, cid: ClauseId, c: &mut Clause<'a>) {
         debug_assert!(self.mode == EliminatorMode::Running);
         debug_assert!(!cid.is_lifted_lit());
         debug_assert!(!c.is_dead());
         c.turn_off(FlagClause::OCCUR_LINKED);
         for l in c.iter() {
-            if asg.assign(l.vi()).is_none() {
+            if l.var.assign.is_none() {
                 self.remove_lit_occur(asg, *l, cid);
-                self.enqueue_var(asg, l.vi(), true);
+                self.enqueue_var(asg, l.var.id, true);
             }
         }
     }
@@ -396,7 +397,7 @@ impl Eliminator {
     // Due to a potential bug of killing clauses and difficulty about
     // synchronization between 'garbage_collect' and clearing occur lists,
     // 'stop' should purge all occur lists to purge any dead clauses for now.
-    fn stop(&mut self, asg: &mut impl AssignIF, cdb: &mut impl ClauseDBIF) {
+    fn stop(&mut self, asg: &mut impl AssignIF<'a>, cdb: &mut impl ClauseDBIF<'a>) {
         let force: bool = true;
         self.clear_clause_queue(cdb);
         self.clear_var_queue(asg);
@@ -415,7 +416,7 @@ impl Eliminator {
     pub fn backward_subsumption_check(
         &mut self,
         asg: &mut impl AssignIF,
-        cdb: &mut impl ClauseDBIF,
+        cdb: &mut impl ClauseDBIF<'a>,
         timedout: &mut usize,
     ) -> MaybeInconsistent {
         debug_assert_eq!(asg.decision_level(), 0);
@@ -449,9 +450,9 @@ impl Eliminator {
                     // so searching the shortest occurs is most efficient.
                     let mut b = 0;
                     for l in c.iter() {
-                        let v = &asg.var(l.vi());
-                        let w = &self[l.vi()];
-                        if asg.assign(l.vi()).is_some() || w.aborted {
+                        let v = l.var;
+                        let w = &self[l.var.id];
+                        if v.assign.is_some() || w.aborted {
                             continue;
                         }
                         let num_sum = if bool::from(*l) {
@@ -460,7 +461,7 @@ impl Eliminator {
                             w.pos_occurs.len()
                         };
                         if !v.is(FlagVar::ELIMINATED) && num_sum < tmp {
-                            b = l.vi();
+                            b = l.var.id;
                             tmp = num_sum;
                         }
                     }
@@ -510,7 +511,7 @@ impl Eliminator {
     fn eliminate(
         &mut self,
         asg: &mut impl AssignIF,
-        cdb: &mut impl ClauseDBIF,
+        cdb: &mut impl ClauseDBIF<'a>,
         state: &mut State,
     ) -> MaybeInconsistent {
         let start = state.elapsed().unwrap_or(0.0);
@@ -537,7 +538,7 @@ impl Eliminator {
     fn eliminate_main(
         &mut self,
         asg: &mut impl AssignIF,
-        cdb: &mut impl ClauseDBIF,
+        cdb: &mut impl ClauseDBIF<'a>,
         state: &mut State,
     ) -> MaybeInconsistent {
         debug_assert!(asg.decision_level() == 0);
@@ -559,8 +560,8 @@ impl Eliminator {
             while let Some(vi) = self.var_queue.select_var(&self.var, asg) {
                 let v = asg.var_mut(vi);
                 v.turn_off(FlagVar::ENQUEUED);
-                if !v.is(FlagVar::ELIMINATED) && asg.assign(vi).is_none() {
-                    eliminate_var(asg, cdb, self, state, vi, &mut timedout)?;
+                if !v.is(FlagVar::ELIMINATED) && v.assign.is_none() {
+                    eliminate_var(asg, vars, cdb, self, state, vi, &mut timedout)?;
                 }
             }
             self.backward_subsumption_check(asg, cdb, &mut timedout)?;
@@ -578,7 +579,7 @@ impl Eliminator {
     }
     /// remove a clause id from literal's occur list.
     pub fn remove_lit_occur(&mut self, asg: &mut impl AssignIF, l: Lit, cid: ClauseId) {
-        let w = &mut self[l.vi()];
+        let w = &mut self[l.var.id];
         if w.aborted {
             return;
         }
@@ -591,7 +592,7 @@ impl Eliminator {
             w.neg_occurs.delete_unstable(|&c| c == cid);
             debug_assert!(!w.neg_occurs.contains(&cid));
         }
-        self.enqueue_var(asg, l.vi(), true);
+        self.enqueue_var(asg, l.var.id, true);
     }
 
     //
@@ -659,7 +660,7 @@ fn check_eliminator(cdb: &impl ClauseDBIF, elim: &Eliminator) -> bool {
             continue;
         }
         for l in c.iter() {
-            let v = l.vi();
+            let v = l.var;
             if bool::from(*l) {
                 if !elim[v].pos_occurs.contains(&(ClauseId::from(cid))) {
                     panic!("failed to check {} {:#}", (ClauseId::from(cid)), c);

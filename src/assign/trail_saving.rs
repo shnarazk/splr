@@ -2,58 +2,69 @@
 /// implement boolean constraint propagation, backjump
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{heap::VarHeapIF, AssignStack, PropagateIF, VarManipulateIF},
-    crate::{cdb::ClauseDBIF, types::*},
+    super::AssignStack,
+    crate::{cdb::ClauseDBIF, solver::VarActivityManager, types::*},
 };
 
 #[cfg(feature = "chrono_BT")]
 use super::AssignIF;
 
 /// Methods on trail saving.
-pub trait TrailSavingIF {
-    fn save_trail(&mut self, to_lvl: DecisionLevel);
-    fn reuse_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult;
-    fn clear_saved_trail(&mut self);
+pub trait TrailSavingIF<'a> {
+    fn save_trail(
+        &'a mut self,
+        vars: &'a mut [Var<'a>],
+        vam: &'a mut VarActivityManager,
+        to_lvl: DecisionLevel,
+    );
+    fn reuse_saved_trail(&'a mut self, cdb: &'a ClauseDB) -> PropagationResult<'a>;
+    fn clear_saved_trail(&'a mut self);
 }
 
-impl TrailSavingIF for AssignStack {
-    fn save_trail(&mut self, to_lvl: DecisionLevel) {
+impl<'a> TrailSavingIF<'a> for AssignStack<'a> {
+    fn save_trail(
+        &'a mut self,
+        vars: &'a mut [Var<'a>],
+        vam: &'a mut VarActivityManager,
+        to_lvl: DecisionLevel,
+    ) {
         let lim = self.trail_lim[to_lvl as usize];
         let dl = self.trail_lim.len();
         let mut free: usize = lim;
         self.clear_saved_trail();
         if 2 <= dl {
             let lim2 = self.trail_lim[dl - 2];
-            let activity_threshold = self.var[self.trail[lim2].vi()].reward;
+            let activity_threshold = self.trail[lim2].var.activity;
             for i in (lim..lim2).rev() {
                 let l = self.trail[i];
-                let vi = l.vi();
+                let vi = l.var.id;
 
                 //
                 //## mutliple backtracks not work
                 //
-                // if let Some(i) = self.trail_saved.iter().position(|k| k.vi() == vi) {
+                // if let Some(i) = self.trail_saved.iter().position(|k| k.var.id == vi) {
                 //     if self.trail_saved[i] == !l {
                 //         self.trail_saved.drain(0..=i);
                 //     }
                 // }
 
                 self.trail_saved.push(l);
-                self.var[vi].reason_saved = self.var[vi].reason;
-                self.reward_at_unassign(vi);
-                if activity_threshold <= self.var[vi].reward {
+                vam.reward_at_unassign(vars, vi);
+                let v = &mut vars[vi];
+                v.reason_saved = v.reason;
+                if activity_threshold <= v.activity {
                     self.insert_heap(vi);
                 }
             }
             free = lim2;
         }
         for i in free..self.trail.len() {
-            let vi = self.trail[i].vi();
-            self.reward_at_unassign(vi);
+            let v = self.trail[i].var;
+            vam.reward_at_unassign(vars, v.id);
             self.insert_heap(vi);
         }
     }
-    fn reuse_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult {
+    fn reuse_saved_trail(&'a mut self, cdb: &'a ClauseDB) -> PropagationResult<'a> {
         let q = self.stage_scale.trailing_zeros() as u16
             + (cdb.derefer(crate::cdb::property::Tf64::LiteralBlockEntanglement) as u16) / 2;
 
@@ -62,13 +73,13 @@ impl TrailSavingIF for AssignStack {
 
         for i in (0..self.trail_saved.len()).rev() {
             let lit = self.trail_saved[i];
-            let vi = lit.vi();
-            let old_reason = self.var[vi].reason_saved;
-            match (self.assigned(lit), old_reason) {
+            let vi = lit.var.id;
+            let old_reason = lit.var.reason_saved;
+            match (lit.assigned(), old_reason) {
                 (Some(true), _) => (),
                 (None, AssignReason::BinaryLink(link)) => {
-                    debug_assert_ne!(link.vi(), lit.vi());
-                    debug_assert_eq!(self.assigned(link), Some(true));
+                    debug_assert_ne!(link.var.id, lit.var.id);
+                    debug_assert_eq!(link.assigned(), Some(true));
                     self.num_repropagation += 1;
 
                     self.assign_by_implication(
@@ -85,10 +96,7 @@ impl TrailSavingIF for AssignStack {
                 }
                 (None, AssignReason::Implication(cid)) => {
                     debug_assert_eq!(cdb[cid].lit0(), lit);
-                    debug_assert!(cdb[cid]
-                        .iter()
-                        .skip(1)
-                        .all(|l| self.assigned(*l) == Some(false)));
+                    debug_assert!(cdb[cid].iter().skip(1).all(|l| l.assigned() == Some(false)));
                     self.num_repropagation += 1;
 
                     self.assign_by_implication(
@@ -99,14 +107,14 @@ impl TrailSavingIF for AssignStack {
                     );
                 }
                 (Some(false), AssignReason::BinaryLink(link)) => {
-                    debug_assert_ne!(link.vi(), lit.vi());
-                    debug_assert_eq!(self.assigned(link), Some(true));
+                    debug_assert_ne!(link.var.id, lit.var.id);
+                    debug_assert_eq!(link.assigned(), Some(true));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_saved_trail();
                     return Err((lit, old_reason));
                 }
                 (Some(false), AssignReason::Implication(cid)) => {
-                    debug_assert!(cdb[cid].iter().all(|l| self.assigned(*l) == Some(false)));
+                    debug_assert!(cdb[cid].iter().all(|l| l.assigned() == Some(false)));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_saved_trail();
                     return Err((cdb[cid].lit0(), AssignReason::Implication(cid)));
@@ -122,10 +130,10 @@ impl TrailSavingIF for AssignStack {
         self.trail_saved.clear();
         Ok(())
     }
-    fn clear_saved_trail(&mut self) {
+    fn clear_saved_trail(&'a mut self) {
         for j in 0..self.trail_saved.len() {
             let l = self.trail_saved[j];
-            self.insert_heap(l.vi());
+            self.insert_heap(l.var.id);
         }
         self.trail_saved.clear();
     }

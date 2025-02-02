@@ -28,16 +28,16 @@ default = [
         "dynamic_restart_threshold",
         "LRB_rewarding",
         "reason_side_rewarding",
-        "rephase",
+        # "rephase",
         "reward_annealing",
         # "stochastic_local_search",
         # "suppress_reason_chain",
         "two_mode_reduction",
-        "trail_saving",
+        # "trail_saving",
 
         ### Logic formula processor
-        "clause_elimination",
-        "clause_vivification",
+        # "clause_elimination",
+        # "clause_vivification",
 
         ### For DEBUG
         # "boundary_check",

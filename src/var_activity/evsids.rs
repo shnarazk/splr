@@ -4,7 +4,7 @@ use {
     crate::types::*,
 };
 
-impl ActivityIF<VarId> for AssignStack {
+impl ActivityIF<VarId> for AssignStack<'_> {
     fn activity(&self, vi: VarId) -> f64 {
         self.var[vi].reward
     }
