@@ -2,10 +2,6 @@
 mod activity;
 /// methods on binary link, namely binary clause
 mod binary;
-/// methods on `ClauseId`
-mod cid;
-/// methods on `Clause`
-mod clause;
 /// methods on `ClauseDB`
 mod db;
 /// EMA
@@ -21,8 +17,6 @@ mod watch_cache;
 
 pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
-    cid::ClauseIdIF,
-    clause::{Clause, ClauseIF},
     db::ClauseDB,
     property::*,
     sls::StochasticLocalSearchIF,
@@ -33,7 +27,6 @@ pub use self::{
 use {
     crate::{assign::AssignIF, types::*},
     std::{
-        num::NonZeroU32,
         ops::IndexMut,
         slice::{Iter, IterMut},
     },
@@ -42,14 +35,6 @@ use {
 
 #[cfg(not(feature = "no_IO"))]
 use std::path::Path;
-
-/// Clause identifier, or clause index, starting with one.
-/// Note: ids are re-used after 'garbage collection'.
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct ClauseId {
-    /// a sequence number.
-    pub ordinal: NonZeroU32,
-}
 
 #[derive(Clone, Debug)]
 pub enum ReductionType {
@@ -268,8 +253,11 @@ pub mod property {
 
 #[cfg(test)]
 mod tests {
-    use super::{clause::ClauseIF, *};
-    use crate::assign::{AssignStack, PropagateIF};
+    use {
+        super::*,
+        crate::assign::{AssignStack, PropagateIF},
+        std::num::NonZeroU32,
+    };
 
     fn lit(i: i32) -> Lit {
         Lit::from(i)
