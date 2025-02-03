@@ -1,5 +1,13 @@
 use std::{fmt, num::NonZeroU32};
 
+/// Decision Level Representation.
+pub type DecisionLevel = u32;
+
+/// 'Variable' identifier or 'variable' index, starting with one.
+/// Implementation note: NonZeroUsize can be used but requires a lot of changes.
+/// The current abstraction is incomplete.
+pub type VarId = usize;
+
 /// API for Clause Id.
 pub trait ClauseIdIF {
     /// return `true` if a given clause id is made from a `Lit`.

@@ -98,3 +98,13 @@ impl FlagIF for Var {
         self.flags.toggle(flag);
     }
 }
+
+#[cfg(feature = "boundary_check")]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum VarState {
+    AssertedSandbox(usize),
+    Assigned(usize),
+    AssignedSandbox(usize),
+    Propagated(usize),
+    Unassigned(usize),
+}

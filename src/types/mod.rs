@@ -1,14 +1,16 @@
 //! Module `types' provides various building blocks, including
 //! some common traits.
 
-/// methods on clause id
-pub mod cid;
 /// methods on clause
 pub mod clause;
+/// methods on CNF file
+pub mod cnf;
 /// methods on clause activity
 pub mod ema;
 /// methods on flags used in Var and Clause
 pub mod flags;
+/// types used as index
+pub mod idx;
 /// methods on literals
 pub mod lit;
 /// methods on binary link, namely binary clause
@@ -18,16 +20,13 @@ pub mod ordered_proxy;
 /// methods on Var
 pub mod var;
 
-pub use self::{cid::*, clause::*, ema::*, flags::*, lit::*, luby::*, ordered_proxy::*, var::*};
+pub use self::{
+    clause::*, cnf::*, ema::*, flags::*, idx::*, lit::*, luby::*, ordered_proxy::*, var::*,
+};
 
 pub use crate::{assign::AssignReason, config::Config, solver::SolverEvent};
 
-use std::{
-    fmt,
-    fs::File,
-    io::{BufRead, BufReader},
-    path::Path,
-};
+use std::{fmt, fs::File};
 
 /// API for accessing internal data in a module.
 /// For example, `State::progress` needs to access misc parameters and statistics,
@@ -99,50 +98,11 @@ pub trait Delete<T> {
         F: FnMut(&T) -> bool;
 }
 
-/// 'Variable' identifier or 'variable' index, starting with one.
-/// Implementation note: NonZeroUsize can be used but requires a lot of changes.
-/// The current abstraction is incomplete.
-pub type VarId = usize;
-
-/// Decision Level Representation.
-pub type DecisionLevel = u32;
-
 /// Capture a conflict
 pub type ConflictContext = (Lit, AssignReason);
 
 /// Return type of unit propagation
 pub type PropagationResult = Result<(), ConflictContext>;
-
-// A generic reference to a clause or something else.
-// we can use DEAD for simply satisfied form, f.e. an empty forms,
-// while EmptyClause can be used for simply UNSAT form.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum RefClause {
-    Clause(ClauseId),
-    Dead,
-    EmptyClause,
-    RegisteredClause(ClauseId),
-    UnitClause(Lit),
-}
-
-impl RefClause {
-    pub fn as_cid(&self) -> ClauseId {
-        match self {
-            RefClause::Clause(cid) => *cid,
-            RefClause::RegisteredClause(cid) => *cid,
-            _ => panic!("invalid reference to clause"),
-        }
-    }
-    pub fn is_new(&self) -> Option<ClauseId> {
-        match self {
-            RefClause::Clause(cid) => Some(*cid),
-            RefClause::RegisteredClause(_) => None,
-            RefClause::EmptyClause => None,
-            RefClause::Dead => None,
-            RefClause::UnitClause(_) => None,
-        }
-    }
-}
 
 /// Internal errors.
 /// Note: returning `Result<(), a-singleton>` is identical to returning `bool`.
@@ -176,146 +136,6 @@ impl fmt::Display for SolverError {
 
 /// A Return type used by solver functions.
 pub type MaybeInconsistent = Result<(), SolverError>;
-
-/// CNF locator
-#[derive(Clone, Debug, Default)]
-pub enum CNFIndicator {
-    /// not specified
-    #[default]
-    Void,
-    /// from a file
-    File(String),
-    /// embedded directly
-    LitVec(usize),
-}
-
-impl fmt::Display for CNFIndicator {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            CNFIndicator::Void => write!(f, "No CNF specified)"),
-            CNFIndicator::File(file) => write!(f, "CNF file({file})"),
-            CNFIndicator::LitVec(n) => write!(f, "A vec({n} clauses)"),
-        }
-    }
-}
-
-// impl CNFIndicator {
-//     pub fn to_string(&self) -> String {
-//         match self {
-//             CNFIndicator::Void => "(no cnf)".to_string(),
-//             CNFIndicator::File(f) => f.to_string(),
-//             CNFIndicator::LitVec(v) => format!("(embedded {} element vector)", v.len()).to_string(),
-//         }
-//     }
-// }
-
-/// Data storage about a problem.
-#[derive(Clone, Debug)]
-pub struct CNFDescription {
-    pub num_of_variables: usize,
-    pub num_of_clauses: usize,
-    pub pathname: CNFIndicator,
-}
-
-impl Default for CNFDescription {
-    fn default() -> CNFDescription {
-        CNFDescription {
-            num_of_variables: 0,
-            num_of_clauses: 0,
-            pathname: CNFIndicator::Void,
-        }
-    }
-}
-
-impl fmt::Display for CNFDescription {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let CNFDescription {
-            num_of_variables: nv,
-            num_of_clauses: nc,
-            pathname: path,
-        } = &self;
-        write!(f, "CNF({nv}, {nc}, {path})")
-    }
-}
-
-impl<V: AsRef<[i32]>> From<&[V]> for CNFDescription {
-    fn from(vec: &[V]) -> Self {
-        let num_of_variables = vec
-            .iter()
-            .map(|clause| clause.as_ref().iter().map(|l| l.abs()).max().unwrap_or(0))
-            .max()
-            .unwrap_or(0) as usize;
-        CNFDescription {
-            num_of_variables,
-            num_of_clauses: vec.len(),
-            pathname: CNFIndicator::LitVec(vec.len()),
-        }
-    }
-}
-
-/// A wrapper structure to make a CNFDescription from a file.
-/// To make CNFDescription clone-able, a BufReader should be separated from it.
-/// If you want to make a CNFDescription which isn't connected to a file,
-/// just call CNFDescription::default() directly.
-#[derive(Debug)]
-pub struct CNFReader {
-    pub cnf: CNFDescription,
-    pub reader: BufReader<File>,
-}
-
-impl TryFrom<&Path> for CNFReader {
-    type Error = SolverError;
-    fn try_from(path: &Path) -> Result<Self, Self::Error> {
-        let pathname = if path.to_string_lossy().is_empty() {
-            "--".to_string()
-        } else {
-            Path::new(&path.to_string_lossy().into_owned())
-                .file_name()
-                .map_or("aStrangeNamed".to_string(), |f| {
-                    f.to_string_lossy().into_owned()
-                })
-        };
-        let fs = File::open(path).map_or(Err(SolverError::IOError), Ok)?;
-        let mut reader = BufReader::new(fs);
-        let mut buf = String::new();
-        let mut nv: usize = 0;
-        let mut nc: usize = 0;
-        let mut found_valid_header = false;
-        loop {
-            buf.clear();
-            match reader.read_line(&mut buf) {
-                Ok(0) => break,
-                Ok(_k) => {
-                    let mut iter = buf.split_whitespace();
-                    if iter.next() == Some("p") && iter.next() == Some("cnf") {
-                        if let Some(v) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
-                            if let Some(c) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
-                                nv = v;
-                                nc = c;
-                                found_valid_header = true;
-                                break;
-                            }
-                        }
-                    }
-                    continue;
-                }
-                Err(e) => {
-                    println!("{e}");
-                    return Err(SolverError::IOError);
-                }
-            }
-        }
-        if !found_valid_header {
-            return Err(SolverError::IOError);
-        }
-        let cnf = CNFDescription {
-            num_of_variables: nv,
-            num_of_clauses: nc,
-            pathname: CNFIndicator::File(pathname),
-        };
-        Ok(CNFReader { cnf, reader })
-    }
-}
 
 impl<T> Delete<T> for Vec<T> {
     fn delete_unstable<F>(&mut self, filter: F)
@@ -368,16 +188,6 @@ pub enum Propagate {
     SandboxFindNewWatch(usize, Lit, Lit),
     SandboxBecameUnit(usize),
     SandboxEmitConflict(usize, Lit),
-}
-
-#[cfg(feature = "boundary_check")]
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum VarState {
-    AssertedSandbox(usize),
-    Assigned(usize),
-    AssignedSandbox(usize),
-    Propagated(usize),
-    Unassigned(usize),
 }
 
 #[cfg(test)]

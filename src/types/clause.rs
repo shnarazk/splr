@@ -312,3 +312,34 @@ impl Clause {
         cnt as usize
     }
 }
+
+// A generic reference to a clause or something else.
+// we can use DEAD for simply satisfied form, f.e. an empty forms,
+// while EmptyClause can be used for simply UNSAT form.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RefClause {
+    Clause(ClauseId),
+    Dead,
+    EmptyClause,
+    RegisteredClause(ClauseId),
+    UnitClause(Lit),
+}
+
+impl RefClause {
+    pub fn as_cid(&self) -> ClauseId {
+        match self {
+            RefClause::Clause(cid) => *cid,
+            RefClause::RegisteredClause(cid) => *cid,
+            _ => panic!("invalid reference to clause"),
+        }
+    }
+    pub fn is_new(&self) -> Option<ClauseId> {
+        match self {
+            RefClause::Clause(cid) => Some(*cid),
+            RefClause::RegisteredClause(_) => None,
+            RefClause::EmptyClause => None,
+            RefClause::Dead => None,
+            RefClause::UnitClause(_) => None,
+        }
+    }
+}
