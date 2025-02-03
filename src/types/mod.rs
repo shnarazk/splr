@@ -1,26 +1,28 @@
 //! Module `types' provides various building blocks, including
 //! some common traits.
 
+/// methods on clause id
+pub mod cid;
+/// methods on clause
+pub mod clause;
 /// methods on clause activity
 pub mod ema;
+/// methods on flags used in Var and Clause
+pub mod flags;
 /// methods on literals
 pub mod lit;
 /// methods on binary link, namely binary clause
 pub mod luby;
+/// methods on f64 sort
+pub mod ordered_proxy;
 /// methods on Var
 pub mod var;
 
-pub use self::{ema::*, lit::*, luby::*, var::*};
+pub use self::{cid::*, clause::*, ema::*, flags::*, lit::*, luby::*, ordered_proxy::*, var::*};
 
-pub use crate::{
-    assign::AssignReason,
-    cdb::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
-    config::Config,
-    solver::SolverEvent,
-};
+pub use crate::{assign::AssignReason, config::Config, solver::SolverEvent};
 
 use std::{
-    cmp::Ordering,
     fmt,
     fs::File,
     io::{BufRead, BufReader},
@@ -326,59 +328,6 @@ impl<T> Delete<T> for Vec<T> {
     }
 }
 
-/// API for object properties.
-pub trait FlagIF {
-    type FlagType;
-    /// return true if the flag in on.
-    fn is(&self, flag: Self::FlagType) -> bool;
-    /// set the flag.
-    fn set(&mut self, f: Self::FlagType, b: bool);
-    // toggle the flag.
-    fn toggle(&mut self, flag: Self::FlagType);
-    /// toggle the flag off.
-    fn turn_off(&mut self, flag: Self::FlagType);
-    /// toggle the flag on.
-    fn turn_on(&mut self, flag: Self::FlagType);
-}
-
-bitflags! {
-    /// Misc flags used by [`Clause`](`crate::cdb::Clause`).
-    #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-    pub struct FlagClause: u8 {
-        /// a clause is a generated clause by conflict analysis and is removable.
-        const LEARNT       = 0b0000_0001;
-        /// used in conflict analyze
-        const USED         = 0b0000_0010;
-        /// a clause or var is enqueued for eliminator.
-        const ENQUEUED     = 0b0000_0100;
-        /// a clause is registered in vars' occurrence list.
-        const OCCUR_LINKED = 0b0000_1000;
-        /// a given clause derived a learnt which LBD is smaller than 20.
-        const DERIVE20     = 0b0001_0000;
-    }
-}
-
-bitflags! {
-    /// Misc flags used by [`Var`](`crate::assign::Var`).
-    #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-    pub struct FlagVar: u8 {
-        /// * the previous assigned value of a Var.
-        const PHASE        = 0b0000_0001;
-        /// used in conflict analyze
-        const USED         = 0b0000_0010;
-        /// a var is eliminated and managed by eliminator.
-        const ELIMINATED   = 0b0000_0100;
-        /// a clause or var is enqueued for eliminator.
-        const ENQUEUED     = 0b0000_1000;
-        /// a var is checked during in the current conflict analysis.
-        const CA_SEEN      = 0b0001_0000;
-
-        #[cfg(feature = "debug_propagation")]
-        /// check propagation
-        const PROPAGATED   = 0b0010_0000;
-    }
-}
-
 #[derive(Debug, Default)]
 pub struct Logger {
     dest: Option<File>,
@@ -404,69 +353,6 @@ impl Logger {
         } else {
             println!("{mes}");
         }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct OrderedProxy<T: Clone + Default + Sized + Ord> {
-    index: f64,
-    body: T,
-}
-
-impl<T: Clone + Default + Sized + Ord> Default for OrderedProxy<T> {
-    fn default() -> Self {
-        OrderedProxy {
-            index: 0.0,
-            body: T::default(),
-        }
-    }
-}
-
-impl<T: Clone + Default + Sized + Ord> PartialEq for OrderedProxy<T> {
-    fn eq(&self, other: &OrderedProxy<T>) -> bool {
-        self.index == other.index && self.body == other.body
-    }
-}
-
-impl<T: Clone + Default + Sized + Ord> Eq for OrderedProxy<T> {}
-
-impl<T: Clone + Default + PartialEq + Ord> PartialOrd for OrderedProxy<T> {
-    fn partial_cmp(&self, other: &OrderedProxy<T>) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<T: Clone + Default + PartialEq + Ord> Ord for OrderedProxy<T> {
-    fn cmp(&self, other: &OrderedProxy<T>) -> Ordering {
-        if let Some(ord) = self.index.partial_cmp(&other.index) {
-            ord
-        } else {
-            match (self.index.is_nan(), other.index.is_nan()) {
-                (true, true) => Ordering::Equal,
-                (true, false) => Ordering::Greater,
-                (false, true) => Ordering::Less,
-                (false, false) => unreachable!(),
-            }
-        }
-    }
-}
-
-impl<T: Clone + Default + Sized + Ord> OrderedProxy<T> {
-    pub fn new(body: T, index: f64) -> Self {
-        OrderedProxy { index, body }
-    }
-    /// TODO: just use std::cmp::Reverse?
-    pub fn new_invert(body: T, rindex: f64) -> Self {
-        OrderedProxy {
-            index: -rindex,
-            body,
-        }
-    }
-    pub fn to(&self) -> T {
-        self.body.clone()
-    }
-    pub fn value(&self) -> f64 {
-        self.index
     }
 }
 

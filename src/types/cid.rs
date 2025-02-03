@@ -1,12 +1,17 @@
-use {
-    super::ClauseId,
-    std::{fmt, num::NonZeroU32},
-};
+use std::{fmt, num::NonZeroU32};
 
 /// API for Clause Id.
 pub trait ClauseIdIF {
     /// return `true` if a given clause id is made from a `Lit`.
     fn is_lifted_lit(&self) -> bool;
+}
+
+/// Clause identifier, or clause index, starting with one.
+/// Note: ids are re-used after 'garbage collection'.
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ClauseId {
+    /// a sequence number.
+    pub ordinal: NonZeroU32,
 }
 
 impl Default for ClauseId {

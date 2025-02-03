@@ -1,7 +1,6 @@
 use {
     super::{
         binary::{BinaryLinkIF, BinaryLinkList},
-        clause::{Clause, ClauseIF},
         ema::ProgressLBD,
         property,
         watch_cache::*,

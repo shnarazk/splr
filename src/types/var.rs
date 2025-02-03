@@ -1,7 +1,7 @@
-/// Var struct and Database management API
+//! Var struct and Database management API
 use {
     // super::{heap::VarHeapIF, stack::AssignStack, AssignIF},
-    crate::types::*,
+    crate::types::{flags::FlagIF, flags::FlagVar, AssignReason, DecisionLevel},
     std::fmt,
 };
 

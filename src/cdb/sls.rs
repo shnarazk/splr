@@ -1,5 +1,6 @@
 /// Implementation of Stochastic Local Search
 use {
+    super::{Clause, ClauseDB, VarId},
     crate::{assign::AssignIF, types::*},
     std::collections::HashMap,
 };

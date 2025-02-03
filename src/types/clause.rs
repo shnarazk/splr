@@ -11,7 +11,7 @@ use {
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct Clause {
     /// The literals in a clause.
-    pub(super) lits: Vec<Lit>,
+    pub(crate) lits: Vec<Lit>,
     /// Flags (8 bits)
     pub(crate) flags: FlagClause,
     /// A static clause evaluation criterion like LBD, NDD, or something.
