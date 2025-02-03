@@ -62,6 +62,8 @@ pub mod solver;
 pub mod state;
 /// Module `types` provides various building blocks, including some common traits.
 pub mod types;
+/// Module `var_vector` provides a static mut vector of vars.
+pub mod var_vector;
 
 pub use {
     config::Config,
