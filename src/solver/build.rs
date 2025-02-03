@@ -5,6 +5,7 @@ use {
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
+        var_vector::*,
     },
 };
 
@@ -117,6 +118,7 @@ impl Instantiate for Solver {
     /// let s = Solver::instantiate(&Config::default(), &CNFDescription::default());
     ///```
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Solver {
+        VarRef(cnf.num_of_variables).initialize();
         Solver {
             asg: AssignStack::instantiate(config, cnf),
             cdb: ClauseDB::instantiate(config, cnf),

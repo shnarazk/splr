@@ -15,13 +15,17 @@ pub trait VarRefIF {
     fn set_reason_saved(&self, value: AssignReason);
     fn reward(&self) -> f64;
     fn set_reward(&self, value: f64);
+    fn is(&self, f: FlagVar) -> bool;
+    fn turn_on(&self, f: FlagVar);
+    fn turn_off(&self, f: FlagVar);
+    fn set_flag(&self, f: FlagVar, b: bool);
 }
-pub struct VarRef(usize);
+pub struct VarRef(pub usize);
 
 impl VarRefIF for VarRef {
     fn initialize(&self) {
         unsafe {
-            VAR_VECTOR.truncate(self.0);
+            VAR_VECTOR.resize(self.0 + 1, Var::default());
         }
     }
     fn assign(&self) -> Option<bool> {
@@ -62,6 +66,24 @@ impl VarRefIF for VarRef {
     fn set_reward(&self, value: f64) {
         unsafe {
             VAR_VECTOR[self.0].reward = value;
+        }
+    }
+    fn is(&self, f: FlagVar) -> bool {
+        unsafe { VAR_VECTOR[self.0].flags.contains(f) }
+    }
+    fn turn_on(&self, f: FlagVar) {
+        unsafe {
+            VAR_VECTOR[self.0].flags.insert(f);
+        }
+    }
+    fn turn_off(&self, f: FlagVar) {
+        unsafe {
+            VAR_VECTOR[self.0].flags.remove(f);
+        }
+    }
+    fn set_flag(&self, f: FlagVar, b: bool) {
+        unsafe {
+            VAR_VECTOR[self.0].flags.set(f, b);
         }
     }
 }
