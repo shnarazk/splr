@@ -23,14 +23,14 @@ use std::{fs::File, io::Write, path::Path};
 #[derive(Clone, Debug)]
 pub struct ClauseDB {
     /// container of clauses
-    pub(super) clause: Vec<Clause>,
+    pub(crate) clause: Vec<Clause>,
     /// hashed representation of binary clauses.
     ///## Note
     /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
     ///
     binary_link: BinaryLinkDB,
     /// container of watch literals
-    pub(super) watch_cache: Vec<WatchCache>,
+    pub(crate) watch_cache: Vec<WatchCache>,
     /// collected free clause ids.
     freelist: Vec<ClauseId>,
     /// see unsat_certificate.rs
@@ -44,7 +44,7 @@ pub struct ClauseDB {
 
     // bi-clause completion
     bi_clause_completion_queue: Vec<Lit>,
-    pub(super) num_bi_clause_completion: usize,
+    pub(crate) num_bi_clause_completion: usize,
 
     //
     //## clause rewarding
@@ -62,30 +62,30 @@ pub struct ClauseDB {
     //
     /// a working buffer for LBD calculation
     lbd_temp: Vec<usize>,
-    pub(super) lbd: ProgressLBD,
+    pub(crate) lbd: ProgressLBD,
 
     //
     //## statistics
     //
     /// the number of active (not DEAD) clauses.
-    pub(super) num_clause: usize,
+    pub(crate) num_clause: usize,
     /// the number of binary clauses.
-    pub(super) num_bi_clause: usize,
+    pub(crate) num_bi_clause: usize,
     /// the number of binary learnt clauses.
-    pub(super) num_bi_learnt: usize,
+    pub(crate) num_bi_learnt: usize,
     /// the number of clauses which LBDs are 2.
-    pub(super) num_lbd2: usize,
+    pub(crate) num_lbd2: usize,
     /// the present number of learnt clauses.
-    pub(super) num_learnt: usize,
+    pub(crate) num_learnt: usize,
     /// the number of reductions.
-    pub(super) num_reduction: usize,
+    pub(crate) num_reduction: usize,
     /// the number of reregistration of a bi-clause
-    pub(super) num_reregistration: usize,
+    pub(crate) num_reregistration: usize,
     /// Literal Block Entanglement
     /// EMA of LBD of clauses used in conflict analysis (dependency graph)
-    pub(super) lb_entanglement: Ema2,
+    pub(crate) lb_entanglement: Ema2,
     /// cutoff value used in the last `reduce`
-    pub(super) reduction_threshold: f64,
+    pub(crate) reduction_threshold: f64,
 
     //
     //## incremental solving
