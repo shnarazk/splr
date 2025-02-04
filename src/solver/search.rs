@@ -10,6 +10,7 @@ use {
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
         types::*,
+        var_vector::*,
     },
 };
 
@@ -96,7 +97,7 @@ impl SolveIF for Solver {
                 state.flush("phasing...");
                 elim.prepare(asg, cdb, true);
                 for vi in 1..=asg.num_vars {
-                    if asg.assign(vi).is_some() {
+                    if VarRef(vi).assign().is_some() {
                         continue;
                     }
                     if let Some((p, m)) = elim.stats(vi) {
@@ -118,7 +119,7 @@ impl SolveIF for Solver {
                                 return Ok(Certificate::UNSAT);
                             }
                         }
-                        asg.var_mut(vi).set(FlagVar::PHASE, m < p);
+                        VarRef(vi).set_flag(FlagVar::PHASE, m < p);
                         elim.enqueue_var(asg, vi, false);
                     }
                 }
@@ -137,20 +138,20 @@ impl SolveIF for Solver {
                         return Ok(Certificate::UNSAT);
                     }
                     for vi in 1..=asg.num_vars {
-                        if asg.assign(vi).is_some() || asg.var(vi).is(FlagVar::ELIMINATED) {
+                        if VarRef(vi).assign().is_some() || VarRef(vi).is(FlagVar::ELIMINATED) {
                             continue;
                         }
                         match elim.stats(vi) {
                             Some((_, 0)) => (),
                             Some((0, _)) => (),
-                            Some((p, m)) if m * 10 < p => asg.var_mut(vi).turn_on(FlagVar::PHASE),
-                            Some((p, m)) if p * 10 < m => asg.var_mut(vi).turn_off(FlagVar::PHASE),
+                            Some((p, m)) if m * 10 < p => VarRef(vi).turn_on(FlagVar::PHASE),
+                            Some((p, m)) if p * 10 < m => VarRef(vi).turn_off(FlagVar::PHASE),
                             _ => (),
                         }
                     }
                     let act = 1.0 / (asg.num_vars as f64).powf(0.25);
-                    for vi in 1..asg.num_vars {
-                        if !asg.var(vi).is(FlagVar::ELIMINATED) {
+                    for vi in 1..=asg.num_vars {
+                        if !VarRef(vi).is(FlagVar::ELIMINATED) {
                             asg.set_activity(vi, act);
                         }
                     }
@@ -191,17 +192,14 @@ impl SolveIF for Solver {
                 }
 
                 // map `Option<bool>` to `i32`, and remove the dummy var at the head.
-                let vals = asg
-                    .var_iter()
-                    .enumerate()
-                    .skip(1)
-                    .map(|(vi, _)| i32::from(Lit::from((vi, model[vi].unwrap()))))
+                let vals = (1..=asg.num_vars)
+                    .map(|vi| i32::from(Lit::from((vi, model[vi].unwrap()))))
                     .collect::<Vec<i32>>();
 
                 // As a preparation for incremental solving, turn flags off.
-                for v in asg.var_iter_mut().skip(1) {
-                    if v.is(FlagVar::ELIMINATED) {
-                        v.turn_off(FlagVar::ELIMINATED);
+                for vi in 1..=asg.num_vars {
+                    if VarRef(vi).is(FlagVar::ELIMINATED) {
+                        VarRef(vi).turn_off(FlagVar::ELIMINATED);
                     }
                 }
                 RESTART!(asg, cdb, state);

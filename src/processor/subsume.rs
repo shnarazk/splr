@@ -1,7 +1,7 @@
 /// Module `eliminator` implements clause subsumption and var elimination.
 use {
     super::{EliminateIF, Eliminator},
-    crate::{assign::AssignIF, cdb::ClauseDBIF, types::*},
+    crate::{assign::AssignIF, cdb::ClauseDBIF, types::*, var_vector::*},
 };
 
 #[derive(Clone, Eq, Debug, Ord, PartialEq, PartialOrd)]
@@ -115,7 +115,10 @@ fn strengthen_clause(
             match asg.assigned(l0) {
                 None => asg.assign_at_root_level(l0),
                 Some(true) => Ok(()),
-                Some(false) => Err(SolverError::RootLevelConflict((l0, asg.reason(l0.vi())))),
+                Some(false) => Err(SolverError::RootLevelConflict((
+                    l0,
+                    VarRef(l0.vi()).reason(), /* asg.reason(l0.vi()) */
+                ))),
             }
         }
         RefClause::Dead | RefClause::EmptyClause => unreachable!("strengthen_clause"),

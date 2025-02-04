@@ -5,6 +5,7 @@ use crate::{
     cdb::{clause::ClauseIF, ClauseDB, ClauseDBIF},
     state::{Stat, State, StateIF},
     types::*,
+    var_vector::*,
 };
 
 const VIVIFY_LIMIT: usize = 80_000;
@@ -253,7 +254,7 @@ impl AssignStack {
             assumes
                 .iter()
                 .filter(|l| all.contains(&!**l))
-                .map(|l| self.reason(l.vi()))
+                .map(|l| VarRef(l.vi()).reason())
                 .collect::<Vec<_>>(),
             // am.iter().filter(|l| am.contains(&!**l)).collect::<Vec<_>>(),
         );
@@ -273,7 +274,7 @@ impl AssignStack {
                 // Thus we must negate the literals.
                 learnt.push(!*l);
             }
-            match self.reason(l.vi()) {
+            match VarRef(l.vi()).reason() {
                 AssignReason::Decision(_) => (),
                 AssignReason::BinaryLink(bil) => {
                     seen[bil.vi()] = key;

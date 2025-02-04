@@ -6,7 +6,7 @@ use {
         watch_cache::*,
         BinaryLinkDB, CertificationStore, ClauseDBIF, ClauseId, ReductionType, RefClause,
     },
-    crate::{assign::AssignIF, types::*},
+    crate::{assign::AssignIF, types::*, var_vector::*},
     std::{
         num::NonZeroU32,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -823,7 +823,7 @@ impl ClauseDBIF for ClauseDB {
         // firstly sweep without consuming extra memory
         let mut need_to_shrink = false;
         for l in self[cid].iter() {
-            debug_assert!(!asg.var(l.vi()).is(FlagVar::ELIMINATED));
+            debug_assert!(!VarRef(l.vi()).is(FlagVar::ELIMINATED));
             match asg.assigned(*l) {
                 Some(true) => {
                     self.remove_clause(cid);
@@ -832,7 +832,7 @@ impl ClauseDBIF for ClauseDB {
                 Some(false) => {
                     need_to_shrink = true;
                 }
-                None if asg.var(l.vi()).is(FlagVar::ELIMINATED) => {
+                None if VarRef(l.vi()).is(FlagVar::ELIMINATED) => {
                     need_to_shrink = true;
                 }
                 None => (),
@@ -855,7 +855,7 @@ impl ClauseDBIF for ClauseDB {
         let mut new_lits = c
             .lits
             .iter()
-            .filter(|l| asg.assigned(**l).is_none() && !asg.var(l.vi()).is(FlagVar::ELIMINATED))
+            .filter(|l| asg.assigned(**l).is_none() && !VarRef(l.vi()).is(FlagVar::ELIMINATED))
             .copied()
             .collect::<Vec<_>>();
         match new_lits.len() {
@@ -1050,12 +1050,12 @@ impl ClauseDBIF for ClauseDB {
 
             // There's no clause stored in `reason` because the decision level is 'zero.'
             debug_assert_ne!(
-                asg.reason(c.lit0().vi()),
+                VarRef(c.lit0().vi()).reason(),
                 AssignReason::Implication(ClauseId::from(i)),
                 "Lit {} {:?} level {}, dl: {}",
                 i32::from(c.lit0()),
                 asg.assigned(c.lit0()),
-                asg.level(c.lit0().vi()),
+                VarRef(c.lit0().vi()).level(),
                 asg.decision_level(),
             );
             if !c.is(FlagClause::LEARNT) {
@@ -1261,8 +1261,8 @@ impl ClauseDBIF for ClauseDB {
     fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path) {
         let nv = asg.derefer(crate::assign::property::Tusize::NumVar);
         for vi in 1..nv {
-            if asg.var(vi).is(FlagVar::ELIMINATED) && asg.assign(vi).is_some() {
-                panic!("conflicting var {} {:?}", vi, asg.assign(vi));
+            if VarRef(vi).is(FlagVar::ELIMINATED) && VarRef(vi).assign().is_some() {
+                panic!("conflicting var {} {:?}", vi, VarRef(vi).assign());
             }
         }
         let Ok(out) = File::create(fname) else {

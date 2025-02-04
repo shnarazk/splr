@@ -3,7 +3,7 @@
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
     super::{heap::VarHeapIF, AssignStack, PropagateIF, VarManipulateIF},
-    crate::{cdb::ClauseDBIF, types::*},
+    crate::{cdb::ClauseDBIF, types::*, var_vector::*},
 };
 
 #[cfg(feature = "chrono_BT")]
@@ -24,7 +24,7 @@ impl TrailSavingIF for AssignStack {
         self.clear_saved_trail();
         if 2 <= dl {
             let lim2 = self.trail_lim[dl - 2];
-            let activity_threshold = self.var[self.trail[lim2].vi()].reward;
+            let activity_threshold = VarRef(self.trail[lim2].vi()).reward() /* self.var[self.trail[lim2].vi()].reward */;
             for i in (lim..lim2).rev() {
                 let l = self.trail[i];
                 let vi = l.vi();
@@ -39,9 +39,12 @@ impl TrailSavingIF for AssignStack {
                 // }
 
                 self.trail_saved.push(l);
-                self.var[vi].reason_saved = self.var[vi].reason;
+                // self.var[vi].reason_saved = self.var[vi].reason;
+                VarRef(vi).set_reason_saved(VarRef(vi).reason());
                 self.reward_at_unassign(vi);
-                if activity_threshold <= self.var[vi].reward {
+                if activity_threshold <= VarRef(vi).reward()
+                /* self.var[vi].reward */
+                {
                     self.insert_heap(vi);
                 }
             }
@@ -63,7 +66,7 @@ impl TrailSavingIF for AssignStack {
         for i in (0..self.trail_saved.len()).rev() {
             let lit = self.trail_saved[i];
             let vi = lit.vi();
-            let old_reason = self.var[vi].reason_saved;
+            let old_reason = VarRef(vi).reason_saved() /* self.var[vi].reason_saved */;
             match (self.assigned(lit), old_reason) {
                 (Some(true), _) => (),
                 (None, AssignReason::BinaryLink(link)) => {

@@ -73,6 +73,23 @@ impl Var {
     pub fn activity(&self) -> f64 {
         self.reward
     }
+    pub fn update_activity(&mut self, decay: f64, reward: f64) -> f64 {
+        // Note: why the condition can be broken.
+        //
+        // 1. asg.ordinal += 1;
+        // 1. handle_conflict -> cancel_until -> reward_at_unassign
+        // 1. assign_by_implication -> v.timestamp = asg.ordinal
+        // 1. restart
+        // 1. cancel_until -> reward_at_unassign -> assertion failed
+        //
+        self.reward *= decay;
+        if self.is(FlagVar::USED) {
+            self.reward += reward;
+            self.turn_off(FlagVar::USED);
+        }
+        // self.reward_ema.update(self.reward);
+        self.reward
+    }
 }
 
 impl FlagIF for Var {

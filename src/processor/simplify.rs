@@ -9,6 +9,7 @@ use {
         cdb::{self, ClauseDBIF},
         state::{self, State, StateIF},
         types::*,
+        var_vector::*,
     },
     std::{
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -239,7 +240,7 @@ impl EliminateIF for Eliminator {
         }
         if force {
             for vi in 1..=asg.derefer(assign::property::Tusize::NumVar) {
-                if asg.var(vi).is(FlagVar::ELIMINATED) || asg.assign(vi).is_some() {
+                if VarRef(vi).is(FlagVar::ELIMINATED) || VarRef(vi).assign().is_some() {
                     continue;
                 }
                 self.enqueue_var(asg, vi, true);
@@ -247,13 +248,13 @@ impl EliminateIF for Eliminator {
         }
         debug_assert_eq!(self.mode, EliminatorMode::Running);
     }
-    fn enqueue_var(&mut self, asg: &mut impl AssignIF, vi: VarId, upward: bool) {
+    fn enqueue_var(&mut self, _asg: &mut impl AssignIF, vi: VarId, upward: bool) {
         if self.mode != EliminatorMode::Running {
             return;
         }
         let w = &mut self[vi];
-        if !asg.var(vi).is(FlagVar::ENQUEUED) && w.activity() < self.eliminate_occurrence_limit {
-            asg.var_mut(vi).turn_on(FlagVar::ENQUEUED);
+        if !VarRef(vi).is(FlagVar::ENQUEUED) && w.activity() < self.eliminate_occurrence_limit {
+            VarRef(vi).turn_on(FlagVar::ENQUEUED);
             self.var_queue.insert(&self.var, vi, upward);
         }
     }
@@ -336,25 +337,24 @@ impl Eliminator {
         let mut checked: Vec<VarId> = Vec::new();
         for l in c.iter() {
             let vi = l.vi();
-            let v = &mut asg.var_mut(vi);
             debug_assert!(
                 !checked.contains(&vi),
                 "eliminator::add_cid_occur356: {c:?}"
             );
             checked.push(vi);
-            let w = &mut self[l.vi()];
+            let w = &mut self[vi];
             let pl = w.pos_occurs.len();
             let nl = w.neg_occurs.len();
             if evo < pl * nl {
                 w.aborted = true;
                 continue;
             }
-            if !v.is(FlagVar::ELIMINATED) {
+            if !VarRef(vi).is(FlagVar::ELIMINATED) {
                 if bool::from(*l) {
                     debug_assert!(
                         !w.pos_occurs.contains(&cid),
                         "elim.add_cid_occur for {:?} found a strange positive clause{}{}, {:?}",
-                        v,
+                        vi,
                         cid,
                         c,
                         w.pos_occurs,
@@ -364,7 +364,7 @@ impl Eliminator {
                     debug_assert!(
                         !w.neg_occurs.contains(&cid),
                         "elim.add_cid_occur for {:?} found a strange negative clause{}{}, {:?}",
-                        v,
+                        vi,
                         cid,
                         c,
                         w.pos_occurs,
@@ -386,7 +386,7 @@ impl Eliminator {
         debug_assert!(!c.is_dead());
         c.turn_off(FlagClause::OCCUR_LINKED);
         for l in c.iter() {
-            if asg.assign(l.vi()).is_none() {
+            if VarRef(l.vi()).assign().is_none() {
                 self.remove_lit_occur(asg, *l, cid);
                 self.enqueue_var(asg, l.vi(), true);
             }
@@ -435,7 +435,7 @@ impl Eliminator {
                 }
                 let best: VarId = if cid.is_lifted_lit() {
                     let vi = Lit::from(cid).vi();
-                    debug_assert!(!asg.var(vi).is(FlagVar::ELIMINATED));
+                    debug_assert!(!VarRef(vi).is(FlagVar::ELIMINATED));
                     vi
                 } else {
                     let mut tmp = cdb.derefer(cdb::property::Tusize::NumClause);
@@ -449,9 +449,8 @@ impl Eliminator {
                     // so searching the shortest occurs is most efficient.
                     let mut b = 0;
                     for l in c.iter() {
-                        let v = &asg.var(l.vi());
                         let w = &self[l.vi()];
-                        if asg.assign(l.vi()).is_some() || w.aborted {
+                        if VarRef(l.vi()).assign().is_some() || w.aborted {
                             continue;
                         }
                         let num_sum = if bool::from(*l) {
@@ -459,14 +458,14 @@ impl Eliminator {
                         } else {
                             w.pos_occurs.len()
                         };
-                        if !v.is(FlagVar::ELIMINATED) && num_sum < tmp {
+                        if !VarRef(l.vi()).is(FlagVar::ELIMINATED) && num_sum < tmp {
                             b = l.vi();
                             tmp = num_sum;
                         }
                     }
                     b
                 };
-                if best == 0 || asg.var(best).is(FlagVar::ELIMINATED) {
+                if best == 0 || VarRef(best).is(FlagVar::ELIMINATED) {
                     continue;
                 }
                 self[best].pos_occurs.retain(|cid| !cdb[*cid].is_dead());
@@ -557,9 +556,8 @@ impl Eliminator {
                 self.backward_subsumption_check(asg, cdb, &mut timedout)?;
             }
             while let Some(vi) = self.var_queue.select_var(&self.var, asg) {
-                let v = asg.var_mut(vi);
-                v.turn_off(FlagVar::ENQUEUED);
-                if !v.is(FlagVar::ELIMINATED) && asg.assign(vi).is_none() {
+                VarRef(vi).turn_off(FlagVar::ENQUEUED);
+                if !VarRef(vi).is(FlagVar::ELIMINATED) && VarRef(vi).assign().is_none() {
                     eliminate_var(asg, cdb, self, state, vi, &mut timedout)?;
                 }
             }

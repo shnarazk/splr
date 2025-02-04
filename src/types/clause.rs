@@ -1,5 +1,5 @@
 use {
-    crate::{assign::AssignIF, types::*},
+    crate::{assign::AssignIF, types::*, var_vector::*},
     std::{
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -289,7 +289,7 @@ impl fmt::Display for Clause {
 impl Clause {
     /// update rank field with the present LBD.
     // If it's big enough, skip the loop.
-    pub fn update_lbd(&mut self, asg: &impl AssignIF, lbd_temp: &mut [usize]) -> usize {
+    pub fn update_lbd(&mut self, _asg: &impl AssignIF, lbd_temp: &mut [usize]) -> usize {
         if 8192 <= self.lits.len() {
             self.rank = u16::MAX;
             return u16::MAX as usize;
@@ -298,7 +298,7 @@ impl Clause {
         lbd_temp[0] = key;
         let mut cnt = 0;
         for l in &self.lits {
-            let lv = asg.level(l.vi());
+            let lv = VarRef(l.vi()).level() /* asg.level(l.vi()) */;
             if lv == 0 {
                 continue;
             }

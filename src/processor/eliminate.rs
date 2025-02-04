@@ -1,7 +1,10 @@
 /// Module `eliminator` implements clause subsumption and var elimination.
 use {
     super::Eliminator,
-    crate::{assign::AssignIF, cdb::ClauseDBIF, solver::SolverEvent, state::State, types::*},
+    crate::{
+        assign::AssignIF, cdb::ClauseDBIF, solver::SolverEvent, state::State, types::*,
+        var_vector::*,
+    },
 };
 
 // Stop elimination if a generated resolvent is larger than this
@@ -15,12 +18,11 @@ pub fn eliminate_var(
     vi: VarId,
     timedout: &mut usize,
 ) -> MaybeInconsistent {
-    let v = &mut asg.var(vi);
     let w = &mut elim.var[vi];
-    if asg.assign(vi).is_some() || w.aborted {
+    if VarRef(vi).assign().is_some() || w.aborted {
         return Ok(());
     }
-    debug_assert!(!v.is(FlagVar::ELIMINATED));
+    debug_assert!(!VarRef(vi).is(FlagVar::ELIMINATED));
     // count only alive clauses
     // Note: it may contain the target literal somehow. So the following may be failed.
     // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, true)))));
@@ -78,7 +80,7 @@ pub fn eliminate_var(
                         Some(false) => {
                             return Err(SolverError::RootLevelConflict((
                                 lit,
-                                asg.reason(lit.vi()),
+                                VarRef(lit.vi()).reason(),
                             )));
                         }
                         None => {
@@ -178,7 +180,7 @@ fn skip_var_elimination(
 /// - `(false, -)` if one of the clauses is always satisfied.
 /// - `(true, n)` if they are merge-able to a n-literal clause.
 fn merge_cost(
-    asg: &impl AssignIF,
+    _asg: &impl AssignIF,
     cdb: &impl ClauseDBIF,
     cp: ClauseId,
     cq: ClauseId,
@@ -195,12 +197,12 @@ fn merge_cost(
             cond = Some(*lit);
             continue;
         }
-        debug_assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
+        debug_assert!(!VarRef(lit.vi()).is(FlagVar::ELIMINATED));
         // if this is the last occurrence of this literal, count it.
         for l in c_q.iter() {
             if !*lit == *l {
                 return Some(0);
-            } else if *lit == *l || asg.var(l.vi()).is(FlagVar::ELIMINATED) {
+            } else if *lit == *l || VarRef(l.vi()).is(FlagVar::ELIMINATED) {
                 continue 'next_lit;
             }
         }
@@ -216,7 +218,7 @@ fn merge_cost(
                 return None;
             }
         }
-        debug_assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
+        debug_assert!(!VarRef(lit.vi()).is(FlagVar::ELIMINATED));
         count += 1;
     }
     cond2.map(|_| count)
@@ -225,7 +227,7 @@ fn merge_cost(
 /// Return the real length of the generated clause by merging two clauses.
 /// Return **zero** if one of the clauses is always satisfied. (merge_vec should not be used.)
 fn merge(
-    asg: &mut impl AssignIF,
+    _asg: &mut impl AssignIF,
     cdb: &mut impl ClauseDBIF,
     cip: ClauseId,
     ciq: ClauseId,
@@ -256,7 +258,7 @@ fn merge(
             .collect::<Vec<_>>(),
     );
     std::mem::swap(&mut lits, vec);
-    debug_assert!(vec.iter().all(|l| !asg.var(l.vi()).is(FlagVar::ELIMINATED)));
+    debug_assert!(vec.iter().all(|l| !VarRef(l.vi()).is(FlagVar::ELIMINATED)));
     debug_assert!(vec.iter().all(|l| l.vi() != vi));
     vec.len()
 }
@@ -320,7 +322,7 @@ fn make_eliminated_clause(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{assign::VarManipulateIF, cdb::ClauseDB, processor::EliminateIF, solver::Solver};
+    use crate::{cdb::ClauseDB, processor::EliminateIF, solver::Solver};
     use ::std::path::Path;
 
     impl Clause {
@@ -357,7 +359,7 @@ mod tests {
         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
         elim.prepare(asg, cdb, true);
         eliminate_var(asg, cdb, &mut elim, state, vi, &mut timedout).expect("panic");
-        assert!(asg.var(vi).is(FlagVar::ELIMINATED));
+        assert!(VarRef(vi).is(FlagVar::ELIMINATED));
         assert!(cdb
             .iter()
             .skip(1)
