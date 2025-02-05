@@ -155,9 +155,10 @@ impl PropagateIF for AssignStack {
         }
     }
     fn assign_by_decision(&mut self, l: Lit) {
-        debug_assert!(
+        debug_assert_ne!(
             // var_assign!(self, l.vi()) == Some(bool::from(l)) || var_assign!(self, l.vi()).is_none()
-            VarRef(l.vi()).assign() != Some(!bool::from(l))
+            VarRef(l.vi()).assign(),
+            Some(!bool::from(l))
         );
         // debug_assert!(l.vi() < self.var.len());
         debug_assert!(!self.trail.contains(&l));

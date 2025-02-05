@@ -28,13 +28,13 @@ pub trait SatSolverIF: Instantiate {
     /// # Example
     ///
     /// ```
-    /// use crate::splr::*;
+    /// use crate::splr::{*, var_vector::*};
     /// use crate::splr::assign::VarManipulateIF;    // for s.asg.assign()
     /// use std::path::Path;
     ///
     /// let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
     /// assert!(s.add_assignment(1).is_ok());
-    /// assert_eq!(s.asg.assign(1), Some(true));
+    /// assert_eq!(VarRef(1).assign(), Some(true));
     /// assert!(s.add_assignment(2).is_ok());
     /// assert!(s.add_assignment(3).is_ok());
     /// assert!(s.add_assignment(4).is_ok());
@@ -118,7 +118,7 @@ impl Instantiate for Solver {
     /// let s = Solver::instantiate(&Config::default(), &CNFDescription::default());
     ///```
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Solver {
-        VarRef(cnf.num_of_variables).initialize();
+        VarRef::initialize(cnf.num_of_variables);
         Solver {
             asg: AssignStack::instantiate(config, cnf),
             cdb: ClauseDB::instantiate(config, cnf),
@@ -220,6 +220,7 @@ impl SatSolverIF for Solver {
             ref mut state,
             ..
         } = self;
+        VarRef::add_var();
         asg.handle(SolverEvent::NewVar);
         cdb.handle(SolverEvent::NewVar);
         state.handle(SolverEvent::NewVar);

@@ -255,7 +255,10 @@ pub mod property {
 mod tests {
     use {
         super::*,
-        crate::assign::{AssignStack, PropagateIF},
+        crate::{
+            assign::{AssignStack, PropagateIF},
+            var_vector::*,
+        },
         std::num::NonZeroU32,
     };
 
@@ -283,12 +286,19 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
+        VarRef::initialize(4);
+        assert_eq!(VarRef(1).level(), 1);
+        assert_eq!(VarRef(4).level(), 4);
         let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         // Now `asg.level` = [_, 1, 2, 3, 4, 5, 6].
         let c0 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
             .as_cid();
+        assert_eq!(cdb[c0].len(), 4);
+        assert_eq!(cdb[c0].lit0().vi(), 1);
+        assert_eq!(VarRef(cdb[c0].lit0().vi()).level(), 1);
+        assert_eq!(VarRef(cdb[c0].lit0().vi()).assign(), None);
         assert_eq!(cdb[c0].rank, 4);
 
         asg.assign_by_decision(lit(-2)); // at level 1

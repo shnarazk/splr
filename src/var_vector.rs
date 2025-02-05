@@ -4,8 +4,6 @@ use crate::types::*;
 pub static mut VAR_VECTOR: Vec<Var> = Vec::new();
 
 pub trait VarRefIF {
-    fn initialize(&self);
-    fn add_var(&self);
     fn assign(&self) -> Option<bool>;
     fn assigned(&self, possitive: bool) -> Option<bool>;
     fn set_assign(&self, value: Option<bool>);
@@ -27,25 +25,29 @@ pub trait VarRefIF {
 pub struct VarRef(pub usize);
 
 impl VarRef {
+    pub fn initialize(num_vars: usize) {
+        unsafe {
+            VAR_VECTOR.clear(); // reqired for cargo test
+            VAR_VECTOR.resize(num_vars + 1, Var::default());
+            for (i, v) in VAR_VECTOR.iter_mut().enumerate().skip(1) {
+                v.level = i as DecisionLevel;
+            }
+        }
+    }
     pub fn var_id_iter() -> impl Iterator<Item = VarId> {
         unsafe { (1..VAR_VECTOR.len()).map(|i| i as VarId) }
     }
     pub fn num_vars(&self) -> usize {
         unsafe { VAR_VECTOR.len() - 1 }
     }
-}
-
-impl VarRefIF for VarRef {
-    fn initialize(&self) {
-        unsafe {
-            VAR_VECTOR.resize(self.0 + 1, Var::default());
-        }
-    }
-    fn add_var(&self) {
+    pub fn add_var() {
         unsafe {
             VAR_VECTOR.push(Var::default());
         }
     }
+}
+
+impl VarRefIF for VarRef {
     #[inline]
     fn assign(&self) -> Option<bool> {
         unsafe { VAR_VECTOR.get_unchecked(self.0).assign }
@@ -143,6 +145,6 @@ mod tests {
 
     #[test]
     fn proof_of_concept_of_static_mut() {
-        VarRef(10).initialize();
+        VarRef::initialize(10);
     }
 }

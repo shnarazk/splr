@@ -211,7 +211,6 @@ impl Instantiate for AssignStack {
                 self.expand_heap();
                 self.num_vars += 1;
                 // self.var.push(Var::default());
-                VarRef(0).add_var();
             }
             SolverEvent::Reinitialize => {
                 self.cancel_until(self.root_level);
@@ -394,6 +393,7 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
+        VarRef::initialize(4);
         let mut asg = AssignStack::instantiate(&config, &cnf);
         // [] + 1 => [1]
         assert!(asg.assign_at_root_level(lit(1)).is_ok());
