@@ -111,7 +111,7 @@ pub struct Eliminator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{processor::EliminateIF, solver::Solver, var_vector::*};
+    use crate::{solver::Solver, var_vector::*};
     use std::path::Path;
 
     #[test]
