@@ -1,5 +1,5 @@
 use {
-    crate::{assign::AssignIF, types::*, var_vector::*},
+    crate::{types::*, var_vector::*},
     std::{
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -49,7 +49,7 @@ pub trait ClauseIF {
     /// return `true` if the clause contains the literal
     fn contains(&self, lit: Lit) -> bool;
     /// check clause satisfiability
-    fn is_satisfied_under(&self, asg: &impl AssignIF) -> bool;
+    fn is_satisfied_under(&self) -> bool;
     /// return an iterator over its literals.
     fn iter(&self) -> Iter<'_, Lit>;
     /// return the number of literals.
@@ -213,9 +213,9 @@ impl ClauseIF for Clause {
     fn contains(&self, lit: Lit) -> bool {
         self.lits.contains(&lit)
     }
-    fn is_satisfied_under(&self, asg: &impl AssignIF) -> bool {
+    fn is_satisfied_under(&self) -> bool {
         for l in self.lits.iter() {
-            if asg.assigned(*l) == Some(true) {
+            if VarRef::assigned(*l) == Some(true) {
                 return true;
             }
         }
@@ -289,7 +289,7 @@ impl fmt::Display for Clause {
 impl Clause {
     /// update rank field with the present LBD.
     // If it's big enough, skip the loop.
-    pub fn update_lbd(&mut self, _asg: &impl AssignIF, lbd_temp: &mut [usize]) -> usize {
+    pub fn update_lbd(&mut self, lbd_temp: &mut [usize]) -> usize {
         if 8192 <= self.lits.len() {
             self.rank = u16::MAX;
             return u16::MAX as usize;

@@ -30,7 +30,7 @@ impl Eliminator {
                 if !cdb[did].is(FlagClause::LEARNT) {
                     cdb[cid].turn_off(FlagClause::LEARNT);
                 }
-                self.remove_cid_occur(asg, did, &mut cdb[did]);
+                self.remove_cid_occur(did, &mut cdb[did]);
                 cdb.remove_clause(did);
                 self.num_subsumed += 1;
             }
@@ -40,7 +40,7 @@ impl Eliminator {
                 #[cfg(feature = "trace_elimination")]
                 println!("BackSubC subsumes {} from {} and {}", l, cid, did);
                 strengthen_clause(asg, cdb, self, did, !l)?;
-                self.enqueue_var(asg, l.vi(), true);
+                self.enqueue_var(l.vi(), true);
             }
             Subsumable::None => (),
         }
@@ -100,19 +100,19 @@ fn strengthen_clause(
             println!("cid {} drops literal {}", cid, l);
 
             elim.enqueue_clause(cid, &mut cdb[cid]);
-            elim.remove_lit_occur(asg, l, cid);
+            elim.remove_lit_occur(l, cid);
             Ok(())
         }
         RefClause::RegisteredClause(_) => {
-            elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
+            elim.remove_cid_occur(cid, &mut cdb[cid]);
             cdb.remove_clause(cid);
             Ok(())
         }
         RefClause::UnitClause(l0) => {
             cdb.certificate_add_assertion(l0);
-            elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
+            elim.remove_cid_occur(cid, &mut cdb[cid]);
             cdb.remove_clause(cid);
-            match asg.assigned(l0) {
+            match VarRef::assigned(l0) {
                 None => asg.assign_at_root_level(l0),
                 Some(true) => Ok(()),
                 Some(false) => Err(SolverError::RootLevelConflict((

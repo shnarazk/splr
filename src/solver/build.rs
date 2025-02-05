@@ -2,7 +2,7 @@
 use {
     super::{Certificate, Solver, SolverEvent, SolverResult, State, StateIF},
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
+        assign::{AssignIF, AssignStack, PropagateIF},
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
         var_vector::*,
@@ -181,7 +181,7 @@ impl SatSolverIF for Solver {
         }
         let lit = Lit::from(val);
         self.cdb.certificate_add_assertion(lit);
-        match self.asg.assigned(lit) {
+        match VarRef::assigned(lit) {
             None => self.asg.assign_at_root_level(lit).map(|_| self),
             Some(true) => Ok(self),
             Some(false) => Err(SolverError::RootLevelConflict((
@@ -270,7 +270,7 @@ impl Solver {
         let mut l_: Option<Lit> = None; // last literal; [x, x.negate()] means tautology.
         for i in 0..lits.len() {
             let li = lits[i];
-            let sat = asg.assigned(li);
+            let sat = VarRef::assigned(li);
             if sat == Some(true) || Some(!li) == l_ {
                 return RefClause::Dead;
             } else if sat != Some(false) && Some(li) != l_ {
@@ -288,7 +288,7 @@ impl Solver {
                 asg.assign_at_root_level(l0)
                     .map_or(RefClause::EmptyClause, |_| RefClause::UnitClause(l0))
             }
-            _ => cdb.new_clause(asg, lits, false),
+            _ => cdb.new_clause(lits, false),
         }
     }
     #[cfg(not(feature = "no_IO"))]

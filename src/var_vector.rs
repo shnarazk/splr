@@ -5,7 +5,6 @@ pub static mut VAR_VECTOR: Vec<Var> = Vec::new();
 
 pub trait VarRefIF {
     fn assign(&self) -> Option<bool>;
-    fn assigned(&self, possitive: bool) -> Option<bool>;
     fn set_assign(&self, value: Option<bool>);
     fn level(&self) -> DecisionLevel;
     fn set_level(&self, value: DecisionLevel);
@@ -37,12 +36,23 @@ impl VarRef {
     pub fn var_id_iter() -> impl Iterator<Item = VarId> {
         unsafe { (1..VAR_VECTOR.len()).map(|i| i as VarId) }
     }
-    pub fn num_vars(&self) -> usize {
+    pub fn num_vars() -> usize {
         unsafe { VAR_VECTOR.len() - 1 }
     }
     pub fn add_var() {
         unsafe {
             VAR_VECTOR.push(Var::default());
+        }
+    }
+    #[inline]
+    pub fn assigned(lit: Lit) -> Option<bool> {
+        unsafe {
+            let vi = lit.vi();
+            let possitive = bool::from(lit);
+            match VAR_VECTOR.get_unchecked(vi).assign {
+                Some(b) if !possitive => Some(!b),
+                ob => ob,
+            }
         }
     }
 }
@@ -51,15 +61,6 @@ impl VarRefIF for VarRef {
     #[inline]
     fn assign(&self) -> Option<bool> {
         unsafe { VAR_VECTOR.get_unchecked(self.0).assign }
-    }
-    #[inline]
-    fn assigned(&self, possitive: bool) -> Option<bool> {
-        unsafe {
-            match VAR_VECTOR.get_unchecked(self.0).assign {
-                Some(b) if !possitive => Some(!b),
-                ob => ob,
-            }
-        }
     }
     #[inline]
     fn set_assign(&self, value: Option<bool>) {

@@ -1,7 +1,7 @@
 //! Vivification
 #![allow(dead_code)]
 use crate::{
-    assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
+    assign::{AssignIF, AssignStack, PropagateIF},
     cdb::{clause::ClauseIF, ClauseDB, ClauseDBIF},
     state::{Stat, State, StateIF},
     types::*,
@@ -69,7 +69,7 @@ impl VivifyIF for ClauseDB {
             let mut decisions: Vec<Lit> = Vec::new();
             for lit in clits.iter().copied() {
                 // assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
-                match asg.assigned(!lit) {
+                match VarRef::assigned(!lit) {
                     //## Rule 1
                     Some(false) => (),
                     //## Rule 2
@@ -139,7 +139,7 @@ impl VivifyIF for ClauseDB {
                                         self.set_activity(ci, cp.value());
                                     }
                                     #[cfg(not(feature = "clause_rewarding"))]
-                                    self.new_clause(asg, &mut vec, is_learnt);
+                                    self.new_clause(&mut vec, is_learnt);
                                     self.remove_clause(cid);
                                     num_shrink += 1;
                                 }

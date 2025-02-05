@@ -490,7 +490,7 @@ impl PropagateIF for AssignStack {
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
                             cdb[cid].search_from = (k + 1) as u16;
-                            debug_assert_ne!(self.assigned(new_watch), Some(true));
+                            debug_assert_ne!(VarRef::assigned(new_watch), Some(true));
                             check_in!(
                                 cid,
                                 Propagate::FindNewWatch(self.num_conflict, propagating, new_watch)
@@ -517,7 +517,7 @@ impl PropagateIF for AssignStack {
                     .unwrap_or(self.root_level);
 
                 debug_assert_eq!(cdb[cid].lit0(), cached);
-                debug_assert_eq!(self.assigned(cached), None);
+                debug_assert_eq!(VarRef::assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
                 self.assign_by_implication(
                     cached,
@@ -665,8 +665,8 @@ impl PropagateIF for AssignStack {
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
                             cdb[cid].search_from = (k as u16).saturating_add(1);
                             debug_assert!(
-                                self.assigned(!new_watch) == Some(true)
-                                    || self.assigned(!new_watch).is_none()
+                                VarRef::assigned(!new_watch) == Some(true)
+                                    || VarRef::assigned(!new_watch).is_none()
                             );
                             check_in!(
                                 cid,
@@ -700,7 +700,7 @@ impl PropagateIF for AssignStack {
                     .max()
                     .unwrap_or(self.root_level);
                 debug_assert_eq!(cdb[cid].lit0(), cached);
-                debug_assert_eq!(self.assigned(cached), None);
+                debug_assert_eq!(VarRef::assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
 
                 self.assign_by_implication(
@@ -740,8 +740,8 @@ impl PropagateIF for AssignStack {
 impl AssignStack {
     #[allow(dead_code)]
     fn check(&self, (b0, b1): (Lit, Lit)) {
-        assert_ne!(self.assigned(b0), Some(false));
-        assert_ne!(self.assigned(b1), Some(false));
+        assert_ne!(VarRef::assigned(b0), Some(false));
+        assert_ne!(VarRef::assigned(b1), Some(false));
     }
     /// simplify clauses by propagating literals at root level.
     fn propagate_at_root_level(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
@@ -756,13 +756,13 @@ impl AssignStack {
                 debug_assert!(cdb[cid]
                     .iter()
                     .all(|l| !VarRef(l.vi()).is(FlagVar::ELIMINATED)));
-                match cdb.transform_by_simplification(self, cid) {
+                match cdb.transform_by_simplification(cid) {
                     RefClause::Clause(_) => (),
                     RefClause::Dead => (), // was a satisfied clause
                     RefClause::EmptyClause => return Err(SolverError::EmptyClause),
                     RefClause::RegisteredClause(_) => (),
                     RefClause::UnitClause(lit) => {
-                        debug_assert!(self.assigned(lit).is_none());
+                        debug_assert!(VarRef::assigned(lit).is_none());
                         cdb.certificate_add_assertion(lit);
                         self.assign_at_root_level(lit)?;
                         cdb.remove_clause(cid);

@@ -2,7 +2,7 @@
 /// implement boolean constraint propagation, backjump
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{heap::VarHeapIF, AssignStack, PropagateIF, VarManipulateIF},
+    super::{heap::VarHeapIF, AssignStack, PropagateIF},
     crate::{cdb::ClauseDBIF, types::*, var_vector::*},
 };
 
@@ -67,11 +67,11 @@ impl TrailSavingIF for AssignStack {
             let lit = self.trail_saved[i];
             let vi = lit.vi();
             let old_reason = VarRef(vi).reason_saved() /* self.var[vi].reason_saved */;
-            match (self.assigned(lit), old_reason) {
+            match (VarRef::assigned(lit), old_reason) {
                 (Some(true), _) => (),
                 (None, AssignReason::BinaryLink(link)) => {
                     debug_assert_ne!(link.vi(), lit.vi());
-                    debug_assert_eq!(self.assigned(link), Some(true));
+                    debug_assert_eq!(VarRef::assigned(link), Some(true));
                     self.num_repropagation += 1;
 
                     self.assign_by_implication(
@@ -91,7 +91,7 @@ impl TrailSavingIF for AssignStack {
                     debug_assert!(cdb[cid]
                         .iter()
                         .skip(1)
-                        .all(|l| self.assigned(*l) == Some(false)));
+                        .all(|l| VarRef::assigned(*l) == Some(false)));
                     self.num_repropagation += 1;
 
                     self.assign_by_implication(
@@ -103,13 +103,13 @@ impl TrailSavingIF for AssignStack {
                 }
                 (Some(false), AssignReason::BinaryLink(link)) => {
                     debug_assert_ne!(link.vi(), lit.vi());
-                    debug_assert_eq!(self.assigned(link), Some(true));
+                    debug_assert_eq!(VarRef::assigned(link), Some(true));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_saved_trail();
                     return Err((lit, old_reason));
                 }
                 (Some(false), AssignReason::Implication(cid)) => {
-                    debug_assert!(cdb[cid].iter().all(|l| self.assigned(*l) == Some(false)));
+                    debug_assert!(cdb[cid].iter().all(|l| VarRef::assigned(*l) == Some(false)));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_saved_trail();
                     return Err((cdb[cid].lit0(), AssignReason::Implication(cid)));

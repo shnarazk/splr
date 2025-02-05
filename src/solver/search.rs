@@ -5,7 +5,7 @@ use {
         SolverResult,
     },
     crate::{
-        assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
+        assign::{self, AssignIF, AssignStack, PropagateIF, VarSelectIF},
         cdb::{self, ClauseDB, ClauseDBIF, ReductionType, VivifyIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
@@ -106,21 +106,21 @@ impl SolveIF for Solver {
                         // This becomes a problem in the case of incremental solving.
                         if m == 0 {
                             let l = Lit::from((vi, true));
-                            debug_assert!(asg.assigned(l).is_none());
+                            debug_assert!(VarRef::assigned(l).is_none());
                             cdb.certificate_add_assertion(l);
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
                         } else if p == 0 {
                             let l = Lit::from((vi, false));
-                            debug_assert!(asg.assigned(l).is_none());
+                            debug_assert!(VarRef::assigned(l).is_none());
                             cdb.certificate_add_assertion(l);
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
                         }
                         VarRef(vi).set_flag(FlagVar::PHASE, m < p);
-                        elim.enqueue_var(asg, vi, false);
+                        elim.enqueue_var(vi, false);
                     }
                 }
                 //
@@ -302,7 +302,7 @@ fn search(
                                     "SLS(#{}, core: {}, steps: {})",
                                     state.sls_index, sls_core, $limit
                                 ));
-                                let cls = cdb.stochastic_local_search(asg, &mut $assign, $limit);
+                                let cls = cdb.stochastic_local_search(&mut $assign, $limit);
                                 asg.override_rephasing_target(&$assign);
                                 sls_core = sls_core.min(cls.1);
                             };

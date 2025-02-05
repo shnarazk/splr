@@ -103,8 +103,8 @@ pub trait ClauseDBIF:
     /// Note this removes an eliminated Lit `p` from a clause. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
     /// And this is called only from `Eliminator::strengthen_clause`.
-    fn new_clause(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
-    fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>) -> RefClause;
+    fn new_clause(&mut self, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
+    fn new_clause_sandbox(&mut self, v: &mut Vec<Lit>) -> RefClause;
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn remove_clause(&mut self, cid: ClauseId);
     /// un-register a clause `cid` from clause database and make the clause dead.
@@ -114,7 +114,7 @@ pub trait ClauseDBIF:
     /// generic clause transformer (not in use)
     fn transform_by_replacement(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause;
     /// check satisfied and nullified literals in a clause
-    fn transform_by_simplification(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> RefClause;
+    fn transform_by_simplification(&mut self, cid: ClauseId) -> RefClause;
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
@@ -123,7 +123,7 @@ pub trait ClauseDBIF:
     fn reset(&mut self);
     /// update flags.
     /// return `true` if it's learnt.
-    fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool;
+    fn update_at_analysis(&mut self, cid: ClauseId) -> bool;
     /// record an asserted literal to unsat certification.
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.
@@ -138,9 +138,9 @@ pub trait ClauseDBIF:
     /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
     fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId>;
     /// minimize a clause.
-    fn minimize_with_bi_clauses(&mut self, asg: &impl AssignIF, vec: &mut Vec<Lit>);
+    fn minimize_with_bi_clauses(&mut self, vec: &mut Vec<Lit>);
     /// complete bi-clause network
-    fn complete_bi_clauses(&mut self, asg: &mut impl AssignIF);
+    fn complete_bi_clauses(&mut self);
 
     //
     //## for debug
@@ -293,7 +293,7 @@ mod tests {
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         // Now `asg.level` = [_, 1, 2, 3, 4, 5, 6].
         let c0 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
+            .new_clause(&mut vec![lit(1), lit(2), lit(3), lit(4)], false)
             .as_cid();
         assert_eq!(cdb[c0].len(), 4);
         assert_eq!(cdb[c0].lit0().vi(), 1);
@@ -305,7 +305,7 @@ mod tests {
         asg.assign_by_decision(lit(1)); // at level 2
                                         // Now `asg.level` = [_, 2, 1, 3, 4, 5, 6].
         let c1 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
+            .new_clause(&mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
         let c = &cdb[c1];
 
@@ -315,7 +315,7 @@ mod tests {
         #[cfg(feature = "just_used")]
         assert!(!c.is(Flag::USED));
         let c2 = cdb
-            .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
+            .new_clause(&mut vec![lit(-1), lit(2), lit(3)], true)
             .as_cid();
         let c = &cdb[c2];
         assert_eq!(c.rank, 3);
@@ -331,14 +331,11 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
-        let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
+            .new_clause(&mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
-        let c2 = cdb
-            .new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false)
-            .as_cid();
+        let c2 = cdb.new_clause(&mut vec![lit(-1), lit(4)], false).as_cid();
         // cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_ne!(c1, c2);
@@ -352,10 +349,9 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
-        let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
+            .new_clause(&mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
         assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
         let mut iter = cdb[c1][0..].iter();

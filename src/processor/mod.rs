@@ -53,7 +53,7 @@ pub trait EliminateIF: Instantiate {
     /// rebuild occur lists.
     fn prepare(&mut self, asg: &mut impl AssignIF, cdb: &mut impl ClauseDBIF, force: bool);
     /// enqueue a var into eliminator's var queue.
-    fn enqueue_var(&mut self, asg: &mut impl AssignIF, vi: VarId, upward: bool);
+    fn enqueue_var(&mut self, vi: VarId, upward: bool);
     /// simplify database by:
     /// * removing satisfiable clauses
     /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.

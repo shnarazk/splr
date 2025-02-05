@@ -6,7 +6,7 @@ use crate::assign::DebugReportIF;
 use {
     super::State,
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
+        assign::{AssignIF, AssignStack, PropagateIF},
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
         var_vector::*,
@@ -101,7 +101,7 @@ pub fn handle_conflict(
         //
         //## A NEW ASSERTION by UNIT LEARNT CLAUSE GENERATION
         //
-        match VarRef(l0.vi()).assigned(l0.as_bool()) /* asg.assigned(l0) */ {
+        match VarRef::assigned(l0) /* asg.assigned(l0) */ {
             Some(true) if asg.root_level() < VarRef(l0.vi()).level() => {
                 panic!("double assignment occured");
                 // asg.lift_to_asserted(l0.vi());
@@ -169,7 +169,7 @@ pub fn handle_conflict(
     } else {
         asg.cancel_until(assign_level);
     }
-    debug_assert_eq!(asg.assigned(l0), None);
+    debug_assert_eq!(VarRef::assigned(l0), None);
     debug_assert_eq!(
         new_learnt
             .iter()
@@ -179,15 +179,15 @@ pub fn handle_conflict(
         Some(assign_level)
     );
     let rank: u16;
-    match cdb.new_clause(asg, new_learnt, true) {
+    match cdb.new_clause(new_learnt, true) {
         RefClause::Clause(cid) if learnt_len == 2 => {
             #[cfg(feature = "boundary_check")]
             cdb[cid].set_birth(asg.num_conflict);
 
             debug_assert_eq!(l0, cdb[cid].lit0());
             debug_assert_eq!(l1, cdb[cid].lit1());
-            debug_assert_eq!(asg.assigned(l1), Some(false));
-            debug_assert_eq!(asg.assigned(l0), None);
+            debug_assert_eq!(VarRef::assigned(l1), Some(false));
+            debug_assert_eq!(VarRef::assigned(l0), None);
 
             asg.assign_by_implication(
                 l0,
@@ -201,14 +201,14 @@ pub fn handle_conflict(
             }
             rank = 1;
             #[cfg(feature = "bi_clause_completion")]
-            cdb.complete_bi_clauses(asg);
+            cdb.complete_bi_clauses();
         }
         RefClause::Clause(cid) => {
             #[cfg(feature = "boundary_check")]
             cdb[cid].set_birth(asg.num_conflict);
 
             debug_assert_eq!(cdb[cid].lit0(), l0);
-            debug_assert_eq!(asg.assigned(l0), None);
+            debug_assert_eq!(VarRef::assigned(l0), None);
             asg.assign_by_implication(
                 l0,
                 AssignReason::Implication(cid),
@@ -229,8 +229,8 @@ pub fn handle_conflict(
                 (l0 == cdb[cid].lit0() && l1 == cdb[cid].lit1())
                     || (l0 == cdb[cid].lit1() && l1 == cdb[cid].lit0())
             );
-            debug_assert_eq!(asg.assigned(l1), Some(false));
-            debug_assert_eq!(asg.assigned(l0), None);
+            debug_assert_eq!(VarRef::assigned(l1), Some(false));
+            debug_assert_eq!(VarRef::assigned(l0), None);
             rank = 1;
             asg.assign_by_implication(
                 l0,
@@ -449,7 +449,7 @@ fn conflict_analyze(
         reason = VarRef(p.vi()).reason();
     }
     if let Some(cid) = cid_with_max_lbd {
-        cdb.update_at_analysis(asg, cid);
+        cdb.update_at_analysis(cid);
     }
     debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(VarRef(p.vi()).level(), dl);
@@ -474,10 +474,10 @@ fn minimize_learnt(
         levels[VarRef(l.vi()).level() as usize] = true;
     }
     let l0 = new_learnt[0];
-    new_learnt.retain(|l| *l == l0 || !l.is_redundant(asg, cdb, &mut to_clear, &levels));
+    new_learnt.retain(|l| *l == l0 || !l.is_redundant(cdb, &mut to_clear, &levels));
     let len = new_learnt.len();
     if 2 < len && len < 30 {
-        cdb.minimize_with_bi_clauses(asg, new_learnt);
+        cdb.minimize_with_bi_clauses(new_learnt);
     }
     // find correct backtrack level from remaining literals
     let mut level_to_return = 0;
@@ -502,13 +502,7 @@ fn minimize_learnt(
 /// return `true` if the `lit` is redundant, which is defined by
 /// any leaf of implication graph for it isn't an asserted var nor a decision var.
 impl Lit {
-    fn is_redundant(
-        self,
-        _asg: &mut AssignStack,
-        cdb: &ClauseDB,
-        clear: &mut Vec<Lit>,
-        levels: &[bool],
-    ) -> bool {
+    fn is_redundant(self, cdb: &ClauseDB, clear: &mut Vec<Lit>, levels: &[bool]) -> bool {
         if matches!(VarRef(self.vi()).reason(), AssignReason::Decision(_)) {
             return false;
         }
@@ -628,7 +622,7 @@ fn lit_level(
 }
 
 #[allow(dead_code)]
-fn dumper(_asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
+fn dumper(cdb: &ClauseDB, bag: &[Lit]) -> String {
     use std::fmt::Write as _;
     let mut s = String::new();
     for l in bag {

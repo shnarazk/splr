@@ -328,7 +328,7 @@ impl AssignIF for AssignStack {
     }
     fn satisfies(&self, vec: &[Lit]) -> bool {
         for l in vec {
-            if self.assigned(*l) == Some(true) {
+            if VarRef::assigned(*l) == Some(true) {
                 return true;
             }
         }
@@ -378,103 +378,8 @@ impl fmt::Display for AssignStack {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::assign::PropagateIF;
-
-    fn lit(i: i32) -> Lit {
-        Lit::from(i)
-    }
-    #[test]
-    fn test_propagation() {
-        let config = Config::default();
-        let cnf = CNFDescription {
-            num_of_variables: 4,
-            ..CNFDescription::default()
-        };
-        VarRef::initialize(4);
-        let mut asg = AssignStack::instantiate(&config, &cnf);
-        // [] + 1 => [1]
-        assert!(asg.assign_at_root_level(lit(1)).is_ok());
-        assert_eq!(asg.trail, vec![lit(1)]);
-
-        // [1] + 1 => [1]
-        assert!(asg.assign_at_root_level(lit(1)).is_ok());
-        assert_eq!(asg.trail, vec![lit(1)]);
-
-        // [1] + 2 => [1, 2]
-        assert!(asg.assign_at_root_level(lit(2)).is_ok());
-        assert_eq!(asg.trail, vec![lit(1), lit(2)]);
-
-        // [1, 2] + -1 => ABORT & [1, 2]
-        assert!(asg.assign_at_root_level(lit(-1)).is_err());
-        assert_eq!(asg.decision_level(), 0);
-        assert_eq!(asg.stack_len(), 2);
-
-        // [1, 2] + 3 => [1, 2, 3]
-        asg.assign_by_decision(lit(3));
-        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
-        assert_eq!(asg.decision_level(), 1);
-        assert_eq!(asg.stack_len(), 3);
-        assert_eq!(asg.len_upto(0), 2);
-
-        // [1, 2, 3] + 4 => [1, 2, 3, 4]
-        asg.assign_by_decision(lit(4));
-        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
-        assert_eq!(asg.decision_level(), 2);
-        assert_eq!(asg.stack_len(), 4);
-        assert_eq!(asg.len_upto(1), 3);
-
-        // [1, 2, 3] => [1, 2]
-        #[cfg(feature = "debug_propagation")]
-        {
-            for l in asg.trail.iter() {
-                asg.var[l.vi()].turn_on(Flag::PROPAGATED);
-            } // simulate propagation
-        }
-        asg.cancel_until(1);
-        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
-        assert_eq!(asg.decision_level(), 1);
-        assert_eq!(asg.stack_len(), 3);
-        assert_eq!(asg.trail_lim, vec![2]);
-        assert_eq!(asg.assigned(lit(1)), Some(true));
-        assert_eq!(asg.assigned(lit(-1)), Some(false));
-        assert_eq!(asg.assigned(lit(4)), None);
-
-        // [1, 2, 3] => [1, 2, 3, 4]
-        asg.assign_by_decision(lit(4));
-        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
-        // assert_eq!(asg.var[lit(4).vi()].level, 2);
-        assert_eq!(VarRef(lit(4).vi()).level(), 2);
-        assert_eq!(asg.trail_lim, vec![2, 3]);
-
-        // [1, 2, 3, 4] => [1, 2, -4]
-        asg.assign_at_root_level(Lit::from(-4i32))
-            .expect("impossible");
-        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(-4)]);
-        assert_eq!(asg.decision_level(), 0);
-        assert_eq!(asg.stack_len(), 3);
-
-        assert_eq!(asg.assigned(lit(-4)), Some(true));
-        assert_eq!(asg.assigned(lit(-3)), None);
-    }
-}
-
 /// Var manipulation
 pub trait VarManipulateIF {
-    /// return *the value* of a literal.
-    fn assigned(&self, l: Lit) -> Option<bool>;
-    // /// return the assignment of var.
-    // fn assign(&self, vi: VarId) -> Option<bool>;
-    // /// return the assign level of var.
-    // fn level(&self, vi: VarId) -> DecisionLevel;
-    // /// return the reason of assignment.
-    // fn reason(&self, vi: VarId) -> AssignReason;
-    // /// return the var.
-    // fn var(&self, vi: VarId) -> &Var;
-    // /// return the var.
-    // fn var_mut(&mut self, vi: VarId) -> &mut Var;
     /// set var status to asserted.
     fn make_var_asserted(&mut self, vi: VarId);
     /// set var status to eliminated.
@@ -482,57 +387,6 @@ pub trait VarManipulateIF {
 }
 
 impl VarManipulateIF for AssignStack {
-    fn assigned(&self, l: Lit) -> Option<bool> {
-        match VarRef(l.vi()).assign() /* self.var[l.vi()].assign */ {
-            Some(x) if !bool::from(l) => Some(!x),
-            x => x,
-        }
-    }
-    // #[inline]
-    // fn assign(&self, vi: VarId) -> Option<bool> {
-    //     #[cfg(feature = "unsafe_access")]
-    //     unsafe {
-    //         self.var.get_unchecked(vi).assign
-    //     }
-    //     #[cfg(not(feature = "unsafe_access"))]
-    //     self.assign[vi]
-    // }
-    // #[inline]
-    // fn level(&self, vi: VarId) -> DecisionLevel {
-    //     #[cfg(feature = "unsafe_access")]
-    //     unsafe {
-    //         self.var.get_unchecked(vi).level
-    //     }
-    //     #[cfg(not(feature = "unsafe_access"))]
-    //     self.level[vi]
-    // }
-    // #[inline]
-    // fn reason(&self, vi: VarId) -> AssignReason {
-    //     #[cfg(feature = "unsafe_access")]
-    //     unsafe {
-    //         self.var.get_unchecked(vi).reason
-    //     }
-    //     #[cfg(not(feature = "unsafe_access"))]
-    //     self.reason[vi]
-    // }
-    // #[inline]
-    // fn var(&self, vi: VarId) -> &Var {
-    //     #[cfg(feature = "unsafe_access")]
-    //     unsafe {
-    //         self.var.get_unchecked(vi)
-    //     }
-    //     #[cfg(not(feature = "unsafe_access"))]
-    //     &self.var[vi]
-    // }
-    // #[inline]
-    // fn var_mut(&mut self, vi: VarId) -> &mut Var {
-    //     #[cfg(feature = "unsafe_access")]
-    //     unsafe {
-    //         self.var.get_unchecked_mut(vi)
-    //     }
-    //     #[cfg(not(feature = "unsafe_access"))]
-    //     &mut self.var[vi]
-    // }
     fn make_var_asserted(&mut self, vi: VarId) {
         // self.var[vi].reason = AssignReason::Decision(0);
         VarRef(vi).set_reason(AssignReason::Decision(0));
@@ -602,5 +456,88 @@ impl AssignStack {
             }
         }
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::assign::PropagateIF;
+
+    fn lit(i: i32) -> Lit {
+        Lit::from(i)
+    }
+    #[test]
+    fn test_propagation() {
+        let config = Config::default();
+        let cnf = CNFDescription {
+            num_of_variables: 4,
+            ..CNFDescription::default()
+        };
+        VarRef::initialize(4);
+        let mut asg = AssignStack::instantiate(&config, &cnf);
+        // [] + 1 => [1]
+        assert!(asg.assign_at_root_level(lit(1)).is_ok());
+        assert_eq!(asg.trail, vec![lit(1)]);
+
+        // [1] + 1 => [1]
+        assert!(asg.assign_at_root_level(lit(1)).is_ok());
+        assert_eq!(asg.trail, vec![lit(1)]);
+
+        // [1] + 2 => [1, 2]
+        assert!(asg.assign_at_root_level(lit(2)).is_ok());
+        assert_eq!(asg.trail, vec![lit(1), lit(2)]);
+
+        // [1, 2] + -1 => ABORT & [1, 2]
+        assert!(asg.assign_at_root_level(lit(-1)).is_err());
+        assert_eq!(asg.decision_level(), 0);
+        assert_eq!(asg.stack_len(), 2);
+
+        // [1, 2] + 3 => [1, 2, 3]
+        asg.assign_by_decision(lit(3));
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
+        assert_eq!(asg.decision_level(), 1);
+        assert_eq!(asg.stack_len(), 3);
+        assert_eq!(asg.len_upto(0), 2);
+
+        // [1, 2, 3] + 4 => [1, 2, 3, 4]
+        asg.assign_by_decision(lit(4));
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
+        assert_eq!(asg.decision_level(), 2);
+        assert_eq!(asg.stack_len(), 4);
+        assert_eq!(asg.len_upto(1), 3);
+
+        // [1, 2, 3] => [1, 2]
+        #[cfg(feature = "debug_propagation")]
+        {
+            for l in asg.trail.iter() {
+                asg.var[l.vi()].turn_on(Flag::PROPAGATED);
+            } // simulate propagation
+        }
+        asg.cancel_until(1);
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
+        assert_eq!(asg.decision_level(), 1);
+        assert_eq!(asg.stack_len(), 3);
+        assert_eq!(asg.trail_lim, vec![2]);
+        assert_eq!(VarRef::assigned(lit(1)), Some(true));
+        assert_eq!(VarRef::assigned(lit(-1)), Some(false));
+        assert_eq!(VarRef::assigned(lit(4)), None);
+
+        // [1, 2, 3] => [1, 2, 3, 4]
+        asg.assign_by_decision(lit(4));
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
+        // assert_eq!(asg.var[lit(4).vi()].level, 2);
+        assert_eq!(VarRef(lit(4).vi()).level(), 2);
+        assert_eq!(asg.trail_lim, vec![2, 3]);
+
+        // [1, 2, 3, 4] => [1, 2, -4]
+        asg.assign_at_root_level(Lit::from(-4i32))
+            .expect("impossible");
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(-4)]);
+        assert_eq!(asg.decision_level(), 0);
+        assert_eq!(asg.stack_len(), 3);
+
+        assert_eq!(VarRef::assigned(lit(-4)), Some(true));
+        assert_eq!(VarRef::assigned(lit(-3)), None);
     }
 }
