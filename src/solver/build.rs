@@ -77,7 +77,7 @@ pub trait SatSolverIF: Instantiate {
     ///
     /// # Example
     /// ```
-    /// use crate::splr::*;
+    /// use crate::splr::{*, var_vector::*};
     /// use std::path::Path;
     ///
     /// let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
