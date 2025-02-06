@@ -85,8 +85,8 @@ pub struct Config {
     //
     /// Var Reward Decay Rate
     pub vrw_dcy_rat: f64,
-    /// Decay increment step.
-    pub vrw_dcy_stp: f64,
+    // /// Decay increment step.
+    // pub vrw_dcy_stp: f64,
 }
 
 impl Default for Config {

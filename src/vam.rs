@@ -11,12 +11,14 @@ use crate::assign::TrailSavingIF;
 pub struct VarActivityManager {
     decay: f64,
     anti_decay: f64,
+    #[cfg(feature = "boundary_check")]
     tick: usize,
 }
 
 pub static mut VAM: VarActivityManager = VarActivityManager {
     decay: 0.95,
     anti_decay: 0.05,
+    #[cfg(feature = "boundary_check")]
     tick: 0,
 };
 
@@ -99,7 +101,8 @@ impl VarActivityManager {
     // pub fn pop_top_var(asg: &mut AssignStack) -> VarId {
     //     unsafe { VAR_HEAP.get_heap_root(asg) }
     // }
-    pub fn increment_tick() {
+    #[cfg(feature = "boundary_check")]
+    pub fn update_activity_tick() {
         unsafe {
             VAM.tick += 1;
         }

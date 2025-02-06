@@ -76,14 +76,14 @@ pub struct AssignStack {
     /// var activity decay
     pub(super) activity_decay: f64,
     /// the default value of var activity decay in configuration
-    #[cfg(feature = "EVSIDS")]
-    activity_decay_default: f64,
+    // #[cfg(feature = "EVSIDS")]
+    // activity_decay_default: f64,
     /// its diff
     pub(super) activity_anti_decay: f64,
-    #[cfg(feature = "EVSIDS")]
-    activity_decay_step: f64,
-    /// an index for counting elapsed time
-    pub(super) tick: usize,
+    // #[cfg(feature = "EVSIDS")]
+    // activity_decay_step: f64,
+    // /// an index for counting elapsed time
+    // pub(super) tick: usize,
 }
 
 impl Default for AssignStack {
@@ -125,7 +125,7 @@ impl Default for AssignStack {
             ppc_ema: EmaSU::new(100),
             cpr_ema: EmaSU::new(100),
 
-            tick: 0,
+            // tick: 0,
             // var: Vec::new(),
             activity_decay: 0.94,
 
@@ -370,7 +370,8 @@ impl VarManipulateIF for AssignStack {
     fn make_var_asserted(&mut self, vi: VarId) {
         // self.var[vi].reason = AssignReason::Decision(0);
         VarRef(vi).set_reason(AssignReason::Decision(0));
-        self.set_activity(vi, 0.0);
+        // self.set_activity(vi, 0.0);
+        VarRef(vi).set_activity(0.0);
         // self.remove_from_heap(vi);
         VarActivityManager::remove_from_heap(vi);
 
@@ -385,7 +386,8 @@ impl VarManipulateIF for AssignStack {
     fn make_var_eliminated(&mut self, vi: VarId) {
         if !VarRef(vi).is(FlagVar::ELIMINATED) {
             VarRef(vi).turn_on(FlagVar::ELIMINATED);
-            self.set_activity(vi, 0.0);
+            // self.set_activity(vi, 0.0);
+            VarRef(vi).set_activity(0.0);
             // self.remove_from_heap(vi);
             VarActivityManager::remove_from_heap(vi);
             debug_assert_eq!(self.decision_level(), self.root_level);

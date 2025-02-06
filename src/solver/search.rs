@@ -10,6 +10,7 @@ use {
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
         types::*,
+        vam::VarActivityManager,
         var_vector::*,
     },
 };
@@ -152,7 +153,8 @@ impl SolveIF for Solver {
                     let act = 1.0 / (VarRef::num_vars() as f64).powf(0.25);
                     for vi in VarRef::var_id_iter() {
                         if !VarRef(vi).is(FlagVar::ELIMINATED) {
-                            asg.set_activity(vi, act);
+                            // asg.set_activity(vi, act);
+                            VarRef(vi).set_activity(act);
                         }
                     }
                     asg.rebuild_order();
@@ -247,7 +249,9 @@ fn search(
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }
-        asg.update_activity_tick();
+        // asg.update_activity_tick();
+        #[cfg(feature = "boundary_check")]
+        VarActivityManager::update_activity_tick();
         #[cfg(feature = "clause_rewarding")]
         cdb.update_activity_tick();
         if 1 < handle_conflict(asg, cdb, state, &cc)? {
@@ -275,7 +279,8 @@ fn search(
             if cfg!(feature = "reward_annealing") {
                 let base = state.stm.current_stage() - state.stm.cycle_starting_stage();
                 let decay_index: f64 = (20 + 2 * base) as f64;
-                asg.update_activity_decay((decay_index - 1.0) / decay_index);
+                // asg.update_activity_decay((decay_index - 1.0) / decay_index);
+                VarActivityManager::set_activity_decay((decay_index - 1.0) / decay_index);
             }
             if let Some(new_segment) = next_stage {
                 // a beginning of a new cycle
@@ -352,7 +357,8 @@ fn search(
                     {
                         let base = state.stm.current_segment();
                         let decay_index: f64 = (20 + 2 * base) as f64;
-                        asg.update_activity_decay((decay_index - 1.0) / decay_index);
+                        // asg.update_activity_decay((decay_index - 1.0) / decay_index);
+                        VarActivityManager::set_activity_decay((decay_index - 1.0) / decay_index);
                     }
                     if cfg!(feature = "clause_elimination") {
                         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);

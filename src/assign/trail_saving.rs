@@ -41,7 +41,8 @@ impl TrailSavingIF for AssignStack {
                 self.trail_saved.push(l);
                 // self.var[vi].reason_saved = self.var[vi].reason;
                 VarRef(vi).set_reason_saved(VarRef(vi).reason());
-                self.reward_at_unassign(vi);
+                // self.reward_at_unassign(vi);
+                VarActivityManager::reward_at_unassign(vi);
                 if activity_threshold <= VarRef(vi).activity()
                 /* self.var[vi].reward */
                 {
@@ -53,7 +54,8 @@ impl TrailSavingIF for AssignStack {
         }
         for i in free..self.trail.len() {
             let vi = self.trail[i].vi();
-            self.reward_at_unassign(vi);
+            // self.reward_at_unassign(vi);
+            VarActivityManager::reward_at_unassign(vi);
             // self.insert_heap(vi);
             VarActivityManager::insert_heap(vi);
         }

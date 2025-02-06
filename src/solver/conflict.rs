@@ -2,6 +2,7 @@
 
 #[cfg(feature = "boundary_check")]
 use crate::assign::DebugReportIF;
+use crate::vam::VarActivityManager;
 
 use {
     super::State,
@@ -137,7 +138,8 @@ pub fn handle_conflict(
         //
         //## Learnt Literal Rewarding
         //
-        asg.reward_at_analysis(lit.vi());
+        // asg.reward_at_analysis(lit.vi());
+        VarActivityManager::reward_at_analysis(lit.vi());
 
         //
         //## Reason-Side Rewarding
@@ -147,7 +149,8 @@ pub fn handle_conflict(
             AssignReason::BinaryLink(from) => {
                 let vi = from.vi();
                 if !bumped.contains(&vi) {
-                    asg.reward_at_analysis(vi);
+                    // asg.reward_at_analysis(vi);
+                    VarActivityManager::reward_at_analysis(vi);
                     bumped.push(vi);
                 }
             }
@@ -155,7 +158,8 @@ pub fn handle_conflict(
                 for l in cdb[r].iter() {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
-                        asg.reward_at_analysis(vi);
+                        // asg.reward_at_analysis(vi);
+                        VarActivityManager::reward_at_analysis(vi);
                         bumped.push(vi);
                     }
                 }
@@ -274,7 +278,8 @@ fn conflict_analyze(
         ($vi: expr) => {
             path_cnt += 1;
             //## Conflict-Side Rewarding
-            asg.reward_at_analysis($vi);
+            // asg.reward_at_analysis($vi);
+            VarActivityManager::reward_at_analysis($vi);
         };
     }
     macro_rules! trace {

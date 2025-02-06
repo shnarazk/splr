@@ -35,8 +35,8 @@ pub use self::trail_saving::TrailSavingIF;
 /// [`stack`](`crate::assign::AssignIF::stack`),
 /// [`best_assigned`](`crate::assign::AssignIF::best_assigned`), and so on.
 pub trait AssignIF:
-    ActivityIF<VarId>
-    + Instantiate
+    // ActivityIF<VarId>
+    Instantiate
     + PropagateIF
     + VarManipulateIF
     + PropertyDereference<property::Tusize, usize>

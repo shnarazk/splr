@@ -1,10 +1,7 @@
-/// Var Rewarding based on Learning Rate Rewarding and Reason Side Rewarding
-use {
-    super::stack::AssignStack,
-    crate::{types::*, var_vector::*},
-};
+//! Var Rewarding based on Learning Rate Rewarding and Reason Side Rewarding
+// use crate::{types::*, var_vector::*};
 
-impl ActivityIF<VarId> for AssignStack {
+/* impl ActivityIF<VarId> for AssignStack {
     #[inline]
     fn activity(&self, vi: VarId) -> f64 {
         // self.var[vi].reward
@@ -39,4 +36,4 @@ impl ActivityIF<VarId> for AssignStack {
     fn update_activity_tick(&mut self) {
         self.tick += 1;
     }
-}
+}*/

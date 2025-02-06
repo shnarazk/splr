@@ -140,7 +140,8 @@ impl PropagateIF for AssignStack {
         VarRef(vi).set_level(lv);
         // self.var[vi].reason = reason;
         VarRef(vi).set_reason(reason);
-        self.reward_at_assign(vi);
+        // self.reward_at_assign(vi);
+        VarActivityManager::reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
@@ -175,7 +176,8 @@ impl PropagateIF for AssignStack {
         debug_assert_eq!(VarRef(vi).reason(), AssignReason::None);
         set_assign!(self, l);
         VarRef(vi).set_reason(AssignReason::Decision(self.decision_level()));
-        self.reward_at_assign(vi);
+        // self.reward_at_assign(vi);
+        VarActivityManager::reward_at_assign(vi);
         self.trail.push(l);
         self.num_decision += 1;
         debug_assert!(self.q_head < self.trail.len());

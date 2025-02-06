@@ -1059,10 +1059,10 @@ impl ClauseDBIF for ClauseDB {
             alives += 1;
             match setting {
                 ReductionType::RASonADD(_) => {
-                    perm.push(OrderedProxy::new(i, c.reverse_activity_sum(asg)));
+                    perm.push(OrderedProxy::new(i, c.reverse_activity_sum()));
                 }
                 ReductionType::RASonALL(cutoff, _) => {
-                    let value = c.reverse_activity_sum(asg);
+                    let value = c.reverse_activity_sum();
                     if cutoff < value.min(c.rank_old as f64) {
                         perm.push(OrderedProxy::new(i, value));
                     }
@@ -1387,8 +1387,8 @@ impl Clause {
         }
         falsified
     }
-    fn reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
-        self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
+    fn reverse_activity_sum(&self) -> f64 {
+        self.iter().map(|l| 1.0 - VarRef(l.vi()).activity()).sum()
     }
     fn lbd(&self) -> f64 {
         self.rank as f64
