@@ -316,14 +316,6 @@ impl AssignIF for AssignStack {
         }
         extended_model
     }
-    fn satisfies(&self, vec: &[Lit]) -> bool {
-        for l in vec {
-            if VarRef::assigned(*l) == Some(true) {
-                return true;
-            }
-        }
-        false
-    }
 }
 
 impl fmt::Display for AssignStack {

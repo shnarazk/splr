@@ -77,8 +77,6 @@ pub trait AssignIF:
     fn best_phases_invalid(&self) -> bool;
     /// inject assignments for eliminated vars.
     fn extend_model(&mut self, cdb: &mut impl ClauseDBIF) -> Vec<Option<bool>>;
-    /// return `true` if the set of literals is satisfiable under the current assignment.
-    fn satisfies(&self, c: &[Lit]) -> bool;
 }
 
 /// Reasons of assignments
