@@ -2,8 +2,8 @@
 /// implement boolean constraint propagation, backjump
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{heap::VarHeapIF, AssignStack, PropagateIF},
-    crate::{cdb::ClauseDBIF, types::*, var_vector::*},
+    super::{AssignStack, PropagateIF},
+    crate::{cdb::ClauseDBIF, types::*, vam::*, var_vector::*},
 };
 
 #[cfg(feature = "chrono_BT")]
@@ -45,7 +45,8 @@ impl TrailSavingIF for AssignStack {
                 if activity_threshold <= VarRef(vi).reward()
                 /* self.var[vi].reward */
                 {
-                    self.insert_heap(vi);
+                    // self.insert_heap(vi);
+                    VarActivityManager::insert_var(vi);
                 }
             }
             free = lim2;
@@ -53,7 +54,8 @@ impl TrailSavingIF for AssignStack {
         for i in free..self.trail.len() {
             let vi = self.trail[i].vi();
             self.reward_at_unassign(vi);
-            self.insert_heap(vi);
+            // self.insert_heap(vi);
+            VarActivityManager::insert_var(vi);
         }
     }
     fn reuse_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult {
@@ -83,7 +85,8 @@ impl TrailSavingIF for AssignStack {
                 }
                 // reason refinement by ignoring this dependecy
                 (None, AssignReason::Implication(c)) if q < cdb[c].rank => {
-                    self.insert_heap(vi);
+                    // self.insert_heap(vi);
+                    VarActivityManager::insert_var(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
                 (None, AssignReason::Implication(cid)) => {
@@ -116,7 +119,8 @@ impl TrailSavingIF for AssignStack {
                 }
                 (_, AssignReason::Decision(lvl)) => {
                     debug_assert_ne!(0, lvl);
-                    self.insert_heap(vi);
+                    // self.insert_heap(vi);
+                    VarActivityManager::insert_var(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
                 _ => unreachable!("from_saved_trail"),
@@ -128,7 +132,8 @@ impl TrailSavingIF for AssignStack {
     fn clear_saved_trail(&mut self) {
         for j in 0..self.trail_saved.len() {
             let l = self.trail_saved[j];
-            self.insert_heap(l.vi());
+            // self.insert_heap(l.vi());
+            VarActivityManager::insert_var(l.vi());
         }
         self.trail_saved.clear();
     }

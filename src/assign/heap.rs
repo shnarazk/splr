@@ -57,7 +57,7 @@ pub trait VarHeapIF {
     fn remove_from_heap(&mut self, vs: VarId);
 }
 
-impl VarHeapIF for AssignStack {
+/* impl VarHeapIF for AssignStack {
     fn clear_heap(&mut self) {
         self.var_order.clear();
     }
@@ -161,7 +161,7 @@ impl VarHeapIF for AssignStack {
             self.percolate_down(i as u32);
         }
     }
-}
+}*/
 
 trait VarOrderIF {
     fn clear(&mut self);

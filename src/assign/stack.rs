@@ -1,7 +1,7 @@
 //! main struct AssignStack
 use {
-    super::{ema::ProgressASG, heap::VarHeapIF, heap::VarIdHeap, AssignIF, PropagateIF},
-    crate::{cdb::ClauseDBIF, types::*, var_vector::*},
+    super::{ema::ProgressASG, AssignIF, PropagateIF},
+    crate::{cdb::ClauseDBIF, types::*, vam::VarActivityManager, var_vector::*},
     std::{fmt, ops::Range, slice::Iter},
 };
 
@@ -20,8 +20,7 @@ pub struct AssignStack {
     /// the-number-of-assigned-and-propagated-vars + 1
     pub(super) q_head: usize,
     pub root_level: DecisionLevel,
-    pub(super) var_order: VarIdHeap, // Variable Order
-
+    // pub(super) var_order: VarIdHeap, // Variable Order
     #[cfg(feature = "trail_saving")]
     pub(super) trail_saved: Vec<Lit>,
 
@@ -94,8 +93,7 @@ impl Default for AssignStack {
             trail_lim: Vec::new(),
             q_head: 0,
             root_level: 0,
-            var_order: VarIdHeap::default(),
-
+            // var_order: VarIdHeap::default(),
             #[cfg(feature = "trail_saving")]
             trail_saved: Vec::new(),
 
@@ -161,8 +159,7 @@ impl Instantiate for AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
             trail: Vec::with_capacity(nv),
-            var_order: VarIdHeap::new(nv),
-
+            // var_order: VarIdHeap::new(nv),
             #[cfg(feature = "trail_saving")]
             trail_saved: Vec::with_capacity(nv),
 
@@ -198,7 +195,7 @@ impl Instantiate for AssignStack {
                 self.clear_saved_trail();
             }
             SolverEvent::NewVar => {
-                self.expand_heap();
+                // VarActivityManager::add_var();
                 // self.var.push(Var::default());
             }
             SolverEvent::Reinitialize => {
@@ -373,7 +370,8 @@ impl VarManipulateIF for AssignStack {
         // self.var[vi].reason = AssignReason::Decision(0);
         VarRef(vi).set_reason(AssignReason::Decision(0));
         self.set_activity(vi, 0.0);
-        self.remove_from_heap(vi);
+        // self.remove_from_heap(vi);
+        VarActivityManager::remove_var(vi);
 
         #[cfg(feature = "boundary_check")]
         {
@@ -387,7 +385,8 @@ impl VarManipulateIF for AssignStack {
         if !VarRef(vi).is(FlagVar::ELIMINATED) {
             VarRef(vi).turn_on(FlagVar::ELIMINATED);
             self.set_activity(vi, 0.0);
-            self.remove_from_heap(vi);
+            //self.remove_from_heap(vi);
+            VarActivityManager::remove_var(vi);
             debug_assert_eq!(self.decision_level(), self.root_level);
             self.trail.retain(|l| l.vi() != vi);
             self.num_eliminated_vars += 1;
@@ -443,8 +442,7 @@ impl AssignStack {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::assign::PropagateIF;
+    use {super::*, crate::assign::PropagateIF};
 
     fn lit(i: i32) -> Lit {
         Lit::from(i)
@@ -457,6 +455,7 @@ mod tests {
             ..CNFDescription::default()
         };
         VarRef::initialize(4);
+        VarActivityManager::initialize();
         let mut asg = AssignStack::instantiate(&config, &cnf);
         // [] + 1 => [1]
         assert!(asg.assign_at_root_level(lit(1)).is_ok());

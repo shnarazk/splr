@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 
 #[derive(Clone, Debug)]
 pub struct OrderedProxy<T: Clone + Default + Sized + Ord> {
-    index: f64,
-    body: T,
+    pub index: f64,
+    pub body: T,
 }
 
 impl<T: Clone + Default + Sized + Ord> Default for OrderedProxy<T> {

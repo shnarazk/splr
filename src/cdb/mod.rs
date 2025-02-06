@@ -257,6 +257,7 @@ mod tests {
         super::*,
         crate::{
             assign::{AssignStack, PropagateIF},
+            vam::*,
             var_vector::*,
         },
         std::num::NonZeroU32,
@@ -287,6 +288,7 @@ mod tests {
             ..CNFDescription::default()
         };
         VarRef::initialize(4);
+        VarActivityManager::initialize();
         assert_eq!(VarRef(1).level(), 1);
         assert_eq!(VarRef(4).level(), 4);
         let mut asg = AssignStack::instantiate(&config, &cnf);

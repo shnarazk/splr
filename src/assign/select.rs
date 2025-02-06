@@ -4,8 +4,8 @@
 use super::property;
 
 use {
-    super::{heap::VarHeapIF, stack::AssignStack},
-    crate::{types::*, var_vector::*},
+    super::stack::AssignStack,
+    crate::{types::*, vam::*, var_vector::*},
     std::collections::HashMap,
 };
 
@@ -83,7 +83,8 @@ impl VarSelectIF for AssignStack {
                 VarRef(*vi).set_reward(
                     VarRef(*vi).reward() * self.activity_decay + self.activity_anti_decay,
                 );
-                self.update_heap(*vi);
+                // self.update_heap(*vi);
+                VarActivityManager::update_heap(*vi);
             }
         }
         num_flipped
@@ -123,13 +124,16 @@ impl VarSelectIF for AssignStack {
         Lit::from((vi, VarRef(vi).is(FlagVar::PHASE)))
     }
     fn update_order(&mut self, v: VarId) {
-        self.update_heap(v);
+        // self.update_heap(v);
+        VarActivityManager::update_heap(v);
     }
     fn rebuild_order(&mut self) {
-        self.clear_heap();
+        // self.clear_heap();
+        VarActivityManager::clear_heap();
         for vi in VarRef::var_id_iter() {
             if VarRef(vi).assign().is_none() && !VarRef(vi).is(FlagVar::ELIMINATED) {
-                self.insert_heap(vi);
+                // self.insert_heap(vi);
+                VarActivityManager::insert_var(vi);
             }
         }
     }
@@ -139,7 +143,7 @@ impl AssignStack {
     /// select a decision var
     fn select_var(&mut self) -> VarId {
         loop {
-            let vi = self.get_heap_root();
+            let vi = VarActivityManager::pop_top_var(self); // self.get_heap_root();
             if var_assign!(self, vi).is_none() && !VarRef(vi).is(FlagVar::ELIMINATED) {
                 return vi;
             }
