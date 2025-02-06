@@ -20,7 +20,7 @@ pub struct Var {
     /// the `Flag`s (8 bits)
     pub(crate) flags: FlagVar,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
-    pub(crate) reward: f64,
+    pub(crate) activity: f64,
     // reward_ema: Ema2,
     #[cfg(feature = "boundary_check")]
     pub propagated_at: usize,
@@ -39,7 +39,7 @@ impl Default for Var {
             #[cfg(feature = "trail_saving")]
             reason_saved: AssignReason::None,
             flags: FlagVar::empty(),
-            reward: 0.0,
+            activity: 0.0,
             // reward_ema: Ema2::new(200).with_slow(4_000),
             #[cfg(feature = "boundary_check")]
             propagated_at: 0,
@@ -71,7 +71,7 @@ impl Var {
             .collect::<Vec<_>>()
     }
     pub fn activity(&self) -> f64 {
-        self.reward
+        self.activity
     }
     pub fn update_activity(&mut self, decay: f64, reward: f64) -> f64 {
         // Note: why the condition can be broken.
@@ -82,13 +82,13 @@ impl Var {
         // 1. restart
         // 1. cancel_until -> reward_at_unassign -> assertion failed
         //
-        self.reward *= decay;
+        self.activity *= decay;
         if self.is(FlagVar::USED) {
-            self.reward += reward;
+            self.activity += reward;
             self.turn_off(FlagVar::USED);
         }
         // self.reward_ema.update(self.reward);
-        self.reward
+        self.activity
     }
 }
 

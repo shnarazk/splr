@@ -80,8 +80,8 @@ impl VarSelectIF for AssignStack {
             if VarRef(*vi).is(FlagVar::PHASE) != *b {
                 num_flipped += 1;
                 VarRef(*vi).set_flag(FlagVar::PHASE, *b);
-                VarRef(*vi).set_reward(
-                    VarRef(*vi).reward() * self.activity_decay + self.activity_anti_decay,
+                VarRef(*vi).set_activity(
+                    VarRef(*vi).activity() * self.activity_decay + self.activity_anti_decay,
                 );
                 self.update_heap(*vi);
             }

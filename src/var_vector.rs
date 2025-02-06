@@ -12,8 +12,8 @@ pub trait VarRefIF {
     fn set_reason(&self, value: AssignReason);
     fn reason_saved(&self) -> AssignReason;
     fn set_reason_saved(&self, value: AssignReason);
-    fn reward(&self) -> f64;
-    fn set_reward(&self, value: f64);
+    fn activity(&self) -> f64;
+    fn set_activity(&self, value: f64);
     fn update_activity(&self, decay: f64, anti_decay: f64);
     fn is(&self, f: FlagVar) -> bool;
     fn turn_on(&self, f: FlagVar);
@@ -57,7 +57,7 @@ impl VarRef {
     }
     pub fn rescale_activity(scaling: f64) {
         for i in VarRef::var_id_iter() {
-            VarRef(i).set_reward(VarRef(i).reward() * scaling);
+            VarRef(i).set_activity(VarRef(i).activity() * scaling);
         }
     }
 }
@@ -104,13 +104,13 @@ impl VarRefIF for VarRef {
         }
     }
     #[inline]
-    fn reward(&self) -> f64 {
-        unsafe { VAR_VECTOR.get_unchecked(self.0).reward }
+    fn activity(&self) -> f64 {
+        unsafe { VAR_VECTOR.get_unchecked(self.0).activity }
     }
     #[inline]
-    fn set_reward(&self, value: f64) {
+    fn set_activity(&self, value: f64) {
         unsafe {
-            VAR_VECTOR.get_unchecked_mut(self.0).reward = value;
+            VAR_VECTOR.get_unchecked_mut(self.0).activity = value;
         }
     }
     #[inline]

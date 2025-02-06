@@ -8,14 +8,14 @@ impl ActivityIF<VarId> for AssignStack {
     #[inline]
     fn activity(&self, vi: VarId) -> f64 {
         // self.var[vi].reward
-        VarRef(vi).reward()
+        VarRef(vi).activity()
     }
     // fn activity_slow(&self, vi: VarId) -> f64 {
     //     self.var[vi].reward_ema.get()
     // }
     fn set_activity(&mut self, vi: VarId, val: f64) {
         // self.var[vi].reward = val;
-        VarRef(vi).set_reward(val);
+        VarRef(vi).set_activity(val);
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
         // self.var[vi].turn_on(FlagVar::USED);

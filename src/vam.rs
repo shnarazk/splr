@@ -51,7 +51,7 @@ impl VarActivityManager {
     }
     pub fn add_var(vi: VarId) {
         unsafe {
-            VAR_HEAP.push(OrderedProxy::new(vi, VarRef(vi).reward()));
+            VAR_HEAP.push(OrderedProxy::new(vi, VarRef(vi).activity()));
         }
     }
     pub fn remove_var(vi: VarId) {
