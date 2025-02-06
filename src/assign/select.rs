@@ -5,23 +5,16 @@ use super::property;
 
 use {
     super::{heap::VarHeapIF, stack::AssignStack},
-    crate::types::*,
+    crate::{types::*, var_vector::*},
     std::collections::HashMap,
 };
 
 /// ```ignore
 /// let x: Option<bool> = var_assign!(self, lit.vi());
 /// ```
-#[cfg(feature = "unsafe_access")]
 macro_rules! var_assign {
-    ($asg: expr, $var: expr) => {
-        unsafe { $asg.var.get_unchecked($var).assign }
-    };
-}
-#[cfg(not(feature = "unsafe_access"))]
-macro_rules! var_assign {
-    ($asg: expr, $var: expr) => {
-        $asg.assign[$var]
+    ($asg: expr, $vi: expr) => {
+        VarRef($vi).assign()
     };
 }
 
@@ -52,17 +45,17 @@ pub trait VarSelectIF {
 impl VarSelectIF for AssignStack {
     #[cfg(feature = "rephase")]
     fn best_phases_ref(&mut self, default_value: Option<bool>) -> HashMap<VarId, bool> {
-        self.var
-            .iter()
-            .enumerate()
-            .filter_map(|(vi, v)| {
-                if v.level == self.root_level || v.is(FlagVar::ELIMINATED) {
+        VarRef::var_id_iter()
+            .filter_map(|vi| {
+                if VarRef(vi).level() == self.root_level || VarRef(vi).is(FlagVar::ELIMINATED) {
                     default_value.map(|b| (vi, b))
                 } else {
                     Some((
                         vi,
                         self.best_phases.get(&vi).map_or(
-                            self.var[vi].assign.unwrap_or_else(|| v.is(FlagVar::PHASE)),
+                            VarRef(vi)
+                                .assign()
+                                .unwrap_or_else(|| VarRef(vi).is(FlagVar::PHASE)),
                             |(b, _)| *b,
                         ),
                     ))
@@ -84,12 +77,12 @@ impl VarSelectIF for AssignStack {
     fn reward_by_sls(&mut self, assignment: &HashMap<VarId, bool>) -> usize {
         let mut num_flipped = 0;
         for (vi, b) in assignment.iter() {
-            let v = &mut self.var[*vi];
-            if v.is(FlagVar::PHASE) != *b {
+            if VarRef(*vi).is(FlagVar::PHASE) != *b {
                 num_flipped += 1;
-                v.set(FlagVar::PHASE, *b);
-                v.reward *= self.activity_decay;
-                v.reward += self.activity_anti_decay;
+                VarRef(*vi).set_flag(FlagVar::PHASE, *b);
+                VarRef(*vi).set_reward(
+                    VarRef(*vi).reward() * self.activity_decay + self.activity_anti_decay,
+                );
                 self.update_heap(*vi);
             }
         }
@@ -108,11 +101,10 @@ impl VarSelectIF for AssignStack {
         debug_assert!(self
             .best_phases
             .iter()
-            .all(|(vi, b)| self.var[*vi].assign != Some(!b.0)));
+            .all(|(vi, b)| VarRef(*vi).assign() != Some(!b.0)));
         self.num_rephase += 1;
         for (vi, (b, _)) in self.best_phases.iter() {
-            let v = &mut self.var[*vi];
-            v.set(FlagVar::PHASE, *b);
+            VarRef(*vi).set_flag(FlagVar::PHASE, *b);
         }
     }
     #[cfg(feature = "rephase")]
@@ -120,7 +112,7 @@ impl VarSelectIF for AssignStack {
         if self
             .best_phases
             .iter()
-            .any(|(vi, b)| self.var[*vi].assign == Some(!b.0))
+            .any(|(vi, b)| VarRef(*vi).assign() == Some(!b.0))
         {
             self.best_phases.clear();
             self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
@@ -128,15 +120,15 @@ impl VarSelectIF for AssignStack {
     }
     fn select_decision_literal(&mut self) -> Lit {
         let vi = self.select_var();
-        Lit::from((vi, self.var[vi].is(FlagVar::PHASE)))
+        Lit::from((vi, VarRef(vi).is(FlagVar::PHASE)))
     }
     fn update_order(&mut self, v: VarId) {
         self.update_heap(v);
     }
     fn rebuild_order(&mut self) {
         self.clear_heap();
-        for vi in 1..self.var.len() {
-            if var_assign!(self, vi).is_none() && !self.var[vi].is(FlagVar::ELIMINATED) {
+        for vi in VarRef::var_id_iter() {
+            if VarRef(vi).assign().is_none() && !VarRef(vi).is(FlagVar::ELIMINATED) {
                 self.insert_heap(vi);
             }
         }
@@ -148,7 +140,7 @@ impl AssignStack {
     fn select_var(&mut self) -> VarId {
         loop {
             let vi = self.get_heap_root();
-            if var_assign!(self, vi).is_none() && !self.var[vi].is(FlagVar::ELIMINATED) {
+            if var_assign!(self, vi).is_none() && !VarRef(vi).is(FlagVar::ELIMINATED) {
                 return vi;
             }
         }

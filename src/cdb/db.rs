@@ -6,7 +6,7 @@ use {
         watch_cache::*,
         BinaryLinkDB, CertificationStore, ClauseDBIF, ClauseId, ReductionType, RefClause,
     },
-    crate::{assign::AssignIF, types::*},
+    crate::{assign::AssignIF, types::*, var_vector::*},
     std::{
         num::NonZeroU32,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -322,12 +322,7 @@ impl ClauseDBIF for ClauseDB {
     fn swap_watch(&mut self, cid: ClauseId) {
         self[cid].lits.swap(0, 1);
     }
-    fn new_clause(
-        &mut self,
-        asg: &mut impl AssignIF,
-        vec: &mut Vec<Lit>,
-        learnt: bool,
-    ) -> RefClause {
+    fn new_clause(&mut self, vec: &mut Vec<Lit>, learnt: bool) -> RefClause {
         debug_assert!(!vec.is_empty());
         debug_assert!(1 < vec.len());
         debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{vec:?}");
@@ -410,7 +405,7 @@ impl ClauseDBIF for ClauseDB {
                 }
             }
         } else {
-            c.update_lbd(asg, lbd_temp);
+            c.update_lbd(lbd_temp);
             c.rank_old = c.rank;
         }
         self.lbd.update(c.rank);
@@ -437,7 +432,7 @@ impl ClauseDBIF for ClauseDB {
         }
         RefClause::Clause(cid)
     }
-    fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, vec: &mut Vec<Lit>) -> RefClause {
+    fn new_clause_sandbox(&mut self, vec: &mut Vec<Lit>) -> RefClause {
         debug_assert!(1 < vec.len());
         if vec.len() == 2 {
             if let Some(&cid) = self.link_to_cid(vec[0], vec[1]) {
@@ -482,7 +477,7 @@ impl ClauseDBIF for ClauseDB {
             c.rank = 1;
             c.rank_old = 1;
         } else {
-            c.update_lbd(asg, lbd_temp);
+            c.update_lbd(lbd_temp);
             c.rank_old = c.rank;
             c.turn_on(FlagClause::LEARNT);
         }
@@ -807,7 +802,7 @@ impl ClauseDBIF for ClauseDB {
         RefClause::Clause(cid)
     }
     // only used in `propagate_at_root_level`
-    fn transform_by_simplification(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> RefClause {
+    fn transform_by_simplification(&mut self, cid: ClauseId) -> RefClause {
         //
         //## Clause transform rules
         //
@@ -823,8 +818,8 @@ impl ClauseDBIF for ClauseDB {
         // firstly sweep without consuming extra memory
         let mut need_to_shrink = false;
         for l in self[cid].iter() {
-            debug_assert!(!asg.var(l.vi()).is(FlagVar::ELIMINATED));
-            match asg.assigned(*l) {
+            debug_assert!(!VarRef(l.vi()).is(FlagVar::ELIMINATED));
+            match VarRef::assigned(*l) {
                 Some(true) => {
                     self.remove_clause(cid);
                     return RefClause::Dead;
@@ -832,7 +827,7 @@ impl ClauseDBIF for ClauseDB {
                 Some(false) => {
                     need_to_shrink = true;
                 }
-                None if asg.var(l.vi()).is(FlagVar::ELIMINATED) => {
+                None if VarRef(l.vi()).is(FlagVar::ELIMINATED) => {
                     need_to_shrink = true;
                 }
                 None => (),
@@ -855,7 +850,7 @@ impl ClauseDBIF for ClauseDB {
         let mut new_lits = c
             .lits
             .iter()
-            .filter(|l| asg.assigned(**l).is_none() && !asg.var(l.vi()).is(FlagVar::ELIMINATED))
+            .filter(|l| VarRef::assigned(**l).is_none() && !VarRef(l.vi()).is(FlagVar::ELIMINATED))
             .copied()
             .collect::<Vec<_>>();
         match new_lits.len() {
@@ -1003,11 +998,11 @@ impl ClauseDBIF for ClauseDB {
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
     }
-    fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool {
+    fn update_at_analysis(&mut self, cid: ClauseId) -> bool {
         let c = &mut self.clause[NonZeroU32::get(cid.ordinal) as usize];
         // Updating LBD at every analysis seems redundant.
         // But it's crucial. Don't remove the below.
-        let rank = c.update_lbd(asg, &mut self.lbd_temp);
+        let rank = c.update_lbd(&mut self.lbd_temp);
         let learnt = c.is(FlagClause::LEARNT);
         if learnt {
             #[cfg(feature = "just_used")]
@@ -1043,19 +1038,19 @@ impl ClauseDBIF for ClauseDB {
             .skip(1)
             .filter(|(_, c)| !c.is_dead())
         {
-            c.update_lbd(asg, lbd_temp);
+            c.update_lbd(lbd_temp);
 
             #[cfg(feature = "clause_rewarding")]
             c.update_activity(*tick, *activity_decay, 0.0);
 
             // There's no clause stored in `reason` because the decision level is 'zero.'
             debug_assert_ne!(
-                asg.reason(c.lit0().vi()),
+                VarRef(c.lit0().vi()).reason(),
                 AssignReason::Implication(ClauseId::from(i)),
                 "Lit {} {:?} level {}, dl: {}",
                 i32::from(c.lit0()),
-                asg.assigned(c.lit0()),
-                asg.level(c.lit0().vi()),
+                VarRef::assigned(c.lit0()),
+                VarRef(c.lit0().vi()).level(),
                 asg.decision_level(),
             );
             if !c.is(FlagClause::LEARNT) {
@@ -1150,7 +1145,7 @@ impl ClauseDBIF for ClauseDB {
         None
     }
     #[allow(clippy::unnecessary_cast)]
-    fn minimize_with_bi_clauses(&mut self, asg: &impl AssignIF, vec: &mut Vec<Lit>) {
+    fn minimize_with_bi_clauses(&mut self, vec: &mut Vec<Lit>) {
         if vec.len() <= 1 {
             return;
         }
@@ -1166,7 +1161,7 @@ impl ClauseDBIF for ClauseDB {
             debug_assert!(c[0] == l0 || c[1] == l0);
             let other = c[(c[0] == l0) as usize];
             let vi = other.vi();
-            if self.lbd_temp[vi] == key && asg.assigned(other) == Some(true) {
+            if self.lbd_temp[vi] == key && VarRef::assigned(other) == Some(true) {
                 num_sat += 1;
                 self.lbd_temp[vi] = key - 1;
             }
@@ -1176,9 +1171,9 @@ impl ClauseDBIF for ClauseDB {
             vec.retain(|l| self.lbd_temp[l.vi()] == key);
         }
     }
-    fn complete_bi_clauses(&mut self, asg: &mut impl AssignIF) {
+    fn complete_bi_clauses(&mut self) {
         while let Some(lit) = self.bi_clause_completion_queue.pop() {
-            self.complete_bi_clauses_with(asg, lit);
+            self.complete_bi_clauses_with(lit);
         }
     }
     #[cfg(feature = "boundary_check")]
@@ -1259,10 +1254,9 @@ impl ClauseDBIF for ClauseDB {
     #[cfg(not(feature = "no_IO"))]
     /// dump all active clauses and assertions as a CNF file.
     fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path) {
-        let nv = asg.derefer(crate::assign::property::Tusize::NumVar);
-        for vi in 1..nv {
-            if asg.var(vi).is(FlagVar::ELIMINATED) && asg.assign(vi).is_some() {
-                panic!("conflicting var {} {:?}", vi, asg.assign(vi));
+        for vi in VarRef::var_id_iter() {
+            if VarRef(vi).is(FlagVar::ELIMINATED) && VarRef(vi).assign().is_some() {
+                panic!("conflicting var {} {:?}", vi, VarRef(vi).assign());
             }
         }
         let Ok(out) = File::create(fname) else {
@@ -1271,7 +1265,7 @@ impl ClauseDBIF for ClauseDB {
         let mut buf = std::io::BufWriter::new(out);
         let na = asg.derefer(crate::assign::property::Tusize::NumAssertedVar);
         let nc = self.iter().skip(1).filter(|c| !c.is_dead()).count();
-        buf.write_all(format!("p cnf {} {}\n", nv, nc + na).as_bytes())
+        buf.write_all(format!("p cnf {} {}\n", VarRef::num_vars(), nc + na).as_bytes())
             .unwrap();
         for c in self.iter().skip(1) {
             if c.is_dead() {
@@ -1296,7 +1290,7 @@ impl ClauseDB {
     /// clause: [a, b] and [-b, c] deduces [a, c]
     /// map: [a].get(b), [!b].get(c), [a].get(c)
     /// rename: [lit].get(other), [!other].get(third), [a].get(third)
-    fn complete_bi_clauses_with(&mut self, asg: &mut impl AssignIF, lit: Lit) {
+    fn complete_bi_clauses_with(&mut self, lit: Lit) {
         let mut vec: Vec<Vec<Lit>> = Vec::new();
         // [lit, other]
         for (other, _) in self.binary_link.connect_with(lit) {
@@ -1309,7 +1303,7 @@ impl ClauseDB {
             }
         }
         for pair in vec.iter_mut() {
-            self.new_clause(asg, pair, false);
+            self.new_clause(pair, false);
             self.num_bi_clause_completion += 1;
         }
     }

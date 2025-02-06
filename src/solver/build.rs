@@ -2,9 +2,10 @@
 use {
     super::{Certificate, Solver, SolverEvent, SolverResult, State, StateIF},
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
+        assign::{AssignIF, AssignStack, PropagateIF},
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
+        var_vector::*,
     },
 };
 
@@ -27,13 +28,13 @@ pub trait SatSolverIF: Instantiate {
     /// # Example
     ///
     /// ```
-    /// use crate::splr::*;
+    /// use crate::splr::{*, var_vector::*};
     /// use crate::splr::assign::VarManipulateIF;    // for s.asg.assign()
     /// use std::path::Path;
     ///
     /// let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
     /// assert!(s.add_assignment(1).is_ok());
-    /// assert_eq!(s.asg.assign(1), Some(true));
+    /// assert_eq!(VarRef(1).assign(), Some(true));
     /// assert!(s.add_assignment(2).is_ok());
     /// assert!(s.add_assignment(3).is_ok());
     /// assert!(s.add_assignment(4).is_ok());
@@ -76,11 +77,11 @@ pub trait SatSolverIF: Instantiate {
     ///
     /// # Example
     /// ```
-    /// use crate::splr::*;
+    /// use crate::splr::{*, var_vector::*};
     /// use std::path::Path;
     ///
     /// let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
-    /// assert_eq!(s.asg.num_vars, 8);
+    /// assert_eq!(VarRef::num_vars(), 8);
     /// assert!(matches!(s.add_assignment(9), Err(SolverError::InvalidLiteral)));
     /// s.add_assignment(1).expect("panic");
     /// s.add_assignment(2).expect("panic");
@@ -117,6 +118,7 @@ impl Instantiate for Solver {
     /// let s = Solver::instantiate(&Config::default(), &CNFDescription::default());
     ///```
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Solver {
+        VarRef::initialize(cnf.num_of_variables);
         Solver {
             asg: AssignStack::instantiate(config, cnf),
             cdb: ClauseDB::instantiate(config, cnf),
@@ -174,17 +176,17 @@ impl TryFrom<&Path> for Solver {
 
 impl SatSolverIF for Solver {
     fn add_assignment(&mut self, val: i32) -> Result<&mut Solver, SolverError> {
-        if val == 0 || self.asg.num_vars < val.unsigned_abs() as usize {
+        if val == 0 || VarRef::num_vars() < val.unsigned_abs() as usize {
             return Err(SolverError::InvalidLiteral);
         }
         let lit = Lit::from(val);
         self.cdb.certificate_add_assertion(lit);
-        match self.asg.assigned(lit) {
+        match VarRef::assigned(lit) {
             None => self.asg.assign_at_root_level(lit).map(|_| self),
             Some(true) => Ok(self),
             Some(false) => Err(SolverError::RootLevelConflict((
                 lit,
-                self.asg.reason(lit.vi()),
+                VarRef(lit.vi()).reason(),
             ))),
         }
     }
@@ -193,7 +195,7 @@ impl SatSolverIF for Solver {
         V: AsRef<[i32]>,
     {
         for i in vec.as_ref().iter() {
-            if *i == 0 || self.asg.num_vars < i.unsigned_abs() as usize {
+            if *i == 0 || VarRef::num_vars() < i.unsigned_abs() as usize {
                 return Err(SolverError::InvalidLiteral);
             }
         }
@@ -218,10 +220,11 @@ impl SatSolverIF for Solver {
             ref mut state,
             ..
         } = self;
+        VarRef::add_var();
         asg.handle(SolverEvent::NewVar);
         cdb.handle(SolverEvent::NewVar);
         state.handle(SolverEvent::NewVar);
-        asg.num_vars as VarId
+        VarRef::num_vars() as VarId
     }
     /// # Examples
     ///
@@ -267,7 +270,7 @@ impl Solver {
         let mut l_: Option<Lit> = None; // last literal; [x, x.negate()] means tautology.
         for i in 0..lits.len() {
             let li = lits[i];
-            let sat = asg.assigned(li);
+            let sat = VarRef::assigned(li);
             if sat == Some(true) || Some(!li) == l_ {
                 return RefClause::Dead;
             } else if sat != Some(false) && Some(li) != l_ {
@@ -285,7 +288,7 @@ impl Solver {
                 asg.assign_at_root_level(l0)
                     .map_or(RefClause::EmptyClause, |_| RefClause::UnitClause(l0))
             }
-            _ => cdb.new_clause(asg, lits, false),
+            _ => cdb.new_clause(lits, false),
         }
     }
     #[cfg(not(feature = "no_IO"))]
@@ -325,7 +328,7 @@ impl Solver {
                 Err(e) => panic!("{}", e),
             }
         }
-        debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
+        debug_assert_eq!(VarRef::num_vars(), self.state.target.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
         Ok(self)
     }
@@ -338,7 +341,7 @@ impl Solver {
         self.state.flush("injecting...");
         for ints in v.iter() {
             for i in ints.as_ref().iter() {
-                if *i == 0 || self.asg.num_vars < i.unsigned_abs() as usize {
+                if *i == 0 || VarRef::num_vars() < i.unsigned_abs() as usize {
                     return Err(SolverError::InvalidLiteral);
                 }
             }
@@ -354,7 +357,7 @@ impl Solver {
                 return Err(SolverError::EmptyClause);
             }
         }
-        debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
+        debug_assert_eq!(VarRef::num_vars(), self.state.target.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
         Ok(self)
     }
@@ -363,14 +366,14 @@ impl Solver {
 #[cfg(test)]
 mod tests {
     // use super::*;
-    use crate::*;
+    use crate::{var_vector::*, *};
     use std::path::Path;
 
     #[cfg(not(feature = "no_IO"))]
     #[test]
     fn test_add_var() {
         let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
-        assert_eq!(s.asg.num_vars, 8);
+        assert_eq!(VarRef::num_vars(), 8);
         assert!(matches!(
             s.add_assignment(9),
             Err(SolverError::InvalidLiteral)

@@ -66,11 +66,11 @@ pub enum SolverEvent {
 /// The SAT solver object consisting of 6 sub modules.
 /// ```
 /// use crate::splr::*;
-/// use crate::splr::{assign::{AssignIF, VarManipulateIF}, state::{State, StateIF}, types::*};
+/// use crate::splr::{assign::{AssignIF, VarManipulateIF}, state::{State, StateIF}, types::*, var_vector::VarRef};
 /// use std::path::Path;
 ///
 /// let mut s = Solver::try_from(Path::new("cnfs/sample.cnf")).expect("can't load");
-/// assert_eq!(s.asg.derefer(assign::property::Tusize::NumVar), 250);
+/// assert_eq!(VarRef::num_vars(), 250);
 /// assert_eq!(s.asg.derefer(assign::property::Tusize::NumUnassertedVar), 250);
 /// if let Ok(Certificate::SAT(v)) = s.solve() {
 ///     assert_eq!(v.len(), 250);
@@ -128,13 +128,13 @@ impl<V: AsRef<[i32]>> TryFrom<Vec<V>> for Certificate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assign;
+    use crate::{assign, var_vector::VarRef};
 
     #[cfg_attr(not(feature = "no_IO"), test)]
     fn test_solver() {
         let config = Config::from("cnfs/sample.cnf");
         if let Ok(s) = Solver::build(&config) {
-            assert_eq!(s.asg.derefer(assign::property::Tusize::NumVar), 250);
+            assert_eq!(VarRef::num_vars(), 250);
             assert_eq!(
                 s.asg.derefer(assign::property::Tusize::NumUnassertedVar),
                 250

@@ -1,7 +1,7 @@
 /// Implementation of Stochastic Local Search
 use {
     super::{Clause, ClauseDB, VarId},
-    crate::{assign::AssignIF, types::*},
+    crate::types::*,
     std::collections::HashMap,
 };
 
@@ -12,7 +12,6 @@ pub trait StochasticLocalSearchIF {
     /// This would be a better criteria that can be used in CDCL solvers.
     fn stochastic_local_search(
         &mut self,
-        asg: &impl AssignIF,
         start: &mut HashMap<VarId, bool>,
         limit: usize,
     ) -> (usize, usize);
@@ -21,7 +20,6 @@ pub trait StochasticLocalSearchIF {
 impl StochasticLocalSearchIF for ClauseDB {
     fn stochastic_local_search(
         &mut self,
-        _asg: &impl AssignIF,
         assignment: &mut HashMap<VarId, bool>,
         limit: usize,
     ) -> (usize, usize) {

@@ -5,11 +5,12 @@ use {
         SolverResult,
     },
     crate::{
-        assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
+        assign::{self, AssignIF, AssignStack, PropagateIF, VarSelectIF},
         cdb::{self, ClauseDB, ClauseDBIF, ReductionType, VivifyIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
         types::*,
+        var_vector::*,
     },
 };
 
@@ -94,9 +95,9 @@ impl SolveIF for Solver {
                 // Otherwise all literals are assigned wrongly.
 
                 state.flush("phasing...");
-                elim.prepare(asg, cdb, true);
-                for vi in 1..=asg.num_vars {
-                    if asg.assign(vi).is_some() {
+                elim.prepare(cdb, true);
+                for vi in VarRef::var_id_iter() {
+                    if VarRef(vi).assign().is_some() {
                         continue;
                     }
                     if let Some((p, m)) = elim.stats(vi) {
@@ -105,21 +106,21 @@ impl SolveIF for Solver {
                         // This becomes a problem in the case of incremental solving.
                         if m == 0 {
                             let l = Lit::from((vi, true));
-                            debug_assert!(asg.assigned(l).is_none());
+                            debug_assert!(VarRef::assigned(l).is_none());
                             cdb.certificate_add_assertion(l);
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
                         } else if p == 0 {
                             let l = Lit::from((vi, false));
-                            debug_assert!(asg.assigned(l).is_none());
+                            debug_assert!(VarRef::assigned(l).is_none());
                             cdb.certificate_add_assertion(l);
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
                         }
-                        asg.var_mut(vi).set(FlagVar::PHASE, m < p);
-                        elim.enqueue_var(asg, vi, false);
+                        VarRef(vi).set_flag(FlagVar::PHASE, m < p);
+                        elim.enqueue_var(vi, false);
                     }
                 }
                 //
@@ -136,21 +137,21 @@ impl SolveIF for Solver {
                         }
                         return Ok(Certificate::UNSAT);
                     }
-                    for vi in 1..=asg.num_vars {
-                        if asg.assign(vi).is_some() || asg.var(vi).is(FlagVar::ELIMINATED) {
+                    for vi in VarRef::var_id_iter() {
+                        if VarRef(vi).assign().is_some() || VarRef(vi).is(FlagVar::ELIMINATED) {
                             continue;
                         }
                         match elim.stats(vi) {
                             Some((_, 0)) => (),
                             Some((0, _)) => (),
-                            Some((p, m)) if m * 10 < p => asg.var_mut(vi).turn_on(FlagVar::PHASE),
-                            Some((p, m)) if p * 10 < m => asg.var_mut(vi).turn_off(FlagVar::PHASE),
+                            Some((p, m)) if m * 10 < p => VarRef(vi).turn_on(FlagVar::PHASE),
+                            Some((p, m)) if p * 10 < m => VarRef(vi).turn_off(FlagVar::PHASE),
                             _ => (),
                         }
                     }
-                    let act = 1.0 / (asg.num_vars as f64).powf(0.25);
-                    for vi in 1..asg.num_vars {
-                        if !asg.var(vi).is(FlagVar::ELIMINATED) {
+                    let act = 1.0 / (VarRef::num_vars() as f64).powf(0.25);
+                    for vi in VarRef::var_id_iter() {
+                        if !VarRef(vi).is(FlagVar::ELIMINATED) {
                             asg.set_activity(vi, act);
                         }
                     }
@@ -191,17 +192,14 @@ impl SolveIF for Solver {
                 }
 
                 // map `Option<bool>` to `i32`, and remove the dummy var at the head.
-                let vals = asg
-                    .var_iter()
-                    .enumerate()
-                    .skip(1)
-                    .map(|(vi, _)| i32::from(Lit::from((vi, model[vi].unwrap()))))
+                let vals = VarRef::var_id_iter()
+                    .map(|vi| i32::from(Lit::from((vi, model[vi].unwrap()))))
                     .collect::<Vec<i32>>();
 
                 // As a preparation for incremental solving, turn flags off.
-                for v in asg.var_iter_mut().skip(1) {
-                    if v.is(FlagVar::ELIMINATED) {
-                        v.turn_off(FlagVar::ELIMINATED);
+                for vi in VarRef::var_id_iter() {
+                    if VarRef(vi).is(FlagVar::ELIMINATED) {
+                        VarRef(vi).turn_off(FlagVar::ELIMINATED);
                     }
                 }
                 RESTART!(asg, cdb, state);
@@ -304,7 +302,7 @@ fn search(
                                     "SLS(#{}, core: {}, steps: {})",
                                     state.sls_index, sls_core, $limit
                                 ));
-                                let cls = cdb.stochastic_local_search(asg, &mut $assign, $limit);
+                                let cls = cdb.stochastic_local_search(&mut $assign, $limit);
                                 asg.override_rephasing_target(&$assign);
                                 sls_core = sls_core.min(cls.1);
                             };
@@ -413,7 +411,7 @@ fn search(
             "search process finished at level {}:: {} = {} - {} - {}",
             asg.decision_level(),
             asg.derefer(assign::property::Tusize::NumUnassignedVar),
-            asg.num_vars,
+            VarRef::num_vars(),
             asg.num_eliminated_vars,
             asg.stack_len(),
         ),
@@ -525,7 +523,7 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
 // Build a conflict clause caused by *assumed* literals UNDER ROOT_LEVEL.
 // So we use zero instead of root_level sometimes in this function.
 fn analyze_final(asg: &mut AssignStack, state: &mut State, c: &Clause) {
-    let mut seen = vec![false; asg.num_vars + 1];
+    let mut seen = vec![false; VarRef::num_vars() + 1];
     state.conflicts.clear();
     if asg.decision_level() == 0 {
         return;

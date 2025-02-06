@@ -1,12 +1,8 @@
 //! main struct AssignStack
 use {
-    super::{ema::ProgressASG, heap::VarHeapIF, heap::VarIdHeap, AssignIF, PropagateIF, Var},
-    crate::{cdb::ClauseDBIF, types::*},
-    std::{
-        fmt,
-        ops::Range,
-        slice::{Iter, IterMut},
-    },
+    super::{ema::ProgressASG, heap::VarHeapIF, heap::VarIdHeap, AssignIF, PropagateIF},
+    crate::{cdb::ClauseDBIF, types::*, var_vector::*},
+    std::{fmt, ops::Range, slice::Iter},
 };
 
 #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
@@ -58,8 +54,6 @@ pub struct AssignStack {
     //
     //## Statistics
     //
-    /// the number of vars.
-    pub num_vars: usize,
     /// the number of asserted vars.
     pub num_asserted_vars: usize,
     /// the number of eliminated vars.
@@ -78,14 +72,6 @@ pub struct AssignStack {
     pub(super) cpr_ema: EmaSU,
 
     //
-    //## Var DB
-    //
-    /// an index for counting elapsed time
-    pub(super) tick: usize,
-    /// vars
-    pub(super) var: Vec<Var>,
-
-    //
     //## Var Rewarding
     //
     /// var activity decay
@@ -97,6 +83,8 @@ pub struct AssignStack {
     pub(super) activity_anti_decay: f64,
     #[cfg(feature = "EVSIDS")]
     activity_decay_step: f64,
+    /// an index for counting elapsed time
+    pub(super) tick: usize,
 }
 
 impl Default for AssignStack {
@@ -128,7 +116,6 @@ impl Default for AssignStack {
             stage_scale: 1,
             eliminated: Vec::new(),
 
-            num_vars: 0,
             num_asserted_vars: 0,
             num_eliminated_vars: 0,
             num_decision: 0,
@@ -141,8 +128,7 @@ impl Default for AssignStack {
             cpr_ema: EmaSU::new(100),
 
             tick: 0,
-            var: Vec::new(),
-
+            // var: Vec::new(),
             activity_decay: 0.94,
 
             #[cfg(feature = "EVSIDS")]
@@ -180,10 +166,8 @@ impl Instantiate for AssignStack {
             #[cfg(feature = "trail_saving")]
             trail_saved: Vec::with_capacity(nv),
 
-            num_vars: cnf.num_of_variables,
             assign_rate: ProgressASG::instantiate(config, cnf),
-            var: Var::new_vars(nv),
-
+            // var: Var::new_vars(nv),
             #[cfg(feature = "EVSIDS")]
             activity_decay: config.vrw_dcy_rat * 0.6,
             #[cfg(not(feature = "EVSIDS"))]
@@ -215,8 +199,7 @@ impl Instantiate for AssignStack {
             }
             SolverEvent::NewVar => {
                 self.expand_heap();
-                self.num_vars += 1;
-                self.var.push(Var::default());
+                // self.var.push(Var::default());
             }
             SolverEvent::Reinitialize => {
                 self.cancel_until(self.root_level);
@@ -267,10 +250,13 @@ impl AssignIF for AssignStack {
         self.q_head < self.trail.len()
     }
     fn assign_ref(&self) -> Vec<Option<bool>> {
-        self.var.iter().map(|v| v.assign).collect::<Vec<_>>()
+        (0..=VarRef::num_vars())
+            .map(|vi| VarRef(vi).assign())
+            .collect::<Vec<_>>()
     }
     fn best_assigned(&mut self) -> Option<usize> {
-        (self.build_best_at == self.num_propagation).then_some(self.num_vars - self.num_best_assign)
+        (self.build_best_at == self.num_propagation)
+            .then_some(VarRef::num_vars() - self.num_best_assign)
     }
     #[cfg(feature = "rephase")]
     fn best_phases_invalid(&self) -> bool {
@@ -332,7 +318,7 @@ impl AssignIF for AssignStack {
     }
     fn satisfies(&self, vec: &[Lit]) -> bool {
         for l in vec {
-            if self.assigned(*l) == Some(true) {
+            if VarRef::assigned(*l) == Some(true) {
                 return true;
             }
         }
@@ -382,6 +368,87 @@ impl fmt::Display for AssignStack {
     }
 }
 
+/// Var manipulation
+pub trait VarManipulateIF {
+    /// set var status to asserted.
+    fn make_var_asserted(&mut self, vi: VarId);
+    /// set var status to eliminated.
+    fn make_var_eliminated(&mut self, vi: VarId);
+}
+
+impl VarManipulateIF for AssignStack {
+    fn make_var_asserted(&mut self, vi: VarId) {
+        // self.var[vi].reason = AssignReason::Decision(0);
+        VarRef(vi).set_reason(AssignReason::Decision(0));
+        self.set_activity(vi, 0.0);
+        self.remove_from_heap(vi);
+
+        #[cfg(feature = "boundary_check")]
+        {
+            self.var[vi].timestamp = self.tick;
+        }
+
+        #[cfg(feature = "best_phases_tracking")]
+        self.check_best_phase(vi);
+    }
+    fn make_var_eliminated(&mut self, vi: VarId) {
+        if !VarRef(vi).is(FlagVar::ELIMINATED) {
+            VarRef(vi).turn_on(FlagVar::ELIMINATED);
+            self.set_activity(vi, 0.0);
+            self.remove_from_heap(vi);
+            debug_assert_eq!(self.decision_level(), self.root_level);
+            self.trail.retain(|l| l.vi() != vi);
+            self.num_eliminated_vars += 1;
+
+            #[cfg(feature = "boundary_check")]
+            {
+                self.var[vi].timestamp = self.tick;
+            }
+
+            #[cfg(feature = "trace_elimination")]
+            {
+                let lv = self.level[vi];
+                if self.root_level == self.level[vi] && self.assign[vi].is_some() {
+                    panic!("v:{}, dl:{}", self.var[vi], self.decision_level());
+                }
+                if !(self.root_level < self.level[vi] || self.assign[vi].is_none()) {
+                    panic!(
+                        "v:{}, lvl:{} => {}, dl:{}, assign:{:?} ",
+                        self.var[vi],
+                        lv,
+                        self.level[vi],
+                        self.decision_level(),
+                        self.assign[vi],
+                    );
+                }
+                debug_assert!(self.root_level < self.level[vi] || self.assign[vi].is_none());
+            }
+        } else {
+            #[cfg(feature = "boundary_check")]
+            panic!("double elimination");
+        }
+    }
+}
+
+#[cfg(feature = "best_phases_tracking")]
+impl AssignStack {
+    /// check usability of the saved best phase.
+    /// return `true` if the current best phase got invalid.
+    fn check_best_phase(&mut self, vi: VarId) -> bool {
+        if let Some((b, _)) = self.best_phases.get(&vi) {
+            debug_assert!(VarRef(vi).assign().is_some());
+            if VarRef(vi).assign() != Some(*b) {
+                if self.root_level == VarRef(vi).level() {
+                    self.best_phases.clear();
+                    self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
+                }
+                return true;
+            }
+        }
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -397,6 +464,7 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
+        VarRef::initialize(4);
         let mut asg = AssignStack::instantiate(&config, &cnf);
         // [] + 1 => [1]
         assert!(asg.assign_at_root_level(lit(1)).is_ok());
@@ -441,14 +509,15 @@ mod tests {
         assert_eq!(asg.decision_level(), 1);
         assert_eq!(asg.stack_len(), 3);
         assert_eq!(asg.trail_lim, vec![2]);
-        assert_eq!(asg.assigned(lit(1)), Some(true));
-        assert_eq!(asg.assigned(lit(-1)), Some(false));
-        assert_eq!(asg.assigned(lit(4)), None);
+        assert_eq!(VarRef::assigned(lit(1)), Some(true));
+        assert_eq!(VarRef::assigned(lit(-1)), Some(false));
+        assert_eq!(VarRef::assigned(lit(4)), None);
 
         // [1, 2, 3] => [1, 2, 3, 4]
         asg.assign_by_decision(lit(4));
         assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
-        assert_eq!(asg.var[lit(4).vi()].level, 2);
+        // assert_eq!(asg.var[lit(4).vi()].level, 2);
+        assert_eq!(VarRef(lit(4).vi()).level(), 2);
         assert_eq!(asg.trail_lim, vec![2, 3]);
 
         // [1, 2, 3, 4] => [1, 2, -4]
@@ -458,160 +527,7 @@ mod tests {
         assert_eq!(asg.decision_level(), 0);
         assert_eq!(asg.stack_len(), 3);
 
-        assert_eq!(asg.assigned(lit(-4)), Some(true));
-        assert_eq!(asg.assigned(lit(-3)), None);
-    }
-}
-
-/// Var manipulation
-pub trait VarManipulateIF {
-    /// return the assignment of var.
-    fn assign(&self, vi: VarId) -> Option<bool>;
-    /// return *the value* of a literal.
-    fn assigned(&self, l: Lit) -> Option<bool>;
-    /// return the assign level of var.
-    fn level(&self, vi: VarId) -> DecisionLevel;
-    /// return the reason of assignment.
-    fn reason(&self, vi: VarId) -> AssignReason;
-    /// return the var.
-    fn var(&self, vi: VarId) -> &Var;
-    /// return the var.
-    fn var_mut(&mut self, vi: VarId) -> &mut Var;
-    /// return an iterator over Vars.
-    fn var_iter(&self) -> Iter<'_, Var>;
-    /// return an mutable iterator over Vars.
-    fn var_iter_mut(&mut self) -> IterMut<'_, Var>;
-    /// set var status to asserted.
-    fn make_var_asserted(&mut self, vi: VarId);
-    /// set var status to eliminated.
-    fn make_var_eliminated(&mut self, vi: VarId);
-}
-
-impl VarManipulateIF for AssignStack {
-    fn assigned(&self, l: Lit) -> Option<bool> {
-        match self.var[l.vi()].assign {
-            Some(x) if !bool::from(l) => Some(!x),
-            x => x,
-        }
-    }
-    #[inline]
-    fn assign(&self, vi: VarId) -> Option<bool> {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.var.get_unchecked(vi).assign
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        self.assign[vi]
-    }
-    #[inline]
-    fn level(&self, vi: VarId) -> DecisionLevel {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.var.get_unchecked(vi).level
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        self.level[vi]
-    }
-    #[inline]
-    fn reason(&self, vi: VarId) -> AssignReason {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.var.get_unchecked(vi).reason
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        self.reason[vi]
-    }
-    #[inline]
-    fn var(&self, vi: VarId) -> &Var {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.var.get_unchecked(vi)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self.var[vi]
-    }
-    #[inline]
-    fn var_mut(&mut self, vi: VarId) -> &mut Var {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.var.get_unchecked_mut(vi)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self.var[vi]
-    }
-    fn var_iter(&self) -> Iter<'_, Var> {
-        self.var.iter()
-    }
-    fn var_iter_mut(&mut self) -> IterMut<'_, Var> {
-        self.var.iter_mut()
-    }
-    fn make_var_asserted(&mut self, vi: VarId) {
-        self.var[vi].reason = AssignReason::Decision(0);
-        self.set_activity(vi, 0.0);
-        self.remove_from_heap(vi);
-
-        #[cfg(feature = "boundary_check")]
-        {
-            self.var[vi].timestamp = self.tick;
-        }
-
-        #[cfg(feature = "best_phases_tracking")]
-        self.check_best_phase(vi);
-    }
-    fn make_var_eliminated(&mut self, vi: VarId) {
-        if !self.var[vi].is(FlagVar::ELIMINATED) {
-            self.var[vi].turn_on(FlagVar::ELIMINATED);
-            self.set_activity(vi, 0.0);
-            self.remove_from_heap(vi);
-            debug_assert_eq!(self.decision_level(), self.root_level);
-            self.trail.retain(|l| l.vi() != vi);
-            self.num_eliminated_vars += 1;
-
-            #[cfg(feature = "boundary_check")]
-            {
-                self.var[vi].timestamp = self.tick;
-            }
-
-            #[cfg(feature = "trace_elimination")]
-            {
-                let lv = self.level[vi];
-                if self.root_level == self.level[vi] && self.assign[vi].is_some() {
-                    panic!("v:{}, dl:{}", self.var[vi], self.decision_level());
-                }
-                if !(self.root_level < self.level[vi] || self.assign[vi].is_none()) {
-                    panic!(
-                        "v:{}, lvl:{} => {}, dl:{}, assign:{:?} ",
-                        self.var[vi],
-                        lv,
-                        self.level[vi],
-                        self.decision_level(),
-                        self.assign[vi],
-                    );
-                }
-                debug_assert!(self.root_level < self.level[vi] || self.assign[vi].is_none());
-            }
-        } else {
-            #[cfg(feature = "boundary_check")]
-            panic!("double elimination");
-        }
-    }
-}
-
-#[cfg(feature = "best_phases_tracking")]
-impl AssignStack {
-    /// check usability of the saved best phase.
-    /// return `true` if the current best phase got invalid.
-    fn check_best_phase(&mut self, vi: VarId) -> bool {
-        if let Some((b, _)) = self.best_phases.get(&vi) {
-            debug_assert!(self.var[vi].assign.is_some());
-            if self.var[vi].assign != Some(*b) {
-                if self.root_level == self.var[vi].level {
-                    self.best_phases.clear();
-                    self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
-                }
-                return true;
-            }
-        }
-        false
+        assert_eq!(VarRef::assigned(lit(-4)), Some(true));
+        assert_eq!(VarRef::assigned(lit(-3)), None);
     }
 }
