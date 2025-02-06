@@ -1,8 +1,8 @@
 // implement boolean constraint propagation, backjump
 // This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{heap::VarHeapIF, AssignIF, AssignStack, VarManipulateIF},
-    crate::{cdb::ClauseDBIF, types::*, var_vector::*},
+    super::{AssignIF, AssignStack, VarManipulateIF},
+    crate::{cdb::ClauseDBIF, types::*, vam::VarActivityManager, var_vector::*},
 };
 
 #[cfg(feature = "trail_saving")]
@@ -290,7 +290,8 @@ impl PropagateIF for AssignStack {
             debug_assert!(self.root_level < VarRef(vi).level());
             unset_assign!(self, vi);
             VarRef(vi).set_reason(AssignReason::None);
-            self.insert_heap(vi);
+            // self.insert_heap(vi);
+            VarActivityManager::insert_heap(vi);
         }
         self.trail.truncate(lim);
         self.trail_lim.truncate(self.root_level as usize);

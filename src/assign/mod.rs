@@ -3,8 +3,6 @@
 
 /// Ema
 mod ema;
-/// Heap
-mod heap;
 /// Boolean constraint propagation
 mod propagate;
 /// Var rewarding

@@ -1,3 +1,4 @@
+//! Variable Activity Manager with idempotent heap
 #![allow(static_mut_refs)]
 use {
     crate::{assign::AssignStack, types::*, var_vector::*},
@@ -27,7 +28,7 @@ static mut VAR_HEAP: VarIdHeap = VarIdHeap {
 impl VarActivityManager {
     pub fn initialize() {
         unsafe {
-            VAR_HEAP.clear();
+            VAR_HEAP = VarIdHeap::new(VarRef::num_vars());
         }
     }
     pub fn set_activity_decay(decay: f64) {
@@ -55,19 +56,49 @@ impl VarActivityManager {
             VarRef(vi).update_activity(VAM.decay, VAM.anti_decay);
         }
     }
-    pub fn add_var(vi: VarId) {
+
+    pub fn clear_heap() {
+        unsafe {
+            VAR_HEAP.clear_heap();
+        }
+    }
+    pub fn expand_heap() {
+        unsafe {
+            VAR_HEAP.expand_heap();
+        }
+    }
+    pub fn insert_heap(vi: VarId) {
         unsafe {
             VAR_HEAP.insert_heap(vi);
         }
     }
-    pub fn remove_var(vi: VarId) {
+    pub fn update_heap(vi: VarId) {
+        unsafe {
+            VAR_HEAP.update_heap(vi);
+        }
+    }
+    pub fn get_heap_root(asg: &mut AssignStack) -> VarId {
+        unsafe { VAR_HEAP.get_heap_root(asg) }
+    }
+    pub fn remove_from_heap(vi: VarId) {
         unsafe {
             VAR_HEAP.remove_from_heap(vi);
         }
     }
-    pub fn pop_top_var(asg: &mut AssignStack) -> VarId {
-        unsafe { VAR_HEAP.get_heap_root(asg) }
-    }
+
+    // pub fn add_var(vi: VarId) {
+    //     unsafe {
+    //         VAR_HEAP.insert_heap(vi);
+    //     }
+    // }
+    // pub fn remove_var(vi: VarId) {
+    //     unsafe {
+    //         VAR_HEAP.remove_from_heap(vi);
+    //     }
+    // }
+    // pub fn pop_top_var(asg: &mut AssignStack) -> VarId {
+    //     unsafe { VAR_HEAP.get_heap_root(asg) }
+    // }
     pub fn increment_tick() {
         unsafe {
             VAM.tick += 1;

@@ -5,6 +5,7 @@ use {
         assign::{AssignIF, AssignStack, PropagateIF},
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
+        vam::*,
         var_vector::*,
     },
 };
@@ -119,6 +120,7 @@ impl Instantiate for Solver {
     ///```
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Solver {
         VarRef::initialize(cnf.num_of_variables);
+        VarActivityManager::initialize();
         Solver {
             asg: AssignStack::instantiate(config, cnf),
             cdb: ClauseDB::instantiate(config, cnf),
