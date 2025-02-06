@@ -72,14 +72,6 @@ pub struct AssignStack {
     pub(super) cpr_ema: EmaSU,
 
     //
-    //## Var DB
-    //
-    /// an index for counting elapsed time
-    pub(super) tick: usize,
-    // /// vars
-    // pub(super) var: Vec<Var>,
-
-    //
     //## Var Rewarding
     //
     /// var activity decay
@@ -91,6 +83,8 @@ pub struct AssignStack {
     pub(super) activity_anti_decay: f64,
     #[cfg(feature = "EVSIDS")]
     activity_decay_step: f64,
+    /// an index for counting elapsed time
+    pub(super) tick: usize,
 }
 
 impl Default for AssignStack {
