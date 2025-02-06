@@ -8,6 +8,7 @@ use {
         assign, cdb,
         solver::{RestartManager, SolverEvent, StageManager},
         types::*,
+        var_vector::*,
     },
     std::{
         fmt,
@@ -446,7 +447,7 @@ impl StateIF for State {
         //
         //## Gather stats from all modules
         //
-        let asg_num_vars = asg.derefer(assign::property::Tusize::NumVar);
+        let asg_num_vars = VarRef::num_vars();
         let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
         let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumEliminatedVar);
         let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
@@ -633,7 +634,7 @@ impl State {
         self[LogF64Id::Progress] = 100.0
             * (self[LogUsizeId::AssertedVar]
                 + asg.derefer(assign::property::Tusize::NumEliminatedVar)) as f64
-            / asg.derefer(assign::property::Tusize::NumVar) as f64;
+            / VarRef::num_vars() as f64;
         self[LogUsizeId::RemovableClause] = cdb.derefer(cdb::property::Tusize::NumLearnt);
         self[LogUsizeId::LBD2Clause] = cdb.derefer(cdb::property::Tusize::NumLBD2);
         self[LogUsizeId::BiClause] = cdb.derefer(cdb::property::Tusize::NumBiClause);
@@ -777,7 +778,7 @@ impl State {
         C: PropertyDereference<cdb::property::Tusize, usize>,
     {
         self.progress_cnt += 1;
-        let asg_num_vars = asg.derefer(assign::property::Tusize::NumVar);
+        let asg_num_vars = VarRef::num_vars();
         let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
         let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumEliminatedVar);
         let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
@@ -810,7 +811,7 @@ impl State {
             + PropertyReference<cdb::property::TEma, EmaView>,
     {
         self.progress_cnt += 1;
-        let asg_num_vars = asg.derefer(assign::property::Tusize::NumVar);
+        let asg_num_vars = VarRef::num_vars();
         let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
         let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumEliminatedVar);
         let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);

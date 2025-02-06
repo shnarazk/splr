@@ -51,7 +51,7 @@ pub trait EliminateIF: Instantiate {
     /// check if the eliminator is running.
     fn is_running(&self) -> bool;
     /// rebuild occur lists.
-    fn prepare(&mut self, asg: &mut impl AssignIF, cdb: &mut impl ClauseDBIF, force: bool);
+    fn prepare(&mut self, cdb: &mut impl ClauseDBIF, force: bool);
     /// enqueue a var into eliminator's var queue.
     fn enqueue_var(&mut self, vi: VarId, upward: bool);
     /// simplify database by:

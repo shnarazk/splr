@@ -45,7 +45,7 @@ pub trait VarSelectIF {
 impl VarSelectIF for AssignStack {
     #[cfg(feature = "rephase")]
     fn best_phases_ref(&mut self, default_value: Option<bool>) -> HashMap<VarId, bool> {
-        (1..=self.num_vars)
+        VarRef::var_id_iter()
             .filter_map(|vi| {
                 if VarRef(vi).level() == self.root_level || VarRef(vi).is(FlagVar::ELIMINATED) {
                     default_value.map(|b| (vi, b))
@@ -127,7 +127,7 @@ impl VarSelectIF for AssignStack {
     }
     fn rebuild_order(&mut self) {
         self.clear_heap();
-        for vi in 1..=self.num_vars {
+        for vi in VarRef::var_id_iter() {
             if VarRef(vi).assign().is_none() && !VarRef(vi).is(FlagVar::ELIMINATED) {
                 self.insert_heap(vi);
             }

@@ -220,7 +220,7 @@ impl EliminateIF for Eliminator {
     fn is_running(&self) -> bool {
         self.enable && self.mode == EliminatorMode::Running
     }
-    fn prepare(&mut self, asg: &mut impl AssignIF, cdb: &mut impl ClauseDBIF, force: bool) {
+    fn prepare(&mut self, cdb: &mut impl ClauseDBIF, force: bool) {
         if !self.enable {
             return;
         }
@@ -239,7 +239,7 @@ impl EliminateIF for Eliminator {
             self.add_cid_occur(ClauseId::from(cid), c, false);
         }
         if force {
-            for vi in 1..=asg.derefer(assign::property::Tusize::NumVar) {
+            for vi in VarRef::var_id_iter() {
                 if VarRef(vi).is(FlagVar::ELIMINATED) || VarRef(vi).assign().is_some() {
                     continue;
                 }
@@ -281,7 +281,7 @@ impl EliminateIF for Eliminator {
         }
         if self.enable {
             if !force_run && self.mode == EliminatorMode::Dormant {
-                self.prepare(asg, cdb, true);
+                self.prepare(cdb, true);
             }
             self.eliminate_grow_limit = state.derefer(state::property::Tusize::IntervalScale) / 2;
             self.subsume_literal_limit = state.config.elm_cls_lim

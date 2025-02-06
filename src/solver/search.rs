@@ -95,8 +95,8 @@ impl SolveIF for Solver {
                 // Otherwise all literals are assigned wrongly.
 
                 state.flush("phasing...");
-                elim.prepare(asg, cdb, true);
-                for vi in 1..=asg.num_vars {
+                elim.prepare(cdb, true);
+                for vi in VarRef::var_id_iter() {
                     if VarRef(vi).assign().is_some() {
                         continue;
                     }
@@ -137,7 +137,7 @@ impl SolveIF for Solver {
                         }
                         return Ok(Certificate::UNSAT);
                     }
-                    for vi in 1..=asg.num_vars {
+                    for vi in VarRef::var_id_iter() {
                         if VarRef(vi).assign().is_some() || VarRef(vi).is(FlagVar::ELIMINATED) {
                             continue;
                         }
@@ -149,8 +149,8 @@ impl SolveIF for Solver {
                             _ => (),
                         }
                     }
-                    let act = 1.0 / (asg.num_vars as f64).powf(0.25);
-                    for vi in 1..=asg.num_vars {
+                    let act = 1.0 / (VarRef::num_vars() as f64).powf(0.25);
+                    for vi in VarRef::var_id_iter() {
                         if !VarRef(vi).is(FlagVar::ELIMINATED) {
                             asg.set_activity(vi, act);
                         }
@@ -192,12 +192,12 @@ impl SolveIF for Solver {
                 }
 
                 // map `Option<bool>` to `i32`, and remove the dummy var at the head.
-                let vals = (1..=asg.num_vars)
+                let vals = VarRef::var_id_iter()
                     .map(|vi| i32::from(Lit::from((vi, model[vi].unwrap()))))
                     .collect::<Vec<i32>>();
 
                 // As a preparation for incremental solving, turn flags off.
-                for vi in 1..=asg.num_vars {
+                for vi in VarRef::var_id_iter() {
                     if VarRef(vi).is(FlagVar::ELIMINATED) {
                         VarRef(vi).turn_off(FlagVar::ELIMINATED);
                     }
@@ -411,7 +411,7 @@ fn search(
             "search process finished at level {}:: {} = {} - {} - {}",
             asg.decision_level(),
             asg.derefer(assign::property::Tusize::NumUnassignedVar),
-            asg.num_vars,
+            VarRef::num_vars(),
             asg.num_eliminated_vars,
             asg.stack_len(),
         ),
@@ -523,7 +523,7 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
 // Build a conflict clause caused by *assumed* literals UNDER ROOT_LEVEL.
 // So we use zero instead of root_level sometimes in this function.
 fn analyze_final(asg: &mut AssignStack, state: &mut State, c: &Clause) {
-    let mut seen = vec![false; asg.num_vars + 1];
+    let mut seen = vec![false; VarRef::num_vars() + 1];
     state.conflicts.clear();
     if asg.decision_level() == 0 {
         return;

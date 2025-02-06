@@ -40,32 +40,3 @@ impl ActivityIF<VarId> for AssignStack {
         self.tick += 1;
     }
 }
-
-impl AssignStack {
-    pub fn rescale_activity(&mut self, scaling: f64) {
-        for i in 1..self.num_vars {
-            VarRef(i).set_reward(VarRef(i).reward() * scaling);
-        }
-    }
-    // pub fn set_activity_trend(&mut self) -> f64 {
-    //     let mut nv = 0;
-    //     let mut inc = 0;
-    //     let mut activity_sum: f64 = 0.0;
-    //     // let mut dec = 1;
-    //     for (vi, v) in self.var.iter_mut().enumerate().skip(1) {
-    //         if v.is(FlagVar::ELIMINATED) || self.level[vi] == self.root_level {
-    //             continue;
-    //         }
-    //         nv += 1;
-    //         activity_sum += v.reward;
-    //         let trend = v.reward_ema.trend();
-    //         if 1.0 < trend {
-    //             inc += 1;
-    //         }
-    //     }
-    //     self.activity_averaged = activity_sum / nv as f64;
-    //     self.cwss = inc as f64 / nv as f64;
-    //     // println!("inc rate:{:>6.4}", self.cwss);
-    //     self.cwss
-    // }
-}

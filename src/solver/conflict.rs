@@ -417,7 +417,7 @@ fn conflict_analyze(
         while {
             let vi = asg.stack(trail_index).vi();
             boundary_check!(
-                0 < vi && vi < asg.num_vars,
+                0 < vi && vi < VarRef::num_vars(),
                 "trail[{}] has an invalid var index {}",
                 trail_index,
                 asg.stack(trail_index)

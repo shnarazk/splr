@@ -55,6 +55,11 @@ impl VarRef {
             }
         }
     }
+    pub fn rescale_activity(scaling: f64) {
+        for i in VarRef::var_id_iter() {
+            VarRef(i).set_reward(VarRef(i).reward() * scaling);
+        }
+    }
 }
 
 impl VarRefIF for VarRef {

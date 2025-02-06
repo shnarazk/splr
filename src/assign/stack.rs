@@ -54,8 +54,6 @@ pub struct AssignStack {
     //
     //## Statistics
     //
-    /// the number of vars.
-    pub num_vars: usize,
     /// the number of asserted vars.
     pub num_asserted_vars: usize,
     /// the number of eliminated vars.
@@ -124,7 +122,6 @@ impl Default for AssignStack {
             stage_scale: 1,
             eliminated: Vec::new(),
 
-            num_vars: 0,
             num_asserted_vars: 0,
             num_eliminated_vars: 0,
             num_decision: 0,
@@ -175,7 +172,6 @@ impl Instantiate for AssignStack {
             #[cfg(feature = "trail_saving")]
             trail_saved: Vec::with_capacity(nv),
 
-            num_vars: cnf.num_of_variables,
             assign_rate: ProgressASG::instantiate(config, cnf),
             // var: Var::new_vars(nv),
             #[cfg(feature = "EVSIDS")]
@@ -209,7 +205,6 @@ impl Instantiate for AssignStack {
             }
             SolverEvent::NewVar => {
                 self.expand_heap();
-                self.num_vars += 1;
                 // self.var.push(Var::default());
             }
             SolverEvent::Reinitialize => {
@@ -261,12 +256,13 @@ impl AssignIF for AssignStack {
         self.q_head < self.trail.len()
     }
     fn assign_ref(&self) -> Vec<Option<bool>> {
-        (0..=self.num_vars)
+        (0..=VarRef::num_vars())
             .map(|vi| VarRef(vi).assign())
             .collect::<Vec<_>>()
     }
     fn best_assigned(&mut self) -> Option<usize> {
-        (self.build_best_at == self.num_propagation).then_some(self.num_vars - self.num_best_assign)
+        (self.build_best_at == self.num_propagation)
+            .then_some(VarRef::num_vars() - self.num_best_assign)
     }
     #[cfg(feature = "rephase")]
     fn best_phases_invalid(&self) -> bool {

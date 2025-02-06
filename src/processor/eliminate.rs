@@ -348,7 +348,7 @@ mod tests {
         let vi = 4;
 
         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-        elim.prepare(asg, cdb, true);
+        elim.prepare(cdb, true);
         eliminate_var(asg, cdb, &mut elim, state, vi, &mut timedout).expect("panic");
         assert!(VarRef(vi).is(FlagVar::ELIMINATED));
         assert!(cdb

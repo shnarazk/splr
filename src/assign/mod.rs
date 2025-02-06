@@ -76,7 +76,7 @@ pub trait AssignIF:
     #[cfg(feature = "rephase")]
     fn best_phases_invalid(&self) -> bool;
     /// inject assignments for eliminated vars.
-    fn extend_model(&mut self, c: &mut impl ClauseDBIF) -> Vec<Option<bool>>;
+    fn extend_model(&mut self, cdb: &mut impl ClauseDBIF) -> Vec<Option<bool>>;
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
 }
@@ -174,7 +174,7 @@ impl DebugReportIF for Clause {
 
 pub mod property {
     use super::stack::AssignStack;
-    use crate::types::*;
+    use crate::{types::*, var_vector::VarRef};
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tusize {
@@ -186,7 +186,6 @@ pub mod property {
         //
         //## var stat
         //
-        NumVar,
         NumAssertedVar,
         NumEliminatedVar,
         NumReconflict,
@@ -198,13 +197,12 @@ pub mod property {
         RootLevel,
     }
 
-    pub const USIZES: [Tusize; 14] = [
+    pub const USIZES: [Tusize; 13] = [
         Tusize::NumConflict,
         Tusize::NumDecision,
         Tusize::NumPropagation,
         Tusize::NumRephase,
         Tusize::NumRestart,
-        Tusize::NumVar,
         Tusize::NumAssertedVar,
         Tusize::NumEliminatedVar,
         Tusize::NumReconflict,
@@ -224,21 +222,20 @@ pub mod property {
                 Tusize::NumPropagation => self.num_propagation,
                 Tusize::NumRephase => self.num_rephase,
                 Tusize::NumRestart => self.num_restart,
-                Tusize::NumVar => self.num_vars,
                 Tusize::NumAssertedVar => self.num_asserted_vars,
                 Tusize::NumEliminatedVar => self.num_eliminated_vars,
                 Tusize::NumReconflict => self.num_reconflict,
                 Tusize::NumRepropagation => self.num_repropagation,
                 Tusize::NumUnassertedVar => {
-                    self.num_vars - self.num_asserted_vars - self.num_eliminated_vars
+                    VarRef::num_vars() - self.num_asserted_vars - self.num_eliminated_vars
                 }
                 Tusize::NumUnassignedVar => {
-                    self.num_vars
+                    VarRef::num_vars()
                         - self.num_asserted_vars
                         - self.num_eliminated_vars
                         - self.trail.len()
                 }
-                Tusize::NumUnreachableVar => self.num_vars - self.num_best_assign,
+                Tusize::NumUnreachableVar => VarRef::num_vars() - self.num_best_assign,
                 Tusize::RootLevel => self.root_level as usize,
             }
         }

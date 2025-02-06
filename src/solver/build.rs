@@ -81,7 +81,7 @@ pub trait SatSolverIF: Instantiate {
     /// use std::path::Path;
     ///
     /// let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
-    /// assert_eq!(s.asg.num_vars, 8);
+    /// assert_eq!(VarRef::num_vars(), 8);
     /// assert!(matches!(s.add_assignment(9), Err(SolverError::InvalidLiteral)));
     /// s.add_assignment(1).expect("panic");
     /// s.add_assignment(2).expect("panic");
@@ -176,7 +176,7 @@ impl TryFrom<&Path> for Solver {
 
 impl SatSolverIF for Solver {
     fn add_assignment(&mut self, val: i32) -> Result<&mut Solver, SolverError> {
-        if val == 0 || self.asg.num_vars < val.unsigned_abs() as usize {
+        if val == 0 || VarRef::num_vars() < val.unsigned_abs() as usize {
             return Err(SolverError::InvalidLiteral);
         }
         let lit = Lit::from(val);
@@ -195,7 +195,7 @@ impl SatSolverIF for Solver {
         V: AsRef<[i32]>,
     {
         for i in vec.as_ref().iter() {
-            if *i == 0 || self.asg.num_vars < i.unsigned_abs() as usize {
+            if *i == 0 || VarRef::num_vars() < i.unsigned_abs() as usize {
                 return Err(SolverError::InvalidLiteral);
             }
         }
@@ -224,7 +224,7 @@ impl SatSolverIF for Solver {
         asg.handle(SolverEvent::NewVar);
         cdb.handle(SolverEvent::NewVar);
         state.handle(SolverEvent::NewVar);
-        asg.num_vars as VarId
+        VarRef::num_vars() as VarId
     }
     /// # Examples
     ///
@@ -328,7 +328,7 @@ impl Solver {
                 Err(e) => panic!("{}", e),
             }
         }
-        debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
+        debug_assert_eq!(VarRef::num_vars(), self.state.target.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
         Ok(self)
     }
@@ -341,7 +341,7 @@ impl Solver {
         self.state.flush("injecting...");
         for ints in v.iter() {
             for i in ints.as_ref().iter() {
-                if *i == 0 || self.asg.num_vars < i.unsigned_abs() as usize {
+                if *i == 0 || VarRef::num_vars() < i.unsigned_abs() as usize {
                     return Err(SolverError::InvalidLiteral);
                 }
             }
@@ -357,7 +357,7 @@ impl Solver {
                 return Err(SolverError::EmptyClause);
             }
         }
-        debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
+        debug_assert_eq!(VarRef::num_vars(), self.state.target.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
         Ok(self)
     }
@@ -366,14 +366,14 @@ impl Solver {
 #[cfg(test)]
 mod tests {
     // use super::*;
-    use crate::*;
+    use crate::{var_vector::*, *};
     use std::path::Path;
 
     #[cfg(not(feature = "no_IO"))]
     #[test]
     fn test_add_var() {
         let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
-        assert_eq!(s.asg.num_vars, 8);
+        assert_eq!(VarRef::num_vars(), 8);
         assert!(matches!(
             s.add_assignment(9),
             Err(SolverError::InvalidLiteral)

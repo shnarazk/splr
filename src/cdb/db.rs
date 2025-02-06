@@ -1254,8 +1254,7 @@ impl ClauseDBIF for ClauseDB {
     #[cfg(not(feature = "no_IO"))]
     /// dump all active clauses and assertions as a CNF file.
     fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path) {
-        let nv = asg.derefer(crate::assign::property::Tusize::NumVar);
-        for vi in 1..nv {
+        for vi in VarRef::var_id_iter() {
             if VarRef(vi).is(FlagVar::ELIMINATED) && VarRef(vi).assign().is_some() {
                 panic!("conflicting var {} {:?}", vi, VarRef(vi).assign());
             }
@@ -1266,7 +1265,7 @@ impl ClauseDBIF for ClauseDB {
         let mut buf = std::io::BufWriter::new(out);
         let na = asg.derefer(crate::assign::property::Tusize::NumAssertedVar);
         let nc = self.iter().skip(1).filter(|c| !c.is_dead()).count();
-        buf.write_all(format!("p cnf {} {}\n", nv, nc + na).as_bytes())
+        buf.write_all(format!("p cnf {} {}\n", VarRef::num_vars(), nc + na).as_bytes())
             .unwrap();
         for c in self.iter().skip(1) {
             if c.is_dead() {

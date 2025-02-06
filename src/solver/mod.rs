@@ -128,13 +128,13 @@ impl<V: AsRef<[i32]>> TryFrom<Vec<V>> for Certificate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assign;
+    use crate::{assign, var_vector::VarRef};
 
     #[cfg_attr(not(feature = "no_IO"), test)]
     fn test_solver() {
         let config = Config::from("cnfs/sample.cnf");
         if let Ok(s) = Solver::build(&config) {
-            assert_eq!(s.asg.derefer(assign::property::Tusize::NumVar), 250);
+            assert_eq!(VarRef::num_vars(), 250);
             assert_eq!(
                 s.asg.derefer(assign::property::Tusize::NumUnassertedVar),
                 250

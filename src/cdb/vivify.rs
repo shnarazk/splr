@@ -25,7 +25,7 @@ impl VivifyIF for ClauseDB {
             })?;
         }
         let mut clauses: Vec<OrderedProxy<ClauseId>> =
-            select_targets(asg, self, state[Stat::Restart] == 0, NUM_TARGETS);
+            select_targets(self, state[Stat::Restart] == 0, NUM_TARGETS);
         if clauses.is_empty() {
             return Ok(());
         }
@@ -33,7 +33,7 @@ impl VivifyIF for ClauseDB {
         state[Stat::Vivification] += 1;
         // This is a reusable vector to reduce memory consumption,
         // the key is the number of invocation
-        let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
+        let mut seen: Vec<usize> = vec![0; VarRef::num_vars() + 1];
         let display_step: usize = 1000;
         let mut num_check = 0;
         let mut num_shrink = 0;
@@ -182,13 +182,13 @@ impl VivifyIF for ClauseDB {
 }
 
 fn select_targets(
-    asg: &mut AssignStack,
     cdb: &mut ClauseDB,
     initial_stage: bool,
     len: Option<usize>,
 ) -> Vec<OrderedProxy<ClauseId>> {
     if initial_stage {
-        let mut seen: Vec<Option<OrderedProxy<ClauseId>>> = vec![None; 2 * (asg.num_vars + 1)];
+        let mut seen: Vec<Option<OrderedProxy<ClauseId>>> =
+            vec![None; 2 * (VarRef::num_vars() + 1)];
         for (i, c) in cdb.iter().enumerate().skip(1) {
             if let Some(rank) = c.to_vivify(true) {
                 let p = &mut seen[usize::from(c.lit0())];
