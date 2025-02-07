@@ -15,59 +15,10 @@ pub use self::{
     property::*,
     stack::{AssignStack, VarManipulateIF},
 };
-use {
-    crate::{cdb::ClauseDBIF, types::*},
-    std::{fmt, ops::Range, slice::Iter},
-};
+use {crate::types::*, std::fmt};
 
 #[cfg(feature = "trail_saving")]
 pub use self::trail_saving::TrailSavingIF;
-
-/// API about assignment like
-/// [`decision_level`](`crate::assign::AssignIF::decision_level`),
-/// [`stack`](`crate::assign::AssignIF::stack`),
-/// [`best_assigned`](`crate::assign::AssignIF::best_assigned`), and so on.
-pub trait AssignIF:
-    Instantiate
-    + PropagateIF
-    + VarManipulateIF
-    + PropertyDereference<property::Tusize, usize>
-    + PropertyReference<property::TEma, EmaView>
-{
-    /// return root level.
-    fn root_level(&self) -> DecisionLevel;
-    /// return a literal in the stack.
-    fn stack(&self, i: usize) -> Lit;
-    /// return literals in the range of stack.
-    fn stack_range(&self, r: Range<usize>) -> &[Lit];
-    /// return the number of assignments.
-    fn stack_len(&self) -> usize;
-    /// return the number of assignments at a given decision level `u`.
-    ///
-    /// ## Caveat
-    /// - it emits a panic by out of index range.
-    /// - it emits a panic if the level is 0.
-    fn len_upto(&self, n: DecisionLevel) -> usize;
-    /// return `true` if there's no assignment.
-    fn stack_is_empty(&self) -> bool;
-    /// return an iterator over assignment stack.
-    fn stack_iter(&self) -> Iter<'_, Lit>;
-    /// return the current decision level.
-    fn decision_level(&self) -> DecisionLevel;
-    ///return the decision var's id at that level.
-    fn decision_vi(&self, lv: DecisionLevel) -> VarId;
-    /// return `true` if there are un-propagated assignments.
-    fn remains(&self) -> bool;
-    /// return a reference to `assign`.
-    fn assign_ref(&self) -> Vec<Option<bool>>;
-    /// return the largest number of assigned vars.
-    fn best_assigned(&mut self) -> Option<usize>;
-    /// return `true` if no best_phases
-    #[cfg(feature = "rephase")]
-    fn best_phases_invalid(&self) -> bool;
-    /// inject assignments for eliminated vars.
-    fn extend_model(&mut self, cdb: &mut impl ClauseDBIF) -> Vec<Option<bool>>;
-}
 
 /// Reasons of assignments
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]

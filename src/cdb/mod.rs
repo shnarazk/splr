@@ -25,7 +25,7 @@ pub use self::{
 };
 
 use {
-    crate::{assign::AssignIF, types::*},
+    crate::{assign::AssignStack, types::*},
     std::{
         ops::IndexMut,
         slice::{Iter, IterMut},
@@ -118,7 +118,7 @@ pub trait ClauseDBIF:
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType);
+    fn reduce(&mut self, asg: &mut AssignStack, setting: ReductionType);
     /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.
@@ -155,7 +155,7 @@ pub trait ClauseDBIF:
     fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool>;
     #[cfg(not(feature = "no_IO"))]
     /// dump all active clauses and assertions as a CNF file.
-    fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);
+    fn dump_cnf(&self, asg: &AssignStack, fname: &Path);
 }
 
 pub mod property {

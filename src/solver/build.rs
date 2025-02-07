@@ -2,7 +2,7 @@
 use {
     super::{Certificate, Solver, SolverEvent, SolverResult, State, StateIF},
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF},
+        assign::{AssignStack, PropagateIF},
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
         vam::*,

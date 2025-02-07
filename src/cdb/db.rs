@@ -6,7 +6,7 @@ use {
         watch_cache::*,
         BinaryLinkDB, CertificationStore, ClauseDBIF, ClauseId, ReductionType, RefClause,
     },
-    crate::{assign::AssignIF, types::*, var_vector::*},
+    crate::{assign::AssignStack, types::*, var_vector::*},
     std::{
         num::NonZeroU32,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -1016,7 +1016,7 @@ impl ClauseDBIF for ClauseDB {
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
+    fn reduce(&mut self, asg: &mut AssignStack, setting: ReductionType) {
         let ClauseDB {
             ref mut clause,
             ref mut lbd_temp,
@@ -1253,7 +1253,7 @@ impl ClauseDBIF for ClauseDB {
     }
     #[cfg(not(feature = "no_IO"))]
     /// dump all active clauses and assertions as a CNF file.
-    fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path) {
+    fn dump_cnf(&self, asg: &AssignStack, fname: &Path) {
         for vi in VarRef::var_id_iter() {
             if VarRef(vi).is(FlagVar::ELIMINATED) && VarRef(vi).assign().is_some() {
                 panic!("conflicting var {} {:?}", vi, VarRef(vi).assign());

@@ -5,7 +5,7 @@ use {
         SolverResult,
     },
     crate::{
-        assign::{self, AssignIF, AssignStack, PropagateIF},
+        assign::{self, AssignStack, PropagateIF},
         cdb::{self, ClauseDB, ClauseDBIF, ReductionType, VivifyIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},

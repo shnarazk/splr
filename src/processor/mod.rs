@@ -27,7 +27,7 @@ mod subsume;
 
 use {
     crate::{
-        assign::AssignIF,
+        assign::AssignStack,
         cdb::ClauseDBIF,
         processor::heap::{LitOccurs, VarOccHeap},
         state::State,
@@ -65,7 +65,7 @@ pub trait EliminateIF: Instantiate {
     /// if solver becomes inconsistent.
     fn simplify(
         &mut self,
-        asg: &mut impl AssignIF,
+        asg: &mut AssignStack,
         cdb: &mut impl ClauseDBIF,
         state: &mut State,
         force_run: bool,

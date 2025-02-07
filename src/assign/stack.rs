@@ -1,6 +1,6 @@
 //! main struct AssignStack
 use {
-    super::{ema::ProgressASG, AssignIF, PropagateIF},
+    super::{ema::ProgressASG, PropagateIF},
     crate::{cdb::ClauseDBIF, types::*, vam::VarActivityManager, var_vector::*},
     std::{fmt, ops::Range, slice::Iter},
 };
@@ -174,54 +174,71 @@ impl Instantiate for AssignStack {
         }
     }
 }
-
-impl AssignIF for AssignStack {
-    fn root_level(&self) -> DecisionLevel {
+impl AssignStack {
+    /// return root level.
+    pub fn root_level(&self) -> DecisionLevel {
         self.root_level
     }
-    fn stack(&self, i: usize) -> Lit {
+    /// return the i-th element in the stack.
+    pub fn stack(&self, i: usize) -> Lit {
         self.trail[i]
     }
-    fn stack_range(&self, r: Range<usize>) -> &[Lit] {
+    /// return literals in the range of stack.
+    pub fn stack_range(&self, r: Range<usize>) -> &[Lit] {
         &self.trail[r]
     }
-    fn stack_len(&self) -> usize {
+    /// return the number of assignments.
+    pub fn stack_len(&self) -> usize {
         self.trail.len()
     }
-    fn len_upto(&self, n: DecisionLevel) -> usize {
+    /// return the number of assignments at a given decision level `u`.
+    ///
+    /// ## Caveat
+    /// - it emits a panic by out of index range.
+    /// - it emits a panic if the level is 0.
+    pub fn len_upto(&self, n: DecisionLevel) -> usize {
         self.trail_lim.get(n as usize).map_or(0, |n| *n)
     }
-    fn stack_is_empty(&self) -> bool {
+    /// return `true` if there's no assignment.
+    pub fn stack_is_empty(&self) -> bool {
         self.trail.is_empty()
     }
-    fn stack_iter(&self) -> Iter<'_, Lit> {
+    /// return an iterator over assignment stack.
+    pub fn stack_iter(&self) -> Iter<'_, Lit> {
         self.trail.iter()
     }
-    fn decision_level(&self) -> DecisionLevel {
+    /// return the current decision level.
+    pub fn decision_level(&self) -> DecisionLevel {
         self.trail_lim.len() as DecisionLevel
     }
-    fn decision_vi(&self, lv: DecisionLevel) -> VarId {
+    ///return the decision var's id at that level.
+    pub fn decision_vi(&self, lv: DecisionLevel) -> VarId {
         debug_assert!(0 < lv);
         self.trail[self.trail_lim[lv as usize - 1]].vi()
     }
-    fn remains(&self) -> bool {
+    /// return `true` if there are un-propagated assignments.
+    pub fn remains(&self) -> bool {
         self.q_head < self.trail.len()
     }
-    fn assign_ref(&self) -> Vec<Option<bool>> {
+    /// return a reference to `assign`.
+    pub fn assign_ref(&self) -> Vec<Option<bool>> {
         (0..=VarRef::num_vars())
             .map(|vi| VarRef(vi).assign())
             .collect::<Vec<_>>()
     }
-    fn best_assigned(&mut self) -> Option<usize> {
+    /// return the largest number of assigned vars.
+    pub fn best_assigned(&mut self) -> Option<usize> {
         (self.build_best_at == self.num_propagation)
             .then_some(VarRef::num_vars() - self.num_best_assign)
     }
+    /// return `true` if no best_phases
     #[cfg(feature = "rephase")]
-    fn best_phases_invalid(&self) -> bool {
+    pub fn best_phases_invalid(&self) -> bool {
         self.best_phases.is_empty()
     }
+    /// inject assignments for eliminated vars.
     #[allow(unused_variables)]
-    fn extend_model(&mut self, cdb: &mut impl ClauseDBIF) -> Vec<Option<bool>> {
+    pub fn extend_model(&self, cdb: &mut impl ClauseDBIF) -> Vec<Option<bool>> {
         let lits = &self.eliminated;
 
         #[cfg(feature = "trace_elimination")]

@@ -5,7 +5,7 @@ use {
         EliminateIF, Eliminator, EliminatorMode,
     },
     crate::{
-        assign::{self, AssignIF},
+        assign::{self, AssignStack, PropagateIF},
         cdb::{self, ClauseDBIF},
         state::{self, State, StateIF},
         types::*,
@@ -260,7 +260,7 @@ impl EliminateIF for Eliminator {
     }
     fn simplify(
         &mut self,
-        asg: &mut impl AssignIF,
+        asg: &mut AssignStack,
         cdb: &mut impl ClauseDBIF,
         state: &mut State,
         force_run: bool,
@@ -408,7 +408,7 @@ impl Eliminator {
     /// - calls `clause_queue.pop`
     pub fn backward_subsumption_check(
         &mut self,
-        asg: &mut impl AssignIF,
+        asg: &mut AssignStack,
         cdb: &mut impl ClauseDBIF,
         timedout: &mut usize,
     ) -> MaybeInconsistent {
@@ -502,7 +502,7 @@ impl Eliminator {
     /// if solver becomes inconsistent.
     fn eliminate(
         &mut self,
-        asg: &mut impl AssignIF,
+        asg: &mut AssignStack,
         cdb: &mut impl ClauseDBIF,
         state: &mut State,
     ) -> MaybeInconsistent {
@@ -529,7 +529,7 @@ impl Eliminator {
     /// do the elimination task
     fn eliminate_main(
         &mut self,
-        asg: &mut impl AssignIF,
+        asg: &mut AssignStack,
         cdb: &mut impl ClauseDBIF,
         state: &mut State,
     ) -> MaybeInconsistent {

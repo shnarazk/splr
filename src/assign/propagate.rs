@@ -1,7 +1,7 @@
 // implement boolean constraint propagation, backjump
 // This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{AssignIF, AssignStack, VarManipulateIF},
+    super::{AssignStack, VarManipulateIF},
     crate::{cdb::ClauseDBIF, types::*, vam::VarActivityManager, var_vector::*},
 };
 

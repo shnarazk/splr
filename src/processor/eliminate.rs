@@ -2,7 +2,11 @@
 use {
     super::Eliminator,
     crate::{
-        assign::AssignIF, cdb::ClauseDBIF, solver::SolverEvent, state::State, types::*,
+        assign::{AssignStack, PropagateIF},
+        cdb::ClauseDBIF,
+        solver::SolverEvent,
+        state::State,
+        types::*,
         var_vector::*,
     },
 };
@@ -11,7 +15,7 @@ use {
 const COMBINATION_LIMIT: f64 = 32.0;
 
 pub fn eliminate_var(
-    asg: &mut impl AssignIF,
+    asg: &mut AssignStack,
     cdb: &mut impl ClauseDBIF,
     elim: &mut Eliminator,
     state: &mut State,

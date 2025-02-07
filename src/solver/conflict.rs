@@ -7,7 +7,7 @@ use crate::vam::VarActivityManager;
 use {
     super::State,
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF},
+        assign::{AssignStack, PropagateIF},
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
         var_vector::*,

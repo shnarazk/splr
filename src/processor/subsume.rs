@@ -1,7 +1,12 @@
 /// Module `eliminator` implements clause subsumption and var elimination.
 use {
     super::{EliminateIF, Eliminator},
-    crate::{assign::AssignIF, cdb::ClauseDBIF, types::*, var_vector::*},
+    crate::{
+        assign::{AssignStack, PropagateIF},
+        cdb::ClauseDBIF,
+        types::*,
+        var_vector::*,
+    },
 };
 
 #[derive(Clone, Eq, Debug, Ord, PartialEq, PartialOrd)]
@@ -14,7 +19,7 @@ enum Subsumable {
 impl Eliminator {
     pub fn try_subsume(
         &mut self,
-        asg: &mut impl AssignIF,
+        asg: &mut AssignStack,
         cdb: &mut impl ClauseDBIF,
         cid: ClauseId,
         did: ClauseId,
@@ -86,7 +91,7 @@ fn have_subsuming_lit(cdb: &mut impl ClauseDBIF, cid: ClauseId, other: ClauseId)
 /// - calls `enqueue_clause`
 /// - calls `enqueue_var`
 fn strengthen_clause(
-    asg: &mut impl AssignIF,
+    asg: &mut AssignStack,
     cdb: &mut impl ClauseDBIF,
     elim: &mut Eliminator,
     cid: ClauseId,
