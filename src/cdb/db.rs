@@ -819,7 +819,7 @@ impl ClauseDBIF for ClauseDB {
         let mut need_to_shrink = false;
         for l in self[cid].iter() {
             debug_assert!(!VarRef(l.vi()).is(FlagVar::ELIMINATED));
-            match VarRef::assigned(*l) {
+            match VarRef::lit_assigned(*l) {
                 Some(true) => {
                     self.remove_clause(cid);
                     return RefClause::Dead;
@@ -850,7 +850,9 @@ impl ClauseDBIF for ClauseDB {
         let mut new_lits = c
             .lits
             .iter()
-            .filter(|l| VarRef::assigned(**l).is_none() && !VarRef(l.vi()).is(FlagVar::ELIMINATED))
+            .filter(|l| {
+                VarRef::lit_assigned(**l).is_none() && !VarRef(l.vi()).is(FlagVar::ELIMINATED)
+            })
             .copied()
             .collect::<Vec<_>>();
         match new_lits.len() {
@@ -1049,7 +1051,7 @@ impl ClauseDBIF for ClauseDB {
                 AssignReason::Implication(ClauseId::from(i)),
                 "Lit {} {:?} level {}, dl: {}",
                 i32::from(c.lit0()),
-                VarRef::assigned(c.lit0()),
+                VarRef::lit_assigned(c.lit0()),
                 VarRef(c.lit0().vi()).level(),
                 asg.decision_level(),
             );
@@ -1161,7 +1163,7 @@ impl ClauseDBIF for ClauseDB {
             debug_assert!(c[0] == l0 || c[1] == l0);
             let other = c[(c[0] == l0) as usize];
             let vi = other.vi();
-            if self.lbd_temp[vi] == key && VarRef::assigned(other) == Some(true) {
+            if self.lbd_temp[vi] == key && VarRef::lit_assigned(other) == Some(true) {
                 num_sat += 1;
                 self.lbd_temp[vi] = key - 1;
             }

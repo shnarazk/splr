@@ -227,7 +227,7 @@ impl AssignStack {
             .collect::<Vec<_>>()
     }
     /// return the largest number of assigned vars.
-    pub fn best_assigned(&mut self) -> Option<usize> {
+    pub fn best_assigned(&self) -> Option<usize> {
         (self.build_best_at == self.num_propagation)
             .then_some(VarRef::num_vars() - self.num_best_assign)
     }
@@ -542,9 +542,9 @@ mod tests {
         assert_eq!(asg.decision_level(), 1);
         assert_eq!(asg.stack_len(), 3);
         assert_eq!(asg.trail_lim, vec![2]);
-        assert_eq!(VarRef::assigned(lit(1)), Some(true));
-        assert_eq!(VarRef::assigned(lit(-1)), Some(false));
-        assert_eq!(VarRef::assigned(lit(4)), None);
+        assert_eq!(VarRef::lit_assigned(lit(1)), Some(true));
+        assert_eq!(VarRef::lit_assigned(lit(-1)), Some(false));
+        assert_eq!(VarRef::lit_assigned(lit(4)), None);
 
         // [1, 2, 3] => [1, 2, 3, 4]
         asg.assign_by_decision(lit(4));
@@ -560,7 +560,7 @@ mod tests {
         assert_eq!(asg.decision_level(), 0);
         assert_eq!(asg.stack_len(), 3);
 
-        assert_eq!(VarRef::assigned(lit(-4)), Some(true));
-        assert_eq!(VarRef::assigned(lit(-3)), None);
+        assert_eq!(VarRef::lit_assigned(lit(-4)), Some(true));
+        assert_eq!(VarRef::lit_assigned(lit(-3)), None);
     }
 }

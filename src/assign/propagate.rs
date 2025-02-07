@@ -45,40 +45,6 @@ pub trait PropagateIF {
     fn clear_asserted_literals(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent;
 }
 
-macro_rules! var_assign {
-    ($asg: expr, $vi: expr) => {
-        VarRef($vi).assign()
-    };
-}
-
-macro_rules! lit_assign {
-    ($asg: expr, $lit: expr) => {
-        match $lit {
-            l => match VarRef(l.vi()).assign() {
-                Some(x) if !bool::from(l) => Some(!x),
-                x => x,
-            },
-        }
-    };
-}
-
-macro_rules! set_assign {
-    ($asg: expr, $lit: expr) => {
-        match $lit {
-            l => {
-                VarRef(l.vi()).set_assign(Some(bool::from(l)));
-            }
-        }
-    };
-}
-
-macro_rules! unset_assign {
-    ($asg: expr, $vi: expr) => {
-        // $asg.var[$var].assign = None;
-        VarRef($vi).set_assign(None);
-    };
-}
-
 impl PropagateIF for AssignStack {
     fn assign_at_root_level(&mut self, l: Lit) -> MaybeInconsistent {
         self.cancel_until(self.root_level);
@@ -89,9 +55,9 @@ impl PropagateIF for AssignStack {
         debug_assert!(self.trail_lim.is_empty());
         // self.var[vi].level = self.root_level;
         VarRef(vi).set_level(self.root_level);
-        match VarRef(vi).assign() /* var_assign!(self, vi) */ {
+        match VarRef(vi).assign() {
             None => {
-                set_assign!(self, l);
+                VarRef::set_lit(l);
                 debug_assert!(!self.trail.contains(&!l));
                 self.trail.push(l);
                 self.make_var_asserted(vi);
@@ -107,7 +73,10 @@ impl PropagateIF for AssignStack {
                 // self.make_var_asserted(vi);
                 Ok(())
             }
-            _ => Err(SolverError::RootLevelConflict((l, VarRef(l.vi()).reason() /* self.var[l.vi()].reason */))),
+            _ => Err(SolverError::RootLevelConflict((
+                l,
+                VarRef(l.vi()).reason(), /* self.var[l.vi()].reason */
+            ))),
         }
     }
     fn assign_by_implication(
@@ -123,15 +92,11 @@ impl PropagateIF for AssignStack {
         let vi = l.vi();
         // debug_assert!(!self.var[vi].is(FlagVar::ELIMINATED));
         debug_assert!(!VarRef(vi).is(FlagVar::ELIMINATED));
-        // // debug_assert!(
-        // //     var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
-        // // );
-        // debug_assert_eq!(self.var[vi].assign, None);
         debug_assert_eq!(VarRef(vi).assign(), None);
         // debug_assert_eq!(self.var[vi].reason, AssignReason::None);
         debug_assert_eq!(VarRef(vi).reason(), AssignReason::None);
         debug_assert!(self.trail.iter().all(|rl| *rl != l));
-        set_assign!(self, l);
+        VarRef::set_lit(l);
 
         #[cfg(not(feature = "chrono_BT"))]
         let lv = self.decision_level();
@@ -156,11 +121,7 @@ impl PropagateIF for AssignStack {
         }
     }
     fn assign_by_decision(&mut self, l: Lit) {
-        debug_assert_ne!(
-            // var_assign!(self, l.vi()) == Some(bool::from(l)) || var_assign!(self, l.vi()).is_none()
-            VarRef(l.vi()).assign(),
-            Some(!bool::from(l))
-        );
+        debug_assert_ne!(VarRef(l.vi()).assign(), Some(!bool::from(l)));
         // debug_assert!(l.vi() < self.var.len());
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(
@@ -174,7 +135,7 @@ impl PropagateIF for AssignStack {
         debug_assert!(!VarRef(vi).is(FlagVar::ELIMINATED));
         debug_assert_eq!(VarRef(vi).assign(), None);
         debug_assert_eq!(VarRef(vi).reason(), AssignReason::None);
-        set_assign!(self, l);
+        VarRef::set_lit(l);
         VarRef(vi).set_reason(AssignReason::Decision(self.decision_level()));
         // self.reward_at_assign(vi);
         VarActivityManager::reward_at_assign(vi);
@@ -236,7 +197,7 @@ impl PropagateIF for AssignStack {
                 v.state = VarState::Unassigned(self.num_conflict);
             }
 
-            unset_assign!(self, vi);
+            VarRef(vi).set_assign(None);
             VarRef(vi).set_reason(AssignReason::None);
 
             #[cfg(not(feature = "trail_saving"))]
@@ -253,10 +214,7 @@ impl PropagateIF for AssignStack {
         #[cfg(feature = "chrono_BT")]
         self.trail.append(&mut unpropagated);
 
-        debug_assert!(self
-            .trail
-            .iter()
-            .all(|l| var_assign!(self, l.vi()).is_some()));
+        debug_assert!(self.trail.iter().all(|l| VarRef(l.vi()).assign().is_some()));
         debug_assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
         self.trail_lim.truncate(lv as usize);
         // assert!(lim < self.q_head) doesn't hold sometimes in chronoBT.
@@ -290,7 +248,7 @@ impl PropagateIF for AssignStack {
             let l = self.trail[i];
             let vi = l.vi();
             debug_assert!(self.root_level < VarRef(vi).level());
-            unset_assign!(self, vi);
+            VarRef(vi).set_assign(None);
             VarRef(vi).set_reason(AssignReason::None);
             // self.insert_heap(vi);
             VarActivityManager::insert_heap(vi);
@@ -394,7 +352,7 @@ impl PropagateIF for AssignStack {
                 debug_assert!(!VarRef(blocker.vi()).is(FlagVar::ELIMINATED));
                 debug_assert_ne!(blocker, false_lit);
                 debug_assert_eq!(cdb[cid].len(), 2);
-                match lit_assign!(self, blocker) {
+                match VarRef::lit_assigned(blocker) {
                     Some(true) => (),
                     Some(false) => {
                         check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, blocker));
@@ -437,7 +395,7 @@ impl PropagateIF for AssignStack {
                 );
                 // assert_ne!(other_watch.vi(), false_lit.vi());
                 // assert!(other_watch == cdb[cid].lit0() || other_watch == cdb[cid].lit1());
-                let mut other_watch_value = lit_assign!(self, cached);
+                let mut other_watch_value = VarRef::lit_assigned(cached);
                 let mut updated_cache: Option<Lit> = None;
                 if Some(true) == other_watch_value {
                     #[cfg(feature = "maintain_watch_cache")]
@@ -461,7 +419,7 @@ impl PropagateIF for AssignStack {
 
                     if cached != other {
                         cached = other;
-                        other_watch_value = lit_assign!(self, other);
+                        other_watch_value = VarRef::lit_assigned(other);
                         if Some(true) == other_watch_value {
                             debug_assert!(!VarRef(other.vi()).is(FlagVar::ELIMINATED));
                             // In this path, we use only `AssignStack::assign`.
@@ -488,12 +446,12 @@ impl PropagateIF for AssignStack {
                         .skip(start as usize)
                         .chain(c.iter().enumerate().skip(2).take(start as usize - 2))
                     {
-                        if lit_assign!(self, *lk) != Some(false) {
+                        if VarRef::lit_assigned(*lk) != Some(false) {
                             let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
                             cdb[cid].search_from = (k + 1) as u16;
-                            debug_assert_ne!(VarRef::assigned(new_watch), Some(true));
+                            debug_assert_ne!(VarRef::lit_assigned(new_watch), Some(true));
                             check_in!(
                                 cid,
                                 Propagate::FindNewWatch(self.num_conflict, propagating, new_watch)
@@ -520,7 +478,7 @@ impl PropagateIF for AssignStack {
                     .unwrap_or(self.root_level);
 
                 debug_assert_eq!(cdb[cid].lit0(), cached);
-                debug_assert_eq!(VarRef::assigned(cached), None);
+                debug_assert_eq!(VarRef::lit_assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
                 self.assign_by_implication(
                     cached,
@@ -593,7 +551,7 @@ impl PropagateIF for AssignStack {
                 #[cfg(feature = "boundary_check")]
                 debug_assert_eq!(cdb[*cid].len(), 2);
 
-                match lit_assign!(self, blocker) {
+                match VarRef::lit_assigned(blocker) {
                     Some(true) => (),
                     Some(false) => conflict_path!(blocker, AssignReason::BinaryLink(propagating)),
                     None => {
@@ -621,7 +579,7 @@ impl PropagateIF for AssignStack {
                     continue;
                 }
                 debug_assert!(!VarRef(cached.vi()).is(FlagVar::ELIMINATED));
-                let mut other_watch_value = lit_assign!(self, cached);
+                let mut other_watch_value = VarRef::lit_assigned(cached);
                 let mut updated_cache: Option<Lit> = None;
                 if matches!(other_watch_value, Some(true)) {
                     cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
@@ -640,7 +598,7 @@ impl PropagateIF for AssignStack {
 
                     if cached != other {
                         cached = other;
-                        other_watch_value = lit_assign!(self, other);
+                        other_watch_value = VarRef::lit_assigned(other);
                         if Some(true) == other_watch_value {
                             debug_assert!(!VarRef(cached.vi()).is(FlagVar::ELIMINATED));
                             cdb.transform_by_restoring_watch_cache(
@@ -662,14 +620,14 @@ impl PropagateIF for AssignStack {
                         .skip(start as usize)
                         .chain(c.iter().enumerate().skip(2).take(start as usize - 2))
                     {
-                        if lit_assign!(self, *lk) != Some(false) {
+                        if VarRef::lit_assigned(*lk) != Some(false) {
                             let new_watch = !*lk;
                             cdb.detach_watch_cache(propagating, &mut source);
                             cdb.transform_by_updating_watch(cid, false_watch_pos, k, true);
                             cdb[cid].search_from = (k as u16).saturating_add(1);
                             debug_assert!(
-                                VarRef::assigned(!new_watch) == Some(true)
-                                    || VarRef::assigned(!new_watch).is_none()
+                                VarRef::lit_assigned(!new_watch) == Some(true)
+                                    || VarRef::lit_assigned(!new_watch).is_none()
                             );
                             check_in!(
                                 cid,
@@ -703,7 +661,7 @@ impl PropagateIF for AssignStack {
                     .max()
                     .unwrap_or(self.root_level);
                 debug_assert_eq!(cdb[cid].lit0(), cached);
-                debug_assert_eq!(VarRef::assigned(cached), None);
+                debug_assert_eq!(VarRef::lit_assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
 
                 self.assign_by_implication(
@@ -743,8 +701,8 @@ impl PropagateIF for AssignStack {
 impl AssignStack {
     #[allow(dead_code)]
     fn check(&self, (b0, b1): (Lit, Lit)) {
-        assert_ne!(VarRef::assigned(b0), Some(false));
-        assert_ne!(VarRef::assigned(b1), Some(false));
+        assert_ne!(VarRef::lit_assigned(b0), Some(false));
+        assert_ne!(VarRef::lit_assigned(b1), Some(false));
     }
     /// simplify clauses by propagating literals at root level.
     fn propagate_at_root_level(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
@@ -765,7 +723,7 @@ impl AssignStack {
                     RefClause::EmptyClause => return Err(SolverError::EmptyClause),
                     RefClause::RegisteredClause(_) => (),
                     RefClause::UnitClause(lit) => {
-                        debug_assert!(VarRef::assigned(lit).is_none());
+                        debug_assert!(VarRef::lit_assigned(lit).is_none());
                         cdb.certificate_add_assertion(lit);
                         self.assign_at_root_level(lit)?;
                         cdb.remove_clause(cid);

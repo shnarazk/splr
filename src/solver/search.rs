@@ -107,14 +107,14 @@ impl SolveIF for Solver {
                         // This becomes a problem in the case of incremental solving.
                         if m == 0 {
                             let l = Lit::from((vi, true));
-                            debug_assert!(VarRef::assigned(l).is_none());
+                            debug_assert!(VarRef::lit_assigned(l).is_none());
                             cdb.certificate_add_assertion(l);
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
                         } else if p == 0 {
                             let l = Lit::from((vi, false));
-                            debug_assert!(VarRef::assigned(l).is_none());
+                            debug_assert!(VarRef::lit_assigned(l).is_none());
                             cdb.certificate_add_assertion(l);
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);

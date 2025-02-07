@@ -69,7 +69,7 @@ impl VivifyIF for ClauseDB {
             let mut decisions: Vec<Lit> = Vec::new();
             for lit in clits.iter().copied() {
                 // assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
-                match VarRef::assigned(!lit) {
+                match VarRef::lit_assigned(!lit) {
                     //## Rule 1
                     Some(false) => (),
                     //## Rule 2

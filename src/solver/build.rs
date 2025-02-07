@@ -183,7 +183,7 @@ impl SatSolverIF for Solver {
         }
         let lit = Lit::from(val);
         self.cdb.certificate_add_assertion(lit);
-        match VarRef::assigned(lit) {
+        match VarRef::lit_assigned(lit) {
             None => self.asg.assign_at_root_level(lit).map(|_| self),
             Some(true) => Ok(self),
             Some(false) => Err(SolverError::RootLevelConflict((
@@ -272,7 +272,7 @@ impl Solver {
         let mut l_: Option<Lit> = None; // last literal; [x, x.negate()] means tautology.
         for i in 0..lits.len() {
             let li = lits[i];
-            let sat = VarRef::assigned(li);
+            let sat = VarRef::lit_assigned(li);
             if sat == Some(true) || Some(!li) == l_ {
                 return RefClause::Dead;
             } else if sat != Some(false) && Some(li) != l_ {

@@ -45,7 +45,7 @@ impl VarRef {
         }
     }
     #[inline]
-    pub fn assigned(lit: Lit) -> Option<bool> {
+    pub fn lit_assigned(lit: Lit) -> Option<bool> {
         unsafe {
             let vi = lit.vi();
             let possitive = bool::from(lit);
@@ -53,6 +53,13 @@ impl VarRef {
                 Some(b) if !possitive => Some(!b),
                 ob => ob,
             }
+        }
+    }
+    pub fn set_lit(lit: Lit) {
+        unsafe {
+            let vi = lit.vi();
+            let possitive = bool::from(lit);
+            VAR_VECTOR.get_unchecked_mut(vi).assign = Some(possitive);
         }
     }
     pub fn rescale_activity(scaling: f64) {

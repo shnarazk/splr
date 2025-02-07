@@ -117,7 +117,7 @@ fn strengthen_clause(
             cdb.certificate_add_assertion(l0);
             elim.remove_cid_occur(cid, &mut cdb[cid]);
             cdb.remove_clause(cid);
-            match VarRef::assigned(l0) {
+            match VarRef::lit_assigned(l0) {
                 None => asg.assign_at_root_level(l0),
                 Some(true) => Ok(()),
                 Some(false) => Err(SolverError::RootLevelConflict((

@@ -78,7 +78,7 @@ pub fn eliminate_var(
                         " - eliminate_var {}: found assign {} from {}{} and {}{}",
                         vi, lit, p, cdb[*p], n, cdb[*n],
                     );
-                    match VarRef::assigned(lit) {
+                    match VarRef::lit_assigned(lit) {
                         Some(true) => (),
                         Some(false) => {
                             return Err(SolverError::RootLevelConflict((
@@ -87,7 +87,7 @@ pub fn eliminate_var(
                             )));
                         }
                         None => {
-                            debug_assert!(VarRef::assigned(lit).is_none());
+                            debug_assert!(VarRef::lit_assigned(lit).is_none());
                             cdb.certificate_add_assertion(lit);
                             asg.assign_at_root_level(lit)?;
                         }
