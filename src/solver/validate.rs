@@ -1,7 +1,6 @@
 //! Crate `validator` implements a model checker.
 use crate::{
     assign::PropagateIF,
-    cdb::ClauseDBIF,
     solver::Solver,
     types::{Lit, MaybeInconsistent, SolverError},
 };

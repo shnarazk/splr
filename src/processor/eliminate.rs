@@ -3,7 +3,7 @@ use {
     super::Eliminator,
     crate::{
         assign::{AssignStack, PropagateIF},
-        cdb::ClauseDBIF,
+        cdb::{ClauseDB, ClauseDBIF},
         solver::SolverEvent,
         state::State,
         types::*,
@@ -16,7 +16,7 @@ const COMBINATION_LIMIT: f64 = 32.0;
 
 pub fn eliminate_var(
     asg: &mut AssignStack,
-    cdb: &mut impl ClauseDBIF,
+    cdb: &mut ClauseDB,
     elim: &mut Eliminator,
     state: &mut State,
     vi: VarId,
@@ -142,7 +142,7 @@ pub fn eliminate_var(
 
 /// returns `true` if elimination is impossible.
 fn skip_var_elimination(
-    cdb: &impl ClauseDBIF,
+    cdb: &ClauseDB,
     pos: &[ClauseId],
     neg: &[ClauseId],
     v: VarId,
@@ -181,7 +181,7 @@ fn skip_var_elimination(
 /// Returns the the-size-of-clause-being-generated.
 /// - `(false, -)` if one of the clauses is always satisfied.
 /// - `(true, n)` if they are merge-able to a n-literal clause.
-fn merge_cost(cdb: &impl ClauseDBIF, cp: ClauseId, cq: ClauseId, vi: VarId) -> Option<usize> {
+fn merge_cost(cdb: &ClauseDB, cp: ClauseId, cq: ClauseId, vi: VarId) -> Option<usize> {
     let c_p = &cdb[cp];
     let c_q = &cdb[cq];
     let mut cond: Option<Lit> = None;
@@ -222,13 +222,7 @@ fn merge_cost(cdb: &impl ClauseDBIF, cp: ClauseId, cq: ClauseId, vi: VarId) -> O
 
 /// Return the real length of the generated clause by merging two clauses.
 /// Return **zero** if one of the clauses is always satisfied. (merge_vec should not be used.)
-fn merge(
-    cdb: &mut impl ClauseDBIF,
-    cip: ClauseId,
-    ciq: ClauseId,
-    vi: VarId,
-    vec: &mut Vec<Lit>,
-) -> usize {
+fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, vi: VarId, vec: &mut Vec<Lit>) -> usize {
     vec.clear();
     let pqb = &cdb[cip];
     let qpb = &cdb[ciq];
@@ -259,7 +253,7 @@ fn merge(
 }
 
 fn make_eliminated_clauses(
-    cdb: &mut impl ClauseDBIF,
+    cdb: &mut ClauseDB,
     store: &mut Vec<Lit>,
     v: VarId,
     pos: &[ClauseId],
@@ -287,12 +281,7 @@ fn make_eliminating_unit_clause(store: &mut Vec<Lit>, x: Lit) {
     store.push(Lit::from(1usize));
 }
 
-fn make_eliminated_clause(
-    cdb: &mut impl ClauseDBIF,
-    store: &mut Vec<Lit>,
-    vi: VarId,
-    cid: ClauseId,
-) {
+fn make_eliminated_clause(cdb: &mut ClauseDB, store: &mut Vec<Lit>, vi: VarId, cid: ClauseId) {
     let first = store.len();
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:
     let c = &cdb[cid];

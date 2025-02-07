@@ -26,10 +26,7 @@ pub use self::{
 
 use {
     crate::{assign::AssignStack, types::*},
-    std::{
-        ops::IndexMut,
-        slice::{Iter, IterMut},
-    },
+    std::{ops::IndexMut, slice::IterMut},
     watch_cache::{WatchCache, WatchCacheIterator, WatchCacheProxy},
 };
 
@@ -55,21 +52,8 @@ pub trait ClauseDBIF:
     + PropertyDereference<property::Tusize, usize>
     + PropertyDereference<property::Tf64, f64>
 {
-    /// return the length of `clause`.
-    fn len(&self) -> usize;
-    /// return true if it's empty.
-    fn is_empty(&self) -> bool;
-    /// return an iterator.
-    fn iter(&self) -> Iter<'_, Clause>;
     /// return a mutable iterator.
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
-
-    //
-    //## interface to binary links
-    //
-
-    /// return binary links: `BinaryLinkList` connected with a `Lit`.
-    fn binary_links(&self, l: Lit) -> &BinaryLinkList;
 
     //
     //## abstraction to watch_cache
@@ -128,15 +112,6 @@ pub trait ClauseDBIF:
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.
     fn certificate_save(&mut self);
-    /// check the number of clauses
-    /// * `Err(SolverError::OutOfMemory)` -- the db size is over the limit.
-    /// * `Ok(true)` -- enough small
-    /// * `Ok(false)` -- close to the limit
-    fn check_size(&self) -> Result<bool, SolverError>;
-    /// returns None if the given assignment is a model of a problem.
-    /// Otherwise returns a clause which is not satisfiable under a given assignment.
-    /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
-    fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId>;
     /// minimize a clause.
     fn minimize_with_bi_clauses(&mut self, vec: &mut Vec<Lit>);
     /// complete bi-clause network

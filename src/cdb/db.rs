@@ -278,22 +278,62 @@ impl Instantiate for ClauseDB {
     }
 }
 
-impl ClauseDBIF for ClauseDB {
-    fn len(&self) -> usize {
+impl ClauseDB {
+    /// return the length of `clause`.
+    pub fn len(&self) -> usize {
         self.clause.len()
     }
-    fn is_empty(&self) -> bool {
+    /// return true if it's empty.
+    pub fn is_empty(&self) -> bool {
         self.clause.is_empty()
     }
-    fn iter(&self) -> Iter<'_, Clause> {
+    /// return an iterator.
+    pub fn iter(&self) -> Iter<'_, Clause> {
         self.clause.iter()
     }
+
+    //
+    //## interface to binary links
+    //
+
+    /// return binary links: `BinaryLinkList` connected with a `Lit`.
+    #[inline]
+    pub fn binary_links(&self, l: Lit) -> &BinaryLinkList {
+        self.binary_link.connect_with(l)
+    }
+    /// check the number of clauses
+    /// * `Err(SolverError::OutOfMemory)` -- the db size is over the limit.
+    /// * `Ok(true)` -- enough small
+    /// * `Ok(false)` -- close to the limit
+    pub fn check_size(&self) -> Result<bool, SolverError> {
+        if self.soft_limit == 0 || self.num_clause <= self.soft_limit {
+            let nc = self.derefer(property::Tusize::NumClause);
+            Ok(0 == self.soft_limit || 4 * nc < 3 * self.soft_limit)
+        } else {
+            Err(SolverError::OutOfMemory)
+        }
+    }
+    /// returns None if the given assignment is a model of a problem.
+    /// Otherwise returns a clause which is not satisfiable under a given assignment.
+    /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
+    pub fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId> {
+        for (i, c) in self.clause.iter().enumerate().skip(1) {
+            if c.is_dead() || (strict && c.is(FlagClause::LEARNT)) {
+                continue;
+            }
+            match c.evaluate(model) {
+                Some(false) => return Some(ClauseId::from(i)),
+                None if strict => return Some(ClauseId::from(i)),
+                _ => (),
+            }
+        }
+        None
+    }
+}
+
+impl ClauseDBIF for ClauseDB {
     fn iter_mut(&mut self) -> IterMut<'_, Clause> {
         self.clause.iter_mut()
-    }
-    #[inline]
-    fn binary_links(&self, l: Lit) -> &BinaryLinkList {
-        self.binary_link.connect_with(l)
     }
     // watch_cache_IF
     fn fetch_watch_cache_entry(&self, lit: Lit, wix: WatchCacheProxy) -> (ClauseId, Lit) {
@@ -1118,27 +1158,6 @@ impl ClauseDBIF for ClauseDB {
     }
     fn certificate_save(&mut self) {
         self.certification_store.close();
-    }
-    fn check_size(&self) -> Result<bool, SolverError> {
-        if self.soft_limit == 0 || self.num_clause <= self.soft_limit {
-            let nc = self.derefer(property::Tusize::NumClause);
-            Ok(0 == self.soft_limit || 4 * nc < 3 * self.soft_limit)
-        } else {
-            Err(SolverError::OutOfMemory)
-        }
-    }
-    fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId> {
-        for (i, c) in self.clause.iter().enumerate().skip(1) {
-            if c.is_dead() || (strict && c.is(FlagClause::LEARNT)) {
-                continue;
-            }
-            match c.evaluate(model) {
-                Some(false) => return Some(ClauseId::from(i)),
-                None if strict => return Some(ClauseId::from(i)),
-                _ => (),
-            }
-        }
-        None
     }
     #[allow(clippy::unnecessary_cast)]
     fn minimize_with_bi_clauses(&mut self, vec: &mut Vec<Lit>) {

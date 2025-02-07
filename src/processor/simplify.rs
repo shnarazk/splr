@@ -6,7 +6,7 @@ use {
     },
     crate::{
         assign::{self, AssignStack, PropagateIF},
-        cdb::{self, ClauseDBIF},
+        cdb::{self, ClauseDB, ClauseDBIF},
         state::{self, State, StateIF},
         types::*,
         var_vector::*,
@@ -220,7 +220,7 @@ impl EliminateIF for Eliminator {
     fn is_running(&self) -> bool {
         self.enable && self.mode == EliminatorMode::Running
     }
-    fn prepare(&mut self, cdb: &mut impl ClauseDBIF, force: bool) {
+    fn prepare(&mut self, cdb: &mut ClauseDB, force: bool) {
         if !self.enable {
             return;
         }
@@ -261,7 +261,7 @@ impl EliminateIF for Eliminator {
     fn simplify(
         &mut self,
         asg: &mut AssignStack,
-        cdb: &mut impl ClauseDBIF,
+        cdb: &mut ClauseDB,
         state: &mut State,
         force_run: bool,
     ) -> MaybeInconsistent {
@@ -409,7 +409,7 @@ impl Eliminator {
     pub fn backward_subsumption_check(
         &mut self,
         asg: &mut AssignStack,
-        cdb: &mut impl ClauseDBIF,
+        cdb: &mut ClauseDB,
         timedout: &mut usize,
     ) -> MaybeInconsistent {
         debug_assert_eq!(asg.decision_level(), 0);
@@ -503,7 +503,7 @@ impl Eliminator {
     fn eliminate(
         &mut self,
         asg: &mut AssignStack,
-        cdb: &mut impl ClauseDBIF,
+        cdb: &mut ClauseDB,
         state: &mut State,
     ) -> MaybeInconsistent {
         let start = state.elapsed().unwrap_or(0.0);
@@ -530,7 +530,7 @@ impl Eliminator {
     fn eliminate_main(
         &mut self,
         asg: &mut AssignStack,
-        cdb: &mut impl ClauseDBIF,
+        cdb: &mut ClauseDB,
         state: &mut State,
     ) -> MaybeInconsistent {
         debug_assert!(asg.decision_level() == 0);
@@ -628,7 +628,7 @@ impl Eliminator {
 }
 
 #[allow(dead_code)]
-fn check_eliminator(cdb: &impl ClauseDBIF, elim: &Eliminator) -> bool {
+fn check_eliminator(cdb: &ClauseDB, elim: &Eliminator) -> bool {
     // clause_queue should be clear.
     // all elements in occur_lists exist.
     // for v in asg {

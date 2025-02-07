@@ -2,7 +2,12 @@
 // This version can handle Chronological and Non Chronological Backtrack.
 use {
     super::{AssignStack, VarManipulateIF},
-    crate::{cdb::ClauseDBIF, types::*, vam::VarActivityManager, var_vector::*},
+    crate::{
+        cdb::{ClauseDB, ClauseDBIF},
+        types::*,
+        vam::VarActivityManager,
+        var_vector::*,
+    },
 };
 
 #[cfg(feature = "trail_saving")]
@@ -38,11 +43,11 @@ pub trait PropagateIF {
     /// execute backjump in vivification sandbox
     fn backtrack_sandbox(&mut self);
     /// execute *boolean constraint propagation* or *unit propagation*.
-    fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
+    fn propagate(&mut self, cdb: &mut ClauseDB) -> PropagationResult;
     /// `propagate` for vivification, which allows dead clauses.
-    fn propagate_sandbox(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
+    fn propagate_sandbox(&mut self, cdb: &mut ClauseDB) -> PropagationResult;
     /// propagate then clear asserted literals
-    fn clear_asserted_literals(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent;
+    fn clear_asserted_literals(&mut self, cdb: &mut ClauseDB) -> MaybeInconsistent;
 }
 
 impl PropagateIF for AssignStack {
@@ -264,7 +269,7 @@ impl PropagateIF for AssignStack {
     ///    So Eliminator should call `garbage_collect` before me.
     ///  - The order of literals in binary clauses will be modified to hold
     ///    propagation order.
-    fn propagate(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
+    fn propagate(&mut self, cdb: &mut ClauseDB) -> PropagationResult {
         #[cfg(feature = "boundary_check")]
         macro_rules! check_in {
             ($cid: expr, $tag :expr) => {
@@ -510,7 +515,7 @@ impl PropagateIF for AssignStack {
     // 1. (allow dead clauses)
     // 1. (allow eliminated vars)
     //
-    fn propagate_sandbox(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
+    fn propagate_sandbox(&mut self, cdb: &mut ClauseDB) -> PropagationResult {
         #[cfg(feature = "boundary_check")]
         macro_rules! check_in {
             ($cid: expr, $tag :expr) => {
@@ -675,7 +680,7 @@ impl PropagateIF for AssignStack {
         }
         Ok(())
     }
-    fn clear_asserted_literals(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
+    fn clear_asserted_literals(&mut self, cdb: &mut ClauseDB) -> MaybeInconsistent {
         debug_assert_eq!(self.decision_level(), self.root_level);
         loop {
             if self.remains() {
@@ -705,7 +710,7 @@ impl AssignStack {
         assert_ne!(VarRef::lit_assigned(b1), Some(false));
     }
     /// simplify clauses by propagating literals at root level.
-    fn propagate_at_root_level(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
+    fn propagate_at_root_level(&mut self, cdb: &mut ClauseDB) -> MaybeInconsistent {
         let mut num_propagated = 0;
         while num_propagated < self.trail.len() {
             num_propagated = self.trail.len();

@@ -28,7 +28,7 @@ mod subsume;
 use {
     crate::{
         assign::AssignStack,
-        cdb::ClauseDBIF,
+        cdb::ClauseDB,
         processor::heap::{LitOccurs, VarOccHeap},
         state::State,
         types::*,
@@ -51,7 +51,7 @@ pub trait EliminateIF: Instantiate {
     /// check if the eliminator is running.
     fn is_running(&self) -> bool;
     /// rebuild occur lists.
-    fn prepare(&mut self, cdb: &mut impl ClauseDBIF, force: bool);
+    fn prepare(&mut self, cdb: &mut ClauseDB, force: bool);
     /// enqueue a var into eliminator's var queue.
     fn enqueue_var(&mut self, vi: VarId, upward: bool);
     /// simplify database by:
@@ -66,7 +66,7 @@ pub trait EliminateIF: Instantiate {
     fn simplify(
         &mut self,
         asg: &mut AssignStack,
-        cdb: &mut impl ClauseDBIF,
+        cdb: &mut ClauseDB,
         state: &mut State,
         force_run: bool,
     ) -> MaybeInconsistent;
