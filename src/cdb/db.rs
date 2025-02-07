@@ -23,14 +23,14 @@ use std::{fs::File, io::Write, path::Path};
 #[derive(Clone, Debug)]
 pub struct ClauseDB {
     /// container of clauses
-    pub(crate) clause: Vec<Clause>,
+    pub(super) clause: Vec<Clause>,
     /// hashed representation of binary clauses.
     ///## Note
     /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
     ///
     binary_link: BinaryLinkDB,
     /// container of watch literals
-    pub(crate) watch_cache: Vec<WatchCache>,
+    pub(super) watch_cache: Vec<WatchCache>,
     /// collected free clause ids.
     freelist: Vec<ClauseId>,
     /// see unsat_certificate.rs
@@ -44,7 +44,7 @@ pub struct ClauseDB {
 
     // bi-clause completion
     bi_clause_completion_queue: Vec<Lit>,
-    pub(crate) num_bi_clause_completion: usize,
+    pub(super) num_bi_clause_completion: usize,
 
     //
     //## clause rewarding
@@ -86,11 +86,6 @@ pub struct ClauseDB {
     pub(crate) lb_entanglement: Ema2,
     /// cutoff value used in the last `reduce`
     pub(crate) reduction_threshold: f64,
-
-    //
-    //## incremental solving
-    //
-    pub eliminated_permanent: Vec<Vec<Lit>>,
 }
 
 impl Default for ClauseDB {
@@ -125,7 +120,6 @@ impl Default for ClauseDB {
             num_reregistration: 0,
             lb_entanglement: Ema2::new(1_000).with_slow(80_000).with_value(2.0),
             reduction_threshold: 0.0,
-            eliminated_permanent: Vec::new(),
         }
     }
 }
