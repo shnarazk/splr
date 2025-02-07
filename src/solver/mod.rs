@@ -66,7 +66,7 @@ pub enum SolverEvent {
 /// The SAT solver object consisting of 6 sub modules.
 /// ```
 /// use crate::splr::*;
-/// use crate::splr::{assign::{AssignIF, VarManipulateIF}, state::{State, StateIF}, types::*, var_vector::VarRef};
+/// use crate::splr::{assign::{VarManipulateIF}, state::{State, StateIF}, types::*, var_vector::VarRef};
 /// use std::path::Path;
 ///
 /// let mut s = Solver::try_from(Path::new("cnfs/sample.cnf")).expect("can't load");
