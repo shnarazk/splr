@@ -28,7 +28,7 @@ static mut VAR_HEAP: VarIdHeap = VarIdHeap {
 };
 
 impl VarActivityManager {
-    pub fn initialize(config: &Config) {
+    pub fn instantiate(config: &Config, _cnf: &CNFDescription) {
         unsafe {
             VAR_HEAP = VarIdHeap::new(VarRef::num_vars());
             VAM.activity_decay = config.vrw_dcy_rat;

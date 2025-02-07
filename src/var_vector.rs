@@ -24,8 +24,10 @@ pub trait VarRefIF {
 pub struct VarRef(pub usize);
 
 impl VarRef {
-    pub fn initialize(num_vars: usize) {
+    // you can't call this function `Instantiate::instantiate`. It must return `Self`.
+    pub fn instantiate(_config: &Config, cnf: &CNFDescription) {
         unsafe {
+            let num_vars = cnf.num_of_variables;
             VAR_VECTOR.clear(); // reqired for cargo test
             VAR_VECTOR.resize(num_vars + 1, Var::default());
             for (i, v) in VAR_VECTOR.iter_mut().enumerate().skip(1) {
@@ -149,15 +151,5 @@ impl VarRefIF for VarRef {
         unsafe {
             VAR_VECTOR.get_unchecked_mut(self.0).flags.set(f, b);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn proof_of_concept_of_static_mut() {
-        VarRef::initialize(10);
     }
 }

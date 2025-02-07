@@ -119,8 +119,8 @@ impl Instantiate for Solver {
     /// let s = Solver::instantiate(&Config::default(), &CNFDescription::default());
     ///```
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Solver {
-        VarRef::initialize(cnf.num_of_variables);
-        VarActivityManager::initialize(config);
+        VarRef::instantiate(config, cnf);
+        VarActivityManager::instantiate(config, cnf);
         Solver {
             asg: AssignStack::instantiate(config, cnf),
             cdb: ClauseDB::instantiate(config, cnf),

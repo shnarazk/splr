@@ -496,8 +496,8 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
-        VarRef::initialize(4);
-        VarActivityManager::initialize(&config);
+        VarRef::instantiate(&config, &cnf);
+        VarActivityManager::instantiate(&config, &cnf);
         let mut asg = AssignStack::instantiate(&config, &cnf);
         // [] + 1 => [1]
         assert!(asg.assign_at_root_level(lit(1)).is_ok());

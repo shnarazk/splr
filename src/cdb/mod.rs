@@ -286,7 +286,7 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
-        VarRef::initialize(4);
+        VarRef::instantiate(&config, &cnf);
         assert_eq!(VarRef(1).level(), 1);
         assert_eq!(VarRef(4).level(), 4);
         let mut asg = AssignStack::instantiate(&config, &cnf);
