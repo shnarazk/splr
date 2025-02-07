@@ -3,7 +3,7 @@ use {
     super::{EliminateIF, Eliminator},
     crate::{
         assign::{AssignStack, PropagateIF},
-        cdb::ClauseDBIF,
+        cdb::{ClauseDB, ClauseDBIF},
         types::*,
         var_vector::*,
     },
@@ -20,7 +20,7 @@ impl Eliminator {
     pub fn try_subsume(
         &mut self,
         asg: &mut AssignStack,
-        cdb: &mut impl ClauseDBIF,
+        cdb: &mut ClauseDB,
         cid: ClauseId,
         did: ClauseId,
     ) -> MaybeInconsistent {
@@ -54,7 +54,7 @@ impl Eliminator {
 }
 
 /// returns a literal if these clauses can be merged by the literal.
-fn have_subsuming_lit(cdb: &mut impl ClauseDBIF, cid: ClauseId, other: ClauseId) -> Subsumable {
+fn have_subsuming_lit(cdb: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Subsumable {
     debug_assert!(!other.is_lifted_lit());
     if cid.is_lifted_lit() {
         let l = Lit::from(cid);
@@ -92,7 +92,7 @@ fn have_subsuming_lit(cdb: &mut impl ClauseDBIF, cid: ClauseId, other: ClauseId)
 /// - calls `enqueue_var`
 fn strengthen_clause(
     asg: &mut AssignStack,
-    cdb: &mut impl ClauseDBIF,
+    cdb: &mut ClauseDB,
     elim: &mut Eliminator,
     cid: ClauseId,
     l: Lit,

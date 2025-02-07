@@ -3,7 +3,7 @@
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
     super::{AssignStack, PropagateIF},
-    crate::{cdb::ClauseDBIF, types::*, vam::VarActivityManager, var_vector::*},
+    crate::{cdb::ClauseDB, types::*, vam::VarActivityManager, var_vector::*},
 };
 
 #[cfg(feature = "chrono_BT")]
@@ -12,7 +12,7 @@ use super::AssignIF;
 /// Methods on trail saving.
 pub trait TrailSavingIF {
     fn save_trail(&mut self, to_lvl: DecisionLevel);
-    fn reuse_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult;
+    fn reuse_saved_trail(&mut self, cdb: &ClauseDB) -> PropagationResult;
     fn clear_saved_trail(&mut self);
 }
 
@@ -60,7 +60,7 @@ impl TrailSavingIF for AssignStack {
             VarActivityManager::insert_heap(vi);
         }
     }
-    fn reuse_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult {
+    fn reuse_saved_trail(&mut self, cdb: &ClauseDB) -> PropagationResult {
         let q = self.stage_scale.trailing_zeros() as u16
             + (cdb.derefer(crate::cdb::property::Tf64::LiteralBlockEntanglement) as u16) / 2;
 

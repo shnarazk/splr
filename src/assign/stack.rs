@@ -1,7 +1,7 @@
 //! main struct AssignStack
 use {
     super::{ema::ProgressASG, PropagateIF},
-    crate::{cdb::ClauseDBIF, types::*, vam::VarActivityManager, var_vector::*},
+    crate::{cdb::ClauseDB, types::*, vam::VarActivityManager, var_vector::*},
     std::{fmt, ops::Range, slice::Iter},
 };
 
@@ -238,7 +238,7 @@ impl AssignStack {
     }
     /// inject assignments for eliminated vars.
     #[allow(unused_variables)]
-    pub fn extend_model(&self, cdb: &mut impl ClauseDBIF) -> Vec<Option<bool>> {
+    pub fn extend_model(&self, cdb: &mut ClauseDB) -> Vec<Option<bool>> {
         let lits = &self.eliminated;
 
         #[cfg(feature = "trace_elimination")]

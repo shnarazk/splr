@@ -390,7 +390,7 @@ impl Eliminator {
     // Due to a potential bug of killing clauses and difficulty about
     // synchronization between 'garbage_collect' and clearing occur lists,
     // 'stop' should purge all occur lists to purge any dead clauses for now.
-    fn stop(&mut self, cdb: &mut impl ClauseDBIF) {
+    fn stop(&mut self, cdb: &mut ClauseDB) {
         let force: bool = true;
         self.clear_clause_queue(cdb);
         self.clear_var_queue();
@@ -602,7 +602,7 @@ impl Eliminator {
         c.turn_on(FlagClause::ENQUEUED);
     }
     /// clear eliminator's clause queue.
-    fn clear_clause_queue(&mut self, cdb: &mut impl ClauseDBIF) {
+    fn clear_clause_queue(&mut self, cdb: &mut ClauseDB) {
         for cid in &self.clause_queue {
             cdb[*cid].turn_off(FlagClause::ENQUEUED);
         }
