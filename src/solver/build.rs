@@ -120,7 +120,7 @@ impl Instantiate for Solver {
     ///```
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Solver {
         VarRef::initialize(cnf.num_of_variables);
-        VarActivityManager::initialize();
+        VarActivityManager::initialize(config);
         Solver {
             asg: AssignStack::instantiate(config, cnf),
             cdb: ClauseDB::instantiate(config, cnf),

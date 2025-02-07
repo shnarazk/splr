@@ -5,12 +5,6 @@
 mod ema;
 /// Boolean constraint propagation
 mod propagate;
-/// Var rewarding
-#[cfg_attr(feature = "EVSIDS", path = "evsids.rs")]
-#[cfg_attr(feature = "LRB_rewarding", path = "learning_rate.rs")]
-mod reward;
-/// Decision var selection
-mod select;
 /// assignment management
 mod stack;
 /// trail saving
@@ -19,7 +13,6 @@ mod trail_saving;
 pub use self::{
     propagate::PropagateIF,
     property::*,
-    select::VarSelectIF,
     stack::{AssignStack, VarManipulateIF},
 };
 use {
@@ -35,7 +28,6 @@ pub use self::trail_saving::TrailSavingIF;
 /// [`stack`](`crate::assign::AssignIF::stack`),
 /// [`best_assigned`](`crate::assign::AssignIF::best_assigned`), and so on.
 pub trait AssignIF:
-    // ActivityIF<VarId>
     Instantiate
     + PropagateIF
     + VarManipulateIF
@@ -241,14 +233,9 @@ pub mod property {
     pub enum Tf64 {
         AverageVarActivity,
         CurrentWorkingSetSize,
-        VarDecayRate,
     }
 
-    pub const F64S: [Tf64; 3] = [
-        Tf64::AverageVarActivity,
-        Tf64::CurrentWorkingSetSize,
-        Tf64::VarDecayRate,
-    ];
+    pub const F64S: [Tf64; 2] = [Tf64::AverageVarActivity, Tf64::CurrentWorkingSetSize];
 
     impl PropertyDereference<Tf64, f64> for AssignStack {
         #[inline]
@@ -256,7 +243,6 @@ pub mod property {
             match k {
                 Tf64::AverageVarActivity => 0.0,    // self.activity_averaged,
                 Tf64::CurrentWorkingSetSize => 0.0, // self.cwss,
-                Tf64::VarDecayRate => self.activity_decay,
             }
         }
     }

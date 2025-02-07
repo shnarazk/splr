@@ -20,7 +20,7 @@ pub struct AssignStack {
     /// the-number-of-assigned-and-propagated-vars + 1
     pub(super) q_head: usize,
     pub root_level: DecisionLevel,
-    // pub(super) var_order: VarIdHeap, // Variable Order
+
     #[cfg(feature = "trail_saving")]
     pub(super) trail_saved: Vec<Lit>,
 
@@ -69,21 +69,6 @@ pub struct AssignStack {
     pub(super) ppc_ema: EmaSU,
     /// Conflicts Per Restart
     pub(super) cpr_ema: EmaSU,
-
-    //
-    //## Var Rewarding
-    //
-    /// var activity decay
-    pub(super) activity_decay: f64,
-    /// the default value of var activity decay in configuration
-    // #[cfg(feature = "EVSIDS")]
-    // activity_decay_default: f64,
-    /// its diff
-    pub(super) activity_anti_decay: f64,
-    // #[cfg(feature = "EVSIDS")]
-    // activity_decay_step: f64,
-    // /// an index for counting elapsed time
-    // pub(super) tick: usize,
 }
 
 impl Default for AssignStack {
@@ -93,7 +78,7 @@ impl Default for AssignStack {
             trail_lim: Vec::new(),
             q_head: 0,
             root_level: 0,
-            // var_order: VarIdHeap::default(),
+
             #[cfg(feature = "trail_saving")]
             trail_saved: Vec::new(),
 
@@ -124,18 +109,6 @@ impl Default for AssignStack {
             dpc_ema: EmaSU::new(100),
             ppc_ema: EmaSU::new(100),
             cpr_ema: EmaSU::new(100),
-
-            // tick: 0,
-            // var: Vec::new(),
-            activity_decay: 0.94,
-
-            #[cfg(feature = "EVSIDS")]
-            activity_decay_default: 0.94,
-
-            activity_anti_decay: 0.06,
-
-            #[cfg(feature = "EVSIDS")]
-            activity_decay_step: 0.1,
         }
     }
 }
@@ -164,19 +137,6 @@ impl Instantiate for AssignStack {
             trail_saved: Vec::with_capacity(nv),
 
             assign_rate: ProgressASG::instantiate(config, cnf),
-            // var: Var::new_vars(nv),
-            #[cfg(feature = "EVSIDS")]
-            activity_decay: config.vrw_dcy_rat * 0.6,
-            #[cfg(not(feature = "EVSIDS"))]
-            activity_decay: config.vrw_dcy_rat,
-
-            #[cfg(feature = "EVSIDS")]
-            activity_decay_default: config.vrw_dcy_rat,
-
-            activity_anti_decay: 1.0 - config.vrw_dcy_rat,
-            #[cfg(feature = "EVSIDS")]
-            activity_decay_step: config.vrw_dcy_stp,
-
             ..AssignStack::default()
         }
     }
@@ -441,6 +401,67 @@ impl AssignStack {
         }
         false
     }
+    #[cfg(feature = "rephase")]
+    pub fn best_phases_ref(&mut self, default_value: Option<bool>) -> HashMap<VarId, bool> {
+        VarRef::var_id_iter()
+            .filter_map(|vi| {
+                if VarRef(vi).level() == self.root_level || VarRef(vi).is(FlagVar::ELIMINATED) {
+                    default_value.map(|b| (vi, b))
+                } else {
+                    Some((
+                        vi,
+                        self.best_phases.get(&vi).map_or(
+                            VarRef(vi)
+                                .assign()
+                                .unwrap_or_else(|| VarRef(vi).is(FlagVar::PHASE)),
+                            |(b, _)| *b,
+                        ),
+                    ))
+                }
+            })
+            .collect::<HashMap<VarId, bool>>()
+    }
+    #[cfg(feature = "rephase")]
+    pub fn override_rephasing_target(&mut self, assignment: &HashMap<VarId, bool>) -> usize {
+        let mut num_flipped = 0;
+        for (vi, b) in assignment.iter() {
+            if self.best_phases.get(vi).is_none_or(|(p, _)| *p != *b) {
+                num_flipped += 1;
+                self.best_phases.insert(*vi, (*b, AssignReason::None));
+            }
+        }
+        num_flipped
+    }
+    #[cfg(feature = "rephase")]
+    pub fn select_rephasing_target(&mut self) {
+        if self.best_phases.is_empty() {
+            return;
+        }
+        self.check_consistency_of_best_phases();
+        if self.derefer(super::property::Tusize::NumUnassertedVar) <= self.best_phases.len() {
+            self.best_phases.clear();
+            return;
+        }
+        debug_assert!(self
+            .best_phases
+            .iter()
+            .all(|(vi, b)| VarRef(*vi).assign() != Some(!b.0)));
+        self.num_rephase += 1;
+        for (vi, (b, _)) in self.best_phases.iter() {
+            VarRef(*vi).set_flag(FlagVar::PHASE, *b);
+        }
+    }
+    #[cfg(feature = "rephase")]
+    pub fn check_consistency_of_best_phases(&mut self) {
+        if self
+            .best_phases
+            .iter()
+            .any(|(vi, b)| VarRef(*vi).assign() == Some(!b.0))
+        {
+            self.best_phases.clear();
+            self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -459,7 +480,7 @@ mod tests {
             ..CNFDescription::default()
         };
         VarRef::initialize(4);
-        VarActivityManager::initialize();
+        VarActivityManager::initialize(&config);
         let mut asg = AssignStack::instantiate(&config, &cnf);
         // [] + 1 => [1]
         assert!(asg.assign_at_root_level(lit(1)).is_ok());

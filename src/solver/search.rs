@@ -5,12 +5,12 @@ use {
         SolverResult,
     },
     crate::{
-        assign::{self, AssignIF, AssignStack, PropagateIF, VarSelectIF},
+        assign::{self, AssignIF, AssignStack, PropagateIF},
         cdb::{self, ClauseDB, ClauseDBIF, ReductionType, VivifyIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
         types::*,
-        vam::VarActivityManager,
+        vam::*,
         var_vector::*,
     },
 };
@@ -157,7 +157,7 @@ impl SolveIF for Solver {
                             VarRef(vi).set_activity(act);
                         }
                     }
-                    asg.rebuild_order();
+                    VarActivityManager::rebuild_order();
                 }
             }
             asg.eliminated.append(elim.eliminated_lits());
@@ -240,7 +240,7 @@ fn search(
     state.stm.initialize(stage_size);
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
-            let lit = asg.select_decision_literal();
+            let lit = VarActivityManager::select_decision_literal(asg);
             asg.assign_by_decision(lit);
         }
         let Err(cc) = asg.propagate(cdb) else {
@@ -433,7 +433,7 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: O
     let stage = state.stm.current_stage();
     let segment = state.stm.current_segment();
     let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
-    let vdr = asg.derefer(assign::property::Tf64::VarDecayRate);
+    let vdr = VarActivityManager::var_activity_decay_rate();
     let cdt = cdb.derefer(cdb::property::Tf64::ReductionThreshold);
     let fuel = if active {
         state.restart.penetration_energy_charged

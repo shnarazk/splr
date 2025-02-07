@@ -1,7 +1,7 @@
 //! Variable Activity Manager with idempotent heap
 #![allow(static_mut_refs)]
 use {
-    crate::{assign::AssignStack, types::*, var_vector::*},
+    crate::{assign::AssignStack, config::Config, types::*, var_vector::*},
     std::fmt,
 };
 
@@ -9,15 +9,15 @@ use {
 use crate::assign::TrailSavingIF;
 
 pub struct VarActivityManager {
-    decay: f64,
-    anti_decay: f64,
+    activity_decay: f64,
+    activity_anti_decay: f64,
     #[cfg(feature = "boundary_check")]
     tick: usize,
 }
 
 pub static mut VAM: VarActivityManager = VarActivityManager {
-    decay: 0.95,
-    anti_decay: 0.05,
+    activity_decay: 0.95,
+    activity_anti_decay: 0.05,
     #[cfg(feature = "boundary_check")]
     tick: 0,
 };
@@ -28,24 +28,28 @@ static mut VAR_HEAP: VarIdHeap = VarIdHeap {
 };
 
 impl VarActivityManager {
-    pub fn initialize() {
+    pub fn initialize(config: &Config) {
         unsafe {
             VAR_HEAP = VarIdHeap::new(VarRef::num_vars());
+            VAM.activity_decay = config.vrw_dcy_rat;
+            VAM.activity_anti_decay = 1.0 - config.vrw_dcy_rat;
         }
+    }
+    pub fn var_activity_decay_rate() -> f64 {
+        unsafe { VAM.activity_decay }
     }
     pub fn set_activity_decay(decay: f64) {
         unsafe {
-            VAM.decay = decay;
-            VAM.anti_decay = 1.0 - decay;
+            VAM.activity_decay = decay;
+            VAM.activity_anti_decay = 1.0 - decay;
         }
     }
     pub fn update_var_activity(vi: VarId) {
         unsafe {
-            VarRef(vi).update_activity(VAM.decay, VAM.anti_decay);
+            VarRef(vi).update_activity(VAM.activity_decay, VAM.activity_anti_decay);
         }
     }
     pub fn reward_at_analysis(vi: VarId) {
-        // self.var[vi].turn_on(FlagVar::USED);
         VarRef(vi).turn_on(FlagVar::USED);
     }
     #[inline]
@@ -55,7 +59,7 @@ impl VarActivityManager {
     #[inline]
     pub fn reward_at_unassign(vi: VarId) {
         unsafe {
-            VarRef(vi).update_activity(VAM.decay, VAM.anti_decay);
+            VarRef(vi).update_activity(VAM.activity_decay, VAM.activity_anti_decay);
         }
     }
 
@@ -149,6 +153,63 @@ impl VarIdHeap {
         }
         idxs[0] = n as u32;
         VarIdHeap { heap, idxs }
+    }
+}
+// Decision var selection
+
+use std::collections::HashMap;
+
+/// API for var selection, depending on an internal heap.
+pub trait VarSelectIF {
+    /// give rewards to vars selected by SLS
+    fn reward_by_sls(assignment: &HashMap<VarId, bool>) -> usize;
+    /// select a new decision variable.
+    fn select_decision_literal(asg: &mut AssignStack) -> Lit;
+    /// update the internal heap on var order.
+    fn update_order(v: VarId);
+    /// rebuild the internal var_order
+    fn rebuild_order();
+}
+
+impl VarSelectIF for VarActivityManager {
+    fn reward_by_sls(assignment: &HashMap<VarId, bool>) -> usize {
+        unsafe {
+            let mut num_flipped = 0;
+            for (vi, b) in assignment.iter() {
+                if VarRef(*vi).is(FlagVar::PHASE) != *b {
+                    num_flipped += 1;
+                    VarRef(*vi).set_flag(FlagVar::PHASE, *b);
+                    VarRef(*vi).set_activity(
+                        VarRef(*vi).activity() * VAM.activity_decay + VAM.activity_anti_decay,
+                    );
+                    // self.update_heap(*vi);
+                    VarActivityManager::update_heap(*vi);
+                }
+            }
+            num_flipped
+        }
+    }
+    fn select_decision_literal(asg: &mut AssignStack) -> Lit {
+        loop {
+            let vi = VarActivityManager::get_heap_root(asg); // self.get_heap_root();
+            if VarRef(vi).assign().is_none() && !VarRef(vi).is(FlagVar::ELIMINATED) {
+                return Lit::from((vi, VarRef(vi).is(FlagVar::PHASE)));
+            }
+        }
+    }
+    fn update_order(v: VarId) {
+        // self.update_heap(v);
+        VarActivityManager::update_heap(v);
+    }
+    fn rebuild_order() {
+        // self.clear_heap();
+        VarActivityManager::clear_heap();
+        for vi in VarRef::var_id_iter() {
+            if VarRef(vi).assign().is_none() && !VarRef(vi).is(FlagVar::ELIMINATED) {
+                // self.insert_heap(vi);
+                VarActivityManager::insert_heap(vi);
+            }
+        }
     }
 }
 
