@@ -299,7 +299,7 @@ impl AssignStack {
         // before finding a conflict by the target clause.
         // So we must skip this conflict.
         if learnt.is_empty() {
-            debug_assert_eq!(self.num_conflict, 0);
+            debug_assert_eq!(self.num_conflicts(), 0);
             // panic!("\n{:?}\n{:?}\n{:?}",
             //        conflicting,
             //        conflicting.iter().map(|l| self.assigned(*l)).collect::<Vec<_>>(),

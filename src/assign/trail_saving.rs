@@ -61,8 +61,7 @@ impl TrailSavingIF for AssignStack {
         }
     }
     fn reuse_saved_trail(&mut self, cdb: &ClauseDB) -> PropagationResult {
-        let q = self.stage_scale.trailing_zeros() as u16
-            + (cdb.refer(crate::cdb::property::TEma::Entanglement).get() as u16) / 2;
+        let q = self.stage_scale.trailing_zeros() as u16 + (cdb.lb_entanglement().get() as u16) / 2;
 
         #[cfg(feature = "chrono_BT")]
         let dl = self.decision_level();

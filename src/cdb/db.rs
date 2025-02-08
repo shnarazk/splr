@@ -320,6 +320,9 @@ impl ClauseDB {
     pub fn lb_entanglement(&self) -> &EmaView {
         self.lb_entanglement.as_view()
     }
+    pub fn reduction_threshold(&self) -> f64 {
+        self.reduction_threshold
+    }
 
     //
     //## interface to binary links
@@ -1307,7 +1310,7 @@ impl ClauseDBIF for ClauseDB {
             return;
         };
         let mut buf = std::io::BufWriter::new(out);
-        let na = asg.derefer(crate::assign::property::Tusize::NumAssertedVar);
+        let na = asg.num_asserted_vars();
         let nc = self.iter().skip(1).filter(|c| !c.is_dead()).count();
         buf.write_all(format!("p cnf {} {}\n", VarRef::num_vars(), nc + na).as_bytes())
             .unwrap();

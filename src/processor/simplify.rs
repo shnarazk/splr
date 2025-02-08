@@ -5,9 +5,9 @@ use {
         EliminateIF, Eliminator, EliminatorMode,
     },
     crate::{
-        assign::{self, AssignStack, PropagateIF},
-        cdb::{self, ClauseDB, ClauseDBIF},
-        state::{self, State, StateIF},
+        assign::{AssignStack, PropagateIF},
+        cdb::{ClauseDB, ClauseDBIF},
+        state::{State, StateIF},
         types::*,
         var_vector::*,
     },
@@ -283,10 +283,10 @@ impl EliminateIF for Eliminator {
             if !force_run && self.mode == EliminatorMode::Dormant {
                 self.prepare(cdb, true);
             }
-            self.eliminate_grow_limit = state.derefer(state::property::Tusize::IntervalScale) / 2;
-            self.subsume_literal_limit = state.config.elm_cls_lim
-                + cdb.refer(cdb::property::TEma::Entanglement).get() as usize;
-            debug_assert!(!cdb.refer(cdb::property::TEma::Entanglement).get().is_nan());
+            self.eliminate_grow_limit = state.stm.current_scale();
+            self.subsume_literal_limit =
+                state.config.elm_cls_lim + cdb.lb_entanglement().get() as usize;
+            debug_assert!(!cdb.lb_entanglement().get().is_nan());
             // self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
             self.eliminate(asg, cdb, state)?;
         } else {
@@ -306,7 +306,7 @@ impl EliminateIF for Eliminator {
     fn sorted_iterator(&self) -> Iter<'_, u32> {
         self.var_queue.heap[1..].iter()
     }
-    fn stats(&self, vi: VarId) -> Option<(usize, usize)> {
+    fn num_phases(&self, vi: VarId) -> Option<(usize, usize)> {
         let w = &self[vi];
         if w.aborted {
             None
@@ -536,7 +536,7 @@ impl Eliminator {
             return Ok(());
         }
         let mut timedout: usize = {
-            let nv = asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64;
+            let nv = asg.num_unasserted_vars() as f64;
             let nc = cdb.num_clauses() as f64;
             (6.0 * nv.log(1.5) * nc) as usize
         };

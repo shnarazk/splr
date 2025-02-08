@@ -145,7 +145,7 @@ impl PropagateIF for AssignStack {
         // self.reward_at_assign(vi);
         VarActivityManager::reward_at_assign(vi);
         self.trail.push(l);
-        self.num_decision += 1;
+        self.num_decisions += 1;
         debug_assert!(self.q_head < self.trail.len());
     }
     fn cancel_until(&mut self, lv: DecisionLevel) {
@@ -224,8 +224,8 @@ impl PropagateIF for AssignStack {
         self.trail_lim.truncate(lv as usize);
         // assert!(lim < self.q_head) doesn't hold sometimes in chronoBT.
         if lv == self.root_level {
-            self.num_restart += 1;
-            self.cpr_ema.update(self.num_conflict);
+            self.num_restarts += 1;
+            self.cpr_ema.update(self.num_conflicts);
         } else {
             #[cfg(feature = "assign_rate")]
             self.assign_rate.update(
@@ -283,9 +283,9 @@ impl PropagateIF for AssignStack {
 
         macro_rules! conflict_path {
             ($lit: expr, $reason: expr) => {
-                self.dpc_ema.update(self.num_decision);
-                self.ppc_ema.update(self.num_propagation);
-                self.num_conflict += 1;
+                self.dpc_ema.update(self.num_decisions);
+                self.ppc_ema.update(self.num_propagations);
+                self.num_conflicts += 1;
                 return Err(($lit, $reason));
             };
         }
@@ -311,11 +311,11 @@ impl PropagateIF for AssignStack {
         macro_rules! from_saved_trail {
             () => {
                 if let cc @ Err(_) = self.reuse_saved_trail(cdb) {
-                    self.num_propagation += 1;
-                    self.num_conflict += 1;
+                    self.num_propagations += 1;
+                    self.num_conflicts += 1;
                     self.num_reconflict += 1;
-                    self.dpc_ema.update(self.num_decision);
-                    self.ppc_ema.update(self.num_propagation);
+                    self.dpc_ema.update(self.num_decisions);
+                    self.ppc_ema.update(self.num_propagations);
                     return cc;
                 }
             };
@@ -328,7 +328,7 @@ impl PropagateIF for AssignStack {
         let dl = self.decision_level();
         from_saved_trail!();
         while let Some(p) = self.trail.get(self.q_head) {
-            self.num_propagation += 1;
+            self.num_propagations += 1;
             self.q_head += 1;
             #[cfg(feature = "debug_propagation")]
             {
@@ -360,7 +360,10 @@ impl PropagateIF for AssignStack {
                 match VarRef::lit_assigned(blocker) {
                     Some(true) => (),
                     Some(false) => {
-                        check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, blocker));
+                        check_in!(
+                            cid,
+                            Propagate::EmitConflict(self.num_conflicts + 1, blocker)
+                        );
                         conflict_path!(blocker, minimized_reason!(propagating));
                     }
                     None => {
@@ -753,7 +756,7 @@ impl AssignStack {
                 }
             }
         }
-        self.build_best_at = self.num_propagation;
+        self.build_best_at = self.num_propagations;
         #[cfg(feature = "rephase")]
         {
             self.phase_age = 0;

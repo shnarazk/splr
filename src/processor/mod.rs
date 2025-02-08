@@ -17,7 +17,7 @@
 //!  } = s;
 //!  let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
 //!  elim.simplify(asg, cdb, state, false).expect("panic");
-//!  assert!(!state.config.enable_eliminator || 0 < asg.num_eliminated_vars);
+//!  assert!(!state.config.enable_eliminator || 0 < asg.num_eliminated_vars());
 //!```
 
 mod eliminate;
@@ -73,7 +73,7 @@ pub trait EliminateIF: Instantiate {
     /// return the order of vars based on their occurrences
     fn sorted_iterator(&self) -> Iter<'_, u32>;
     /// return vi's stats
-    fn stats(&self, vi: VarId) -> Option<(usize, usize)>;
+    fn num_phases(&self, vi: VarId) -> Option<(usize, usize)>;
     /// return the constraints on eliminated literals.
     fn eliminated_lits(&mut self) -> &mut Vec<Lit>;
 }
@@ -132,9 +132,9 @@ mod tests {
         assert!(elim.enable);
         elim.simplify(asg, cdb, state, false).expect("");
         assert!(!VarRef::var_id_iter().all(|vi| VarRef(vi).is(FlagVar::ELIMINATED)));
-        assert!(0 < asg.num_eliminated_vars);
+        assert!(0 < asg.num_eliminated_vars());
         assert_eq!(
-            asg.num_eliminated_vars,
+            asg.num_eliminated_vars(),
             VarRef::var_id_iter()
                 .filter(|vi| VarRef(*vi).is(FlagVar::ELIMINATED))
                 .count()

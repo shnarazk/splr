@@ -19,7 +19,7 @@ pub struct AssignStack {
     pub(super) trail_lim: Vec<usize>,
     /// the-number-of-assigned-and-propagated-vars + 1
     pub(super) q_head: usize,
-    pub root_level: DecisionLevel,
+    pub(super) root_level: DecisionLevel,
 
     #[cfg(feature = "trail_saving")]
     pub(super) trail_saved: Vec<Lit>,
@@ -44,7 +44,7 @@ pub struct AssignStack {
     //
     //## Stage
     //
-    pub stage_scale: usize,
+    pub(super) stage_scale: usize,
 
     //## Elimanated vars
     //
@@ -54,13 +54,13 @@ pub struct AssignStack {
     //## Statistics
     //
     /// the number of asserted vars.
-    pub num_asserted_vars: usize,
+    pub(super) num_asserted_vars: usize,
     /// the number of eliminated vars.
-    pub num_eliminated_vars: usize,
-    pub(super) num_decision: usize,
-    pub(super) num_propagation: usize,
-    pub num_conflict: usize,
-    pub(super) num_restart: usize,
+    pub(super) num_eliminated_vars: usize,
+    pub(super) num_decisions: usize,
+    pub(super) num_propagations: usize,
+    pub(super) num_conflicts: usize,
+    pub(super) num_restarts: usize,
     /// Assign rate EMA
     pub(super) assign_rate: ProgressASG,
     /// Decisions Per Conflict
@@ -101,10 +101,10 @@ impl Default for AssignStack {
 
             num_asserted_vars: 0,
             num_eliminated_vars: 0,
-            num_decision: 0,
-            num_propagation: 0,
-            num_conflict: 0,
-            num_restart: 0,
+            num_decisions: 0,
+            num_propagations: 0,
+            num_conflicts: 0,
+            num_restarts: 0,
             assign_rate: ProgressASG::default(),
             dpc_ema: EmaSU::new(100),
             ppc_ema: EmaSU::new(100),
@@ -179,6 +179,48 @@ impl AssignStack {
     pub fn root_level(&self) -> DecisionLevel {
         self.root_level
     }
+    pub fn num_asserted_vars(&self) -> usize {
+        self.num_asserted_vars
+    }
+    pub fn num_eliminated_vars(&self) -> usize {
+        self.num_eliminated_vars
+    }
+    pub fn num_decisions(&self) -> usize {
+        self.num_decisions
+    }
+    pub fn num_propagations(&self) -> usize {
+        self.num_propagations
+    }
+    pub fn num_conflicts(&self) -> usize {
+        self.num_conflicts
+    }
+    pub fn num_restart(&self) -> usize {
+        self.num_restarts
+    }
+    pub fn num_unasserted_vars(&self) -> usize {
+        VarRef::num_vars() - self.num_asserted_vars - self.num_eliminated_vars
+    }
+    pub fn num_unassigned_vars(&self) -> usize {
+        VarRef::num_vars() - self.num_asserted_vars - self.num_eliminated_vars - self.trail.len()
+    }
+    pub fn num_unreachable_vars(&self) -> usize {
+        VarRef::num_vars() - self.num_best_assign
+    }
+    pub fn assign_rate(&self) -> &EmaView {
+        self.assign_rate.as_view()
+    }
+    /// EMA of Decision/Conflict
+    pub fn dpc_ema(&self) -> &EmaView {
+        self.dpc_ema.as_view()
+    }
+    /// EMA of Propagation/Conflict
+    pub fn ppc_ema(&self) -> &EmaView {
+        self.ppc_ema.as_view()
+    }
+    /// EMA of Conflict/Restart
+    pub fn cpr_ema(&self) -> &EmaView {
+        self.cpr_ema.as_view()
+    }
     /// return the i-th element in the stack.
     pub fn stack(&self, i: usize) -> Lit {
         self.trail[i]
@@ -228,7 +270,7 @@ impl AssignStack {
     }
     /// return the largest number of assigned vars.
     pub fn best_assigned(&self) -> Option<usize> {
-        (self.build_best_at == self.num_propagation)
+        (self.build_best_at == self.num_propagations)
             .then_some(VarRef::num_vars() - self.num_best_assign)
     }
     /// return `true` if no best_phases
@@ -455,7 +497,7 @@ impl AssignStack {
             return;
         }
         self.check_consistency_of_best_phases();
-        if self.derefer(super::property::Tusize::NumUnassertedVar) <= self.best_phases.len() {
+        if self.num_unasserted_vars() <= self.best_phases.len() {
             self.best_phases.clear();
             return;
         }

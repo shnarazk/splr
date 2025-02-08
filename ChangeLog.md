@@ -3,6 +3,9 @@
 - Remove feature 'incremental_solver'
 - Remove feature 'EVSIDS'
 - Use `static mut` vars. So splr is non-thread-safe now.
+- Refactor visivility of modules and structs
+  - Rename `property` to `stats`
+  - Use struct names directly instead of trait requirements
 
 ## 0.17.6, 2025-02-01
 

@@ -5,8 +5,8 @@ use {
         SolverResult,
     },
     crate::{
-        assign::{self, AssignStack, PropagateIF},
-        cdb::{self, ClauseDB, ClauseDBIF, ReductionType, VivifyIF},
+        assign::{AssignStack, PropagateIF},
+        cdb::{ClauseDB, ClauseDBIF, ReductionType, VivifyIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
         types::*,
@@ -101,7 +101,7 @@ impl SolveIF for Solver {
                     if VarRef(vi).assign().is_some() {
                         continue;
                     }
-                    if let Some((p, m)) = elim.stats(vi) {
+                    if let Some((p, m)) = elim.num_phases(vi) {
                         // We can't call `asg.assign_at_root_level(l)` even if p or m == 0.
                         // This means we can't pick `!l`.
                         // This becomes a problem in the case of incremental solving.
@@ -142,7 +142,7 @@ impl SolveIF for Solver {
                         if VarRef(vi).assign().is_some() || VarRef(vi).is(FlagVar::ELIMINATED) {
                             continue;
                         }
-                        match elim.stats(vi) {
+                        match elim.num_phases(vi) {
                             Some((_, 0)) => (),
                             Some((0, _)) => (),
                             Some((p, m)) if m * 10 < p => VarRef(vi).turn_on(FlagVar::PHASE),
@@ -238,7 +238,7 @@ fn search(
     let mut sls_core = cdb.num_clauses();
 
     state.stm.initialize(stage_size);
-    while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
+    while 0 < asg.num_unassigned_vars() || asg.remains() {
         if !asg.remains() {
             let lit = VarActivityManager::select_decision_literal(asg);
             asg.assign_by_decision(lit);
@@ -299,7 +299,7 @@ fn search(
                 #[cfg(feature = "rephase")]
                 {
                     if cfg!(feature = "stochastic_local_search") {
-                        use cdb::StochasticLocalSearchIF;
+                        use crate::cdb::StochasticLocalSearchIF;
                         macro_rules! sls {
                             ($assign: expr, $limit: expr) => {
                                 state.sls_index += 1;
@@ -332,7 +332,7 @@ fn search(
                                     + 1
                             };
                         }
-                        let ent = cdb.refer(cdb::property::TEma::Entanglement).get() as usize;
+                        let ent = cdb.lb_entanglement().get() as usize;
                         let n = cdb.num_clauses();
                         if let Some(c) = core_was_rebuilt {
                             core_was_rebuilt = None;
@@ -413,9 +413,9 @@ fn search(
         format!(
             "search process finished at level {}:: {} = {} - {} - {}",
             asg.decision_level(),
-            asg.derefer(assign::property::Tusize::NumUnassignedVar),
+            asg.num_unassigned_vars(),
             VarRef::num_vars(),
-            asg.num_eliminated_vars,
+            asg.num_eliminated_vars(),
             asg.stack_len(),
         ),
     );
@@ -429,9 +429,9 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: O
     let span = state.stm.current_span();
     let stage = state.stm.current_stage();
     let segment = state.stm.current_segment();
-    let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
+    let cpr = asg.cpr_ema().get();
     let vdr = VarActivityManager::var_activity_decay_rate();
-    let cdt = cdb.derefer(cdb::property::Tf64::ReductionThreshold);
+    let cdt = cdb.reduction_threshold();
     let fuel = if active {
         state.restart.penetration_energy_charged
     } else {
@@ -456,7 +456,7 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
             "falsifies by {} at level {}, NumConf {}",
             cid,
             asg.decision_level(),
-            asg.derefer(assign::property::Tusize::NumConflict),
+            asg.num_conflict(),
         );
         assert!(asg.stack_iter().all(|l| asg.assigned(*l) == Some(true)));
         let (c0, c1) = cdb.watch_caches(cid, "check (search 441)");
