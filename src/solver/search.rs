@@ -235,7 +235,7 @@ fn search(
     let mut core_was_rebuilt: Option<usize> = None;
     let stage_size: usize = 32;
     #[cfg(feature = "rephase")]
-    let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
+    let mut sls_core = cdb.num_clauses();
 
     state.stm.initialize(stage_size);
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -333,7 +333,7 @@ fn search(
                             };
                         }
                         let ent = cdb.refer(cdb::property::TEma::Entanglement).get() as usize;
-                        let n = cdb.derefer(cdb::property::Tusize::NumClause);
+                        let n = cdb.num_clauses();
                         if let Some(c) = core_was_rebuilt {
                             core_was_rebuilt = None;
                             if c < current_core {
@@ -342,7 +342,7 @@ fn search(
                                 sls!(assignment, steps);
                             }
                         } else if new_segment {
-                            let n = cdb.derefer(cdb::property::Tusize::NumClause);
+                            let n = cdb.num_clauses();
                             let steps = scale!(27_u32, current_core) * scale!(24_u32, n) / ent;
                             let mut assignment = asg.best_phases_ref(Some(false));
                             sls!(assignment, steps);
@@ -396,10 +396,7 @@ fn search(
             asg.handle(SolverEvent::Stage(scale));
             state.restart.set_stage_parameters(scale);
             previous_stage = next_stage;
-        } else if state.restart.restart(
-            cdb.refer(cdb::property::TEma::LBD),
-            cdb.refer(cdb::property::TEma::Entanglement),
-        ) {
+        } else if state.restart.restart(cdb.lbd(), cdb.lb_entanglement()) {
             RESTART!(asg, cdb, state);
         }
         if let Some(na) = asg.best_assigned() {

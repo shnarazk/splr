@@ -2,7 +2,6 @@ use {
     super::{
         binary::{BinaryLinkIF, BinaryLinkList},
         ema::ProgressLBD,
-        property,
         watch_cache::*,
         BinaryLinkDB, CertificationStore, ClauseDBIF, ClauseId, ReductionType, RefClause,
     },
@@ -62,30 +61,30 @@ pub struct ClauseDB {
     //
     /// a working buffer for LBD calculation
     lbd_temp: Vec<usize>,
-    pub(crate) lbd: ProgressLBD,
+    pub(super) lbd: ProgressLBD,
 
     //
     //## statistics
     //
     /// the number of active (not DEAD) clauses.
-    pub(crate) num_clause: usize,
+    pub(super) num_clauses: usize,
     /// the number of binary clauses.
-    pub(crate) num_bi_clause: usize,
+    pub(super) num_bi_clauses: usize,
     /// the number of binary learnt clauses.
-    pub(crate) num_bi_learnt: usize,
+    pub(super) num_bi_learnts: usize,
     /// the number of clauses which LBDs are 2.
-    pub(crate) num_lbd2: usize,
+    pub(super) num_lbd2: usize,
     /// the present number of learnt clauses.
-    pub(crate) num_learnt: usize,
+    pub(super) num_learnts: usize,
     /// the number of reductions.
-    pub(crate) num_reduction: usize,
+    pub(super) num_reduction: usize,
     /// the number of reregistration of a bi-clause
-    pub(crate) num_reregistration: usize,
+    pub(super) num_reregistration: usize,
     /// Literal Block Entanglement
     /// EMA of LBD of clauses used in conflict analysis (dependency graph)
-    pub(crate) lb_entanglement: Ema2,
+    pub(super) lb_entanglement: Ema2,
     /// cutoff value used in the last `reduce`
-    pub(crate) reduction_threshold: f64,
+    pub(super) reduction_threshold: f64,
 }
 
 impl Default for ClauseDB {
@@ -111,11 +110,11 @@ impl Default for ClauseDB {
             lbd_temp: Vec::new(),
             lbd: ProgressLBD::default(),
 
-            num_clause: 0,
-            num_bi_clause: 0,
-            num_bi_learnt: 0,
+            num_clauses: 0,
+            num_bi_clauses: 0,
+            num_bi_learnts: 0,
             num_lbd2: 0,
-            num_learnt: 0,
+            num_learnts: 0,
             num_reduction: 0,
             num_reregistration: 0,
             lb_entanglement: Ema2::new(1_000).with_slow(80_000).with_value(2.0),
@@ -291,6 +290,36 @@ impl ClauseDB {
     pub fn iter(&self) -> Iter<'_, Clause> {
         self.clause.iter()
     }
+    pub fn num_clauses(&self) -> usize {
+        self.num_clauses
+    }
+    pub fn num_bi_clauses(&self) -> usize {
+        self.num_bi_clauses
+    }
+    pub fn num_bi_learnts(&self) -> usize {
+        self.num_bi_learnts
+    }
+    pub fn num_learnts(&self) -> usize {
+        self.num_learnts
+    }
+    pub fn num_lbd2(&self) -> usize {
+        self.num_lbd2
+    }
+    pub fn num_reduction(&self) -> usize {
+        self.num_reduction
+    }
+    pub fn num_reregistration(&self) -> usize {
+        self.num_reregistration
+    }
+    pub fn num_bi_clause_completion(&self) -> usize {
+        self.num_bi_clause_completion
+    }
+    pub fn lbd(&self) -> &EmaView {
+        self.lbd.as_view()
+    }
+    pub fn lb_entanglement(&self) -> &EmaView {
+        self.lb_entanglement.as_view()
+    }
 
     //
     //## interface to binary links
@@ -306,8 +335,8 @@ impl ClauseDB {
     /// * `Ok(true)` -- enough small
     /// * `Ok(false)` -- close to the limit
     pub fn check_size(&self) -> Result<bool, SolverError> {
-        if self.soft_limit == 0 || self.num_clause <= self.soft_limit {
-            let nc = self.derefer(property::Tusize::NumClause);
+        if self.soft_limit == 0 || self.num_clauses <= self.soft_limit {
+            let nc = self.num_clauses;
             Ok(0 == self.soft_limit || 4 * nc < 3 * self.soft_limit)
         } else {
             Err(SolverError::OutOfMemory)
@@ -407,11 +436,11 @@ impl ClauseDBIF for ClauseDB {
             ref mut bi_clause_completion_queue,
             ref mut clause,
             ref mut lbd_temp,
-            ref mut num_clause,
-            ref mut num_bi_clause,
-            ref mut num_bi_learnt,
+            ref mut num_clauses,
+            ref mut num_bi_clauses,
+            ref mut num_bi_learnts,
             ref mut num_lbd2,
-            ref mut num_learnt,
+            ref mut num_learnts,
             ref mut binary_link,
 
             #[cfg(feature = "clause_rewarding")]
@@ -443,13 +472,13 @@ impl ClauseDBIF for ClauseDB {
             c.rank_old = c.rank;
         }
         self.lbd.update(c.rank);
-        *num_clause += 1;
+        *num_clauses += 1;
         if learnt {
             if len2 {
-                *num_bi_learnt += 1;
+                *num_bi_learnts += 1;
             } else {
                 c.turn_on(FlagClause::LEARNT);
-                *num_learnt += 1;
+                *num_learnts += 1;
                 if c.rank <= 2 {
                     *num_lbd2 += 1;
                 }
@@ -458,7 +487,7 @@ impl ClauseDBIF for ClauseDB {
         let l0 = c.lits[0];
         let l1 = c.lits[1];
         if len2 {
-            *num_bi_clause += 1;
+            *num_bi_clauses += 1;
             binary_link.add(l0, l1, cid);
         } else {
             watch_cache[!l0].insert_watch(cid, l1);
@@ -538,9 +567,9 @@ impl ClauseDBIF for ClauseDB {
             &mut self.certification_store,
             &mut self.binary_link,
             &mut self.watch_cache,
-            &mut self.num_bi_clause,
-            &mut self.num_clause,
-            &mut self.num_learnt,
+            &mut self.num_bi_clauses,
+            &mut self.num_clauses,
+            &mut self.num_learnts,
             cid,
             c,
         );
@@ -609,7 +638,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut binary_link,
             ref mut watch_cache,
             ref mut certification_store,
-            ref mut num_bi_clause,
+            ref mut num_bi_clauses,
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
@@ -650,7 +679,7 @@ impl ClauseDBIF for ClauseDB {
             watch_cache[!l0].remove_watch(&cid);
             watch_cache[!l1].remove_watch(&cid);
             binary_link.add(lits[0], lits[1], cid);
-            *num_bi_clause += 1;
+            *num_bi_clauses += 1;
             // self.watches(cid, "after strengthen_by_elimination case:3-2");
         } else {
             let old_l0 = lits[0];
@@ -777,7 +806,7 @@ impl ClauseDBIF for ClauseDB {
                 certification_store.delete_clause(&c.lits);
             }
             c.turn_off(FlagClause::LEARNT);
-            self.num_bi_clause += 1;
+            self.num_bi_clauses += 1;
 
             if certification_store.is_active() {
                 certification_store.add_clause(&c.lits);
@@ -911,9 +940,9 @@ impl ClauseDBIF for ClauseDB {
                 watch_cache[!c.lits[1]].remove_watch(&cid);
                 binary_link.add(l0, l1, cid);
                 std::mem::swap(&mut c.lits, &mut new_lits);
-                self.num_bi_clause += 1;
+                self.num_bi_clauses += 1;
                 if c.is(FlagClause::LEARNT) {
-                    self.num_learnt -= 1;
+                    self.num_learnts -= 1;
                     c.turn_off(FlagClause::LEARNT);
                 }
 
@@ -1144,9 +1173,9 @@ impl ClauseDBIF for ClauseDB {
                     &mut self.certification_store,
                     &mut self.binary_link,
                     &mut self.watch_cache,
-                    &mut self.num_bi_clause,
-                    &mut self.num_clause,
-                    &mut self.num_learnt,
+                    &mut self.num_bi_clauses,
+                    &mut self.num_clauses,
+                    &mut self.num_learnts,
                     ClauseId::from(i),
                     c,
                 );
@@ -1360,9 +1389,9 @@ fn remove_clause_fn(
     certification_store: &mut CertificationStore,
     binary_link: &mut BinaryLinkDB,
     watcher: &mut [WatchCache],
-    num_bi_clause: &mut usize,
-    num_clause: &mut usize,
-    num_learnt: &mut usize,
+    num_bi_clauses: &mut usize,
+    num_clauses: &mut usize,
+    num_learnts: &mut usize,
     cid: ClauseId,
     c: &mut Clause,
 ) {
@@ -1373,15 +1402,15 @@ fn remove_clause_fn(
         binary_link
             .remove(l0, l1)
             .expect("Eror (remove_clause_fn#01)");
-        *num_bi_clause -= 1;
+        *num_bi_clauses -= 1;
     } else {
         watcher[usize::from(!l0)].remove_watch(&cid); // .expect("db1076");
         watcher[usize::from(!l1)].remove_watch(&cid); // .expect("db1077");
     }
     if c.is(FlagClause::LEARNT) {
-        *num_learnt -= 1;
+        *num_learnts -= 1;
     }
-    *num_clause -= 1;
+    *num_clauses -= 1;
     certification_store.delete_clause(&c.lits);
     c.lits.clear();
 }

@@ -285,10 +285,8 @@ impl EliminateIF for Eliminator {
             }
             self.eliminate_grow_limit = state.derefer(state::property::Tusize::IntervalScale) / 2;
             self.subsume_literal_limit = state.config.elm_cls_lim
-                + cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement) as usize;
-            debug_assert!(!cdb
-                .derefer(cdb::property::Tf64::LiteralBlockEntanglement)
-                .is_nan());
+                + cdb.refer(cdb::property::TEma::Entanglement).get() as usize;
+            debug_assert!(!cdb.refer(cdb::property::TEma::Entanglement).get().is_nan());
             // self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
             self.eliminate(asg, cdb, state)?;
         } else {
@@ -432,7 +430,7 @@ impl Eliminator {
                     debug_assert!(!VarRef(vi).is(FlagVar::ELIMINATED));
                     vi
                 } else {
-                    let mut tmp = cdb.derefer(cdb::property::Tusize::NumClause);
+                    let mut tmp = cdb.num_clauses();
                     let c = &mut cdb[cid];
                     c.turn_off(FlagClause::ENQUEUED);
                     if c.is_dead() || self.subsume_literal_limit < c.len() {
@@ -539,7 +537,7 @@ impl Eliminator {
         }
         let mut timedout: usize = {
             let nv = asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64;
-            let nc = cdb.derefer(cdb::property::Tusize::NumClause) as f64;
+            let nc = cdb.num_clauses() as f64;
             (6.0 * nv.log(1.5) * nc) as usize
         };
         while self.bwdsub_assigns < asg.stack_len()

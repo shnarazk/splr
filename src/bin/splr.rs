@@ -351,6 +351,16 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             .as_bytes(),
         )?;
     }
+    for key in &cdb::property::EMAS {
+        out.write_all(
+            format!(
+                "c   clause::{:<27}{:>19.3}\n",
+                format!("{key:?}"),
+                s.cdb.refer(*key).get(),
+            )
+            .as_bytes(),
+        )?;
+    }
     for key in &state::property::USIZES {
         out.write_all(
             format!(

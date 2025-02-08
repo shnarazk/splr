@@ -5,7 +5,8 @@ use instant::{Duration, Instant};
 use std::time::{Duration, Instant};
 use {
     crate::{
-        assign, cdb,
+        assign,
+        cdb::ClauseDB,
         solver::{RestartManager, SolverEvent, StageManager},
         types::*,
         var_vector::*,
@@ -28,14 +29,11 @@ pub trait StateIF {
     /// write a header of stat data to stdio.
     fn progress_header(&mut self);
     /// write stat data to stdio.
-    fn progress<A, C>(&mut self, asg: &A, cdb: &C)
+    fn progress<A>(&mut self, asg: &A, cdb: &ClauseDB)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyDereference<assign::property::Tf64, f64>
-            + PropertyReference<assign::property::TEma, EmaView>,
-        C: PropertyDereference<cdb::property::Tusize, usize>
-            + PropertyDereference<cdb::property::Tf64, f64>
-            + PropertyReference<cdb::property::TEma, EmaView>;
+            + PropertyReference<assign::property::TEma, EmaView>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
     /// write a one-line message as log.
@@ -429,14 +427,11 @@ impl StateIF for State {
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
-    fn progress<A, C>(&mut self, asg: &A, cdb: &C)
+    fn progress<A>(&mut self, asg: &A, cdb: &ClauseDB)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyDereference<assign::property::Tf64, f64>
             + PropertyReference<assign::property::TEma, EmaView>,
-        C: PropertyDereference<cdb::property::Tusize, usize>
-            + PropertyDereference<cdb::property::Tf64, f64>
-            + PropertyReference<cdb::property::TEma, EmaView>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
             self.log_messages.clear();
@@ -461,14 +456,14 @@ impl StateIF for State {
         let asg_ppc_ema = asg.refer(assign::property::TEma::PropagationPerConflict);
         let asg_cpr_ema = asg.refer(assign::property::TEma::ConflictPerRestart);
 
-        let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
-        let cdb_num_bi_clause = cdb.derefer(cdb::property::Tusize::NumBiClause);
-        let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
-        let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
-        let cdb_lb_ent: f64 = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
+        let cdb_num_clause = cdb.num_clauses();
+        let cdb_num_bi_clause = cdb.num_bi_clauses();
+        let cdb_num_lbd2 = cdb.num_lbd2();
+        let cdb_num_learnt = cdb.num_learnts();
+        let cdb_lb_ent: f64 = cdb.lb_entanglement().get();
         let rst_num_rst: usize = self[Stat::Restart];
         let rst_asg: &EmaView = asg.refer(assign::property::TEma::AssignRate);
-        let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
+        let rst_lbd: &EmaView = cdb.lbd();
         let rst_eng: f64 = self.restart.penetration_energy_charged;
         let stg_segment: usize = self.stm.current_segment();
 
@@ -617,13 +612,10 @@ impl StateIF for State {
 
 impl State {
     #[allow(clippy::cognitive_complexity)]
-    fn record_stats<A, C>(&mut self, asg: &A, cdb: &C)
+    fn record_stats<A>(&mut self, asg: &A, cdb: &ClauseDB)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyReference<assign::property::TEma, EmaView>,
-        C: PropertyDereference<cdb::property::Tusize, usize>
-            + PropertyDereference<cdb::property::Tf64, f64>
-            + PropertyReference<cdb::property::TEma, EmaView>,
     {
         self[LogUsizeId::NumConflict] = asg.derefer(assign::property::Tusize::NumConflict);
         self[LogUsizeId::NumDecision] = asg.derefer(assign::property::Tusize::NumDecision);
@@ -635,11 +627,10 @@ impl State {
             * (self[LogUsizeId::AssertedVar]
                 + asg.derefer(assign::property::Tusize::NumEliminatedVar)) as f64
             / VarRef::num_vars() as f64;
-        self[LogUsizeId::RemovableClause] = cdb.derefer(cdb::property::Tusize::NumLearnt);
-        self[LogUsizeId::LBD2Clause] = cdb.derefer(cdb::property::Tusize::NumLBD2);
-        self[LogUsizeId::BiClause] = cdb.derefer(cdb::property::Tusize::NumBiClause);
-        self[LogUsizeId::PermanentClause] =
-            cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
+        self[LogUsizeId::RemovableClause] = cdb.num_learnts();
+        self[LogUsizeId::LBD2Clause] = cdb.num_lbd2();
+        self[LogUsizeId::BiClause] = cdb.num_bi_clauses();
+        self[LogUsizeId::PermanentClause] = cdb.num_clauses() - self[LogUsizeId::RemovableClause];
         self[LogUsizeId::Restart] = self[Stat::Restart];
         self[LogUsizeId::Stage] = self.stm.current_stage();
         self[LogUsizeId::StageCycle] = self.stm.current_cycle();
@@ -649,12 +640,11 @@ impl State {
         self[LogUsizeId::VivifiedClause] = self[Stat::VivifiedClause];
         self[LogUsizeId::VivifiedVar] = self[Stat::VivifiedVar];
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
-        let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
+        let rst_lbd: &EmaView = cdb.lbd();
         self[LogF64Id::EmaLBD] = rst_lbd.get_fast();
         self[LogF64Id::TrendLBD] = rst_lbd.trend();
 
-        self[LogF64Id::LiteralBlockEntanglement] =
-            cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
+        self[LogF64Id::LiteralBlockEntanglement] = cdb.lb_entanglement().get();
         self[LogF64Id::DecisionPerConflict] =
             asg.refer(assign::property::TEma::DecisionPerConflict).get();
 
@@ -772,10 +762,9 @@ impl State {
              c |-------------------|----------------------------|--------------------------|----------|"
         );
     }
-    fn dump<A, C>(&mut self, asg: &A, cdb: &C)
+    fn dump<A>(&mut self, asg: &A, cdb: &ClauseDB)
     where
         A: PropertyDereference<assign::property::Tusize, usize>,
-        C: PropertyDereference<cdb::property::Tusize, usize>,
     {
         self.progress_cnt += 1;
         let asg_num_vars = VarRef::num_vars();
@@ -785,10 +774,10 @@ impl State {
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let asg_num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
         let asg_num_restart = asg.derefer(assign::property::Tusize::NumRestart);
-        let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
-        let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
-        let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
-        let cdb_num_reduction = cdb.derefer(cdb::property::Tusize::NumReduction);
+        let cdb_num_clause = cdb.num_clauses();
+        let cdb_num_lbd2 = cdb.num_lbd2();
+        let cdb_num_learnt = cdb.num_learnts();
+        let cdb_num_reduction = cdb.num_reduction();
         println!(
             "c | {:>8} {:>8} | {:>8} {:>8} {:>8} |  {:>4}  {:>8} {:>8} | {:>6.3} % |",
             asg_num_restart,                           // restart
@@ -803,12 +792,10 @@ impl State {
         );
     }
     #[allow(dead_code)]
-    fn dump_details<A, C>(&mut self, asg: &A, cdb: &C)
+    fn dump_details<A>(&mut self, asg: &A, cdb: &ClauseDB)
     where
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyReference<assign::property::TEma, EmaView>,
-        C: PropertyDereference<cdb::property::Tusize, usize>
-            + PropertyReference<cdb::property::TEma, EmaView>,
     {
         self.progress_cnt += 1;
         let asg_num_vars = VarRef::num_vars();
@@ -817,10 +804,10 @@ impl State {
         let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let asg_num_restart = asg.derefer(assign::property::Tusize::NumRestart);
-        let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
-        let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
+        let cdb_num_clause = cdb.num_clauses();
+        let cdb_num_learnt = cdb.num_learnts();
         let rst_asg = asg.refer(assign::property::TEma::AssignRate);
-        let rst_lbd = cdb.refer(cdb::property::TEma::LBD);
+        let rst_lbd = cdb.lbd();
 
         println!(
             "{:>3},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\

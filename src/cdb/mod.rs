@@ -46,12 +46,7 @@ pub enum ReductionType {
 }
 
 /// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`remove_clause`](`crate::cdb::ClauseDBIF::remove_clause`), and so on.
-pub trait ClauseDBIF:
-    Instantiate
-    + IndexMut<ClauseId, Output = Clause>
-    + PropertyDereference<property::Tusize, usize>
-    + PropertyDereference<property::Tf64, f64>
-{
+pub trait ClauseDBIF: Instantiate + IndexMut<ClauseId, Output = Clause> {
     /// return a mutable iterator.
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
 
@@ -147,10 +142,9 @@ pub mod property {
         NumLearnt,
         NumReduction,
         NumReRegistration,
-        Timestamp,
     }
 
-    pub const USIZES: [Tusize; 9] = [
+    pub const USIZES: [Tusize; 8] = [
         Tusize::NumBiClause,
         Tusize::NumBiClauseCompletion,
         Tusize::NumBiLearnt,
@@ -159,55 +153,41 @@ pub mod property {
         Tusize::NumLearnt,
         Tusize::NumReduction,
         Tusize::NumReRegistration,
-        Tusize::Timestamp,
     ];
 
     impl PropertyDereference<Tusize, usize> for ClauseDB {
         #[inline]
         fn derefer(&self, k: Tusize) -> usize {
             match k {
-                Tusize::NumClause => self.num_clause,
-                Tusize::NumBiClause => self.num_bi_clause,
+                Tusize::NumClause => self.num_clauses,
+                Tusize::NumBiClause => self.num_bi_clauses,
                 Tusize::NumBiClauseCompletion => self.num_bi_clause_completion,
-                Tusize::NumBiLearnt => self.num_bi_learnt,
+                Tusize::NumBiLearnt => self.num_bi_learnts,
                 Tusize::NumLBD2 => self.num_lbd2,
-                Tusize::NumLearnt => self.num_learnt,
+                Tusize::NumLearnt => self.num_learnts,
                 Tusize::NumReduction => self.num_reduction,
                 Tusize::NumReRegistration => self.num_reregistration,
-
-                #[cfg(feature = "clause_rewarding")]
-                Tusize::Timestamp => self.tick,
-                #[cfg(not(feature = "clause_rewarding"))]
-                Tusize::Timestamp => 0,
             }
         }
     }
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tf64 {
-        LiteralBlockDistance,
-        LiteralBlockEntanglement,
         ReductionThreshold,
     }
 
-    pub const F64: [Tf64; 3] = [
-        Tf64::LiteralBlockDistance,
-        Tf64::LiteralBlockEntanglement,
-        Tf64::ReductionThreshold,
-    ];
+    pub const F64: [Tf64; 1] = [Tf64::ReductionThreshold];
 
     impl PropertyDereference<Tf64, f64> for ClauseDB {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
-                Tf64::LiteralBlockDistance => self.lbd.get(),
-                Tf64::LiteralBlockEntanglement => self.lb_entanglement.get(),
                 Tf64::ReductionThreshold => self.reduction_threshold,
             }
         }
     }
 
-    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum TEma {
         Entanglement,
         LBD,
