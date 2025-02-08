@@ -57,11 +57,8 @@ impl PropagateIF for AssignStack {
     fn assign_at_root_level(&mut self, l: Lit) -> MaybeInconsistent {
         self.cancel_until(self.root_level);
         let vi = l.vi();
-        // debug_assert!(vi < self.var.len());
-        // debug_assert!(!self.var[vi].is(FlagVar::ELIMINATED));
         debug_assert!(!VarRef(vi).is(FlagVar::ELIMINATED));
         debug_assert!(self.trail_lim.is_empty());
-        // self.var[vi].level = self.root_level;
         VarRef(vi).set_level(self.root_level);
         match VarRef(vi).assign() {
             None => {
@@ -96,14 +93,11 @@ impl PropagateIF for AssignStack {
         #[cfg(feature = "chrono_BT")] lv: DecisionLevel,
     ) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be enqueued");
-        // debug_assert!(l.vi() < self.var.len());
         // The following doesn't hold anymore by using chronoBT.
         // assert!(self.trail_lim.is_empty() || !cid.is_none());
         let vi = l.vi();
-        // debug_assert!(!self.var[vi].is(FlagVar::ELIMINATED));
         debug_assert!(!VarRef(vi).is(FlagVar::ELIMINATED));
         debug_assert_eq!(VarRef(vi).assign(), None);
-        // debug_assert_eq!(self.var[vi].reason, AssignReason::None);
         debug_assert_eq!(VarRef(vi).reason(), AssignReason::None);
         debug_assert!(self.trail.iter().all(|rl| *rl != l));
         VarRef::set_lit(l);
@@ -111,11 +105,8 @@ impl PropagateIF for AssignStack {
         #[cfg(not(feature = "chrono_BT"))]
         let lv = self.decision_level();
 
-        // self.var[vi].level = lv;
         VarRef(vi).set_level(lv);
-        // self.var[vi].reason = reason;
         VarRef(vi).set_reason(reason);
-        // self.reward_at_assign(vi);
         VarActivityManager::reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
@@ -134,7 +125,6 @@ impl PropagateIF for AssignStack {
     }
     fn assign_by_decision(&mut self, l: Lit) {
         debug_assert_ne!(VarRef(l.vi()).assign(), Some(!bool::from(l)));
-        // debug_assert!(l.vi() < self.var.len());
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(
             !self.trail.contains(&!l),
@@ -149,7 +139,6 @@ impl PropagateIF for AssignStack {
         debug_assert_eq!(VarRef(vi).reason(), AssignReason::None);
         VarRef::set_lit(l);
         VarRef(vi).set_reason(AssignReason::Decision(self.decision_level()));
-        // self.reward_at_assign(vi);
         VarActivityManager::reward_at_assign(vi);
         self.trail.push(l);
         self.num_decisions += 1;
@@ -179,7 +168,6 @@ impl PropagateIF for AssignStack {
                 VarRef(l.vi()).assign().is_some(),
                 "cancel_until found unassigned var in trail {}",
                 l.vi(),
-                // &self.var[l.vi()],
             );
             let vi = l.vi();
             #[cfg(feature = "debug_propagation")]

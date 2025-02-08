@@ -282,7 +282,6 @@ fn search(
             if cfg!(feature = "reward_annealing") {
                 let base = state.stm.current_stage() - state.stm.cycle_starting_stage();
                 let decay_index: f64 = (20 + 2 * base) as f64;
-                // asg.update_activity_decay((decay_index - 1.0) / decay_index);
                 VarActivityManager::set_activity_decay((decay_index - 1.0) / decay_index);
             }
             if let Some(new_segment) = next_stage {
@@ -360,7 +359,6 @@ fn search(
                     {
                         let base = state.stm.current_segment();
                         let decay_index: f64 = (20 + 2 * base) as f64;
-                        // asg.update_activity_decay((decay_index - 1.0) / decay_index);
                         VarActivityManager::set_activity_decay((decay_index - 1.0) / decay_index);
                     }
                     if cfg!(feature = "clause_elimination") {

@@ -39,14 +39,9 @@ impl TrailSavingIF for AssignStack {
                 // }
 
                 self.trail_saved.push(l);
-                // self.var[vi].reason_saved = self.var[vi].reason;
                 VarRef(vi).set_reason_saved(VarRef(vi).reason());
-                // self.reward_at_unassign(vi);
                 VarActivityManager::reward_at_unassign(vi);
-                if activity_threshold <= VarRef(vi).activity()
-                /* self.var[vi].reward */
-                {
-                    // self.insert_heap(vi);
+                if activity_threshold <= VarRef(vi).activity() {
                     VarActivityManager::insert_heap(vi);
                 }
             }
@@ -54,9 +49,7 @@ impl TrailSavingIF for AssignStack {
         }
         for i in free..self.trail.len() {
             let vi = self.trail[i].vi();
-            // self.reward_at_unassign(vi);
             VarActivityManager::reward_at_unassign(vi);
-            // self.insert_heap(vi);
             VarActivityManager::insert_heap(vi);
         }
     }
@@ -86,7 +79,6 @@ impl TrailSavingIF for AssignStack {
                 }
                 // reason refinement by ignoring this dependecy
                 (None, AssignReason::Implication(c)) if q < cdb[c].rank => {
-                    // self.insert_heap(vi);
                     VarActivityManager::insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
@@ -122,7 +114,6 @@ impl TrailSavingIF for AssignStack {
                 }
                 (_, AssignReason::Decision(lvl)) => {
                     debug_assert_ne!(0, lvl);
-                    // self.insert_heap(vi);
                     VarActivityManager::insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
@@ -135,7 +126,6 @@ impl TrailSavingIF for AssignStack {
     fn clear_saved_trail(&mut self) {
         for j in 0..self.trail_saved.len() {
             let l = self.trail_saved[j];
-            // self.insert_heap(l.vi());
             VarActivityManager::insert_heap(l.vi());
         }
         self.trail_saved.clear();

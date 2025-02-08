@@ -271,10 +271,7 @@ impl EliminateIF for Eliminator {
         {
             for (i, _) in asg.var_iter().enumerate().skip(1) {
                 if asg.reason(i) != AssignReason::None {
-                    assert_eq!(
-                        asg.level(i),
-                        asg.derefer(assign::property::Tusize::RootLevel) as DecisionLevel
-                    );
+                    assert_eq!(asg.level(i), asg.root_level() as DecisionLevel,);
                     // asg.reason(v.index) = AssignReason::None;
                 }
             }
@@ -287,7 +284,7 @@ impl EliminateIF for Eliminator {
             self.subsume_literal_limit =
                 state.config.elm_cls_lim + cdb.lb_entanglement().get() as usize;
             debug_assert!(!cdb.lb_entanglement().get().is_nan());
-            // self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
+            // self.eliminate_combination_limit = cdb.lb_entanglement().get() as usize;
             self.eliminate(asg, cdb, state)?;
         } else {
             asg.propagate_sandbox(cdb)

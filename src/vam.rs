@@ -181,7 +181,6 @@ impl VarSelectIF for VarActivityManager {
                     VarRef(*vi).set_activity(
                         VarRef(*vi).activity() * VAM.activity_decay + VAM.activity_anti_decay,
                     );
-                    // self.update_heap(*vi);
                     VarActivityManager::update_heap(*vi);
                 }
             }
@@ -197,15 +196,12 @@ impl VarSelectIF for VarActivityManager {
         }
     }
     fn update_order(v: VarId) {
-        // self.update_heap(v);
         VarActivityManager::update_heap(v);
     }
     fn rebuild_order() {
-        // self.clear_heap();
         VarActivityManager::clear_heap();
         for vi in VarRef::var_id_iter() {
             if VarRef(vi).assign().is_none() && !VarRef(vi).is(FlagVar::ELIMINATED) {
-                // self.insert_heap(vi);
                 VarActivityManager::insert_heap(vi);
             }
         }

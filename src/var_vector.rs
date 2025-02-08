@@ -65,15 +65,17 @@ impl VarRef {
         }
     }
     pub fn rescale_activity(scaling: f64) {
-        for i in VarRef::var_id_iter() {
-            VarRef(i).set_activity(VarRef(i).activity() * scaling);
+        unsafe {
+            for i in VarRef::var_id_iter() {
+                VAR_VECTOR.get_unchecked_mut(i).activity *= scaling;
+            }
         }
     }
     /// set `vi`s status to asserted.
     pub fn make_var_asserted(vi: VarId) {
         unsafe {
-            VAR_VECTOR[vi].reason = AssignReason::Decision(0);
-            VAR_VECTOR[vi].activity = 0.0;
+            VAR_VECTOR.get_unchecked_mut(vi).reason = AssignReason::Decision(0);
+            VAR_VECTOR.get_unchecked_mut(vi).activity = 0.0;
         }
         VarActivityManager::remove_from_heap(vi);
 
@@ -86,18 +88,19 @@ impl VarRef {
     /// return true if `vi` is just eliminated.
     pub fn make_var_eliminated(vi: VarId) -> bool {
         unsafe {
-            if VAR_VECTOR[vi].is(FlagVar::ELIMINATED) {
+            let v = VAR_VECTOR.get_unchecked_mut(vi);
+            if v.is(FlagVar::ELIMINATED) {
                 #[cfg(feature = "boundary_check")]
                 panic!("double elimination");
                 false
             } else {
-                VAR_VECTOR[vi].turn_on(FlagVar::ELIMINATED);
-                VAR_VECTOR[vi].activity = 0.0;
+                v.turn_on(FlagVar::ELIMINATED);
+                v.activity = 0.0;
                 VarActivityManager::remove_from_heap(vi);
 
                 #[cfg(feature = "boundary_check")]
                 {
-                    self.var[vi].timestamp = self.tick;
+                    v.timestamp = self.tick;
                 }
                 true
             }

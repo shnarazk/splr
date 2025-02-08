@@ -148,7 +148,6 @@ impl Instantiate for AssignStack {
             SolverEvent::Eliminate(vi) => {
                 debug_assert_eq!(self.decision_level(), self.root_level());
                 debug_assert!(self.trail.iter().all(|l| l.vi() != vi));
-                // self.trail.retain(|l| l.vi() != vi);
                 self.num_eliminated_vars += 1;
             }
             SolverEvent::Stage(scale) => {
