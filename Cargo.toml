@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.18.0-dev2"
+version = "0.18.0-dev3"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2021"
@@ -26,7 +26,6 @@ default = [
         # "bi_clause_completion",
         # "clause_rewarding",
         "dynamic_restart_threshold",
-        "LRB_rewarding",
         "reason_side_rewarding",
         "rephase",
         "reward_annealing",
@@ -57,9 +56,7 @@ clause_vivification = []        # pre(in)-processor setting
 debug_propagation = []          # for debug
 dynamic_restart_threshold = []  # control restart spans like Glucose
 EMA_calibration = []            # each exponential moving average has a calbration value
-EVSIDS = []                     # Eponential Variable State Independent Decaying Sum
 just_used = []                  # Var and clause have 'just_used' flags
-LRB_rewarding = []              # Vearning Rate Based rewarding, a new var activity criteria
 maintain_watch_cache = []       # for DEBUG
 no_IO = []                      # to embed Splr into non-std environments
 platform_wasm = [

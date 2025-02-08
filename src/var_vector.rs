@@ -1,5 +1,5 @@
 #![allow(static_mut_refs)]
-use crate::types::*;
+use crate::{types::*, vam::VarActivityManager};
 
 pub static mut VAR_VECTOR: Vec<Var> = Vec::new();
 
@@ -12,8 +12,8 @@ pub trait VarRefIF {
     fn set_reason(&self, value: AssignReason);
     fn reason_saved(&self) -> AssignReason;
     fn set_reason_saved(&self, value: AssignReason);
-    fn reward(&self) -> f64;
-    fn set_reward(&self, value: f64);
+    fn activity(&self) -> f64;
+    fn set_activity(&self, value: f64);
     fn update_activity(&self, decay: f64, anti_decay: f64);
     fn is(&self, f: FlagVar) -> bool;
     fn turn_on(&self, f: FlagVar);
@@ -24,8 +24,10 @@ pub trait VarRefIF {
 pub struct VarRef(pub usize);
 
 impl VarRef {
-    pub fn initialize(num_vars: usize) {
+    // you can't call this function `Instantiate::instantiate`. It must return `Self`.
+    pub fn instantiate(_config: &Config, cnf: &CNFDescription) {
         unsafe {
+            let num_vars = cnf.num_of_variables;
             VAR_VECTOR.clear(); // reqired for cargo test
             VAR_VECTOR.resize(num_vars + 1, Var::default());
             for (i, v) in VAR_VECTOR.iter_mut().enumerate().skip(1) {
@@ -45,7 +47,7 @@ impl VarRef {
         }
     }
     #[inline]
-    pub fn assigned(lit: Lit) -> Option<bool> {
+    pub fn lit_assigned(lit: Lit) -> Option<bool> {
         unsafe {
             let vi = lit.vi();
             let possitive = bool::from(lit);
@@ -55,9 +57,53 @@ impl VarRef {
             }
         }
     }
+    pub fn set_lit(lit: Lit) {
+        unsafe {
+            let vi = lit.vi();
+            let possitive = bool::from(lit);
+            VAR_VECTOR.get_unchecked_mut(vi).assign = Some(possitive);
+        }
+    }
     pub fn rescale_activity(scaling: f64) {
-        for i in VarRef::var_id_iter() {
-            VarRef(i).set_reward(VarRef(i).reward() * scaling);
+        unsafe {
+            for i in VarRef::var_id_iter() {
+                VAR_VECTOR.get_unchecked_mut(i).activity *= scaling;
+            }
+        }
+    }
+    /// set `vi`s status to asserted.
+    pub fn make_var_asserted(vi: VarId) {
+        unsafe {
+            VAR_VECTOR.get_unchecked_mut(vi).reason = AssignReason::Decision(0);
+            VAR_VECTOR.get_unchecked_mut(vi).activity = 0.0;
+        }
+        VarActivityManager::remove_from_heap(vi);
+
+        #[cfg(feature = "boundary_check")]
+        {
+            VarRef(vi).timestamp = VAM.tick;
+        }
+    }
+    /// set `vi`s status to eliminated.
+    /// return true if `vi` is just eliminated.
+    pub fn make_var_eliminated(vi: VarId) -> bool {
+        unsafe {
+            let v = VAR_VECTOR.get_unchecked_mut(vi);
+            if v.is(FlagVar::ELIMINATED) {
+                #[cfg(feature = "boundary_check")]
+                panic!("double elimination");
+                false
+            } else {
+                v.turn_on(FlagVar::ELIMINATED);
+                v.activity = 0.0;
+                VarActivityManager::remove_from_heap(vi);
+
+                #[cfg(feature = "boundary_check")]
+                {
+                    v.timestamp = self.tick;
+                }
+                true
+            }
         }
     }
 }
@@ -104,13 +150,13 @@ impl VarRefIF for VarRef {
         }
     }
     #[inline]
-    fn reward(&self) -> f64 {
-        unsafe { VAR_VECTOR.get_unchecked(self.0).reward }
+    fn activity(&self) -> f64 {
+        unsafe { VAR_VECTOR.get_unchecked(self.0).activity }
     }
     #[inline]
-    fn set_reward(&self, value: f64) {
+    fn set_activity(&self, value: f64) {
         unsafe {
-            VAR_VECTOR.get_unchecked_mut(self.0).reward = value;
+            VAR_VECTOR.get_unchecked_mut(self.0).activity = value;
         }
     }
     #[inline]
@@ -142,15 +188,5 @@ impl VarRefIF for VarRef {
         unsafe {
             VAR_VECTOR.get_unchecked_mut(self.0).flags.set(f, b);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn proof_of_concept_of_static_mut() {
-        VarRef::initialize(10);
     }
 }

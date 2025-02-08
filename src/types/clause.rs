@@ -215,7 +215,7 @@ impl ClauseIF for Clause {
     }
     fn is_satisfied_under(&self) -> bool {
         for l in self.lits.iter() {
-            if VarRef::assigned(*l) == Some(true) {
+            if VarRef::lit_assigned(*l) == Some(true) {
                 return true;
             }
         }

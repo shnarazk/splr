@@ -2,9 +2,10 @@
 use {
     super::{Certificate, Solver, SolverEvent, SolverResult, State, StateIF},
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF},
+        assign::{AssignStack, PropagateIF},
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
+        vam::*,
         var_vector::*,
     },
 };
@@ -29,7 +30,6 @@ pub trait SatSolverIF: Instantiate {
     ///
     /// ```
     /// use crate::splr::{*, var_vector::*};
-    /// use crate::splr::assign::VarManipulateIF;    // for s.asg.assign()
     /// use std::path::Path;
     ///
     /// let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
@@ -118,7 +118,8 @@ impl Instantiate for Solver {
     /// let s = Solver::instantiate(&Config::default(), &CNFDescription::default());
     ///```
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Solver {
-        VarRef::initialize(cnf.num_of_variables);
+        VarRef::instantiate(config, cnf);
+        VarActivityManager::instantiate(config, cnf);
         Solver {
             asg: AssignStack::instantiate(config, cnf),
             cdb: ClauseDB::instantiate(config, cnf),
@@ -181,7 +182,7 @@ impl SatSolverIF for Solver {
         }
         let lit = Lit::from(val);
         self.cdb.certificate_add_assertion(lit);
-        match VarRef::assigned(lit) {
+        match VarRef::lit_assigned(lit) {
             None => self.asg.assign_at_root_level(lit).map(|_| self),
             Some(true) => Ok(self),
             Some(false) => Err(SolverError::RootLevelConflict((
@@ -270,7 +271,7 @@ impl Solver {
         let mut l_: Option<Lit> = None; // last literal; [x, x.negate()] means tautology.
         for i in 0..lits.len() {
             let li = lits[i];
-            let sat = VarRef::assigned(li);
+            let sat = VarRef::lit_assigned(li);
             if sat == Some(true) || Some(!li) == l_ {
                 return RefClause::Dead;
             } else if sat != Some(false) && Some(li) != l_ {

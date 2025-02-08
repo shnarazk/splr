@@ -1,7 +1,12 @@
 /// Module `eliminator` implements clause subsumption and var elimination.
 use {
     super::{EliminateIF, Eliminator},
-    crate::{assign::AssignIF, cdb::ClauseDBIF, types::*, var_vector::*},
+    crate::{
+        assign::{AssignStack, PropagateIF},
+        cdb::{ClauseDB, ClauseDBIF},
+        types::*,
+        var_vector::*,
+    },
 };
 
 #[derive(Clone, Eq, Debug, Ord, PartialEq, PartialOrd)]
@@ -14,8 +19,8 @@ enum Subsumable {
 impl Eliminator {
     pub fn try_subsume(
         &mut self,
-        asg: &mut impl AssignIF,
-        cdb: &mut impl ClauseDBIF,
+        asg: &mut AssignStack,
+        cdb: &mut ClauseDB,
         cid: ClauseId,
         did: ClauseId,
     ) -> MaybeInconsistent {
@@ -49,7 +54,7 @@ impl Eliminator {
 }
 
 /// returns a literal if these clauses can be merged by the literal.
-fn have_subsuming_lit(cdb: &mut impl ClauseDBIF, cid: ClauseId, other: ClauseId) -> Subsumable {
+fn have_subsuming_lit(cdb: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Subsumable {
     debug_assert!(!other.is_lifted_lit());
     if cid.is_lifted_lit() {
         let l = Lit::from(cid);
@@ -86,8 +91,8 @@ fn have_subsuming_lit(cdb: &mut impl ClauseDBIF, cid: ClauseId, other: ClauseId)
 /// - calls `enqueue_clause`
 /// - calls `enqueue_var`
 fn strengthen_clause(
-    asg: &mut impl AssignIF,
-    cdb: &mut impl ClauseDBIF,
+    asg: &mut AssignStack,
+    cdb: &mut ClauseDB,
     elim: &mut Eliminator,
     cid: ClauseId,
     l: Lit,
@@ -112,7 +117,7 @@ fn strengthen_clause(
             cdb.certificate_add_assertion(l0);
             elim.remove_cid_occur(cid, &mut cdb[cid]);
             cdb.remove_clause(cid);
-            match VarRef::assigned(l0) {
+            match VarRef::lit_assigned(l0) {
                 None => asg.assign_at_root_level(l0),
                 Some(true) => Ok(()),
                 Some(false) => Err(SolverError::RootLevelConflict((

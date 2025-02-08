@@ -1,7 +1,7 @@
 //! Vivification
 #![allow(dead_code)]
 use crate::{
-    assign::{AssignIF, AssignStack, PropagateIF},
+    assign::{AssignStack, PropagateIF},
     cdb::{clause::ClauseIF, ClauseDB, ClauseDBIF},
     state::{Stat, State, StateIF},
     types::*,
@@ -68,8 +68,7 @@ impl VivifyIF for ClauseDB {
             debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
             let mut decisions: Vec<Lit> = Vec::new();
             for lit in clits.iter().copied() {
-                // assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
-                match VarRef::assigned(!lit) {
+                match VarRef::lit_assigned(!lit) {
                     //## Rule 1
                     Some(false) => (),
                     //## Rule 2
@@ -299,7 +298,7 @@ impl AssignStack {
         // before finding a conflict by the target clause.
         // So we must skip this conflict.
         if learnt.is_empty() {
-            debug_assert_eq!(self.num_conflict, 0);
+            debug_assert_eq!(self.num_conflicts(), 0);
             // panic!("\n{:?}\n{:?}\n{:?}",
             //        conflicting,
             //        conflicting.iter().map(|l| self.assigned(*l)).collect::<Vec<_>>(),

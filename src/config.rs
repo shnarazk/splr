@@ -85,8 +85,8 @@ pub struct Config {
     //
     /// Var Reward Decay Rate
     pub vrw_dcy_rat: f64,
-    /// Decay increment step.
-    pub vrw_dcy_stp: f64,
+    // /// Decay increment step.
+    // pub vrw_dcy_stp: f64,
 }
 
 impl Default for Config {
@@ -117,14 +117,14 @@ impl Default for Config {
             elm_grw_lim: 0,
             elm_var_occ: 20000,
 
-            #[cfg(feature = "EVSIDS")]
-            vrw_dcy_rat: 0.98,
-            #[cfg(feature = "LRB_rewarding")]
+            // #[cfg(feature = "EVSIDS")]
+            // vrw_dcy_rat: 0.98,
+            // #[cfg(feature = "LRB_rewarding")]
             vrw_dcy_rat: 0.96,
-            #[cfg(feature = "EVSIDS")]
-            vrw_dcy_stp: 0.0001,
-            #[cfg(feature = "LRB_rewarding")]
-            vrw_dcy_stp: 0.0,
+            // #[cfg(feature = "EVSIDS")]
+            // vrw_dcy_stp: 0.0001,
+            // #[cfg(feature = "LRB_rewarding")]
+            // vrw_dcy_stp: 0.0,
         }
     }
 }
@@ -190,8 +190,7 @@ impl Config {
                                         "cr1" => self.cls_rdc_rm1 = val,
                                         "cr2" => self.cls_rdc_rm2 = val,
                                         "vdr" => self.vrw_dcy_rat = val,
-                                        "vds" => self.vrw_dcy_stp = val,
-
+                                        // "vds" => self.vrw_dcy_stp = val,
                                         _ => panic!("invalid option: {name}"),
                                     }
                                 } else {
@@ -270,11 +269,11 @@ impl Config {
                 "stage-based dynamic restart threshold",
                 #[cfg(feature = "EMA_calibration")]
                 "EMA calibration",
-                #[cfg(feature = "EVSIDS")]
-                "EVSIDS rewarding",
+                // #[cfg(feature = "EVSIDS")]
+                // "EVSIDS rewarding",
                 #[cfg(feature = "just_used")]
                 "use 'just used' flag",
-                #[cfg(feature = "LRB_rewarding")]
+                // #[cfg(feature = "LRB_rewarding")]
                 "Learning-Rate Based rewarding",
                 #[cfg(feature = "reason_side_rewarding")]
                 "reason-side rewarding",
@@ -345,7 +344,7 @@ OPTIONS:
   -r, --result <io-rfile>   Result filename/stdout              {:>10}
   -t, --timeout <timeout>   CPU time limit in sec.         {:>10}
       --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
-{}ARGS:
+ARGS:
   <cnf-file>    DIMACS CNF file
 ",
         config.c_cls_lim,
@@ -377,11 +376,11 @@ OPTIONS:
         config.io_rfile.to_string_lossy(),
         config.c_timeout,
         config.vrw_dcy_rat,
-        OPTION!(
-            "EVSIDS",
-            config.vrw_dcy_stp,
-            "      --vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}\n"
-        ),
+        // OPTION!(
+        //     "EVSIDS",
+        //     config.vrw_dcy_stp,
+        //     "      --vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}\n"
+        // ),
     )
 }
 

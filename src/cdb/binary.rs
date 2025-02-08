@@ -66,7 +66,7 @@ pub trait BinaryLinkIF {
     /// add new var
     fn add_new_var(&mut self);
     // /// sort links based on var activities
-    // fn reorder(&mut self, asg: &impl AssignIF);
+    // fn reorder(&mut self, asg: &AssignStack);
 }
 
 impl BinaryLinkIF for BinaryLinkDB {
@@ -99,7 +99,7 @@ impl BinaryLinkIF for BinaryLinkDB {
         }
     }
     /*
-    fn reorder(&mut self, asg: &impl AssignIF) {
+    fn reorder(&mut self, asg: &AssignStack) {
         let nv = self.list.len() / 2;
         let thr: f64 = (1usize..nv).map(|i| asg.activity(i)).sum::<f64>()
             / (1usize..nv)

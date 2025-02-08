@@ -8,6 +8,8 @@ mod db;
 mod ema;
 /// methods for Stochastic Local Search
 mod sls;
+/// properties
+pub mod stats;
 /// methods for UNSAT certification
 mod unsat_certificate;
 /// implementation of clause vivification
@@ -18,18 +20,14 @@ mod watch_cache;
 pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
     db::ClauseDB,
-    property::*,
     sls::StochasticLocalSearchIF,
     unsat_certificate::CertificationStore,
     vivify::VivifyIF,
 };
 
 use {
-    crate::{assign::AssignIF, types::*},
-    std::{
-        ops::IndexMut,
-        slice::{Iter, IterMut},
-    },
+    crate::{assign::AssignStack, types::*},
+    std::{ops::IndexMut, slice::IterMut},
     watch_cache::{WatchCache, WatchCacheIterator, WatchCacheProxy},
 };
 
@@ -49,27 +47,9 @@ pub enum ReductionType {
 }
 
 /// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`remove_clause`](`crate::cdb::ClauseDBIF::remove_clause`), and so on.
-pub trait ClauseDBIF:
-    Instantiate
-    + IndexMut<ClauseId, Output = Clause>
-    + PropertyDereference<property::Tusize, usize>
-    + PropertyDereference<property::Tf64, f64>
-{
-    /// return the length of `clause`.
-    fn len(&self) -> usize;
-    /// return true if it's empty.
-    fn is_empty(&self) -> bool;
-    /// return an iterator.
-    fn iter(&self) -> Iter<'_, Clause>;
+pub trait ClauseDBIF: Instantiate + IndexMut<ClauseId, Output = Clause> {
     /// return a mutable iterator.
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
-
-    //
-    //## interface to binary links
-    //
-
-    /// return binary links: `BinaryLinkList` connected with a `Lit`.
-    fn binary_links(&self, l: Lit) -> &BinaryLinkList;
 
     //
     //## abstraction to watch_cache
@@ -118,7 +98,7 @@ pub trait ClauseDBIF:
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType);
+    fn reduce(&mut self, asg: &mut AssignStack, setting: ReductionType);
     /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.
@@ -128,15 +108,6 @@ pub trait ClauseDBIF:
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.
     fn certificate_save(&mut self);
-    /// check the number of clauses
-    /// * `Err(SolverError::OutOfMemory)` -- the db size is over the limit.
-    /// * `Ok(true)` -- enough small
-    /// * `Ok(false)` -- close to the limit
-    fn check_size(&self) -> Result<bool, SolverError>;
-    /// returns None if the given assignment is a model of a problem.
-    /// Otherwise returns a clause which is not satisfiable under a given assignment.
-    /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
-    fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId>;
     /// minimize a clause.
     fn minimize_with_bi_clauses(&mut self, vec: &mut Vec<Lit>);
     /// complete bi-clause network
@@ -155,100 +126,7 @@ pub trait ClauseDBIF:
     fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool>;
     #[cfg(not(feature = "no_IO"))]
     /// dump all active clauses and assertions as a CNF file.
-    fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);
-}
-
-pub mod property {
-    use super::ClauseDB;
-    use crate::types::*;
-
-    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    pub enum Tusize {
-        NumBiClause,
-        NumBiClauseCompletion,
-        NumBiLearnt,
-        NumClause,
-        NumLBD2,
-        NumLearnt,
-        NumReduction,
-        NumReRegistration,
-        Timestamp,
-    }
-
-    pub const USIZES: [Tusize; 9] = [
-        Tusize::NumBiClause,
-        Tusize::NumBiClauseCompletion,
-        Tusize::NumBiLearnt,
-        Tusize::NumClause,
-        Tusize::NumLBD2,
-        Tusize::NumLearnt,
-        Tusize::NumReduction,
-        Tusize::NumReRegistration,
-        Tusize::Timestamp,
-    ];
-
-    impl PropertyDereference<Tusize, usize> for ClauseDB {
-        #[inline]
-        fn derefer(&self, k: Tusize) -> usize {
-            match k {
-                Tusize::NumClause => self.num_clause,
-                Tusize::NumBiClause => self.num_bi_clause,
-                Tusize::NumBiClauseCompletion => self.num_bi_clause_completion,
-                Tusize::NumBiLearnt => self.num_bi_learnt,
-                Tusize::NumLBD2 => self.num_lbd2,
-                Tusize::NumLearnt => self.num_learnt,
-                Tusize::NumReduction => self.num_reduction,
-                Tusize::NumReRegistration => self.num_reregistration,
-
-                #[cfg(feature = "clause_rewarding")]
-                Tusize::Timestamp => self.tick,
-                #[cfg(not(feature = "clause_rewarding"))]
-                Tusize::Timestamp => 0,
-            }
-        }
-    }
-
-    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    pub enum Tf64 {
-        LiteralBlockDistance,
-        LiteralBlockEntanglement,
-        ReductionThreshold,
-    }
-
-    pub const F64: [Tf64; 3] = [
-        Tf64::LiteralBlockDistance,
-        Tf64::LiteralBlockEntanglement,
-        Tf64::ReductionThreshold,
-    ];
-
-    impl PropertyDereference<Tf64, f64> for ClauseDB {
-        #[inline]
-        fn derefer(&self, k: Tf64) -> f64 {
-            match k {
-                Tf64::LiteralBlockDistance => self.lbd.get(),
-                Tf64::LiteralBlockEntanglement => self.lb_entanglement.get(),
-                Tf64::ReductionThreshold => self.reduction_threshold,
-            }
-        }
-    }
-
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub enum TEma {
-        Entanglement,
-        LBD,
-    }
-
-    pub const EMAS: [TEma; 2] = [TEma::Entanglement, TEma::LBD];
-
-    impl PropertyReference<TEma, EmaView> for ClauseDB {
-        #[inline]
-        fn refer(&self, k: TEma) -> &EmaView {
-            match k {
-                TEma::Entanglement => self.lb_entanglement.as_view(),
-                TEma::LBD => self.lbd.as_view(),
-            }
-        }
-    }
+    fn dump_cnf(&self, asg: &AssignStack, fname: &Path);
 }
 
 #[cfg(test)]
@@ -286,7 +164,7 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
-        VarRef::initialize(4);
+        VarRef::instantiate(&config, &cnf);
         assert_eq!(VarRef(1).level(), 1);
         assert_eq!(VarRef(4).level(), 4);
         let mut asg = AssignStack::instantiate(&config, &cnf);

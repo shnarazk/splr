@@ -24,7 +24,7 @@ impl StochasticLocalSearchIF for ClauseDB {
         limit: usize,
     ) -> (usize, usize) {
         let mut returns: (usize, usize) = (0, 0);
-        let mut last_flip = self.num_clause;
+        let mut last_flip = self.num_clauses;
         let mut seed = 721_109;
         for step in 1..=limit {
             let mut unsat_clauses = 0;

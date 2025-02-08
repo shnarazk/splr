@@ -5,14 +5,18 @@ use {
         SolverResult,
     },
     crate::{
-        assign::{self, AssignIF, AssignStack, PropagateIF, VarSelectIF},
-        cdb::{self, ClauseDB, ClauseDBIF, ReductionType, VivifyIF},
+        assign::{AssignStack, PropagateIF},
+        cdb::{ClauseDB, ClauseDBIF, ReductionType, VivifyIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
         types::*,
+        vam::*,
         var_vector::*,
     },
 };
+
+#[cfg(feature = "rephase")]
+use crate::assign::rephase::AssignRephaseIF;
 
 /// API to [`solve`](`crate::solver::SolveIF::solve`) SAT problems.
 pub trait SolveIF {
@@ -100,20 +104,20 @@ impl SolveIF for Solver {
                     if VarRef(vi).assign().is_some() {
                         continue;
                     }
-                    if let Some((p, m)) = elim.stats(vi) {
+                    if let Some((p, m)) = elim.get_phases(vi) {
                         // We can't call `asg.assign_at_root_level(l)` even if p or m == 0.
                         // This means we can't pick `!l`.
                         // This becomes a problem in the case of incremental solving.
                         if m == 0 {
                             let l = Lit::from((vi, true));
-                            debug_assert!(VarRef::assigned(l).is_none());
+                            debug_assert!(VarRef::lit_assigned(l).is_none());
                             cdb.certificate_add_assertion(l);
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
                         } else if p == 0 {
                             let l = Lit::from((vi, false));
-                            debug_assert!(VarRef::assigned(l).is_none());
+                            debug_assert!(VarRef::lit_assigned(l).is_none());
                             cdb.certificate_add_assertion(l);
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
@@ -141,7 +145,7 @@ impl SolveIF for Solver {
                         if VarRef(vi).assign().is_some() || VarRef(vi).is(FlagVar::ELIMINATED) {
                             continue;
                         }
-                        match elim.stats(vi) {
+                        match elim.get_phases(vi) {
                             Some((_, 0)) => (),
                             Some((0, _)) => (),
                             Some((p, m)) if m * 10 < p => VarRef(vi).turn_on(FlagVar::PHASE),
@@ -152,10 +156,11 @@ impl SolveIF for Solver {
                     let act = 1.0 / (VarRef::num_vars() as f64).powf(0.25);
                     for vi in VarRef::var_id_iter() {
                         if !VarRef(vi).is(FlagVar::ELIMINATED) {
-                            asg.set_activity(vi, act);
+                            // asg.set_activity(vi, act);
+                            VarRef(vi).set_activity(act);
                         }
                     }
-                    asg.rebuild_order();
+                    VarActivityManager::rebuild_order();
                 }
             }
             asg.eliminated.append(elim.eliminated_lits());
@@ -233,12 +238,12 @@ fn search(
     let mut core_was_rebuilt: Option<usize> = None;
     let stage_size: usize = 32;
     #[cfg(feature = "rephase")]
-    let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
+    let mut sls_core = cdb.num_clauses();
 
     state.stm.initialize(stage_size);
-    while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
+    while 0 < asg.num_unassigned_vars() || asg.remains() {
         if !asg.remains() {
-            let lit = asg.select_decision_literal();
+            let lit = VarActivityManager::select_decision_literal(asg);
             asg.assign_by_decision(lit);
         }
         let Err(cc) = asg.propagate(cdb) else {
@@ -247,7 +252,9 @@ fn search(
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }
-        asg.update_activity_tick();
+        // asg.update_activity_tick();
+        #[cfg(feature = "boundary_check")]
+        VarActivityManager::update_activity_tick();
         #[cfg(feature = "clause_rewarding")]
         cdb.update_activity_tick();
         if 1 < handle_conflict(asg, cdb, state, &cc)? {
@@ -275,7 +282,7 @@ fn search(
             if cfg!(feature = "reward_annealing") {
                 let base = state.stm.current_stage() - state.stm.cycle_starting_stage();
                 let decay_index: f64 = (20 + 2 * base) as f64;
-                asg.update_activity_decay((decay_index - 1.0) / decay_index);
+                VarActivityManager::set_activity_decay((decay_index - 1.0) / decay_index);
             }
             if let Some(new_segment) = next_stage {
                 // a beginning of a new cycle
@@ -294,7 +301,7 @@ fn search(
                 #[cfg(feature = "rephase")]
                 {
                     if cfg!(feature = "stochastic_local_search") {
-                        use cdb::StochasticLocalSearchIF;
+                        use crate::cdb::StochasticLocalSearchIF;
                         macro_rules! sls {
                             ($assign: expr, $limit: expr) => {
                                 state.sls_index += 1;
@@ -327,8 +334,8 @@ fn search(
                                     + 1
                             };
                         }
-                        let ent = cdb.refer(cdb::property::TEma::Entanglement).get() as usize;
-                        let n = cdb.derefer(cdb::property::Tusize::NumClause);
+                        let ent = cdb.lb_entanglement().get() as usize;
+                        let n = cdb.num_clauses();
                         if let Some(c) = core_was_rebuilt {
                             core_was_rebuilt = None;
                             if c < current_core {
@@ -337,7 +344,7 @@ fn search(
                                 sls!(assignment, steps);
                             }
                         } else if new_segment {
-                            let n = cdb.derefer(cdb::property::Tusize::NumClause);
+                            let n = cdb.num_clauses();
                             let steps = scale!(27_u32, current_core) * scale!(24_u32, n) / ent;
                             let mut assignment = asg.best_phases_ref(Some(false));
                             sls!(assignment, steps);
@@ -352,7 +359,7 @@ fn search(
                     {
                         let base = state.stm.current_segment();
                         let decay_index: f64 = (20 + 2 * base) as f64;
-                        asg.update_activity_decay((decay_index - 1.0) / decay_index);
+                        VarActivityManager::set_activity_decay((decay_index - 1.0) / decay_index);
                     }
                     if cfg!(feature = "clause_elimination") {
                         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
@@ -390,10 +397,7 @@ fn search(
             asg.handle(SolverEvent::Stage(scale));
             state.restart.set_stage_parameters(scale);
             previous_stage = next_stage;
-        } else if state.restart.restart(
-            cdb.refer(cdb::property::TEma::LBD),
-            cdb.refer(cdb::property::TEma::Entanglement),
-        ) {
+        } else if state.restart.restart(cdb.lbd(), cdb.lb_entanglement()) {
             RESTART!(asg, cdb, state);
         }
         if let Some(na) = asg.best_assigned() {
@@ -410,9 +414,9 @@ fn search(
         format!(
             "search process finished at level {}:: {} = {} - {} - {}",
             asg.decision_level(),
-            asg.derefer(assign::property::Tusize::NumUnassignedVar),
+            asg.num_unassigned_vars(),
             VarRef::num_vars(),
-            asg.num_eliminated_vars,
+            asg.num_eliminated_vars(),
             asg.stack_len(),
         ),
     );
@@ -426,9 +430,9 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: O
     let span = state.stm.current_span();
     let stage = state.stm.current_stage();
     let segment = state.stm.current_segment();
-    let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
-    let vdr = asg.derefer(assign::property::Tf64::VarDecayRate);
-    let cdt = cdb.derefer(cdb::property::Tf64::ReductionThreshold);
+    let cpr = asg.cpr_ema().get();
+    let vdr = VarActivityManager::var_activity_decay_rate();
+    let cdt = cdb.reduction_threshold();
     let fuel = if active {
         state.restart.penetration_energy_charged
     } else {
@@ -453,7 +457,7 @@ fn check(asg: &mut AssignStack, cdb: &mut ClauseDB, all: bool, message: &str) {
             "falsifies by {} at level {}, NumConf {}",
             cid,
             asg.decision_level(),
-            asg.derefer(assign::property::Tusize::NumConflict),
+            asg.num_conflict(),
         );
         assert!(asg.stack_iter().all(|l| asg.assigned(*l) == Some(true)));
         let (c0, c1) = cdb.watch_caches(cid, "check (search 441)");

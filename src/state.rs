@@ -5,7 +5,8 @@ use instant::{Duration, Instant};
 use std::time::{Duration, Instant};
 use {
     crate::{
-        assign, cdb,
+        assign::AssignStack,
+        cdb::ClauseDB,
         solver::{RestartManager, SolverEvent, StageManager},
         types::*,
         var_vector::*,
@@ -28,14 +29,7 @@ pub trait StateIF {
     /// write a header of stat data to stdio.
     fn progress_header(&mut self);
     /// write stat data to stdio.
-    fn progress<A, C>(&mut self, asg: &A, cdb: &C)
-    where
-        A: PropertyDereference<assign::property::Tusize, usize>
-            + PropertyDereference<assign::property::Tf64, f64>
-            + PropertyReference<assign::property::TEma, EmaView>,
-        C: PropertyDereference<cdb::property::Tusize, usize>
-            + PropertyDereference<cdb::property::Tf64, f64>
-            + PropertyReference<cdb::property::TEma, EmaView>;
+    fn progress(&mut self, asg: &AssignStack, cdb: &ClauseDB);
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
     /// write a one-line message as log.
@@ -429,15 +423,7 @@ impl StateIF for State {
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
-    fn progress<A, C>(&mut self, asg: &A, cdb: &C)
-    where
-        A: PropertyDereference<assign::property::Tusize, usize>
-            + PropertyDereference<assign::property::Tf64, f64>
-            + PropertyReference<assign::property::TEma, EmaView>,
-        C: PropertyDereference<cdb::property::Tusize, usize>
-            + PropertyDereference<cdb::property::Tf64, f64>
-            + PropertyReference<cdb::property::TEma, EmaView>,
-    {
+    fn progress(&mut self, asg: &AssignStack, cdb: &ClauseDB) {
         if !self.config.splr_interface || self.config.quiet_mode {
             self.log_messages.clear();
             self.record_stats(asg, cdb);
@@ -448,27 +434,27 @@ impl StateIF for State {
         //## Gather stats from all modules
         //
         let asg_num_vars = VarRef::num_vars();
-        let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
-        let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumEliminatedVar);
-        let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
-        let asg_num_unreachables = asg.derefer(assign::property::Tusize::NumUnreachableVar);
+        let asg_num_asserted_vars = asg.num_asserted_vars();
+        let asg_num_eliminated_vars = asg.num_eliminated_vars();
+        let asg_num_unasserted_vars = asg.num_unasserted_vars();
+        let asg_num_unreachables = asg.num_unreachable_vars();
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let asg_num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
-        let asg_num_decision = asg.derefer(assign::property::Tusize::NumDecision);
-        let asg_num_propagation = asg.derefer(assign::property::Tusize::NumPropagation);
+        let asg_num_conflict = asg.num_conflicts();
+        let asg_num_decision = asg.num_decisions();
+        let asg_num_propagation = asg.num_propagations();
         // let asg_cwss: f64 = asg.derefer(assign::property::Tf64::CurrentWorkingSetSize);
-        let asg_dpc_ema = asg.refer(assign::property::TEma::DecisionPerConflict);
-        let asg_ppc_ema = asg.refer(assign::property::TEma::PropagationPerConflict);
-        let asg_cpr_ema = asg.refer(assign::property::TEma::ConflictPerRestart);
+        let asg_dpc_ema = asg.dpc_ema();
+        let asg_ppc_ema = asg.ppc_ema();
+        let asg_cpr_ema = asg.cpr_ema();
 
-        let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
-        let cdb_num_bi_clause = cdb.derefer(cdb::property::Tusize::NumBiClause);
-        let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
-        let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
-        let cdb_lb_ent: f64 = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
+        let cdb_num_clause = cdb.num_clauses();
+        let cdb_num_bi_clause = cdb.num_bi_clauses();
+        let cdb_num_lbd2 = cdb.num_lbd2();
+        let cdb_num_learnt = cdb.num_learnts();
+        let cdb_lb_ent: f64 = cdb.lb_entanglement().get();
         let rst_num_rst: usize = self[Stat::Restart];
-        let rst_asg: &EmaView = asg.refer(assign::property::TEma::AssignRate);
-        let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
+        let rst_asg: &EmaView = asg.assign_rate();
+        let rst_lbd: &EmaView = cdb.lbd();
         let rst_eng: f64 = self.restart.penetration_energy_charged;
         let stg_segment: usize = self.stm.current_segment();
 
@@ -617,29 +603,20 @@ impl StateIF for State {
 
 impl State {
     #[allow(clippy::cognitive_complexity)]
-    fn record_stats<A, C>(&mut self, asg: &A, cdb: &C)
-    where
-        A: PropertyDereference<assign::property::Tusize, usize>
-            + PropertyReference<assign::property::TEma, EmaView>,
-        C: PropertyDereference<cdb::property::Tusize, usize>
-            + PropertyDereference<cdb::property::Tf64, f64>
-            + PropertyReference<cdb::property::TEma, EmaView>,
-    {
-        self[LogUsizeId::NumConflict] = asg.derefer(assign::property::Tusize::NumConflict);
-        self[LogUsizeId::NumDecision] = asg.derefer(assign::property::Tusize::NumDecision);
-        self[LogUsizeId::NumPropagate] = asg.derefer(assign::property::Tusize::NumPropagation);
-        self[LogUsizeId::RemainingVar] = asg.derefer(assign::property::Tusize::NumUnassertedVar);
-        self[LogUsizeId::AssertedVar] = asg.derefer(assign::property::Tusize::NumAssertedVar);
-        self[LogUsizeId::EliminatedVar] = asg.derefer(assign::property::Tusize::NumEliminatedVar);
+    fn record_stats(&mut self, asg: &AssignStack, cdb: &ClauseDB) {
+        self[LogUsizeId::NumConflict] = asg.num_conflicts();
+        self[LogUsizeId::NumDecision] = asg.num_decisions();
+        self[LogUsizeId::NumPropagate] = asg.num_propagations();
+        self[LogUsizeId::RemainingVar] = asg.num_unasserted_vars();
+        self[LogUsizeId::AssertedVar] = asg.num_asserted_vars();
+        self[LogUsizeId::EliminatedVar] = asg.num_eliminated_vars();
         self[LogF64Id::Progress] = 100.0
-            * (self[LogUsizeId::AssertedVar]
-                + asg.derefer(assign::property::Tusize::NumEliminatedVar)) as f64
+            * (self[LogUsizeId::AssertedVar] + asg.num_eliminated_vars()) as f64
             / VarRef::num_vars() as f64;
-        self[LogUsizeId::RemovableClause] = cdb.derefer(cdb::property::Tusize::NumLearnt);
-        self[LogUsizeId::LBD2Clause] = cdb.derefer(cdb::property::Tusize::NumLBD2);
-        self[LogUsizeId::BiClause] = cdb.derefer(cdb::property::Tusize::NumBiClause);
-        self[LogUsizeId::PermanentClause] =
-            cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
+        self[LogUsizeId::RemovableClause] = cdb.num_learnts();
+        self[LogUsizeId::LBD2Clause] = cdb.num_lbd2();
+        self[LogUsizeId::BiClause] = cdb.num_bi_clauses();
+        self[LogUsizeId::PermanentClause] = cdb.num_clauses() - self[LogUsizeId::RemovableClause];
         self[LogUsizeId::Restart] = self[Stat::Restart];
         self[LogUsizeId::Stage] = self.stm.current_stage();
         self[LogUsizeId::StageCycle] = self.stm.current_cycle();
@@ -649,29 +626,24 @@ impl State {
         self[LogUsizeId::VivifiedClause] = self[Stat::VivifiedClause];
         self[LogUsizeId::VivifiedVar] = self[Stat::VivifiedVar];
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
-        let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
+        let rst_lbd: &EmaView = cdb.lbd();
         self[LogF64Id::EmaLBD] = rst_lbd.get_fast();
         self[LogF64Id::TrendLBD] = rst_lbd.trend();
 
-        self[LogF64Id::LiteralBlockEntanglement] =
-            cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
-        self[LogF64Id::DecisionPerConflict] =
-            asg.refer(assign::property::TEma::DecisionPerConflict).get();
+        self[LogF64Id::LiteralBlockEntanglement] = cdb.lb_entanglement().get();
+        self[LogF64Id::DecisionPerConflict] = asg.dpc_ema().get();
 
-        self[LogF64Id::TrendASG] = asg.refer(assign::property::TEma::AssignRate).trend();
+        self[LogF64Id::TrendASG] = asg.assign_rate().trend();
         self[LogF64Id::CLevel] = self.c_lvl.get();
         self[LogF64Id::BLevel] = self.b_lvl.get();
-        self[LogF64Id::PropagationPerConflict] = asg
-            .refer(assign::property::TEma::PropagationPerConflict)
-            .get();
+        self[LogF64Id::PropagationPerConflict] = asg.ppc_ema().get();
         {
-            let core = asg.derefer(assign::property::Tusize::NumUnreachableVar);
+            let core = asg.num_unreachable_vars();
             if 0 < core {
                 self[LogUsizeId::UnreachableCore] = core;
             }
         }
-        self[LogF64Id::ConflictPerRestart] =
-            asg.refer(assign::property::TEma::ConflictPerRestart).get();
+        self[LogF64Id::ConflictPerRestart] = asg.cpr_ema().get();
     }
 }
 
@@ -772,23 +744,19 @@ impl State {
              c |-------------------|----------------------------|--------------------------|----------|"
         );
     }
-    fn dump<A, C>(&mut self, asg: &A, cdb: &C)
-    where
-        A: PropertyDereference<assign::property::Tusize, usize>,
-        C: PropertyDereference<cdb::property::Tusize, usize>,
-    {
+    fn dump(&mut self, asg: &AssignStack, cdb: &ClauseDB) {
         self.progress_cnt += 1;
         let asg_num_vars = VarRef::num_vars();
-        let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
-        let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumEliminatedVar);
-        let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+        let asg_num_asserted_vars = asg.num_asserted_vars();
+        let asg_num_eliminated_vars = asg.num_eliminated_vars();
+        let asg_num_unasserted_vars = asg.num_unasserted_vars();
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let asg_num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
-        let asg_num_restart = asg.derefer(assign::property::Tusize::NumRestart);
-        let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
-        let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
-        let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
-        let cdb_num_reduction = cdb.derefer(cdb::property::Tusize::NumReduction);
+        let asg_num_conflict = asg.num_conflicts();
+        let asg_num_restart = asg.num_restart();
+        let cdb_num_clause = cdb.num_clauses();
+        let cdb_num_lbd2 = cdb.num_lbd2();
+        let cdb_num_learnt = cdb.num_learnts();
+        let cdb_num_reduction = cdb.num_reduction();
         println!(
             "c | {:>8} {:>8} | {:>8} {:>8} {:>8} |  {:>4}  {:>8} {:>8} | {:>6.3} % |",
             asg_num_restart,                           // restart
@@ -803,24 +771,18 @@ impl State {
         );
     }
     #[allow(dead_code)]
-    fn dump_details<A, C>(&mut self, asg: &A, cdb: &C)
-    where
-        A: PropertyDereference<assign::property::Tusize, usize>
-            + PropertyReference<assign::property::TEma, EmaView>,
-        C: PropertyDereference<cdb::property::Tusize, usize>
-            + PropertyReference<cdb::property::TEma, EmaView>,
-    {
+    fn dump_details(&mut self, asg: &AssignStack, cdb: &ClauseDB) {
         self.progress_cnt += 1;
         let asg_num_vars = VarRef::num_vars();
-        let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
-        let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumEliminatedVar);
-        let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+        let asg_num_asserted_vars = asg.num_asserted_vars();
+        let asg_num_eliminated_vars = asg.num_eliminated_vars();
+        let asg_num_unasserted_vars = asg.num_unasserted_vars();
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let asg_num_restart = asg.derefer(assign::property::Tusize::NumRestart);
-        let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
-        let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
-        let rst_asg = asg.refer(assign::property::TEma::AssignRate);
-        let rst_lbd = cdb.refer(cdb::property::TEma::LBD);
+        let asg_num_restart = asg.num_restart();
+        let cdb_num_clause = cdb.num_clauses();
+        let cdb_num_learnt = cdb.num_learnts();
+        let rst_asg = asg.assign_rate();
+        let rst_lbd = cdb.lbd();
 
         println!(
             "{:>3},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
@@ -991,7 +953,7 @@ impl IndexMut<LogF64Id> for ProgressRecord {
     }
 }
 
-pub mod property {
+pub mod stats {
     use super::*;
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]

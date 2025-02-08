@@ -62,6 +62,8 @@ pub mod solver;
 pub mod state;
 /// Module `types` provides various building blocks, including some common traits.
 pub mod types;
+/// Module `vam` provides variable activity manager.
+pub mod vam;
 /// Module `var_vector` provides a static mut vector of vars.
 pub mod var_vector;
 

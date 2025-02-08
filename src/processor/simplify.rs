@@ -5,9 +5,9 @@ use {
         EliminateIF, Eliminator, EliminatorMode,
     },
     crate::{
-        assign::{self, AssignIF},
-        cdb::{self, ClauseDBIF},
-        state::{self, State, StateIF},
+        assign::{AssignStack, PropagateIF},
+        cdb::{ClauseDB, ClauseDBIF},
+        state::{State, StateIF},
         types::*,
         var_vector::*,
     },
@@ -220,7 +220,7 @@ impl EliminateIF for Eliminator {
     fn is_running(&self) -> bool {
         self.enable && self.mode == EliminatorMode::Running
     }
-    fn prepare(&mut self, cdb: &mut impl ClauseDBIF, force: bool) {
+    fn prepare(&mut self, cdb: &mut ClauseDB, force: bool) {
         if !self.enable {
             return;
         }
@@ -260,8 +260,8 @@ impl EliminateIF for Eliminator {
     }
     fn simplify(
         &mut self,
-        asg: &mut impl AssignIF,
-        cdb: &mut impl ClauseDBIF,
+        asg: &mut AssignStack,
+        cdb: &mut ClauseDB,
         state: &mut State,
         force_run: bool,
     ) -> MaybeInconsistent {
@@ -271,10 +271,7 @@ impl EliminateIF for Eliminator {
         {
             for (i, _) in asg.var_iter().enumerate().skip(1) {
                 if asg.reason(i) != AssignReason::None {
-                    assert_eq!(
-                        asg.level(i),
-                        asg.derefer(assign::property::Tusize::RootLevel) as DecisionLevel
-                    );
+                    assert_eq!(asg.level(i), asg.root_level() as DecisionLevel,);
                     // asg.reason(v.index) = AssignReason::None;
                 }
             }
@@ -283,13 +280,11 @@ impl EliminateIF for Eliminator {
             if !force_run && self.mode == EliminatorMode::Dormant {
                 self.prepare(cdb, true);
             }
-            self.eliminate_grow_limit = state.derefer(state::property::Tusize::IntervalScale) / 2;
-            self.subsume_literal_limit = state.config.elm_cls_lim
-                + cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement) as usize;
-            debug_assert!(!cdb
-                .derefer(cdb::property::Tf64::LiteralBlockEntanglement)
-                .is_nan());
-            // self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
+            self.eliminate_grow_limit = state.stm.current_scale() / 2;
+            self.subsume_literal_limit =
+                state.config.elm_cls_lim + cdb.lb_entanglement().get() as usize;
+            debug_assert!(!cdb.lb_entanglement().get().is_nan());
+            // self.eliminate_combination_limit = cdb.lb_entanglement().get() as usize;
             self.eliminate(asg, cdb, state)?;
         } else {
             asg.propagate_sandbox(cdb)
@@ -308,7 +303,7 @@ impl EliminateIF for Eliminator {
     fn sorted_iterator(&self) -> Iter<'_, u32> {
         self.var_queue.heap[1..].iter()
     }
-    fn stats(&self, vi: VarId) -> Option<(usize, usize)> {
+    fn get_phases(&self, vi: VarId) -> Option<(usize, usize)> {
         let w = &self[vi];
         if w.aborted {
             None
@@ -390,7 +385,7 @@ impl Eliminator {
     // Due to a potential bug of killing clauses and difficulty about
     // synchronization between 'garbage_collect' and clearing occur lists,
     // 'stop' should purge all occur lists to purge any dead clauses for now.
-    fn stop(&mut self, cdb: &mut impl ClauseDBIF) {
+    fn stop(&mut self, cdb: &mut ClauseDB) {
         let force: bool = true;
         self.clear_clause_queue(cdb);
         self.clear_var_queue();
@@ -408,8 +403,8 @@ impl Eliminator {
     /// - calls `clause_queue.pop`
     pub fn backward_subsumption_check(
         &mut self,
-        asg: &mut impl AssignIF,
-        cdb: &mut impl ClauseDBIF,
+        asg: &mut AssignStack,
+        cdb: &mut ClauseDB,
         timedout: &mut usize,
     ) -> MaybeInconsistent {
         debug_assert_eq!(asg.decision_level(), 0);
@@ -432,7 +427,7 @@ impl Eliminator {
                     debug_assert!(!VarRef(vi).is(FlagVar::ELIMINATED));
                     vi
                 } else {
-                    let mut tmp = cdb.derefer(cdb::property::Tusize::NumClause);
+                    let mut tmp = cdb.num_clauses();
                     let c = &mut cdb[cid];
                     c.turn_off(FlagClause::ENQUEUED);
                     if c.is_dead() || self.subsume_literal_limit < c.len() {
@@ -502,8 +497,8 @@ impl Eliminator {
     /// if solver becomes inconsistent.
     fn eliminate(
         &mut self,
-        asg: &mut impl AssignIF,
-        cdb: &mut impl ClauseDBIF,
+        asg: &mut AssignStack,
+        cdb: &mut ClauseDB,
         state: &mut State,
     ) -> MaybeInconsistent {
         let start = state.elapsed().unwrap_or(0.0);
@@ -529,8 +524,8 @@ impl Eliminator {
     /// do the elimination task
     fn eliminate_main(
         &mut self,
-        asg: &mut impl AssignIF,
-        cdb: &mut impl ClauseDBIF,
+        asg: &mut AssignStack,
+        cdb: &mut ClauseDB,
         state: &mut State,
     ) -> MaybeInconsistent {
         debug_assert!(asg.decision_level() == 0);
@@ -538,8 +533,8 @@ impl Eliminator {
             return Ok(());
         }
         let mut timedout: usize = {
-            let nv = asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64;
-            let nc = cdb.derefer(cdb::property::Tusize::NumClause) as f64;
+            let nv = asg.num_unasserted_vars() as f64;
+            let nc = cdb.num_clauses() as f64;
             (6.0 * nv.log(1.5) * nc) as usize
         };
         while self.bwdsub_assigns < asg.stack_len()
@@ -602,7 +597,7 @@ impl Eliminator {
         c.turn_on(FlagClause::ENQUEUED);
     }
     /// clear eliminator's clause queue.
-    fn clear_clause_queue(&mut self, cdb: &mut impl ClauseDBIF) {
+    fn clear_clause_queue(&mut self, cdb: &mut ClauseDB) {
         for cid in &self.clause_queue {
             cdb[*cid].turn_off(FlagClause::ENQUEUED);
         }
@@ -628,7 +623,7 @@ impl Eliminator {
 }
 
 #[allow(dead_code)]
-fn check_eliminator(cdb: &impl ClauseDBIF, elim: &Eliminator) -> bool {
+fn check_eliminator(cdb: &ClauseDB, elim: &Eliminator) -> bool {
     // clause_queue should be clear.
     // all elements in occur_lists exist.
     // for v in asg {

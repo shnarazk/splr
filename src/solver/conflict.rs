@@ -2,11 +2,12 @@
 
 #[cfg(feature = "boundary_check")]
 use crate::assign::DebugReportIF;
+use crate::vam::VarActivityManager;
 
 use {
     super::State,
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF},
+        assign::{AssignStack, PropagateIF},
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
         var_vector::*,
@@ -101,7 +102,7 @@ pub fn handle_conflict(
         //
         //## A NEW ASSERTION by UNIT LEARNT CLAUSE GENERATION
         //
-        match VarRef::assigned(l0) /* asg.assigned(l0) */ {
+        match VarRef::lit_assigned(l0) /* asg.assigned(l0) */ {
             Some(true) if asg.root_level() < VarRef(l0.vi()).level() => {
                 panic!("double assignment occured");
                 // asg.lift_to_asserted(l0.vi());
@@ -137,7 +138,8 @@ pub fn handle_conflict(
         //
         //## Learnt Literal Rewarding
         //
-        asg.reward_at_analysis(lit.vi());
+        // asg.reward_at_analysis(lit.vi());
+        VarActivityManager::reward_at_analysis(lit.vi());
 
         //
         //## Reason-Side Rewarding
@@ -147,7 +149,8 @@ pub fn handle_conflict(
             AssignReason::BinaryLink(from) => {
                 let vi = from.vi();
                 if !bumped.contains(&vi) {
-                    asg.reward_at_analysis(vi);
+                    // asg.reward_at_analysis(vi);
+                    VarActivityManager::reward_at_analysis(vi);
                     bumped.push(vi);
                 }
             }
@@ -155,7 +158,8 @@ pub fn handle_conflict(
                 for l in cdb[r].iter() {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
-                        asg.reward_at_analysis(vi);
+                        // asg.reward_at_analysis(vi);
+                        VarActivityManager::reward_at_analysis(vi);
                         bumped.push(vi);
                     }
                 }
@@ -169,7 +173,7 @@ pub fn handle_conflict(
     } else {
         asg.cancel_until(assign_level);
     }
-    debug_assert_eq!(VarRef::assigned(l0), None);
+    debug_assert_eq!(VarRef::lit_assigned(l0), None);
     debug_assert_eq!(
         new_learnt
             .iter()
@@ -186,8 +190,8 @@ pub fn handle_conflict(
 
             debug_assert_eq!(l0, cdb[cid].lit0());
             debug_assert_eq!(l1, cdb[cid].lit1());
-            debug_assert_eq!(VarRef::assigned(l1), Some(false));
-            debug_assert_eq!(VarRef::assigned(l0), None);
+            debug_assert_eq!(VarRef::lit_assigned(l1), Some(false));
+            debug_assert_eq!(VarRef::lit_assigned(l0), None);
 
             asg.assign_by_implication(
                 l0,
@@ -208,7 +212,7 @@ pub fn handle_conflict(
             cdb[cid].set_birth(asg.num_conflict);
 
             debug_assert_eq!(cdb[cid].lit0(), l0);
-            debug_assert_eq!(VarRef::assigned(l0), None);
+            debug_assert_eq!(VarRef::lit_assigned(l0), None);
             asg.assign_by_implication(
                 l0,
                 AssignReason::Implication(cid),
@@ -229,8 +233,8 @@ pub fn handle_conflict(
                 (l0 == cdb[cid].lit0() && l1 == cdb[cid].lit1())
                     || (l0 == cdb[cid].lit1() && l1 == cdb[cid].lit0())
             );
-            debug_assert_eq!(VarRef::assigned(l1), Some(false));
-            debug_assert_eq!(VarRef::assigned(l0), None);
+            debug_assert_eq!(VarRef::lit_assigned(l1), Some(false));
+            debug_assert_eq!(VarRef::lit_assigned(l0), None);
             rank = 1;
             asg.assign_by_implication(
                 l0,
@@ -274,7 +278,8 @@ fn conflict_analyze(
         ($vi: expr) => {
             path_cnt += 1;
             //## Conflict-Side Rewarding
-            asg.reward_at_analysis($vi);
+            // asg.reward_at_analysis($vi);
+            VarActivityManager::reward_at_analysis($vi);
         };
     }
     macro_rules! trace {
