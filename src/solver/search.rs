@@ -101,7 +101,7 @@ impl SolveIF for Solver {
                     if VarRef(vi).assign().is_some() {
                         continue;
                     }
-                    if let Some((p, m)) = elim.num_phases(vi) {
+                    if let Some((p, m)) = elim.get_phases(vi) {
                         // We can't call `asg.assign_at_root_level(l)` even if p or m == 0.
                         // This means we can't pick `!l`.
                         // This becomes a problem in the case of incremental solving.
@@ -142,7 +142,7 @@ impl SolveIF for Solver {
                         if VarRef(vi).assign().is_some() || VarRef(vi).is(FlagVar::ELIMINATED) {
                             continue;
                         }
-                        match elim.num_phases(vi) {
+                        match elim.get_phases(vi) {
                             Some((_, 0)) => (),
                             Some((0, _)) => (),
                             Some((p, m)) if m * 10 < p => VarRef(vi).turn_on(FlagVar::PHASE),

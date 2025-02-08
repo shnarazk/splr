@@ -283,7 +283,7 @@ impl EliminateIF for Eliminator {
             if !force_run && self.mode == EliminatorMode::Dormant {
                 self.prepare(cdb, true);
             }
-            self.eliminate_grow_limit = state.stm.current_scale();
+            self.eliminate_grow_limit = state.stm.current_scale() / 2;
             self.subsume_literal_limit =
                 state.config.elm_cls_lim + cdb.lb_entanglement().get() as usize;
             debug_assert!(!cdb.lb_entanglement().get().is_nan());
@@ -306,7 +306,7 @@ impl EliminateIF for Eliminator {
     fn sorted_iterator(&self) -> Iter<'_, u32> {
         self.var_queue.heap[1..].iter()
     }
-    fn num_phases(&self, vi: VarId) -> Option<(usize, usize)> {
+    fn get_phases(&self, vi: VarId) -> Option<(usize, usize)> {
         let w = &self[vi];
         if w.aborted {
             None

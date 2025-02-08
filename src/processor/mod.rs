@@ -73,7 +73,7 @@ pub trait EliminateIF: Instantiate {
     /// return the order of vars based on their occurrences
     fn sorted_iterator(&self) -> Iter<'_, u32>;
     /// return vi's stats
-    fn num_phases(&self, vi: VarId) -> Option<(usize, usize)>;
+    fn get_phases(&self, vi: VarId) -> Option<(usize, usize)>;
     /// return the constraints on eliminated literals.
     fn eliminated_lits(&mut self) -> &mut Vec<Lit>;
 }
