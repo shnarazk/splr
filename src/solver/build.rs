@@ -30,7 +30,6 @@ pub trait SatSolverIF: Instantiate {
     ///
     /// ```
     /// use crate::splr::{*, var_vector::*};
-    /// use crate::splr::assign::VarManipulateIF;    // for s.asg.assign()
     /// use std::path::Path;
     ///
     /// let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
