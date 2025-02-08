@@ -83,9 +83,14 @@ impl VarRef {
         }
     }
     /// set `vi`s status to eliminated.
-    pub fn make_var_eliminated(vi: VarId) {
+    /// return true if `vi` is just eliminated.
+    pub fn make_var_eliminated(vi: VarId) -> bool {
         unsafe {
             if VAR_VECTOR[vi].is(FlagVar::ELIMINATED) {
+                #[cfg(feature = "boundary_check")]
+                panic!("double elimination");
+                false
+            } else {
                 VAR_VECTOR[vi].turn_on(FlagVar::ELIMINATED);
                 VAR_VECTOR[vi].activity = 0.0;
                 VarActivityManager::remove_from_heap(vi);
@@ -94,13 +99,7 @@ impl VarRef {
                 {
                     self.var[vi].timestamp = self.tick;
                 }
-                #[cfg(feature = "trace_elimination")]
-                debug_assert!(
-                    asg.root_level() < VAR_VECTOR[vi].level || VAR_VECTOR[vi].assign.is_none()
-                );
-            } else {
-                #[cfg(feature = "boundary_check")]
-                panic!("double elimination");
+                true
             }
         }
     }

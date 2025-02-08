@@ -11,7 +11,7 @@ use {
 };
 
 #[cfg(feature = "rephase")]
-use super::AssignRephaseIF;
+use super::rephase::AssignRephaseIF;
 
 #[cfg(feature = "trail_saving")]
 use super::TrailSavingIF;
