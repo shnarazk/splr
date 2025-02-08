@@ -135,6 +135,7 @@ pub fn eliminate_var(
         cdb.remove_clause(*cid);
     }
     elim[vi].clear();
+    VarRef::make_var_eliminated(vi);
     asg.handle(SolverEvent::Eliminate(vi));
     state.restart.handle(SolverEvent::Eliminate(vi));
     elim.backward_subsumption_check(asg, cdb, timedout)

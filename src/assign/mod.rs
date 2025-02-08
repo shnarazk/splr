@@ -12,11 +12,11 @@ pub mod stats;
 /// trail saving
 mod trail_saving;
 
-pub use self::{
-    propagate::PropagateIF,
-    stack::{AssignStack, VarManipulateIF},
+pub use self::{propagate::PropagateIF, stack::AssignStack};
+use {
+    crate::types::*,
+    std::{collections::HashMap, fmt},
 };
-use {crate::types::*, std::fmt};
 
 #[cfg(feature = "trail_saving")]
 pub use self::trail_saving::TrailSavingIF;
@@ -110,4 +110,15 @@ impl DebugReportIF for Clause {
         l.sort();
         l
     }
+}
+
+#[cfg(feature = "rephase")]
+pub trait AssignRephaseIF {
+    /// check usability of the saved best phase.
+    /// return `true` if the current best phase got invalid.
+    fn check_best_phase(&mut self, vi: VarId) -> bool;
+    fn best_phases_ref(&mut self, default_value: Option<bool>) -> HashMap<VarId, bool>;
+    fn override_rephasing_target(&mut self, assignment: &HashMap<VarId, bool>) -> usize;
+    fn select_rephasing_target(&mut self);
+    fn check_consistency_of_best_phases(&mut self);
 }

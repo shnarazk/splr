@@ -15,6 +15,9 @@ use {
     },
 };
 
+#[cfg(feature = "rephase")]
+use crate::assign::AssignRephaseIF;
+
 /// API to [`solve`](`crate::solver::SolveIF::solve`) SAT problems.
 pub trait SolveIF {
     /// search an assignment.

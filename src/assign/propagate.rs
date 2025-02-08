@@ -1,7 +1,7 @@
 // implement boolean constraint propagation, backjump
 // This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{AssignStack, VarManipulateIF},
+    super::AssignStack,
     crate::{
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
@@ -9,6 +9,9 @@ use {
         var_vector::*,
     },
 };
+
+#[cfg(feature = "rephase")]
+use super::AssignRephaseIF;
 
 #[cfg(feature = "trail_saving")]
 use super::TrailSavingIF;
@@ -65,7 +68,9 @@ impl PropagateIF for AssignStack {
                 VarRef::set_lit(l);
                 debug_assert!(!self.trail.contains(&!l));
                 self.trail.push(l);
-                self.make_var_asserted(vi);
+                VarRef::make_var_asserted(vi);
+                #[cfg(feature = "best_phases_tracking")]
+                self.check_best_phase(vi);
                 Ok(())
             }
             Some(x) if x == bool::from(l) => {
@@ -116,7 +121,9 @@ impl PropagateIF for AssignStack {
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
         if self.root_level == lv {
-            self.make_var_asserted(vi);
+            VarRef::make_var_asserted(vi);
+            #[cfg(feature = "best_phases_tracking")]
+            self.check_best_phase(vi);
         }
 
         #[cfg(feature = "boundary_check")]

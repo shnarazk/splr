@@ -62,7 +62,6 @@ impl VarActivityManager {
             VarRef(vi).update_activity(VAM.activity_decay, VAM.activity_anti_decay);
         }
     }
-
     pub fn clear_heap() {
         unsafe {
             VAR_HEAP.clear_heap();

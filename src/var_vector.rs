@@ -1,5 +1,5 @@
 #![allow(static_mut_refs)]
-use crate::types::*;
+use crate::{types::*, vam::VarActivityManager};
 
 pub static mut VAR_VECTOR: Vec<Var> = Vec::new();
 
@@ -67,6 +67,41 @@ impl VarRef {
     pub fn rescale_activity(scaling: f64) {
         for i in VarRef::var_id_iter() {
             VarRef(i).set_activity(VarRef(i).activity() * scaling);
+        }
+    }
+    /// set `vi`s status to asserted.
+    pub fn make_var_asserted(vi: VarId) {
+        unsafe {
+            VAR_VECTOR[vi].reason = AssignReason::Decision(0);
+            VAR_VECTOR[vi].activity = 0.0;
+        }
+        VarActivityManager::remove_from_heap(vi);
+
+        #[cfg(feature = "boundary_check")]
+        {
+            VarRef(vi).timestamp = VAM.tick;
+        }
+    }
+    /// set `vi`s status to eliminated.
+    pub fn make_var_eliminated(vi: VarId) {
+        unsafe {
+            if VAR_VECTOR[vi].is(FlagVar::ELIMINATED) {
+                VAR_VECTOR[vi].turn_on(FlagVar::ELIMINATED);
+                VAR_VECTOR[vi].activity = 0.0;
+                VarActivityManager::remove_from_heap(vi);
+
+                #[cfg(feature = "boundary_check")]
+                {
+                    self.var[vi].timestamp = self.tick;
+                }
+                #[cfg(feature = "trace_elimination")]
+                debug_assert!(
+                    asg.root_level() < VAR_VECTOR[vi].level || VAR_VECTOR[vi].assign.is_none()
+                );
+            } else {
+                #[cfg(feature = "boundary_check")]
+                panic!("double elimination");
+            }
         }
     }
 }

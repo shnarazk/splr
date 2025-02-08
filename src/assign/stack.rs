@@ -6,7 +6,7 @@ use {
 };
 
 #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
-use std::collections::HashMap;
+use {super::AssignRephaseIF, std::collections::HashMap};
 
 #[cfg(feature = "trail_saving")]
 use super::TrailSavingIF;
@@ -132,7 +132,6 @@ impl Instantiate for AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
             trail: Vec::with_capacity(nv),
-            // var_order: VarIdHeap::new(nv),
             #[cfg(feature = "trail_saving")]
             trail_saved: Vec::with_capacity(nv),
 
@@ -147,7 +146,10 @@ impl Instantiate for AssignStack {
             // So execute everything of `assign_by_unitclause` but cancel_until(root_level)
             SolverEvent::Conflict => (),
             SolverEvent::Eliminate(vi) => {
-                self.make_var_eliminated(vi);
+                debug_assert_eq!(self.decision_level(), self.root_level());
+                debug_assert!(self.trail.iter().all(|l| l.vi() != vi));
+                // self.trail.retain(|l| l.vi() != vi);
+                self.num_eliminated_vars += 1;
             }
             SolverEvent::Stage(scale) => {
                 self.stage_scale = scale;
@@ -155,9 +157,7 @@ impl Instantiate for AssignStack {
                 self.clear_saved_trail();
             }
             SolverEvent::NewVar => {
-                // self.expand_heap();
                 VarActivityManager::expand_heap();
-                // self.var.push(Var::default());
             }
             SolverEvent::Reinitialize => {
                 self.cancel_until(self.root_level);
@@ -377,74 +377,8 @@ impl fmt::Display for AssignStack {
     }
 }
 
-/// Var manipulation
-pub trait VarManipulateIF {
-    /// set var status to asserted.
-    fn make_var_asserted(&mut self, vi: VarId);
-    /// set var status to eliminated.
-    fn make_var_eliminated(&mut self, vi: VarId);
-}
-
-impl VarManipulateIF for AssignStack {
-    fn make_var_asserted(&mut self, vi: VarId) {
-        // self.var[vi].reason = AssignReason::Decision(0);
-        VarRef(vi).set_reason(AssignReason::Decision(0));
-        // self.set_activity(vi, 0.0);
-        VarRef(vi).set_activity(0.0);
-        // self.remove_from_heap(vi);
-        VarActivityManager::remove_from_heap(vi);
-
-        #[cfg(feature = "boundary_check")]
-        {
-            self.var[vi].timestamp = self.tick;
-        }
-
-        #[cfg(feature = "best_phases_tracking")]
-        self.check_best_phase(vi);
-    }
-    fn make_var_eliminated(&mut self, vi: VarId) {
-        if !VarRef(vi).is(FlagVar::ELIMINATED) {
-            VarRef(vi).turn_on(FlagVar::ELIMINATED);
-            // self.set_activity(vi, 0.0);
-            VarRef(vi).set_activity(0.0);
-            // self.remove_from_heap(vi);
-            VarActivityManager::remove_from_heap(vi);
-            debug_assert_eq!(self.decision_level(), self.root_level);
-            self.trail.retain(|l| l.vi() != vi);
-            self.num_eliminated_vars += 1;
-
-            #[cfg(feature = "boundary_check")]
-            {
-                self.var[vi].timestamp = self.tick;
-            }
-
-            #[cfg(feature = "trace_elimination")]
-            {
-                let lv = self.level[vi];
-                if self.root_level == self.level[vi] && self.assign[vi].is_some() {
-                    panic!("v:{}, dl:{}", self.var[vi], self.decision_level());
-                }
-                if !(self.root_level < self.level[vi] || self.assign[vi].is_none()) {
-                    panic!(
-                        "v:{}, lvl:{} => {}, dl:{}, assign:{:?} ",
-                        self.var[vi],
-                        lv,
-                        self.level[vi],
-                        self.decision_level(),
-                        self.assign[vi],
-                    );
-                }
-                debug_assert!(self.root_level < self.level[vi] || self.assign[vi].is_none());
-            }
-        } else {
-            #[cfg(feature = "boundary_check")]
-            panic!("double elimination");
-        }
-    }
-}
-
-#[cfg(feature = "best_phases_tracking")]
-impl AssignStack {
+#[cfg(feature = "rephase")]
+impl AssignRephaseIF for AssignStack {
     /// check usability of the saved best phase.
     /// return `true` if the current best phase got invalid.
     fn check_best_phase(&mut self, vi: VarId) -> bool {
@@ -460,8 +394,7 @@ impl AssignStack {
         }
         false
     }
-    #[cfg(feature = "rephase")]
-    pub fn best_phases_ref(&mut self, default_value: Option<bool>) -> HashMap<VarId, bool> {
+    fn best_phases_ref(&mut self, default_value: Option<bool>) -> HashMap<VarId, bool> {
         VarRef::var_id_iter()
             .filter_map(|vi| {
                 if VarRef(vi).level() == self.root_level || VarRef(vi).is(FlagVar::ELIMINATED) {
@@ -480,8 +413,7 @@ impl AssignStack {
             })
             .collect::<HashMap<VarId, bool>>()
     }
-    #[cfg(feature = "rephase")]
-    pub fn override_rephasing_target(&mut self, assignment: &HashMap<VarId, bool>) -> usize {
+    fn override_rephasing_target(&mut self, assignment: &HashMap<VarId, bool>) -> usize {
         let mut num_flipped = 0;
         for (vi, b) in assignment.iter() {
             if self.best_phases.get(vi).is_none_or(|(p, _)| *p != *b) {
@@ -491,8 +423,7 @@ impl AssignStack {
         }
         num_flipped
     }
-    #[cfg(feature = "rephase")]
-    pub fn select_rephasing_target(&mut self) {
+    fn select_rephasing_target(&mut self) {
         if self.best_phases.is_empty() {
             return;
         }
@@ -510,8 +441,7 @@ impl AssignStack {
             VarRef(*vi).set_flag(FlagVar::PHASE, *b);
         }
     }
-    #[cfg(feature = "rephase")]
-    pub fn check_consistency_of_best_phases(&mut self) {
+    fn check_consistency_of_best_phases(&mut self) {
         if self
             .best_phases
             .iter()
