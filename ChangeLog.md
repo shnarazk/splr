@@ -6,6 +6,7 @@
 - Refactor visivility of modules and structs
   - Rename `property` to `stats`
   - Use struct names directly instead of trait requirements
+- Remove log option
 
 ## 0.17.6, 2025-02-01
 

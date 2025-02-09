@@ -160,7 +160,7 @@ use rustc_data_structures::fx::FxHashMap;
 
 /// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
-    /// give rewards to vars selected by SLS
+    /// give rewards to the vars selected by SLS
     fn reward_by_sls(assignment: &FxHashMap<VarId, bool>) -> usize;
     /// select a new decision variable.
     fn select_decision_literal(asg: &mut AssignStack) -> Lit;
