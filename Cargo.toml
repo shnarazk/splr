@@ -16,6 +16,7 @@ rust-version = "1.84"
 [dependencies]
 bitflags = "^2.8"
 instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
+rustc_data_structures = "^0.1"
 
 [features]
 default = [

@@ -156,12 +156,12 @@ impl VarIdHeap {
 }
 // Decision var selection
 
-use std::collections::HashMap;
+use rustc_data_structures::fx::FxHashMap;
 
 /// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
     /// give rewards to vars selected by SLS
-    fn reward_by_sls(assignment: &HashMap<VarId, bool>) -> usize;
+    fn reward_by_sls(assignment: &FxHashMap<VarId, bool>) -> usize;
     /// select a new decision variable.
     fn select_decision_literal(asg: &mut AssignStack) -> Lit;
     /// update the internal heap on var order.
@@ -171,7 +171,7 @@ pub trait VarSelectIF {
 }
 
 impl VarSelectIF for VarActivityManager {
-    fn reward_by_sls(assignment: &HashMap<VarId, bool>) -> usize {
+    fn reward_by_sls(assignment: &FxHashMap<VarId, bool>) -> usize {
         unsafe {
             let mut num_flipped = 0;
             for (vi, b) in assignment.iter() {

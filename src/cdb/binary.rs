@@ -1,8 +1,10 @@
 use {
     super::ClauseId,
     crate::types::*,
+    rustc_data_structures::fx::{FxHashMap, FxHasher},
     std::{
         collections::HashMap,
+        hash::BuildHasherDefault,
         ops::{Index, IndexMut},
     },
 };
@@ -38,7 +40,7 @@ impl IndexMut<Lit> for Vec<BinaryLinkList> {
 /// storage with mapper to `ClauseId` of binary links
 #[derive(Clone, Debug, Default)]
 pub struct BinaryLinkDB {
-    hash: HashMap<(Lit, Lit), ClauseId>,
+    hash: FxHashMap<(Lit, Lit), ClauseId>,
     list: Vec<BinaryLinkList>,
 }
 
@@ -46,7 +48,7 @@ impl Instantiate for BinaryLinkDB {
     fn instantiate(_conf: &Config, cnf: &CNFDescription) -> Self {
         let num_lit = 2 * (cnf.num_of_variables + 1);
         BinaryLinkDB {
-            hash: HashMap::new(),
+            hash: HashMap::<(Lit, Lit), ClauseId, BuildHasherDefault<FxHasher>>::default(),
             list: vec![Vec::new(); num_lit],
         }
     }

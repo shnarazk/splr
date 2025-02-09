@@ -6,7 +6,10 @@ use {
 };
 
 #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
-use std::collections::HashMap;
+use {
+    rustc_data_structures::fx::{FxHashMap, FxHasher},
+    std::{collections::HashMap, hash::BuildHasherDefault},
+};
 
 #[cfg(feature = "trail_saving")]
 use super::TrailSavingIF;
@@ -37,7 +40,7 @@ pub struct AssignStack {
     pub(super) bp_divergence_ema: Ema,
 
     #[cfg(feature = "best_phases_tracking")]
-    pub(super) best_phases: HashMap<VarId, (bool, AssignReason)>,
+    pub(super) best_phases: FxHashMap<VarId, (bool, AssignReason)>,
     #[cfg(feature = "rephase")]
     pub(super) phase_age: usize,
 
@@ -92,7 +95,8 @@ impl Default for AssignStack {
             bp_divergence_ema: Ema::new(10),
 
             #[cfg(feature = "best_phases_tracking")]
-            best_phases: HashMap::new(),
+            best_phases:
+                HashMap::<VarId, (bool, AssignReason), BuildHasherDefault<FxHasher>>::default(),
             #[cfg(feature = "rephase")]
             phase_age: 0,
 

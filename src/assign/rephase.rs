@@ -1,15 +1,15 @@
 use {
     super::AssignStack,
     crate::{types::*, var_vector::*},
-    std::collections::HashMap,
+    rustc_data_structures::fx::FxHashMap,
 };
 
 pub trait AssignRephaseIF {
     /// check usability of the saved best phase.
     /// return `true` if the current best phase got invalid.
     fn check_best_phase(&mut self, vi: VarId) -> bool;
-    fn best_phases_ref(&mut self, default_value: Option<bool>) -> HashMap<VarId, bool>;
-    fn override_rephasing_target(&mut self, assignment: &HashMap<VarId, bool>) -> usize;
+    fn best_phases_ref(&mut self, default_value: Option<bool>) -> FxHashMap<VarId, bool>;
+    fn override_rephasing_target(&mut self, assignment: &FxHashMap<VarId, bool>) -> usize;
     fn select_rephasing_target(&mut self);
     fn check_consistency_of_best_phases(&mut self);
 }
@@ -30,7 +30,7 @@ impl AssignRephaseIF for AssignStack {
         }
         false
     }
-    fn best_phases_ref(&mut self, default_value: Option<bool>) -> HashMap<VarId, bool> {
+    fn best_phases_ref(&mut self, default_value: Option<bool>) -> FxHashMap<VarId, bool> {
         VarRef::var_id_iter()
             .filter_map(|vi| {
                 if VarRef(vi).level() == self.root_level || VarRef(vi).is(FlagVar::ELIMINATED) {
@@ -47,9 +47,9 @@ impl AssignRephaseIF for AssignStack {
                     ))
                 }
             })
-            .collect::<HashMap<VarId, bool>>()
+            .collect::<FxHashMap<VarId, bool>>()
     }
-    fn override_rephasing_target(&mut self, assignment: &HashMap<VarId, bool>) -> usize {
+    fn override_rephasing_target(&mut self, assignment: &FxHashMap<VarId, bool>) -> usize {
         let mut num_flipped = 0;
         for (vi, b) in assignment.iter() {
             if self.best_phases.get(vi).is_none_or(|(p, _)| *p != *b) {
