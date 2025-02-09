@@ -4,6 +4,7 @@ use crate::{types::*, vam::VarActivityManager};
 pub static mut VAR_VECTOR: Vec<Var> = Vec::new();
 
 pub trait VarRefIF {
+    fn get_reference(&self) -> &'static Var;
     fn assign(&self) -> Option<bool>;
     fn set_assign(&self, value: Option<bool>);
     fn level(&self) -> DecisionLevel;
@@ -109,6 +110,9 @@ impl VarRef {
 }
 
 impl VarRefIF for VarRef {
+    fn get_reference(&self) -> &'static Var {
+        unsafe { &VAR_VECTOR.get_unchecked(self.0) }
+    }
     #[inline]
     fn assign(&self) -> Option<bool> {
         unsafe { VAR_VECTOR.get_unchecked(self.0).assign }

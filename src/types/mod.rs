@@ -1,6 +1,8 @@
 //! Module `types' provides various building blocks, including
 //! some common traits.
 
+/// Bounded static Var ref
+pub mod bsvr;
 /// methods on clause
 pub mod clause;
 /// methods on CNF file
