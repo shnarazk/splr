@@ -1,13 +1,14 @@
 //! Var struct and Database management API
 use {
     // super::{heap::VarHeapIF, stack::AssignStack, AssignIF},
-    crate::types::{flags::FlagIF, flags::FlagVar, AssignReason, DecisionLevel},
+    crate::types::{flags::FlagIF, flags::FlagVar, AssignReason, DecisionLevel, VarId},
     std::fmt,
 };
 
 /// Object representing a variable.
 #[derive(Clone, Debug)]
 pub struct Var {
+    pub id: VarId,
     /// assignment
     pub(crate) assign: Option<bool>,
     /// decision level
@@ -33,6 +34,7 @@ pub struct Var {
 impl Default for Var {
     fn default() -> Var {
         Var {
+            id: 0,
             assign: None,
             level: 0,
             reason: AssignReason::None,
@@ -64,6 +66,7 @@ impl Var {
         (0..n as u32 + 1)
             .map(|n| {
                 Var {
+                    id: n as VarId,
                     level: n, // each literal occupies a single level.
                     ..Default::default()
                 }

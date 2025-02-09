@@ -38,3 +38,9 @@ impl BSVR {
         Lit::from((self.vi, self.possitive))
     }
 }
+
+impl From<Lit> for BSVR {
+    fn from(lit: Lit) -> Self {
+        BSVR::new(lit.vi(), bool::from(lit))
+    }
+}
