@@ -7,7 +7,7 @@ mod db;
 /// EMA
 mod ema;
 /// methods for Stochastic Local Search
-mod sls;
+// mod sls;
 /// properties
 pub mod stats;
 /// methods for UNSAT certification
@@ -20,13 +20,16 @@ mod watch_cache;
 pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
     db::ClauseDB,
-    sls::StochasticLocalSearchIF,
+    // sls::StochasticLocalSearchIF,
     unsat_certificate::CertificationStore,
     vivify::VivifyIF,
 };
 
 use {
-    crate::{assign::AssignStack, types::*},
+    crate::{
+        assign::AssignStack,
+        types::{bsvr::*, *},
+    },
     std::{ops::IndexMut, slice::IterMut},
     watch_cache::{WatchCache, WatchCacheIterator, WatchCacheProxy},
 };
@@ -56,13 +59,13 @@ pub trait ClauseDBIF: Instantiate + IndexMut<ClauseId, Output = Clause> {
     //
 
     // get mutable reference to a watch_cache
-    fn fetch_watch_cache_entry(&self, lit: Lit, index: WatchCacheProxy) -> (ClauseId, Lit);
+    fn fetch_watch_cache_entry(&self, lit: BSVR, index: WatchCacheProxy) -> (ClauseId, BSVR);
     /// replace the mutable watcher list with an empty one, and return the list
-    fn watch_cache_iter(&mut self, l: Lit) -> WatchCacheIterator;
+    fn watch_cache_iter(&mut self, l: BSVR) -> WatchCacheIterator;
     /// detach the watch_cache referred by the head of a watch_cache iterator
-    fn detach_watch_cache(&mut self, l: Lit, iter: &mut WatchCacheIterator);
+    fn detach_watch_cache(&mut self, l: BSVR, iter: &mut WatchCacheIterator);
     /// Merge two watch cache
-    fn merge_watch_cache(&mut self, l: Lit, wc: WatchCache);
+    fn merge_watch_cache(&mut self, l: BSVR, wc: WatchCache);
     /// swap the first two literals in a clause.
     fn swap_watch(&mut self, cid: ClauseId);
 
@@ -73,9 +76,9 @@ pub trait ClauseDBIF: Instantiate + IndexMut<ClauseId, Output = Clause> {
     /// push back a watch literal cache by adjusting the iterator for `lit`
     fn transform_by_restoring_watch_cache(
         &mut self,
-        l: Lit,
+        l: BSVR,
         iter: &mut WatchCacheIterator,
-        p: Option<Lit>,
+        p: Option<BSVR>,
     );
     /// swap i-th watch with j-th literal then update watch caches correctly
     fn transform_by_updating_watch(&mut self, cid: ClauseId, old: usize, new: usize, removed: bool);
@@ -83,16 +86,16 @@ pub trait ClauseDBIF: Instantiate + IndexMut<ClauseId, Output = Clause> {
     /// Note this removes an eliminated Lit `p` from a clause. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
     /// And this is called only from `Eliminator::strengthen_clause`.
-    fn new_clause(&mut self, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
-    fn new_clause_sandbox(&mut self, v: &mut Vec<Lit>) -> RefClause;
+    fn new_clause(&mut self, v: &mut Vec<BSVR>, learnt: bool) -> RefClause;
+    fn new_clause_sandbox(&mut self, v: &mut Vec<BSVR>) -> RefClause;
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn remove_clause(&mut self, cid: ClauseId);
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn remove_clause_sandbox(&mut self, cid: ClauseId);
     /// update watches of the clause
-    fn transform_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause;
+    fn transform_by_elimination(&mut self, cid: ClauseId, p: BSVR) -> RefClause;
     /// generic clause transformer (not in use)
-    fn transform_by_replacement(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause;
+    fn transform_by_replacement(&mut self, cid: ClauseId, vec: &mut Vec<BSVR>) -> RefClause;
     /// check satisfied and nullified literals in a clause
     fn transform_by_simplification(&mut self, cid: ClauseId) -> RefClause;
     /// reduce learnt clauses
@@ -109,7 +112,7 @@ pub trait ClauseDBIF: Instantiate + IndexMut<ClauseId, Output = Clause> {
     /// save the certification record to a file.
     fn certificate_save(&mut self);
     /// minimize a clause.
-    fn minimize_with_bi_clauses(&mut self, vec: &mut Vec<Lit>);
+    fn minimize_with_bi_clauses(&mut self, vec: &mut Vec<BSVR>);
     /// complete bi-clause network
     fn complete_bi_clauses(&mut self);
 
@@ -140,8 +143,8 @@ mod tests {
         std::num::NonZeroU32,
     };
 
-    fn lit(i: i32) -> Lit {
-        Lit::from(i)
+    fn lit(i: i32) -> BSVR {
+        BSVR::from(i)
     }
 
     #[allow(dead_code)]

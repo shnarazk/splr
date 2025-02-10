@@ -23,7 +23,7 @@ pub mod ordered_proxy;
 pub mod var;
 
 pub use self::{
-    clause::*, cnf::*, ema::*, flags::*, idx::*, lit::*, luby::*, ordered_proxy::*, var::*,
+    bsvr::*, clause::*, cnf::*, ema::*, flags::*, idx::*, lit::*, luby::*, ordered_proxy::*, var::*,
 };
 
 pub use crate::{assign::AssignReason, config::Config, solver::SolverEvent};
@@ -101,7 +101,7 @@ pub trait Delete<T> {
 }
 
 /// Capture a conflict
-pub type ConflictContext = (Lit, AssignReason);
+pub type ConflictContext = (BSVR, AssignReason);
 
 /// Return type of unit propagation
 pub type PropagationResult = Result<(), ConflictContext>;

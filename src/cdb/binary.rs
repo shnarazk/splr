@@ -1,6 +1,6 @@
 use {
     super::ClauseId,
-    crate::types::*,
+    crate::types::{bsvr::BSVR, *},
     rustc_data_structures::fx::{FxHashMap, FxHasher},
     std::{
         collections::HashMap,
@@ -10,12 +10,12 @@ use {
 };
 
 /// storage of binary links
-pub type BinaryLinkList = Vec<(Lit, ClauseId)>;
+pub type BinaryLinkList = Vec<(BSVR, ClauseId)>;
 
-impl Index<Lit> for Vec<BinaryLinkList> {
+impl Index<BSVR> for Vec<BinaryLinkList> {
     type Output = BinaryLinkList;
     #[inline]
-    fn index(&self, l: Lit) -> &Self::Output {
+    fn index(&self, l: BSVR) -> &Self::Output {
         #[cfg(feature = "unsafe_access")]
         unsafe {
             self.get_unchecked(usize::from(l))
@@ -25,9 +25,9 @@ impl Index<Lit> for Vec<BinaryLinkList> {
     }
 }
 
-impl IndexMut<Lit> for Vec<BinaryLinkList> {
+impl IndexMut<BSVR> for Vec<BinaryLinkList> {
     #[inline]
-    fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
+    fn index_mut(&mut self, l: BSVR) -> &mut Self::Output {
         #[cfg(feature = "unsafe_access")]
         unsafe {
             self.get_unchecked_mut(usize::from(l))
@@ -40,7 +40,7 @@ impl IndexMut<Lit> for Vec<BinaryLinkList> {
 /// storage with mapper to `ClauseId` of binary links
 #[derive(Clone, Debug, Default)]
 pub struct BinaryLinkDB {
-    hash: FxHashMap<(Lit, Lit), ClauseId>,
+    hash: FxHashMap<(BSVR, BSVR), ClauseId>,
     list: Vec<BinaryLinkList>,
 }
 
@@ -48,7 +48,7 @@ impl Instantiate for BinaryLinkDB {
     fn instantiate(_conf: &Config, cnf: &CNFDescription) -> Self {
         let num_lit = 2 * (cnf.num_of_variables + 1);
         BinaryLinkDB {
-            hash: HashMap::<(Lit, Lit), ClauseId, BuildHasherDefault<FxHasher>>::default(),
+            hash: HashMap::<(BSVR, BSVR), ClauseId, BuildHasherDefault<FxHasher>>::default(),
             list: vec![Vec::new(); num_lit],
         }
     }
@@ -57,14 +57,14 @@ impl Instantiate for BinaryLinkDB {
 
 pub trait BinaryLinkIF {
     /// add a mapping from a pair of Lit to a `ClauseId`
-    fn add(&mut self, lit0: Lit, lit1: Lit, cid: ClauseId);
+    fn add(&mut self, lit0: BSVR, lit1: BSVR, cid: ClauseId);
     /// remove a pair of `Lit`s
-    fn remove(&mut self, lit0: Lit, lit1: Lit) -> MaybeInconsistent;
+    fn remove(&mut self, lit0: BSVR, lit1: BSVR) -> MaybeInconsistent;
     /// return 'ClauseId` linked from a pair of `Lit`s
-    fn search(&self, lit0: Lit, lit1: Lit) -> Option<&ClauseId>;
+    fn search(&self, lit0: BSVR, lit1: BSVR) -> Option<&ClauseId>;
     /// return the all links that include `Lit`.
     /// Note this is not a `watch_list`. The other literal has an opposite phase.
-    fn connect_with(&self, lit: Lit) -> &BinaryLinkList;
+    fn connect_with(&self, lit: BSVR) -> &BinaryLinkList;
     /// add new var
     fn add_new_var(&mut self);
     // /// sort links based on var activities
@@ -72,14 +72,14 @@ pub trait BinaryLinkIF {
 }
 
 impl BinaryLinkIF for BinaryLinkDB {
-    fn add(&mut self, lit0: Lit, lit1: Lit, cid: ClauseId) {
+    fn add(&mut self, lit0: BSVR, lit1: BSVR, cid: ClauseId) {
         let l0 = lit0.min(lit1);
         let l1 = lit0.max(lit1);
         self.hash.insert((l0, l1), cid);
         self.list[lit0].push((lit1, cid));
         self.list[lit1].push((lit0, cid));
     }
-    fn remove(&mut self, lit0: Lit, lit1: Lit) -> MaybeInconsistent {
+    fn remove(&mut self, lit0: BSVR, lit1: BSVR) -> MaybeInconsistent {
         let l0 = lit0.min(lit1);
         let l1 = lit0.max(lit1);
         self.hash.remove(&(l0, l1));
@@ -87,12 +87,12 @@ impl BinaryLinkIF for BinaryLinkDB {
         self.list[lit1].delete_unstable(|p| p.0 == lit0);
         Ok(())
     }
-    fn search(&self, lit0: Lit, lit1: Lit) -> Option<&ClauseId> {
+    fn search(&self, lit0: BSVR, lit1: BSVR) -> Option<&ClauseId> {
         let l0 = lit0.min(lit1);
         let l1 = lit0.max(lit1);
         self.hash.get(&(l0, l1))
     }
-    fn connect_with(&self, lit: Lit) -> &BinaryLinkList {
+    fn connect_with(&self, lit: BSVR) -> &BinaryLinkList {
         &self.list[lit]
     }
     fn add_new_var(&mut self) {

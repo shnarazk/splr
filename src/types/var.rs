@@ -1,8 +1,11 @@
 //! Var struct and Database management API
 use {
     // super::{heap::VarHeapIF, stack::AssignStack, AssignIF},
-    crate::types::{flags::FlagIF, flags::FlagVar, AssignReason, DecisionLevel, VarId},
-    std::fmt,
+    crate::types::{
+        flags::{FlagIF, FlagVar},
+        AssignReason, DecisionLevel, VarId,
+    },
+    std::{fmt, hash::Hash},
 };
 
 /// Object representing a variable.
@@ -53,6 +56,32 @@ impl Default for Var {
     }
 }
 
+impl PartialEq for Var {
+    fn eq(&self, other: &Var) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for Var {}
+
+impl Ord for Var {
+    fn cmp(&self, other: &Var) -> std::cmp::Ordering {
+        self.id.cmp(&other.id)
+    }
+}
+
+impl PartialOrd for Var {
+    fn partial_cmp(&self, other: &Var) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Hash for Var {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
 impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
@@ -61,6 +90,12 @@ impl fmt::Display for Var {
 }
 
 impl Var {
+    pub fn new(id: VarId) -> Var {
+        Var {
+            id,
+            ..Default::default()
+        }
+    }
     /// return a new vector of $n$ `Var`s.
     pub fn new_vars(n: usize) -> Vec<Var> {
         (0..n as u32 + 1)

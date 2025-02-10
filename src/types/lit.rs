@@ -1,5 +1,5 @@
 use {
-    crate::types::{ClauseId, VarId},
+    crate::types::{bsvr::*, ClauseId, VarId},
     std::{
         fmt,
         num::NonZeroU32,
@@ -120,6 +120,22 @@ impl From<Lit> for ClauseId {
         ClauseId {
             ordinal: unsafe { NonZeroU32::new_unchecked(NonZeroU32::get(l.ordinal) | 0x8000_0000) },
         }
+    }
+}
+
+impl From<BSVR> for ClauseId {
+    #[inline]
+    fn from(l: BSVR) -> ClauseId {
+        ClauseId {
+            ordinal: unsafe { NonZeroU32::new_unchecked(usize::from(l) as u32) | 0x8000_0000 },
+        }
+    }
+}
+
+impl From<ClauseId> for BSVR {
+    #[inline]
+    fn from(cid: ClauseId) -> BSVR {
+        BSVR::from(Lit::from(cid))
     }
 }
 

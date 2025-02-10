@@ -109,16 +109,16 @@ impl SolveIF for Solver {
                         // This means we can't pick `!l`.
                         // This becomes a problem in the case of incremental solving.
                         if m == 0 {
-                            let l = Lit::from((vi, true));
-                            debug_assert!(VarRef::lit_assigned(l).is_none());
-                            cdb.certificate_add_assertion(l);
+                            let l = BSVR::new(vi, true);
+                            debug_assert!(l.lit_assigned().is_none());
+                            cdb.certificate_add_assertion(Lit::from(l));
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
                         } else if p == 0 {
-                            let l = Lit::from((vi, false));
-                            debug_assert!(VarRef::lit_assigned(l).is_none());
-                            cdb.certificate_add_assertion(l);
+                            let l = BSVR::new(vi, false);
+                            debug_assert!(l.lit_assigned().is_none());
+                            cdb.certificate_add_assertion(Lit::from(l));
                             if asg.assign_at_root_level(l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
@@ -238,7 +238,7 @@ fn search(
     let mut core_was_rebuilt: Option<usize> = None;
     let stage_size: usize = 32;
     #[cfg(feature = "rephase")]
-    let mut sls_core = cdb.num_clauses();
+    let mut _sls_core = cdb.num_clauses();
 
     state.stm.initialize(stage_size);
     while 0 < asg.num_unassigned_vars() || asg.remains() {
@@ -300,7 +300,7 @@ fn search(
                 }
                 #[cfg(feature = "rephase")]
                 {
-                    if cfg!(feature = "stochastic_local_search") {
+                    /* if cfg!(feature = "stochastic_local_search") {
                         use crate::cdb::StochasticLocalSearchIF;
                         macro_rules! sls {
                             ($assign: expr, $limit: expr) => {
@@ -349,7 +349,7 @@ fn search(
                             let mut assignment = asg.best_phases_ref(Some(false));
                             sls!(assignment, steps);
                         }
-                    }
+                    } */
                     asg.select_rephasing_target();
                 }
                 if cfg!(feature = "clause_vivification") {

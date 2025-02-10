@@ -35,10 +35,7 @@ pub fn handle_conflict(
     // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
     {
         if let AssignReason::Implication(cid) = cc.1 {
-            if cdb[cid]
-                .iter()
-                .all(|l| VarRef(l.vi()).level() /* asg.level(l.vi()) */ == asg.root_level())
-            {
+            if cdb[cid].iter().all(|l| l.var.level == asg.root_level()) {
                 return Err(SolverError::RootLevelConflict(*cc));
             }
         }
@@ -102,17 +99,17 @@ pub fn handle_conflict(
         //
         //## A NEW ASSERTION by UNIT LEARNT CLAUSE GENERATION
         //
-        match VarRef::lit_assigned(l0) /* asg.assigned(l0) */ {
-            Some(true) if asg.root_level() < VarRef(l0.vi()).level() => {
+        match l0.lit_assigned() /* asg.assigned(l0) */ {
+            Some(true) if asg.root_level() < l0.var.level => {
                 panic!("double assignment occured");
                 // asg.lift_to_asserted(l0.vi());
             }
-            Some(false) if VarRef(l0.vi()).level() == asg.root_level() => {
-                return Err(SolverError::RootLevelConflict((l0, VarRef(l0.vi()).reason())));
+            Some(false) if l0.var.level == asg.root_level() => {
+                return Err(SolverError::RootLevelConflict((l0, l0.var.reason)));
             }
             _ => {
                 // dump to certified even if it's a literal.
-                cdb.certificate_add_assertion(l0);
+                cdb.certificate_add_assertion(Lit::from(l0));
                 if asg.assign_at_root_level(l0).is_err() {
                     unreachable!("handle_conflict::root_level_conflict_by_assertion");
                 }
@@ -145,7 +142,7 @@ pub fn handle_conflict(
         //## Reason-Side Rewarding
         //
         #[cfg(feature = "reason_side_rewarding")]
-        match VarRef(lit.vi()).reason() {
+        match lit.var.reason {
             AssignReason::BinaryLink(from) => {
                 let vi = from.vi();
                 if !bumped.contains(&vi) {
@@ -173,13 +170,9 @@ pub fn handle_conflict(
     } else {
         asg.cancel_until(assign_level);
     }
-    debug_assert_eq!(VarRef::lit_assigned(l0), None);
+    debug_assert_eq!(l0.lit_assigned(), None);
     debug_assert_eq!(
-        new_learnt
-            .iter()
-            .skip(1)
-            .map(|l| VarRef(l.vi()).level())
-            .max(),
+        new_learnt.iter().skip(1).map(|l| l.var.level).max(),
         Some(assign_level)
     );
     let rank: u16;
@@ -190,8 +183,8 @@ pub fn handle_conflict(
 
             debug_assert_eq!(l0, cdb[cid].lit0());
             debug_assert_eq!(l1, cdb[cid].lit1());
-            debug_assert_eq!(VarRef::lit_assigned(l1), Some(false));
-            debug_assert_eq!(VarRef::lit_assigned(l0), None);
+            debug_assert_eq!(l1.lit_assigned(), Some(false));
+            debug_assert_eq!(l0.lit_assigned(), None);
 
             asg.assign_by_implication(
                 l0,
@@ -212,7 +205,7 @@ pub fn handle_conflict(
             cdb[cid].set_birth(asg.num_conflict);
 
             debug_assert_eq!(cdb[cid].lit0(), l0);
-            debug_assert_eq!(VarRef::lit_assigned(l0), None);
+            debug_assert_eq!(l0.lit_assigned(), None);
             asg.assign_by_implication(
                 l0,
                 AssignReason::Implication(cid),
@@ -233,8 +226,8 @@ pub fn handle_conflict(
                 (l0 == cdb[cid].lit0() && l1 == cdb[cid].lit1())
                     || (l0 == cdb[cid].lit1() && l1 == cdb[cid].lit0())
             );
-            debug_assert_eq!(VarRef::lit_assigned(l1), Some(false));
-            debug_assert_eq!(VarRef::lit_assigned(l0), None);
+            debug_assert_eq!(l1.lit_assigned(), Some(false));
+            debug_assert_eq!(l0.lit_assigned(), None);
             rank = 1;
             asg.assign_by_implication(
                 l0,
@@ -268,7 +261,7 @@ fn conflict_analyze(
 ) -> DecisionLevel {
     let learnt = &mut state.new_learnt;
     learnt.clear();
-    learnt.push(Lit::from(u32::MAX));
+    learnt.push(BSVR::default());
     let root_level = asg.root_level();
     let dl = asg.decision_level();
     let mut path_cnt = 0;
@@ -338,7 +331,7 @@ fn conflict_analyze(
         let vi = p.vi();
         validate_vi!(vi);
         set_seen!(vi);
-        let lvl = VarRef(vi).level();
+        let lvl = p.var.level;
         if dl == lvl {
             conflict_level!(vi);
         } else {
@@ -353,7 +346,7 @@ fn conflict_analyze(
         match reason {
             AssignReason::BinaryLink(l) => {
                 let vi = l.vi();
-                if !VarRef(vi).is(FlagVar::CA_SEEN) {
+                if !l.var.is(FlagVar::CA_SEEN) {
                     validate_vi!(vi);
                     debug_assert_eq!(VarRef(vi).level(), dl, "strange level binary clause");
                     // if root_level == asg.level(vi) { continue; }
@@ -381,8 +374,8 @@ fn conflict_analyze(
                 for q in cdb[cid].iter().skip(1) {
                     let vi = q.vi();
                     validate_vi!(vi);
-                    if !VarRef(vi).is(FlagVar::CA_SEEN) {
-                        let lvl = VarRef(vi).level();
+                    if !q.var.is(FlagVar::CA_SEEN) {
+                        let lvl = q.var.level;
                         if root_level == lvl {
                             trace_lit!(q, " -- ignore");
                             continue;
@@ -451,7 +444,7 @@ fn conflict_analyze(
         }
         debug_assert!(0 < trail_index);
         trail_index -= 1;
-        reason = VarRef(p.vi()).reason();
+        reason = p.var.reason;
     }
     if let Some(cid) = cid_with_max_lbd {
         cdb.update_at_analysis(cid);
@@ -468,15 +461,15 @@ fn conflict_analyze(
 }
 
 fn minimize_learnt(
-    new_learnt: &mut Vec<Lit>,
+    new_learnt: &mut Vec<BSVR>,
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
 ) -> DecisionLevel {
-    let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
+    let mut to_clear: Vec<BSVR> = vec![new_learnt[0]];
     let mut levels = vec![false; asg.decision_level() as usize + 1];
     for l in &new_learnt[1..] {
         to_clear.push(*l);
-        levels[VarRef(l.vi()).level() as usize] = true;
+        levels[l.var.level as usize] = true;
     }
     let l0 = new_learnt[0];
     new_learnt.retain(|l| *l == l0 || !l.is_redundant(cdb, &mut to_clear, &levels));
@@ -488,9 +481,9 @@ fn minimize_learnt(
     let mut level_to_return = 0;
     if 1 < new_learnt.len() {
         let mut max_i = 1;
-        level_to_return = VarRef(new_learnt[max_i].vi()).level();
+        level_to_return = new_learnt[max_i].var.level;
         for (i, l) in new_learnt.iter().enumerate().skip(2) {
-            let lv = VarRef(l.vi()).level();
+            let lv = l.var.level;
             if level_to_return < lv {
                 level_to_return = lv;
                 max_i = i;
@@ -506,22 +499,22 @@ fn minimize_learnt(
 
 /// return `true` if the `lit` is redundant, which is defined by
 /// any leaf of implication graph for it isn't an asserted var nor a decision var.
-impl Lit {
-    fn is_redundant(self, cdb: &ClauseDB, clear: &mut Vec<Lit>, levels: &[bool]) -> bool {
-        if matches!(VarRef(self.vi()).reason(), AssignReason::Decision(_)) {
+impl BSVR {
+    fn is_redundant(self, cdb: &ClauseDB, clear: &mut Vec<BSVR>, levels: &[bool]) -> bool {
+        if matches!(self.var.reason, AssignReason::Decision(_)) {
             return false;
         }
         let mut stack = vec![self];
         let top = clear.len();
         while let Some(sl) = stack.pop() {
-            match VarRef(sl.vi()).reason() {
+            match sl.var.reason {
                 AssignReason::BinaryLink(l) => {
                     let vi = l.vi();
-                    let lv = VarRef(vi).level();
-                    if 0 < lv && !VarRef(vi).is(FlagVar::CA_SEEN) {
+                    let lv = l.var.level;
+                    if 0 < lv && !l.var.is(FlagVar::CA_SEEN) {
                         // if asg.reason(vi) != AssignReason::Decision(_) && levels[lv as usize] {
                         if matches!(
-                            VarRef(vi).reason(),
+                            l.var.reason,
                             AssignReason::Implication(_) | AssignReason::BinaryLink(_)
                         ) && levels[lv as usize]
                         {
@@ -542,11 +535,11 @@ impl Lit {
                     let c = &cdb[cid];
                     for q in &(*c)[1..] {
                         let vi = q.vi();
-                        let lv = VarRef(vi).level();
-                        if 0 < lv && !VarRef(vi).is(FlagVar::CA_SEEN) {
+                        let lv = q.var.level;
+                        if 0 < lv && !q.var.is(FlagVar::CA_SEEN) {
                             // if asg.reason(vi) != AssignReason::default() && levels[lv as usize] {
                             if matches!(
-                                VarRef(vi).reason(),
+                                q.var.reason,
                                 AssignReason::BinaryLink(_) | AssignReason::Implication(_)
                             ) && levels[lv as usize]
                             {
@@ -572,8 +565,8 @@ impl Lit {
 }
 
 #[allow(dead_code)]
-fn check_graph(asg: &AssignStack, cdb: &ClauseDB, lit: Lit, mes: &str) {
-    let its_level = VarRef(lit.vi()).level();
+fn check_graph(asg: &AssignStack, cdb: &ClauseDB, lit: BSVR, mes: &str) {
+    let its_level = lit.var.level;
     let mut children = Vec::new();
     let precedents = lit_level(asg, cdb, lit, &mut children, mes);
     assert!(precedents <= its_level);
@@ -583,15 +576,15 @@ fn check_graph(asg: &AssignStack, cdb: &ClauseDB, lit: Lit, mes: &str) {
 fn lit_level(
     asg: &AssignStack,
     cdb: &ClauseDB,
-    lit: Lit,
-    bag: &mut Vec<Lit>,
+    lit: BSVR,
+    bag: &mut Vec<BSVR>,
     _mes: &str,
 ) -> DecisionLevel {
     if bag.contains(&lit) {
         return 0;
     }
     bag.push(lit);
-    match VarRef(lit.vi()).reason() {
+    match lit.var.reason {
         AssignReason::Decision(0) => asg.root_level(),
         AssignReason::Decision(lvl) => lvl,
         AssignReason::Implication(cid) => {
@@ -627,7 +620,7 @@ fn lit_level(
 }
 
 #[allow(dead_code)]
-fn dumper(cdb: &ClauseDB, bag: &[Lit]) -> String {
+fn dumper(cdb: &ClauseDB, bag: &[BSVR]) -> String {
     use std::fmt::Write as _;
     let mut s = String::new();
     for l in bag {
@@ -635,12 +628,12 @@ fn dumper(cdb: &ClauseDB, bag: &[Lit]) -> String {
             s,
             "{:8>} :: level {:4>}, {:?} {:?}",
             *l,
-            VarRef(l.vi()).level(),
-            VarRef(l.vi()).reason(),
-            match VarRef(l.vi()).reason() {
+            l.var.level,
+            l.var.reason,
+            match l.var.reason {
                 AssignReason::Decision(_) => vec![],
                 AssignReason::BinaryLink(lit) => vec![*l, !lit],
-                AssignReason::Implication(cid) => cdb[cid].iter().copied().collect::<Vec<Lit>>(),
+                AssignReason::Implication(cid) => cdb[cid].iter().copied().collect::<Vec<BSVR>>(),
                 AssignReason::None => vec![],
             },
         )

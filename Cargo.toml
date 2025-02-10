@@ -87,3 +87,5 @@ codegen-units = 1
 opt-level = 3
 panic = "abort"
 strip = true
+# debuginfo = 2
+# debug = true
