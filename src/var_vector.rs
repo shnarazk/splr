@@ -10,7 +10,9 @@ pub trait VarRefIF {
     fn set_level(&self, value: DecisionLevel);
     fn reason(&self) -> AssignReason;
     fn set_reason(&self, value: AssignReason);
+    #[cfg(feature = "trail_saving")]
     fn reason_saved(&self) -> AssignReason;
+    #[cfg(feature = "trail_saving")]
     fn set_reason_saved(&self, value: AssignReason);
     fn activity(&self) -> f64;
     fn set_activity(&self, value: f64);
@@ -52,11 +54,12 @@ impl VarRef {
             let vi = lit.vi();
             let possitive = bool::from(lit);
             match VAR_VECTOR.get_unchecked(vi).assign {
-                Some(b) if !possitive => Some(!b),
+                Some(b) => Some(b == possitive),
                 ob => ob,
             }
         }
     }
+    #[inline]
     pub fn set_lit(lit: Lit) {
         unsafe {
             let vi = lit.vi();
@@ -139,10 +142,12 @@ impl VarRefIF for VarRef {
             VAR_VECTOR.get_unchecked_mut(self.0).reason = value;
         }
     }
+    #[cfg(feature = "trail_saving")]
     #[inline]
     fn reason_saved(&self) -> AssignReason {
         unsafe { VAR_VECTOR.get_unchecked(self.0).reason_saved }
     }
+    #[cfg(feature = "trail_saving")]
     #[inline]
     fn set_reason_saved(&self, value: AssignReason) {
         unsafe {

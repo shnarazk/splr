@@ -202,8 +202,8 @@ impl PropagateIF for AssignStack {
 
             #[cfg(not(feature = "trail_saving"))]
             {
-                self.reward_at_unassign(vi);
-                self.insert_heap(vi);
+                VarActivityManager::reward_at_unassign(vi);
+                VarActivityManager::insert_heap(vi);
             }
         }
         self.trail.truncate(lim);

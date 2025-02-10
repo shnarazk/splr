@@ -241,6 +241,7 @@ impl VarHeapIF for VarIdHeap {
         let i = self.insert(vi);
         self.percolate_up(i as u32);
     }
+    #[allow(unused_variables)]
     fn get_heap_root(&mut self, asg: &mut AssignStack) -> VarId {
         #[cfg(feature = "trail_saving")]
         if self.is_empty() {
@@ -325,7 +326,7 @@ impl VarHeapIF for VarIdHeap {
     }
 }
 
-trait VarOrderIF {
+pub trait VarOrderIF {
     fn clear(&mut self);
     fn contains(&self, v: VarId) -> bool;
     fn get_root(&mut self) -> VarId;
