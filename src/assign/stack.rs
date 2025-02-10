@@ -18,14 +18,14 @@ use super::TrailSavingIF;
 #[derive(Clone, Debug)]
 pub struct AssignStack {
     /// record of assignment
-    pub(super) trail: Vec<Lit>,
+    pub(super) trail: Vec<BSVR>,
     pub(super) trail_lim: Vec<usize>,
     /// the-number-of-assigned-and-propagated-vars + 1
     pub(super) q_head: usize,
     pub(super) root_level: DecisionLevel,
 
     #[cfg(feature = "trail_saving")]
-    pub(super) trail_saved: Vec<Lit>,
+    pub(super) trail_saved: Vec<BSVR>,
 
     pub(super) num_reconflict: usize,
     pub(super) num_repropagation: usize,
@@ -51,7 +51,7 @@ pub struct AssignStack {
 
     //## Elimanated vars
     //
-    pub eliminated: Vec<Lit>,
+    pub eliminated: Vec<BSVR>,
 
     //
     //## Statistics
@@ -118,8 +118,8 @@ impl Default for AssignStack {
 }
 
 impl<'a> IntoIterator for &'a mut AssignStack {
-    type Item = &'a Lit;
-    type IntoIter = Iter<'a, Lit>;
+    type Item = &'a BSVR;
+    type IntoIter = Iter<'a, BSVR>;
     fn into_iter(self) -> Self::IntoIter {
         self.trail.iter()
     }
@@ -225,11 +225,11 @@ impl AssignStack {
         self.cpr_ema.as_view()
     }
     /// return the i-th element in the stack.
-    pub fn stack(&self, i: usize) -> Lit {
+    pub fn stack(&self, i: usize) -> BSVR {
         self.trail[i]
     }
     /// return literals in the range of stack.
-    pub fn stack_range(&self, r: Range<usize>) -> &[Lit] {
+    pub fn stack_range(&self, r: Range<usize>) -> &[BSVR] {
         &self.trail[r]
     }
     /// return the number of assignments.
@@ -249,7 +249,7 @@ impl AssignStack {
         self.trail.is_empty()
     }
     /// return an iterator over assignment stack.
-    pub fn stack_iter(&self) -> Iter<'_, Lit> {
+    pub fn stack_iter(&self) -> Iter<'_, BSVR> {
         self.trail.iter()
     }
     /// return the current decision level.
@@ -385,8 +385,8 @@ mod tests {
     use super::*;
     use crate::assign::PropagateIF;
 
-    fn lit(i: i32) -> Lit {
-        Lit::from(i)
+    fn lit(i: i32) -> BSVR {
+        BSVR::from(i)
     }
     #[test]
     fn test_propagation() {
@@ -441,9 +441,9 @@ mod tests {
         assert_eq!(asg.decision_level(), 1);
         assert_eq!(asg.stack_len(), 3);
         assert_eq!(asg.trail_lim, vec![2]);
-        assert_eq!(VarRef::lit_assigned(lit(1)), Some(true));
-        assert_eq!(VarRef::lit_assigned(lit(-1)), Some(false));
-        assert_eq!(VarRef::lit_assigned(lit(4)), None);
+        assert_eq!(lit(1).lit_assigned(), Some(true));
+        assert_eq!(lit(-1).lit_assigned(), Some(false));
+        assert_eq!(lit(4).lit_assigned(), None);
 
         // [1, 2, 3] => [1, 2, 3, 4]
         asg.assign_by_decision(lit(4));
@@ -453,13 +453,13 @@ mod tests {
         assert_eq!(asg.trail_lim, vec![2, 3]);
 
         // [1, 2, 3, 4] => [1, 2, -4]
-        asg.assign_at_root_level(Lit::from(-4i32))
+        asg.assign_at_root_level(BSVR::from(-4i32))
             .expect("impossible");
         assert_eq!(asg.trail, vec![lit(1), lit(2), lit(-4)]);
         assert_eq!(asg.decision_level(), 0);
         assert_eq!(asg.stack_len(), 3);
 
-        assert_eq!(VarRef::lit_assigned(lit(-4)), Some(true));
-        assert_eq!(VarRef::lit_assigned(lit(-3)), None);
+        assert_eq!(lit(-4).lit_assigned(), Some(true));
+        assert_eq!(lit(-3).lit_assigned(), None);
     }
 }

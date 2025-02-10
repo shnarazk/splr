@@ -75,7 +75,7 @@ pub trait EliminateIF: Instantiate {
     /// return vi's stats
     fn get_phases(&self, vi: VarId) -> Option<(usize, usize)>;
     /// return the constraints on eliminated literals.
-    fn eliminated_lits(&mut self) -> &mut Vec<Lit>;
+    fn eliminated_lits(&mut self) -> &mut Vec<BSVR>;
 }
 
 #[derive(Copy, Clone, Eq, Debug, PartialEq)]
@@ -93,7 +93,7 @@ pub struct Eliminator {
     var_queue: VarOccHeap,
     bwdsub_assigns: usize,
     /// constraints on eliminated var. It is used by `extend_model`.
-    elim_lits: Vec<Lit>,
+    elim_lits: Vec<BSVR>,
     /// Maximum number of clauses to try to eliminate a var
     eliminate_var_occurrence_limit: usize,
     /// Stop elimination if the increase of clauses is over this

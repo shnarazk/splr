@@ -4,6 +4,7 @@ use crate::{types::*, vam::VarActivityManager};
 pub static mut VAR_VECTOR: Vec<Var> = Vec::new();
 
 pub trait VarRefIF {
+    fn get_reference(&self) -> &'static Var;
     fn assign(&self) -> Option<bool>;
     fn set_assign(&self, value: Option<bool>);
     fn level(&self) -> DecisionLevel;
@@ -31,6 +32,7 @@ impl VarRef {
             VAR_VECTOR.clear(); // reqired for cargo test
             VAR_VECTOR.resize(num_vars + 1, Var::default());
             for (i, v) in VAR_VECTOR.iter_mut().enumerate().skip(1) {
+                v.id = i as VarId;
                 v.level = i as DecisionLevel;
             }
         }
@@ -43,7 +45,7 @@ impl VarRef {
     }
     pub fn add_var() {
         unsafe {
-            VAR_VECTOR.push(Var::default());
+            VAR_VECTOR.push(Var::new(VAR_VECTOR.len() as VarId));
         }
     }
     #[inline]
@@ -52,7 +54,7 @@ impl VarRef {
             let vi = lit.vi();
             let possitive = bool::from(lit);
             match VAR_VECTOR.get_unchecked(vi).assign {
-                Some(b) if !possitive => Some(!b),
+                Some(b) => Some(b == possitive),
                 ob => ob,
             }
         }
@@ -109,6 +111,9 @@ impl VarRef {
 }
 
 impl VarRefIF for VarRef {
+    fn get_reference(&self) -> &'static Var {
+        unsafe { VAR_VECTOR.get_unchecked(self.0) }
+    }
     #[inline]
     fn assign(&self) -> Option<bool> {
         unsafe { VAR_VECTOR.get_unchecked(self.0).assign }

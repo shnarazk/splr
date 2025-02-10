@@ -5,14 +5,13 @@ use {
         assign::{AssignStack, PropagateIF},
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
-        var_vector::*,
     },
 };
 
 #[derive(Clone, Eq, Debug, Ord, PartialEq, PartialOrd)]
 enum Subsumable {
     None,
-    By(Lit),
+    By(BSVR),
     Success,
 }
 
@@ -57,7 +56,7 @@ impl Eliminator {
 fn have_subsuming_lit(cdb: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Subsumable {
     debug_assert!(!other.is_lifted_lit());
     if cid.is_lifted_lit() {
-        let l = Lit::from(cid);
+        let l = BSVR::from(cid);
         let oh = &cdb[other];
         for lo in oh.iter() {
             if l == !*lo {
@@ -95,7 +94,7 @@ fn strengthen_clause(
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
     cid: ClauseId,
-    l: Lit,
+    l: BSVR,
 ) -> MaybeInconsistent {
     debug_assert!(!cdb[cid].is_dead());
     debug_assert!(1 < cdb[cid].len());
@@ -114,16 +113,13 @@ fn strengthen_clause(
             Ok(())
         }
         RefClause::UnitClause(l0) => {
-            cdb.certificate_add_assertion(l0);
+            cdb.certificate_add_assertion(Lit::from(l0));
             elim.remove_cid_occur(cid, &mut cdb[cid]);
             cdb.remove_clause(cid);
-            match VarRef::lit_assigned(l0) {
+            match l0.lit_assigned() {
                 None => asg.assign_at_root_level(l0),
                 Some(true) => Ok(()),
-                Some(false) => Err(SolverError::RootLevelConflict((
-                    l0,
-                    VarRef(l0.vi()).reason(), /* asg.reason(l0.vi()) */
-                ))),
+                Some(false) => Err(SolverError::RootLevelConflict((l0, l0.var.reason))),
             }
         }
         RefClause::Dead | RefClause::EmptyClause => unreachable!("strengthen_clause"),

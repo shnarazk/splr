@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.18.0-dev4"
+version = "0.18.0-dev5"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2021"
@@ -87,3 +87,5 @@ codegen-units = 1
 opt-level = 3
 panic = "abort"
 strip = true
+# debuginfo = 2
+# debug = true

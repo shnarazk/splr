@@ -122,7 +122,7 @@ pub struct State {
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
     /// working place to build learnt clauses
-    pub new_learnt: Vec<Lit>,
+    pub new_learnt: Vec<BSVR>,
     /// working place to store given clauses' ids which is used to derive a good learnt
     pub derive20: Vec<ClauseId>,
     /// `progress` invocation counter

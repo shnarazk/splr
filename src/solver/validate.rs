@@ -2,7 +2,7 @@
 use crate::{
     assign::PropagateIF,
     solver::Solver,
-    types::{Lit, MaybeInconsistent, SolverError},
+    types::{bsvr::*, MaybeInconsistent, SolverError},
 };
 
 /// API for SAT validator like [`inject_assignment`](`crate::solver::ValidateIF::inject_assignment`), [`validate`](`crate::solver::ValidateIF::validate`) and so on.
@@ -40,7 +40,7 @@ impl ValidateIF for Solver {
             return Err(SolverError::Inconsistent);
         }
         for i in vec {
-            self.asg.assign_at_root_level(Lit::from(*i))?;
+            self.asg.assign_at_root_level(BSVR::from(*i))?;
         }
         Ok(())
     }

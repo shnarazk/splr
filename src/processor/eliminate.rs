@@ -31,10 +31,10 @@ pub fn eliminate_var(
     // Note: it may contain the target literal somehow. So the following may be failed.
     // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, true)))));
     w.pos_occurs
-        .retain(|&c| cdb[c].contains(Lit::from((vi, true))));
+        .retain(|&c| cdb[c].contains(BSVR::new(vi, true)));
     // debug_assert!(w.pos_occurs.iter().all(|c| cdb[*c].is_dead() || cdb[*c].contains(Lit::from((vi, false)))));
     w.neg_occurs
-        .retain(|&c| cdb[c].contains(Lit::from((vi, false))));
+        .retain(|&c| cdb[c].contains(BSVR::new(vi, false)));
 
     let num_combination = w.pos_occurs.len() * w.neg_occurs.len();
 
@@ -78,17 +78,14 @@ pub fn eliminate_var(
                         " - eliminate_var {}: found assign {} from {}{} and {}{}",
                         vi, lit, p, cdb[*p], n, cdb[*n],
                     );
-                    match VarRef::lit_assigned(lit) {
+                    match lit.lit_assigned() {
                         Some(true) => (),
                         Some(false) => {
-                            return Err(SolverError::RootLevelConflict((
-                                lit,
-                                VarRef(lit.vi()).reason(),
-                            )));
+                            return Err(SolverError::RootLevelConflict((lit, lit.var.reason)));
                         }
                         None => {
-                            debug_assert!(VarRef::lit_assigned(lit).is_none());
-                            cdb.certificate_add_assertion(lit);
+                            debug_assert!(lit.lit_assigned().is_none());
+                            cdb.certificate_add_assertion(Lit::from(lit));
                             asg.assign_at_root_level(lit)?;
                         }
                     }
@@ -186,8 +183,8 @@ fn skip_var_elimination(
 fn merge_cost(cdb: &ClauseDB, cp: ClauseId, cq: ClauseId, vi: VarId) -> Option<usize> {
     let c_p = &cdb[cp];
     let c_q = &cdb[cq];
-    let mut cond: Option<Lit> = None;
-    let mut cond2: Option<Lit> = None;
+    let mut cond: Option<BSVR> = None;
+    let mut cond2: Option<BSVR> = None;
     let mut count = 0;
 
     'next_lit: for lit in c_p.iter() {
@@ -200,7 +197,7 @@ fn merge_cost(cdb: &ClauseDB, cp: ClauseId, cq: ClauseId, vi: VarId) -> Option<u
         for l in c_q.iter() {
             if !*lit == *l {
                 return Some(0);
-            } else if *lit == *l || VarRef(l.vi()).is(FlagVar::ELIMINATED) {
+            } else if *lit == *l || l.var.is(FlagVar::ELIMINATED) {
                 continue 'next_lit;
             }
         }
@@ -216,7 +213,7 @@ fn merge_cost(cdb: &ClauseDB, cp: ClauseId, cq: ClauseId, vi: VarId) -> Option<u
                 return None;
             }
         }
-        debug_assert!(!VarRef(lit.vi()).is(FlagVar::ELIMINATED));
+        debug_assert!(!lit.var.is(FlagVar::ELIMINATED));
         count += 1;
     }
     cond2.map(|_| count)
@@ -224,7 +221,13 @@ fn merge_cost(cdb: &ClauseDB, cp: ClauseId, cq: ClauseId, vi: VarId) -> Option<u
 
 /// Return the real length of the generated clause by merging two clauses.
 /// Return **zero** if one of the clauses is always satisfied. (merge_vec should not be used.)
-fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, vi: VarId, vec: &mut Vec<Lit>) -> usize {
+fn merge(
+    cdb: &mut ClauseDB,
+    cip: ClauseId,
+    ciq: ClauseId,
+    vi: VarId,
+    vec: &mut Vec<BSVR>,
+) -> usize {
     vec.clear();
     let pqb = &cdb[cip];
     let qpb = &cdb[ciq];
@@ -256,7 +259,7 @@ fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, vi: VarId, vec: &mut 
 
 fn make_eliminated_clauses(
     cdb: &mut ClauseDB,
-    store: &mut Vec<Lit>,
+    store: &mut Vec<BSVR>,
     v: VarId,
     pos: &[ClauseId],
     neg: &[ClauseId],
@@ -266,24 +269,24 @@ fn make_eliminated_clauses(
             debug_assert!(!cdb[*cid].is_dead());
             make_eliminated_clause(cdb, store, v, *cid);
         }
-        make_eliminating_unit_clause(store, Lit::from((v, true)));
+        make_eliminating_unit_clause(store, BSVR::new(v, true));
     } else {
         for cid in pos {
             debug_assert!(!cdb[*cid].is_dead());
             make_eliminated_clause(cdb, store, v, *cid);
         }
-        make_eliminating_unit_clause(store, Lit::from((v, false)));
+        make_eliminating_unit_clause(store, BSVR::new(v, false));
     }
 }
 
-fn make_eliminating_unit_clause(store: &mut Vec<Lit>, x: Lit) {
+fn make_eliminating_unit_clause(store: &mut Vec<BSVR>, x: BSVR) {
     #[cfg(feature = "trace_elimination")]
     println!(" - eliminator save {}", x);
     store.push(x);
-    store.push(Lit::from(1usize));
+    store.push(BSVR::from(Lit::from(1usize)));
 }
 
-fn make_eliminated_clause(cdb: &mut ClauseDB, store: &mut Vec<Lit>, vi: VarId, cid: ClauseId) {
+fn make_eliminated_clause(cdb: &mut ClauseDB, store: &mut Vec<BSVR>, vi: VarId, cid: ClauseId) {
     let first = store.len();
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:
     let c = &cdb[cid];
@@ -300,7 +303,7 @@ fn make_eliminated_clause(cdb: &mut ClauseDB, store: &mut Vec<Lit>, vi: VarId, c
     }
     // Store the length of the clause last:
     debug_assert_eq!(store[first].vi(), vi);
-    store.push(Lit::from(c.len()));
+    store.push(BSVR::from(Lit::from(c.len())));
     #[cfg(feature = "trace_elimination")]
     println!("# make_eliminated_clause: eliminate({}) clause {}", vi, c);
 }
@@ -354,7 +357,7 @@ mod tests {
         assert!(cdb
             .iter()
             .skip(1)
-            .all(|c| c.iter().all(|l| *l != Lit::from((vi, false)))
-                && c.iter().all(|l| *l != Lit::from((vi, false)))));
+            .all(|c| c.iter().all(|l| *l != BSVR::new(vi, false))
+                && c.iter().all(|l| *l != BSVR::new(vi, false))));
     }
 }

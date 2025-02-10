@@ -180,15 +180,12 @@ impl SatSolverIF for Solver {
         if val == 0 || VarRef::num_vars() < val.unsigned_abs() as usize {
             return Err(SolverError::InvalidLiteral);
         }
-        let lit = Lit::from(val);
-        self.cdb.certificate_add_assertion(lit);
-        match VarRef::lit_assigned(lit) {
+        let lit = BSVR::from(val);
+        self.cdb.certificate_add_assertion(Lit::from(val));
+        match lit.lit_assigned() {
             None => self.asg.assign_at_root_level(lit).map(|_| self),
             Some(true) => Ok(self),
-            Some(false) => Err(SolverError::RootLevelConflict((
-                lit,
-                VarRef(lit.vi()).reason(),
-            ))),
+            Some(false) => Err(SolverError::RootLevelConflict((lit, lit.var.reason))),
         }
     }
     fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver, SolverError>
@@ -203,8 +200,8 @@ impl SatSolverIF for Solver {
         let mut clause = vec
             .as_ref()
             .iter()
-            .map(|i| Lit::from(*i))
-            .collect::<Vec<Lit>>();
+            .map(|i| BSVR::from(*i))
+            .collect::<Vec<BSVR>>();
 
         if clause.is_empty() {
             return Err(SolverError::EmptyClause);
@@ -256,7 +253,7 @@ impl SatSolverIF for Solver {
 
 impl Solver {
     // renamed from clause_new
-    fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> RefClause {
+    fn add_unchecked_clause(&mut self, lits: &mut Vec<BSVR>) -> RefClause {
         let Solver {
             ref mut asg,
             ref mut cdb,
@@ -268,10 +265,10 @@ impl Solver {
         debug_assert!(asg.decision_level() == 0);
         lits.sort();
         let mut j = 0;
-        let mut l_: Option<Lit> = None; // last literal; [x, x.negate()] means tautology.
+        let mut l_: Option<BSVR> = None; // last literal; [x, x.negate()] means tautology.
         for i in 0..lits.len() {
             let li = lits[i];
-            let sat = VarRef::lit_assigned(li);
+            let sat = li.lit_assigned();
             if sat == Some(true) || Some(!li) == l_ {
                 return RefClause::Dead;
             } else if sat != Some(false) && Some(li) != l_ {
@@ -285,7 +282,7 @@ impl Solver {
             0 => RefClause::EmptyClause, // for UNSAT
             1 => {
                 let l0 = lits[0];
-                cdb.certificate_add_assertion(l0);
+                cdb.certificate_add_assertion(Lit::from(l0));
                 asg.assign_at_root_level(l0)
                     .map_or(RefClause::EmptyClause, |_| RefClause::UnitClause(l0))
             }
@@ -306,14 +303,14 @@ impl Solver {
                 Ok(_) if buf.starts_with('c') => continue,
                 Ok(_) => {
                     let iter = buf.split_whitespace();
-                    let mut v: Vec<Lit> = Vec::new();
+                    let mut v: Vec<BSVR> = Vec::new();
                     for s in iter {
                         match s.parse::<i32>() {
                             Ok(0) => {
                                 ends_zero = true;
                                 break;
                             }
-                            Ok(val) => v.push(Lit::from(val)),
+                            Ok(val) => v.push(BSVR::from(val)),
                             Err(_) => (),
                         }
                     }
@@ -349,8 +346,8 @@ impl Solver {
             let mut lits = ints
                 .as_ref()
                 .iter()
-                .map(|i| Lit::from(*i))
-                .collect::<Vec<Lit>>();
+                .map(|i| BSVR::from(*i))
+                .collect::<Vec<BSVR>>();
             if v.is_empty() {
                 return Err(SolverError::EmptyClause);
             }

@@ -1,5 +1,5 @@
 use {
-    crate::{types::*, var_vector::*},
+    crate::types::{bsvr::*, *},
     std::{
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -11,7 +11,7 @@ use {
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct Clause {
     /// The literals in a clause.
-    pub(crate) lits: Vec<Lit>,
+    pub(crate) lits: Vec<BSVR>,
     /// Flags (8 bits)
     pub(crate) flags: FlagClause,
     /// A static clause evaluation criterion like LBD, NDD, or something.
@@ -38,23 +38,6 @@ pub struct Clause {
 
 /// API for Clause, providing literal accessors.
 pub trait ClauseIF {
-    /// return true if it contains no literals; a clause after unit propagation.
-    fn is_empty(&self) -> bool;
-    /// return true if it contains no literals; a clause after unit propagation.
-    fn is_dead(&self) -> bool;
-    /// return 1st watch
-    fn lit0(&self) -> Lit;
-    /// return 2nd watch
-    fn lit1(&self) -> Lit;
-    /// return `true` if the clause contains the literal
-    fn contains(&self, lit: Lit) -> bool;
-    /// check clause satisfiability
-    fn is_satisfied_under(&self) -> bool;
-    /// return an iterator over its literals.
-    fn iter(&self) -> Iter<'_, Lit>;
-    /// return the number of literals.
-    fn len(&self) -> usize;
-
     #[cfg(feature = "boundary_check")]
     /// return timestamp.
     fn timestamp(&self) -> usize;
@@ -86,9 +69,9 @@ impl Default for Clause {
 }
 
 impl Index<usize> for Clause {
-    type Output = Lit;
+    type Output = BSVR;
     #[inline]
-    fn index(&self, i: usize) -> &Lit {
+    fn index(&self, i: usize) -> &BSVR {
         #[cfg(feature = "unsafe_access")]
         unsafe {
             self.lits.get_unchecked(i)
@@ -100,7 +83,7 @@ impl Index<usize> for Clause {
 
 impl IndexMut<usize> for Clause {
     #[inline]
-    fn index_mut(&mut self, i: usize) -> &mut Lit {
+    fn index_mut(&mut self, i: usize) -> &mut BSVR {
         #[cfg(feature = "unsafe_access")]
         unsafe {
             self.lits.get_unchecked_mut(i)
@@ -111,9 +94,9 @@ impl IndexMut<usize> for Clause {
 }
 
 impl Index<Range<usize>> for Clause {
-    type Output = [Lit];
+    type Output = [BSVR];
     #[inline]
-    fn index(&self, r: Range<usize>) -> &[Lit] {
+    fn index(&self, r: Range<usize>) -> &[BSVR] {
         #[cfg(feature = "unsafe_access")]
         unsafe {
             self.lits.get_unchecked(r)
@@ -124,9 +107,9 @@ impl Index<Range<usize>> for Clause {
 }
 
 impl Index<RangeFrom<usize>> for Clause {
-    type Output = [Lit];
+    type Output = [BSVR];
     #[inline]
-    fn index(&self, r: RangeFrom<usize>) -> &[Lit] {
+    fn index(&self, r: RangeFrom<usize>) -> &[BSVR] {
         #[cfg(feature = "unsafe_access")]
         unsafe {
             self.lits.get_unchecked(r)
@@ -138,7 +121,7 @@ impl Index<RangeFrom<usize>> for Clause {
 
 impl IndexMut<Range<usize>> for Clause {
     #[inline]
-    fn index_mut(&mut self, r: Range<usize>) -> &mut [Lit] {
+    fn index_mut(&mut self, r: Range<usize>) -> &mut [BSVR] {
         #[cfg(feature = "unsafe_access")]
         unsafe {
             self.lits.get_unchecked_mut(r)
@@ -150,7 +133,7 @@ impl IndexMut<Range<usize>> for Clause {
 
 impl IndexMut<RangeFrom<usize>> for Clause {
     #[inline]
-    fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Lit] {
+    fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [BSVR] {
         #[cfg(feature = "unsafe_access")]
         unsafe {
             self.lits.get_unchecked_mut(r)
@@ -161,16 +144,16 @@ impl IndexMut<RangeFrom<usize>> for Clause {
 }
 
 impl<'a> IntoIterator for &'a Clause {
-    type Item = &'a Lit;
-    type IntoIter = Iter<'a, Lit>;
+    type Item = &'a BSVR;
+    type IntoIter = Iter<'a, BSVR>;
     fn into_iter(self) -> Self::IntoIter {
         self.lits.iter()
     }
 }
 
 impl<'a> IntoIterator for &'a mut Clause {
-    type Item = &'a Lit;
-    type IntoIter = Iter<'a, Lit>;
+    type Item = &'a BSVR;
+    type IntoIter = Iter<'a, BSVR>;
     fn into_iter(self) -> Self::IntoIter {
         self.lits.iter()
     }
@@ -182,18 +165,22 @@ impl From<&Clause> for Vec<i32> {
     }
 }
 
-impl ClauseIF for Clause {
-    fn is_empty(&self) -> bool {
+impl Clause {
+    /// return true if it contains no literals; a clause after unit propagation.
+    pub fn is_empty(&self) -> bool {
         self.lits.is_empty()
     }
-    fn is_dead(&self) -> bool {
+    /// return true if it contains no literals; a clause after unit propagation.
+    pub fn is_dead(&self) -> bool {
         self.lits.is_empty()
     }
-    fn iter(&self) -> Iter<'_, Lit> {
+    /// return an iterator over its literals.
+    pub fn iter(&self) -> Iter<'_, BSVR> {
         self.lits.iter()
     }
+    /// return 1st watch placed lits[0]
     #[inline]
-    fn lit0(&self) -> Lit {
+    pub fn lit0(&self) -> BSVR {
         #[cfg(feature = "unsafe_access")]
         unsafe {
             *self.lits.get_unchecked(0)
@@ -201,8 +188,9 @@ impl ClauseIF for Clause {
         #[cfg(not(feature = "unsafe_access"))]
         self.lits[0]
     }
+    /// return 2nd watch placed lits[1]
     #[inline]
-    fn lit1(&self) -> Lit {
+    pub fn lit1(&self) -> BSVR {
         #[cfg(feature = "unsafe_access")]
         unsafe {
             *self.lits.get_unchecked(1)
@@ -210,21 +198,32 @@ impl ClauseIF for Clause {
         #[cfg(not(feature = "unsafe_access"))]
         self.lits[1]
     }
-    fn contains(&self, lit: Lit) -> bool {
+    pub fn as_lits(&self) -> Vec<Lit> {
+        self.lits
+            .iter()
+            .map(|l| Lit::from(*l))
+            .collect::<Vec<Lit>>()
+    }
+    /// return `true` if the clause contains the literal
+    pub fn contains(&self, lit: BSVR) -> bool {
         self.lits.contains(&lit)
     }
-    fn is_satisfied_under(&self) -> bool {
+    /// check clause satisfiability
+    pub fn is_satisfied_under(&self) -> bool {
         for l in self.lits.iter() {
-            if VarRef::lit_assigned(*l) == Some(true) {
+            if l.lit_assigned() == Some(true) {
                 return true;
             }
         }
         false
     }
-    fn len(&self) -> usize {
+    /// return the number of literals.
+    pub fn len(&self) -> usize {
         self.lits.len()
     }
+}
 
+impl ClauseIF for Clause {
     #[cfg(feature = "boundary_check")]
     /// return timestamp.
     fn timestamp(&self) -> usize {
@@ -279,7 +278,7 @@ impl fmt::Display for Clause {
         write!(
             f,
             "{{{:?}{}{}}}",
-            i32s(&self.lits),
+            i32s(&self.as_lits()),
             st(FlagClause::LEARNT, ", learnt"),
             st(FlagClause::ENQUEUED, ", enqueued"),
         )
@@ -298,7 +297,7 @@ impl Clause {
         lbd_temp[0] = key;
         let mut cnt = 0;
         for l in &self.lits {
-            let lv = VarRef(l.vi()).level() /* asg.level(l.vi()) */;
+            let lv = l.var.level;
             if lv == 0 {
                 continue;
             }
@@ -322,7 +321,7 @@ pub enum RefClause {
     Dead,
     EmptyClause,
     RegisteredClause(ClauseId),
-    UnitClause(Lit),
+    UnitClause(BSVR),
 }
 
 impl RefClause {

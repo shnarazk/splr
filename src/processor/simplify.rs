@@ -311,7 +311,7 @@ impl EliminateIF for Eliminator {
             Some((w.pos_occurs.len(), w.neg_occurs.len()))
         }
     }
-    fn eliminated_lits(&mut self) -> &mut Vec<Lit> {
+    fn eliminated_lits(&mut self) -> &mut Vec<BSVR> {
         &mut self.elim_lits
     }
 }
@@ -375,7 +375,7 @@ impl Eliminator {
         debug_assert!(!c.is_dead());
         c.turn_off(FlagClause::OCCUR_LINKED);
         for l in c.iter() {
-            if VarRef(l.vi()).assign().is_none() {
+            if l.var.assign.is_none() {
                 self.remove_lit_occur(*l, cid);
                 self.enqueue_var(l.vi(), true);
             }
@@ -439,7 +439,7 @@ impl Eliminator {
                     let mut b = 0;
                     for l in c.iter() {
                         let w = &self[l.vi()];
-                        if VarRef(l.vi()).assign().is_some() || w.aborted {
+                        if l.var.assign.is_some() || w.aborted {
                             continue;
                         }
                         let num_sum = if bool::from(*l) {
@@ -447,7 +447,7 @@ impl Eliminator {
                         } else {
                             w.pos_occurs.len()
                         };
-                        if !VarRef(l.vi()).is(FlagVar::ELIMINATED) && num_sum < tmp {
+                        if !l.var.is(FlagVar::ELIMINATED) && num_sum < tmp {
                             b = l.vi();
                             tmp = num_sum;
                         }
@@ -473,8 +473,8 @@ impl Eliminator {
                         }
                         if !d.is_dead() && d.len() <= self.subsume_literal_limit {
                             debug_assert!(
-                                d.contains(Lit::from((best, false)))
-                                    || d.contains(Lit::from((best, true)))
+                                d.contains(BSVR::new(best, false))
+                                    || d.contains(BSVR::new(best, true))
                             );
                             self.try_subsume(asg, cdb, cid, *did)?;
                         }
@@ -564,7 +564,7 @@ impl Eliminator {
         Ok(())
     }
     /// remove a clause id from literal's occur list.
-    pub fn remove_lit_occur(&mut self, l: Lit, cid: ClauseId) {
+    pub fn remove_lit_occur(&mut self, l: BSVR, cid: ClauseId) {
         let w = &mut self[l.vi()];
         if w.aborted {
             return;

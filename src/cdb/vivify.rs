@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 use crate::{
     assign::{AssignStack, PropagateIF},
-    cdb::{clause::ClauseIF, ClauseDB, ClauseDBIF},
+    cdb::{ClauseDB, ClauseDBIF},
     state::{Stat, State, StateIF},
     types::*,
     var_vector::*,
@@ -56,7 +56,7 @@ impl VivifyIF for ClauseDB {
             }
             let is_learnt = c.is(FlagClause::LEARNT);
             c.vivified();
-            let clits = c.iter().copied().collect::<Vec<Lit>>();
+            let clits = c.iter().copied().collect::<Vec<BSVR>>();
             if to_display <= num_check {
                 state.flush("");
                 state.flush(format!(
@@ -66,9 +66,9 @@ impl VivifyIF for ClauseDB {
             }
             num_check += 1;
             debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
-            let mut decisions: Vec<Lit> = Vec::new();
+            let mut decisions: Vec<BSVR> = Vec::new();
             for lit in clits.iter().copied() {
-                match VarRef::lit_assigned(!lit) {
+                match (!lit).lit_assigned() {
                     //## Rule 1
                     Some(false) => (),
                     //## Rule 2
@@ -78,7 +78,7 @@ impl VivifyIF for ClauseDB {
                         asg.assign_by_decision(!lit);
                         //## Rule 3
                         if let Err(cc) = asg.propagate_sandbox(self) {
-                            let mut vec: Vec<Lit>;
+                            let mut vec: Vec<BSVR>;
                             match cc.1 {
                                 AssignReason::BinaryLink(l) => {
                                     let cnfl_lits = vec![cc.0, !l];
@@ -105,7 +105,7 @@ impl VivifyIF for ClauseDB {
                                         continue 'next_clause;
                                     } else {
                                         let cnfl_lits =
-                                            &self[ci].iter().copied().collect::<Vec<Lit>>();
+                                            &self[ci].iter().copied().collect::<Vec<BSVR>>();
                                         seen[0] = num_check;
                                         vec = asg.analyze_sandbox(
                                             self, &decisions, cnfl_lits, &mut seen,
@@ -126,7 +126,7 @@ impl VivifyIF for ClauseDB {
                                     return Err(SolverError::EmptyClause);
                                 }
                                 1 => {
-                                    self.certificate_add_assertion(vec[0]);
+                                    self.certificate_add_assertion(Lit::from(vec[0]));
                                     asg.assign_at_root_level(vec[0])?;
                                     num_assert += 1;
                                 }
@@ -230,12 +230,12 @@ impl AssignStack {
     fn analyze_sandbox(
         &self,
         cdb: &ClauseDB,
-        decisions: &[Lit],
-        conflicting: &[Lit],
+        decisions: &[BSVR],
+        conflicting: &[BSVR],
         seen: &mut [usize],
-    ) -> Vec<Lit> {
+    ) -> Vec<BSVR> {
         let key = seen[0];
-        let mut learnt: Vec<Lit> = Vec::new();
+        let mut learnt: Vec<BSVR> = Vec::new();
         for l in conflicting {
             seen[l.vi()] = key;
         }
@@ -253,7 +253,7 @@ impl AssignStack {
             assumes
                 .iter()
                 .filter(|l| all.contains(&!**l))
-                .map(|l| VarRef(l.vi()).reason())
+                .map(|l| l.var.reason)
                 .collect::<Vec<_>>(),
             // am.iter().filter(|l| am.contains(&!**l)).collect::<Vec<_>>(),
         );
@@ -273,7 +273,7 @@ impl AssignStack {
                 // Thus we must negate the literals.
                 learnt.push(!*l);
             }
-            match VarRef(l.vi()).reason() {
+            match l.var.reason {
                 AssignReason::Decision(_) => (),
                 AssignReason::BinaryLink(bil) => {
                     seen[bil.vi()] = key;

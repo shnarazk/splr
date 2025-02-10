@@ -163,7 +163,7 @@ pub trait VarSelectIF {
     /// give rewards to the vars selected by SLS
     fn reward_by_sls(assignment: &FxHashMap<VarId, bool>) -> usize;
     /// select a new decision variable.
-    fn select_decision_literal(asg: &mut AssignStack) -> Lit;
+    fn select_decision_literal(asg: &mut AssignStack) -> BSVR;
     /// update the internal heap on var order.
     fn update_order(v: VarId);
     /// rebuild the internal var_order
@@ -187,11 +187,11 @@ impl VarSelectIF for VarActivityManager {
             num_flipped
         }
     }
-    fn select_decision_literal(asg: &mut AssignStack) -> Lit {
+    fn select_decision_literal(asg: &mut AssignStack) -> BSVR {
         loop {
             let vi = VarActivityManager::get_heap_root(asg); // self.get_heap_root();
             if VarRef(vi).assign().is_none() && !VarRef(vi).is(FlagVar::ELIMINATED) {
-                return Lit::from((vi, VarRef(vi).is(FlagVar::PHASE)));
+                return BSVR::new(vi, VarRef(vi).is(FlagVar::PHASE));
             }
         }
     }

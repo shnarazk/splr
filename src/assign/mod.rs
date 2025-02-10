@@ -27,7 +27,7 @@ pub use self::trail_saving::TrailSavingIF;
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum AssignReason {
     /// Implication by binary clause
-    BinaryLink(Lit),
+    BinaryLink(BSVR),
     /// Assigned by decision
     Decision(DecisionLevel),
     /// Assigned by a non-binary clause.
