@@ -8,7 +8,7 @@ use {
 };
 
 /// A representation of 'clause'
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Debug)]
 pub struct Clause {
     /// The literals in a clause.
     pub(crate) lits: Vec<Lit>,
@@ -84,6 +84,14 @@ impl Default for Clause {
         }
     }
 }
+
+impl PartialEq for Clause {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl Eq for Clause {}
 
 impl Index<usize> for Clause {
     type Output = Lit;

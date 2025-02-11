@@ -51,6 +51,12 @@ impl Default for Var {
     }
 }
 
+impl PartialEq for Var {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
 impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
