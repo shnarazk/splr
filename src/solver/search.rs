@@ -1,8 +1,8 @@
 //! Conflict-Driven Clause Learning Search engine
 use {
     super::{
-        conflict::handle_conflict, restart::RestartIF, Certificate, Solver, SolverEvent,
-        SolverResult,
+        Certificate, Solver, SolverEvent, SolverResult, conflict::handle_conflict,
+        restart::RestartIF,
     },
     crate::{
         assign::{AssignStack, PropagateIF},
@@ -50,11 +50,7 @@ impl SolveIF for Solver {
     /// }
     ///```
     fn solve(&mut self) -> SolverResult {
-        let Solver {
-            ref mut asg,
-            ref mut cdb,
-            ref mut state,
-        } = self;
+        let Solver { asg, cdb, state } = self;
         if cdb.check_size().is_err() {
             return Err(SolverError::OutOfMemory);
         }

@@ -272,7 +272,7 @@ fn conflict_analyze(
     let root_level = asg.root_level();
     let dl = asg.decision_level();
     let mut path_cnt = 0;
-    let (mut p, mut reason) = cc;
+    let &(mut p, mut reason) = cc;
 
     macro_rules! conflict_level {
         ($vi: expr) => {
@@ -461,8 +461,7 @@ fn conflict_analyze(
     learnt[0] = !p;
     trace!(
         "appending {}, the final (but not minimized) learnt is {:?}",
-        learnt[0],
-        learnt
+        learnt[0], learnt
     );
     minimize_learnt(&mut state.new_learnt, asg, cdb)
 }

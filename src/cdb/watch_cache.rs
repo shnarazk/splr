@@ -104,6 +104,7 @@ pub struct WatchCacheIterator {
 
 impl Iterator for WatchCacheIterator {
     type Item = WatchCacheProxy;
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         // assert!(self.checksum == self.end_at - self.index);
         (self.index < self.end_at).then_some({
@@ -122,9 +123,11 @@ impl WatchCacheIterator {
             // checksum: len,
         }
     }
+    #[inline]
     pub fn restore_entry(&mut self) {
         self.index += 1;
     }
+    #[inline]
     pub fn detach_entry(&mut self) {
         // assert!(self.end_at != 0);
         self.end_at -= 1;

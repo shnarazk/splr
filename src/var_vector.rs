@@ -28,7 +28,7 @@ impl VarRef {
     pub fn instantiate(_config: &Config, cnf: &CNFDescription) {
         unsafe {
             let num_vars = cnf.num_of_variables;
-            VAR_VECTOR.clear(); // reqired for cargo test
+            VAR_VECTOR.clear(); // required for cargo test
             VAR_VECTOR.resize(num_vars + 1, Var::default());
             for (i, v) in VAR_VECTOR.iter_mut().enumerate().skip(1) {
                 v.level = i as DecisionLevel;

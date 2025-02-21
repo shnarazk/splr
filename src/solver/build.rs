@@ -216,10 +216,7 @@ impl SatSolverIF for Solver {
     }
     fn add_var(&mut self) -> VarId {
         let Solver {
-            ref mut asg,
-            ref mut cdb,
-            ref mut state,
-            ..
+            asg, cdb, state, ..
         } = self;
         VarRef::add_var();
         asg.handle(SolverEvent::NewVar);
@@ -257,11 +254,7 @@ impl SatSolverIF for Solver {
 impl Solver {
     // renamed from clause_new
     fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> RefClause {
-        let Solver {
-            ref mut asg,
-            ref mut cdb,
-            ..
-        } = self;
+        let Solver { asg, cdb, .. } = self;
         if lits.is_empty() {
             return RefClause::EmptyClause;
         }

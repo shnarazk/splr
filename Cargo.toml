@@ -3,7 +3,7 @@ name = "splr"
 version = "0.18.0-dev4"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
-edition = "2021"
+edition = "2024"
 license = "MPL-2.0"
 readme = "README.md"
 repository = "https://github.com/shnarazk/splr"
@@ -11,7 +11,7 @@ homepage = "https://github.com/shnarazk/splr"
 keywords = ["SAT", "SAT-solver", "logic", "satisfiability"]
 categories = ["science", "mathematics"]
 default-run = "splr"
-rust-version = "1.84"
+rust-version = "1.85"
 
 [dependencies]
 bitflags = "^2.8"
