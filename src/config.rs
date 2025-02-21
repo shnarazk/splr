@@ -48,9 +48,6 @@ pub struct Config {
     /// Writes a DRAT UNSAT certification file
     pub use_certification: bool,
 
-    /// Uses Glucose-like progress report
-    pub use_log: bool,
-
     //
     //## clause management
     //
@@ -85,8 +82,8 @@ pub struct Config {
     //
     /// Var Reward Decay Rate
     pub vrw_dcy_rat: f64,
-    /// Decay increment step.
-    pub vrw_dcy_stp: f64,
+    // /// Decay increment step.
+    // pub vrw_dcy_stp: f64,
 }
 
 impl Default for Config {
@@ -105,7 +102,6 @@ impl Default for Config {
             quiet_mode: false,
             show_journal: false,
             use_certification: false,
-            use_log: false,
 
             crw_dcy_rat: 0.95,
             cls_rdc_lbd: 5,
@@ -117,14 +113,14 @@ impl Default for Config {
             elm_grw_lim: 0,
             elm_var_occ: 20000,
 
-            #[cfg(feature = "EVSIDS")]
-            vrw_dcy_rat: 0.98,
-            #[cfg(feature = "LRB_rewarding")]
+            // #[cfg(feature = "EVSIDS")]
+            // vrw_dcy_rat: 0.98,
+            // #[cfg(feature = "LRB_rewarding")]
             vrw_dcy_rat: 0.96,
-            #[cfg(feature = "EVSIDS")]
-            vrw_dcy_stp: 0.0001,
-            #[cfg(feature = "LRB_rewarding")]
-            vrw_dcy_stp: 0.0,
+            // #[cfg(feature = "EVSIDS")]
+            // vrw_dcy_stp: 0.0001,
+            // #[cfg(feature = "LRB_rewarding")]
+            // vrw_dcy_stp: 0.0,
         }
     }
 }
@@ -143,9 +139,7 @@ impl Config {
         let mut iter = args.skip(1);
         while let Some(arg) = iter.next() {
             if let Some(stripped) = arg.strip_prefix("--") {
-                let flags = [
-                    "no-color", "quiet", "certify", "journal", "log", "help", "version",
-                ];
+                let flags = ["no-color", "quiet", "certify", "journal", "help", "version"];
                 let options_usize = ["cl", "crl", "stat", "ecl", "evl", "evo"];
                 let options_f64 = ["timeout", "cdr", "cr1", "cr2", "vdr", "vds"];
                 let options_path = ["dir", "proof", "result"];
@@ -159,7 +153,6 @@ impl Config {
                                 "quiet" => self.quiet_mode = true,
                                 "certify" => self.use_certification = true,
                                 "journal" => self.show_journal = true,
-                                "log" => self.use_log = true,
                                 "help" => help = true,
                                 "version" => version = true,
                                 _ => panic!("invalid flag: {name}"),
@@ -190,8 +183,7 @@ impl Config {
                                         "cr1" => self.cls_rdc_rm1 = val,
                                         "cr2" => self.cls_rdc_rm2 = val,
                                         "vdr" => self.vrw_dcy_rat = val,
-                                        "vds" => self.vrw_dcy_stp = val,
-
+                                        // "vds" => self.vrw_dcy_stp = val,
                                         _ => panic!("invalid option: {name}"),
                                     }
                                 } else {
@@ -228,7 +220,6 @@ impl Config {
                         "q" => self.quiet_mode = true,
                         "c" => self.use_certification = true,
                         "j" => self.show_journal = true,
-                        "l" => self.use_log = true,
                         "h" => help = true,
                         "V" => version = true,
                         _ => panic!("invalid flag: {name}"),
@@ -270,13 +261,11 @@ impl Config {
                 "stage-based dynamic restart threshold",
                 #[cfg(feature = "EMA_calibration")]
                 "EMA calibration",
-                #[cfg(feature = "EVSIDS")]
-                "EVSIDS rewarding",
-                #[cfg(feature = "incremental_solver")]
-                "incremental solver",
+                // #[cfg(feature = "EVSIDS")]
+                // "EVSIDS rewarding",
                 #[cfg(feature = "just_used")]
                 "use 'just used' flag",
-                #[cfg(feature = "LRB_rewarding")]
+                // #[cfg(feature = "LRB_rewarding")]
                 "Learning-Rate Based rewarding",
                 #[cfg(feature = "reason_side_rewarding")]
                 "reason-side rewarding",
@@ -335,7 +324,6 @@ FLAGS:
   -q, --quiet               Disable any progress message
   -c, --certify             Writes a DRAT UNSAT certification file
   -j, --journal             Shows log about restart stages
-  -l, --log                 Uses Glucose-like progress report
   -V, --version             Prints version information
 OPTIONS:
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
@@ -347,7 +335,7 @@ OPTIONS:
   -r, --result <io-rfile>   Result filename/stdout              {:>10}
   -t, --timeout <timeout>   CPU time limit in sec.         {:>10}
       --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
-{}ARGS:
+ARGS:
   <cnf-file>    DIMACS CNF file
 ",
         config.c_cls_lim,
@@ -379,11 +367,11 @@ OPTIONS:
         config.io_rfile.to_string_lossy(),
         config.c_timeout,
         config.vrw_dcy_rat,
-        OPTION!(
-            "EVSIDS",
-            config.vrw_dcy_stp,
-            "      --vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}\n"
-        ),
+        // OPTION!(
+        //     "EVSIDS",
+        //     config.vrw_dcy_stp,
+        //     "      --vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}\n"
+        // ),
     )
 }
 

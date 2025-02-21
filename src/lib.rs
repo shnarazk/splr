@@ -45,11 +45,6 @@ match Certificate::try_from(v).expect("panic!") {
 };
 ```
 
-## Incremental solver
-
-Splr provides 'incremental solver mode' if you built it with feature 'incremental_solver'.
-This document covers extra functions only if you built it with `cargo doc --features incremental_solver`.
-
 */
 /// Module `assign` implements Boolean Constraint Propagation and decision var selection.
 pub mod assign;
@@ -59,8 +54,6 @@ pub mod cdb;
 pub mod cnf;
 /// Module `config` provides solver's configuration and CLI.
 pub mod config;
-/// Module `primitive` provides some fundamental data structures.
-pub mod primitive;
 /// Module `processor` implements a simplifier: clause subsumption and var elimination.
 pub mod processor;
 /// Module `solver` provides the top-level API as a SAT solver.
@@ -69,12 +62,15 @@ pub mod solver;
 pub mod state;
 /// Module `types` provides various building blocks, including some common traits.
 pub mod types;
+/// Module `vam` provides variable activity manager.
+pub mod vam;
+/// Module `var_vector` provides a static mut vector of vars.
+pub mod var_vector;
 
 pub use {
     config::Config,
-    primitive::{ema::*, luby::*},
     solver::{Certificate, SatSolverIF, SolveIF, Solver, ValidateIF},
-    types::{PropertyDereference, PropertyReference, SolverError},
+    types::*,
 };
 
 /// Splr version number.

@@ -66,12 +66,12 @@ pub enum SolverEvent {
 /// The SAT solver object consisting of 6 sub modules.
 /// ```
 /// use crate::splr::*;
-/// use crate::splr::{assign::{AssignIF, VarManipulateIF}, state::{State, StateIF}, types::*};
+/// use crate::splr::{state::{State, StateIF}, types::*, var_vector::VarRef};
 /// use std::path::Path;
 ///
 /// let mut s = Solver::try_from(Path::new("cnfs/sample.cnf")).expect("can't load");
-/// assert_eq!(s.asg.derefer(assign::property::Tusize::NumVar), 250);
-/// assert_eq!(s.asg.derefer(assign::property::Tusize::NumUnassertedVar), 250);
+/// assert_eq!(VarRef::num_vars(), 250);
+/// assert_eq!(s.asg.num_unasserted_vars(), 250);
 /// if let Ok(Certificate::SAT(v)) = s.solve() {
 ///     assert_eq!(v.len(), 250);
 ///     // But don't expect `s.asg.var_stats().3 == 0` at this point.
@@ -125,77 +125,17 @@ impl<V: AsRef<[i32]>> TryFrom<Vec<V>> for Certificate {
     }
 }
 
-/// Iterator for Solver
-/// * takes `&mut Solver`
-/// * returns `Option<Vec<i32>>`
-///    * `Some(Vec<i32>)` -- satisfiable assignment
-///    * `None` -- unsatisfiable anymore
-/// * Some internal error causes panic.
-#[cfg(feature = "incremental_solver")]
-pub struct SolverIter<'a> {
-    solver: &'a mut Solver,
-    refute: Option<Vec<i32>>,
-}
-
-#[cfg(feature = "incremental_solver")]
-impl Solver {
-    /// return an iterator on Solver. **Requires 'incremental_solver' feature**
-    ///```ignore
-    ///use splr::Solver;
-    ///use std::path::Path;
-    ///
-    ///for v in Solver::try_from(Path::new("cnfs/sample.cnf")).expect("panic").iter() {
-    ///    println!(" - answer: {:?}", v);
-    ///}
-    ///```
-    pub fn iter(&mut self) -> SolverIter {
-        SolverIter {
-            solver: self,
-            refute: None,
-        }
-    }
-}
-
-#[cfg(feature = "incremental_solver")]
-impl<'a> Iterator for SolverIter<'a> {
-    type Item = Vec<i32>;
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(ref v) = self.refute {
-            debug_assert!(1 < v.len());
-            match self.solver.add_clause(v) {
-                Err(SolverError::Inconsistent) => return None,
-                Err(SolverError::EmptyClause) => return None,
-                Err(e) => panic!("s UNKNOWN: {:?} by adding {:?}", e, v),
-                Ok(_) => self.solver.reset(),
-            }
-            self.refute = None;
-        }
-        match self.solver.solve() {
-            Ok(Certificate::SAT(ans)) => {
-                let rft: Vec<i32> = ans.iter().map(|i| -i).collect::<Vec<i32>>();
-                self.refute = Some(rft);
-                Some(ans)
-            }
-            Ok(Certificate::UNSAT) => None,
-            e => panic!("s UNKNOWN: {:?}", e),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assign;
+    use crate::var_vector::VarRef;
 
     #[cfg_attr(not(feature = "no_IO"), test)]
     fn test_solver() {
         let config = Config::from("cnfs/sample.cnf");
         if let Ok(s) = Solver::build(&config) {
-            assert_eq!(s.asg.derefer(assign::property::Tusize::NumVar), 250);
-            assert_eq!(
-                s.asg.derefer(assign::property::Tusize::NumUnassertedVar),
-                250
-            );
+            assert_eq!(VarRef::num_vars(), 250);
+            assert_eq!(s.asg.num_unasserted_vars(), 250);
         } else {
             panic!("failed to build a solver for cnfs/sample.cnf");
         }
@@ -296,88 +236,5 @@ mod tests {
             vec![-3i32],
         );
         sat!(vec![&v1, &v2, &v3, &v4, &v5]); // : Vec<&[i32]>
-    }
-
-    #[cfg(feature = "incremental_solver")]
-    #[test]
-    fn test_solver_iter() {
-        let mut slv = Solver::instantiate(
-            &Config::default(),
-            &CNFDescription {
-                num_of_variables: 8,
-                ..CNFDescription::default()
-            },
-        );
-        assert_eq!(slv.iter().count(), 256);
-    }
-    #[cfg(feature = "incremental_solver")]
-    #[test]
-    fn test_add_var_on_incremental_solver() {
-        let mut slv = Solver::instantiate(
-            &Config::default(),
-            &CNFDescription {
-                num_of_variables: 4,
-                ..CNFDescription::default()
-            },
-        );
-        assert!(slv.add_clause(vec![-1, -2]).is_ok());
-        assert!(slv.add_clause(vec![-3, -4]).is_ok());
-        assert!(slv.add_assignment(-2).is_ok());
-        let a = slv.add_var() as i32;
-        assert!(slv.add_clause(vec![1, 3, 4, -a]).is_ok());
-        assert!(slv.add_clause(vec![1, -3, -4, -a]).is_ok());
-        assert!(slv.add_clause(vec![-1, 3, -4, -a]).is_ok());
-        assert!(slv.add_clause(vec![-1, -3, 4, -a]).is_ok());
-        assert!(slv.add_clause(vec![-1, -3, -4, a]).is_ok());
-        assert!(slv.add_clause(vec![-1, 3, 4, a]).is_ok());
-        assert!(slv.add_clause(vec![1, -3, 4, a]).is_ok());
-        assert!(slv.add_clause(vec![1, 3, -4, a]).is_ok());
-        let b = slv.add_var() as i32;
-        assert!(slv.add_clause(vec![1, 3, -b]).is_ok());
-        assert!(slv.add_clause(vec![1, 4, -b]).is_ok());
-        assert!(slv.add_clause(vec![3, 4, -b]).is_ok());
-        assert!(slv.add_clause(vec![-1, -3, b]).is_ok());
-        assert!(slv.add_clause(vec![-1, -4, b]).is_ok());
-        assert!(slv.add_clause(vec![-3, -4, b]).is_ok());
-        assert!(slv.add_clause(vec![-1, -b]).is_ok());
-        assert!(slv.add_clause(vec![-a, -b]).is_ok());
-        // let solns: Vec<Vec<i32>> = slv.iter().collect();
-        // Use the result of
-        // cargo run --features incremental_solver --example all-solutions -- cnfs/isseu-182.cnf
-        assert_eq!(slv.iter().count(), 4);
-    }
-    #[cfg(feature = "incremental_solver")]
-    #[test]
-    // There was an inconsistency in AssignStack::var_order.
-    fn test_add_var_and_add_assignment() {
-        let mut slv = Solver::instantiate(
-            &Config::default(),
-            &CNFDescription {
-                num_of_variables: 3 as usize,
-                ..CNFDescription::default()
-            },
-        );
-
-        slv.add_var();
-        assert!(slv.add_clause(vec![-1, 4]).is_ok());
-        slv.add_var();
-        assert!(slv.add_clause(vec![-2, 5]).is_ok());
-        slv.add_var();
-        assert!(slv.add_clause(vec![-1, -2, 6]).is_ok());
-        slv.add_var();
-        assert!(slv.add_clause(vec![-5, 7]).is_ok());
-        slv.add_var();
-        assert!(slv.add_clause(vec![-6, 8]).is_ok());
-        slv.add_var();
-        assert!(slv.add_clause(vec![-4, 9]).is_ok());
-        slv.add_var();
-        assert!(slv.add_clause(vec![-3, 10]).is_ok());
-        slv.add_var();
-        assert!(slv.add_clause(vec![-5, -3, 11]).is_ok());
-        assert!(slv.add_clause(vec![-6, -3, 11]).is_ok());
-        slv.add_var();
-        assert!(slv.add_clause(vec![-4, -3, 12]).is_ok());
-        assert!(slv.add_assignment(-11).is_ok());
-        assert!(slv.solve().is_ok());
     }
 }

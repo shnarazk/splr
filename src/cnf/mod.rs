@@ -1,10 +1,12 @@
 // pub mod cnf;
 // pub use self::cnf::*;
-use std::{
-    collections::HashSet,
-    fs::File,
-    io::{BufRead, BufReader},
-    path::Path,
+use {
+    rustc_data_structures::fx::FxHashSet,
+    std::{
+        fs::File,
+        io::{BufRead, BufReader},
+        path::Path,
+    },
 };
 
 const TOO_MANY_CLAUSES: usize = 100_000;
@@ -26,9 +28,9 @@ pub enum CNFOperationError {
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct CNF {
     num_vars: u32,
-    assign: HashSet<i32>,
+    assign: FxHashSet<i32>,
     clauses: Vec<Clause>,
-    cls_map: HashSet<Vec<i32>>,
+    cls_map: FxHashSet<Vec<i32>>,
     no_check_uniqueness: bool,
 }
 
@@ -43,7 +45,7 @@ impl std::fmt::Display for CNF {
     }
 }
 
-pub trait CnfIf: Sized {
+pub trait CnfIF: Sized {
     type Error;
     // Add a `Clause` and returns:
     // - `Some(self)`: if add it successfully
@@ -57,7 +59,7 @@ pub trait CnfIf: Sized {
     fn dump_to_string(&self) -> String;
 }
 
-impl CnfIf for CNF {
+impl CnfIF for CNF {
     type Error = CNFOperationError;
     fn add_clause<C: AsRef<Clause>>(&mut self, clause: C) -> Result<&mut CNF, Self::Error> {
         let c = clause.as_ref().clone();

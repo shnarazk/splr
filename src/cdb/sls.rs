@@ -1,7 +1,9 @@
 /// Implementation of Stochastic Local Search
 use {
-    crate::{assign::AssignIF, types::*},
-    std::collections::HashMap,
+    super::{Clause, ClauseDB, VarId},
+    crate::types::*,
+    rustc_data_structures::fx::{FxHashMap, FxHasher},
+    std::{collections::HashMap, hash::BuildHasherDefault},
 };
 
 pub trait StochasticLocalSearchIF {
@@ -11,8 +13,7 @@ pub trait StochasticLocalSearchIF {
     /// This would be a better criteria that can be used in CDCL solvers.
     fn stochastic_local_search(
         &mut self,
-        asg: &impl AssignIF,
-        start: &mut HashMap<VarId, bool>,
+        start: &mut FxHashMap<VarId, bool>,
         limit: usize,
     ) -> (usize, usize);
 }
@@ -20,18 +21,18 @@ pub trait StochasticLocalSearchIF {
 impl StochasticLocalSearchIF for ClauseDB {
     fn stochastic_local_search(
         &mut self,
-        _asg: &impl AssignIF,
-        assignment: &mut HashMap<VarId, bool>,
+        assignment: &mut FxHashMap<VarId, bool>,
         limit: usize,
     ) -> (usize, usize) {
         let mut returns: (usize, usize) = (0, 0);
-        let mut last_flip = self.num_clause;
+        let mut last_flip = self.num_clauses;
         let mut seed = 721_109;
         for step in 1..=limit {
             let mut unsat_clauses = 0;
             // let mut level: DecisionLevel = 0;
             // CONSIDER: counting only given (permanent) clauses.
-            let mut flip_target: HashMap<VarId, usize> = HashMap::new();
+            let mut flip_target: FxHashMap<VarId, usize> =
+                HashMap::<VarId, usize, BuildHasherDefault<FxHasher>>::default();
             let mut target_clause: Option<&Clause> = None;
             for c in self.clause.iter().skip(1).filter(|c| !c.is_dead()) {
                 // let mut cls_lvl: DecisionLevel = 0;
@@ -87,8 +88,8 @@ impl StochasticLocalSearchIF for ClauseDB {
 impl Clause {
     fn is_falsified(
         &self,
-        assignment: &HashMap<VarId, bool>,
-        flip_target: &mut HashMap<VarId, usize>,
+        assignment: &FxHashMap<VarId, bool>,
+        flip_target: &mut FxHashMap<VarId, usize>,
     ) -> bool {
         let mut num_sat = 0;
         let mut sat_vi = 0;

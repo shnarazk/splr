@@ -2,9 +2,11 @@
 use {
     super::{Certificate, Solver, SolverEvent, SolverResult, State, StateIF},
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
+        assign::{AssignStack, PropagateIF},
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
+        vam::*,
+        var_vector::*,
     },
 };
 
@@ -27,13 +29,12 @@ pub trait SatSolverIF: Instantiate {
     /// # Example
     ///
     /// ```
-    /// use crate::splr::*;
-    /// use crate::splr::assign::VarManipulateIF;    // for s.asg.assign()
+    /// use crate::splr::{*, var_vector::*};
     /// use std::path::Path;
     ///
     /// let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
     /// assert!(s.add_assignment(1).is_ok());
-    /// assert_eq!(s.asg.assign(1), Some(true));
+    /// assert_eq!(VarRef(1).assign(), Some(true));
     /// assert!(s.add_assignment(2).is_ok());
     /// assert!(s.add_assignment(3).is_ok());
     /// assert!(s.add_assignment(4).is_ok());
@@ -76,11 +77,11 @@ pub trait SatSolverIF: Instantiate {
     ///
     /// # Example
     /// ```
-    /// use crate::splr::*;
+    /// use crate::splr::{*, var_vector::*};
     /// use std::path::Path;
     ///
     /// let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
-    /// assert_eq!(s.asg.num_vars, 8);
+    /// assert_eq!(VarRef::num_vars(), 8);
     /// assert!(matches!(s.add_assignment(9), Err(SolverError::InvalidLiteral)));
     /// s.add_assignment(1).expect("panic");
     /// s.add_assignment(2).expect("panic");
@@ -102,8 +103,6 @@ pub trait SatSolverIF: Instantiate {
     /// * `SolverError::Inconsistent` if the CNF is conflicting.
     /// * `SolverError::InvalidLiteral` if any literal used in the CNF is out of range for var index.
     fn build(config: &Config) -> Result<Solver, SolverError>;
-    /// reinitialize a solver for incremental solving. **Requires 'incremental_solver' feature**
-    fn reset(&mut self);
     #[cfg(not(feature = "no_IO"))]
     /// dump an UNSAT certification file
     fn save_certification(&mut self);
@@ -119,6 +118,8 @@ impl Instantiate for Solver {
     /// let s = Solver::instantiate(&Config::default(), &CNFDescription::default());
     ///```
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Solver {
+        VarRef::instantiate(config, cnf);
+        VarActivityManager::instantiate(config, cnf);
         Solver {
             asg: AssignStack::instantiate(config, cnf),
             cdb: ClauseDB::instantiate(config, cnf),
@@ -176,17 +177,17 @@ impl TryFrom<&Path> for Solver {
 
 impl SatSolverIF for Solver {
     fn add_assignment(&mut self, val: i32) -> Result<&mut Solver, SolverError> {
-        if val == 0 || self.asg.num_vars < val.unsigned_abs() as usize {
+        if val == 0 || VarRef::num_vars() < val.unsigned_abs() as usize {
             return Err(SolverError::InvalidLiteral);
         }
         let lit = Lit::from(val);
         self.cdb.certificate_add_assertion(lit);
-        match self.asg.assigned(lit) {
+        match VarRef::lit_assigned(lit) {
             None => self.asg.assign_at_root_level(lit).map(|_| self),
             Some(true) => Ok(self),
             Some(false) => Err(SolverError::RootLevelConflict((
                 lit,
-                self.asg.reason(lit.vi()),
+                VarRef(lit.vi()).reason(),
             ))),
         }
     }
@@ -195,7 +196,7 @@ impl SatSolverIF for Solver {
         V: AsRef<[i32]>,
     {
         for i in vec.as_ref().iter() {
-            if *i == 0 || self.asg.num_vars < i.unsigned_abs() as usize {
+            if *i == 0 || VarRef::num_vars() < i.unsigned_abs() as usize {
                 return Err(SolverError::InvalidLiteral);
             }
         }
@@ -215,15 +216,13 @@ impl SatSolverIF for Solver {
     }
     fn add_var(&mut self) -> VarId {
         let Solver {
-            ref mut asg,
-            ref mut cdb,
-            ref mut state,
-            ..
+            asg, cdb, state, ..
         } = self;
+        VarRef::add_var();
         asg.handle(SolverEvent::NewVar);
         cdb.handle(SolverEvent::NewVar);
         state.handle(SolverEvent::NewVar);
-        asg.num_vars as VarId
+        VarRef::num_vars() as VarId
     }
     /// # Examples
     ///
@@ -238,26 +237,6 @@ impl SatSolverIF for Solver {
     fn build(config: &Config) -> Result<Solver, SolverError> {
         let CNFReader { cnf, reader } = CNFReader::try_from(Path::new(&config.cnf_file))?;
         Solver::instantiate(config, &cnf).inject(reader)
-    }
-    fn reset(&mut self) {
-        let Solver {
-            ref mut asg,
-            ref mut cdb,
-            ref mut state,
-        } = self;
-        asg.handle(SolverEvent::Reinitialize);
-        cdb.handle(SolverEvent::Reinitialize);
-        state.handle(SolverEvent::Reinitialize);
-
-        #[cfg(feature = "clause_elimination")]
-        {
-            let mut tmp = Vec::new();
-            std::mem::swap(&mut tmp, &mut cdb.eliminated_permanent);
-            while let Some(mut vec) = tmp.pop() {
-                // TODO: handle unit clauses
-                cdb.new_clause(asg, &mut vec, false);
-            }
-        }
     }
     #[cfg(not(feature = "no_IO"))]
     /// dump an UNSAT certification file
@@ -275,11 +254,7 @@ impl SatSolverIF for Solver {
 impl Solver {
     // renamed from clause_new
     fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> RefClause {
-        let Solver {
-            ref mut asg,
-            ref mut cdb,
-            ..
-        } = self;
+        let Solver { asg, cdb, .. } = self;
         if lits.is_empty() {
             return RefClause::EmptyClause;
         }
@@ -289,7 +264,7 @@ impl Solver {
         let mut l_: Option<Lit> = None; // last literal; [x, x.negate()] means tautology.
         for i in 0..lits.len() {
             let li = lits[i];
-            let sat = asg.assigned(li);
+            let sat = VarRef::lit_assigned(li);
             if sat == Some(true) || Some(!li) == l_ {
                 return RefClause::Dead;
             } else if sat != Some(false) && Some(li) != l_ {
@@ -307,7 +282,7 @@ impl Solver {
                 asg.assign_at_root_level(l0)
                     .map_or(RefClause::EmptyClause, |_| RefClause::UnitClause(l0))
             }
-            _ => cdb.new_clause(asg, lits, false),
+            _ => cdb.new_clause(lits, false),
         }
     }
     #[cfg(not(feature = "no_IO"))]
@@ -347,7 +322,7 @@ impl Solver {
                 Err(e) => panic!("{}", e),
             }
         }
-        debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
+        debug_assert_eq!(VarRef::num_vars(), self.state.target.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
         Ok(self)
     }
@@ -360,7 +335,7 @@ impl Solver {
         self.state.flush("injecting...");
         for ints in v.iter() {
             for i in ints.as_ref().iter() {
-                if *i == 0 || self.asg.num_vars < i.unsigned_abs() as usize {
+                if *i == 0 || VarRef::num_vars() < i.unsigned_abs() as usize {
                     return Err(SolverError::InvalidLiteral);
                 }
             }
@@ -376,7 +351,7 @@ impl Solver {
                 return Err(SolverError::EmptyClause);
             }
         }
-        debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
+        debug_assert_eq!(VarRef::num_vars(), self.state.target.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
         Ok(self)
     }
@@ -385,14 +360,14 @@ impl Solver {
 #[cfg(test)]
 mod tests {
     // use super::*;
-    use crate::*;
+    use crate::{var_vector::*, *};
     use std::path::Path;
 
     #[cfg(not(feature = "no_IO"))]
     #[test]
     fn test_add_var() {
         let mut s = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("can't load");
-        assert_eq!(s.asg.num_vars, 8);
+        assert_eq!(VarRef::num_vars(), 8);
         assert!(matches!(
             s.add_assignment(9),
             Err(SolverError::InvalidLiteral)
