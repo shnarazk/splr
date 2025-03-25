@@ -85,13 +85,13 @@ impl Default for Clause {
     }
 }
 
-impl PartialEq for Clause {
-    fn eq(&self, other: &Self) -> bool {
-        self == other
-    }
-}
+// impl PartialEq for Clause {
+//     fn eq(&self, other: &Self) -> bool {
+//         self == other
+//     }
+// }
 
-impl Eq for Clause {}
+// impl Eq for Clause {}
 
 impl Index<usize> for Clause {
     type Output = Lit;
