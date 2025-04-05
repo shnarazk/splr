@@ -40,7 +40,7 @@ impl TargetOpts {
     pub fn inject_from_args(&mut self) {
         let mut help = false;
         let mut version = false;
-        if let Some(ref cnf) = std::env::args().last() {
+        if let Some(ref cnf) = std::env::args().next_back() {
             let path = PathBuf::from(cnf.clone());
             if path.exists() {
                 self.problem = path;
