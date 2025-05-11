@@ -134,7 +134,7 @@ impl Config {
         let mut help = false;
         let mut version = false;
         if 1 < std::env::args().count() {
-            if let Some(ref cnf) = std::env::args().last() {
+            if let Some(ref cnf) = std::env::args().next_back() {
                 // we'll check the existence after parsing all args.
                 self.cnf_file = PathBuf::from(cnf.clone());
             }
