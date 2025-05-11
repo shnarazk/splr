@@ -397,6 +397,7 @@ mod tests {
         };
         VarRef::instantiate(&config, &cnf);
         VarActivityManager::instantiate(&config, &cnf);
+        assert_eq!(VarRef::num_vars(), 4);
         let mut asg = AssignStack::instantiate(&config, &cnf);
         // [] + 1 => [1]
         assert!(asg.assign_at_root_level(lit(1)).is_ok());

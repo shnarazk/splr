@@ -339,6 +339,8 @@ mod tests {
             ref mut state,
             ..
         } = Solver::try_from(Path::new("cnfs/uf8.cnf")).expect("failed to load");
+        VarRef::instantiate(&state.config, &state.cnf);
+        assert_eq!(VarRef::num_vars(), 8);
         if !state.config.enable_eliminator {
             return;
         }
