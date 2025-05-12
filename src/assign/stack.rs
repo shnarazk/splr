@@ -501,7 +501,7 @@ impl VarManipulateIF for AssignStack {
             self.var.get_unchecked(vi).assign
         }
         #[cfg(not(feature = "unsafe_access"))]
-        self.assign[vi]
+        self.var[vi].assign
     }
     #[inline]
     fn level(&self, vi: VarId) -> DecisionLevel {
@@ -510,7 +510,7 @@ impl VarManipulateIF for AssignStack {
             self.var.get_unchecked(vi).level
         }
         #[cfg(not(feature = "unsafe_access"))]
-        self.level[vi]
+        self.var[vi].level
     }
     #[inline]
     fn reason(&self, vi: VarId) -> AssignReason {
@@ -519,7 +519,7 @@ impl VarManipulateIF for AssignStack {
             self.var.get_unchecked(vi).reason
         }
         #[cfg(not(feature = "unsafe_access"))]
-        self.reason[vi]
+        self.var[vi].reason
     }
     #[inline]
     fn var(&self, vi: VarId) -> &Var {
@@ -574,21 +574,21 @@ impl VarManipulateIF for AssignStack {
 
             #[cfg(feature = "trace_elimination")]
             {
-                let lv = self.level[vi];
-                if self.root_level == self.level[vi] && self.assign[vi].is_some() {
+                let lv = self.var[vi].level;
+                if self.root_level == self.var[vi].level && self.var[vi].assign.is_some() {
                     panic!("v:{}, dl:{}", self.var[vi], self.decision_level());
                 }
-                if !(self.root_level < self.level[vi] || self.assign[vi].is_none()) {
+                if !(self.root_level < self.var[vi].level || self.var[vi].assign.is_none()) {
                     panic!(
                         "v:{}, lvl:{} => {}, dl:{}, assign:{:?} ",
                         self.var[vi],
                         lv,
-                        self.level[vi],
+                        self.var[vi].level,
                         self.decision_level(),
-                        self.assign[vi],
+                        self.var[vi].assign,
                     );
                 }
-                debug_assert!(self.root_level < self.level[vi] || self.assign[vi].is_none());
+                debug_assert!(self.root_level < self.var[vi].level || self.var[vi].assign.is_none());
             }
         } else {
             #[cfg(feature = "boundary_check")]

@@ -55,17 +55,17 @@ pub fn handle_conflict(
 
         if chronobt
             && state.config.c_cbt_thr < conflicting_level
-            && 1 == c.iter().filter(|l| level[l.vi()] == max_level).count()
+            && 1 == c.iter().filter(|l| asg.level(l.vi()) == max_level).count()
         {
             if let Some(second_level) = c
                 .iter()
-                .map(|l| level[l.vi()])
+                .map(|l| asg.level(l.vi()))
                 .filter(|l| *l < max_level)
                 .max()
             {
                 debug_assert!(0 < second_level);
                 asg.cancel_until(second_level);
-                return Ok(());
+                return Ok(c.rank);
             }
         }
         if max_level < conflicting_level {

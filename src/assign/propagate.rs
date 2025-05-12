@@ -233,7 +233,7 @@ impl PropagateIF for AssignStack {
             #[cfg(feature = "debug_propagation")]
             debug_assert!(self.q_head <= i || self.var[vi].is(Flag::PROPAGATED),
                     "unpropagated assigned level-{} var {:?},{:?} (loc:{} in trail{:?}) found, staying at level {}",
-                    self.level[vi],
+                    self.var[vi].level,
                     self.var[vi],
                     self.reason[vi],
                     i,
@@ -242,7 +242,7 @@ impl PropagateIF for AssignStack {
             );
 
             #[cfg(feature = "chrono_BT")]
-            if self.level[vi] <= lv {
+            if self.var[vi].level <= lv {
                 unpropagated.push(l);
                 continue;
             }
@@ -427,7 +427,7 @@ impl PropagateIF for AssignStack {
                             blocker,
                             minimized_reason!(propagating),
                             #[cfg(feature = "chrono_BT")]
-                            self.level[propagating.vi()],
+                            self.var[propagating.vi()].level,
                         );
                     }
                 }
@@ -536,7 +536,7 @@ impl PropagateIF for AssignStack {
                 let dl = cdb[cid]
                     .iter()
                     .skip(1)
-                    .map(|l| self.level[l.vi()])
+                    .map(|l| self.var[l.vi()].level)
                     .max()
                     .unwrap_or(self.root_level);
 
@@ -624,7 +624,7 @@ impl PropagateIF for AssignStack {
                             blocker,
                             AssignReason::BinaryLink(propagating),
                             #[cfg(feature = "chrono_BT")]
-                            self.level[false_lit.vi()],
+                            self.var[false_lit.vi()].level,
                         );
                     }
                 }
@@ -720,7 +720,7 @@ impl PropagateIF for AssignStack {
                 let dl = cdb[cid]
                     .iter()
                     .skip(1)
-                    .map(|l| self.level[l.vi()])
+                    .map(|l| self.var[l.vi()].level)
                     .max()
                     .unwrap_or(self.root_level);
                 debug_assert_eq!(cdb[cid].lit0(), cached);
