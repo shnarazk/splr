@@ -423,6 +423,7 @@ impl PropagateIF for AssignStack {
                     }
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
+                        debug_assert_eq!(dl, self.var[blocker.vi()].level);
                         self.assign_by_implication(
                             blocker,
                             minimized_reason!(propagating),
