@@ -47,11 +47,12 @@ pub fn handle_conflict(
     let chronobt: bool = false;
 
     #[cfg(feature = "chrono_BT")]
-    {
-        let c = match cc.1 {
-            AssignReason::Implication(cid) => &cdb[cid],
-            _ => panic!(),
-        };
+    if let AssignReason::Implication(cid) = cc.1 {
+        // let c = match cc.1 {
+        //     AssignReason::Implication(cid) => &cdb[cid],
+        //     _ => panic!(),
+        // };
+        let c = &cdb[cid];
         let max_level = c.iter().map(|l| asg.level(l.vi())).max().unwrap();
 
         if chronobt
