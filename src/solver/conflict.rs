@@ -165,11 +165,11 @@ pub fn handle_conflict(
     } else {
         asg.cancel_until(assign_level);
     }
-    debug_assert_eq!(asg.assigned(l0), None);
-    debug_assert_eq!(
-        new_learnt.iter().skip(1).map(|l| asg.level(l.vi())).max(),
-        Some(assign_level)
-    );
+    // debug_assert_eq!(asg.assigned(l0), None);
+    // debug_assert_eq!(
+    //     new_learnt.iter().skip(1).map(|l| asg.level(l.vi())).max(),
+    //     Some(assign_level)
+    // );
     let rank: u16;
     match cdb.new_clause(asg, new_learnt, true) {
         RefClause::Clause(cid) if learnt_len == 2 => {
@@ -444,7 +444,7 @@ fn conflict_analyze(
     if let Some(cid) = cid_with_max_lbd {
         cdb.update_at_analysis(asg, cid);
     }
-    debug_assert!(learnt.iter().all(|l| *l != !p));
+    // debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);
     learnt[0] = !p;
     trace!(

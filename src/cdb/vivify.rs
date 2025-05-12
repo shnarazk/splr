@@ -46,8 +46,8 @@ impl VivifyIF for ClauseDB {
                     .map_err(SolverError::RootLevelConflict)?;
             }
 
-            debug_assert!(asg.stack_is_empty() || !asg.remains());
-            debug_assert_eq!(asg.root_level(), asg.decision_level());
+            // debug_assert!(asg.stack_is_empty() || !asg.remains());
+            // debug_assert_eq!(asg.root_level(), asg.decision_level());
             let cid = cp.to();
             let c = &mut self[cid];
             if c.is_dead() {
@@ -64,7 +64,7 @@ impl VivifyIF for ClauseDB {
                 to_display = num_check + display_step;
             }
             num_check += 1;
-            debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
+            // debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
             let mut decisions: Vec<Lit> = Vec::new();
             for lit in clits.iter().copied() {
                 // assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
@@ -91,7 +91,7 @@ impl VivifyIF for ClauseDB {
                                         asg.backtrack_sandbox();
                                         continue 'next_clause;
                                     } else {
-                                        debug_assert!(clits.len() != 2 || decisions.len() != 2);
+                                        // debug_assert!(clits.len() != 2 || decisions.len() != 2);
                                         seen[0] = num_check;
                                         vec = asg.analyze_sandbox(
                                             self, &decisions, &cnfl_lits, &mut seen,

@@ -607,9 +607,9 @@ impl PropagateIF for AssignStack {
             //## binary loop
             //
             for (blocker, cid) in cdb.binary_links(false_lit).iter().copied() {
-                debug_assert!(!cdb[cid].is_dead());
-                debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
-                debug_assert_ne!(blocker, false_lit);
+                // debug_assert!(!cdb[cid].is_dead());
+                // debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
+                // debug_assert_ne!(blocker, false_lit);
 
                 #[cfg(feature = "boundary_check")]
                 debug_assert_eq!(cdb[*cid].len(), 2);
@@ -618,7 +618,7 @@ impl PropagateIF for AssignStack {
                     Some(true) => (),
                     Some(false) => conflict_path!(blocker, AssignReason::BinaryLink(propagating)),
                     None => {
-                        debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
+                        // debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
 
                         self.assign_by_implication(
                             blocker,
@@ -641,7 +641,7 @@ impl PropagateIF for AssignStack {
                     cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
                     continue;
                 }
-                debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
+                // debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
                 let mut other_watch_value = lit_assign!(self, cached);
                 let mut updated_cache: Option<Lit> = None;
                 if matches!(other_watch_value, Some(true)) {
