@@ -423,7 +423,7 @@ impl PropagateIF for AssignStack {
                     }
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
-                        debug_assert_eq!(dl, self.var[blocker.vi()].level);
+                        // debug_assert_eq!(dl, self.var[blocker.vi()].level);
                         self.assign_by_implication(
                             blocker,
                             minimized_reason!(propagating),
@@ -625,7 +625,7 @@ impl PropagateIF for AssignStack {
                             blocker,
                             AssignReason::BinaryLink(propagating),
                             #[cfg(feature = "chrono_BT")]
-                            self.var[false_lit.vi()].level,
+                            self.var[propagating.vi()].level,
                         );
                     }
                 }

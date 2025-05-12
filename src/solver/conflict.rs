@@ -344,7 +344,11 @@ fn conflict_analyze(
                 let vi = l.vi();
                 if !asg.var(vi).is(FlagVar::CA_SEEN) {
                     validate_vi!(vi);
-                    debug_assert_eq!(asg.level(vi), dl, "strange level binary clause");
+                    debug_assert_eq!(
+                        asg.level(vi),
+                        dl,
+                        "strange level binary clause at conflict level {dl}"
+                    );
                     // if root_level == asg.level(vi) { continue; }
                     set_seen!(vi);
                     trace_lit!(l, " - binary linked");
