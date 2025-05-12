@@ -41,7 +41,8 @@ pub fn handle_conflict(
 
     // If we can settle this conflict w/o restart, solver will get a big progress.
     #[cfg(feature = "chrono_BT")]
-    let chronobt = 1000 < asg.num_conflict && 0 < state.config.c_cbt_thr;
+    // let chronobt = 1000 < asg.num_conflict && 0 < state.config.c_cbt_thr;
+    let chronobt = true;
     #[cfg(not(feature = "chrono_BT"))]
     let chronobt: bool = false;
 

@@ -92,7 +92,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            c_cbt_thr: 100,
+            c_cbt_thr: 4, // 100,
             c_cls_lim: 0,
             c_timeout: 5000.0,
 
