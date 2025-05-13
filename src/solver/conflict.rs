@@ -47,32 +47,42 @@ pub fn handle_conflict(
     let chronobt: bool = false;
 
     #[cfg(feature = "chrono_BT")]
-    if let AssignReason::Implication(cid) = cc.1 {
-        // let c = match cc.1 {
-        //     AssignReason::Implication(cid) => &cdb[cid],
-        //     _ => panic!(),
-        // };
-        let c = &cdb[cid];
-        let max_level = c.iter().map(|l| asg.level(l.vi())).max().unwrap();
+    match cc.1 {
+        AssignReason::BinaryLink(l) => {
+            conflicting_level = asg.var(cc.0.vi()).level;
+            assert_eq!(conflicting_level, asg.var(l.vi()).level);
+            asg.cancel_until(conflicting_level);
+        }
+        AssignReason::Implication(cid) => {
+            // let c = match cc.1 {
+            //     AssignReason::Implication(cid) => &cdb[cid],
+            //     _ => panic!(),
+            // };
+            let c = &cdb[cid];
+            let max_level = c.iter().map(|l| asg.level(l.vi())).max().unwrap();
 
-        if chronobt
-            && state.config.c_cbt_thr < conflicting_level
-            && 1 == c.iter().filter(|l| asg.level(l.vi()) == max_level).count()
-        {
-            if let Some(second_level) = c
-                .iter()
-                .map(|l| asg.level(l.vi()))
-                .filter(|l| *l < max_level)
-                .max()
+            if chronobt
+                && state.config.c_cbt_thr < conflicting_level
+                && 1 == c.iter().filter(|l| asg.level(l.vi()) == max_level).count()
             {
-                debug_assert!(0 < second_level);
-                asg.cancel_until(second_level);
-                return Ok(c.rank);
+                if let Some(second_level) = c
+                    .iter()
+                    .map(|l| asg.level(l.vi()))
+                    .filter(|l| *l < max_level)
+                    .max()
+                {
+                    debug_assert!(0 < second_level);
+                    asg.cancel_until(second_level);
+                    return Ok(c.rank);
+                }
+            }
+            if max_level < conflicting_level {
+                conflicting_level = max_level;
+                asg.cancel_until(conflicting_level);
             }
         }
-        if max_level < conflicting_level {
-            conflicting_level = max_level;
-            asg.cancel_until(conflicting_level);
+        _ => {
+            panic!();
         }
     }
     assert_eq!(conflicting_level, asg.decision_level());
@@ -162,12 +172,14 @@ pub fn handle_conflict(
             AssignReason::None => unreachable!("handle_conflict"),
         }
     }
-    if chronobt && assign_level + state.config.c_cbt_thr <= conflicting_level {
+    let chbt: bool = if chronobt && assign_level + state.config.c_cbt_thr <= conflicting_level {
         // FIXME: assign_level と違う。いいのか？
         asg.cancel_until(conflicting_level - 1);
+        true
     } else {
         asg.cancel_until(assign_level);
-    }
+        false
+    };
     // debug_assert_eq!(asg.assigned(l0), None);
     // debug_assert_eq!(
     //     new_learnt.iter().skip(1).map(|l| asg.level(l.vi())).max(),
@@ -198,7 +210,15 @@ pub fn handle_conflict(
             cdb[cid].set_birth(asg.num_conflict);
 
             debug_assert_eq!(cdb[cid].lit0(), l0);
-            debug_assert_eq!(asg.assigned(l0), None);
+            debug_assert!(
+                chbt || asg.assigned(l0) == None,
+                "[L209] asg.assigned(l0): {:?} != None, l0:{l0}, {:?}",
+                asg.assigned(l0),
+                cdb[cid]
+                    .iter()
+                    .map(|l| (l, asg.var(l.vi())))
+                    .collect::<Vec<_>>()
+            );
             asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
             // || check_graph(asg, cdb, l0, "clause");
             rank = cdb[cid].rank;
