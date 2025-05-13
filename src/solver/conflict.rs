@@ -75,7 +75,7 @@ pub fn handle_conflict(
             asg.cancel_until(conflicting_level);
         }
     }
-
+    assert_eq!(conflicting_level, asg.decision_level());
     asg.handle(SolverEvent::Conflict);
 
     state.derive20.clear();
@@ -249,6 +249,11 @@ fn conflict_analyze(
     let dl = asg.decision_level();
     let mut path_cnt = 0;
     let (mut p, mut reason) = cc;
+    assert_eq!(
+        dl,
+        asg.var(p.vi()).level,
+        "conflict occured at a lower level than current dl"
+    );
 
     macro_rules! conflict_level {
         ($vi: expr) => {
@@ -333,7 +338,8 @@ fn conflict_analyze(
                     debug_assert_eq!(
                         asg.level(vi),
                         dl,
-                        "strange level binary clause at conflict level {dl}"
+                        "unblanced bi-clause at conflict level {dl}, source:{}",
+                        asg.var(p.vi()).level
                     );
                     // if root_level == asg.level(vi) { continue; }
                     set_seen!(vi);

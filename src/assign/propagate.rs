@@ -142,7 +142,11 @@ impl PropagateIF for AssignStack {
         let vi = l.vi();
         debug_assert!(!self.var[vi].is(FlagVar::ELIMINATED));
         debug_assert!(
-            var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
+            var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none(),
+            "wrong assignmentto {:?}: {:?} by {:?} ",
+            l,
+            self.var[vi].assign,
+            reason
         );
         debug_assert_eq!(self.var[vi].assign, None);
         debug_assert_eq!(self.var[vi].reason, AssignReason::None);
