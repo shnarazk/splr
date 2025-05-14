@@ -49,9 +49,9 @@ pub fn handle_conflict(
     #[cfg(feature = "chrono_BT")]
     match cc.1 {
         AssignReason::BinaryLink(l) => {
-            conflicting_level = asg.var(cc.0.vi()).level;
-            assert_eq!(conflicting_level, asg.var(l.vi()).level);
-            asg.cancel_until(conflicting_level);
+            assert_eq!(asg.var(cc.0.vi()).level, asg.var(l.vi()).level);
+            // conflicting_level = asg.var(cc.0.vi()).level;
+            // asg.cancel_until(conflicting_level);
         }
         AssignReason::Implication(cid) => {
             // let c = match cc.1 {
@@ -387,9 +387,8 @@ fn conflict_analyze(
                     let vi = q.vi();
                     if asg.var(vi).assign.is_none() {
                         println!(
-                            "cc: {:?}, cc.0: {:?}, level: {:?}",
+                            "Implication clause contains non-assinged lit (cc: {:?}, at level: {:?})",
                             cc,
-                            cc.0,
                             asg.var(cc.0.vi()).level
                         );
                         println!("p: {:?}, level: {:?}", p, asg.var(p.vi()).level);
@@ -399,18 +398,13 @@ fn conflict_analyze(
                             cid,
                             cdb[cid]
                                 .iter()
+                                .filter(|l| asg.var(l.vi()).assign.is_none())
                                 .map(|l| (l, asg.var(l.vi()).assign, asg.var(l.vi()).level))
                                 .collect::<Vec<_>>()
                         );
                         panic!();
                     }
-                    validate_vi!(
-                        vi,
-                        cdb[cid]
-                            .iter()
-                            .map(|l| asg.var(l.vi()).level)
-                            .collect::<Vec<_>>()
-                    );
+                    validate_vi!(vi);
                     if !asg.var(vi).is(FlagVar::CA_SEEN) {
                         let lvl = asg.level(vi);
                         if root_level == lvl {
