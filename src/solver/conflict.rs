@@ -73,18 +73,17 @@ pub fn handle_conflict(
                 {
                     debug_assert!(0 < second_level);
                     asg.cancel_until(second_level);
+                    println!("CB:: cc: {:?}, at level {}", cc, conflicting_level);
                     return Ok(c.rank);
                 }
-            }
-            if max_level < conflicting_level {
-                conflicting_level = max_level;
-                asg.cancel_until(conflicting_level);
             }
         }
         _ => {
             panic!();
         }
     }
+    conflicting_level = asg.var(cc.0.vi()).level;
+    asg.cancel_until(conflicting_level);
     assert_eq!(conflicting_level, asg.decision_level());
     asg.handle(SolverEvent::Conflict);
 
@@ -272,7 +271,8 @@ fn conflict_analyze(
     assert_eq!(
         dl,
         asg.var(p.vi()).level,
-        "conflict occured at a lower level than current dl"
+        "conflict: {:?} occured at a lower level than current dl",
+        cc
     );
 
     macro_rules! conflict_level {
@@ -385,7 +385,32 @@ fn conflict_analyze(
                 }
                 for q in cdb[cid].iter().skip(1) {
                     let vi = q.vi();
-                    validate_vi!(vi);
+                    if asg.var(vi).assign.is_none() {
+                        println!(
+                            "cc: {:?}, cc.0: {:?}, level: {:?}",
+                            cc,
+                            cc.0,
+                            asg.var(cc.0.vi()).level
+                        );
+                        println!("p: {:?}, level: {:?}", p, asg.var(p.vi()).level);
+                        println!("dl: {}", asg.decision_level());
+                        println!(
+                            "c{:?}: {:?}",
+                            cid,
+                            cdb[cid]
+                                .iter()
+                                .map(|l| (l, asg.var(l.vi()).assign, asg.var(l.vi()).level))
+                                .collect::<Vec<_>>()
+                        );
+                        panic!();
+                    }
+                    validate_vi!(
+                        vi,
+                        cdb[cid]
+                            .iter()
+                            .map(|l| asg.var(l.vi()).level)
+                            .collect::<Vec<_>>()
+                    );
                     if !asg.var(vi).is(FlagVar::CA_SEEN) {
                         let lvl = asg.level(vi);
                         if root_level == lvl {

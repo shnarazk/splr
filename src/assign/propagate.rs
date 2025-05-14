@@ -534,6 +534,7 @@ impl PropagateIF for AssignStack {
                     cached,
                     AssignReason::Implication(cid),
                     if cfg!(feature = "chrono_BT") {
+                        debug_assert!(self.var[cdb[cid].lit0().vi()].assign.is_none());
                         cdb[cid]
                             .iter()
                             .skip(1)
