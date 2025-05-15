@@ -54,7 +54,7 @@ pub struct Config {
     //
     //## clause management
     //
-    // clause reward dacay rate
+    // clause reward decay rate
     pub crw_dcy_rat: f64,
     // clause reduction LBD threshold for mode 2: exploration
     pub cls_rdc_lbd: u16,
