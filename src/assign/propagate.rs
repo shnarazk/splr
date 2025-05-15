@@ -603,7 +603,7 @@ impl PropagateIF for AssignStack {
             //
             //## binary loop
             //
-            for (blocker, cid) in cdb.binary_links(false_lit).iter().copied() {
+            for (blocker, _) in cdb.binary_links(false_lit).iter().copied() {
                 // debug_assert!(!cdb[cid].is_dead());
                 // debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
                 // debug_assert_ne!(blocker, false_lit);
