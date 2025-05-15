@@ -23,8 +23,11 @@ pub fn handle_conflict(
     state: &mut State,
     cc: &ConflictContext,
 ) -> Result<u16, SolverError> {
+    // `conflicting_level` should be calculated from cc.1 instead of cc.0.
+    // Because the conflicting_literal has two valuels assinged at different levels.
+    // We need larger one.
     #[cfg(feature = "chrono_BT")]
-    let mut conflicting_level = asg.decision_level();
+    let conflicting_level; // for now
     #[cfg(not(feature = "chrono_BT"))]
     let conflicting_level = asg.decision_level();
 
@@ -50,7 +53,7 @@ pub fn handle_conflict(
     match cc.1 {
         AssignReason::BinaryLink(l) => {
             assert_eq!(asg.var(cc.0.vi()).level, asg.var(l.vi()).level);
-            // conflicting_level = asg.var(cc.0.vi()).level;
+            conflicting_level = asg.var(l.vi()).level;
             // asg.cancel_until(conflicting_level);
         }
         AssignReason::Implication(cid) => {
@@ -59,16 +62,18 @@ pub fn handle_conflict(
             //     _ => panic!(),
             // };
             let c = &cdb[cid];
-            let max_level = c.iter().map(|l| asg.level(l.vi())).max().unwrap();
-
+            conflicting_level = c.iter().map(|l| asg.level(l.vi())).max().unwrap();
             if chronobt
                 && state.config.c_cbt_thr < conflicting_level
-                && 1 == c.iter().filter(|l| asg.level(l.vi()) == max_level).count()
+                && 1 == c
+                    .iter()
+                    .filter(|l| asg.level(l.vi()) == conflicting_level)
+                    .count()
             {
                 if let Some(second_level) = c
                     .iter()
                     .map(|l| asg.level(l.vi()))
-                    .filter(|l| *l < max_level)
+                    .filter(|l| *l < conflicting_level)
                     .max()
                 {
                     debug_assert!(0 < second_level);
@@ -82,7 +87,6 @@ pub fn handle_conflict(
             panic!();
         }
     }
-    conflicting_level = asg.var(cc.0.vi()).level;
     asg.cancel_until(conflicting_level);
     assert_eq!(conflicting_level, asg.decision_level());
     asg.handle(SolverEvent::Conflict);
@@ -265,16 +269,17 @@ fn conflict_analyze(
     learnt.clear();
     learnt.push(Lit::from(u32::MAX));
     let root_level = asg.root_level();
+    // assert_eq!(asg.decision_level(), asg.var(cc.0.vi()).level);
     let dl = asg.decision_level();
     let mut path_cnt = 0;
     let (mut p, mut reason) = cc;
-    assert_eq!(
-        dl,
-        asg.var(p.vi()).level,
-        "conflict: {:?} occured at a lower level than current dl",
-        cc
-    );
-
+    // assert_eq!(
+    //     dl,
+    //     asg.var(p.vi()).level,
+    //     "conflict: {:?} occured at a lower level than current dl",
+    //     cc
+    // );
+    /// trace and reward the var
     macro_rules! conflict_level {
         ($vi: expr) => {
             path_cnt += 1;
@@ -288,6 +293,7 @@ fn conflict_analyze(
             println!($($arg),*);
         };
     }
+    /// a logging facility
     macro_rules! trace_lit {
         ($lit: expr, $message: expr) => {
             #[cfg(feature = "trace_analysis")]
@@ -298,7 +304,7 @@ fn conflict_analyze(
             }
         };
     }
-
+    /// vi must be assinged at the current or lower decision level
     macro_rules! validate_vi {
         ($vi: expr) => {
             debug_assert!(!asg.var($vi).is(FlagVar::ELIMINATED));
@@ -398,8 +404,8 @@ fn conflict_analyze(
                             cid,
                             cdb[cid]
                                 .iter()
-                                .filter(|l| asg.var(l.vi()).assign.is_none())
-                                .map(|l| (l, asg.var(l.vi()).assign, asg.var(l.vi()).level))
+                                // .filter(|l| asg.var(l.vi()).assign.is_none())
+                                .map(|l| (l, asg.var(l.vi()).level))
                                 .collect::<Vec<_>>()
                         );
                         panic!();
