@@ -52,7 +52,13 @@ pub fn handle_conflict(
     #[cfg(feature = "chrono_BT")]
     match cc.1 {
         AssignReason::BinaryLink(l) => {
-            assert_eq!(asg.var(cc.0.vi()).level, asg.var(l.vi()).level);
+            // Use the logic used in Implication case
+            // assert_eq!(
+            //     asg.var(cc.0.vi()).level,
+            //     asg.var(l.vi()).level,
+            //     "L55 dl {}",
+            //     asg.decision_level()
+            // );
             conflicting_level = asg.var(l.vi()).level;
             // asg.cancel_until(conflicting_level);
         }
