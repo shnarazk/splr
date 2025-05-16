@@ -220,7 +220,7 @@ pub fn handle_conflict(
 
             debug_assert_eq!(cdb[cid].lit0(), l0);
             debug_assert!(
-                chbt || asg.assigned(l0) == None,
+                chbt || asg.assigned(l0).is_none(),
                 "[L209] asg.assigned(l0): {:?} != None, l0:{l0}, {:?}",
                 asg.assigned(l0),
                 cdb[cid]
