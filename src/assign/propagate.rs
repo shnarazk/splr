@@ -410,15 +410,29 @@ impl PropagateIF for AssignStack {
                     Some(true) => (),
                     Some(false) => {
                         check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, blocker));
+                        if [100].contains(&blocker.vi()) && [98, 100].contains(&false_lit.vi()) {
+                            println!(
+                                "{RED}{:?} at {} conflicts with bin{}({})! (dl {}, propagation lv {}) {RESET}",
+                                blocker,
+                                self.var[blocker.vi()].level,
+                                cid,
+                                propagating,
+                                self.decision_level(),
+                                self.var[propagating.vi()].level,
+                            );
+                            println!("cdb[{:?}]: {:?}", cid, cdb[cid]);
+                        }
                         conflict_path!(blocker, minimized_reason!(propagating));
                     }
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
                         // debug_assert_eq!(dl, self.var[blocker.vi()].level);
-                        if [43, 16, 78].contains(&blocker.vi()) {
+                        if [98, 100].contains(&blocker.vi()) && [98, 100].contains(&false_lit.vi())
+                        {
                             println!(
-                                "{:?} Bound! dlevel {}, vlevel {}, bin {:?}",
+                                "{:?} Bound from {:?}! dlevel {}, vlevel {}, bin {:?}",
                                 blocker,
+                                propagating,
                                 self.decision_level(),
                                 self.var[propagating.vi()].level,
                                 propagating,
@@ -533,7 +547,7 @@ impl PropagateIF for AssignStack {
                 cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
                 if other_watch_value == Some(false) {
                     check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, cached));
-                    if [43, 16, 78].contains(&cached.vi()) {
+                    if [100].contains(&cached.vi()) {
                         println!(
                             "{:?} conflict! (dlevel {}) vlevel {}, cid {:?}\n{:?}",
                             cached,
@@ -562,10 +576,11 @@ impl PropagateIF for AssignStack {
                 debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
-                if [43, 16, 78].contains(&cached.vi()) {
+                if [98, 100].contains(&cached.vi()) {
                     println!(
-                        "{:?} Bound! (dlevel {}) vlevel {}, cid {:?}\n{:?}",
+                        "{:?} Bound from {:?}! (dlevel {}) vlevel {}, cid {:?}\n{:?}",
                         cached,
+                        propagating,
                         self.decision_level(),
                         cdb[cid]
                             .iter()

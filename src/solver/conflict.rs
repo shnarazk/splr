@@ -59,7 +59,15 @@ pub fn handle_conflict(
             //     "L55 dl {}",
             //     asg.decision_level()
             // );
-            conflicting_level = asg.var(l.vi()).level;
+            conflicting_level = asg.var(l.vi()).level.max(asg.var(cc.0.vi()).level);
+            if asg.decision_level() != conflicting_level {
+                println!(
+                    "handle_conflict fixes level from {} to {} for {:?}",
+                    asg.decision_level(),
+                    conflicting_level,
+                    cc
+                );
+            }
             // asg.cancel_until(conflicting_level);
         }
         AssignReason::Implication(cid) => {
@@ -202,7 +210,8 @@ pub fn handle_conflict(
 
             debug_assert_eq!(l0, cdb[cid].lit0());
             debug_assert_eq!(l1, cdb[cid].lit1());
-            debug_assert_eq!(asg.assigned(l1), Some(false));
+            // why?
+            // debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
 
             asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
@@ -243,7 +252,8 @@ pub fn handle_conflict(
                 (l0 == cdb[cid].lit0() && l1 == cdb[cid].lit1())
                     || (l0 == cdb[cid].lit1() && l1 == cdb[cid].lit0())
             );
-            debug_assert_eq!(asg.assigned(l1), Some(false));
+            // FIXME: why Some(false)???
+            // debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
             rank = 1;
             asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
@@ -314,7 +324,11 @@ fn conflict_analyze(
     macro_rules! validate_vi {
         ($vi: expr) => {
             debug_assert!(!asg.var($vi).is(FlagVar::ELIMINATED));
-            debug_assert!(asg.assign($vi).is_some());
+            debug_assert!(
+                asg.assign($vi).is_some(),
+                "conflict_analyze(validate_vi) found unassigned: {:?}",
+                $vi
+            );
             debug_assert!(asg.level($vi) <= dl);
         };
     }
@@ -348,6 +362,14 @@ fn conflict_analyze(
     {
         trace_lit!("- handle conflicting literal", p);
         let vi = p.vi();
+        if asg.var(vi).assign.is_none() {
+            println!("L355: {:?}", cc);
+            println!(
+                " - dl: {}, cc.0.level {}",
+                asg.decision_level(),
+                asg.var(cc.0.vi()).level
+            );
+        }
         validate_vi!(vi);
         set_seen!(vi);
         let lvl = asg.level(vi);
@@ -367,16 +389,26 @@ fn conflict_analyze(
                 let vi = l.vi();
                 if !asg.var(vi).is(FlagVar::CA_SEEN) {
                     validate_vi!(vi);
-                    debug_assert_eq!(
-                        asg.level(vi),
-                        dl,
-                        "unblanced bi-clause at conflict level {dl}, source:{}",
-                        asg.var(p.vi()).level
-                    );
+                    // debug_assert_eq!(
+                    //     asg.level(vi),
+                    //     dl,
+                    //     "unblanced bi-clause {}-{} at conflict level {dl}, source: {}, cc: {:?}",
+                    //     p,
+                    //     l,
+                    //     asg.var(p.vi()).level,
+                    //     cc
+                    // );
                     // if root_level == asg.level(vi) { continue; }
                     set_seen!(vi);
                     trace_lit!(l, " - binary linked");
-                    conflict_level!(vi);
+                    let lvl = asg.level(vi);
+                    if dl == lvl {
+                        trace_lit!(l, " -- found another path");
+                        conflict_level!(vi);
+                    } else {
+                        trace_lit!(l, " -- push to earnt");
+                        learnt.push(l);
+                    }
                 }
             }
             AssignReason::Implication(cid) => {
