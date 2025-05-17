@@ -407,7 +407,10 @@ fn conflict_analyze(
                         conflict_level!(vi);
                     } else {
                         trace_lit!(l, " -- push to earnt");
-                        learnt.push(l);
+                        // This path is created for chrono-BT.
+                        // So we must consider if `l` should be pushed or `!l`.
+                        // From debug log, it seems to be `!l`.
+                        learnt.push(!l);
                     }
                 }
             }
