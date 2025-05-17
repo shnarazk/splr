@@ -61,12 +61,12 @@ pub fn handle_conflict(
             // );
             conflicting_level = asg.var(l.vi()).level.max(asg.var(cc.0.vi()).level);
             if asg.decision_level() != conflicting_level {
-                println!(
-                    "handle_conflict fixes level from {} to {} for {:?}",
-                    asg.decision_level(),
-                    conflicting_level,
-                    cc
-                );
+                // println!(
+                //     "handle_conflict fixes level from {} to {} for {:?}",
+                //     asg.decision_level(),
+                //     conflicting_level,
+                //     cc
+                // );
             }
             // asg.cancel_until(conflicting_level);
         }
@@ -92,7 +92,7 @@ pub fn handle_conflict(
                 {
                     debug_assert!(0 < second_level);
                     asg.cancel_until(second_level);
-                    println!("CB:: cc: {:?}, at level {}", cc, conflicting_level);
+                    // println!("CB:: cc: {:?}, at level {}", cc, conflicting_level);
                     return Ok(c.rank);
                 }
             }
@@ -253,6 +253,15 @@ pub fn handle_conflict(
                     || (l0 == cdb[cid].lit1() && l1 == cdb[cid].lit0())
             );
             // FIXME: why Some(false)???
+            if asg.assigned(l1) != Some(false) {
+                dbg!(cc);
+                dbg!(asg.decision_level());
+                dbg!(cid);
+                for l in cdb[cid].iter() {
+                    println!("{:?} @ {} => {:?}", l, asg.level(l.vi()), asg.assigned(*l));
+                }
+                panic!("here we are!");
+            }
             // debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
             rank = 1;

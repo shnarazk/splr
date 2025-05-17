@@ -410,7 +410,7 @@ impl PropagateIF for AssignStack {
                     Some(true) => (),
                     Some(false) => {
                         check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, blocker));
-                        if [100].contains(&blocker.vi()) && [98, 100].contains(&false_lit.vi()) {
+                        if [].contains(&blocker.vi()) && [].contains(&false_lit.vi()) {
                             println!(
                                 "{RED}{:?} at {} conflicts with bin{}({})! (dl {}, propagation lv {}) {RESET}",
                                 blocker,
@@ -427,8 +427,7 @@ impl PropagateIF for AssignStack {
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
                         // debug_assert_eq!(dl, self.var[blocker.vi()].level);
-                        if [98, 100].contains(&blocker.vi()) && [98, 100].contains(&false_lit.vi())
-                        {
+                        if [].contains(&blocker.vi()) && [].contains(&false_lit.vi()) {
                             println!(
                                 "{:?} Bound from {:?}! dlevel {}, vlevel {}, bin {:?}",
                                 blocker,
@@ -547,7 +546,7 @@ impl PropagateIF for AssignStack {
                 cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
                 if other_watch_value == Some(false) {
                     check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, cached));
-                    if [100].contains(&cached.vi()) {
+                    if [].contains(&cached.vi()) {
                         println!(
                             "{:?} conflict! (dlevel {}) vlevel {}, cid {:?}\n{:?}",
                             cached,
@@ -576,7 +575,7 @@ impl PropagateIF for AssignStack {
                 debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
-                if [98, 100].contains(&cached.vi()) {
+                if [].contains(&cached.vi()) {
                     println!(
                         "{:?} Bound from {:?}! (dlevel {}) vlevel {}, cid {:?}\n{:?}",
                         cached,
