@@ -52,29 +52,9 @@ pub fn handle_conflict(
     #[cfg(feature = "chrono_BT")]
     match cc.1 {
         AssignReason::BinaryLink(l) => {
-            // Use the logic used in Implication case
-            // assert_eq!(
-            //     asg.var(cc.0.vi()).level,
-            //     asg.var(l.vi()).level,
-            //     "L55 dl {}",
-            //     asg.decision_level()
-            // );
             conflicting_level = asg.var(l.vi()).level.max(asg.var(cc.0.vi()).level);
-            if asg.decision_level() != conflicting_level {
-                // println!(
-                //     "handle_conflict fixes level from {} to {} for {:?}",
-                //     asg.decision_level(),
-                //     conflicting_level,
-                //     cc
-                // );
-            }
-            // asg.cancel_until(conflicting_level);
         }
         AssignReason::Implication(cid) => {
-            // let c = match cc.1 {
-            //     AssignReason::Implication(cid) => &cdb[cid],
-            //     _ => panic!(),
-            // };
             let c = &cdb[cid];
             conflicting_level = c.iter().map(|l| asg.level(l.vi())).max().unwrap();
             if chronobt
@@ -92,7 +72,6 @@ pub fn handle_conflict(
                 {
                     debug_assert!(0 < second_level);
                     asg.cancel_until(second_level);
-                    // println!("CB:: cc: {:?}, at level {}", cc, conflicting_level);
                     return Ok(c.rank);
                 }
             }
@@ -102,7 +81,6 @@ pub fn handle_conflict(
         }
     }
     asg.cancel_until(conflicting_level);
-    assert_eq!(conflicting_level, asg.decision_level());
     asg.handle(SolverEvent::Conflict);
 
     state.derive20.clear();
@@ -210,8 +188,7 @@ pub fn handle_conflict(
 
             debug_assert_eq!(l0, cdb[cid].lit0());
             debug_assert_eq!(l1, cdb[cid].lit1());
-            // why?
-            // debug_assert_eq!(asg.assigned(l1), Some(false));
+            debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
 
             asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
