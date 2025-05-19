@@ -42,13 +42,6 @@ pub fn handle_conflict(
         }
     }
 
-    // If we can settle this conflict w/o restart, solver will get a big progress.
-    #[cfg(feature = "chrono_BT")]
-    // let chronobt = 1000 < asg.num_conflict && 0 < state.config.c_cbt_thr;
-    let chronobt = true;
-    #[cfg(not(feature = "chrono_BT"))]
-    let chronobt: bool = false;
-
     #[cfg(feature = "chrono_BT")]
     match cc.1 {
         AssignReason::BinaryLink(l) => {
@@ -57,7 +50,7 @@ pub fn handle_conflict(
         AssignReason::Implication(cid) => {
             let c = &cdb[cid];
             conflicting_level = c.iter().map(|l| asg.level(l.vi())).max().unwrap();
-            if chronobt
+            if cfg!(feature = "chrono_BT")
                 && state.config.c_cbt_thr < conflicting_level
                 && 1 == c
                     .iter()
@@ -167,7 +160,9 @@ pub fn handle_conflict(
             AssignReason::None => unreachable!("handle_conflict"),
         }
     }
-    let chbt: bool = if chronobt && assign_level + state.config.c_cbt_thr <= conflicting_level {
+    let chbt: bool = if cfg!(feature = "chrono_BT")
+        && assign_level + state.config.c_cbt_thr <= conflicting_level
+    {
         // FIXME: assign_level と違う。いいのか？
         asg.cancel_until(conflicting_level - 1);
         true
