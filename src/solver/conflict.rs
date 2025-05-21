@@ -161,7 +161,9 @@ pub fn handle_conflict(
         }
     }
     asg.cancel_until(
-        if cfg!(feature = "chrono_BT") && assign_level + state.config.c_cbt_thr <= conflicting_level
+        if cfg!(feature = "chrono_BT")
+            && (assign_level as f64).powf(1.25) + state.config.c_cbt_thr as f64
+                <= (conflicting_level as f64).powf(1.25)
         {
             // FIXME: assign_level と違う。いいのか？ 多分OK
             state.num_chrono_bt += 1;
