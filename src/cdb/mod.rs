@@ -215,7 +215,7 @@ pub mod property {
         ReductionThreshold,
     }
 
-    pub const F64: [Tf64; 3] = [
+    pub const F64S: [Tf64; 3] = [
         Tf64::LiteralBlockDistance,
         Tf64::LiteralBlockEntanglement,
         Tf64::ReductionThreshold,

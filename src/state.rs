@@ -123,6 +123,7 @@ pub struct State {
     #[cfg(feature = "chrono_BT")]
     /// chronoBT threshold
     pub chrono_bt_threshold: DecisionLevel,
+    pub num_chrono_bt: usize,
 
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
@@ -166,6 +167,7 @@ impl Default for State {
 
             #[cfg(feature = "chrono_BT")]
             chrono_bt_threshold: 100,
+            num_chrono_bt: 0,
 
             last_asg: 0,
             new_learnt: Vec::new(),
@@ -1032,6 +1034,25 @@ pub mod property {
                 Tusize::NumStage => self.stm.current_stage(),
                 Tusize::IntervalScale => self.stm.current_scale(),
                 Tusize::IntervalScaleMax => self.stm.max_scale(),
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub enum Tf64 {
+        /// the number of chronoBT / the number of BT
+        ChronologicalBacktrackRate,
+    }
+
+    pub const F64S: [Tf64; 1] = [Tf64::ChronologicalBacktrackRate];
+
+    impl PropertyDereference<Tf64, f64> for State {
+        #[inline]
+        fn derefer(&self, k: Tf64) -> f64 {
+            match k {
+                Tf64::ChronologicalBacktrackRate => {
+                    self.num_chrono_bt as f64 / self[LogUsizeId::NumConflict] as f64
+                }
             }
         }
     }

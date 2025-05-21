@@ -164,6 +164,7 @@ pub fn handle_conflict(
         if cfg!(feature = "chrono_BT") && assign_level + state.config.c_cbt_thr <= conflicting_level
         {
             // FIXME: assign_level と違う。いいのか？ 多分OK
+            state.num_chrono_bt += 1;
             conflicting_level - 1
         } else {
             assign_level
