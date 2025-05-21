@@ -160,16 +160,15 @@ pub fn handle_conflict(
             AssignReason::None => unreachable!("handle_conflict"),
         }
     }
-    let chbt: bool = if cfg!(feature = "chrono_BT")
-        && assign_level + state.config.c_cbt_thr <= conflicting_level
-    {
-        // FIXME: assign_level と違う。いいのか？
-        asg.cancel_until(conflicting_level - 1);
-        true
-    } else {
-        asg.cancel_until(assign_level);
-        false
-    };
+    asg.cancel_until(
+        if cfg!(feature = "chrono_BT") && assign_level + state.config.c_cbt_thr <= conflicting_level
+        {
+            // FIXME: assign_level と違う。いいのか？ 多分OK
+            conflicting_level - 1
+        } else {
+            assign_level
+        },
+    );
     // debug_assert_eq!(asg.assigned(l0), None);
     // debug_assert_eq!(
     //     new_learnt.iter().skip(1).map(|l| asg.level(l.vi())).max(),
