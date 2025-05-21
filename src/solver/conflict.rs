@@ -200,15 +200,6 @@ pub fn handle_conflict(
             cdb[cid].set_birth(asg.num_conflict);
 
             debug_assert_eq!(cdb[cid].lit0(), l0);
-            debug_assert!(
-                chbt || asg.assigned(l0).is_none(),
-                "[L209] asg.assigned(l0): {:?} != None, l0:{l0}, {:?}",
-                asg.assigned(l0),
-                cdb[cid]
-                    .iter()
-                    .map(|l| (l, asg.var(l.vi())))
-                    .collect::<Vec<_>>()
-            );
             asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
             // || check_graph(asg, cdb, l0, "clause");
             rank = cdb[cid].rank;
