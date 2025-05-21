@@ -578,7 +578,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|vivC:{}, xplr:{}, core:{}, /ppc:{}",
+            "\x1B[2K        misc|vivC:{}, cbt%:{}, core:{}, /ppc:{}",
             im!(
                 "{:>9}",
                 self,
@@ -588,9 +588,11 @@ impl StateIF for State {
             fm!(
                 "{:>9.4}",
                 self,
-                LogF64Id::ExExTrend,
+                LogF64Id::ChronologicalBacktrackPercentage,
+                // LogF64Id::ExExTrend,
                 // self.e_mode.trend(),
-                self.exploration_rate_ema.get() // , self.e_mode_threshold
+                // self.exploration_rate_ema.get() // , self.e_mode_threshold
+                100.0 * self.num_chrono_bt as f64 / self[LogUsizeId::NumConflict] as f64
             ),
             im!(
                 "{:>9}",
@@ -922,6 +924,7 @@ pub enum LogF64Id {
     PropagationPerConflict,
     LiteralBlockEntanglement,
     RestartEnergy,
+    ChronologicalBacktrackPercentage,
 
     End,
 }
