@@ -255,7 +255,8 @@ fn search(
         if 1 < handle_conflict(asg, cdb, state, &cc)? {
             num_learnt += 1;
         }
-        if state.stm.stage_ended(num_learnt) {
+        let stage_counter = num_learnt - state.num_chrono_bt;
+        if state.stm.stage_ended(/* num_learnt */ stage_counter) {
             if let Some(p) = state.elapsed() {
                 if 1.0 <= p {
                     return Err(SolverError::TimeOut);
@@ -271,7 +272,8 @@ fn search(
             cdb.check_consistency(asg, "before simplify");
 
             dump_stage(asg, cdb, state, previous_stage);
-            let next_stage: Option<bool> = state.stm.prepare_new_stage(num_learnt);
+            let next_stage: Option<bool> =
+                state.stm.prepare_new_stage(/* num_learnt */ stage_counter);
             let scale = state.stm.current_scale();
             let max_scale = state.stm.max_scale();
             if cfg!(feature = "reward_annealing") {
