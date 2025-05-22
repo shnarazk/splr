@@ -31,6 +31,9 @@ pub fn handle_conflict(
     #[cfg(not(feature = "chrono_BT"))]
     let conflicting_level = asg.decision_level();
 
+    #[cfg(feature = "chrono_BT")]
+    let cfl_lvl_lits = asg.len_upto(asg.decision_level().saturating_sub(1));
+
     // we need a catch here for handling the possibility of level zero conflict
     // at higher level due to the incoherence between the current level and conflicting
     // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
@@ -160,18 +163,22 @@ pub fn handle_conflict(
             AssignReason::None => unreachable!("handle_conflict"),
         }
     }
+    let num_bt_lits = (cfl_lvl_lits - asg.len_upto(assign_level)) as f64;
     asg.cancel_until(
         if cfg!(feature = "chrono_BT")
-            && (assign_level as f64).powf(1.25) + state.config.c_cbt_thr as f64
-                <= (conflicting_level as f64).powf(1.25)
+            /* && (assign_level as f64).powf(1.25) + state.config.c_cbt_thr as f64
+            <= (conflicting_level as f64).powf(1.25) */
+            // && 2 * assign_level < state.b_lvl.get() as u32
+            && 3.0 * state.tb_lits_ema.get() < num_bt_lits
+        // < (conflicting_level as f64)
         {
-            // FIXME: assign_level と違う。いいのか？ 多分OK
             state.num_chrono_bt += 1;
             conflicting_level - 1
         } else {
             assign_level
         },
     );
+    state.tb_lits_ema.update(num_bt_lits);
     // debug_assert_eq!(asg.assigned(l0), None);
     // debug_assert_eq!(
     //     new_learnt.iter().skip(1).map(|l| asg.level(l.vi())).max(),
