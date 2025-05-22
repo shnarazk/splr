@@ -255,7 +255,7 @@ fn search(
         if 1 < handle_conflict(asg, cdb, state, &cc)? {
             num_learnt += 1;
         }
-        let stage_counter = num_learnt - state.num_chrono_bt;
+        let stage_counter = num_learnt; // - state.num_chrono_bt;
         if state.stm.stage_ended(/* num_learnt */ stage_counter) {
             if let Some(p) = state.elapsed() {
                 if 1.0 <= p {
