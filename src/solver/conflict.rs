@@ -166,9 +166,9 @@ pub fn handle_conflict(
     let num_bt_lits = (cfl_lvl_lits - asg.len_upto(assign_level)) as f64;
     asg.cancel_until(
         if cfg!(feature = "chrono_BT")
-            && 2.0 * cdb.refer(cdb::property::TEma::Entanglement).get_slow() + state.c_lvl.get()
+            && 1.5 * cdb.refer(cdb::property::TEma::Entanglement).get_slow() + state.c_lvl.get()
                 <= (conflicting_level as f64)
-            && assign_level + 8 < conflicting_level
+            && assign_level + 16 < conflicting_level
         {
             state.num_chrono_bt += 1;
             conflicting_level - 1
