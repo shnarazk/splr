@@ -342,7 +342,7 @@ fn conflict_analyze(
         trace_lit!("- handle conflicting literal", p);
         let vi = p.vi();
         if asg.var(vi).assign.is_none() {
-            println!("L355: {:?}", cc);
+            println!("L355: {cc:?}");
             println!(
                 " - dl: {}, cc.0.level {}",
                 asg.decision_level(),
