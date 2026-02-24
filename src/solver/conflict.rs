@@ -52,6 +52,7 @@ pub fn handle_conflict(
             let c = &cdb[cid];
             conflicting_level = c.iter().map(|l| asg.level(l.vi())).max().unwrap();
             if cfg!(feature = "chrono_BT")
+                // && (state.config.c_cbt_thr as usize) < asg.stack_len() - asg.len_upto(conflicting_level)
                 && state.config.c_cbt_thr < conflicting_level
                 && 1 == c
                     .iter()
