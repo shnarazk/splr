@@ -51,13 +51,17 @@ pub fn handle_conflict(
         AssignReason::Implication(cid) => {
             let c = &cdb[cid];
             conflicting_level = c.iter().map(|l| asg.level(l.vi())).max().unwrap();
+            let decision_level = asg.decision_level();
             if cfg!(feature = "chrono_BT")
-                // && (state.config.c_cbt_thr as usize) < asg.stack_len() - asg.len_upto(conflicting_level)
-                && state.config.c_cbt_thr < conflicting_level
                 && 1 == c
                     .iter()
                     .filter(|l| asg.level(l.vi()) == conflicting_level)
                     .count()
+                // && (state.config.c_cbt_thr as usize) < (asg.stack_len() - asg.len_upto(conflicting_level)) / ((decision_level - conflicting_level) as usize)
+                // && state.config.c_cbt_thr < conflicting_level
+                // && 1.5 < (conflicting_level as f64) / state.c_lvl.get()
+                // && state.config.c_cbt_thr < decision_level - conflicting_level
+                && 1.5 * (state.c_lvl.get() - state.b_lvl.get()) < (decision_level - conflicting_level) as f64
             {
                 if let Some(second_level) = c
                     .iter()
