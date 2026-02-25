@@ -410,33 +410,33 @@ impl PropagateIF for AssignStack {
                     Some(true) => (),
                     Some(false) => {
                         check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, blocker));
-                        if [].contains(&blocker.vi()) && [].contains(&false_lit.vi()) {
-                            println!(
-                                "{RED}{:?} at {} conflicts with bin{}({})! (dl {}, propagation lv {}) {RESET}",
-                                blocker,
-                                self.var[blocker.vi()].level,
-                                cid,
-                                propagating,
-                                self.decision_level(),
-                                self.var[propagating.vi()].level,
-                            );
-                            println!("cdb[{:?}]: {:?}", cid, cdb[cid]);
-                        }
+                        // if [].contains(&blocker.vi()) && [].contains(&false_lit.vi()) {
+                        //     println!(
+                        //         "{RED}{:?} at {} conflicts with bin{}({})! (dl {}, propagation lv {}) {RESET}",
+                        //         blocker,
+                        //         self.var[blocker.vi()].level,
+                        //         cid,
+                        //         propagating,
+                        //         self.decision_level(),
+                        //         self.var[propagating.vi()].level,
+                        //     );
+                        //     println!("cdb[{:?}]: {:?}", cid, cdb[cid]);
+                        // }
                         conflict_path!(blocker, minimized_reason!(propagating));
                     }
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
                         // debug_assert_eq!(dl, self.var[blocker.vi()].level);
-                        if [].contains(&blocker.vi()) && [].contains(&false_lit.vi()) {
-                            println!(
-                                "{:?} Bound from {:?}! dlevel {}, vlevel {}, bin {:?}",
-                                blocker,
-                                propagating,
-                                self.decision_level(),
-                                self.var[propagating.vi()].level,
-                                propagating,
-                            );
-                        }
+                        // if [].contains(&blocker.vi()) && [].contains(&false_lit.vi()) {
+                        //     println!(
+                        //         "{:?} Bound from {:?}! dlevel {}, vlevel {}, bin {:?}",
+                        //         blocker,
+                        //         propagating,
+                        //         self.decision_level(),
+                        //         self.var[propagating.vi()].level,
+                        //         propagating,
+                        //     );
+                        // }
                         self.assign_by_implication(
                             blocker,
                             minimized_reason!(propagating),
@@ -546,59 +546,59 @@ impl PropagateIF for AssignStack {
                 cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
                 if other_watch_value == Some(false) {
                     check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, cached));
-                    if [].contains(&cached.vi()) {
-                        println!(
-                            "{:?} conflict! (dlevel {}) vlevel {}, cid {:?}\n{:?}",
-                            cached,
-                            self.decision_level(),
-                            cdb[cid]
-                                .iter()
-                                .map(|l| {
-                                    if *l == cached {
-                                        self.root_level
-                                    } else {
-                                        self.var[l.vi()].level
-                                    }
-                                })
-                                .max()
-                                .unwrap_or(self.root_level),
-                            cid,
-                            cdb[cid]
-                                .iter()
-                                .map(|l| (l, self.var[l.vi()].level))
-                                .collect::<Vec<_>>()
-                        );
-                    }
+                    // if [].contains(&cached.vi()) {
+                    //     println!(
+                    //         "{:?} conflict! (dlevel {}) vlevel {}, cid {:?}\n{:?}",
+                    //         cached,
+                    //         self.decision_level(),
+                    //         cdb[cid]
+                    //             .iter()
+                    //             .map(|l| {
+                    //                 if *l == cached {
+                    //                     self.root_level
+                    //                 } else {
+                    //                     self.var[l.vi()].level
+                    //                 }
+                    //             })
+                    //             .max()
+                    //             .unwrap_or(self.root_level),
+                    //         cid,
+                    //         cdb[cid]
+                    //             .iter()
+                    //             .map(|l| (l, self.var[l.vi()].level))
+                    //             .collect::<Vec<_>>()
+                    //     );
+                    // }
                     conflict_path!(cached, AssignReason::Implication(cid));
                 }
 
                 debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
-                if [].contains(&cached.vi()) {
-                    println!(
-                        "{:?} Bound from {:?}! (dlevel {}) vlevel {}, cid {:?}\n{:?}",
-                        cached,
-                        propagating,
-                        self.decision_level(),
-                        cdb[cid]
-                            .iter()
-                            .map(|l| {
-                                if *l == cached {
-                                    self.root_level
-                                } else {
-                                    self.var[l.vi()].level
-                                }
-                            })
-                            .max()
-                            .unwrap_or(self.root_level),
-                        cid,
-                        cdb[cid]
-                            .iter()
-                            .map(|l| (l, self.var[l.vi()].level))
-                            .collect::<Vec<_>>()
-                    );
-                }
+                // if [].contains(&cached.vi()) {
+                //     println!(
+                //         "{:?} Bound from {:?}! (dlevel {}) vlevel {}, cid {:?}\n{:?}",
+                //         cached,
+                //         propagating,
+                //         self.decision_level(),
+                //         cdb[cid]
+                //             .iter()
+                //             .map(|l| {
+                //                 if *l == cached {
+                //                     self.root_level
+                //                 } else {
+                //                     self.var[l.vi()].level
+                //                 }
+                //             })
+                //             .max()
+                //             .unwrap_or(self.root_level),
+                //         cid,
+                //         cdb[cid]
+                //             .iter()
+                //             .map(|l| (l, self.var[l.vi()].level))
+                //             .collect::<Vec<_>>()
+                //     );
+                // }
                 self.assign_by_implication(
                     cached,
                     AssignReason::Implication(cid),

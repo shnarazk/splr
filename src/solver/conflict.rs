@@ -412,25 +412,26 @@ fn conflict_analyze(
                 }
                 for q in cdb[cid].iter().skip(1) {
                     let vi = q.vi();
-                    if asg.var(vi).assign.is_none() {
-                        println!(
-                            "Implication clause contains non-assinged lit (cc: {:?}, at level: {:?})",
-                            cc,
-                            asg.var(cc.0.vi()).level
-                        );
-                        println!("p: {:?}, level: {:?}", p, asg.var(p.vi()).level);
-                        println!("dl: {}", asg.decision_level());
-                        println!(
-                            "c{:?}: {:?}",
-                            cid,
-                            cdb[cid]
-                                .iter()
-                                // .filter(|l| asg.var(l.vi()).assign.is_none())
-                                .map(|l| (l, asg.var(l.vi()).level))
-                                .collect::<Vec<_>>()
-                        );
-                        panic!();
-                    }
+                    debug_assert!(asg.var(vi).assign.is_some());
+                    // if asg.var(vi).assign.is_none() {
+                    //     println!(
+                    //         "Implication clause contains non-assinged lit (cc: {:?}, at level: {:?})",
+                    //         cc,
+                    //         asg.var(cc.0.vi()).level
+                    //     );
+                    //     println!("p: {:?}, level: {:?}", p, asg.var(p.vi()).level);
+                    //     println!("dl: {}", asg.decision_level());
+                    //     println!(
+                    //         "c{:?}: {:?}",
+                    //         cid,
+                    //         cdb[cid]
+                    //             .iter()
+                    //             // .filter(|l| asg.var(l.vi()).assign.is_none())
+                    //             .map(|l| (l, asg.var(l.vi()).level))
+                    //             .collect::<Vec<_>>()
+                    //     );
+                    //     panic!();
+                    // }
                     validate_vi!(vi);
                     if !asg.var(vi).is(FlagVar::CA_SEEN) {
                         let lvl = asg.level(vi);
