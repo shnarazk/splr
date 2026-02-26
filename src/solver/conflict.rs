@@ -61,7 +61,7 @@ pub fn handle_conflict(
                 // && state.config.c_cbt_thr < conflicting_level
                 // && 1.5 < (conflicting_level as f64) / state.c_lvl.get()
                 // && state.config.c_cbt_thr < decision_level - conflicting_level
-                && 1.6 * (state.c_lvl.get() - state.b_lvl.get()) < (decision_level - conflicting_level) as f64
+                && 1.65 * (state.c_lvl.get() - state.b_lvl.get()) < (decision_level - conflicting_level) as f64
             {
                 if let Some(second_level) = c
                     .iter()
