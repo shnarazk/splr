@@ -54,6 +54,8 @@ pub trait ClauseIF {
     fn iter(&self) -> Iter<'_, Lit>;
     /// return the number of literals.
     fn len(&self) -> usize;
+    /// return true is this is a unit clause under `asg`.
+    fn is_unit_under(&self, asg: &impl AssignIF) -> bool;
 
     #[cfg(feature = "boundary_check")]
     /// return timestamp.
@@ -223,6 +225,19 @@ impl ClauseIF for Clause {
     }
     fn len(&self) -> usize {
         self.lits.len()
+    }
+    fn is_unit_under(&self, asg: &impl AssignIF) -> bool {
+        let unassigned = self
+            .lits
+            .iter()
+            .filter(|l| asg.assigned(**l).is_none())
+            .count();
+        let all_others_false = self
+            .lits
+            .iter()
+            .filter(|l| asg.assigned(**l).is_some())
+            .all(|l| asg.assigned(*l) == Some(false));
+        unassigned == 1 && all_others_false
     }
 
     #[cfg(feature = "boundary_check")]

@@ -162,26 +162,24 @@ pub fn handle_conflict(
 
     // learnt clause quality based backtrack strategy switching
     // Idea: If the learned clause is low quality, don’t trust it to justify a large backjump; use CBT/limited-backjump instead.
-    let did_cbt: bool;
-    asg.cancel_until(
-        if cfg!(feature = "chrono_BT")
-            && 1_000_000 < asg.num_conflict
-            && new_learnt
-                .iter()
-                .map(|l| asg.level(l.vi()))
-                .collect::<HashSet<_>>()
-                .len() as f64
-                > 2.0 * cdb.lbd.get_slow()
-        // && new_learnt.len() > 16
-        {
-            did_cbt = true;
-            state.num_chrono_bt += 1;
-            conflicting_level - 1
-        } else {
-            did_cbt = false;
-            assign_level
-        },
-    );
+    let bt_drift: Option<bool> = if cfg!(feature = "chrono_BT") && 100_000 < asg.num_conflict {
+        let lbd = new_learnt
+            .iter()
+            .map(|l| asg.level(l.vi()))
+            .collect::<HashSet<_>>()
+            .len();
+        (lbd as f64 > 2.5 * cdb.lbd.get_fast()).then(|| conflicting_level - assign_level > 30)
+    } else {
+        None
+    };
+    asg.cancel_until(match bt_drift {
+        None => assign_level,
+        Some(false) => assign_level.saturating_sub(1),
+        Some(true) => conflicting_level - 1,
+    });
+    if bt_drift.is_some() {
+        state.num_chrono_bt += 1;
+    }
     // debug_assert_eq!(asg.assigned(l0), None);
     // debug_assert_eq!(
     //     new_learnt.iter().skip(1).map(|l| asg.level(l.vi())).max(),
@@ -212,12 +210,9 @@ pub fn handle_conflict(
             cdb[cid].set_birth(asg.num_conflict);
 
             debug_assert_eq!(cdb[cid].lit0(), l0);
-            if !did_cbt
-            /* || asg.assigned(l0).is_none() */
-            {
+            if bt_drift.map_or(true, |up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
             }
-            // || check_graph(asg, cdb, l0, "clause");
             rank = cdb[cid].rank;
             if rank <= 20 {
                 for cid in &state.derive20 {
