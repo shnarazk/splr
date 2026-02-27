@@ -17,7 +17,7 @@
 //!  } = s;
 //!  let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
 //!  elim.simplify(asg, cdb, state, false).expect("panic");
-//!  assert!(!state.config.enable_eliminator || 0 < asg.num_eliminated_vars);
+//!  assert!(!state.config.enable_eliminator || 0 < asg.num_eliminated_vars());
 //!```
 
 mod eliminate;
@@ -27,8 +27,8 @@ mod subsume;
 
 use {
     crate::{
-        assign::AssignIF,
-        cdb::ClauseDBIF,
+        assign::AssignStack,
+        cdb::ClauseDB,
         processor::heap::{LitOccurs, VarOccHeap},
         state::State,
         types::*,
@@ -51,9 +51,9 @@ pub trait EliminateIF: Instantiate {
     /// check if the eliminator is running.
     fn is_running(&self) -> bool;
     /// rebuild occur lists.
-    fn prepare(&mut self, asg: &mut impl AssignIF, cdb: &mut impl ClauseDBIF, force: bool);
+    fn prepare(&mut self, cdb: &mut ClauseDB, force: bool);
     /// enqueue a var into eliminator's var queue.
-    fn enqueue_var(&mut self, asg: &mut impl AssignIF, vi: VarId, upward: bool);
+    fn enqueue_var(&mut self, vi: VarId, upward: bool);
     /// simplify database by:
     /// * removing satisfiable clauses
     /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.
@@ -65,15 +65,15 @@ pub trait EliminateIF: Instantiate {
     /// if solver becomes inconsistent.
     fn simplify(
         &mut self,
-        asg: &mut impl AssignIF,
-        cdb: &mut impl ClauseDBIF,
+        asg: &mut AssignStack,
+        cdb: &mut ClauseDB,
         state: &mut State,
         force_run: bool,
     ) -> MaybeInconsistent;
     /// return the order of vars based on their occurrences
     fn sorted_iterator(&self) -> Iter<'_, u32>;
     /// return vi's stats
-    fn stats(&self, vi: VarId) -> Option<(usize, usize)>;
+    fn get_phases(&self, vi: VarId) -> Option<(usize, usize)>;
     /// return the constraints on eliminated literals.
     fn eliminated_lits(&mut self) -> &mut Vec<Lit>;
 }
@@ -111,7 +111,7 @@ pub struct Eliminator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{assign::VarManipulateIF, processor::EliminateIF, solver::Solver};
+    use crate::{solver::Solver, var_vector::*};
     use std::path::Path;
 
     #[test]
@@ -131,18 +131,16 @@ mod tests {
         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
         assert!(elim.enable);
         elim.simplify(asg, cdb, state, false).expect("");
-        assert!(!asg.var_iter().skip(1).all(|v| v.is(FlagVar::ELIMINATED)));
-        assert!(0 < asg.num_eliminated_vars);
+        assert!(!VarRef::var_id_iter().all(|vi| VarRef(vi).is(FlagVar::ELIMINATED)));
+        assert!(0 < asg.num_eliminated_vars());
         assert_eq!(
-            asg.num_eliminated_vars,
-            asg.var_iter().filter(|v| v.is(FlagVar::ELIMINATED)).count()
+            asg.num_eliminated_vars(),
+            VarRef::var_id_iter()
+                .filter(|vi| VarRef(*vi).is(FlagVar::ELIMINATED))
+                .count()
         );
-        let elim_vars = asg
-            .var_iter()
-            .enumerate()
-            .skip(1)
-            .filter(|(_, v)| v.is(FlagVar::ELIMINATED))
-            .map(|(vi, _)| vi)
+        let elim_vars = VarRef::var_id_iter()
+            .filter(|vi| VarRef(*vi).is(FlagVar::ELIMINATED))
             .collect::<Vec<_>>();
         assert_eq!(
             0,

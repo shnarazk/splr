@@ -1,9 +1,9 @@
 [package]
 name = "splr"
-version = "0.18.0-dev1"
+version = "0.18.0-dev4"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
-edition = "2021"
+edition = "2024"
 license = "MPL-2.0"
 readme = "README.md"
 repository = "https://github.com/shnarazk/splr"
@@ -11,11 +11,12 @@ homepage = "https://github.com/shnarazk/splr"
 keywords = ["SAT", "SAT-solver", "logic", "satisfiability"]
 categories = ["science", "mathematics"]
 default-run = "splr"
-rust-version = "1.84"
+rust-version = "1.85"
 
 [dependencies]
 bitflags = "^2.8"
 instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
+rustc_data_structures = "^0.1"
 
 [features]
 default = [
@@ -58,9 +59,7 @@ clause_vivification = []        # pre(in)-processor setting
 debug_propagation = []          # for debug
 dynamic_restart_threshold = []  # control restart spans like Glucose
 EMA_calibration = []            # each exponential moving average has a calbration value
-EVSIDS = []                     # Eponential Variable State Independent Decaying Sum
 just_used = []                  # Var and clause have 'just_used' flags
-LRB_rewarding = []              # Vearning Rate Based rewarding, a new var activity criteria
 maintain_watch_cache = []       # for DEBUG
 no_IO = []                      # to embed Splr into non-std environments
 platform_wasm = [

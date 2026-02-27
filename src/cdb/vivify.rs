@@ -1,10 +1,11 @@
 //! Vivification
 #![allow(dead_code)]
 use crate::{
-    assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
+    assign::{AssignStack, PropagateIF},
     cdb::{clause::ClauseIF, ClauseDB, ClauseDBIF},
     state::{Stat, State, StateIF},
     types::*,
+    var_vector::*,
 };
 
 const VIVIFY_LIMIT: usize = 80_000;
@@ -24,7 +25,7 @@ impl VivifyIF for ClauseDB {
             })?;
         }
         let mut clauses: Vec<OrderedProxy<ClauseId>> =
-            select_targets(asg, self, state[Stat::Restart] == 0, NUM_TARGETS);
+            select_targets(self, state[Stat::Restart] == 0, NUM_TARGETS);
         if clauses.is_empty() {
             return Ok(());
         }
@@ -32,7 +33,7 @@ impl VivifyIF for ClauseDB {
         state[Stat::Vivification] += 1;
         // This is a reusable vector to reduce memory consumption,
         // the key is the number of invocation
-        let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
+        let mut seen: Vec<usize> = vec![0; VarRef::num_vars() + 1];
         let display_step: usize = 1000;
         let mut num_check = 0;
         let mut num_shrink = 0;
@@ -67,8 +68,7 @@ impl VivifyIF for ClauseDB {
             debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
             let mut decisions: Vec<Lit> = Vec::new();
             for lit in clits.iter().copied() {
-                // assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
-                match asg.assigned(!lit) {
+                match VarRef::lit_assigned(!lit) {
                     //## Rule 1
                     Some(false) => (),
                     //## Rule 2
@@ -138,7 +138,7 @@ impl VivifyIF for ClauseDB {
                                         self.set_activity(ci, cp.value());
                                     }
                                     #[cfg(not(feature = "clause_rewarding"))]
-                                    self.new_clause(asg, &mut vec, is_learnt);
+                                    self.new_clause(&mut vec, is_learnt);
                                     self.remove_clause(cid);
                                     num_shrink += 1;
                                 }
@@ -181,13 +181,13 @@ impl VivifyIF for ClauseDB {
 }
 
 fn select_targets(
-    asg: &mut AssignStack,
     cdb: &mut ClauseDB,
     initial_stage: bool,
     len: Option<usize>,
 ) -> Vec<OrderedProxy<ClauseId>> {
     if initial_stage {
-        let mut seen: Vec<Option<OrderedProxy<ClauseId>>> = vec![None; 2 * (asg.num_vars + 1)];
+        let mut seen: Vec<Option<OrderedProxy<ClauseId>>> =
+            vec![None; 2 * (VarRef::num_vars() + 1)];
         for (i, c) in cdb.iter().enumerate().skip(1) {
             if let Some(rank) = c.to_vivify(true) {
                 let p = &mut seen[usize::from(c.lit0())];
@@ -253,7 +253,7 @@ impl AssignStack {
             assumes
                 .iter()
                 .filter(|l| all.contains(&!**l))
-                .map(|l| self.reason(l.vi()))
+                .map(|l| VarRef(l.vi()).reason())
                 .collect::<Vec<_>>(),
             // am.iter().filter(|l| am.contains(&!**l)).collect::<Vec<_>>(),
         );
@@ -273,7 +273,7 @@ impl AssignStack {
                 // Thus we must negate the literals.
                 learnt.push(!*l);
             }
-            match self.reason(l.vi()) {
+            match VarRef(l.vi()).reason() {
                 AssignReason::Decision(_) => (),
                 AssignReason::BinaryLink(bil) => {
                     seen[bil.vi()] = key;
@@ -298,7 +298,7 @@ impl AssignStack {
         // before finding a conflict by the target clause.
         // So we must skip this conflict.
         if learnt.is_empty() {
-            debug_assert_eq!(self.num_conflict, 0);
+            debug_assert_eq!(self.num_conflicts(), 0);
             // panic!("\n{:?}\n{:?}\n{:?}",
             //        conflicting,
             //        conflicting.iter().map(|l| self.assigned(*l)).collect::<Vec<_>>(),

@@ -2,7 +2,7 @@ use {
     super::ClauseId,
     crate::types::*,
     std::{
-        collections::HashMap,
+        //        collections::HashMap,
         ops::{Index, IndexMut},
     },
 };
@@ -44,30 +44,30 @@ impl WatchCacheIF for WatchCacheList {
     }
 }
 
-impl Index<Lit> for Vec<HashMap<Lit, ClauseId>> {
-    type Output = HashMap<Lit, ClauseId>;
-    #[inline]
-    fn index(&self, l: Lit) -> &Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.get_unchecked(usize::from(l))
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self[usize::from(l)]
-    }
-}
+// impl Index<Lit> for Vec<HashMap<Lit, ClauseId>> {
+//     type Output = HashMap<Lit, ClauseId>;
+//     #[inline]
+//     fn index(&self, l: Lit) -> &Self::Output {
+//         #[cfg(feature = "unsafe_access")]
+//         unsafe {
+//             self.get_unchecked(usize::from(l))
+//         }
+//         #[cfg(not(feature = "unsafe_access"))]
+//         &self[usize::from(l)]
+//     }
+// }
 
-impl IndexMut<Lit> for Vec<HashMap<Lit, ClauseId>> {
-    #[inline]
-    fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.get_unchecked_mut(usize::from(l))
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self[usize::from(l)]
-    }
-}
+// impl IndexMut<Lit> for Vec<HashMap<Lit, ClauseId>> {
+//     #[inline]
+//     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
+//         #[cfg(feature = "unsafe_access")]
+//         unsafe {
+//             self.get_unchecked_mut(usize::from(l))
+//         }
+//         #[cfg(not(feature = "unsafe_access"))]
+//         &mut self[usize::from(l)]
+//     }
+// }
 
 impl Index<Lit> for Vec<WatchCache> {
     type Output = WatchCache;
@@ -104,6 +104,7 @@ pub struct WatchCacheIterator {
 
 impl Iterator for WatchCacheIterator {
     type Item = WatchCacheProxy;
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         // assert!(self.checksum == self.end_at - self.index);
         (self.index < self.end_at).then_some({
@@ -122,9 +123,11 @@ impl WatchCacheIterator {
             // checksum: len,
         }
     }
+    #[inline]
     pub fn restore_entry(&mut self) {
         self.index += 1;
     }
+    #[inline]
     pub fn detach_entry(&mut self) {
         // assert!(self.end_at != 0);
         self.end_at -= 1;

@@ -1,17 +1,17 @@
 /// Module `eliminator` implements clause subsumption and var elimination.
 use {
-    crate::{assign::AssignIF, types::*},
+    crate::{types::*, var_vector::*},
     std::fmt,
 };
 
 pub trait VarOrderIF {
-    fn clear(&mut self, asg: &mut impl AssignIF);
+    fn clear(&mut self);
     fn len(&self) -> usize;
     fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upward: bool);
     fn is_empty(&self) -> bool;
-    fn select_var(&mut self, occur: &[LitOccurs], asg: &impl AssignIF) -> Option<VarId>;
+    fn select_var(&mut self, occur: &[LitOccurs]) -> Option<VarId>;
     #[allow(dead_code)]
-    fn rebuild(&mut self, asg: &impl AssignIF, occur: &[LitOccurs]);
+    fn rebuild(&mut self, occur: &[LitOccurs]);
 }
 
 /// Mapping from Literal to Clauses.
@@ -98,9 +98,10 @@ impl VarOrderIF for VarOccHeap {
         self.idxs[0] = n;
         self.percolate_up(occur, n);
     }
-    fn clear(&mut self, asg: &mut impl AssignIF) {
+    fn clear(&mut self) {
         for v in &mut self.heap[0..self.idxs[0] as usize] {
-            asg.var_mut(*v as usize).turn_off(FlagVar::ENQUEUED);
+            // asg.var_mut(*v as usize).turn_off(FlagVar::ENQUEUED);
+            VarRef(*v as usize).turn_off(FlagVar::ENQUEUED);
         }
         self.reset()
     }
@@ -110,21 +111,21 @@ impl VarOrderIF for VarOccHeap {
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0
     }
-    fn select_var(&mut self, occur: &[LitOccurs], asg: &impl AssignIF) -> Option<VarId> {
+    fn select_var(&mut self, occur: &[LitOccurs]) -> Option<VarId> {
         loop {
             let vi = self.get_root(occur);
             if vi == 0 {
                 return None;
             }
-            if !asg.var(vi).is(FlagVar::ELIMINATED) {
+            if !VarRef(vi).is(FlagVar::ELIMINATED) {
                 return Some(vi);
             }
         }
     }
-    fn rebuild(&mut self, asg: &impl AssignIF, occur: &[LitOccurs]) {
+    fn rebuild(&mut self, occur: &[LitOccurs]) {
         self.reset();
-        for (vi, v) in asg.var_iter().enumerate().skip(1) {
-            if asg.assign(vi).is_none() && !v.is(FlagVar::ELIMINATED) {
+        for vi in VarRef::var_id_iter() {
+            if VarRef(vi).assign().is_none() && !VarRef(vi).is(FlagVar::ELIMINATED) {
                 self.insert(occur, vi, true);
             }
         }

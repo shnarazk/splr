@@ -311,7 +311,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             .as_bytes(),
         )?;
     }
-    for key in &assign::property::USIZES {
+    for key in &assign::stats::USIZES {
         out.write_all(
             format!(
                 "c   assign::{:<27}{:>15}\n",
@@ -321,7 +321,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             .as_bytes(),
         )?;
     }
-    for key in &assign::property::EMAS {
+    for key in &assign::stats::EMAS {
         out.write_all(
             format!(
                 "c   assign::{:<27}{:>19.3}\n",
@@ -331,7 +331,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             .as_bytes(),
         )?;
     }
-    for key in &cdb::property::USIZES {
+    for key in &cdb::stats::USIZES {
         out.write_all(
             format!(
                 "c   clause::{:<27}{:>15}\n",
@@ -341,7 +341,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             .as_bytes(),
         )?;
     }
-    for key in &cdb::property::F64 {
+    for key in &cdb::stats::F64 {
         out.write_all(
             format!(
                 "c   clause::{:<27}{:>19.3}\n",
@@ -351,7 +351,17 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             .as_bytes(),
         )?;
     }
-    for key in &state::property::USIZES {
+    for key in &cdb::stats::EMAS {
+        out.write_all(
+            format!(
+                "c   clause::{:<27}{:>19.3}\n",
+                format!("{key:?}"),
+                s.cdb.refer(*key).get(),
+            )
+            .as_bytes(),
+        )?;
+    }
+    for key in &state::stats::USIZES {
         out.write_all(
             format!(
                 "c   state::{:<28}{:>15}\n",
@@ -361,7 +371,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             .as_bytes(),
         )?;
     }
-    for key in &state::property::EMAS {
+    for key in &state::stats::EMAS {
         out.write_all(
             format!(
                 "c   state::{:<28}{:>19.3}\n",
