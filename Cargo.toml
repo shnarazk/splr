@@ -11,7 +11,7 @@ homepage = "https://github.com/shnarazk/splr"
 keywords = ["SAT", "SAT-solver", "logic", "satisfiability"]
 categories = ["science", "mathematics"]
 default-run = "splr"
-rust-version = "1.85"
+rust-version = "1.93"
 
 [dependencies]
 bitflags = "^2.8"
@@ -22,20 +22,20 @@ rustc_data_structures = "^0.1"
 default = [
     ### Essential
     "unsafe_access",
-    "chrono_BT",
+    # "chrono_BT",
 
     ### Heuristics
     # "bi_clause_completion",
     # "clause_rewarding",
     "dynamic_restart_threshold",
-    "LRB_rewarding",
+    # "LRB_rewarding",
     "reason_side_rewarding",
     "rephase",
     "reward_annealing",
     # "stochastic_local_search",
     # "suppress_reason_chain",
     "two_mode_reduction",
-    # "trail_saving",
+    "trail_saving",
 
     ### Logic formula processor
     "clause_elimination",
