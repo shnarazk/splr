@@ -2,7 +2,6 @@
 
 #[cfg(feature = "boundary_check")]
 use crate::assign::DebugReportIF;
-use crate::cdb;
 
 use {
     super::State,
@@ -11,6 +10,7 @@ use {
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
     },
+    std::collections::HashSet,
 };
 
 /// returns:
@@ -51,17 +51,11 @@ pub fn handle_conflict(
         AssignReason::Implication(cid) => {
             let c = &cdb[cid];
             conflicting_level = c.iter().map(|l| asg.level(l.vi())).max().unwrap();
-            let decision_level = asg.decision_level();
-            if cfg!(feature = "chrono_BT")
+            if false
                 && 1 == c
                     .iter()
                     .filter(|l| asg.level(l.vi()) == conflicting_level)
                     .count()
-                // && (state.config.c_cbt_thr as usize) < (asg.stack_len() - asg.len_upto(conflicting_level)) / ((decision_level - conflicting_level) as usize)
-                // && state.config.c_cbt_thr < conflicting_level
-                // && 1.5 < (conflicting_level as f64) / state.c_lvl.get()
-                // && state.config.c_cbt_thr < decision_level - conflicting_level
-                && 1.6 * (state.c_lvl.get() - state.b_lvl.get()) < (decision_level - conflicting_level) as f64
             {
                 if let Some(second_level) = c
                     .iter()
@@ -167,13 +161,17 @@ pub fn handle_conflict(
         }
     }
 
-    let cfl_lvl_lits = asg.stack_len();
-    let num_bt_lits = (cfl_lvl_lits - asg.len_upto(assign_level)) as f64;
+    // learnt clause quality based backtrack strategy switching
+    // Idea: If the learned clause is low quality, don’t trust it to justify a large backjump; use CBT/limited-backjump instead.
     asg.cancel_until(
         if cfg!(feature = "chrono_BT")
-            && 1.5 * cdb.refer(cdb::property::TEma::Entanglement).get_slow() + state.c_lvl.get()
-                <= (conflicting_level as f64)
-            && assign_level + 16 < conflicting_level
+            && new_learnt
+                .iter()
+                .map(|l| asg.level(l.vi()))
+                .collect::<HashSet<_>>()
+                .len() as f64
+                * 1.6
+                > cdb.lbd.get_slow()
         {
             state.num_chrono_bt += 1;
             conflicting_level - 1
@@ -181,7 +179,6 @@ pub fn handle_conflict(
             assign_level
         },
     );
-    state.tb_lits_ema.update(num_bt_lits);
     // debug_assert_eq!(asg.assigned(l0), None);
     // debug_assert_eq!(
     //     new_learnt.iter().skip(1).map(|l| asg.level(l.vi())).max(),

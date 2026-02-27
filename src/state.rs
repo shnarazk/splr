@@ -115,7 +115,6 @@ pub struct State {
     pub e_mode: Ema2,
     pub e_mode_threshold: f64,
     pub exploration_rate_ema: Ema,
-    pub tb_lits_ema: Ema,
 
     #[cfg(feature = "support_user_assumption")]
     /// hold conflicting user-defined *assumed* literals for UNSAT problems
@@ -162,7 +161,6 @@ impl Default for State {
             e_mode: Ema2::new(40).with_slow(4_000).with_value(10.0),
             e_mode_threshold: 1.20,
             exploration_rate_ema: Ema::new(1000),
-            tb_lits_ema: Ema::new(8000),
 
             #[cfg(feature = "support_user_assumption")]
             conflicts: Vec::new(),
