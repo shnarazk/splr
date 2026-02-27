@@ -2,12 +2,9 @@
 /// implement boolean constraint propagation, backjump
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{heap::VarHeapIF, AssignStack, PropagateIF, VarManipulateIF},
+    super::{heap::VarHeapIF, AssignIF, AssignStack, PropagateIF, VarManipulateIF},
     crate::{cdb::ClauseDBIF, types::*},
 };
-
-#[cfg(feature = "chrono_BT")]
-use super::AssignIF;
 
 /// Methods on trail saving.
 pub trait TrailSavingIF {
@@ -57,8 +54,11 @@ impl TrailSavingIF for AssignStack {
         let q = self.stage_scale.trailing_zeros() as u16
             + (cdb.derefer(crate::cdb::property::Tf64::LiteralBlockEntanglement) as u16) / 2;
 
-        #[cfg(feature = "chrono_BT")]
-        let dl = self.decision_level();
+        let dl = if cfg!(feature = "chrono_BT") {
+            self.decision_level()
+        } else {
+            0
+        };
 
         for i in (0..self.trail_saved.len()).rev() {
             let lit = self.trail_saved[i];
@@ -71,12 +71,7 @@ impl TrailSavingIF for AssignStack {
                     debug_assert_eq!(self.assigned(link), Some(true));
                     self.num_repropagation += 1;
 
-                    self.assign_by_implication(
-                        lit,
-                        old_reason,
-                        #[cfg(feature = "chrono_BT")]
-                        dl,
-                    );
+                    self.assign_by_implication(lit, old_reason, dl);
                 }
                 // reason refinement by ignoring this dependecy
                 (None, AssignReason::Implication(c)) if q < cdb[c].rank => {
@@ -91,12 +86,7 @@ impl TrailSavingIF for AssignStack {
                         .all(|l| self.assigned(*l) == Some(false)));
                     self.num_repropagation += 1;
 
-                    self.assign_by_implication(
-                        lit,
-                        old_reason,
-                        #[cfg(feature = "chrono_BT")]
-                        dl,
-                    );
+                    self.assign_by_implication(lit, old_reason, dl);
                 }
                 (Some(false), AssignReason::BinaryLink(link)) => {
                     debug_assert_ne!(link.vi(), lit.vi());
