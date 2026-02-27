@@ -210,7 +210,7 @@ pub fn handle_conflict(
             cdb[cid].set_birth(asg.num_conflict);
 
             debug_assert_eq!(cdb[cid].lit0(), l0);
-            if bt_drift.map_or(true, |up1| up1 && cdb[cid].is_unit_under(&*asg)) {
+            if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
             }
             rank = cdb[cid].rank;
