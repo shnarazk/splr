@@ -14,8 +14,7 @@ default-run = "splr"
 rust-version = "1.93"
 
 [dependencies]
-bitflags = "^2.8"
-instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
+bitflags = "^2.11"
 rustc_data_structures = "^0.1"
 
 [features]
@@ -44,9 +43,6 @@ default = [
     ### For DEBUG
     # "boundary_check",
     # "maintain_watch_cache",
-
-    ### platform dependency
-    # "platform_wasm"
 ]
 assign_rate = []                # for debug and study
 best_phases_tracking = []       # save the best-so-far assignment, used by 'rephase'
@@ -62,9 +58,6 @@ EMA_calibration = []            # each exponential moving average has a calbrati
 just_used = []                  # Var and clause have 'just_used' flags
 maintain_watch_cache = []       # for DEBUG
 no_IO = []                      # to embed Splr into non-std environments
-platform_wasm = [
-    "instant",                  # use instant::Duration instead of std::time::Duration
-]
 reason_side_rewarding = []      # an idea used in Learning-rate based rewarding
 rephase = [                     # search around the best-so-far candidate repeatedly
     "best_phases_tracking",

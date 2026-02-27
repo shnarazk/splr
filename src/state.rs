@@ -1,7 +1,3 @@
-/// Module `state` is a collection of internal data.
-#[cfg(feature = "platform_wasm")]
-use instant::{Duration, Instant};
-#[cfg(not(feature = "platform_wasm"))]
 use std::time::{Duration, Instant};
 use {
     crate::{
@@ -13,7 +9,7 @@ use {
     },
     std::{
         fmt,
-        io::{stdout, Write},
+        io::{Write, stdout},
         ops::{Index, IndexMut},
     },
 };
