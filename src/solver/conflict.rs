@@ -168,7 +168,13 @@ pub fn handle_conflict(
             .map(|l| asg.level(l.vi()))
             .collect::<HashSet<_>>()
             .len();
-        (lbd as f64 > 2.5 * cdb.lbd.get_fast()).then(|| conflicting_level - assign_level > 30)
+        if conflicting_level - assign_level > 40 {
+            Some(true)
+        } else if lbd as f64 > 2.8 * cdb.lbd.get_fast() {
+            Some(false)
+        } else {
+            None
+        }
     } else {
         None
     };
