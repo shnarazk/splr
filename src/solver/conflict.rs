@@ -163,14 +163,14 @@ pub fn handle_conflict(
     // learnt clause quality based backtrack strategy switching
     // Idea: If the learned clause is low quality, don’t trust it to justify a large backjump; use CBT/limited-backjump instead.
     let bt_drift: Option<bool> = if cfg!(feature = "chrono_BT") && 100_000 < asg.num_conflict {
-        if conflicting_level - assign_level >= 40 {
+        if conflicting_level - assign_level >= 36 {
             Some(true)
         } else if new_learnt
             .iter()
             .map(|l| asg.level(l.vi()))
             .collect::<HashSet<_>>()
             .len() as f64
-            >= 1.4 * (cdb.lbd.get_slow() + cdb.lb_entanglement.get_slow())
+            >= 1.45 * (cdb.lbd.get_slow() + cdb.lb_entanglement.get_slow())
         {
             Some(false)
         } else {
