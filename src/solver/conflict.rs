@@ -6,8 +6,8 @@ use crate::assign::DebugReportIF;
 use {
     super::State,
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-        cdb::{ClauseDB, ClauseDBIF},
+        assign::{AssignIF, AssignStack, PropagateIF, TrailSavingIF, VarManipulateIF},
+        cdb::{self, ClauseDB, ClauseDBIF},
         types::*,
     },
 };
@@ -160,10 +160,23 @@ pub fn handle_conflict(
             AssignReason::None => unreachable!("handle_conflict"),
         }
     }
+    let mut bt_drift = false;
     if chronobt && assign_level + state.config.c_cbt_thr <= conflicting_level {
         asg.cancel_until(conflicting_level - 1);
     } else {
-        asg.cancel_until(assign_level);
+        let lbd = new_learnt
+            .iter()
+            .map(|l| asg.level(l.vi()))
+            .collect::<std::collections::HashSet<_>>()
+            .len();
+        if lbd as f64 > 2.5 * cdb.refer(cdb::property::TEma::LBD).get().max(3.0) && assign_level > 0
+        {
+            bt_drift = true;
+            asg.cancel_until(assign_level - 1);
+            asg.clear_saved_trail();
+        } else {
+            asg.cancel_until(assign_level);
+        }
     }
     debug_assert_eq!(asg.assigned(l0), None);
     debug_assert_eq!(
@@ -178,15 +191,17 @@ pub fn handle_conflict(
 
             debug_assert_eq!(l0, cdb[cid].lit0());
             debug_assert_eq!(l1, cdb[cid].lit1());
-            debug_assert_eq!(asg.assigned(l1), Some(false));
+            debug_assert!(bt_drift || asg.assigned(l1) == Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
 
-            asg.assign_by_implication(
-                l0,
-                AssignReason::BinaryLink(!l1),
-                #[cfg(feature = "chrono_BT")]
-                assign_level,
-            );
+            if !bt_drift {
+                asg.assign_by_implication(
+                    l0,
+                    AssignReason::BinaryLink(!l1),
+                    #[cfg(feature = "chrono_BT")]
+                    assign_level,
+                );
+            }
             // || check_graph(asg, cdb, l0, "biclause");
             for cid in &state.derive20 {
                 cdb[cid].turn_on(FlagClause::DERIVE20);
@@ -201,12 +216,14 @@ pub fn handle_conflict(
 
             debug_assert_eq!(cdb[cid].lit0(), l0);
             debug_assert_eq!(asg.assigned(l0), None);
-            asg.assign_by_implication(
-                l0,
-                AssignReason::Implication(cid),
-                #[cfg(feature = "chrono_BT")]
-                assign_level,
-            );
+            if !bt_drift {
+                asg.assign_by_implication(
+                    l0,
+                    AssignReason::Implication(cid),
+                    #[cfg(feature = "chrono_BT")]
+                    assign_level,
+                );
+            }
             // || check_graph(asg, cdb, l0, "clause");
             rank = cdb[cid].rank;
             if rank <= 20 {
@@ -224,12 +241,14 @@ pub fn handle_conflict(
             debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
             rank = 1;
-            asg.assign_by_implication(
-                l0,
-                AssignReason::BinaryLink(!l1),
-                #[cfg(feature = "chrono_BT")]
-                assign_level,
-            );
+            if !bt_drift {
+                asg.assign_by_implication(
+                    l0,
+                    AssignReason::BinaryLink(!l1),
+                    #[cfg(feature = "chrono_BT")]
+                    assign_level,
+                );
+            }
             // || check_graph(asg, cdb, l0, "registeredclause");
         }
         RefClause::Dead => unreachable!("handle_conflict::RefClause::Deaf"),
