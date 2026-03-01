@@ -660,7 +660,8 @@ impl<T: Clone + Default + PartialEq + Ord> PartialOrd for OrderedProxy<T> {
 
 impl<T: Clone + Default + PartialEq + Ord> Ord for OrderedProxy<T> {
     fn cmp(&self, other: &OrderedProxy<T>) -> Ordering {
-        if (self.index - other.index).abs() < f64::EPSILON {
+        if self.index == other.index {
+            // if (self.index - other.index).abs() < f64::EPSILON {
             self.body.cmp(&other.body)
         } else if self.index < other.index {
             Ordering::Less
