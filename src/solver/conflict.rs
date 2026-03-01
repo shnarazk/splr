@@ -170,7 +170,8 @@ pub fn handle_conflict(
             .map(|l| asg.level(l.vi()))
             .collect::<HashSet<_>>()
             .len() as f64
-            >= 1.25 * (cdb.lbd.get_fast() + cdb.lb_entanglement.get_fast())
+            >= 2.5 * cdb.lbd.get().max(3.0)
+            && assign_level > 0
         {
             Some(false)
         } else {
@@ -200,11 +201,12 @@ pub fn handle_conflict(
 
             debug_assert_eq!(l0, cdb[cid].lit0());
             debug_assert_eq!(l1, cdb[cid].lit1());
-            debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
+            debug_assert!(bt_drift.is_some() || asg.assigned(l1) == Some(false));
 
-            asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
-            // || check_graph(asg, cdb, l0, "biclause");
+            if bt_drift.is_none() {
+                asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
+            }
             for cid in &state.derive20 {
                 cdb[cid].turn_on(FlagClause::DERIVE20);
             }
@@ -233,21 +235,21 @@ pub fn handle_conflict(
                 (l0 == cdb[cid].lit0() && l1 == cdb[cid].lit1())
                     || (l0 == cdb[cid].lit1() && l1 == cdb[cid].lit0())
             );
-            // FIXME: why Some(false)???
-            if asg.assigned(l1) != Some(false) {
-                dbg!(cc);
-                dbg!(asg.decision_level());
-                dbg!(cid);
-                for l in cdb[cid].iter() {
-                    println!("{:?} @ {} => {:?}", l, asg.level(l.vi()), asg.assigned(*l));
-                }
-                panic!("here we are!");
-            }
-            // debug_assert_eq!(asg.assigned(l1), Some(false));
             debug_assert_eq!(asg.assigned(l0), None);
+            debug_assert!(bt_drift.is_some() || asg.assigned(l1) == Some(false));
+            // if bt_drift.is_none() && asg.assigned(l1) != Some(false) {
+            //     dbg!(cc);
+            //     dbg!(asg.decision_level());
+            //     dbg!(cid);
+            //     for l in cdb[cid].iter() {
+            //         println!("{:?} @ {} => {:?}", l, asg.level(l.vi()), asg.assigned(*l));
+            //     }
+            //     panic!("here we are!");
+            // }
             rank = 1;
-            asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
-            // || check_graph(asg, cdb, l0, "registeredclause");
+            if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
+                asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
+            }
         }
         RefClause::Dead => unreachable!("handle_conflict::RefClause::Dead"),
         RefClause::EmptyClause => unreachable!("handle_conflict::RefClause::EmptyClause"),
