@@ -57,6 +57,7 @@ pub trait AssignIF:
     /// ## Caveat
     /// - it emits a panic by out of index range.
     /// - it emits a panic if the level is 0.
+    /// CAVEAT: this return a wrong value under chrono_BT
     fn len_upto(&self, n: DecisionLevel) -> usize;
     /// return `true` if there's no assignment.
     fn stack_is_empty(&self) -> bool;

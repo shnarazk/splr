@@ -165,7 +165,11 @@ pub fn handle_conflict(
     let bt_drift: Option<bool> = if cfg!(feature = "chrono_BT")
     /* && 100_000 < asg.num_conflict */
     {
-        if asg.len_upto(conflicting_level) - asg.len_upto(assign_level) >= 40 {
+        if asg
+            .len_upto(conflicting_level)
+            .saturating_sub(asg.len_upto(assign_level))
+            >= 40
+        {
             Some(true)
         } else if new_learnt
             .iter()
