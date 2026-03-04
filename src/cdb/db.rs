@@ -1062,6 +1062,9 @@ impl ClauseDBIF for ClauseDB {
                 continue;
             }
             alives += 1;
+            if c.rank <= 4 {
+                continue;
+            }
             match setting {
                 ReductionType::RASonADD(_) => {
                     perm.push(OrderedProxy::new(i, c.reverse_activity_sum(asg)));
