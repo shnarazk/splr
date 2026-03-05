@@ -2,6 +2,8 @@
 
 #[cfg(feature = "boundary_check")]
 use crate::assign::DebugReportIF;
+#[cfg(feature = "trail_saving")]
+use crate::assign::TrailSavingIF;
 
 use {
     super::State,

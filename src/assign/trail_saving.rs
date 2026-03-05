@@ -54,11 +54,7 @@ impl TrailSavingIF for AssignStack {
         let q = self.stage_scale.trailing_zeros() as u16
             + (cdb.derefer(crate::cdb::property::Tf64::LiteralBlockEntanglement) as u16) / 2;
 
-        let dl = if cfg!(feature = "chrono_BT") {
-            self.decision_level()
-        } else {
-            0
-        };
+        let dl = self.decision_level();
 
         for i in (0..self.trail_saved.len()).rev() {
             let lit = self.trail_saved[i];
