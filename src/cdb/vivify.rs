@@ -206,7 +206,7 @@ fn select_targets(
         }
         clauses
     } else {
-        let n = state[Stat::Vivification] % 16;
+        let n = state[Stat::Vivification] % 32;
         let mut skips = 0;
         let mut clauses: Vec<OrderedProxy<ClauseId>> = cdb
             .iter()
@@ -223,9 +223,9 @@ fn select_targets(
                 })
             })
             .collect::<Vec<_>>();
-        if skips < clauses.len() {
-            return vec![];
-        }
+        // if skips < clauses.len() {
+        //     return vec![];
+        // }
         if let Some(max_len) = len {
             if max_len < clauses.len() {
                 clauses.sort();
@@ -357,14 +357,15 @@ impl Clause {
     fn to_vivify(&self, initial_stage: Option<u16>) -> Option<f64> {
         if let Some(n) = initial_stage {
             if n == 0 {
-                (!self.is_dead()
-                    && self.rank > 5
-                    && self.rank * 2 <= self.rank_old
-                    && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
-                .then(|| -((self.rank_old - self.rank) as f64 / self.rank as f64))
+                (
+                    !self.is_dead() && self.rank < 2
+                    // && (self.rank as usize) * 2 <= self.len()
+                    // && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20))
+                )
+                .then(|| -((self.len() as f64 - self.rank as f64) / self.rank as f64))
             } else {
-                (!self.is_dead() && self.rank == n).then(|| {
-                    if self.rank == self.rank_old {
+                (!self.is_dead() && self.rank == n && self.used >= 4).then(|| {
+                    if (self.rank as usize) < self.len() {
                         -(self.len() as f64) / self.rank as f64
                     } else {
                         0.0
@@ -377,9 +378,6 @@ impl Clause {
     }
     /// clear flags about vivification
     fn vivified(&mut self) {
-        self.rank_old = self.rank;
-        if !self.is(FlagClause::LEARNT) {
-            self.turn_off(FlagClause::DERIVE20);
-        }
+        self.used = 0;
     }
 }

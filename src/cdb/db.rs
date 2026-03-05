@@ -354,6 +354,7 @@ impl ClauseDBIF for ClauseDB {
             // }
             // assert!(c.is_dead());
             c.flags = FlagClause::empty();
+            c.used = 0;
 
             #[cfg(feature = "clause_rewarding")]
             {
@@ -392,6 +393,7 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
+        c.used = 0;
         #[cfg(feature = "clause_rewarding")]
         {
             c.timestamp = *tick;
@@ -399,7 +401,6 @@ impl ClauseDBIF for ClauseDB {
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
-            c.rank_old = 1;
 
             #[cfg(feature = "bi_clause_completion")]
             if learnt {
@@ -411,7 +412,6 @@ impl ClauseDBIF for ClauseDB {
             }
         } else {
             c.update_lbd(asg, lbd_temp);
-            c.rank_old = c.rank;
         }
         self.lbd.update(c.rank);
         *num_clause += 1;
@@ -449,6 +449,7 @@ impl ClauseDBIF for ClauseDB {
             cid = cid_used;
             let c = &mut self[cid];
             c.flags = FlagClause::empty();
+            c.used = 0;
             std::mem::swap(&mut c.lits, vec);
             c.search_from = 2;
         } else {
@@ -471,6 +472,7 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
+        c.used = 0;
 
         #[cfg(feature = "clause_rewarding")]
         {
@@ -480,10 +482,8 @@ impl ClauseDBIF for ClauseDB {
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
-            c.rank_old = 1;
         } else {
             c.update_lbd(asg, lbd_temp);
-            c.rank_old = c.rank;
             c.turn_on(FlagClause::LEARNT);
         }
         let l0 = c.lits[0];
@@ -1071,7 +1071,7 @@ impl ClauseDBIF for ClauseDB {
                 }
                 ReductionType::RASonALL(cutoff, _) => {
                     let value = c.reverse_activity_sum(asg);
-                    if cutoff < value.min(c.rank_old as f64) {
+                    if cutoff < value.min(c.rank as f64) {
                         perm.push(OrderedProxy::new(i, value));
                     }
                 }
@@ -1079,7 +1079,7 @@ impl ClauseDBIF for ClauseDB {
                     perm.push(OrderedProxy::new(i, c.lbd()));
                 }
                 ReductionType::LBDonALL(cutoff, _) => {
-                    let value = c.rank.min(c.rank_old);
+                    let value = c.rank;
                     if cutoff < value {
                         perm.push(OrderedProxy::new(i, value as f64));
                     }

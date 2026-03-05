@@ -75,7 +75,6 @@ pub fn handle_conflict(
     asg.cancel_until(conflicting_level);
     asg.handle(SolverEvent::Conflict);
 
-    state.derive20.clear();
     let assign_level = conflict_analyze(asg, cdb, state, cc).max(asg.root_level());
     let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
@@ -212,9 +211,7 @@ pub fn handle_conflict(
 
             if bt_drift.is_none() {
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
-            }
-            for cid in &state.derive20 {
-                cdb[cid].turn_on(FlagClause::DERIVE20);
+                cdb[cid].used = cdb[cid].used.saturating_add(1);
             }
             rank = 1;
             #[cfg(feature = "bi_clause_completion")]
@@ -227,13 +224,9 @@ pub fn handle_conflict(
             debug_assert_eq!(cdb[cid].lit0(), l0);
             if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
+                cdb[cid].used = cdb[cid].used.saturating_add(1);
             }
             rank = cdb[cid].rank;
-            if rank <= 20 {
-                for cid in &state.derive20 {
-                    cdb[cid].turn_on(FlagClause::DERIVE20);
-                }
-            }
         }
         RefClause::RegisteredClause(cid) => {
             debug_assert_eq!(learnt_len, 2);
@@ -255,6 +248,7 @@ pub fn handle_conflict(
             rank = 1;
             if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
+                cdb[cid].used = cdb[cid].used.saturating_add(1);
             }
         }
         RefClause::Dead => unreachable!("handle_conflict::RefClause::Dead"),
@@ -266,7 +260,6 @@ pub fn handle_conflict(
     state
         .e_mode
         .update(conflicting_level as f64 - assign_level as f64);
-    state.derive20.clear();
     Ok(rank)
 }
 
@@ -422,7 +415,7 @@ fn conflict_analyze(
                 debug_assert!(!cdb[cid].is_dead() && 2 < cdb[cid].len());
                 // if !cdb.update_at_analysis(asg, cid) {
                 if !cdb[cid].is(FlagClause::LEARNT) {
-                    state.derive20.push(cid);
+                    cdb[cid].used = cdb[cid].used.saturating_add(1);
                 }
                 if max_lbd < cdb[cid].rank {
                     max_lbd = cdb[cid].rank;

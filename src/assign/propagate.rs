@@ -599,6 +599,7 @@ impl PropagateIF for AssignStack {
                 //             .collect::<Vec<_>>()
                 //     );
                 // }
+                cdb[cid].used = cdb[cid].used.saturating_add(1);
                 self.assign_by_implication(
                     cached,
                     AssignReason::Implication(cid),
