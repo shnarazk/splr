@@ -78,6 +78,47 @@ pub fn handle_conflict(
     asg.handle(SolverEvent::Conflict);
 
     let assign_level = conflict_analyze(asg, cdb, state, cc).max(asg.root_level());
+    // Reorder LRAT hints for the checker.
+    //
+    // Conflict analysis collects hints in trail-backward order (last propagated
+    // first).  LRAT checkers process hints sequentially and each hint clause
+    // must be unit (or empty) under the current partial assignment at the time
+    // it is reached.
+    //
+    // Root-level unit clauses (input or previously learned) justify literals
+    // that are unconditionally true; they must appear *before* any clause that
+    // relies on those literals.  Non-root hints are collected backwards along
+    // the trail and need to be reversed to restore forward-propagation order.
+    //
+    // Strategy: partition into root-level hints and non-root hints, deduplicate
+    // each group, then concatenate root-first followed by reversed non-root.
+    #[cfg(not(feature = "no_IO"))]
+    {
+        // Build a set of LRAT IDs that correspond to root-level assignments.
+        let root_id_set: std::collections::HashSet<u64> = state
+            .lrat_root_ids
+            .iter()
+            .copied()
+            .filter(|&id| id != 0)
+            .collect();
+        let mut root_hints: Vec<u64> = Vec::new();
+        let mut nonroot_hints: Vec<u64> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for &id in state.lrat_hints.iter() {
+            if id == 0 || !seen.insert(id) {
+                continue;
+            }
+            if root_id_set.contains(&id) {
+                root_hints.push(id);
+            } else {
+                nonroot_hints.push(id);
+            }
+        }
+        nonroot_hints.reverse();
+        state.lrat_hints.clear();
+        state.lrat_hints.extend_from_slice(&root_hints);
+        state.lrat_hints.append(&mut nonroot_hints);
+    }
     let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
     if learnt_len == 0 {
@@ -108,7 +149,10 @@ pub fn handle_conflict(
             _ => {
                 // dump to certified even if it's a literal.
                 #[cfg(not(feature = "no_IO"))]
-                cdb.certificate_add_assertion_lrat(l0, &state.lrat_hints);
+                {
+                    let lrat_id = cdb.certificate_add_assertion_lrat(l0, &state.lrat_hints);
+                    state.lrat_root_ids[l0.vi()] = lrat_id;
+                }
                 #[cfg(feature = "no_IO")]
                 cdb.certificate_add_assertion(l0);
                 if asg.assign_at_root_level(l0).is_err() {
@@ -210,9 +254,13 @@ pub fn handle_conflict(
     let rank: u16;
     match {
         #[cfg(not(feature = "no_IO"))]
-        { cdb.new_clause_lrat(asg, new_learnt, &state.lrat_hints) }
+        {
+            cdb.new_clause_lrat(asg, new_learnt, &state.lrat_hints)
+        }
         #[cfg(feature = "no_IO")]
-        { cdb.new_clause(asg, new_learnt, true) }
+        {
+            cdb.new_clause(asg, new_learnt, true)
+        }
     } {
         RefClause::Clause(cid) if learnt_len == 2 => {
             #[cfg(feature = "boundary_check")]
@@ -393,42 +441,48 @@ fn conflict_analyze(
     loop {
         match reason {
             AssignReason::BinaryLink(l) => {
+                // Always collect LRAT hint for the binary clause [!l, p],
+                // even if l's variable was already SEEN.  The hint is needed
+                // by the LRAT checker regardless of whether we still need to
+                // traverse the variable in the implication graph.
+                #[cfg(not(feature = "no_IO"))]
+                {
+                    let bcid = cdb
+                        .binary_links(!l)
+                        .iter()
+                        .find(|(ol, _)| *ol == p)
+                        .map(|(_, cid)| *cid);
+                    if let Some(bcid) = bcid {
+                        state.lrat_hints.push(cdb[bcid].lrat_id);
+                    }
+                }
                 let vi = l.vi();
                 if !asg.var(vi).is(FlagVar::CA_SEEN) {
                     validate_vi!(vi);
-                    // Collect LRAT hint: the binary clause [!l, p]
-                    #[cfg(not(feature = "no_IO"))]
-                    {
-                        let bcid = cdb.binary_links(!l)
-                            .iter()
-                            .find(|(ol, _)| *ol == p)
-                            .map(|(_, cid)| *cid);
-                        if let Some(bcid) = bcid {
-                            state.lrat_hints.push(cdb[bcid].lrat_id);
-                        }
-                    }
-                    // debug_assert_eq!(
-                    //     asg.level(vi),
-                    //     dl,
-                    //     "unblanced bi-clause {}-{} at conflict level {dl}, source: {}, cc: {:?}",
-                    //     p,
-                    //     l,
-                    //     asg.var(p.vi()).level,
-                    //     cc
-                    // );
-                    // if root_level == asg.level(vi) { continue; }
-                    set_seen!(vi);
-                    trace_lit!(l, " - binary linked");
                     let lvl = asg.level(vi);
-                    if dl == lvl {
-                        trace_lit!(l, " -- found another path");
-                        conflict_level!(vi);
+                    if root_level == lvl {
+                        // Collect LRAT hint for root-level literal
+                        #[cfg(not(feature = "no_IO"))]
+                        {
+                            let rid = state.lrat_root_ids[vi];
+                            if rid != 0 {
+                                state.lrat_hints.push(rid);
+                            }
+                        }
+                        trace_lit!(l, " -- ignore root level");
                     } else {
-                        trace_lit!(l, " -- push to earnt");
-                        // This path is created for chrono-BT.
-                        // So we must consider if `l` should be pushed or `!l`.
-                        // From debug log, it seems to be `!l`.
-                        learnt.push(!l);
+                        set_seen!(vi);
+                        trace_lit!(l, " - binary linked");
+                        if dl == lvl {
+                            trace_lit!(l, " -- found another path");
+                            conflict_level!(vi);
+                        } else {
+                            trace_lit!(l, " -- push to earnt");
+                            // This path is created for chrono-BT.
+                            // So we must consider if `l` should be pushed or `!l`.
+                            // From debug log, it seems to be `!l`.
+                            learnt.push(!l);
+                        }
                     }
                 }
             }
@@ -477,6 +531,17 @@ fn conflict_analyze(
                     if !asg.var(vi).is(FlagVar::CA_SEEN) {
                         let lvl = asg.level(vi);
                         if root_level == lvl {
+                            // Collect LRAT hint for root-level literal: the
+                            // clause that justified this root-level assignment
+                            // is needed by the LRAT checker even though we
+                            // don't traverse the variable further.
+                            #[cfg(not(feature = "no_IO"))]
+                            {
+                                let rid = state.lrat_root_ids[vi];
+                                if rid != 0 {
+                                    state.lrat_hints.push(rid);
+                                }
+                            }
                             trace_lit!(q, " -- ignore");
                             continue;
                         }
@@ -557,7 +622,39 @@ fn conflict_analyze(
         "appending {}, the final (but not minimized) learnt is {:?}",
         learnt[0], learnt
     );
+    // When LRAT certification is active, skip clause minimization because
+    // `is_redundant` and `minimize_with_bi_clauses` traverse reason clauses
+    // whose IDs are not collected into the LRAT hints.
+    #[cfg(not(feature = "no_IO"))]
+    if cdb.is_certification_active() {
+        return find_backtrack_level(&mut state.new_learnt, asg);
+    }
     minimize_learnt(&mut state.new_learnt, asg, cdb)
+}
+
+/// Compute the correct backtrack level from the learnt clause without minimizing it,
+/// and clear CA_SEEN flags. Used when LRAT certification is active (minimization skipped).
+#[cfg(not(feature = "no_IO"))]
+fn find_backtrack_level(new_learnt: &mut Vec<Lit>, asg: &mut AssignStack) -> DecisionLevel {
+    // Clear CA_SEEN for all literals in the learnt clause (they were set during analysis)
+    for l in new_learnt.iter() {
+        asg.var_mut(l.vi()).turn_off(FlagVar::CA_SEEN);
+    }
+    // Find correct backtrack level from remaining literals
+    let mut level_to_return = 0;
+    if 1 < new_learnt.len() {
+        let mut max_i = 1;
+        level_to_return = asg.level(new_learnt[max_i].vi());
+        for (i, l) in new_learnt.iter().enumerate().skip(2) {
+            let lv = asg.level(l.vi());
+            if level_to_return < lv {
+                level_to_return = lv;
+                max_i = i;
+            }
+        }
+        new_learnt.swap(1, max_i);
+    }
+    level_to_return
 }
 
 fn minimize_learnt(

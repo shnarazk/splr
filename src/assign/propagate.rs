@@ -1,7 +1,7 @@
 // implement boolean constraint propagation, backjump
 // This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{heap::VarHeapIF, AssignIF, AssignStack, VarManipulateIF},
+    super::{AssignIF, AssignStack, VarManipulateIF, heap::VarHeapIF},
     crate::{cdb::ClauseDBIF, types::*},
 };
 
@@ -222,14 +222,18 @@ impl PropagateIF for AssignStack {
             );
             let vi = l.vi();
             #[cfg(feature = "debug_propagation")]
-            debug_assert!(self.q_head <= i || self.var[vi].is(Flag::PROPAGATED),
-                    "unpropagated assigned level-{} var {:?},{:?} (loc:{} in trail{:?}) found, staying at level {}",
-                    self.var[vi].level,
-                    self.var[vi],
-                    self.reason[vi],
-                    i,
-                    self.trail_lim.iter().filter(|n| **n <= i).collect::<Vec<_>>(),
-                    self.decision_level(),
+            debug_assert!(
+                self.q_head <= i || self.var[vi].is(Flag::PROPAGATED),
+                "unpropagated assigned level-{} var {:?},{:?} (loc:{} in trail{:?}) found, staying at level {}",
+                self.var[vi].level,
+                self.var[vi],
+                self.reason[vi],
+                i,
+                self.trail_lim
+                    .iter()
+                    .filter(|n| **n <= i)
+                    .collect::<Vec<_>>(),
+                self.decision_level(),
             );
 
             #[cfg(feature = "chrono_BT")]
@@ -266,10 +270,11 @@ impl PropagateIF for AssignStack {
         #[cfg(feature = "chrono_BT")]
         self.trail.append(&mut unpropagated);
 
-        debug_assert!(self
-            .trail
-            .iter()
-            .all(|l| var_assign!(self, l.vi()).is_some()));
+        debug_assert!(
+            self.trail
+                .iter()
+                .all(|l| var_assign!(self, l.vi()).is_some())
+        );
         debug_assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
         self.trail_lim.truncate(lv as usize);
         // assert!(lim < self.q_head) doesn't hold sometimes in chronoBT.
@@ -838,7 +843,13 @@ impl AssignStack {
         assert_ne!(self.assigned(b1), Some(false));
     }
     /// simplify clauses by propagating literals at root level.
+    /// When LRAT certification is active, skip clause simplification because
+    /// `transform_by_simplification` would need proper LRAT hints for shortened
+    /// or unit clauses, which are not available here.
     fn propagate_at_root_level(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent {
+        if cdb.is_certification_active() {
+            return Ok(());
+        }
         let mut num_propagated = 0;
         while num_propagated < self.trail.len() {
             num_propagated = self.trail.len();
@@ -847,9 +858,11 @@ impl AssignStack {
                 if cdb[cid].is_dead() {
                     continue;
                 }
-                debug_assert!(cdb[cid]
-                    .iter()
-                    .all(|l| !self.var[l.vi()].is(FlagVar::ELIMINATED)));
+                debug_assert!(
+                    cdb[cid]
+                        .iter()
+                        .all(|l| !self.var[l.vi()].is(FlagVar::ELIMINATED))
+                );
                 match cdb.transform_by_simplification(self, cid) {
                     RefClause::Clause(_) => (),
                     RefClause::Dead => (), // was a satisfied clause

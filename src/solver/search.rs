@@ -55,7 +55,7 @@ impl SolveIF for Solver {
         state.flush("Preprocessing stage: ");
 
         #[cfg(feature = "clause_vivification")]
-        {
+        if !cdb.is_certification_active() {
             state.flush("vivifying...");
             if cdb.vivify(asg, state).is_err() {
                 #[cfg(feature = "support_user_assumption")]
@@ -99,19 +99,25 @@ impl SolveIF for Solver {
                         // We can't call `asg.assign_at_root_level(l)` even if p or m == 0.
                         // This means we can't pick `!l`.
                         // This becomes a problem in the case of incremental solving.
-                        if m == 0 {
-                            let l = Lit::from((vi, true));
-                            debug_assert!(asg.assigned(l).is_none());
-                            cdb.certificate_add_assertion(l);
-                            if asg.assign_at_root_level(l).is_err() {
-                                return Ok(Certificate::UNSAT);
-                            }
-                        } else if p == 0 {
-                            let l = Lit::from((vi, false));
-                            debug_assert!(asg.assigned(l).is_none());
-                            cdb.certificate_add_assertion(l);
-                            if asg.assign_at_root_level(l).is_err() {
-                                return Ok(Certificate::UNSAT);
+                        //
+                        // Skip pure literal elimination when LRAT certification is
+                        // active: the assertion would need LRAT hints referencing all
+                        // clauses that contain the variable, which we don't collect here.
+                        if !cdb.is_certification_active() {
+                            if m == 0 {
+                                let l = Lit::from((vi, true));
+                                debug_assert!(asg.assigned(l).is_none());
+                                cdb.certificate_add_assertion(l);
+                                if asg.assign_at_root_level(l).is_err() {
+                                    return Ok(Certificate::UNSAT);
+                                }
+                            } else if p == 0 {
+                                let l = Lit::from((vi, false));
+                                debug_assert!(asg.assigned(l).is_none());
+                                cdb.certificate_add_assertion(l);
+                                if asg.assign_at_root_level(l).is_err() {
+                                    return Ok(Certificate::UNSAT);
+                                }
                             }
                         }
                         asg.var_mut(vi).set(FlagVar::PHASE, m < p);
@@ -345,7 +351,7 @@ fn search(
                     }
                     asg.select_rephasing_target();
                 }
-                if cfg!(feature = "clause_vivification") {
+                if cfg!(feature = "clause_vivification") && !cdb.is_certification_active() {
                     cdb.vivify(asg, state)?;
                 }
                 if new_segment {

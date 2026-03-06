@@ -345,6 +345,23 @@ impl ClauseDBIF for ClauseDB {
         };
         self.new_clause_store(asg, vec, learnt, lrat_id)
     }
+    fn new_clause_input(
+        &mut self,
+        asg: &mut impl AssignIF,
+        vec: &mut Vec<Lit>,
+        lrat_id: u64,
+    ) -> RefClause {
+        debug_assert!(!vec.is_empty());
+        debug_assert!(1 < vec.len());
+        debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{vec:?}");
+        if vec.len() == 2
+            && let Some(&cid) = self.link_to_cid(vec[0], vec[1])
+        {
+            self.num_reregistration += 1;
+            return RefClause::RegisteredClause(cid);
+        }
+        self.new_clause_store(asg, vec, false, lrat_id)
+    }
     fn new_clause_lrat(
         &mut self,
         asg: &mut impl AssignIF,
@@ -1079,8 +1096,14 @@ impl ClauseDBIF for ClauseDB {
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause_lrat(&[lit], &[]);
     }
-    fn certificate_add_assertion_lrat(&mut self, lit: Lit, hints: &[u64]) {
-        self.certification_store.add_clause_lrat(&[lit], hints);
+    fn certificate_add_assertion_lrat(&mut self, lit: Lit, hints: &[u64]) -> u64 {
+        self.certification_store.add_clause_lrat(&[lit], hints)
+    }
+    fn certificate_add_input_clause(&mut self) -> u64 {
+        self.certification_store.add_input_clause()
+    }
+    fn certificate_emit_empty_clause(&mut self, hints: &[u64]) {
+        self.certification_store.add_clause_lrat(&[], hints);
     }
     fn is_certification_active(&self) -> bool {
         self.certification_store.is_active()
@@ -1310,8 +1333,7 @@ impl ClauseDB {
         asg: &mut impl AssignIF,
         vec: &mut Vec<Lit>,
         learnt: bool,
-        #[cfg_attr(feature = "no_IO", allow(unused_variables))]
-        lrat_id: u64,
+        #[cfg_attr(feature = "no_IO", allow(unused_variables))] lrat_id: u64,
     ) -> RefClause {
         let cid;
         if let Some(cid_used) = self.freelist.pop() {
