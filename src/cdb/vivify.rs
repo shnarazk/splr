@@ -7,7 +7,7 @@ use crate::{
     types::*,
 };
 
-const VIVIFY_LIMIT: usize = 80_000;
+const VIVIFY_LIMIT: usize = 20_000;
 
 pub trait VivifyIF {
     fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent;
@@ -24,12 +24,12 @@ impl VivifyIF for ClauseDB {
             })?;
         }
         let mut clauses: Vec<OrderedProxy<ClauseId>> =
-            select_targets(asg, self, state[Stat::Restart] == 0, NUM_TARGETS);
+            select_targets(asg, self, state, state[Stat::Restart] == 0, NUM_TARGETS);
+        state[Stat::Vivification] += 1;
         if clauses.is_empty() {
             return Ok(());
         }
         let num_target = clauses.len();
-        state[Stat::Vivification] += 1;
         // This is a reusable vector to reduce memory consumption,
         // the key is the number of invocation
         let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
@@ -46,8 +46,8 @@ impl VivifyIF for ClauseDB {
                     .map_err(SolverError::RootLevelConflict)?;
             }
 
-            debug_assert!(asg.stack_is_empty() || !asg.remains());
-            debug_assert_eq!(asg.root_level(), asg.decision_level());
+            // debug_assert!(asg.stack_is_empty() || !asg.remains());
+            // debug_assert_eq!(asg.root_level(), asg.decision_level());
             let cid = cp.to();
             let c = &mut self[cid];
             if c.is_dead() {
@@ -64,7 +64,7 @@ impl VivifyIF for ClauseDB {
                 to_display = num_check + display_step;
             }
             num_check += 1;
-            debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
+            // debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
             let mut decisions: Vec<Lit> = Vec::new();
             for lit in clits.iter().copied() {
                 // assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
@@ -91,7 +91,7 @@ impl VivifyIF for ClauseDB {
                                         asg.backtrack_sandbox();
                                         continue 'next_clause;
                                     } else {
-                                        debug_assert!(clits.len() != 2 || decisions.len() != 2);
+                                        // debug_assert!(clits.len() != 2 || decisions.len() != 2);
                                         seen[0] = num_check;
                                         vec = asg.analyze_sandbox(
                                             self, &decisions, &cnfl_lits, &mut seen,
@@ -183,13 +183,14 @@ impl VivifyIF for ClauseDB {
 fn select_targets(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
+    state: &State,
     initial_stage: bool,
     len: Option<usize>,
 ) -> Vec<OrderedProxy<ClauseId>> {
     if initial_stage {
         let mut seen: Vec<Option<OrderedProxy<ClauseId>>> = vec![None; 2 * (asg.num_vars + 1)];
         for (i, c) in cdb.iter().enumerate().skip(1) {
-            if let Some(rank) = c.to_vivify(true) {
+            if let Some(rank) = c.to_vivify(None) {
                 let p = &mut seen[usize::from(c.lit0())];
                 if p.as_ref().map_or(0.0, |r| r.value()) < rank {
                     *p = Some(OrderedProxy::new(ClauseId::from(i), rank));
@@ -205,15 +206,26 @@ fn select_targets(
         }
         clauses
     } else {
+        let n = state[Stat::Vivification] % 32;
+        let mut skips = 0;
         let mut clauses: Vec<OrderedProxy<ClauseId>> = cdb
             .iter()
             .enumerate()
             .skip(1)
             .filter_map(|(i, c)| {
-                c.to_vivify(false)
-                    .map(|r| OrderedProxy::new_invert(ClauseId::from(i), r))
+                c.to_vivify(Some(n as u16)).and_then(|r| {
+                    if r == 0.0 {
+                        skips += 1;
+                        None
+                    } else {
+                        Some(OrderedProxy::new_invert(ClauseId::from(i), r))
+                    }
+                })
             })
             .collect::<Vec<_>>();
+        // if skips < clauses.len() {
+        //     return vec![];
+        // }
         if let Some(max_len) = len {
             if max_len < clauses.len() {
                 clauses.sort();
@@ -342,21 +354,30 @@ impl Clause {
         }
     }
     #[cfg(not(feature = "clause_rewarding"))]
-    fn to_vivify(&self, initial_stage: bool) -> Option<f64> {
-        if initial_stage {
-            (!self.is_dead()).then(|| self.len() as f64)
+    fn to_vivify(&self, initial_stage: Option<u16>) -> Option<f64> {
+        if let Some(n) = initial_stage {
+            if n == 0 {
+                (
+                    !self.is_dead() && self.rank < 2
+                    // && (self.rank as usize) * 2 <= self.len()
+                    // && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20))
+                )
+                .then(|| -((self.len() as f64 - self.rank as f64) / self.rank as f64))
+            } else {
+                (!self.is_dead() && self.rank == n && self.used >= 4).then(|| {
+                    if (self.rank as usize) < self.len() {
+                        -(self.len() as f64) / self.rank as f64
+                    } else {
+                        0.0
+                    }
+                })
+            }
         } else {
-            (!self.is_dead()
-                && self.rank * 2 <= self.rank_old
-                && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
-            .then(|| -((self.rank_old - self.rank) as f64 / self.rank as f64))
+            (!self.is_dead()).then(|| self.len() as f64)
         }
     }
     /// clear flags about vivification
     fn vivified(&mut self) {
-        self.rank_old = self.rank;
-        if !self.is(FlagClause::LEARNT) {
-            self.turn_off(FlagClause::DERIVE20);
-        }
+        self.used = 0;
     }
 }

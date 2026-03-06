@@ -54,7 +54,7 @@ pub struct Config {
     //
     //## clause management
     //
-    // clause reward dacay rate
+    // clause reward decay rate
     pub crw_dcy_rat: f64,
     // clause reduction LBD threshold for mode 2: exploration
     pub cls_rdc_lbd: u16,
@@ -92,7 +92,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            c_cbt_thr: 100,
+            c_cbt_thr: 32, // 100,
             c_cls_lim: 0,
             c_timeout: 5000.0,
 
@@ -134,7 +134,7 @@ impl Config {
         let mut help = false;
         let mut version = false;
         if 1 < std::env::args().count() {
-            if let Some(ref cnf) = std::env::args().last() {
+            if let Some(ref cnf) = std::env::args().next_back() {
                 // we'll check the existence after parsing all args.
                 self.cnf_file = PathBuf::from(cnf.clone());
             }
@@ -272,8 +272,6 @@ impl Config {
                 "EMA calibration",
                 #[cfg(feature = "EVSIDS")]
                 "EVSIDS rewarding",
-                #[cfg(feature = "incremental_solver")]
-                "incremental solver",
                 #[cfg(feature = "just_used")]
                 "use 'just used' flag",
                 #[cfg(feature = "LRB_rewarding")]

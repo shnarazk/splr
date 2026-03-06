@@ -232,82 +232,8 @@ fn main() {
 }
 ```
 
-### All solutions SAT solver as an application of 'incremental_solver' feature
-
-The following example requires 'incremental_solver' feature. You need the following dependeny:
-
-```toml
-splr = { version = "^0.17", features = ["incremental_solver"] }
-```
-Under this configuration, module `splr` provides some more functions:
-
-- `splr::Solver::reset(&mut self)`
-- `splr::Solver::add_var(&mut self)` // increments the last variable number
-- `splr::Solver::add_clause(&mut self, vec: AsRef<[i32]>) -> Result<&mut Solver, SolverError>`
-
-You have to call `reset` before calling `add_var`, `add_clause`, and `solve` again.
-By this, splr forgets everything about the previous formula, especially non-equivalent transformations by pre/inter-processors like clause subsumbtion.
-So technically splr is not an incremental solver.
-
-'add_clause' will emit an error if `vec` is invalid.
-
-```rust
-use splr::*;
-use std::env::args;
-
-fn main() {
-    let cnf = args().nth(1).expect("takes an arg");
-    let assigns: Vec<i32> = Vec::new();
-    println!("#solutions: {}", run(&cnf, &assigns));
-}
-
-#[cfg(feature = "incremental_solver")]
-fn run(cnf: &str, assigns: &[i32]) -> usize {
-    let mut solver = Solver::try_from(cnf).expect("panic at loading a CNF");
-    for n in assigns.iter() {
-        solver.add_assignment(*n).expect("panic at assertion");
-    }
-    let mut count = 0;
-    loop {
-        match solver.solve() {
-            Ok(Certificate::SAT(ans)) => {
-                count += 1;
-                println!("s SATISFIABLE({}): {:?}", count, ans);
-                let ans = ans.iter().map(|i| -i).collect::<Vec<i32>>();
-                match solver.add_clause(ans) {
-                    Err(SolverError::Inconsistent) => {
-                        println!("c no answer due to level zero conflict");
-                        break;
-                    }
-                    Err(e) => {
-                        println!("s UNKNOWN; {:?}", e);
-                        break;
-                    }
-                    Ok(_) => solver.reset(),
-                }
-            }
-            Ok(Certificate::UNSAT) => {
-                println!("s UNSATISFIABLE");
-                break;
-            }
-            Err(e) => {
-                println!("s UNKNOWN; {}", e);
-                break;
-            }
-        }
-    }
-    count
-}
-```
-
-Since 0.4.1, `Solver` has `iter()`. So you can iterate on satisfiable '`solution: Vec<i32>`'s as:
-
-```rust
-#[cfg(feature = "incremental_solver")]
-for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
-    println!("{}-th answer: {:?}", i, v);
-}
-```
+Note: As of version 0.18.0, Splr no longer supports incremental mode,
+as it is not part of the development direction.
 
 #### sample code from my [sudoku solver](https://github.com/shnarazk/sudoku_sat/)
 

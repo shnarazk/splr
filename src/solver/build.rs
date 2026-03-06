@@ -102,8 +102,6 @@ pub trait SatSolverIF: Instantiate {
     /// * `SolverError::Inconsistent` if the CNF is conflicting.
     /// * `SolverError::InvalidLiteral` if any literal used in the CNF is out of range for var index.
     fn build(config: &Config) -> Result<Solver, SolverError>;
-    /// reinitialize a solver for incremental solving. **Requires 'incremental_solver' feature**
-    fn reset(&mut self);
     #[cfg(not(feature = "no_IO"))]
     /// dump an UNSAT certification file
     fn save_certification(&mut self);
@@ -238,26 +236,6 @@ impl SatSolverIF for Solver {
     fn build(config: &Config) -> Result<Solver, SolverError> {
         let CNFReader { cnf, reader } = CNFReader::try_from(Path::new(&config.cnf_file))?;
         Solver::instantiate(config, &cnf).inject(reader)
-    }
-    fn reset(&mut self) {
-        let Solver {
-            ref mut asg,
-            ref mut cdb,
-            ref mut state,
-        } = self;
-        asg.handle(SolverEvent::Reinitialize);
-        cdb.handle(SolverEvent::Reinitialize);
-        state.handle(SolverEvent::Reinitialize);
-
-        #[cfg(feature = "clause_elimination")]
-        {
-            let mut tmp = Vec::new();
-            std::mem::swap(&mut tmp, &mut cdb.eliminated_permanent);
-            while let Some(mut vec) = tmp.pop() {
-                // TODO: handle unit clauses
-                cdb.new_clause(asg, &mut vec, false);
-            }
-        }
     }
     #[cfg(not(feature = "no_IO"))]
     /// dump an UNSAT certification file

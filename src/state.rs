@@ -123,13 +123,12 @@ pub struct State {
     #[cfg(feature = "chrono_BT")]
     /// chronoBT threshold
     pub chrono_bt_threshold: DecisionLevel,
+    pub num_chrono_bt: usize,
 
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
     /// working place to build learnt clauses
     pub new_learnt: Vec<Lit>,
-    /// working place to store given clauses' ids which is used to derive a good learnt
-    pub derive20: Vec<ClauseId>,
     /// `progress` invocation counter
     pub progress_cnt: usize,
     /// keep the previous statistics values
@@ -166,10 +165,10 @@ impl Default for State {
 
             #[cfg(feature = "chrono_BT")]
             chrono_bt_threshold: 100,
+            num_chrono_bt: 0,
 
             last_asg: 0,
             new_learnt: Vec::new(),
-            derive20: Vec::new(),
             progress_cnt: 0,
             record: ProgressRecord::default(),
             sls_index: 0,
@@ -576,7 +575,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|vivC:{}, xplr:{}, core:{}, /ppc:{}",
+            "\x1B[2K        misc|vivC:{}, cbt%:{}, core:{}, /ppc:{}",
             im!(
                 "{:>9}",
                 self,
@@ -586,9 +585,11 @@ impl StateIF for State {
             fm!(
                 "{:>9.4}",
                 self,
-                LogF64Id::ExExTrend,
+                LogF64Id::ChronologicalBacktrackPercentage,
+                // LogF64Id::ExExTrend,
                 // self.e_mode.trend(),
-                self.exploration_rate_ema.get() // , self.e_mode_threshold
+                // self.exploration_rate_ema.get() // , self.e_mode_threshold
+                100.0 * self.num_chrono_bt as f64 / self[LogUsizeId::NumConflict] as f64
             ),
             im!(
                 "{:>9}",
@@ -920,6 +921,7 @@ pub enum LogF64Id {
     PropagationPerConflict,
     LiteralBlockEntanglement,
     RestartEnergy,
+    ChronologicalBacktrackPercentage,
 
     End,
 }
@@ -1032,6 +1034,25 @@ pub mod property {
                 Tusize::NumStage => self.stm.current_stage(),
                 Tusize::IntervalScale => self.stm.current_scale(),
                 Tusize::IntervalScaleMax => self.stm.max_scale(),
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub enum Tf64 {
+        /// the number of chronoBT / the number of BT
+        ChronologicalBacktrackRate,
+    }
+
+    pub const F64S: [Tf64; 1] = [Tf64::ChronologicalBacktrackRate];
+
+    impl PropertyDereference<Tf64, f64> for State {
+        #[inline]
+        fn derefer(&self, k: Tf64) -> f64 {
+            match k {
+                Tf64::ChronologicalBacktrackRate => {
+                    self.num_chrono_bt as f64 / self[LogUsizeId::NumConflict] as f64
+                }
             }
         }
     }

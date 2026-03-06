@@ -341,7 +341,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             .as_bytes(),
         )?;
     }
-    for key in &cdb::property::F64 {
+    for key in &cdb::property::F64S {
         out.write_all(
             format!(
                 "c   clause::{:<27}{:>19.3}\n",
@@ -355,6 +355,16 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
         out.write_all(
             format!(
                 "c   state::{:<28}{:>15}\n",
+                format!("{key:?}"),
+                s.state.derefer(*key),
+            )
+            .as_bytes(),
+        )?;
+    }
+    for key in &state::property::F64S {
+        out.write_all(
+            format!(
+                "c   state::{:<28}{:>19.3}\n",
                 format!("{key:?}"),
                 s.state.derefer(*key),
             )
