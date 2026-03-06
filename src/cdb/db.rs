@@ -339,104 +339,27 @@ impl ClauseDBIF for ClauseDB {
         }
 
         self.certification_store.add_clause(vec);
-        let cid;
-        if let Some(cid_used) = self.freelist.pop() {
-            cid = cid_used;
-            let c = &mut self[cid];
-            // if !c.is_dead() {
-            //     println!("{} {:?}", cid.format(), vec2int(&c.lits));
-            //     println!("len {}", self.watcher[NULL_LIT.negate() as usize].len());
-            //     for w in &self.watcher[NULL_LIT.negate() as usize][..10] {
-            //         if !self.clause[w.c].is_dead() {
-            //             println!("{}", w.c.format());
-            //         }
-            //     }
-            //     panic!("done");
-            // }
-            // assert!(c.is_dead());
-            c.flags = FlagClause::empty();
-            c.used = 0;
-
-            #[cfg(feature = "clause_rewarding")]
-            {
-                c.reward = 0.0;
-            }
-
-            debug_assert!(c.lits.is_empty()); // c.lits.clear();
-            std::mem::swap(&mut c.lits, vec);
-            c.search_from = 2;
-        } else {
-            cid = ClauseId::from(self.clause.len());
-            let mut c = Clause {
-                flags: FlagClause::empty(),
-                ..Clause::default()
-            };
-            std::mem::swap(&mut c.lits, vec);
-            self.clause.push(c);
-        };
-
-        let ClauseDB {
-            #[cfg(feature = "bi_clause_completion")]
-            bi_clause_completion_queue,
-            clause,
-            lbd_temp,
-            num_clause,
-            num_bi_clause,
-            num_bi_learnt,
-            num_lbd2,
-            num_learnt,
-            binary_link,
-
-            #[cfg(feature = "clause_rewarding")]
-            tick,
-
-            watch_cache,
-            ..
-        } = self;
-        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
-        c.used = 0;
-        #[cfg(feature = "clause_rewarding")]
+        self.new_clause_store(asg, vec, learnt)
+    }
+    fn new_clause_pr(
+        &mut self,
+        asg: &mut impl AssignIF,
+        vec: &mut Vec<Lit>,
+        learnt: bool,
+        witness: &[Lit],
+    ) -> RefClause {
+        debug_assert!(!vec.is_empty());
+        debug_assert!(1 < vec.len());
+        debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{vec:?}");
+        if vec.len() == 2
+            && let Some(&cid) = self.link_to_cid(vec[0], vec[1])
         {
-            c.timestamp = *tick;
+            self.num_reregistration += 1;
+            return RefClause::RegisteredClause(cid);
         }
-        let len2 = c.lits.len() == 2;
-        if len2 {
-            c.rank = 1;
 
-            #[cfg(feature = "bi_clause_completion")]
-            if learnt {
-                for lit in c.iter() {
-                    if !bi_clause_completion_queue.contains(lit) {
-                        bi_clause_completion_queue.push(*lit);
-                    }
-                }
-            }
-        } else {
-            c.update_lbd(asg, lbd_temp);
-        }
-        self.lbd.update(c.rank);
-        *num_clause += 1;
-        if learnt {
-            if len2 {
-                *num_bi_learnt += 1;
-            } else {
-                c.turn_on(FlagClause::LEARNT);
-                *num_learnt += 1;
-                if c.rank <= 2 {
-                    *num_lbd2 += 1;
-                }
-            }
-        }
-        let l0 = c.lits[0];
-        let l1 = c.lits[1];
-        if len2 {
-            *num_bi_clause += 1;
-            binary_link.add(l0, l1, cid);
-        } else {
-            watch_cache[!l0].insert_watch(cid, l1);
-            watch_cache[!l1].insert_watch(cid, l0);
-        }
-        RefClause::Clause(cid)
+        self.certification_store.add_clause_pr(vec, witness);
+        self.new_clause_store(asg, vec, learnt)
     }
     fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, vec: &mut Vec<Lit>) -> RefClause {
         debug_assert!(1 < vec.len());
@@ -1134,6 +1057,9 @@ impl ClauseDBIF for ClauseDB {
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);
     }
+    fn certificate_add_clause_pr(&mut self, clause: &[Lit], witness: &[Lit]) {
+        self.certification_store.add_clause_pr(clause, witness);
+    }
     fn certificate_save(&mut self) {
         self.certification_store.close();
     }
@@ -1351,6 +1277,102 @@ impl ClauseDB {
     ///```
     fn link_to_cid(&self, l0: Lit, l1: Lit) -> Option<&ClauseId> {
         self.binary_link.search(l0, l1)
+    }
+    /// Shared core for `new_clause` and `new_clause_pr`: create and register a clause,
+    /// assuming certification has already been recorded by the caller.
+    fn new_clause_store(
+        &mut self,
+        asg: &mut impl AssignIF,
+        vec: &mut Vec<Lit>,
+        learnt: bool,
+    ) -> RefClause {
+        let cid;
+        if let Some(cid_used) = self.freelist.pop() {
+            cid = cid_used;
+            let c = &mut self[cid];
+            c.flags = FlagClause::empty();
+            c.used = 0;
+
+            #[cfg(feature = "clause_rewarding")]
+            {
+                c.reward = 0.0;
+            }
+
+            debug_assert!(c.lits.is_empty()); // c.lits.clear();
+            std::mem::swap(&mut c.lits, vec);
+            c.search_from = 2;
+        } else {
+            cid = ClauseId::from(self.clause.len());
+            let mut c = Clause {
+                flags: FlagClause::empty(),
+                ..Clause::default()
+            };
+            std::mem::swap(&mut c.lits, vec);
+            self.clause.push(c);
+        };
+
+        let ClauseDB {
+            #[cfg(feature = "bi_clause_completion")]
+            bi_clause_completion_queue,
+            clause,
+            lbd_temp,
+            num_clause,
+            num_bi_clause,
+            num_bi_learnt,
+            num_lbd2,
+            num_learnt,
+            binary_link,
+
+            #[cfg(feature = "clause_rewarding")]
+            tick,
+
+            watch_cache,
+            ..
+        } = self;
+        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
+        c.used = 0;
+        #[cfg(feature = "clause_rewarding")]
+        {
+            c.timestamp = *tick;
+        }
+        let len2 = c.lits.len() == 2;
+        if len2 {
+            c.rank = 1;
+
+            #[cfg(feature = "bi_clause_completion")]
+            if learnt {
+                for lit in c.iter() {
+                    if !bi_clause_completion_queue.contains(lit) {
+                        bi_clause_completion_queue.push(*lit);
+                    }
+                }
+            }
+        } else {
+            c.update_lbd(asg, lbd_temp);
+        }
+        self.lbd.update(c.rank);
+        *num_clause += 1;
+        if learnt {
+            if len2 {
+                *num_bi_learnt += 1;
+            } else {
+                c.turn_on(FlagClause::LEARNT);
+                *num_learnt += 1;
+                if c.rank <= 2 {
+                    *num_lbd2 += 1;
+                }
+            }
+        }
+        let l0 = c.lits[0];
+        let l1 = c.lits[1];
+        if len2 {
+            *num_bi_clause += 1;
+            binary_link.add(l0, l1, cid);
+        } else {
+            watch_cache[!l0].insert_watch(cid, l1);
+            watch_cache[!l1].insert_watch(cid, l0);
+        }
+        RefClause::Clause(cid)
     }
 }
 

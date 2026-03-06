@@ -24,6 +24,7 @@ impl CertificationStore {
         false
     }
     pub fn add_clause(&mut self, _clause: &[Lit]) {}
+    pub fn add_clause_pr(&mut self, _clause: &[Lit], _witness: &[Lit]) {}
     pub fn delete_clause(&mut self, _vec: &[Lit]) {}
     pub fn close(&mut self) {}
 }
@@ -77,6 +78,38 @@ impl CertificationStore {
         }
         if DUMP_INTERVAL < self.queue.len() {
             self.dump_to_file();
+        }
+    }
+    /// Add a PR (Propagation Redundancy) clause with a witness to the proof.
+    /// Writes the DPR line: `l1 l2 ... lk 0 w1 w2 ... wm 0\n`
+    pub fn add_clause_pr(&mut self, clause: &[Lit], witness: &[Lit]) {
+        self.dump_to_file();
+        if let Some(ref mut buf) = self.buffer {
+            for l in clause.iter() {
+                if buf
+                    .write_all(format!("{} ", i32::from(*l)).as_bytes())
+                    .is_err()
+                {
+                    self.buffer = None;
+                    return;
+                }
+            }
+            if buf.write_all(b"0 ").is_err() {
+                self.buffer = None;
+                return;
+            }
+            for l in witness.iter() {
+                if buf
+                    .write_all(format!("{} ", i32::from(*l)).as_bytes())
+                    .is_err()
+                {
+                    self.buffer = None;
+                    return;
+                }
+            }
+            if buf.write_all(b"0\n").is_err() {
+                self.buffer = None;
+            }
         }
     }
     pub fn delete_clause(&mut self, clause: &[Lit]) {

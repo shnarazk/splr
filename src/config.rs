@@ -1,7 +1,7 @@
 /// Module `config` provides solver's configuration and CLI.
 use {crate::types::DecisionLevel, std::path::PathBuf};
 
-pub const CERTIFICATION_DEFAULT_FILENAME: &str = "proof.drat";
+pub const CERTIFICATION_DEFAULT_FILENAME: &str = "proof.out";
 
 /// Configuration built from command line options
 #[derive(Clone, Debug)]
@@ -30,7 +30,7 @@ pub struct Config {
     /// Output directory
     pub io_odir: PathBuf,
 
-    /// DRAT Cert. filename
+    /// DPR Cert. filename
     pub io_pfile: PathBuf,
 
     /// Result filename/stdout
@@ -45,7 +45,7 @@ pub struct Config {
     /// Show sub-module logging report
     pub show_journal: bool,
 
-    /// Writes a DRAT UNSAT certification file
+    /// Writes a DPR UNSAT certification file
     pub use_certification: bool,
 
     //
@@ -324,7 +324,7 @@ FLAGS:
   -h, --help                Prints help information
   -C, --no-color            Disable coloring
   -q, --quiet               Disable any progress message
-  -c, --certify             Writes a DRAT UNSAT certification file
+  -c, --certify             Writes a DPR UNSAT certification file
   -j, --journal             Shows log about restart stages
   -V, --version             Prints version information
 OPTIONS:
@@ -333,7 +333,7 @@ OPTIONS:
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
       --evo <elm-var-occ>   Max #cls for var elimination   {:>10}
   -o, --dir <io-outdir>     Output directory                {:>10}
-  -p, --proof <io-pfile>    DRAT Cert. filename                 {:>10}
+  -p, --proof <io-pfile>    DPR Cert. filename                 {:>10}
   -r, --result <io-rfile>   Result filename/stdout              {:>10}
   -t, --timeout <timeout>   CPU time limit in sec.         {:>10}
       --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
