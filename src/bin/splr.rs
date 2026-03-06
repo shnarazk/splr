@@ -2,11 +2,10 @@
 /// SAT solver for Propositional Logic in Rust, which can't be compiled with feature 'no_IO'
 use {
     splr::{
-        assign, cdb,
+        Config, EmaIF, PropertyDereference, PropertyReference, SolverError, VERSION, assign, cdb,
         config::{self, CERTIFICATION_DEFAULT_FILENAME},
         solver::*,
         state::{self, LogF64Id, LogUsizeId},
-        Config, EmaIF, PropertyDereference, PropertyReference, SolverError, VERSION,
     },
     std::{
         borrow::Cow,
@@ -63,23 +62,25 @@ fn main() {
     if config.io_pfile.to_string_lossy() != CERTIFICATION_DEFAULT_FILENAME
         && !config.use_certification
     {
-        println!("Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good.");
+        println!(
+            "Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good."
+        );
         return;
     }
-    if let Ok(val) = env::var("SPLR_TIMEOUT") {
-        if let Ok(timeout) = val.parse::<u64>() {
-            let input = cnf_file.as_ref().to_string();
-            let no_color = config.no_color;
-            thread::spawn(move || {
-                thread::sleep(Duration::from_millis(timeout * 1000));
-                println!(
-                    "{} (TimeOut): {}",
-                    colored(Err(&SolverError::TimeOut), no_color),
-                    input
-                );
-                std::process::exit(0);
-            });
-        }
+    if let Ok(val) = env::var("SPLR_TIMEOUT")
+        && let Ok(timeout) = val.parse::<u64>()
+    {
+        let input = cnf_file.as_ref().to_string();
+        let no_color = config.no_color;
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(timeout * 1000));
+            println!(
+                "{} (TimeOut): {}",
+                colored(Err(&SolverError::TimeOut), no_color),
+                input
+            );
+            std::process::exit(0);
+        });
     }
     let mut s = match Solver::build(&config) {
         Err(SolverError::EmptyClause | SolverError::RootLevelConflict(_)) => {

@@ -133,7 +133,7 @@ impl From<Lit> for usize {
 impl From<Lit> for i32 {
     #[inline]
     fn from(l: Lit) -> i32 {
-        if NonZeroU32::get(l.ordinal) % 2 == 0 {
+        if NonZeroU32::get(l.ordinal).is_multiple_of(2) {
             -((NonZeroU32::get(l.ordinal) >> 1) as i32)
         } else {
             (NonZeroU32::get(l.ordinal) >> 1) as i32
@@ -144,7 +144,7 @@ impl From<Lit> for i32 {
 impl From<&Lit> for i32 {
     #[inline]
     fn from(l: &Lit) -> i32 {
-        if NonZeroU32::get(l.ordinal) % 2 == 0 {
+        if NonZeroU32::get(l.ordinal).is_multiple_of(2) {
             -((NonZeroU32::get(l.ordinal) >> 1) as i32)
         } else {
             (NonZeroU32::get(l.ordinal) >> 1) as i32

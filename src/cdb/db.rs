@@ -331,12 +331,13 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(!vec.is_empty());
         debug_assert!(1 < vec.len());
         debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{vec:?}");
-        if vec.len() == 2 {
-            if let Some(&cid) = self.link_to_cid(vec[0], vec[1]) {
-                self.num_reregistration += 1;
-                return RefClause::RegisteredClause(cid);
-            }
+        if vec.len() == 2
+            && let Some(&cid) = self.link_to_cid(vec[0], vec[1])
+        {
+            self.num_reregistration += 1;
+            return RefClause::RegisteredClause(cid);
         }
+
         self.certification_store.add_clause(vec);
         let cid;
         if let Some(cid_used) = self.freelist.pop() {
@@ -439,11 +440,12 @@ impl ClauseDBIF for ClauseDB {
     }
     fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, vec: &mut Vec<Lit>) -> RefClause {
         debug_assert!(1 < vec.len());
-        if vec.len() == 2 {
-            if let Some(&cid) = self.link_to_cid(vec[0], vec[1]) {
-                return RefClause::RegisteredClause(cid);
-            }
+        if vec.len() == 2
+            && let Some(&cid) = self.link_to_cid(vec[0], vec[1])
+        {
+            return RefClause::RegisteredClause(cid);
         }
+
         let cid;
         if let Some(cid_used) = self.freelist.pop() {
             cid = cid_used;

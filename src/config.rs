@@ -133,12 +133,13 @@ impl Config {
     pub fn inject_from_args(&mut self) {
         let mut help = false;
         let mut version = false;
-        if 1 < std::env::args().count() {
-            if let Some(ref cnf) = std::env::args().next_back() {
-                // we'll check the existence after parsing all args.
-                self.cnf_file = PathBuf::from(cnf.clone());
-            }
+        if 1 < std::env::args().count()
+            && let Some(ref cnf) = std::env::args().next_back()
+        {
+            // we'll check the existence after parsing all args.
+            self.cnf_file = PathBuf::from(cnf.clone());
         }
+
         let args = std::env::args();
         let mut iter = args.skip(1);
         while let Some(arg) = iter.next() {

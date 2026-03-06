@@ -118,15 +118,15 @@ impl TryFrom<&Path> for CNFReader {
                 Ok(0) => break,
                 Ok(_k) => {
                     let mut iter = buf.split_whitespace();
-                    if iter.next() == Some("p") && iter.next() == Some("cnf") {
-                        if let Some(v) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
-                            if let Some(c) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
-                                nv = v;
-                                nc = c;
-                                found_valid_header = true;
-                                break;
-                            }
-                        }
+                    if iter.next() == Some("p")
+                        && iter.next() == Some("cnf")
+                        && let Some(v) = iter.next().map(|s| s.parse::<usize>().ok().unwrap())
+                        && let Some(c) = iter.next().map(|s| s.parse::<usize>().ok().unwrap())
+                    {
+                        nv = v;
+                        nc = c;
+                        found_valid_header = true;
+                        break;
                     }
                     continue;
                 }

@@ -38,10 +38,10 @@ pub fn handle_conflict(
     // at higher level due to the incoherence between the current level and conflicting
     // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
     {
-        if let AssignReason::Implication(cid) = cc.1 {
-            if cdb[cid].iter().all(|l| asg.level(l.vi()) == 0) {
-                return Err(SolverError::RootLevelConflict(*cc));
-            }
+        if let AssignReason::Implication(cid) = cc.1
+            && cdb[cid].iter().all(|l| asg.level(l.vi()) == 0)
+        {
+            return Err(SolverError::RootLevelConflict(*cc));
         }
     }
 

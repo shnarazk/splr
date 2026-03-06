@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 use crate::{
     assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
-    cdb::{clause::ClauseIF, ClauseDB, ClauseDBIF},
+    cdb::{ClauseDB, ClauseDBIF, clause::ClauseIF},
     state::{Stat, State, StateIF},
     types::*,
 };
@@ -198,12 +198,13 @@ fn select_targets(
             }
         }
         let mut clauses = seen.iter().filter_map(|p| p.clone()).collect::<Vec<_>>();
-        if let Some(max_len) = len {
-            if 10 * max_len < clauses.len() {
-                clauses.sort();
-                clauses.truncate(max_len);
-            }
+        if let Some(max_len) = len
+            && 10 * max_len < clauses.len()
+        {
+            clauses.sort();
+            clauses.truncate(max_len);
         }
+
         clauses
     } else {
         let n = state[Stat::Vivification] % 32;
@@ -226,12 +227,13 @@ fn select_targets(
         // if skips < clauses.len() {
         //     return vec![];
         // }
-        if let Some(max_len) = len {
-            if max_len < clauses.len() {
-                clauses.sort();
-                clauses.truncate(max_len);
-            }
+        if let Some(max_len) = len
+            && max_len < clauses.len()
+        {
+            clauses.sort();
+            clauses.truncate(max_len);
         }
+
         clauses
     }
 }
