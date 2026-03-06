@@ -16,8 +16,8 @@ pub struct Clause {
     pub(crate) flags: FlagClause,
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: u16,
-    /// A record of the rank at previos stage.
-    pub rank_old: u16,
+    /// The number of proagation.
+    pub used: u16,
     /// the index from which `propagate` starts searching an un-falsified literal.
     /// Since it's just a hint, we don't need u32 or usize.
     pub search_from: u16,
@@ -70,7 +70,7 @@ impl Default for Clause {
             lits: vec![],
             flags: FlagClause::empty(),
             rank: 0,
-            rank_old: 0,
+            used: 0,
             search_from: 2,
 
             #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]

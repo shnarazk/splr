@@ -25,8 +25,6 @@ bitflags! {
         const ENQUEUED     = 0b0000_0100;
         /// a clause is registered in vars' occurrence list.
         const OCCUR_LINKED = 0b0000_1000;
-        /// a given clause derived a learnt which LBD is smaller than 20.
-        const DERIVE20     = 0b0001_0000;
     }
 }
 

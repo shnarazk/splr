@@ -2,6 +2,8 @@
 
 #[cfg(feature = "boundary_check")]
 use crate::assign::DebugReportIF;
+#[cfg(feature = "trail_saving")]
+use crate::assign::TrailSavingIF;
 
 use {
     super::State,
@@ -75,7 +77,6 @@ pub fn handle_conflict(
     asg.cancel_until(conflicting_level);
     asg.handle(SolverEvent::Conflict);
 
-    state.derive20.clear();
     let assign_level = conflict_analyze(asg, cdb, state, cc).max(asg.root_level());
     let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
@@ -163,36 +164,40 @@ pub fn handle_conflict(
     // learnt clause quality based backtrack strategy switching
     // Idea: If the learned clause is low quality, don’t trust it to justify a large backjump; use CBT/limited-backjump instead.
     let bt_drift: Option<bool> = if cfg!(feature = "chrono_BT")
-    /* && 100_000 < asg.num_conflict */
-    {
-        if asg
+        && assign_level > 0
+        && asg
             .len_upto(conflicting_level)
             .saturating_sub(asg.len_upto(assign_level))
             >= 40
-        {
-            Some(true)
-        } else if new_learnt
+    {
+        Some(true)
+    } else if cfg!(feature = "BT_drift")
+        && assign_level > 0
+        && new_learnt
             .iter()
             .map(|l| asg.level(l.vi()))
             .collect::<HashSet<_>>()
             .len() as f64
             >= 2.5 * cdb.lbd.get().max(3.0)
-            && assign_level > 0
-        {
-            Some(false)
-        } else {
-            None
-        }
+    {
+        Some(false)
     } else {
         None
     };
     asg.cancel_until(match bt_drift {
         None => assign_level,
-        Some(false) => assign_level.saturating_sub(1),
+        Some(false) => assign_level - 1,
         Some(true) => conflicting_level - 1,
     });
     if bt_drift.is_some() {
-        state.num_chrono_bt += 1;
+        #[cfg(feature = "trail_saving")]
+        {
+            asg.clear_saved_trail();
+        }
+        #[cfg(feature = "chrono_BT")]
+        {
+            state.num_chrono_bt += 1;
+        }
     }
     // debug_assert_eq!(asg.assigned(l0), None);
     // debug_assert_eq!(
@@ -212,9 +217,7 @@ pub fn handle_conflict(
 
             if bt_drift.is_none() {
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
-            }
-            for cid in &state.derive20 {
-                cdb[cid].turn_on(FlagClause::DERIVE20);
+                cdb[cid].used = cdb[cid].used.saturating_add(1);
             }
             rank = 1;
             #[cfg(feature = "bi_clause_completion")]
@@ -227,13 +230,9 @@ pub fn handle_conflict(
             debug_assert_eq!(cdb[cid].lit0(), l0);
             if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
+                cdb[cid].used = cdb[cid].used.saturating_add(1);
             }
             rank = cdb[cid].rank;
-            if rank <= 20 {
-                for cid in &state.derive20 {
-                    cdb[cid].turn_on(FlagClause::DERIVE20);
-                }
-            }
         }
         RefClause::RegisteredClause(cid) => {
             debug_assert_eq!(learnt_len, 2);
@@ -255,6 +254,7 @@ pub fn handle_conflict(
             rank = 1;
             if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
+                cdb[cid].used = cdb[cid].used.saturating_add(1);
             }
         }
         RefClause::Dead => unreachable!("handle_conflict::RefClause::Dead"),
@@ -266,7 +266,6 @@ pub fn handle_conflict(
     state
         .e_mode
         .update(conflicting_level as f64 - assign_level as f64);
-    state.derive20.clear();
     Ok(rank)
 }
 
@@ -422,7 +421,7 @@ fn conflict_analyze(
                 debug_assert!(!cdb[cid].is_dead() && 2 < cdb[cid].len());
                 // if !cdb.update_at_analysis(asg, cid) {
                 if !cdb[cid].is(FlagClause::LEARNT) {
-                    state.derive20.push(cid);
+                    cdb[cid].used = cdb[cid].used.saturating_add(1);
                 }
                 if max_lbd < cdb[cid].rank {
                     max_lbd = cdb[cid].rank;
