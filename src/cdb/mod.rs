@@ -104,14 +104,12 @@ pub trait ClauseDBIF:
     /// This returns `true` if the clause became a unit clause.
     /// And this is called only from `Eliminator::strengthen_clause`.
     fn new_clause(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
-    /// allocate a new clause produced by BVE (variable elimination) and record it as a
-    /// DPR PR step with `witness` in the proof.
-    fn new_clause_pr(
+    /// allocate a new CDCL learned clause with LRAT propagation hints and return its id.
+    fn new_clause_lrat(
         &mut self,
         asg: &mut impl AssignIF,
         v: &mut Vec<Lit>,
-        learnt: bool,
-        witness: &[Lit],
+        hints: &[u64],
     ) -> RefClause;
     fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>) -> RefClause;
     /// un-register a clause `cid` from clause database and make the clause dead.
@@ -133,10 +131,12 @@ pub trait ClauseDBIF:
     /// update flags.
     /// return `true` if it's learnt.
     fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool;
-    /// record an asserted literal to unsat certification.
+    /// record an asserted literal to unsat certification (no hints — used for non-CDCL assertions).
     fn certificate_add_assertion(&mut self, lit: Lit);
-    /// record a PR clause with witness to unsat certification.
-    fn certificate_add_clause_pr(&mut self, clause: &[Lit], witness: &[Lit]);
+    /// record an asserted unit learned clause with LRAT hints.
+    fn certificate_add_assertion_lrat(&mut self, lit: Lit, hints: &[u64]);
+    /// return true if proof certification is active.
+    fn is_certification_active(&self) -> bool;
     /// save the certification record to a file.
     fn certificate_save(&mut self);
     /// check the number of clauses

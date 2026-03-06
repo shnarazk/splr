@@ -107,6 +107,9 @@ pub fn handle_conflict(
             }
             _ => {
                 // dump to certified even if it's a literal.
+                #[cfg(not(feature = "no_IO"))]
+                cdb.certificate_add_assertion_lrat(l0, &state.lrat_hints);
+                #[cfg(feature = "no_IO")]
                 cdb.certificate_add_assertion(l0);
                 if asg.assign_at_root_level(l0).is_err() {
                     unreachable!("handle_conflict::root_level_conflict_by_assertion");
@@ -205,7 +208,12 @@ pub fn handle_conflict(
     //     Some(assign_level)
     // );
     let rank: u16;
-    match cdb.new_clause(asg, new_learnt, true) {
+    match {
+        #[cfg(not(feature = "no_IO"))]
+        { cdb.new_clause_lrat(asg, new_learnt, &state.lrat_hints) }
+        #[cfg(feature = "no_IO")]
+        { cdb.new_clause(asg, new_learnt, true) }
+    } {
         RefClause::Clause(cid) if learnt_len == 2 => {
             #[cfg(feature = "boundary_check")]
             cdb[cid].set_birth(asg.num_conflict);
@@ -281,6 +289,8 @@ fn conflict_analyze(
     let learnt = &mut state.new_learnt;
     learnt.clear();
     learnt.push(Lit::from(u32::MAX));
+    #[cfg(not(feature = "no_IO"))]
+    state.lrat_hints.clear();
     let root_level = asg.root_level();
     // assert_eq!(asg.decision_level(), asg.var(cc.0.vi()).level);
     let dl = asg.decision_level();
@@ -386,6 +396,17 @@ fn conflict_analyze(
                 let vi = l.vi();
                 if !asg.var(vi).is(FlagVar::CA_SEEN) {
                     validate_vi!(vi);
+                    // Collect LRAT hint: the binary clause [!l, p]
+                    #[cfg(not(feature = "no_IO"))]
+                    {
+                        let bcid = cdb.binary_links(!l)
+                            .iter()
+                            .find(|(ol, _)| *ol == p)
+                            .map(|(_, cid)| *cid);
+                        if let Some(bcid) = bcid {
+                            state.lrat_hints.push(cdb[bcid].lrat_id);
+                        }
+                    }
                     // debug_assert_eq!(
                     //     asg.level(vi),
                     //     dl,
@@ -419,6 +440,9 @@ fn conflict_analyze(
                     p
                 );
                 debug_assert!(!cdb[cid].is_dead() && 2 < cdb[cid].len());
+                // Collect LRAT hint
+                #[cfg(not(feature = "no_IO"))]
+                state.lrat_hints.push(cdb[cid].lrat_id);
                 // if !cdb.update_at_analysis(asg, cid) {
                 if !cdb[cid].is(FlagClause::LEARNT) {
                     cdb[cid].used = cdb[cid].used.saturating_add(1);

@@ -34,6 +34,10 @@ pub struct Clause {
     pub birth: usize,
     #[cfg(feature = "boundary_check")]
     pub moved_at: Propagate,
+
+    /// LRAT proof step ID assigned to this clause (0 = unassigned).
+    #[cfg(not(feature = "no_IO"))]
+    pub(crate) lrat_id: u64,
 }
 
 /// API for Clause, providing literal accessors.
@@ -83,6 +87,9 @@ impl Default for Clause {
             birth: 0,
             #[cfg(feature = "boundary_check")]
             moved_at: Propagate::None,
+
+            #[cfg(not(feature = "no_IO"))]
+            lrat_id: 0,
         }
     }
 }

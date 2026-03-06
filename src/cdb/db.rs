@@ -338,15 +338,18 @@ impl ClauseDBIF for ClauseDB {
             return RefClause::RegisteredClause(cid);
         }
 
-        self.certification_store.add_clause(vec);
-        self.new_clause_store(asg, vec, learnt)
+        let lrat_id = if learnt {
+            self.certification_store.add_clause_lrat(vec, &[])
+        } else {
+            self.certification_store.add_input_clause()
+        };
+        self.new_clause_store(asg, vec, learnt, lrat_id)
     }
-    fn new_clause_pr(
+    fn new_clause_lrat(
         &mut self,
         asg: &mut impl AssignIF,
         vec: &mut Vec<Lit>,
-        learnt: bool,
-        witness: &[Lit],
+        hints: &[u64],
     ) -> RefClause {
         debug_assert!(!vec.is_empty());
         debug_assert!(1 < vec.len());
@@ -358,8 +361,8 @@ impl ClauseDBIF for ClauseDB {
             return RefClause::RegisteredClause(cid);
         }
 
-        self.certification_store.add_clause_pr(vec, witness);
-        self.new_clause_store(asg, vec, learnt)
+        let lrat_id = self.certification_store.add_clause_lrat(vec, hints);
+        self.new_clause_store(asg, vec, true, lrat_id)
     }
     fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, vec: &mut Vec<Lit>) -> RefClause {
         debug_assert!(1 < vec.len());
@@ -512,6 +515,8 @@ impl ClauseDBIF for ClauseDB {
         // debug_assert!((*ch).lits.contains(&p));
         // debug_assert!(1 < (*ch).len());
         debug_assert!(1 < usize::from(!p));
+        #[cfg(not(feature = "no_IO"))]
+        let old_lrat_id = c.lrat_id;
         let lits = &mut c.lits;
         debug_assert!(1 < lits.len());
         //
@@ -624,8 +629,11 @@ impl ClauseDBIF for ClauseDB {
             // self.watches(cid, "after strengthen_by_elimination case:3-3");
         }
         if certification_store.is_active() {
-            certification_store.add_clause(&c.lits);
-            certification_store.delete_clause(&new_lits);
+            #[cfg(not(feature = "no_IO"))]
+            {
+                c.lrat_id = certification_store.add_clause_lrat(&c.lits, &[]);
+                certification_store.delete_clause_lrat(old_lrat_id);
+            }
         }
         RefClause::Clause(cid)
     }
@@ -650,13 +658,16 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
         debug_assert!(new_lits.len() < c.len());
+        #[cfg(not(feature = "no_IO"))]
+        let old_lrat_id = c.lrat_id;
         if new_lits.len() == 2 {
             if let Some(&did) = binary_link.search(new_lits[0], new_lits[1]) {
                 //
                 //## Case:0
                 //
                 if certification_store.is_active() {
-                    certification_store.delete_clause(new_lits);
+                    #[cfg(not(feature = "no_IO"))]
+                    certification_store.delete_clause_lrat(old_lrat_id);
                 }
                 return RefClause::RegisteredClause(did);
             }
@@ -673,16 +684,16 @@ impl ClauseDBIF for ClauseDB {
             binary_link.add(l0, l1, cid);
 
             if certification_store.is_active() {
-                certification_store.add_clause(new_lits);
-                certification_store.delete_clause(&c.lits);
+                #[cfg(not(feature = "no_IO"))]
+                {
+                    // add new binary, delete old longer
+                    let new_id = certification_store.add_clause_lrat(&c.lits, &[]);
+                    certification_store.delete_clause_lrat(old_lrat_id);
+                    c.lrat_id = new_id;
+                }
             }
             c.turn_off(FlagClause::LEARNT);
             self.num_bi_clause += 1;
-
-            if certification_store.is_active() {
-                certification_store.add_clause(&c.lits);
-                certification_store.delete_clause(new_lits);
-            }
         } else {
             //
             //## Case:3
@@ -729,8 +740,11 @@ impl ClauseDBIF for ClauseDB {
             // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
 
             if certification_store.is_active() {
-                certification_store.add_clause(new_lits);
-                certification_store.delete_clause(&c.lits);
+                #[cfg(not(feature = "no_IO"))]
+                {
+                    c.lrat_id = certification_store.add_clause_lrat(&c.lits, &[]);
+                    certification_store.delete_clause_lrat(old_lrat_id);
+                }
             }
         }
         RefClause::Clause(cid)
@@ -781,6 +795,8 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
+        #[cfg(not(feature = "no_IO"))]
+        let old_lrat_id = c.lrat_id;
         let mut new_lits = c
             .lits
             .iter()
@@ -816,8 +832,11 @@ impl ClauseDBIF for ClauseDB {
                 }
 
                 if certification_store.is_active() {
-                    certification_store.add_clause(&c.lits);
-                    certification_store.delete_clause(&new_lits);
+                    #[cfg(not(feature = "no_IO"))]
+                    {
+                        c.lrat_id = certification_store.add_clause_lrat(&c.lits, &[]);
+                        certification_store.delete_clause_lrat(old_lrat_id);
+                    }
                 }
                 RefClause::Clause(cid)
             }
@@ -872,8 +891,11 @@ impl ClauseDBIF for ClauseDB {
                 // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
 
                 if certification_store.is_active() {
-                    certification_store.add_clause(&c.lits);
-                    certification_store.delete_clause(&new_lits);
+                    #[cfg(not(feature = "no_IO"))]
+                    {
+                        c.lrat_id = certification_store.add_clause_lrat(&c.lits, &[]);
+                        certification_store.delete_clause_lrat(old_lrat_id);
+                    }
                 }
                 RefClause::Clause(cid)
             }
@@ -1055,10 +1077,13 @@ impl ClauseDBIF for ClauseDB {
         }
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
-        self.certification_store.add_clause(&[lit]);
+        self.certification_store.add_clause_lrat(&[lit], &[]);
     }
-    fn certificate_add_clause_pr(&mut self, clause: &[Lit], witness: &[Lit]) {
-        self.certification_store.add_clause_pr(clause, witness);
+    fn certificate_add_assertion_lrat(&mut self, lit: Lit, hints: &[u64]) {
+        self.certification_store.add_clause_lrat(&[lit], hints);
+    }
+    fn is_certification_active(&self) -> bool {
+        self.certification_store.is_active()
     }
     fn certificate_save(&mut self) {
         self.certification_store.close();
@@ -1278,13 +1303,15 @@ impl ClauseDB {
     fn link_to_cid(&self, l0: Lit, l1: Lit) -> Option<&ClauseId> {
         self.binary_link.search(l0, l1)
     }
-    /// Shared core for `new_clause` and `new_clause_pr`: create and register a clause,
+    /// Shared core for `new_clause` and `new_clause_lrat`: create and register a clause,
     /// assuming certification has already been recorded by the caller.
     fn new_clause_store(
         &mut self,
         asg: &mut impl AssignIF,
         vec: &mut Vec<Lit>,
         learnt: bool,
+        #[cfg_attr(feature = "no_IO", allow(unused_variables))]
+        lrat_id: u64,
     ) -> RefClause {
         let cid;
         if let Some(cid_used) = self.freelist.pop() {
@@ -1335,6 +1362,10 @@ impl ClauseDB {
         {
             c.timestamp = *tick;
         }
+        #[cfg(not(feature = "no_IO"))]
+        {
+            c.lrat_id = lrat_id;
+        }
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
@@ -1379,6 +1410,7 @@ impl ClauseDB {
 #[inline]
 #[allow(clippy::too_many_arguments)]
 fn remove_clause_fn(
+    #[cfg_attr(feature = "no_IO", allow(unused_variables))]
     certification_store: &mut CertificationStore,
     binary_link: &mut BinaryLinkDB,
     watcher: &mut [WatchCache],
@@ -1404,7 +1436,8 @@ fn remove_clause_fn(
         *num_learnt -= 1;
     }
     *num_clause -= 1;
-    certification_store.delete_clause(&c.lits);
+    #[cfg(not(feature = "no_IO"))]
+    certification_store.delete_clause_lrat(c.lrat_id);
     c.lits.clear();
 }
 

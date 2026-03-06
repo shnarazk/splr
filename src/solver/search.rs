@@ -119,9 +119,9 @@ impl SolveIF for Solver {
                     }
                 }
                 //
-                //## Run eliminator
+                //## Run eliminator (skip when LRAT certification is active)
                 //
-                if USE_PRE_PROCESSING_ELIMINATOR {
+                if USE_PRE_PROCESSING_ELIMINATOR && !cdb.is_certification_active() {
                     state.flush("simplifying...");
                     if elim.simplify(asg, cdb, state, false).is_err() {
                         // Why inconsistent? Because the CNF contains a conflict, not an error!

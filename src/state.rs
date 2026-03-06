@@ -129,6 +129,9 @@ pub struct State {
     pub last_asg: usize,
     /// working place to build learnt clauses
     pub new_learnt: Vec<Lit>,
+    /// LRAT hint clause IDs collected during conflict analysis
+    #[cfg(not(feature = "no_IO"))]
+    pub lrat_hints: Vec<u64>,
     /// `progress` invocation counter
     pub progress_cnt: usize,
     /// keep the previous statistics values
@@ -169,6 +172,8 @@ impl Default for State {
 
             last_asg: 0,
             new_learnt: Vec::new(),
+            #[cfg(not(feature = "no_IO"))]
+            lrat_hints: Vec::new(),
             progress_cnt: 0,
             record: ProgressRecord::default(),
             sls_index: 0,
