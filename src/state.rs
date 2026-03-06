@@ -11,7 +11,7 @@ use {
     },
     std::{
         fmt,
-        io::{stdout, Write},
+        io::{Write, stdout},
         ops::{Index, IndexMut},
     },
 };
@@ -381,10 +381,6 @@ impl StateIF for State {
         if !self.config.splr_interface || self.config.quiet_mode {
             return;
         }
-        if self.config.use_log {
-            self.dump_header();
-            return;
-        }
         if 0 == self.progress_cnt {
             self.progress_cnt = 1;
             println!("{self}");
@@ -396,7 +392,7 @@ impl StateIF for State {
         }
     }
     fn flush<S: AsRef<str>>(&self, mes: S) {
-        if self.config.splr_interface && !self.config.quiet_mode && !self.config.use_log {
+        if self.config.splr_interface && !self.config.quiet_mode {
             if mes.as_ref().is_empty() {
                 print!("\x1B[1G\x1B[K")
             } else {
@@ -406,7 +402,7 @@ impl StateIF for State {
         }
     }
     fn log<S: AsRef<str>>(&mut self, tick: Option<(Option<usize>, Option<usize>, usize)>, mes: S) {
-        if self.config.splr_interface && !self.config.quiet_mode && !self.config.use_log {
+        if self.config.splr_interface && !self.config.quiet_mode {
             self.log_messages.insert(
                 0,
                 match tick {
@@ -470,10 +466,6 @@ impl StateIF for State {
         let rst_eng: f64 = self.restart.penetration_energy_charged;
         let stg_segment: usize = self.stm.current_segment();
 
-        if self.config.use_log {
-            self.dump(asg, cdb);
-            return;
-        }
         self.progress_cnt += 1;
         // print!("\x1B[9A\x1B[1G");
         print!("\x1B[");
@@ -748,102 +740,6 @@ impl IndexMut<LogF64Id> for State {
         }
         #[cfg(not(feature = "unsafe_access"))]
         &mut self.record.valf[i as usize]
-    }
-}
-
-impl State {
-    #[allow(dead_code)]
-    fn dump_header_details(&self) {
-        println!(
-            "   #mode,         Variable Assignment      ,,  \
-             Clause Database ent  ,,  Restart Strategy       ,, \
-             Misc Progress Parameters,,   Eliminator"
-        );
-        println!(
-            "   #init,    #remain,#asserted,#elim,total%,,#learnt,  \
-             #perm,#binary,,block,force, #asgn,  lbd/,,    lbd, \
-             back lv, conf lv,,clause,   var"
-        );
-    }
-    fn dump_header(&self) {
-        println!(
-            "c |      RESTARTS     |       ORIGINAL FORMULA     |       LEARNT CLAUSES     | Progress |\n\
-             c |   number av. cnfl |  Remains  Elim-ed  Clauses | #rdct   Learnts     LBD2 |          |\n\
-             c |-------------------|----------------------------|--------------------------|----------|"
-        );
-    }
-    fn dump<A, C>(&mut self, asg: &A, cdb: &C)
-    where
-        A: PropertyDereference<assign::property::Tusize, usize>,
-        C: PropertyDereference<cdb::property::Tusize, usize>,
-    {
-        self.progress_cnt += 1;
-        let asg_num_vars = asg.derefer(assign::property::Tusize::NumVar);
-        let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
-        let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumEliminatedVar);
-        let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
-        let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let asg_num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
-        let asg_num_restart = asg.derefer(assign::property::Tusize::NumRestart);
-        let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
-        let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
-        let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
-        let cdb_num_reduction = cdb.derefer(cdb::property::Tusize::NumReduction);
-        println!(
-            "c | {:>8} {:>8} | {:>8} {:>8} {:>8} |  {:>4}  {:>8} {:>8} | {:>6.3} % |",
-            asg_num_restart,                           // restart
-            asg_num_conflict / asg_num_restart.max(1), // average cfc (Conflict / Restart)
-            asg_num_unasserted_vars,                   // alive vars
-            asg_num_eliminated_vars,                   // eliminated vars
-            cdb_num_clause - cdb_num_learnt,           // given clauses
-            cdb_num_reduction,                         // clause reduction
-            cdb_num_learnt,                            // alive learnts
-            cdb_num_lbd2,                              // learnts with LBD = 2
-            rate * 100.0,                              // progress
-        );
-    }
-    #[allow(dead_code)]
-    fn dump_details<A, C>(&mut self, asg: &A, cdb: &C)
-    where
-        A: PropertyDereference<assign::property::Tusize, usize>
-            + PropertyReference<assign::property::TEma, EmaView>,
-        C: PropertyDereference<cdb::property::Tusize, usize>
-            + PropertyReference<cdb::property::TEma, EmaView>,
-    {
-        self.progress_cnt += 1;
-        let asg_num_vars = asg.derefer(assign::property::Tusize::NumVar);
-        let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
-        let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumEliminatedVar);
-        let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
-        let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let asg_num_restart = asg.derefer(assign::property::Tusize::NumRestart);
-        let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
-        let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
-        let rst_asg = asg.refer(assign::property::TEma::AssignRate);
-        let rst_lbd = cdb.refer(cdb::property::TEma::LBD);
-
-        println!(
-            "{:>3},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
-             {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
-             {:>6},{:>6}",
-            self.progress_cnt,
-            asg_num_unasserted_vars,
-            asg_num_asserted_vars,
-            asg_num_eliminated_vars,
-            rate * 100.0,
-            cdb_num_learnt,
-            cdb_num_clause,
-            0,
-            0,
-            asg_num_restart,
-            rst_asg.trend(),
-            rst_lbd.get(),
-            rst_lbd.trend(),
-            self.b_lvl.get(),
-            self.c_lvl.get(),
-            0, // elim.clause_queue_len(),
-            0, // elim.var_queue_len(),
-        );
     }
 }
 
