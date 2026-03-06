@@ -1,10 +1,10 @@
 use {
     super::{
+        BinaryLinkDB, CertificationStore, ClauseDBIF, ClauseId, ReductionType, RefClause,
         binary::{BinaryLinkIF, BinaryLinkList},
         ema::ProgressLBD,
         property,
         watch_cache::*,
-        BinaryLinkDB, CertificationStore, ClauseDBIF, ClauseId, ReductionType, RefClause,
     },
     crate::{assign::AssignIF, types::*},
     std::{
@@ -376,20 +376,20 @@ impl ClauseDBIF for ClauseDB {
 
         let ClauseDB {
             #[cfg(feature = "bi_clause_completion")]
-            ref mut bi_clause_completion_queue,
-            ref mut clause,
-            ref mut lbd_temp,
-            ref mut num_clause,
-            ref mut num_bi_clause,
-            ref mut num_bi_learnt,
-            ref mut num_lbd2,
-            ref mut num_learnt,
-            ref mut binary_link,
+            bi_clause_completion_queue,
+            clause,
+            lbd_temp,
+            num_clause,
+            num_bi_clause,
+            num_bi_learnt,
+            num_lbd2,
+            num_learnt,
+            binary_link,
 
             #[cfg(feature = "clause_rewarding")]
-            ref tick,
+            tick,
 
-            ref mut watch_cache,
+            watch_cache,
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
@@ -463,12 +463,12 @@ impl ClauseDBIF for ClauseDB {
         };
 
         let ClauseDB {
-            ref mut clause,
-            ref mut lbd_temp,
-            ref mut binary_link,
+            clause,
+            lbd_temp,
+            binary_link,
             #[cfg(feature = "clause_rewarding")]
-            ref tick,
-            ref mut watch_cache,
+            tick,
+            watch_cache,
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
@@ -576,11 +576,11 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(!self[cid].is_dead());
         debug_assert!(1 < self[cid].len());
         let ClauseDB {
-            ref mut clause,
-            ref mut binary_link,
-            ref mut watch_cache,
-            ref mut certification_store,
-            ref mut num_bi_clause,
+            clause,
+            binary_link,
+            watch_cache,
+            certification_store,
+            num_bi_clause,
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
@@ -684,12 +684,16 @@ impl ClauseDBIF for ClauseDB {
 
             #[cfg(feature = "maintain_watch_cache")]
             {
-                debug_assert!(watch_cache[!c.lits[0]]
-                    .iter()
-                    .any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
-                debug_assert!(watch_cache[!c.lits[1]]
-                    .iter()
-                    .any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
+                debug_assert!(
+                    watch_cache[!c.lits[0]]
+                        .iter()
+                        .any(|wc| wc.0 == cid && wc.1 == c.lits[1])
+                );
+                debug_assert!(
+                    watch_cache[!c.lits[1]]
+                        .iter()
+                        .any(|wc| wc.0 == cid && wc.1 == c.lits[0])
+                );
             }
 
             // self.watches(cid, "after strengthen_by_elimination case:3-3");
@@ -976,8 +980,8 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(old < 2);
         debug_assert!(1 < new);
         let ClauseDB {
-            ref mut clause,
-            ref mut watch_cache,
+            clause,
+            watch_cache,
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
@@ -1023,9 +1027,9 @@ impl ClauseDBIF for ClauseDB {
     /// reduce the number of 'learnt' or *removable* clauses.
     fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
         let ClauseDB {
-            ref mut clause,
-            ref mut lbd_temp,
-            ref mut num_reduction,
+            clause,
+            lbd_temp,
+            num_reduction,
 
             #[cfg(feature = "clause_rewarding")]
             ref tick,

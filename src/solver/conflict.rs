@@ -285,7 +285,7 @@ fn conflict_analyze(
     // assert_eq!(asg.decision_level(), asg.var(cc.0.vi()).level);
     let dl = asg.decision_level();
     let mut path_cnt = 0;
-    let (mut p, mut reason) = cc;
+    let &(mut p, mut reason) = cc;
     // assert_eq!(
     //     dl,
     //     asg.var(p.vi()).level,
@@ -531,8 +531,7 @@ fn conflict_analyze(
     learnt[0] = !p;
     trace!(
         "appending {}, the final (but not minimized) learnt is {:?}",
-        learnt[0],
-        learnt
+        learnt[0], learnt
     );
     minimize_learnt(&mut state.new_learnt, asg, cdb)
 }
