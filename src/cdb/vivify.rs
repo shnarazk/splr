@@ -23,8 +23,13 @@ impl VivifyIF for ClauseDB {
                 SolverError::RootLevelConflict(cc)
             })?;
         }
-        let mut clauses: Vec<OrderedProxy<ClauseId>> =
-            select_targets(asg, self, state, state[Stat::Restart] == 0, NUM_TARGETS);
+        let mut clauses: Vec<OrderedProxy<ClauseId>> = select_targets(
+            asg,
+            self,
+            state,
+            false, // state[Stat::Restart] == 0,
+            NUM_TARGETS,
+        );
         state[Stat::Vivification] += 1;
         if clauses.is_empty() {
             return Ok(());
@@ -360,7 +365,7 @@ impl Clause {
         if let Some(n) = initial_stage {
             if n == 0 {
                 (
-                    !self.is_dead() && self.rank < 2
+                    !self.is_dead() && self.rank <= 4
                     // && (self.rank as usize) * 2 <= self.len()
                     // && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20))
                 )
