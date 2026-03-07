@@ -2,7 +2,8 @@
 /// SAT solver for Propositional Logic in Rust, which can't be compiled with feature 'no_IO'
 use {
     splr::{
-        Config, EmaIF, PropertyDereference, PropertyReference, SolverError, VERSION, assign, cdb,
+        Config, EmaIF, PropertyDereference, PropertyReference, SolverError, VERSION, assign,
+        cdb::{self, ClauseDBIF},
         config::{self, CERTIFICATION_DEFAULT_FILENAME},
         solver::*,
         state::{self, LogF64Id, LogUsizeId},
@@ -98,6 +99,7 @@ fn main() {
     };
     let res = s.solve();
     save_result(&mut s, &res, &cnf_file, ans_file);
+    dbg!(s.cdb.clause_heatmap());
     std::process::exit(match res {
         Ok(Certificate::SAT(_)) => 10,
         Ok(Certificate::UNSAT) => 20,

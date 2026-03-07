@@ -156,6 +156,7 @@ pub trait ClauseDBIF:
     #[cfg(not(feature = "no_IO"))]
     /// dump all active clauses and assertions as a CNF file.
     fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);
+    fn clause_heatmap(&self) -> [[f64; 8]; 8];
 }
 
 pub mod property {
@@ -270,9 +271,11 @@ mod tests {
             println!("skip checking watches of an empty clause");
             return;
         }
-        assert!(c.lits[0..2]
-            .iter()
-            .all(|l| cdb.watch_cache[!*l].iter().any(|(c, _)| *c == cid)));
+        assert!(
+            c.lits[0..2]
+                .iter()
+                .all(|l| cdb.watch_cache[!*l].iter().any(|(c, _)| *c == cid))
+        );
         println!("pass to check watches");
     }
 
@@ -293,7 +296,7 @@ mod tests {
 
         asg.assign_by_decision(lit(-2)); // at level 1
         asg.assign_by_decision(lit(1)); // at level 2
-                                        // Now `asg.level` = [_, 2, 1, 3, 4, 5, 6].
+        // Now `asg.level` = [_, 2, 1, 3, 4, 5, 6].
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();

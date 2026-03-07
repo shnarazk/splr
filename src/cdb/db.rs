@@ -8,6 +8,7 @@ use {
     },
     crate::{assign::AssignIF, types::*},
     std::{
+        collections::HashMap,
         num::NonZeroU32,
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::{Iter, IterMut},
@@ -1297,6 +1298,25 @@ impl ClauseDBIF for ClauseDB {
             buf.write_all(format!("{} 0\n", i32::from(*x)).as_bytes())
                 .unwrap();
         }
+    }
+    fn clause_heatmap(&self) -> [[f64; 8]; 8] {
+        let mut stats: HashMap<(u16, u32), usize> = HashMap::new();
+        for c in self.clause.iter() {
+            if !c.is_dead() && c.rank <= 8 {
+                let u = c.used.saturating_add(1).ilog2().min(7);
+                *stats.entry((c.rank.saturating_sub(1), u)).or_default() += 1;
+            }
+        }
+        let total = stats.values().sum::<usize>() as f64;
+        let mut ret = [[0.0; 8]; 8];
+        for (i, r) in ret.iter_mut().enumerate() {
+            for j in 0..8 {
+                if let Some(k) = stats.get(&((i as u16), j)) {
+                    r[j as usize] = (*k as f64) / total;
+                }
+            }
+        }
+        ret
     }
 }
 
