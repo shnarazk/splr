@@ -541,16 +541,18 @@ fn minimize_learnt(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
 ) -> DecisionLevel {
-    let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
+    let mut to_clear: Vec<Lit> = new_learnt.clone();
     let mut levels = vec![false; asg.decision_level() as usize + 1];
     for l in &new_learnt[1..] {
-        to_clear.push(*l);
         levels[asg.level(l.vi()) as usize] = true;
     }
     let l0 = new_learnt[0];
+    let _len = new_learnt.len();
+    let _lbd = levels.iter().filter(|b| **b).count();
+    // if lbd < 5 || 20 < len {
     new_learnt.retain(|l| *l == l0 || !l.is_redundant(asg, cdb, &mut to_clear, &levels));
-    let len = new_learnt.len();
-    if 2 < len && len < 30 {
+    // }
+    if 2 < new_learnt.len() {
         cdb.minimize_with_bi_clauses(asg, new_learnt);
     }
     // find correct backtrack level from remaining literals
