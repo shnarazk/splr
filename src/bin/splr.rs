@@ -99,7 +99,21 @@ fn main() {
     };
     let res = s.solve();
     save_result(&mut s, &res, &cnf_file, ans_file);
-    dbg!(s.cdb.clause_heatmap());
+    {
+        let heatmap = s.cdb.clause_heatmap();
+        for (i, l) in heatmap.iter().enumerate() {
+            println!(
+                "LBD {} ({:.3}): {}",
+                i + 1,
+                l[0],
+                l.iter()
+                    .skip(1)
+                    .map(|v| format!("{v:.3}"))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            );
+        }
+    }
     std::process::exit(match res {
         Ok(Certificate::SAT(_)) => 10,
         Ok(Certificate::UNSAT) => 20,

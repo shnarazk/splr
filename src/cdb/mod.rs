@@ -156,7 +156,7 @@ pub trait ClauseDBIF:
     #[cfg(not(feature = "no_IO"))]
     /// dump all active clauses and assertions as a CNF file.
     fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);
-    fn clause_heatmap(&self) -> [[f64; 8]; 8];
+    fn clause_heatmap(&self) -> [[f64; 9]; 8];
 }
 
 pub mod property {

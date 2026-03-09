@@ -1299,22 +1299,29 @@ impl ClauseDBIF for ClauseDB {
                 .unwrap();
         }
     }
-    fn clause_heatmap(&self) -> [[f64; 8]; 8] {
+    fn clause_heatmap(&self) -> [[f64; 9]; 8] {
         let mut stats: HashMap<(u16, u32), usize> = HashMap::new();
+        let mut nc = 0;
         for c in self.clause.iter() {
-            if !c.is_dead() && c.rank <= 8 {
-                let u = c.used.saturating_add(1).ilog2().min(7);
-                *stats.entry((c.rank.saturating_sub(1), u)).or_default() += 1;
+            if !c.is_dead() {
+                nc += 1;
+                if c.rank <= 8 {
+                    let u = c.used.saturating_add(1).ilog2().min(7);
+                    *stats.entry((c.rank.saturating_sub(1), u)).or_default() += 1;
+                }
             }
         }
         let total = stats.values().sum::<usize>() as f64;
-        let mut ret = [[0.0; 8]; 8];
+        let mut ret = [[0.0; 9]; 8];
         for (i, r) in ret.iter_mut().enumerate() {
-            for j in 0..8 {
+            let mut subtotal = 0;
+            for j in 1..9 {
                 if let Some(k) = stats.get(&((i as u16), j)) {
+                    subtotal += k;
                     r[j as usize] = (*k as f64) / total;
                 }
             }
+            r[0] = (subtotal as f64) / (nc as f64);
         }
         ret
     }
