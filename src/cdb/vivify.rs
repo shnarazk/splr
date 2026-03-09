@@ -23,13 +23,8 @@ impl VivifyIF for ClauseDB {
                 SolverError::RootLevelConflict(cc)
             })?;
         }
-        let mut clauses: Vec<OrderedProxy<ClauseId>> = select_targets(
-            asg,
-            self,
-            state,
-            false, // state[Stat::Restart] == 0,
-            NUM_TARGETS,
-        );
+        let mut clauses: Vec<OrderedProxy<ClauseId>> =
+            select_targets(asg, self, state, state[Stat::Restart] == 0, NUM_TARGETS);
         state[Stat::Vivification] += 1;
         if clauses.is_empty() {
             return Ok(());
