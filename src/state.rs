@@ -540,13 +540,13 @@ impl StateIF for State {
         println!(
             "\x1B[2K    Conflict|entg:{}, cLvl:{}, bLvl:{}, /cpr:{}",
             fm!(
-                "{:>9.4}",
+                "{:>9.2}",
                 self,
                 LogF64Id::LiteralBlockEntanglement,
                 cdb_lb_ent
             ),
-            fm!("{:>9.4}", self, LogF64Id::CLevel, self.c_lvl.get()),
-            fm!("{:>9.4}", self, LogF64Id::BLevel, self.b_lvl.get()),
+            fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
+            fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
             fm!(
                 "{:>9.2}",
                 self,
@@ -556,8 +556,8 @@ impl StateIF for State {
         );
         println!(
             "\x1B[2K    Learning|avrg:{}, trnd:{}, #RST:{}, /dpc:{}",
-            fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd.get_fast()),
-            fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
+            fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get_fast()),
+            fm!("{:>9.2}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
             fm!(
                 "{:>9.2}",
