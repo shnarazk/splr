@@ -12,7 +12,6 @@ use {
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
     },
-    std::collections::HashSet,
 };
 
 /// returns:
@@ -162,49 +161,45 @@ pub fn handle_conflict(
     }
 
     // learnt clause quality based backtrack strategy switching
-    // Idea: If the learned clause is low quality, don't trust it to justify a large backjump; use CBT/limited-backjump instead.
-    //       The drift depth `d` scales with LBD trend: worse recent clause quality → deeper backtrack,
-    //       acting as a partial restart proportional to how badly the search is going.
-    let bt_drift: Option<bool> = if cfg!(feature = "chrono_BT")
+    // bt_drift: true only for chronological backtracking condition.
+    // drift: LBD-trend-based depth for partial restart via deeper backtracking.
+    //   trend < 1.2 → d = 0 (standard NCB, clause quality is fine)
+    //   trend < 1.5 → d = 1
+    //   trend < 2.0 → d = 2
+    //   otherwise   → d = 3
+    let bt_drift = cfg!(feature = "chrono_BT")
         && assign_level > 0
         && asg
             .len_upto(conflicting_level)
             .saturating_sub(asg.len_upto(assign_level))
-            >= 40
-    {
-        Some(true)
-    } else if cfg!(feature = "BT_drift")
-        && assign_level > 0
-        && new_learnt
-            .iter()
-            .map(|l| asg.level(l.vi()))
-            .collect::<HashSet<_>>()
-            .len() as f64
-            >= 2.5 * cdb.lbd.get().max(3.0)
-    {
-        Some(false)
-    } else {
-        None
-    };
-    asg.cancel_until(match bt_drift {
-        None => assign_level,
-        Some(false) => {
-            // Dynamic drift depth: d = max(1, floor(lbd_trend)).
-            // When trend ≈ 1.0 (normal quality), d = 1 (same as before).
-            // When trend ≈ 2.0 (twice as bad), d = 2 (deeper escape).
-            // When trend ≈ 3.0+, d = 3+ (even deeper, partial restart).
-            let d = (cdb.lbd.trend().floor() as u32).max(1);
-            assign_level.saturating_sub(d).max(asg.root_level())
+            >= 40;
+    let drift: u32 = if cfg!(feature = "BT_drift") && !bt_drift {
+        let trend = cdb.lbd.trend();
+        if trend < 1.2 {
+            0
+        } else if trend < 1.5 {
+            1
+        } else if trend < 2.0 {
+            2
+        } else {
+            3
         }
-        Some(true) => conflicting_level - 1,
+    } else {
+        0
+    };
+    let drifted = bt_drift || drift > 0;
+    asg.cancel_until(if bt_drift {
+        conflicting_level - 1
+    } else {
+        assign_level.saturating_sub(drift).max(asg.root_level())
     });
-    if bt_drift.is_some() {
+    if drifted {
         #[cfg(feature = "trail_saving")]
         {
             asg.clear_saved_trail();
         }
         #[cfg(feature = "chrono_BT")]
-        {
+        if bt_drift {
             state.num_chrono_bt += 1;
         }
     }
@@ -222,9 +217,9 @@ pub fn handle_conflict(
             debug_assert_eq!(l0, cdb[cid].lit0());
             debug_assert_eq!(l1, cdb[cid].lit1());
             debug_assert_eq!(asg.assigned(l0), None);
-            debug_assert!(bt_drift.is_some() || asg.assigned(l1) == Some(false));
+            debug_assert!(drifted || asg.assigned(l1) == Some(false));
 
-            if bt_drift.is_none() {
+            if !drifted {
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
                 cdb[cid].used = cdb[cid].used.saturating_add(1);
             }
@@ -237,7 +232,7 @@ pub fn handle_conflict(
             cdb[cid].set_birth(asg.num_conflict);
 
             debug_assert_eq!(cdb[cid].lit0(), l0);
-            if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
+            if !drifted || (bt_drift && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
                 cdb[cid].used = cdb[cid].used.saturating_add(1);
             }
@@ -250,7 +245,7 @@ pub fn handle_conflict(
                     || (l0 == cdb[cid].lit1() && l1 == cdb[cid].lit0())
             );
             debug_assert_eq!(asg.assigned(l0), None);
-            debug_assert!(bt_drift.is_some() || asg.assigned(l1) == Some(false));
+            debug_assert!(drifted || asg.assigned(l1) == Some(false));
             // if bt_drift.is_none() && asg.assigned(l1) != Some(false) {
             //     dbg!(cc);
             //     dbg!(asg.decision_level());
@@ -261,7 +256,7 @@ pub fn handle_conflict(
             //     panic!("here we are!");
             // }
             rank = 1;
-            if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
+            if !drifted || (bt_drift && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
                 cdb[cid].used = cdb[cid].used.saturating_add(1);
             }
