@@ -566,23 +566,16 @@ impl StateIF for State {
                 asg_dpc_ema.get()
             ),
         );
+        let e_mode_trend = self.e_mode.trend();
         println!(
-            "\x1B[2K        misc|vivC:{}, cbt%:{}, core:{}, /ppc:{}",
+            "\x1B[2K        misc|vivC:{}, eXeX:{}, core:{}, /ppc:{}",
             im!(
                 "{:>9}",
                 self,
                 LogUsizeId::VivifiedClause,
                 self[Stat::VivifiedClause]
             ),
-            fm!(
-                "{:>9.4}",
-                self,
-                LogF64Id::ChronologicalBacktrackPercentage,
-                // LogF64Id::ExExTrend,
-                // self.e_mode.trend(),
-                // self.exploration_rate_ema.get() // , self.e_mode_threshold
-                100.0 * self.num_chrono_bt as f64 / self[LogUsizeId::NumConflict] as f64
-            ),
+            fm!("{:>9.4}", self, LogF64Id::ExExTrend, e_mode_trend),
             im!(
                 "{:>9}",
                 self,

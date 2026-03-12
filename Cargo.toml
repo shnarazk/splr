@@ -24,6 +24,7 @@ default = [
     # "chrono_BT",
     "trail_saving",
     "BT_drift",
+    "e_mode_adaptive_restart",
 
     ### Heuristics
     # "bi_clause_completion",
@@ -54,6 +55,7 @@ bi_clause_completion = []       # this will increase memory pressure
 boundary_check = []             # for debug
 BT_drift = []                   # backtrack drift
 chrono_BT = []                  # NOT WORK
+e_mode_adaptive_restart = []    # e_mode-based adaptive restart threshold
 clause_elimination = []         # pre(in)-processor setting
 clause_rewarding = []           # clauses have activities w/ decay rate
 clause_vivification = []        # pre(in)-processor setting

@@ -394,8 +394,11 @@ fn search(
         //     cdb.refer(cdb::property::TEma::LBD),
         //     cdb.refer(cdb::property::TEma::Entanglement),
         // ) {
-        } else if cdb.refer(cdb::property::TEma::LBD).trend() > 2.0 {
-            RESTART!(asg, cdb, state);
+        } else {
+            let lbd_threshold = state.restart.lbd_restart_threshold(state.e_mode.as_view());
+            if cdb.refer(cdb::property::TEma::LBD).trend() > lbd_threshold {
+                RESTART!(asg, cdb, state);
+            }
         }
         if let Some(na) = asg.best_assigned() {
             if current_core < na && core_was_rebuilt.is_none() {
