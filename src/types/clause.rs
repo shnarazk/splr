@@ -11,13 +11,13 @@ use {
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct Clause {
     /// The literals in a clause.
-    pub(super) lits: Vec<Lit>,
+    pub(crate) lits: Vec<Lit>,
     /// Flags (8 bits)
     pub(crate) flags: FlagClause,
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: u16,
-    /// A record of the rank at previos stage.
-    pub rank_old: u16,
+    /// The number of proagation.
+    pub used: u16,
     /// the index from which `propagate` starts searching an un-falsified literal.
     /// Since it's just a hint, we don't need u32 or usize.
     pub search_from: u16,
@@ -54,6 +54,8 @@ pub trait ClauseIF {
     fn iter(&self) -> Iter<'_, Lit>;
     /// return the number of literals.
     fn len(&self) -> usize;
+    /// return true is this is a unit clause under `asg`.
+    fn is_unit_under(&self, asg: &impl AssignIF) -> bool;
 
     #[cfg(feature = "boundary_check")]
     /// return timestamp.
@@ -68,7 +70,7 @@ impl Default for Clause {
             lits: vec![],
             flags: FlagClause::empty(),
             rank: 0,
-            rank_old: 0,
+            used: 0,
             search_from: 2,
 
             #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
@@ -224,6 +226,19 @@ impl ClauseIF for Clause {
     fn len(&self) -> usize {
         self.lits.len()
     }
+    fn is_unit_under(&self, asg: &impl AssignIF) -> bool {
+        let unassigned = self
+            .lits
+            .iter()
+            .filter(|l| asg.assigned(**l).is_none())
+            .count();
+        let all_others_false = self
+            .lits
+            .iter()
+            .filter(|l| asg.assigned(**l).is_some())
+            .all(|l| asg.assigned(*l) == Some(false));
+        unassigned == 1 && all_others_false
+    }
 
     #[cfg(feature = "boundary_check")]
     /// return timestamp.
@@ -310,5 +325,36 @@ impl Clause {
         }
         self.rank = cnt;
         cnt as usize
+    }
+}
+
+// A generic reference to a clause or something else.
+// we can use DEAD for simply satisfied form, f.e. an empty forms,
+// while EmptyClause can be used for simply UNSAT form.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RefClause {
+    Clause(ClauseId),
+    Dead,
+    EmptyClause,
+    RegisteredClause(ClauseId),
+    UnitClause(Lit),
+}
+
+impl RefClause {
+    pub fn as_cid(&self) -> ClauseId {
+        match self {
+            RefClause::Clause(cid) => *cid,
+            RefClause::RegisteredClause(cid) => *cid,
+            _ => panic!("invalid reference to clause"),
+        }
+    }
+    pub fn is_new(&self) -> Option<ClauseId> {
+        match self {
+            RefClause::Clause(cid) => Some(*cid),
+            RefClause::RegisteredClause(_) => None,
+            RefClause::EmptyClause => None,
+            RefClause::Dead => None,
+            RefClause::UnitClause(_) => None,
+        }
     }
 }

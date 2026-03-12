@@ -169,6 +169,7 @@ trait VarOrderIF {
     fn get_root(&mut self) -> VarId;
     fn len(&self) -> usize;
     fn insert(&mut self, vi: VarId) -> usize;
+    #[allow(dead_code)]
     fn is_empty(&self) -> bool;
     fn remove(&mut self, vi: VarId) -> Option<usize>;
 }

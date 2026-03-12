@@ -1,14 +1,14 @@
 use {
     super::{
+        BinaryLinkDB, CertificationStore, ClauseDBIF, ClauseId, ReductionType, RefClause,
         binary::{BinaryLinkIF, BinaryLinkList},
-        clause::{Clause, ClauseIF},
         ema::ProgressLBD,
         property,
         watch_cache::*,
-        BinaryLinkDB, CertificationStore, ClauseDBIF, ClauseId, ReductionType, RefClause,
     },
     crate::{assign::AssignIF, types::*},
     std::{
+        collections::HashMap,
         num::NonZeroU32,
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::{Iter, IterMut},
@@ -24,14 +24,14 @@ use std::{fs::File, io::Write, path::Path};
 #[derive(Clone, Debug)]
 pub struct ClauseDB {
     /// container of clauses
-    pub(super) clause: Vec<Clause>,
+    pub(crate) clause: Vec<Clause>,
     /// hashed representation of binary clauses.
     ///## Note
     /// This means a biclause \[l0, l1\] is stored at bi_clause\[l0\] instead of bi_clause\[!l0\].
     ///
     binary_link: BinaryLinkDB,
     /// container of watch literals
-    pub(super) watch_cache: Vec<WatchCache>,
+    pub(crate) watch_cache: Vec<WatchCache>,
     /// collected free clause ids.
     freelist: Vec<ClauseId>,
     /// see unsat_certificate.rs
@@ -45,7 +45,7 @@ pub struct ClauseDB {
 
     // bi-clause completion
     bi_clause_completion_queue: Vec<Lit>,
-    pub(super) num_bi_clause_completion: usize,
+    pub(crate) num_bi_clause_completion: usize,
 
     //
     //## clause rewarding
@@ -63,30 +63,30 @@ pub struct ClauseDB {
     //
     /// a working buffer for LBD calculation
     lbd_temp: Vec<usize>,
-    pub(super) lbd: ProgressLBD,
+    pub(crate) lbd: ProgressLBD,
 
     //
     //## statistics
     //
     /// the number of active (not DEAD) clauses.
-    pub(super) num_clause: usize,
+    pub(crate) num_clause: usize,
     /// the number of binary clauses.
-    pub(super) num_bi_clause: usize,
+    pub(crate) num_bi_clause: usize,
     /// the number of binary learnt clauses.
-    pub(super) num_bi_learnt: usize,
+    pub(crate) num_bi_learnt: usize,
     /// the number of clauses which LBDs are 2.
-    pub(super) num_lbd2: usize,
+    pub(crate) num_lbd2: usize,
     /// the present number of learnt clauses.
-    pub(super) num_learnt: usize,
+    pub(crate) num_learnt: usize,
     /// the number of reductions.
-    pub(super) num_reduction: usize,
+    pub(crate) num_reduction: usize,
     /// the number of reregistration of a bi-clause
-    pub(super) num_reregistration: usize,
+    pub(crate) num_reregistration: usize,
     /// Literal Block Entanglement
     /// EMA of LBD of clauses used in conflict analysis (dependency graph)
-    pub(super) lb_entanglement: Ema2,
+    pub(crate) lb_entanglement: Ema2,
     /// cutoff value used in the last `reduce`
-    pub(super) reduction_threshold: f64,
+    pub(crate) reduction_threshold: f64,
 
     //
     //## incremental solving
@@ -332,12 +332,13 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(!vec.is_empty());
         debug_assert!(1 < vec.len());
         debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{vec:?}");
-        if vec.len() == 2 {
-            if let Some(&cid) = self.link_to_cid(vec[0], vec[1]) {
-                self.num_reregistration += 1;
-                return RefClause::RegisteredClause(cid);
-            }
+        if vec.len() == 2
+            && let Some(&cid) = self.link_to_cid(vec[0], vec[1])
+        {
+            self.num_reregistration += 1;
+            return RefClause::RegisteredClause(cid);
         }
+
         self.certification_store.add_clause(vec);
         let cid;
         if let Some(cid_used) = self.freelist.pop() {
@@ -355,6 +356,7 @@ impl ClauseDBIF for ClauseDB {
             // }
             // assert!(c.is_dead());
             c.flags = FlagClause::empty();
+            c.used = 0;
 
             #[cfg(feature = "clause_rewarding")]
             {
@@ -376,23 +378,24 @@ impl ClauseDBIF for ClauseDB {
 
         let ClauseDB {
             #[cfg(feature = "bi_clause_completion")]
-            ref mut bi_clause_completion_queue,
-            ref mut clause,
-            ref mut lbd_temp,
-            ref mut num_clause,
-            ref mut num_bi_clause,
-            ref mut num_bi_learnt,
-            ref mut num_lbd2,
-            ref mut num_learnt,
-            ref mut binary_link,
+            bi_clause_completion_queue,
+            clause,
+            lbd_temp,
+            num_clause,
+            num_bi_clause,
+            num_bi_learnt,
+            num_lbd2,
+            num_learnt,
+            binary_link,
 
             #[cfg(feature = "clause_rewarding")]
-            ref tick,
+            tick,
 
-            ref mut watch_cache,
+            watch_cache,
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
+        c.used = 0;
         #[cfg(feature = "clause_rewarding")]
         {
             c.timestamp = *tick;
@@ -400,7 +403,6 @@ impl ClauseDBIF for ClauseDB {
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
-            c.rank_old = 1;
 
             #[cfg(feature = "bi_clause_completion")]
             if learnt {
@@ -412,7 +414,6 @@ impl ClauseDBIF for ClauseDB {
             }
         } else {
             c.update_lbd(asg, lbd_temp);
-            c.rank_old = c.rank;
         }
         self.lbd.update(c.rank);
         *num_clause += 1;
@@ -440,16 +441,18 @@ impl ClauseDBIF for ClauseDB {
     }
     fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, vec: &mut Vec<Lit>) -> RefClause {
         debug_assert!(1 < vec.len());
-        if vec.len() == 2 {
-            if let Some(&cid) = self.link_to_cid(vec[0], vec[1]) {
-                return RefClause::RegisteredClause(cid);
-            }
+        if vec.len() == 2
+            && let Some(&cid) = self.link_to_cid(vec[0], vec[1])
+        {
+            return RefClause::RegisteredClause(cid);
         }
+
         let cid;
         if let Some(cid_used) = self.freelist.pop() {
             cid = cid_used;
             let c = &mut self[cid];
             c.flags = FlagClause::empty();
+            c.used = 0;
             std::mem::swap(&mut c.lits, vec);
             c.search_from = 2;
         } else {
@@ -463,15 +466,16 @@ impl ClauseDBIF for ClauseDB {
         };
 
         let ClauseDB {
-            ref mut clause,
-            ref mut lbd_temp,
-            ref mut binary_link,
+            clause,
+            lbd_temp,
+            binary_link,
             #[cfg(feature = "clause_rewarding")]
-            ref tick,
-            ref mut watch_cache,
+            tick,
+            watch_cache,
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
+        c.used = 0;
 
         #[cfg(feature = "clause_rewarding")]
         {
@@ -481,10 +485,8 @@ impl ClauseDBIF for ClauseDB {
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
-            c.rank_old = 1;
         } else {
             c.update_lbd(asg, lbd_temp);
-            c.rank_old = c.rank;
             c.turn_on(FlagClause::LEARNT);
         }
         let l0 = c.lits[0];
@@ -577,11 +579,11 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(!self[cid].is_dead());
         debug_assert!(1 < self[cid].len());
         let ClauseDB {
-            ref mut clause,
-            ref mut binary_link,
-            ref mut watch_cache,
-            ref mut certification_store,
-            ref mut num_bi_clause,
+            clause,
+            binary_link,
+            watch_cache,
+            certification_store,
+            num_bi_clause,
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
@@ -685,12 +687,16 @@ impl ClauseDBIF for ClauseDB {
 
             #[cfg(feature = "maintain_watch_cache")]
             {
-                debug_assert!(watch_cache[!c.lits[0]]
-                    .iter()
-                    .any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
-                debug_assert!(watch_cache[!c.lits[1]]
-                    .iter()
-                    .any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
+                debug_assert!(
+                    watch_cache[!c.lits[0]]
+                        .iter()
+                        .any(|wc| wc.0 == cid && wc.1 == c.lits[1])
+                );
+                debug_assert!(
+                    watch_cache[!c.lits[1]]
+                        .iter()
+                        .any(|wc| wc.0 == cid && wc.1 == c.lits[0])
+                );
             }
 
             // self.watches(cid, "after strengthen_by_elimination case:3-3");
@@ -736,10 +742,10 @@ impl ClauseDBIF for ClauseDB {
             //## Case:2
             //
             let old_l0 = c.lit0();
-            let old_l1 = c.lit0();
+            let old_l1 = c.lit1();
             std::mem::swap(&mut c.lits, new_lits);
             let l0 = c.lit0();
-            let l1 = c.lit0();
+            let l1 = c.lit1();
             watch_cache[!old_l0].remove_watch(&cid);
             watch_cache[!old_l1].remove_watch(&cid);
             binary_link.add(l0, l1, cid);
@@ -760,10 +766,10 @@ impl ClauseDBIF for ClauseDB {
             //## Case:3
             //
             let old_l0 = c.lit0();
-            let old_l1 = c.lit0();
+            let old_l1 = c.lit1();
             std::mem::swap(&mut c.lits, new_lits);
             let l0 = c.lit0();
-            let l1 = c.lit0();
+            let l1 = c.lit1();
 
             if (l0 == old_l0 && l1 == old_l1) || (l0 == old_l1 && l1 == old_l0) {
             } else if l0 == old_l0 {
@@ -977,8 +983,8 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(old < 2);
         debug_assert!(1 < new);
         let ClauseDB {
-            ref mut clause,
-            ref mut watch_cache,
+            clause,
+            watch_cache,
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
@@ -1024,9 +1030,9 @@ impl ClauseDBIF for ClauseDB {
     /// reduce the number of 'learnt' or *removable* clauses.
     fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
         let ClauseDB {
-            ref mut clause,
-            ref mut lbd_temp,
-            ref mut num_reduction,
+            clause,
+            lbd_temp,
+            num_reduction,
 
             #[cfg(feature = "clause_rewarding")]
             ref tick,
@@ -1063,13 +1069,16 @@ impl ClauseDBIF for ClauseDB {
                 continue;
             }
             alives += 1;
+            if c.rank <= 4 {
+                continue;
+            }
             match setting {
                 ReductionType::RASonADD(_) => {
                     perm.push(OrderedProxy::new(i, c.reverse_activity_sum(asg)));
                 }
                 ReductionType::RASonALL(cutoff, _) => {
                     let value = c.reverse_activity_sum(asg);
-                    if cutoff < value.min(c.rank_old as f64) {
+                    if cutoff < value.min(c.rank as f64) {
                         perm.push(OrderedProxy::new(i, value));
                     }
                 }
@@ -1077,7 +1086,7 @@ impl ClauseDBIF for ClauseDB {
                     perm.push(OrderedProxy::new(i, c.lbd()));
                 }
                 ReductionType::LBDonALL(cutoff, _) => {
-                    let value = c.rank.min(c.rank_old);
+                    let value = c.rank;
                     if cutoff < value {
                         perm.push(OrderedProxy::new(i, value as f64));
                     }
@@ -1181,14 +1190,6 @@ impl ClauseDBIF for ClauseDB {
         while let Some(lit) = self.bi_clause_completion_queue.pop() {
             self.complete_bi_clauses_with(asg, lit);
         }
-    }
-    #[cfg(feature = "incremental_solver")]
-    fn make_permanent_immortal(&mut self, cid: ClauseId) {
-        self.eliminated_permanent.push(
-            self.clause[NonZeroU32::get(cid.ordinal) as usize]
-                .lits
-                .clone(),
-        );
     }
     #[cfg(feature = "boundary_check")]
     fn watch_cache_contains(&self, lit: Lit, cid: ClauseId) -> bool {
@@ -1297,6 +1298,32 @@ impl ClauseDBIF for ClauseDB {
             buf.write_all(format!("{} 0\n", i32::from(*x)).as_bytes())
                 .unwrap();
         }
+    }
+    fn clause_heatmap(&self) -> [[f64; 9]; 8] {
+        let mut stats: HashMap<(u16, u32), usize> = HashMap::new();
+        let mut nc = 0;
+        for c in self.clause.iter() {
+            if !c.is_dead() {
+                nc += 1;
+                if c.rank <= 8 {
+                    let u = c.used.saturating_add(1).ilog2().min(7);
+                    *stats.entry((c.rank.saturating_sub(1), u)).or_default() += 1;
+                }
+            }
+        }
+        let total = stats.values().sum::<usize>() as f64;
+        let mut ret = [[0.0; 9]; 8];
+        for (i, r) in ret.iter_mut().enumerate() {
+            let mut subtotal = 0;
+            for j in 1..9 {
+                if let Some(k) = stats.get(&((i as u16), j)) {
+                    subtotal += k;
+                    r[j as usize] = (*k as f64) / total;
+                }
+            }
+            r[0] = (subtotal as f64) / (nc as f64);
+        }
+        ret
     }
 }
 

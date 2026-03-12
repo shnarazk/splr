@@ -1,8 +1,8 @@
 //! Conflict-Driven Clause Learning Search engine
 use {
     super::{
-        conflict::handle_conflict, restart::RestartIF, Certificate, Solver, SolverEvent,
-        SolverResult,
+        Certificate, Solver, SolverEvent, SolverResult, conflict::handle_conflict,
+        restart::RestartIF,
     },
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
@@ -45,18 +45,9 @@ impl SolveIF for Solver {
     /// }
     ///```
     fn solve(&mut self) -> SolverResult {
-        let Solver {
-            ref mut asg,
-            ref mut cdb,
-            ref mut state,
-        } = self;
+        let Solver { asg, cdb, state } = self;
         if cdb.check_size().is_err() {
             return Err(SolverError::OutOfMemory);
-        }
-        #[cfg(feature = "incremental_solver")]
-        {
-            // Reinitialize AssignStack::var_order with respect for assignments.
-            asg.rebuild_order();
         }
         state.progress_header();
         state.progress(asg, cdb);
@@ -108,22 +99,19 @@ impl SolveIF for Solver {
                         // We can't call `asg.assign_at_root_level(l)` even if p or m == 0.
                         // This means we can't pick `!l`.
                         // This becomes a problem in the case of incremental solving.
-                        #[cfg(not(feature = "incremental_solver"))]
-                        {
-                            if m == 0 {
-                                let l = Lit::from((vi, true));
-                                debug_assert!(asg.assigned(l).is_none());
-                                cdb.certificate_add_assertion(l);
-                                if asg.assign_at_root_level(l).is_err() {
-                                    return Ok(Certificate::UNSAT);
-                                }
-                            } else if p == 0 {
-                                let l = Lit::from((vi, false));
-                                debug_assert!(asg.assigned(l).is_none());
-                                cdb.certificate_add_assertion(l);
-                                if asg.assign_at_root_level(l).is_err() {
-                                    return Ok(Certificate::UNSAT);
-                                }
+                        if m == 0 {
+                            let l = Lit::from((vi, true));
+                            debug_assert!(asg.assigned(l).is_none());
+                            cdb.certificate_add_assertion(l);
+                            if asg.assign_at_root_level(l).is_err() {
+                                return Ok(Certificate::UNSAT);
+                            }
+                        } else if p == 0 {
+                            let l = Lit::from((vi, false));
+                            debug_assert!(asg.assigned(l).is_none());
+                            cdb.certificate_add_assertion(l);
+                            if asg.assign_at_root_level(l).is_err() {
+                                return Ok(Certificate::UNSAT);
                             }
                         }
                         asg.var_mut(vi).set(FlagVar::PHASE, m < p);
@@ -263,7 +251,8 @@ fn search(
         if 1 < handle_conflict(asg, cdb, state, &cc)? {
             num_learnt += 1;
         }
-        if state.stm.stage_ended(num_learnt) {
+        let stage_counter = num_learnt; // - state.num_chrono_bt;
+        if state.stm.stage_ended(/* num_learnt */ stage_counter) {
             if let Some(p) = state.elapsed() {
                 if 1.0 <= p {
                     return Err(SolverError::TimeOut);
@@ -279,7 +268,8 @@ fn search(
             cdb.check_consistency(asg, "before simplify");
 
             dump_stage(asg, cdb, state, previous_stage);
-            let next_stage: Option<bool> = state.stm.prepare_new_stage(num_learnt);
+            let next_stage: Option<bool> =
+                state.stm.prepare_new_stage(/* num_learnt */ stage_counter);
             let scale = state.stm.current_scale();
             let max_scale = state.stm.max_scale();
             if cfg!(feature = "reward_annealing") {
@@ -400,10 +390,11 @@ fn search(
             asg.handle(SolverEvent::Stage(scale));
             state.restart.set_stage_parameters(scale);
             previous_stage = next_stage;
-        } else if state.restart.restart(
-            cdb.refer(cdb::property::TEma::LBD),
-            cdb.refer(cdb::property::TEma::Entanglement),
-        ) {
+        // } else if state.restart.restart(
+        //     cdb.refer(cdb::property::TEma::LBD),
+        //     cdb.refer(cdb::property::TEma::Entanglement),
+        // ) {
+        } else if cdb.refer(cdb::property::TEma::LBD).trend() > 2.0 {
             RESTART!(asg, cdb, state);
         }
         if let Some(na) = asg.best_assigned() {

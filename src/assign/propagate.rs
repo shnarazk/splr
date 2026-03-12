@@ -23,12 +23,7 @@ pub trait PropagateIF {
     ///
     /// ## Warning
     /// Callers must assure the consistency after this assignment.
-    fn assign_by_implication(
-        &mut self,
-        l: Lit,
-        reason: AssignReason,
-        #[cfg(feature = "chrono_BT")] lv: DecisionLevel,
-    );
+    fn assign_by_implication(&mut self, l: Lit, reason: AssignReason, lv: DecisionLevel);
     /// unsafe assume (assign by decision); doesn't emit an exception.
     /// ## Caveat
     /// Callers have to assure the consistency after this assignment.
@@ -139,12 +134,7 @@ impl PropagateIF for AssignStack {
             _ => Err(SolverError::RootLevelConflict((l, self.var[l.vi()].reason))),
         }
     }
-    fn assign_by_implication(
-        &mut self,
-        l: Lit,
-        reason: AssignReason,
-        #[cfg(feature = "chrono_BT")] lv: DecisionLevel,
-    ) {
+    fn assign_by_implication(&mut self, l: Lit, reason: AssignReason, lv: DecisionLevel) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be enqueued");
         debug_assert!(l.vi() < self.var.len());
         // The following doesn't hold anymore by using chronoBT.
@@ -152,15 +142,16 @@ impl PropagateIF for AssignStack {
         let vi = l.vi();
         debug_assert!(!self.var[vi].is(FlagVar::ELIMINATED));
         debug_assert!(
-            var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
+            var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none(),
+            "wrong assignmentto {:?}: {:?} by {:?} ",
+            l,
+            self.var[vi].assign,
+            reason
         );
         debug_assert_eq!(self.var[vi].assign, None);
         debug_assert_eq!(self.var[vi].reason, AssignReason::None);
         debug_assert!(self.trail.iter().all(|rl| *rl != l));
         set_assign!(self, l);
-
-        #[cfg(not(feature = "chrono_BT"))]
-        let lv = self.decision_level();
 
         self.var[vi].level = lv;
         self.var[vi].reason = reason;
@@ -233,7 +224,7 @@ impl PropagateIF for AssignStack {
             #[cfg(feature = "debug_propagation")]
             debug_assert!(self.q_head <= i || self.var[vi].is(Flag::PROPAGATED),
                     "unpropagated assigned level-{} var {:?},{:?} (loc:{} in trail{:?}) found, staying at level {}",
-                    self.level[vi],
+                    self.var[vi].level,
                     self.var[vi],
                     self.reason[vi],
                     i,
@@ -242,7 +233,7 @@ impl PropagateIF for AssignStack {
             );
 
             #[cfg(feature = "chrono_BT")]
-            if self.level[vi] <= lv {
+            if self.var[vi].level <= lv {
                 unpropagated.push(l);
                 continue;
             }
@@ -419,15 +410,41 @@ impl PropagateIF for AssignStack {
                     Some(true) => (),
                     Some(false) => {
                         check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, blocker));
+                        // if [].contains(&blocker.vi()) && [].contains(&false_lit.vi()) {
+                        //     println!(
+                        //         "{RED}{:?} at {} conflicts with bin{}({})! (dl {}, propagation lv {}) {RESET}",
+                        //         blocker,
+                        //         self.var[blocker.vi()].level,
+                        //         cid,
+                        //         propagating,
+                        //         self.decision_level(),
+                        //         self.var[propagating.vi()].level,
+                        //     );
+                        //     println!("cdb[{:?}]: {:?}", cid, cdb[cid]);
+                        // }
                         conflict_path!(blocker, minimized_reason!(propagating));
                     }
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
+                        // debug_assert_eq!(dl, self.var[blocker.vi()].level);
+                        // if [].contains(&blocker.vi()) && [].contains(&false_lit.vi()) {
+                        //     println!(
+                        //         "{:?} Bound from {:?}! dlevel {}, vlevel {}, bin {:?}",
+                        //         blocker,
+                        //         propagating,
+                        //         self.decision_level(),
+                        //         self.var[propagating.vi()].level,
+                        //         propagating,
+                        //     );
+                        // }
                         self.assign_by_implication(
                             blocker,
                             minimized_reason!(propagating),
-                            #[cfg(feature = "chrono_BT")]
-                            self.level[propagating.vi()],
+                            if cfg!(feature = "chrono_BT") {
+                                self.var[propagating.vi()].level
+                            } else {
+                                dl
+                            },
                         );
                     }
                 }
@@ -529,25 +546,74 @@ impl PropagateIF for AssignStack {
                 cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
                 if other_watch_value == Some(false) {
                     check_in!(cid, Propagate::EmitConflict(self.num_conflict + 1, cached));
+                    // if [].contains(&cached.vi()) {
+                    //     println!(
+                    //         "{:?} conflict! (dlevel {}) vlevel {}, cid {:?}\n{:?}",
+                    //         cached,
+                    //         self.decision_level(),
+                    //         cdb[cid]
+                    //             .iter()
+                    //             .map(|l| {
+                    //                 if *l == cached {
+                    //                     self.root_level
+                    //                 } else {
+                    //                     self.var[l.vi()].level
+                    //                 }
+                    //             })
+                    //             .max()
+                    //             .unwrap_or(self.root_level),
+                    //         cid,
+                    //         cdb[cid]
+                    //             .iter()
+                    //             .map(|l| (l, self.var[l.vi()].level))
+                    //             .collect::<Vec<_>>()
+                    //     );
+                    // }
                     conflict_path!(cached, AssignReason::Implication(cid));
                 }
-
-                #[cfg(feature = "chrono_BT")]
-                let dl = cdb[cid]
-                    .iter()
-                    .skip(1)
-                    .map(|l| self.level[l.vi()])
-                    .max()
-                    .unwrap_or(self.root_level);
 
                 debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
+                // if [].contains(&cached.vi()) {
+                //     println!(
+                //         "{:?} Bound from {:?}! (dlevel {}) vlevel {}, cid {:?}\n{:?}",
+                //         cached,
+                //         propagating,
+                //         self.decision_level(),
+                //         cdb[cid]
+                //             .iter()
+                //             .map(|l| {
+                //                 if *l == cached {
+                //                     self.root_level
+                //                 } else {
+                //                     self.var[l.vi()].level
+                //                 }
+                //             })
+                //             .max()
+                //             .unwrap_or(self.root_level),
+                //         cid,
+                //         cdb[cid]
+                //             .iter()
+                //             .map(|l| (l, self.var[l.vi()].level))
+                //             .collect::<Vec<_>>()
+                //     );
+                // }
+                cdb[cid].used = cdb[cid].used.saturating_add(1);
                 self.assign_by_implication(
                     cached,
                     AssignReason::Implication(cid),
-                    #[cfg(feature = "chrono_BT")]
-                    dl,
+                    if cfg!(feature = "chrono_BT") {
+                        debug_assert!(self.var[cdb[cid].lit0().vi()].assign.is_none());
+                        cdb[cid]
+                            .iter()
+                            .skip(1)
+                            .map(|l| self.var[l.vi()].level)
+                            .max()
+                            .unwrap_or(self.root_level)
+                    } else {
+                        dl
+                    },
                 );
                 check_in!(cid, Propagate::BecameUnit(self.num_conflict, cached));
             }
@@ -589,6 +655,7 @@ impl PropagateIF for AssignStack {
                 return Err(($lit, $reason))
             };
         }
+        let dl = self.decision_level();
         while let Some(p) = self.trail.get(self.q_head) {
             self.q_head += 1;
             #[cfg(feature = "debug_propagation")]
@@ -606,10 +673,10 @@ impl PropagateIF for AssignStack {
             //
             //## binary loop
             //
-            for (blocker, cid) in cdb.binary_links(false_lit).iter().copied() {
-                debug_assert!(!cdb[cid].is_dead());
-                debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
-                debug_assert_ne!(blocker, false_lit);
+            for (blocker, _) in cdb.binary_links(false_lit).iter().copied() {
+                // debug_assert!(!cdb[cid].is_dead());
+                // debug_assert!(!self.var[blocker.vi()].is(FlagVar::ELIMINATED));
+                // debug_assert_ne!(blocker, false_lit);
 
                 #[cfg(feature = "boundary_check")]
                 debug_assert_eq!(cdb[*cid].len(), 2);
@@ -618,13 +685,16 @@ impl PropagateIF for AssignStack {
                     Some(true) => (),
                     Some(false) => conflict_path!(blocker, AssignReason::BinaryLink(propagating)),
                     None => {
-                        debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
+                        // debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
 
                         self.assign_by_implication(
                             blocker,
                             AssignReason::BinaryLink(propagating),
-                            #[cfg(feature = "chrono_BT")]
-                            self.level[false_lit.vi()],
+                            if cfg!(feature = "chrono_BT") {
+                                self.var[propagating.vi()].level
+                            } else {
+                                dl
+                            },
                         );
                     }
                 }
@@ -641,7 +711,7 @@ impl PropagateIF for AssignStack {
                     cdb.transform_by_restoring_watch_cache(propagating, &mut source, None);
                     continue;
                 }
-                debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
+                // debug_assert!(!self.var[cached.vi()].is(FlagVar::ELIMINATED));
                 let mut other_watch_value = lit_assign!(self, cached);
                 let mut updated_cache: Option<Lit> = None;
                 if matches!(other_watch_value, Some(true)) {
@@ -715,14 +785,6 @@ impl PropagateIF for AssignStack {
                     );
                     return Err((cached, AssignReason::Implication(cid)));
                 }
-
-                #[cfg(feature = "chrono_BT")]
-                let dl = cdb[cid]
-                    .iter()
-                    .skip(1)
-                    .map(|l| self.level[l.vi()])
-                    .max()
-                    .unwrap_or(self.root_level);
                 debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
@@ -730,8 +792,16 @@ impl PropagateIF for AssignStack {
                 self.assign_by_implication(
                     cached,
                     AssignReason::Implication(cid),
-                    #[cfg(feature = "chrono_BT")]
-                    dl,
+                    if cfg!(feature = "chrono_BT") {
+                        cdb[cid]
+                            .iter()
+                            .skip(1)
+                            .map(|l| self.var[l.vi()].level)
+                            .max()
+                            .unwrap_or(self.root_level)
+                    } else {
+                        dl
+                    },
                 );
                 check_in!(cid, Propagate::SandboxBecameUnit(self.num_conflict));
             }

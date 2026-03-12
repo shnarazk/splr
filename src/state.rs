@@ -11,7 +11,7 @@ use {
     },
     std::{
         fmt,
-        io::{stdout, Write},
+        io::{Write, stdout},
         ops::{Index, IndexMut},
     },
 };
@@ -123,13 +123,12 @@ pub struct State {
     #[cfg(feature = "chrono_BT")]
     /// chronoBT threshold
     pub chrono_bt_threshold: DecisionLevel,
+    pub num_chrono_bt: usize,
 
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
     /// working place to build learnt clauses
     pub new_learnt: Vec<Lit>,
-    /// working place to store given clauses' ids which is used to derive a good learnt
-    pub derive20: Vec<ClauseId>,
     /// `progress` invocation counter
     pub progress_cnt: usize,
     /// keep the previous statistics values
@@ -166,10 +165,10 @@ impl Default for State {
 
             #[cfg(feature = "chrono_BT")]
             chrono_bt_threshold: 100,
+            num_chrono_bt: 0,
 
             last_asg: 0,
             new_learnt: Vec::new(),
-            derive20: Vec::new(),
             progress_cnt: 0,
             record: ProgressRecord::default(),
             sls_index: 0,
@@ -382,10 +381,6 @@ impl StateIF for State {
         if !self.config.splr_interface || self.config.quiet_mode {
             return;
         }
-        if self.config.use_log {
-            self.dump_header();
-            return;
-        }
         if 0 == self.progress_cnt {
             self.progress_cnt = 1;
             println!("{self}");
@@ -397,7 +392,7 @@ impl StateIF for State {
         }
     }
     fn flush<S: AsRef<str>>(&self, mes: S) {
-        if self.config.splr_interface && !self.config.quiet_mode && !self.config.use_log {
+        if self.config.splr_interface && !self.config.quiet_mode {
             if mes.as_ref().is_empty() {
                 print!("\x1B[1G\x1B[K")
             } else {
@@ -407,7 +402,7 @@ impl StateIF for State {
         }
     }
     fn log<S: AsRef<str>>(&mut self, tick: Option<(Option<usize>, Option<usize>, usize)>, mes: S) {
-        if self.config.splr_interface && !self.config.quiet_mode && !self.config.use_log {
+        if self.config.splr_interface && !self.config.quiet_mode {
             self.log_messages.insert(
                 0,
                 match tick {
@@ -471,10 +466,6 @@ impl StateIF for State {
         let rst_eng: f64 = self.restart.penetration_energy_charged;
         let stg_segment: usize = self.stm.current_segment();
 
-        if self.config.use_log {
-            self.dump(asg, cdb);
-            return;
-        }
         self.progress_cnt += 1;
         // print!("\x1B[9A\x1B[1G");
         print!("\x1B[");
@@ -549,13 +540,13 @@ impl StateIF for State {
         println!(
             "\x1B[2K    Conflict|entg:{}, cLvl:{}, bLvl:{}, /cpr:{}",
             fm!(
-                "{:>9.4}",
+                "{:>9.2}",
                 self,
                 LogF64Id::LiteralBlockEntanglement,
                 cdb_lb_ent
             ),
-            fm!("{:>9.4}", self, LogF64Id::CLevel, self.c_lvl.get()),
-            fm!("{:>9.4}", self, LogF64Id::BLevel, self.b_lvl.get()),
+            fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
+            fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
             fm!(
                 "{:>9.2}",
                 self,
@@ -565,8 +556,8 @@ impl StateIF for State {
         );
         println!(
             "\x1B[2K    Learning|avrg:{}, trnd:{}, #RST:{}, /dpc:{}",
-            fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd.get_fast()),
-            fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
+            fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get_fast()),
+            fm!("{:>9.2}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
             fm!(
                 "{:>9.2}",
@@ -575,21 +566,16 @@ impl StateIF for State {
                 asg_dpc_ema.get()
             ),
         );
+        let e_mode_trend = self.e_mode.trend();
         println!(
-            "\x1B[2K        misc|vivC:{}, xplr:{}, core:{}, /ppc:{}",
+            "\x1B[2K        misc|vivC:{}, eXeX:{}, core:{}, /ppc:{}",
             im!(
                 "{:>9}",
                 self,
                 LogUsizeId::VivifiedClause,
                 self[Stat::VivifiedClause]
             ),
-            fm!(
-                "{:>9.4}",
-                self,
-                LogF64Id::ExExTrend,
-                // self.e_mode.trend(),
-                self.exploration_rate_ema.get() // , self.e_mode_threshold
-            ),
+            fm!("{:>9.4}", self, LogF64Id::ExExTrend, e_mode_trend),
             im!(
                 "{:>9}",
                 self,
@@ -750,102 +736,6 @@ impl IndexMut<LogF64Id> for State {
     }
 }
 
-impl State {
-    #[allow(dead_code)]
-    fn dump_header_details(&self) {
-        println!(
-            "   #mode,         Variable Assignment      ,,  \
-             Clause Database ent  ,,  Restart Strategy       ,, \
-             Misc Progress Parameters,,   Eliminator"
-        );
-        println!(
-            "   #init,    #remain,#asserted,#elim,total%,,#learnt,  \
-             #perm,#binary,,block,force, #asgn,  lbd/,,    lbd, \
-             back lv, conf lv,,clause,   var"
-        );
-    }
-    fn dump_header(&self) {
-        println!(
-            "c |      RESTARTS     |       ORIGINAL FORMULA     |       LEARNT CLAUSES     | Progress |\n\
-             c |   number av. cnfl |  Remains  Elim-ed  Clauses | #rdct   Learnts     LBD2 |          |\n\
-             c |-------------------|----------------------------|--------------------------|----------|"
-        );
-    }
-    fn dump<A, C>(&mut self, asg: &A, cdb: &C)
-    where
-        A: PropertyDereference<assign::property::Tusize, usize>,
-        C: PropertyDereference<cdb::property::Tusize, usize>,
-    {
-        self.progress_cnt += 1;
-        let asg_num_vars = asg.derefer(assign::property::Tusize::NumVar);
-        let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
-        let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumEliminatedVar);
-        let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
-        let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let asg_num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
-        let asg_num_restart = asg.derefer(assign::property::Tusize::NumRestart);
-        let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
-        let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
-        let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
-        let cdb_num_reduction = cdb.derefer(cdb::property::Tusize::NumReduction);
-        println!(
-            "c | {:>8} {:>8} | {:>8} {:>8} {:>8} |  {:>4}  {:>8} {:>8} | {:>6.3} % |",
-            asg_num_restart,                           // restart
-            asg_num_conflict / asg_num_restart.max(1), // average cfc (Conflict / Restart)
-            asg_num_unasserted_vars,                   // alive vars
-            asg_num_eliminated_vars,                   // eliminated vars
-            cdb_num_clause - cdb_num_learnt,           // given clauses
-            cdb_num_reduction,                         // clause reduction
-            cdb_num_learnt,                            // alive learnts
-            cdb_num_lbd2,                              // learnts with LBD = 2
-            rate * 100.0,                              // progress
-        );
-    }
-    #[allow(dead_code)]
-    fn dump_details<A, C>(&mut self, asg: &A, cdb: &C)
-    where
-        A: PropertyDereference<assign::property::Tusize, usize>
-            + PropertyReference<assign::property::TEma, EmaView>,
-        C: PropertyDereference<cdb::property::Tusize, usize>
-            + PropertyReference<cdb::property::TEma, EmaView>,
-    {
-        self.progress_cnt += 1;
-        let asg_num_vars = asg.derefer(assign::property::Tusize::NumVar);
-        let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
-        let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumEliminatedVar);
-        let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
-        let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let asg_num_restart = asg.derefer(assign::property::Tusize::NumRestart);
-        let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
-        let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
-        let rst_asg = asg.refer(assign::property::TEma::AssignRate);
-        let rst_lbd = cdb.refer(cdb::property::TEma::LBD);
-
-        println!(
-            "{:>3},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
-             {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
-             {:>6},{:>6}",
-            self.progress_cnt,
-            asg_num_unasserted_vars,
-            asg_num_asserted_vars,
-            asg_num_eliminated_vars,
-            rate * 100.0,
-            cdb_num_learnt,
-            cdb_num_clause,
-            0,
-            0,
-            asg_num_restart,
-            rst_asg.trend(),
-            rst_lbd.get(),
-            rst_lbd.trend(),
-            self.b_lvl.get(),
-            self.c_lvl.get(),
-            0, // elim.clause_queue_len(),
-            0, // elim.var_queue_len(),
-        );
-    }
-}
-
 /// Index for `Usize` data, used in [`ProgressRecord`](`crate::state::ProgressRecord`).
 #[derive(Clone, Copy, Debug)]
 pub enum LogUsizeId {
@@ -920,6 +810,7 @@ pub enum LogF64Id {
     PropagationPerConflict,
     LiteralBlockEntanglement,
     RestartEnergy,
+    ChronologicalBacktrackPercentage,
 
     End,
 }
@@ -1032,6 +923,25 @@ pub mod property {
                 Tusize::NumStage => self.stm.current_stage(),
                 Tusize::IntervalScale => self.stm.current_scale(),
                 Tusize::IntervalScaleMax => self.stm.max_scale(),
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub enum Tf64 {
+        /// the number of chronoBT / the number of BT
+        ChronologicalBacktrackRate,
+    }
+
+    pub const F64S: [Tf64; 1] = [Tf64::ChronologicalBacktrackRate];
+
+    impl PropertyDereference<Tf64, f64> for State {
+        #[inline]
+        fn derefer(&self, k: Tf64) -> f64 {
+            match k {
+                Tf64::ChronologicalBacktrackRate => {
+                    self.num_chrono_bt as f64 / self[LogUsizeId::NumConflict] as f64
+                }
             }
         }
     }

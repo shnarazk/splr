@@ -48,13 +48,10 @@ pub struct Config {
     /// Writes a DRAT UNSAT certification file
     pub use_certification: bool,
 
-    /// Uses Glucose-like progress report
-    pub use_log: bool,
-
     //
     //## clause management
     //
-    // clause reward dacay rate
+    // clause reward decay rate
     pub crw_dcy_rat: f64,
     // clause reduction LBD threshold for mode 2: exploration
     pub cls_rdc_lbd: u16,
@@ -92,7 +89,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            c_cbt_thr: 100,
+            c_cbt_thr: 32, // 100,
             c_cls_lim: 0,
             c_timeout: 5000.0,
 
@@ -105,7 +102,6 @@ impl Default for Config {
             quiet_mode: false,
             show_journal: false,
             use_certification: false,
-            use_log: false,
 
             crw_dcy_rat: 0.95,
             cls_rdc_lbd: 5,
@@ -133,19 +129,18 @@ impl Config {
     pub fn inject_from_args(&mut self) {
         let mut help = false;
         let mut version = false;
-        if 1 < std::env::args().count() {
-            if let Some(ref cnf) = std::env::args().last() {
-                // we'll check the existence after parsing all args.
-                self.cnf_file = PathBuf::from(cnf.clone());
-            }
+        if 1 < std::env::args().count()
+            && let Some(ref cnf) = std::env::args().next_back()
+        {
+            // we'll check the existence after parsing all args.
+            self.cnf_file = PathBuf::from(cnf.clone());
         }
+
         let args = std::env::args();
         let mut iter = args.skip(1);
         while let Some(arg) = iter.next() {
             if let Some(stripped) = arg.strip_prefix("--") {
-                let flags = [
-                    "no-color", "quiet", "certify", "journal", "log", "help", "version",
-                ];
+                let flags = ["no-color", "quiet", "certify", "journal", "help", "version"];
                 let options_usize = ["cl", "crl", "stat", "ecl", "evl", "evo"];
                 let options_f64 = ["timeout", "cdr", "cr1", "cr2", "vdr", "vds"];
                 let options_path = ["dir", "proof", "result"];
@@ -159,7 +154,6 @@ impl Config {
                                 "quiet" => self.quiet_mode = true,
                                 "certify" => self.use_certification = true,
                                 "journal" => self.show_journal = true,
-                                "log" => self.use_log = true,
                                 "help" => help = true,
                                 "version" => version = true,
                                 _ => panic!("invalid flag: {name}"),
@@ -228,7 +222,6 @@ impl Config {
                         "q" => self.quiet_mode = true,
                         "c" => self.use_certification = true,
                         "j" => self.show_journal = true,
-                        "l" => self.use_log = true,
                         "h" => help = true,
                         "V" => version = true,
                         _ => panic!("invalid flag: {name}"),
@@ -272,8 +265,6 @@ impl Config {
                 "EMA calibration",
                 #[cfg(feature = "EVSIDS")]
                 "EVSIDS rewarding",
-                #[cfg(feature = "incremental_solver")]
-                "incremental solver",
                 #[cfg(feature = "just_used")]
                 "use 'just used' flag",
                 #[cfg(feature = "LRB_rewarding")]
@@ -335,7 +326,6 @@ FLAGS:
   -q, --quiet               Disable any progress message
   -c, --certify             Writes a DRAT UNSAT certification file
   -j, --journal             Shows log about restart stages
-  -l, --log                 Uses Glucose-like progress report
   -V, --version             Prints version information
 OPTIONS:
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}

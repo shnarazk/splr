@@ -17,15 +17,12 @@ mod select;
 mod stack;
 /// trail saving
 mod trail_saving;
-/// var struct and its methods
-mod var;
 
 pub use self::{
     propagate::PropagateIF,
     property::*,
     select::VarSelectIF,
-    stack::AssignStack,
-    var::{Var, VarManipulateIF},
+    stack::{AssignStack, VarManipulateIF},
 };
 use {
     crate::{cdb::ClauseDBIF, types::*},
@@ -60,6 +57,8 @@ pub trait AssignIF:
     /// ## Caveat
     /// - it emits a panic by out of index range.
     /// - it emits a panic if the level is 0.
+    ///
+    /// CAVEAT: this return a wrong value under chrono_BT
     fn len_upto(&self, n: DecisionLevel) -> usize;
     /// return `true` if there's no assignment.
     fn stack_is_empty(&self) -> bool;

@@ -1,3 +1,7 @@
+## 0.18.0, 2025-0X-XX
+
+- Remove feature 'incremental_solver'
+
 ## 0.17.4, 2025-01-28
 
 - Rename feature 'no_clause_elimination' to 'clause_elimination'

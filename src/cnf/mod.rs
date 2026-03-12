@@ -149,15 +149,15 @@ impl CnfIf for CNF {
                 }
                 Ok(_) => {
                     let mut iter = buf.split_whitespace();
-                    if iter.next() == Some("p") && iter.next() == Some("cnf") {
-                        if let Some(v) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
-                            if let Some(c) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
-                                nv = v as u32;
-                                nc = c;
-                                found_valid_header = true;
-                                cnf.no_check_uniqueness = TOO_MANY_CLAUSES < nc;
-                            }
-                        }
+                    if iter.next() == Some("p")
+                        && iter.next() == Some("cnf")
+                        && let Some(v) = iter.next().map(|s| s.parse::<usize>().ok().unwrap())
+                        && let Some(c) = iter.next().map(|s| s.parse::<usize>().ok().unwrap())
+                    {
+                        nv = v as u32;
+                        nc = c;
+                        found_valid_header = true;
+                        cnf.no_check_uniqueness = TOO_MANY_CLAUSES < nc;
                     }
                 }
                 Err(e) => {
