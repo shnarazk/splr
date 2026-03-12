@@ -111,6 +111,8 @@ pub struct State {
     pub b_lvl: Ema,
     /// EMA of conflicting levels
     pub c_lvl: Ema,
+    /// EMA of backtrack level drift caused by chrono_BT or BT_deepen
+    pub bt_drift_average: Ema,
     /// EMA of c_lbd - b_lbd, or Exploration vs. Eploitation
     pub e_mode: Ema2,
     pub e_mode_threshold: f64,
@@ -156,6 +158,7 @@ impl Default for State {
 
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
+            bt_drift_average: Ema::new(1000),
             e_mode: Ema2::new(40).with_slow(4_000).with_value(10.0),
             e_mode_threshold: 1.20,
             exploration_rate_ema: Ema::new(1000),
@@ -567,7 +570,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|vivC:{}, cbt%:{}, core:{}, /ppc:{}",
+            "\x1B[2K        misc|vivC:{}, btdf:{}, core:{}, /ppc:{}",
             im!(
                 "{:>9}",
                 self,
@@ -577,11 +580,12 @@ impl StateIF for State {
             fm!(
                 "{:>9.4}",
                 self,
-                LogF64Id::ChronologicalBacktrackPercentage,
+                LogF64Id::BacktrackDriftRate,
                 // LogF64Id::ExExTrend,
                 // self.e_mode.trend(),
                 // self.exploration_rate_ema.get() // , self.e_mode_threshold
-                100.0 * self.num_chrono_bt as f64 / self[LogUsizeId::NumConflict] as f64
+                // 100.0 * self.num_chrono_bt as f64 / self[LogUsizeId::NumConflict] as f64
+                self.bt_drift_average.get()
             ),
             im!(
                 "{:>9}",
@@ -811,6 +815,7 @@ pub enum LogF64Id {
     TrendLBD,
     BLevel,
     CLevel,
+    BacktrackDriftRate,
     ExExTrend,
     DecisionPerConflict,
     ConflictPerRestart,

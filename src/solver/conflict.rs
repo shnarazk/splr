@@ -184,12 +184,14 @@ pub fn handle_conflict(
     } else {
         None
     };
-    asg.cancel_until(match bt_drift {
-        None => assign_level,
-        Some(false) => assign_level - 1,
-        Some(true) => conflicting_level - 1,
-    });
-    if bt_drift.is_some() {
+    if let Some(b) = bt_drift {
+        if b {
+            asg.cancel_until(conflicting_level - 1);
+            state.bt_drift_average.update(1.0);
+        } else {
+            asg.cancel_until(assign_level - 1);
+            state.bt_drift_average.update(-1.0);
+        }
         #[cfg(feature = "trail_saving")]
         {
             asg.clear_saved_trail();
@@ -198,6 +200,9 @@ pub fn handle_conflict(
         {
             state.num_chrono_bt += 1;
         }
+    } else {
+        asg.cancel_until(assign_level);
+        state.bt_drift_average.update(0.0);
     }
     // debug_assert_eq!(asg.assigned(l0), None);
     // debug_assert_eq!(
