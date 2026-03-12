@@ -339,105 +339,48 @@ impl ClauseDBIF for ClauseDB {
             return RefClause::RegisteredClause(cid);
         }
 
-        self.certification_store.add_clause(vec);
-        let cid;
-        if let Some(cid_used) = self.freelist.pop() {
-            cid = cid_used;
-            let c = &mut self[cid];
-            // if !c.is_dead() {
-            //     println!("{} {:?}", cid.format(), vec2int(&c.lits));
-            //     println!("len {}", self.watcher[NULL_LIT.negate() as usize].len());
-            //     for w in &self.watcher[NULL_LIT.negate() as usize][..10] {
-            //         if !self.clause[w.c].is_dead() {
-            //             println!("{}", w.c.format());
-            //         }
-            //     }
-            //     panic!("done");
-            // }
-            // assert!(c.is_dead());
-            c.flags = FlagClause::empty();
-            c.used = 0;
-
-            #[cfg(feature = "clause_rewarding")]
-            {
-                c.reward = 0.0;
-            }
-
-            debug_assert!(c.lits.is_empty()); // c.lits.clear();
-            std::mem::swap(&mut c.lits, vec);
-            c.search_from = 2;
+        let lrat_id = if learnt {
+            self.certification_store.add_clause_lrat(vec, &[])
         } else {
-            cid = ClauseId::from(self.clause.len());
-            let mut c = Clause {
-                flags: FlagClause::empty(),
-                ..Clause::default()
-            };
-            std::mem::swap(&mut c.lits, vec);
-            self.clause.push(c);
+            self.certification_store.add_input_clause()
         };
-
-        let ClauseDB {
-            #[cfg(feature = "bi_clause_completion")]
-            bi_clause_completion_queue,
-            clause,
-            lbd_temp,
-            num_clause,
-            num_bi_clause,
-            num_bi_learnt,
-            num_lbd2,
-            num_learnt,
-            binary_link,
-
-            #[cfg(feature = "clause_rewarding")]
-            tick,
-
-            watch_cache,
-            ..
-        } = self;
-        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
-        c.used = 0;
-        #[cfg(feature = "clause_rewarding")]
+        self.new_clause_store(asg, vec, learnt, lrat_id)
+    }
+    fn new_clause_input(
+        &mut self,
+        asg: &mut impl AssignIF,
+        vec: &mut Vec<Lit>,
+        lrat_id: u64,
+    ) -> RefClause {
+        debug_assert!(!vec.is_empty());
+        debug_assert!(1 < vec.len());
+        debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{vec:?}");
+        if vec.len() == 2
+            && let Some(&cid) = self.link_to_cid(vec[0], vec[1])
         {
-            c.timestamp = *tick;
+            self.num_reregistration += 1;
+            return RefClause::RegisteredClause(cid);
         }
-        let len2 = c.lits.len() == 2;
-        if len2 {
-            c.rank = 1;
+        self.new_clause_store(asg, vec, false, lrat_id)
+    }
+    fn new_clause_lrat(
+        &mut self,
+        asg: &mut impl AssignIF,
+        vec: &mut Vec<Lit>,
+        hints: &[u64],
+    ) -> RefClause {
+        debug_assert!(!vec.is_empty());
+        debug_assert!(1 < vec.len());
+        debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{vec:?}");
+        if vec.len() == 2
+            && let Some(&cid) = self.link_to_cid(vec[0], vec[1])
+        {
+            self.num_reregistration += 1;
+            return RefClause::RegisteredClause(cid);
+        }
 
-            #[cfg(feature = "bi_clause_completion")]
-            if learnt {
-                for lit in c.iter() {
-                    if !bi_clause_completion_queue.contains(lit) {
-                        bi_clause_completion_queue.push(*lit);
-                    }
-                }
-            }
-        } else {
-            c.update_lbd(asg, lbd_temp);
-        }
-        self.lbd.update(c.rank);
-        *num_clause += 1;
-        if learnt {
-            if len2 {
-                *num_bi_learnt += 1;
-            } else {
-                c.turn_on(FlagClause::LEARNT);
-                *num_learnt += 1;
-                if c.rank <= 2 {
-                    *num_lbd2 += 1;
-                }
-            }
-        }
-        let l0 = c.lits[0];
-        let l1 = c.lits[1];
-        if len2 {
-            *num_bi_clause += 1;
-            binary_link.add(l0, l1, cid);
-        } else {
-            watch_cache[!l0].insert_watch(cid, l1);
-            watch_cache[!l1].insert_watch(cid, l0);
-        }
-        RefClause::Clause(cid)
+        let lrat_id = self.certification_store.add_clause_lrat(vec, hints);
+        self.new_clause_store(asg, vec, true, lrat_id)
     }
     fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, vec: &mut Vec<Lit>) -> RefClause {
         debug_assert!(1 < vec.len());
@@ -590,6 +533,8 @@ impl ClauseDBIF for ClauseDB {
         // debug_assert!((*ch).lits.contains(&p));
         // debug_assert!(1 < (*ch).len());
         debug_assert!(1 < usize::from(!p));
+        #[cfg(not(feature = "no_IO"))]
+        let old_lrat_id = c.lrat_id;
         let lits = &mut c.lits;
         debug_assert!(1 < lits.len());
         //
@@ -702,8 +647,11 @@ impl ClauseDBIF for ClauseDB {
             // self.watches(cid, "after strengthen_by_elimination case:3-3");
         }
         if certification_store.is_active() {
-            certification_store.add_clause(&c.lits);
-            certification_store.delete_clause(&new_lits);
+            #[cfg(not(feature = "no_IO"))]
+            {
+                c.lrat_id = certification_store.add_clause_lrat(&c.lits, &[]);
+                certification_store.delete_clause_lrat(old_lrat_id);
+            }
         }
         RefClause::Clause(cid)
     }
@@ -728,13 +676,16 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
         debug_assert!(new_lits.len() < c.len());
+        #[cfg(not(feature = "no_IO"))]
+        let old_lrat_id = c.lrat_id;
         if new_lits.len() == 2 {
             if let Some(&did) = binary_link.search(new_lits[0], new_lits[1]) {
                 //
                 //## Case:0
                 //
                 if certification_store.is_active() {
-                    certification_store.delete_clause(new_lits);
+                    #[cfg(not(feature = "no_IO"))]
+                    certification_store.delete_clause_lrat(old_lrat_id);
                 }
                 return RefClause::RegisteredClause(did);
             }
@@ -751,16 +702,16 @@ impl ClauseDBIF for ClauseDB {
             binary_link.add(l0, l1, cid);
 
             if certification_store.is_active() {
-                certification_store.add_clause(new_lits);
-                certification_store.delete_clause(&c.lits);
+                #[cfg(not(feature = "no_IO"))]
+                {
+                    // add new binary, delete old longer
+                    let new_id = certification_store.add_clause_lrat(&c.lits, &[]);
+                    certification_store.delete_clause_lrat(old_lrat_id);
+                    c.lrat_id = new_id;
+                }
             }
             c.turn_off(FlagClause::LEARNT);
             self.num_bi_clause += 1;
-
-            if certification_store.is_active() {
-                certification_store.add_clause(&c.lits);
-                certification_store.delete_clause(new_lits);
-            }
         } else {
             //
             //## Case:3
@@ -807,8 +758,11 @@ impl ClauseDBIF for ClauseDB {
             // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
 
             if certification_store.is_active() {
-                certification_store.add_clause(new_lits);
-                certification_store.delete_clause(&c.lits);
+                #[cfg(not(feature = "no_IO"))]
+                {
+                    c.lrat_id = certification_store.add_clause_lrat(&c.lits, &[]);
+                    certification_store.delete_clause_lrat(old_lrat_id);
+                }
             }
         }
         RefClause::Clause(cid)
@@ -859,6 +813,8 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
+        #[cfg(not(feature = "no_IO"))]
+        let old_lrat_id = c.lrat_id;
         let mut new_lits = c
             .lits
             .iter()
@@ -894,8 +850,11 @@ impl ClauseDBIF for ClauseDB {
                 }
 
                 if certification_store.is_active() {
-                    certification_store.add_clause(&c.lits);
-                    certification_store.delete_clause(&new_lits);
+                    #[cfg(not(feature = "no_IO"))]
+                    {
+                        c.lrat_id = certification_store.add_clause_lrat(&c.lits, &[]);
+                        certification_store.delete_clause_lrat(old_lrat_id);
+                    }
                 }
                 RefClause::Clause(cid)
             }
@@ -950,8 +909,11 @@ impl ClauseDBIF for ClauseDB {
                 // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
 
                 if certification_store.is_active() {
-                    certification_store.add_clause(&c.lits);
-                    certification_store.delete_clause(&new_lits);
+                    #[cfg(not(feature = "no_IO"))]
+                    {
+                        c.lrat_id = certification_store.add_clause_lrat(&c.lits, &[]);
+                        certification_store.delete_clause_lrat(old_lrat_id);
+                    }
                 }
                 RefClause::Clause(cid)
             }
@@ -1133,7 +1095,19 @@ impl ClauseDBIF for ClauseDB {
         }
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
-        self.certification_store.add_clause(&[lit]);
+        self.certification_store.add_clause_lrat(&[lit], &[]);
+    }
+    fn certificate_add_assertion_lrat(&mut self, lit: Lit, hints: &[u64]) -> u64 {
+        self.certification_store.add_clause_lrat(&[lit], hints)
+    }
+    fn certificate_add_input_clause(&mut self) -> u64 {
+        self.certification_store.add_input_clause()
+    }
+    fn certificate_emit_empty_clause(&mut self, hints: &[u64]) {
+        self.certification_store.add_clause_lrat(&[], hints);
+    }
+    fn is_certification_active(&self) -> bool {
+        self.certification_store.is_active()
     }
     fn certificate_save(&mut self) {
         self.certification_store.close();
@@ -1379,11 +1353,113 @@ impl ClauseDB {
     fn link_to_cid(&self, l0: Lit, l1: Lit) -> Option<&ClauseId> {
         self.binary_link.search(l0, l1)
     }
+    /// Shared core for `new_clause` and `new_clause_lrat`: create and register a clause,
+    /// assuming certification has already been recorded by the caller.
+    fn new_clause_store(
+        &mut self,
+        asg: &mut impl AssignIF,
+        vec: &mut Vec<Lit>,
+        learnt: bool,
+        #[cfg_attr(feature = "no_IO", allow(unused_variables))] lrat_id: u64,
+    ) -> RefClause {
+        let cid;
+        if let Some(cid_used) = self.freelist.pop() {
+            cid = cid_used;
+            let c = &mut self[cid];
+            c.flags = FlagClause::empty();
+            c.used = 0;
+
+            #[cfg(feature = "clause_rewarding")]
+            {
+                c.reward = 0.0;
+            }
+
+            debug_assert!(c.lits.is_empty()); // c.lits.clear();
+            std::mem::swap(&mut c.lits, vec);
+            c.search_from = 2;
+        } else {
+            cid = ClauseId::from(self.clause.len());
+            let mut c = Clause {
+                flags: FlagClause::empty(),
+                ..Clause::default()
+            };
+            std::mem::swap(&mut c.lits, vec);
+            self.clause.push(c);
+        };
+
+        let ClauseDB {
+            #[cfg(feature = "bi_clause_completion")]
+            bi_clause_completion_queue,
+            clause,
+            lbd_temp,
+            num_clause,
+            num_bi_clause,
+            num_bi_learnt,
+            num_lbd2,
+            num_learnt,
+            binary_link,
+
+            #[cfg(feature = "clause_rewarding")]
+            tick,
+
+            watch_cache,
+            ..
+        } = self;
+        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
+        c.used = 0;
+        #[cfg(feature = "clause_rewarding")]
+        {
+            c.timestamp = *tick;
+        }
+        #[cfg(not(feature = "no_IO"))]
+        {
+            c.lrat_id = lrat_id;
+        }
+        let len2 = c.lits.len() == 2;
+        if len2 {
+            c.rank = 1;
+
+            #[cfg(feature = "bi_clause_completion")]
+            if learnt {
+                for lit in c.iter() {
+                    if !bi_clause_completion_queue.contains(lit) {
+                        bi_clause_completion_queue.push(*lit);
+                    }
+                }
+            }
+        } else {
+            c.update_lbd(asg, lbd_temp);
+        }
+        self.lbd.update(c.rank);
+        *num_clause += 1;
+        if learnt {
+            if len2 {
+                *num_bi_learnt += 1;
+            } else {
+                c.turn_on(FlagClause::LEARNT);
+                *num_learnt += 1;
+                if c.rank <= 2 {
+                    *num_lbd2 += 1;
+                }
+            }
+        }
+        let l0 = c.lits[0];
+        let l1 = c.lits[1];
+        if len2 {
+            *num_bi_clause += 1;
+            binary_link.add(l0, l1, cid);
+        } else {
+            watch_cache[!l0].insert_watch(cid, l1);
+            watch_cache[!l1].insert_watch(cid, l0);
+        }
+        RefClause::Clause(cid)
+    }
 }
 
 #[inline]
 #[allow(clippy::too_many_arguments)]
 fn remove_clause_fn(
+    #[cfg_attr(feature = "no_IO", allow(unused_variables))]
     certification_store: &mut CertificationStore,
     binary_link: &mut BinaryLinkDB,
     watcher: &mut [WatchCache],
@@ -1409,7 +1485,8 @@ fn remove_clause_fn(
         *num_learnt -= 1;
     }
     *num_clause -= 1;
-    certification_store.delete_clause(&c.lits);
+    #[cfg(not(feature = "no_IO"))]
+    certification_store.delete_clause_lrat(c.lrat_id);
     c.lits.clear();
 }
 

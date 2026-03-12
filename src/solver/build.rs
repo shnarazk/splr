@@ -237,6 +237,19 @@ impl SatSolverIF for Solver {
     #[cfg(not(feature = "no_IO"))]
     /// dump an UNSAT certification file
     fn save_certification(&mut self) {
+        // Emit the empty clause to finalise the LRAT proof.
+        // The hints are all root-level unit clause IDs (input and derived)
+        // that, when propagated, produce a contradiction.
+        let hints: Vec<u64> = self
+            .state
+            .lrat_root_ids
+            .iter()
+            .copied()
+            .filter(|&id| id != 0)
+            .collect();
+        if !hints.is_empty() {
+            self.cdb.certificate_emit_empty_clause(&hints);
+        }
         self.cdb.certificate_save();
     }
     #[cfg(not(feature = "no_IO"))]
@@ -281,6 +294,53 @@ impl Solver {
             _ => cdb.new_clause(asg, lits, false),
         }
     }
+    /// Add an input clause from CNF, always allocating a sequential LRAT step ID.
+    /// Unlike `add_unchecked_clause`, this guarantees every CNF clause gets an ID,
+    /// even if it is a tautology, satisfied, or unit clause.
+    fn add_input_clause(&mut self, lits: &mut Vec<Lit>) -> RefClause {
+        let Solver {
+            asg, cdb, state, ..
+        } = self;
+        // Always allocate a sequential LRAT ID for this CNF clause.
+        let lrat_id = cdb.certificate_add_input_clause();
+        if lits.is_empty() {
+            return RefClause::EmptyClause;
+        }
+        debug_assert!(asg.decision_level() == 0);
+        lits.sort();
+        let mut j = 0;
+        let mut l_: Option<Lit> = None;
+        for i in 0..lits.len() {
+            let li = lits[i];
+            let sat = asg.assigned(li);
+            if sat == Some(true) || Some(!li) == l_ {
+                // Tautology or satisfied — ID already allocated, just skip.
+                return RefClause::Dead;
+            } else if sat != Some(false) && Some(li) != l_ {
+                lits[j] = li;
+                j += 1;
+                l_ = Some(li);
+            }
+        }
+        lits.truncate(j);
+        match lits.len() {
+            0 => RefClause::EmptyClause,
+            1 => {
+                // Unit input clause: don't write to proof (checker knows it from CNF).
+                // Record its LRAT ID so conflict analysis can reference it for
+                // root-level literals.
+                let l0 = lits[0];
+                #[cfg(not(feature = "no_IO"))]
+                {
+                    state.lrat_root_ids[l0.vi()] = lrat_id;
+                }
+                let _ = &state; // suppress unused warning under no_IO
+                asg.assign_at_root_level(l0)
+                    .map_or(RefClause::EmptyClause, |_| RefClause::UnitClause(l0))
+            }
+            _ => cdb.new_clause_input(asg, lits, lrat_id),
+        }
+    }
     #[cfg(not(feature = "no_IO"))]
     fn inject(mut self, mut reader: BufReader<File>) -> Result<Solver, SolverError> {
         self.state.progress_header();
@@ -311,7 +371,7 @@ impl Solver {
                             return Err(SolverError::EmptyClause);
                         }
                         continue;
-                    } else if self.add_unchecked_clause(&mut v) == RefClause::EmptyClause {
+                    } else if self.add_input_clause(&mut v) == RefClause::EmptyClause {
                         return Err(SolverError::EmptyClause);
                     }
                 }
@@ -340,10 +400,10 @@ impl Solver {
                 .iter()
                 .map(|i| Lit::from(*i))
                 .collect::<Vec<Lit>>();
-            if v.is_empty() {
+            if lits.is_empty() {
                 return Err(SolverError::EmptyClause);
             }
-            if self.add_unchecked_clause(&mut lits) == RefClause::EmptyClause {
+            if self.add_input_clause(&mut lits) == RefClause::EmptyClause {
                 return Err(SolverError::EmptyClause);
             }
         }

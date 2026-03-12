@@ -104,6 +104,20 @@ pub trait ClauseDBIF:
     /// This returns `true` if the clause became a unit clause.
     /// And this is called only from `Eliminator::strengthen_clause`.
     fn new_clause(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
+    /// allocate a new clause with a pre-allocated LRAT step ID (for input clauses).
+    fn new_clause_input(
+        &mut self,
+        asg: &mut impl AssignIF,
+        v: &mut Vec<Lit>,
+        lrat_id: u64,
+    ) -> RefClause;
+    /// allocate a new CDCL learned clause with LRAT propagation hints and return its id.
+    fn new_clause_lrat(
+        &mut self,
+        asg: &mut impl AssignIF,
+        v: &mut Vec<Lit>,
+        hints: &[u64],
+    ) -> RefClause;
     fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>) -> RefClause;
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn remove_clause(&mut self, cid: ClauseId);
@@ -124,8 +138,17 @@ pub trait ClauseDBIF:
     /// update flags.
     /// return `true` if it's learnt.
     fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool;
-    /// record an asserted literal to unsat certification.
+    /// record an asserted literal to unsat certification (no hints — used for non-CDCL assertions).
     fn certificate_add_assertion(&mut self, lit: Lit);
+    /// record an asserted unit learned clause with LRAT hints. Returns the LRAT step ID.
+    fn certificate_add_assertion_lrat(&mut self, lit: Lit, hints: &[u64]) -> u64;
+    /// allocate an LRAT step ID for an original (input) clause without writing to the proof.
+    /// Returns the allocated LRAT step ID.
+    fn certificate_add_input_clause(&mut self) -> u64;
+    /// emit the empty clause to the LRAT proof with the given hints (finalises an UNSAT proof).
+    fn certificate_emit_empty_clause(&mut self, hints: &[u64]);
+    /// return true if proof certification is active.
+    fn is_certification_active(&self) -> bool;
     /// save the certification record to a file.
     fn certificate_save(&mut self);
     /// check the number of clauses

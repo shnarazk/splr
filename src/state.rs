@@ -129,6 +129,14 @@ pub struct State {
     pub last_asg: usize,
     /// working place to build learnt clauses
     pub new_learnt: Vec<Lit>,
+    /// LRAT hint clause IDs collected during conflict analysis
+    #[cfg(not(feature = "no_IO"))]
+    pub lrat_hints: Vec<u64>,
+    /// LRAT step IDs for root-level variable assignments, indexed by VarId.
+    /// Used so that conflict analysis can include the justification for
+    /// root-level literals in LRAT hints.
+    #[cfg(not(feature = "no_IO"))]
+    pub lrat_root_ids: Vec<u64>,
     /// `progress` invocation counter
     pub progress_cnt: usize,
     /// keep the previous statistics values
@@ -169,6 +177,10 @@ impl Default for State {
 
             last_asg: 0,
             new_learnt: Vec::new(),
+            #[cfg(not(feature = "no_IO"))]
+            lrat_hints: Vec::new(),
+            #[cfg(not(feature = "no_IO"))]
+            lrat_root_ids: Vec::new(),
             progress_cnt: 0,
             record: ProgressRecord::default(),
             sls_index: 0,
@@ -213,6 +225,8 @@ impl Instantiate for State {
             stm: StageManager::instantiate(config, cnf),
             target: cnf.clone(),
             time_limit: config.c_timeout,
+            #[cfg(not(feature = "no_IO"))]
+            lrat_root_ids: vec![0; cnf.num_of_variables + 1],
             ..State::default()
         }
     }
