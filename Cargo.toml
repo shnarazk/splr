@@ -23,7 +23,7 @@ default = [
     "unsafe_access",
     # "chrono_BT",
     "trail_saving",
-    "BT_drift",
+    "BT_deepen",
 
     ### Heuristics
     # "bi_clause_completion",
@@ -52,7 +52,7 @@ assign_rate = []                # for debug and study
 best_phases_tracking = []       # save the best-so-far assignment, used by 'rephase'
 bi_clause_completion = []       # this will increase memory pressure
 boundary_check = []             # for debug
-BT_drift = []                   # backtrack drift
+BT_deepen = []                   # backtrack drift
 chrono_BT = []                  # NOT WORK
 clause_elimination = []         # pre(in)-processor setting
 clause_rewarding = []           # clauses have activities w/ decay rate

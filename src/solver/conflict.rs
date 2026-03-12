@@ -171,7 +171,7 @@ pub fn handle_conflict(
             >= 40
     {
         Some(true)
-    } else if cfg!(feature = "BT_drift")
+    } else if cfg!(feature = "BT_deepen")
         && assign_level > 0
         && new_learnt
             .iter()
