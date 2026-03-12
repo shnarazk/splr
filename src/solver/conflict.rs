@@ -162,7 +162,9 @@ pub fn handle_conflict(
     }
 
     // learnt clause quality based backtrack strategy switching
-    // Idea: If the learned clause is low quality, don’t trust it to justify a large backjump; use CBT/limited-backjump instead.
+    // Idea: If the learned clause is low quality, don't trust it to justify a large backjump; use CBT/limited-backjump instead.
+    //       The drift depth `d` scales with LBD trend: worse recent clause quality → deeper backtrack,
+    //       acting as a partial restart proportional to how badly the search is going.
     let bt_drift: Option<bool> = if cfg!(feature = "chrono_BT")
         && assign_level > 0
         && asg
@@ -186,7 +188,14 @@ pub fn handle_conflict(
     };
     asg.cancel_until(match bt_drift {
         None => assign_level,
-        Some(false) => assign_level - 1,
+        Some(false) => {
+            // Dynamic drift depth: d = max(1, floor(lbd_trend)).
+            // When trend ≈ 1.0 (normal quality), d = 1 (same as before).
+            // When trend ≈ 2.0 (twice as bad), d = 2 (deeper escape).
+            // When trend ≈ 3.0+, d = 3+ (even deeper, partial restart).
+            let d = (cdb.lbd.trend().floor() as u32).max(1);
+            assign_level.saturating_sub(d).max(asg.root_level())
+        }
         Some(true) => conflicting_level - 1,
     });
     if bt_drift.is_some() {
