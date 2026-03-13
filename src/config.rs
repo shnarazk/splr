@@ -225,7 +225,7 @@ impl Config {
                         }
                     }
                     _ => {
-                        println!("connected long arg: {:?} = {:?}", seg[0], seg[1]);
+                        panic!("connected long arg: {:?} = {:?}", seg[0], seg[1]);
                     }
                 }
             } else if let Some(name) = arg.strip_prefix('-') {
