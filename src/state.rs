@@ -558,7 +558,7 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K    Learning|avrg:{}, trnd:{}, #RST:{}, /dpc:{}",
+            "\x1B[2K    Learning| LBD:{}, trnd:{}, #RST:{}, /dpc:{}",
             fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get_fast()),
             fm!("{:>9.2}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
