@@ -103,7 +103,7 @@ impl Default for Config {
             io_rfile: PathBuf::new(),
             no_color: false,
             quiet_mode: false,
-            show_cdb_heatmap: true,
+            show_cdb_heatmap: false,
             show_journal: false,
             use_certification: false,
 
@@ -145,13 +145,7 @@ impl Config {
         while let Some(arg) = iter.next() {
             if let Some(stripped) = arg.strip_prefix("--") {
                 let flags = [
-                    "no-color",
-                    "quiet",
-                    "certify",
-                    "hide-heatmap",
-                    "journal",
-                    "help",
-                    "version",
+                    "no-color", "quiet", "certify", "heatmap", "journal", "help", "version",
                 ];
                 let options_usize = ["cl", "crl", "stat", "ecl", "evl", "evo"];
                 let options_f64 = ["timeout", "cdr", "cr1", "cr2", "vdr", "vds"];
@@ -165,7 +159,7 @@ impl Config {
                                 "no-color" => self.no_color = true,
                                 "quiet" => self.quiet_mode = true,
                                 "certify" => self.use_certification = true,
-                                "hide-heatmap" => self.show_cdb_heatmap = false,
+                                "heatmap" => self.show_cdb_heatmap = true,
                                 "journal" => self.show_journal = true,
                                 "help" => help = true,
                                 "version" => version = true,
@@ -227,7 +221,7 @@ impl Config {
                     }
                 }
             } else if let Some(name) = arg.strip_prefix('-') {
-                let flags = ["C", "q", "c", "j", "l", "h", "V"];
+                let flags = ["C", "q", "c", "j", "H", "h", "V"];
                 let options_path = ["o", "p", "r", "t"];
                 if flags.contains(&name) {
                     match name {
@@ -235,6 +229,7 @@ impl Config {
                         "q" => self.quiet_mode = true,
                         "c" => self.use_certification = true,
                         "j" => self.show_journal = true,
+                        "H" => self.show_cdb_heatmap = true,
                         "h" => help = true,
                         "V" => version = true,
                         _ => panic!("invalid flag: {name}"),
@@ -338,7 +333,7 @@ FLAGS:
   -C, --no-color            Disable coloring
   -q, --quiet               Disable any progress message
   -c, --certify             Writes a DRAT UNSAT certification file
-      --hide-heatmap        Hide clause heatmap
+  -H, --heatmap             Shows clause heatmap
   -j, --journal             Shows log about restart stages
   -V, --version             Prints version information
 OPTIONS:
