@@ -64,6 +64,12 @@ pub struct Config {
     pub cls_rdc_rm2: f64,
 
     //
+    //## restart
+    //
+    // LBD trend threshold to trigger a restart
+    pub rst_lbd_thr: f64,
+
+    //
     //## eliminator
     //
     pub enable_eliminator: bool,
@@ -111,6 +117,7 @@ impl Default for Config {
             cls_rdc_lbd: 5,
             cls_rdc_rm1: 0.2,
             cls_rdc_rm2: 0.05,
+            rst_lbd_thr: 2.0,
 
             enable_eliminator: cfg!(feature = "clause_elimination"),
             elm_cls_lim: 64,
@@ -148,7 +155,7 @@ impl Config {
                     "no-color", "quiet", "certify", "heatmap", "journal", "help", "version",
                 ];
                 let options_usize = ["cl", "crl", "stat", "ecl", "evl", "evo"];
-                let options_f64 = ["timeout", "cdr", "cr1", "cr2", "vdr", "vds"];
+                let options_f64 = ["timeout", "cdr", "cr1", "cr2", "rlt", "vdr", "vds"];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
                 match seg.len() {
@@ -190,6 +197,7 @@ impl Config {
                                         "cdr" => self.crw_dcy_rat = val,
                                         "cr1" => self.cls_rdc_rm1 = val,
                                         "cr2" => self.cls_rdc_rm2 = val,
+                                        "rlt" => self.rst_lbd_thr = val,
                                         "vdr" => self.vrw_dcy_rat = val,
                                         "vds" => self.vrw_dcy_stp = val,
 
@@ -341,11 +349,12 @@ OPTIONS:
 {}{}{}{}      --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
       --evo <elm-var-occ>   Max #cls for var elimination   {:>10}
+      --rlt <rst-lbd-thr>   LBD trend threshold to restart    {:>10.2}
+      --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
   -o, --dir <io-outdir>     Output directory                {:>10}
   -p, --proof <io-pfile>    DRAT Cert. filename                 {:>10}
   -r, --result <io-rfile>   Result filename/stdout              {:>10}
   -t, --timeout <timeout>   CPU time limit in sec.         {:>10}
-      --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
 {}ARGS:
   <cnf-file>    DIMACS CNF file
 ",
@@ -373,11 +382,12 @@ OPTIONS:
         config.elm_cls_lim,
         config.elm_grw_lim,
         config.elm_var_occ,
+        config.rst_lbd_thr,
+        config.vrw_dcy_rat,
         config.io_odir.to_string_lossy(),
         config.io_pfile.to_string_lossy(),
         config.io_rfile.to_string_lossy(),
         config.c_timeout,
-        config.vrw_dcy_rat,
         OPTION!(
             "EVSIDS",
             config.vrw_dcy_stp,

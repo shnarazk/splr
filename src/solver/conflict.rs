@@ -173,6 +173,7 @@ pub fn handle_conflict(
         Some(true)
     } else if cfg!(feature = "BT_deepen")
         && assign_level > 0
+        && new_learnt.len() > 2
         && new_learnt
             .iter()
             .map(|l| asg.level(l.vi()))
@@ -364,14 +365,6 @@ fn conflict_analyze(
     {
         trace_lit!("- handle conflicting literal", p);
         let vi = p.vi();
-        if asg.var(vi).assign.is_none() {
-            println!("L355: {cc:?}");
-            println!(
-                " - dl: {}, cc.0.level {}",
-                asg.decision_level(),
-                asg.var(cc.0.vi()).level
-            );
-        }
         validate_vi!(vi);
         set_seen!(vi);
         let lvl = asg.level(vi);

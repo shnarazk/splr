@@ -344,25 +344,13 @@ impl AssignStack {
 impl Clause {
     /// return `true` if the clause should try vivification.
     /// smaller is better.
-    #[cfg(feature = "clause_rewarding")]
-    fn to_vivify(&self, initial_stage: bool) -> Option<f64> {
-        if initial_stage {
-            (!self.is_dead()).then(|| self.len() as f64)
-        } else {
-            (!self.is_dead()
-                && self.rank * 2 <= self.rank_old
-                && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20)))
-            .then(|| self.reward)
-        }
-    }
-    #[cfg(not(feature = "clause_rewarding"))]
     fn to_vivify(&self, initial_stage: Option<u16>) -> Option<f64> {
         if let Some(n) = initial_stage {
             if n == 0 {
                 (
                     !self.is_dead() && self.rank <= 4
                     // && (self.rank as usize) * 2 <= self.len()
-                    // && (self.is(FlagClause::LEARNT) || self.is(FlagClause::DERIVE20))
+                    // && self.is(FlagClause::LEARNT)
                 )
                 .then(|| -((self.len() as f64 - self.rank as f64) / self.rank as f64))
             } else {

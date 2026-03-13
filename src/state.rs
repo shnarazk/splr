@@ -370,27 +370,7 @@ macro_rules! fm {
                 }
             }
         }
-    }; /* ($format: expr, $state: expr, $key: expr, $val: expr, $threshold: expr) => {
-           match ($val, $key) {
-               (v, LogF64Id::End) => format!($format, v),
-               (v, k) => {
-                   let ptr = &mut $state.record[k];
-                   if $state.config.no_color {
-                       *ptr = v;
-                       format!($format, *ptr)
-                   } else if v < $threshold {
-                       *ptr = v;
-                       format!("\x1B[031m{}\x1B[000m", format!($format, *ptr))
-                   } else if $threshold < v {
-                       *ptr = v;
-                       format!("\x1B[036m{}\x1B[000m", format!($format, *ptr))
-                   } else {
-                       *ptr = v;
-                       format!($format, *ptr)
-                   }
-               }
-           }
-       }; */
+    };
 }
 
 #[allow(unused_macros)]
@@ -983,7 +963,6 @@ pub enum LogF64Id {
     CdbHeatmap4,
     CdbHeatmap5,
     CdbHeatmap6,
-    CdbHeatmap7,
     CdbHeatmapR0C1,
     CdbHeatmapR0C2,
     CdbHeatmapR0C3,

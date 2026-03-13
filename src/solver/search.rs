@@ -390,11 +390,12 @@ fn search(
             asg.handle(SolverEvent::Stage(scale));
             state.restart.set_stage_parameters(scale);
             previous_stage = next_stage;
-        // } else if state.restart.restart(
+        // Old condition was superseded by a simpler code based on experiments.
+        // state.restart.restart(
         //     cdb.refer(cdb::property::TEma::LBD),
         //     cdb.refer(cdb::property::TEma::Entanglement),
-        // ) {
-        } else if cdb.refer(cdb::property::TEma::LBD).trend() > 2.0 {
+        // )
+        } else if cdb.refer(cdb::property::TEma::LBD).trend() > state.config.rst_lbd_thr {
             RESTART!(asg, cdb, state);
         }
         if let Some(na) = asg.best_assigned() {

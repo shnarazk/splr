@@ -1,4 +1,4 @@
-## 0.18.0, 2026-03-1X
+## 0.18.0, 2026-03-13
 
 - Remove feature 'incremental_solver'
 - Add feature 'BT_deepen'
