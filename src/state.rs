@@ -341,19 +341,49 @@ macro_rules! fm {
                 if $state.config.no_color {
                     *ptr = v;
                     format!($format, *ptr)
-                } else if v < $threshold {
-                    *ptr = v;
-                    format!("\x1B[031m{}\x1B[000m", format!($format, *ptr))
-                } else if $threshold < v {
-                    *ptr = v;
-                    format!("\x1B[036m{}\x1B[000m", format!($format, *ptr))
+                } else if v + $threshold < *ptr {
+                    if v * 1.6 < *ptr {
+                        *ptr = v;
+                        format!("\x1B[001m\x1B[031m{}\x1B[000m", format!($format, *ptr))
+                    } else {
+                        *ptr = v;
+                        format!("\x1B[031m{}\x1B[000m", format!($format, *ptr))
+                    }
+                } else if *ptr + $threshold < v {
+                    if *ptr * 1.6 < v {
+                        *ptr = v;
+                        format!("\x1B[001m\x1B[036m{}\x1B[000m", format!($format, *ptr))
+                    } else {
+                        *ptr = v;
+                        format!("\x1B[036m{}\x1B[000m", format!($format, *ptr))
+                    }
                 } else {
                     *ptr = v;
                     format!($format, *ptr)
                 }
             }
         }
-    };
+    }; /* ($format: expr, $state: expr, $key: expr, $val: expr, $threshold: expr) => {
+           match ($val, $key) {
+               (v, LogF64Id::End) => format!($format, v),
+               (v, k) => {
+                   let ptr = &mut $state.record[k];
+                   if $state.config.no_color {
+                       *ptr = v;
+                       format!($format, *ptr)
+                   } else if v < $threshold {
+                       *ptr = v;
+                       format!("\x1B[031m{}\x1B[000m", format!($format, *ptr))
+                   } else if $threshold < v {
+                       *ptr = v;
+                       format!("\x1B[036m{}\x1B[000m", format!($format, *ptr))
+                   } else {
+                       *ptr = v;
+                       format!($format, *ptr)
+                   }
+               }
+           }
+       }; */
 }
 
 #[allow(unused_macros)]
@@ -546,27 +576,30 @@ impl StateIF for State {
                 "{:>9.2}",
                 self,
                 LogF64Id::LiteralBlockEntanglement,
-                cdb_lb_ent
+                cdb_lb_ent,
+                0.01
             ),
-            fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
-            fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
+            fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get(), 0.01),
+            fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get(), 0.01),
             fm!(
                 "{:>9.2}",
                 self,
                 LogF64Id::ConflictPerRestart,
-                asg_cpr_ema.get()
+                asg_cpr_ema.get(),
+                0.01
             )
         );
         println!(
             "\x1B[2K    Learning| LBD:{}, trnd:{}, #RST:{}, /dpc:{}",
-            fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get_fast()),
-            fm!("{:>9.2}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
+            fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get_fast(), 0.01),
+            fm!("{:>9.2}", self, LogF64Id::TrendLBD, rst_lbd.trend(), 0.01),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
             fm!(
                 "{:>9.2}",
                 self,
                 LogF64Id::DecisionPerConflict,
-                asg_dpc_ema.get()
+                asg_dpc_ema.get(),
+                0.01
             ),
         );
         println!(
@@ -585,7 +618,8 @@ impl StateIF for State {
                 // self.e_mode.trend(),
                 // self.exploration_rate_ema.get() // , self.e_mode_threshold
                 // 100.0 * self.num_chrono_bt as f64 / self[LogUsizeId::NumConflict] as f64
-                self.bt_drift_average.get()
+                self.bt_drift_average.get(),
+                0.0001
             ),
             im!(
                 "{:>9}",
@@ -601,7 +635,8 @@ impl StateIF for State {
                 "{:>9.2}",
                 self,
                 LogF64Id::PropagationPerConflict,
-                asg_ppc_ema.get()
+                asg_ppc_ema.get(),
+                0.01
             ),
         );
         self[LogUsizeId::Stage] = self.stm.current_stage();
