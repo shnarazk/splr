@@ -42,6 +42,9 @@ pub struct Config {
     /// Disable any progress message
     pub quiet_mode: bool,
 
+    /// Show clause DB heatmap
+    pub show_cdb_heatmap: bool,
+
     /// Show sub-module logging report
     pub show_journal: bool,
 
@@ -100,6 +103,7 @@ impl Default for Config {
             io_rfile: PathBuf::new(),
             no_color: false,
             quiet_mode: false,
+            show_cdb_heatmap: true,
             show_journal: false,
             use_certification: false,
 
@@ -140,7 +144,15 @@ impl Config {
         let mut iter = args.skip(1);
         while let Some(arg) = iter.next() {
             if let Some(stripped) = arg.strip_prefix("--") {
-                let flags = ["no-color", "quiet", "certify", "journal", "help", "version"];
+                let flags = [
+                    "no-color",
+                    "quiet",
+                    "certify",
+                    "hide-heatmap",
+                    "journal",
+                    "help",
+                    "version",
+                ];
                 let options_usize = ["cl", "crl", "stat", "ecl", "evl", "evo"];
                 let options_f64 = ["timeout", "cdr", "cr1", "cr2", "vdr", "vds"];
                 let options_path = ["dir", "proof", "result"];
@@ -153,6 +165,7 @@ impl Config {
                                 "no-color" => self.no_color = true,
                                 "quiet" => self.quiet_mode = true,
                                 "certify" => self.use_certification = true,
+                                "hide-heatmap" => self.show_cdb_heatmap = false,
                                 "journal" => self.show_journal = true,
                                 "help" => help = true,
                                 "version" => version = true,
@@ -325,6 +338,7 @@ FLAGS:
   -C, --no-color            Disable coloring
   -q, --quiet               Disable any progress message
   -c, --certify             Writes a DRAT UNSAT certification file
+      --hide-heatmap        Hide clause heatmap
   -j, --journal             Shows log about restart stages
   -V, --version             Prints version information
 OPTIONS:

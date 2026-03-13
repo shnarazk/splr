@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use {
     crate::{
         assign, cdb,
+        cdb::ClauseDBIF,
         solver::{RestartManager, SolverEvent, StageManager},
         types::*,
     },
@@ -16,6 +17,7 @@ use {
     },
 };
 const PROGRESS_REPORT_ROWS: usize = 7;
+const CDB_HEATMAP_ROWS: usize = 7;
 
 /// API for state/statistics management, providing [`progress`](`crate::state::StateIF::progress`).
 pub trait StateIF {
@@ -32,7 +34,8 @@ pub trait StateIF {
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyDereference<assign::property::Tf64, f64>
             + PropertyReference<assign::property::TEma, EmaView>,
-        C: PropertyDereference<cdb::property::Tusize, usize>
+        C: ClauseDBIF
+            + PropertyDereference<cdb::property::Tusize, usize>
             + PropertyDereference<cdb::property::Tf64, f64>
             + PropertyReference<cdb::property::TEma, EmaView>;
     /// write a short message to stdout.
@@ -143,6 +146,7 @@ pub struct State {
     pub time_limit: f64,
     /// logging facility.
     log_messages: Vec<String>,
+    progress_report_rows: usize,
 }
 
 impl Default for State {
@@ -178,6 +182,7 @@ impl Default for State {
             start: Instant::now(),
             time_limit: 0.0,
             log_messages: Vec::new(),
+            progress_report_rows: PROGRESS_REPORT_ROWS,
         }
     }
 }
@@ -216,6 +221,8 @@ impl Instantiate for State {
             stm: StageManager::instantiate(config, cnf),
             target: cnf.clone(),
             time_limit: config.c_timeout,
+            progress_report_rows: PROGRESS_REPORT_ROWS
+                + CDB_HEATMAP_ROWS * (config.show_cdb_heatmap as usize),
             ..State::default()
         }
     }
@@ -419,7 +426,7 @@ impl StateIF for State {
             println!("{self}");
 
             //## PROGRESS REPORT ROWS
-            for _i in 0..PROGRESS_REPORT_ROWS - 1 {
+            for _i in 0..self.progress_report_rows - 1 {
                 println!("                                                  ");
             }
         }
@@ -461,7 +468,8 @@ impl StateIF for State {
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyDereference<assign::property::Tf64, f64>
             + PropertyReference<assign::property::TEma, EmaView>,
-        C: PropertyDereference<cdb::property::Tusize, usize>
+        C: ClauseDBIF
+            + PropertyDereference<cdb::property::Tusize, usize>
             + PropertyDereference<cdb::property::Tf64, f64>
             + PropertyReference<cdb::property::TEma, EmaView>,
     {
@@ -502,7 +510,7 @@ impl StateIF for State {
         self.progress_cnt += 1;
         // print!("\x1B[9A\x1B[1G");
         print!("\x1B[");
-        print!("{PROGRESS_REPORT_ROWS}");
+        print!("{}", self.progress_report_rows);
         print!("A\x1B[1G");
 
         if self.config.show_journal {
@@ -642,6 +650,116 @@ impl StateIF for State {
         self[LogUsizeId::Stage] = self.stm.current_stage();
         self[LogUsizeId::StageCycle] = self.stm.current_cycle();
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
+        if self.config.show_cdb_heatmap {
+            let big_change = 0.002;
+            let heatmap = cdb.clause_heatmap();
+            for (i, l) in heatmap.iter().enumerate() {
+                let row_label = match i {
+                    0 => LogF64Id::CdbHeatmap0,
+                    1 => LogF64Id::CdbHeatmap1,
+                    2 => LogF64Id::CdbHeatmap2,
+                    3 => LogF64Id::CdbHeatmap3,
+                    4 => LogF64Id::CdbHeatmap4,
+                    5 => LogF64Id::CdbHeatmap5,
+                    6 => LogF64Id::CdbHeatmap6,
+                    __ => LogF64Id::End,
+                };
+                let col_labels: [LogF64Id; 8] = match i {
+                    0 => [
+                        LogF64Id::CdbHeatmapR0C1,
+                        LogF64Id::CdbHeatmapR0C2,
+                        LogF64Id::CdbHeatmapR0C3,
+                        LogF64Id::CdbHeatmapR0C4,
+                        LogF64Id::CdbHeatmapR0C5,
+                        LogF64Id::CdbHeatmapR0C6,
+                        LogF64Id::CdbHeatmapR0C7,
+                        LogF64Id::CdbHeatmapR0C8,
+                    ],
+                    1 => [
+                        LogF64Id::CdbHeatmapR1C1,
+                        LogF64Id::CdbHeatmapR1C2,
+                        LogF64Id::CdbHeatmapR1C3,
+                        LogF64Id::CdbHeatmapR1C4,
+                        LogF64Id::CdbHeatmapR1C5,
+                        LogF64Id::CdbHeatmapR1C6,
+                        LogF64Id::CdbHeatmapR1C7,
+                        LogF64Id::CdbHeatmapR1C8,
+                    ],
+                    2 => [
+                        LogF64Id::CdbHeatmapR2C1,
+                        LogF64Id::CdbHeatmapR2C2,
+                        LogF64Id::CdbHeatmapR2C3,
+                        LogF64Id::CdbHeatmapR2C4,
+                        LogF64Id::CdbHeatmapR2C5,
+                        LogF64Id::CdbHeatmapR2C6,
+                        LogF64Id::CdbHeatmapR2C7,
+                        LogF64Id::CdbHeatmapR2C8,
+                    ],
+                    3 => [
+                        LogF64Id::CdbHeatmapR3C1,
+                        LogF64Id::CdbHeatmapR3C2,
+                        LogF64Id::CdbHeatmapR3C3,
+                        LogF64Id::CdbHeatmapR3C4,
+                        LogF64Id::CdbHeatmapR3C5,
+                        LogF64Id::CdbHeatmapR3C6,
+                        LogF64Id::CdbHeatmapR3C7,
+                        LogF64Id::CdbHeatmapR3C8,
+                    ],
+                    4 => [
+                        LogF64Id::CdbHeatmapR4C1,
+                        LogF64Id::CdbHeatmapR4C2,
+                        LogF64Id::CdbHeatmapR4C3,
+                        LogF64Id::CdbHeatmapR4C4,
+                        LogF64Id::CdbHeatmapR4C5,
+                        LogF64Id::CdbHeatmapR4C6,
+                        LogF64Id::CdbHeatmapR4C7,
+                        LogF64Id::CdbHeatmapR4C8,
+                    ],
+                    5 => [
+                        LogF64Id::CdbHeatmapR5C1,
+                        LogF64Id::CdbHeatmapR5C2,
+                        LogF64Id::CdbHeatmapR5C3,
+                        LogF64Id::CdbHeatmapR5C4,
+                        LogF64Id::CdbHeatmapR5C5,
+                        LogF64Id::CdbHeatmapR5C6,
+                        LogF64Id::CdbHeatmapR5C7,
+                        LogF64Id::CdbHeatmapR5C8,
+                    ],
+                    _ => [
+                        LogF64Id::CdbHeatmapR6C1,
+                        LogF64Id::CdbHeatmapR6C2,
+                        LogF64Id::CdbHeatmapR6C3,
+                        LogF64Id::CdbHeatmapR6C4,
+                        LogF64Id::CdbHeatmapR6C5,
+                        LogF64Id::CdbHeatmapR6C6,
+                        LogF64Id::CdbHeatmapR6C7,
+                        LogF64Id::CdbHeatmapR6C8,
+                    ],
+                };
+                let columns = l
+                    .iter()
+                    .skip(1)
+                    .enumerate()
+                    .map(|(j, &v)| fm!("{:.3}", self, col_labels[j], v, big_change))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                if i == heatmap.len() - 1 {
+                    println!(
+                        "    LBD>{} ({}): {}",
+                        i,
+                        fm!("{:>5.3}", self, row_label, l[0], big_change),
+                        columns
+                    );
+                } else {
+                    println!(
+                        "    LBD {} ({}): {}",
+                        i + 1,
+                        fm!("{:>5.3}", self, row_label, l[0], big_change),
+                        columns
+                    );
+                }
+            }
+        }
         self.flush("");
     }
 }
@@ -858,6 +976,70 @@ pub enum LogF64Id {
     LiteralBlockEntanglement,
     RestartEnergy,
     ChronologicalBacktrackPercentage,
+    CdbHeatmap0,
+    CdbHeatmap1,
+    CdbHeatmap2,
+    CdbHeatmap3,
+    CdbHeatmap4,
+    CdbHeatmap5,
+    CdbHeatmap6,
+    CdbHeatmap7,
+    CdbHeatmapR0C1,
+    CdbHeatmapR0C2,
+    CdbHeatmapR0C3,
+    CdbHeatmapR0C4,
+    CdbHeatmapR0C5,
+    CdbHeatmapR0C6,
+    CdbHeatmapR0C7,
+    CdbHeatmapR0C8,
+    CdbHeatmapR1C1,
+    CdbHeatmapR1C2,
+    CdbHeatmapR1C3,
+    CdbHeatmapR1C4,
+    CdbHeatmapR1C5,
+    CdbHeatmapR1C6,
+    CdbHeatmapR1C7,
+    CdbHeatmapR1C8,
+    CdbHeatmapR2C1,
+    CdbHeatmapR2C2,
+    CdbHeatmapR2C3,
+    CdbHeatmapR2C4,
+    CdbHeatmapR2C5,
+    CdbHeatmapR2C6,
+    CdbHeatmapR2C7,
+    CdbHeatmapR2C8,
+    CdbHeatmapR3C1,
+    CdbHeatmapR3C2,
+    CdbHeatmapR3C3,
+    CdbHeatmapR3C4,
+    CdbHeatmapR3C5,
+    CdbHeatmapR3C6,
+    CdbHeatmapR3C7,
+    CdbHeatmapR3C8,
+    CdbHeatmapR4C1,
+    CdbHeatmapR4C2,
+    CdbHeatmapR4C3,
+    CdbHeatmapR4C4,
+    CdbHeatmapR4C5,
+    CdbHeatmapR4C6,
+    CdbHeatmapR4C7,
+    CdbHeatmapR4C8,
+    CdbHeatmapR5C1,
+    CdbHeatmapR5C2,
+    CdbHeatmapR5C3,
+    CdbHeatmapR5C4,
+    CdbHeatmapR5C5,
+    CdbHeatmapR5C6,
+    CdbHeatmapR5C7,
+    CdbHeatmapR5C8,
+    CdbHeatmapR6C1,
+    CdbHeatmapR6C2,
+    CdbHeatmapR6C3,
+    CdbHeatmapR6C4,
+    CdbHeatmapR6C5,
+    CdbHeatmapR6C6,
+    CdbHeatmapR6C7,
+    CdbHeatmapR6C8,
 
     End,
 }

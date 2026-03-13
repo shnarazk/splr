@@ -99,21 +99,6 @@ fn main() {
     };
     let res = s.solve();
     save_result(&mut s, &res, &cnf_file, ans_file);
-    {
-        let heatmap = s.cdb.clause_heatmap();
-        for (i, l) in heatmap.iter().enumerate() {
-            println!(
-                "LBD {} ({:.3}): {}",
-                i + 1,
-                l[0],
-                l.iter()
-                    .skip(1)
-                    .map(|v| format!("{v:.3}"))
-                    .collect::<Vec<_>>()
-                    .join(", "),
-            );
-        }
-    }
     std::process::exit(match res {
         Ok(Certificate::SAT(_)) => 10,
         Ok(Certificate::UNSAT) => 20,
@@ -397,6 +382,24 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             )
             .as_bytes(),
         )?;
+    }
+    {
+        let heatmap = s.cdb.clause_heatmap();
+        for (i, l) in heatmap.iter().enumerate() {
+            let columns = l
+                .iter()
+                .skip(1)
+                .map(|v| format!("{v:.3}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            if i == heatmap.len() - 1 {
+                out.write_all(format!("c   LBD>{} ({:5.3}): {}\n", i, l[0], columns).as_bytes())?;
+            } else {
+                out.write_all(
+                    format!("c   LBD {} ({:5.3}): {}\n", i + 1, l[0], columns).as_bytes(),
+                )?;
+            }
+        }
     }
 
     out.write_all(b"c \n")?;
