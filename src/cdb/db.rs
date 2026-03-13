@@ -1307,7 +1307,7 @@ impl ClauseDBIF for ClauseDB {
                 nc += 1;
                 let u = c.used.saturating_add(1).ilog2().min(7);
                 *stats
-                    .entry((c.rank.min(8).saturating_sub(1), u))
+                    .entry((c.rank.min(7).saturating_sub(1), u))
                     .or_default() += 1;
             }
         }
