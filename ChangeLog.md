@@ -1,10 +1,11 @@
-## 0.18.0, 2026-03-13
+## 0.18.0, 2026-03-14
 
-This would be a no better than the previous implementations.
+This would be no better than the previous implementations.
 
 - Remove feature 'incremental_solver'
 - Add feature 'BT_deepen'
 - Add option `--heatmap`
+- Add option `--rst-lbd-thr`
 - Fix errors on `chrono_BT`
 - Switch to Rust edition 2024
 
