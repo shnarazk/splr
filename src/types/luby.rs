@@ -3,6 +3,7 @@ use std::{fmt, num::NonZeroU32};
 
 #[derive(Clone, Debug)]
 pub struct LubySegment {
+    pub as_n: usize,
     pub seg_index: u32,
     pub ix_in_seg: u32,
 }
@@ -10,6 +11,7 @@ pub struct LubySegment {
 impl Default for LubySegment {
     fn default() -> Self {
         LubySegment {
+            as_n: 0,
             seg_index: 1,
             ix_in_seg: 0,
         }
@@ -18,7 +20,11 @@ impl Default for LubySegment {
 
 impl fmt::Display for LubySegment {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Luby[seg:{}, ix:{}]", self.seg_index, self.ix_in_seg)
+        write!(
+            f,
+            "Luby[n: {}, seg:{}, ix:{}]",
+            self.as_n, self.seg_index, self.ix_in_seg
+        )
     }
 }
 
@@ -32,17 +38,20 @@ impl LubySegment {
     pub fn to_next(&self) -> Self {
         if self.ix_in_seg + 1 == self.segment_len() {
             Self {
+                as_n: self.as_n + 1,
                 seg_index: self.seg_index + 1,
                 ix_in_seg: 0,
             }
         } else {
             Self {
+                as_n: self.as_n + 1,
                 seg_index: self.seg_index,
                 ix_in_seg: self.ix_in_seg + 1,
             }
         }
     }
     pub fn shift(&mut self) -> &mut Self {
+        self.as_n += 1;
         if self.ix_in_seg + 1 == self.segment_len() {
             self.seg_index += 1;
             self.ix_in_seg = 0;
