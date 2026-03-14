@@ -16,7 +16,7 @@ pub struct Clause {
     pub(crate) flags: FlagClause,
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: u16,
-    /// The number of proagation.
+    /// The number of propagation.
     pub used: u16,
     /// the index from which `propagate` starts searching an un-falsified literal.
     /// Since it's just a hint, we don't need u32 or usize.

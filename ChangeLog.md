@@ -1,5 +1,7 @@
 ## 0.18.0, 2026-03-13
 
+This would be a no better than the previous implementations.
+
 - Remove feature 'incremental_solver'
 - Add feature 'BT_deepen'
 - Add option `--heatmap`

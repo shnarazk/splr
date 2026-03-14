@@ -1,4 +1,4 @@
-//! Module `types' provides various building blocks, including
+//! Module `types` provides various building blocks, including
 //! some common traits.
 
 /// methods on clause

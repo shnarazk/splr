@@ -1,6 +1,6 @@
 //! main struct AssignStack
 use {
-    super::{ema::ProgressASG, heap::VarHeapIF, heap::VarIdHeap, AssignIF, PropagateIF, Var},
+    super::{AssignIF, PropagateIF, Var, ema::ProgressASG, heap::VarHeapIF, heap::VarIdHeap},
     crate::{cdb::ClauseDBIF, types::*},
     std::{
         fmt,
@@ -287,11 +287,7 @@ impl AssignIF for AssignStack {
             lits.iter()
                 .map(|l| {
                     let i = i32::from(l);
-                    if i < 0 {
-                        -2 * i
-                    } else {
-                        2 * i + 1
-                    }
+                    if i < 0 { -2 * i } else { 2 * i + 1 }
                 })
                 .collect::<Vec<_>>(),
         );
@@ -479,7 +475,7 @@ pub trait VarManipulateIF {
     fn var_mut(&mut self, vi: VarId) -> &mut Var;
     /// return an iterator over Vars.
     fn var_iter(&self) -> Iter<'_, Var>;
-    /// return an mutable iterator over Vars.
+    /// return a mutable iterator over Vars.
     fn var_iter_mut(&mut self) -> IterMut<'_, Var>;
     /// set var status to asserted.
     fn make_var_asserted(&mut self, vi: VarId);
@@ -588,7 +584,9 @@ impl VarManipulateIF for AssignStack {
                         self.var[vi].assign,
                     );
                 }
-                debug_assert!(self.root_level < self.var[vi].level || self.var[vi].assign.is_none());
+                debug_assert!(
+                    self.root_level < self.var[vi].level || self.var[vi].assign.is_none()
+                );
             }
         } else {
             #[cfg(feature = "boundary_check")]

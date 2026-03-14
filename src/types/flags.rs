@@ -1,7 +1,7 @@
 /// API for object properties.
 pub trait FlagIF {
     type FlagType;
-    /// return true if the flag in on.
+    /// return true if the flag is on.
     fn is(&self, flag: Self::FlagType) -> bool;
     /// set the flag.
     fn set(&mut self, f: Self::FlagType, b: bool);
