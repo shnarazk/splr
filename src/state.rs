@@ -218,7 +218,7 @@ impl Instantiate for State {
             config: config.clone(),
             cnf: cnf.clone(),
             restart: RestartManager::instantiate(config, cnf),
-            stm: StageManager::instantiate(config, cnf),
+            stm: StageManager::new(),
             target: cnf.clone(),
             time_limit: config.c_timeout,
             progress_report_rows: PROGRESS_REPORT_ROWS
@@ -627,8 +627,8 @@ impl StateIF for State {
                 0.01
             ),
         );
-        self[LogUsizeId::Stage] = self.stm.current_stage();
-        self[LogUsizeId::StageCycle] = self.stm.current_cycle();
+        self[LogUsizeId::Stage] = self.stm.current_segment();
+        self[LogUsizeId::StageCycle] = self.stm.envelop_index();
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
         if self.config.show_cdb_heatmap {
             let big_change = 0.002;
@@ -770,8 +770,8 @@ impl State {
         self[LogUsizeId::PermanentClause] =
             cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
         self[LogUsizeId::Restart] = self[Stat::Restart];
-        self[LogUsizeId::Stage] = self.stm.current_stage();
-        self[LogUsizeId::StageCycle] = self.stm.current_cycle();
+        self[LogUsizeId::Stage] = self.stm.current_segment();
+        self[LogUsizeId::StageCycle] = self.stm.envelop_index();
         self[LogUsizeId::StageSegment] = self.stm.max_scale();
         self[LogUsizeId::Simplify] = self[Stat::Simplify];
         self[LogUsizeId::SubsumedClause] = self[Stat::SubsumedClause];
@@ -1127,9 +1127,9 @@ pub mod property {
                 Tusize::Vivification => self[Stat::Vivification],
                 Tusize::VivifiedClause => self[Stat::VivifiedClause],
                 Tusize::VivifiedVar => self[Stat::VivifiedVar],
-                Tusize::NumCycle => self.stm.current_cycle(),
-                Tusize::NumStage => self.stm.current_stage(),
-                Tusize::IntervalScale => self.stm.current_scale(),
+                Tusize::NumCycle => self.stm.envelop_index(),
+                Tusize::NumStage => self.stm.current_segment(),
+                Tusize::IntervalScale => self.stm.current_segment_length(),
                 Tusize::IntervalScaleMax => self.stm.max_scale(),
             }
         }

@@ -226,14 +226,15 @@ fn search(
     state: &mut State,
 ) -> Result<bool, SolverError> {
     let mut previous_stage: Option<bool> = Some(true);
-    let mut num_learnt = 0;
     let mut current_core: usize = 999_999;
     let mut core_was_rebuilt: Option<usize> = None;
-    let stage_size: usize = 32;
     #[cfg(feature = "rephase")]
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
+    let mut after_restart: usize = 0;
+    let mut num_depression: usize = 0;
+    let mut num_learnts: usize = 0;
 
-    state.stm.initialize(stage_size);
+    state.stm.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
             let lit = asg.select_decision_literal();
@@ -242,6 +243,7 @@ fn search(
         let Err(cc) = asg.propagate(cdb) else {
             continue;
         };
+        after_restart += 1;
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }
@@ -249,10 +251,15 @@ fn search(
         #[cfg(feature = "clause_rewarding")]
         cdb.update_activity_tick();
         if 1 < handle_conflict(asg, cdb, state, &cc)? {
-            num_learnt += 1;
+            num_learnts += 1;
         }
-        let stage_counter = num_learnt; // - state.num_chrono_bt;
-        if state.stm.stage_ended(/* num_learnt */ stage_counter) {
+        if after_restart >= 10
+            && cdb.refer(cdb::property::TEma::LBD).trend() > state.config.rst_lbd_thr
+        {
+            num_depression += 1;
+        }
+
+        if state.stm.span_ended(num_depression) {
             if let Some(p) = state.elapsed() {
                 if 1.0 <= p {
                     return Err(SolverError::TimeOut);
@@ -260,6 +267,8 @@ fn search(
             } else {
                 return Err(SolverError::UndescribedError);
             }
+            after_restart = 0;
+            num_depression = 0;
             RESTART!(asg, cdb, state);
             asg.select_rephasing_target();
             asg.clear_asserted_literals(cdb)?;
@@ -268,28 +277,28 @@ fn search(
             cdb.check_consistency(asg, "before simplify");
 
             dump_stage(asg, cdb, state, previous_stage);
-            let next_stage: Option<bool> =
-                state.stm.prepare_new_stage(/* num_learnt */ stage_counter);
-            let scale = state.stm.current_scale();
+            let new_span: Option<bool> = state.stm.prepare_new_span(num_depression);
+            let segment_length = state.stm.current_segment_length();
             let max_scale = state.stm.max_scale();
             if cfg!(feature = "reward_annealing") {
-                let base = state.stm.current_stage() - state.stm.cycle_starting_stage();
+                let base = state.stm.current_segment() - state.stm.envelope_starting_segment();
                 let decay_index: f64 = (20 + 2 * base) as f64;
                 asg.update_activity_decay((decay_index - 1.0) / decay_index);
             }
-            if let Some(new_segment) = next_stage {
+            if let Some(new_envelope) = new_span {
                 // a beginning of a new cycle
                 {
                     state.exploration_rate_ema.update(1.0);
-                    if cfg!(feature = "two_mode_reduction") {
-                        cdb.reduce(
-                            asg,
-                            ReductionType::LBDonALL(
-                                state.config.cls_rdc_lbd,
-                                state.config.cls_rdc_rm2,
-                            ),
-                        );
-                    }
+                    // if cfg!(feature = "two_mode_reduction") && num_learnts > 40_000 {
+                    //     cdb.reduce(
+                    //         asg,
+                    //         ReductionType::LBDonALL(
+                    //             state.config.cls_rdc_lbd,
+                    //             state.config.cls_rdc_rm2,
+                    //         ),
+                    //     );
+                    //     num_learnts = 0;
+                    // }
                 }
                 #[cfg(feature = "rephase")]
                 {
@@ -336,7 +345,7 @@ fn search(
                                 let mut assignment = asg.best_phases_ref(Some(false));
                                 sls!(assignment, steps);
                             }
-                        } else if new_segment {
+                        } else if new_envelope {
                             let n = cdb.derefer(cdb::property::Tusize::NumClause);
                             let steps = scale!(27_u32, current_core) * scale!(24_u32, n) / ent;
                             let mut assignment = asg.best_phases_ref(Some(false));
@@ -345,10 +354,10 @@ fn search(
                     }
                     asg.select_rephasing_target();
                 }
-                if cfg!(feature = "clause_vivification") {
+                if cfg!(feature = "clause_vivification") && num_learnts < 4000 {
                     cdb.vivify(asg, state)?;
                 }
-                if new_segment {
+                if new_envelope {
                     {
                         let base = state.stm.current_segment();
                         let decay_index: f64 = (20 + 2 * base) as f64;
@@ -368,35 +377,35 @@ fn search(
                 }
             } else {
                 {
-                    if cfg!(feature = "two_mode_reduction") {
+                    if cfg!(feature = "two_mode_reduction") && num_learnts > 40_000 {
                         cdb.reduce(
                             asg,
                             ReductionType::RASonADD(
                                 state.stm.num_reducible(state.config.cls_rdc_rm1),
                             ),
                         );
+                        num_learnts = 0;
                     }
                 }
             }
             {
-                if !cfg!(feature = "two_mode_reduction") {
+                if !cfg!(feature = "two_mode_reduction") && num_learnts > 40_000 {
                     cdb.reduce(
                         asg,
                         ReductionType::RASonADD(state.stm.num_reducible(state.config.cls_rdc_rm1)),
                     );
+                    num_learnts = 0;
                 }
             }
             state.progress(asg, cdb);
-            asg.handle(SolverEvent::Stage(scale));
-            state.restart.set_stage_parameters(scale);
-            previous_stage = next_stage;
-        // Old condition was superseded by a simpler code based on experiments.
-        // state.restart.restart(
-        //     cdb.refer(cdb::property::TEma::LBD),
-        //     cdb.refer(cdb::property::TEma::Entanglement),
-        // )
-        } else if cdb.refer(cdb::property::TEma::LBD).trend() > state.config.rst_lbd_thr {
-            RESTART!(asg, cdb, state);
+            asg.handle(SolverEvent::Stage(segment_length));
+            state.restart.set_stage_parameters(segment_length);
+            previous_stage = new_span;
+            // Old condition was superseded by a simpler code based on experiments.
+            // state.restart.restart(
+            //     cdb.refer(cdb::property::TEma::LBD),
+            //     cdb.refer(cdb::property::TEma::Entanglement),
+            // )
         }
         if let Some(na) = asg.best_assigned() {
             if current_core < na && core_was_rebuilt.is_none() {
@@ -424,9 +433,9 @@ fn search(
 /// display the current stats. before updating stabiliation parameters
 fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: Option<bool>) {
     let active = true; // state.rst.enable;
-    let cycle = state.stm.current_cycle();
+    let cycle = state.stm.envelop_index();
     let span = state.stm.current_span();
-    let stage = state.stm.current_stage();
+    let stage = state.stm.current_segment();
     let segment = state.stm.current_segment();
     let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
     let vdr = asg.derefer(assign::property::Tf64::VarDecayRate);
