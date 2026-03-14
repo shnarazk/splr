@@ -642,7 +642,7 @@ impl StateIF for State {
                     4 => LogF64Id::CdbHeatmap4,
                     5 => LogF64Id::CdbHeatmap5,
                     6 => LogF64Id::CdbHeatmap6,
-                    __ => LogF64Id::End,
+                    _ => LogF64Id::End,
                 };
                 let col_labels: [LogF64Id; 8] = match i {
                     0 => [
