@@ -2,10 +2,6 @@
 mod activity;
 /// methods on binary link, namely binary clause
 mod binary;
-/// methods on `ClauseId`
-mod cid;
-/// methods on `Clause`
-mod clause;
 /// methods on `ClauseDB`
 mod db;
 /// EMA
@@ -21,8 +17,6 @@ mod watch_cache;
 
 pub use self::{
     binary::{BinaryLinkDB, BinaryLinkList},
-    cid::ClauseIdIF,
-    clause::{Clause, ClauseIF},
     db::ClauseDB,
     property::*,
     sls::StochasticLocalSearchIF,
@@ -33,7 +27,6 @@ pub use self::{
 use {
     crate::{assign::AssignIF, types::*},
     std::{
-        num::NonZeroU32,
         ops::IndexMut,
         slice::{Iter, IterMut},
     },
@@ -42,14 +35,6 @@ use {
 
 #[cfg(not(feature = "no_IO"))]
 use std::path::Path;
-
-/// Clause identifier, or clause index, starting with one.
-/// Note: ids are re-used after 'garbage collection'.
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct ClauseId {
-    /// a sequence number.
-    pub ordinal: NonZeroU32,
-}
 
 #[derive(Clone, Debug)]
 pub enum ReductionType {
@@ -157,10 +142,6 @@ pub trait ClauseDBIF:
     /// complete bi-clause network
     fn complete_bi_clauses(&mut self, asg: &mut impl AssignIF);
 
-    #[cfg(feature = "incremental_solver")]
-    /// save an eliminated permanent clause to an extra space for incremental solving.
-    fn make_permanent_immortal(&mut self, cid: ClauseId);
-
     //
     //## for debug
     //
@@ -175,6 +156,7 @@ pub trait ClauseDBIF:
     #[cfg(not(feature = "no_IO"))]
     /// dump all active clauses and assertions as a CNF file.
     fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);
+    fn clause_heatmap(&self) -> [[f64; 9]; 7];
 }
 
 pub mod property {
@@ -234,7 +216,7 @@ pub mod property {
         ReductionThreshold,
     }
 
-    pub const F64: [Tf64; 3] = [
+    pub const F64S: [Tf64; 3] = [
         Tf64::LiteralBlockDistance,
         Tf64::LiteralBlockEntanglement,
         Tf64::ReductionThreshold,
@@ -272,8 +254,11 @@ pub mod property {
 
 #[cfg(test)]
 mod tests {
-    use super::{clause::ClauseIF, *};
-    use crate::assign::{AssignStack, PropagateIF};
+    use {
+        super::*,
+        crate::assign::{AssignStack, PropagateIF},
+        std::num::NonZeroU32,
+    };
 
     fn lit(i: i32) -> Lit {
         Lit::from(i)
@@ -286,9 +271,11 @@ mod tests {
             println!("skip checking watches of an empty clause");
             return;
         }
-        assert!(c.lits[0..2]
-            .iter()
-            .all(|l| cdb.watch_cache[!*l].iter().any(|(c, _)| *c == cid)));
+        assert!(
+            c.lits[0..2]
+                .iter()
+                .all(|l| cdb.watch_cache[!*l].iter().any(|(c, _)| *c == cid))
+        );
         println!("pass to check watches");
     }
 
@@ -309,7 +296,7 @@ mod tests {
 
         asg.assign_by_decision(lit(-2)); // at level 1
         asg.assign_by_decision(lit(1)); // at level 2
-                                        // Now `asg.level` = [_, 2, 1, 3, 4, 5, 6].
+        // Now `asg.level` = [_, 2, 1, 3, 4, 5, 6].
         let c1 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();

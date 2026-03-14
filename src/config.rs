@@ -42,19 +42,19 @@ pub struct Config {
     /// Disable any progress message
     pub quiet_mode: bool,
 
+    /// Show clause DB heatmap
+    pub show_cdb_heatmap: bool,
+
     /// Show sub-module logging report
     pub show_journal: bool,
 
     /// Writes a DRAT UNSAT certification file
     pub use_certification: bool,
 
-    /// Uses Glucose-like progress report
-    pub use_log: bool,
-
     //
     //## clause management
     //
-    // clause reward dacay rate
+    // clause reward decay rate
     pub crw_dcy_rat: f64,
     // clause reduction LBD threshold for mode 2: exploration
     pub cls_rdc_lbd: u16,
@@ -62,6 +62,12 @@ pub struct Config {
     pub cls_rdc_rm1: f64,
     // clause reduction ratio for mode 2: exploration
     pub cls_rdc_rm2: f64,
+
+    //
+    //## restart
+    //
+    // LBD trend threshold to trigger a restart
+    pub rst_lbd_thr: f64,
 
     //
     //## eliminator
@@ -92,7 +98,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            c_cbt_thr: 100,
+            c_cbt_thr: 32, // 100,
             c_cls_lim: 0,
             c_timeout: 5000.0,
 
@@ -103,14 +109,15 @@ impl Default for Config {
             io_rfile: PathBuf::new(),
             no_color: false,
             quiet_mode: false,
+            show_cdb_heatmap: false,
             show_journal: false,
             use_certification: false,
-            use_log: false,
 
             crw_dcy_rat: 0.95,
             cls_rdc_lbd: 5,
             cls_rdc_rm1: 0.2,
             cls_rdc_rm2: 0.05,
+            rst_lbd_thr: 2.0,
 
             enable_eliminator: cfg!(feature = "clause_elimination"),
             elm_cls_lim: 64,
@@ -133,21 +140,22 @@ impl Config {
     pub fn inject_from_args(&mut self) {
         let mut help = false;
         let mut version = false;
-        if 1 < std::env::args().count() {
-            if let Some(ref cnf) = std::env::args().last() {
-                // we'll check the existence after parsing all args.
-                self.cnf_file = PathBuf::from(cnf.clone());
-            }
+        if 1 < std::env::args().count()
+            && let Some(ref cnf) = std::env::args().next_back()
+        {
+            // we'll check the existence after parsing all args.
+            self.cnf_file = PathBuf::from(cnf.clone());
         }
+
         let args = std::env::args();
         let mut iter = args.skip(1);
         while let Some(arg) = iter.next() {
             if let Some(stripped) = arg.strip_prefix("--") {
                 let flags = [
-                    "no-color", "quiet", "certify", "journal", "log", "help", "version",
+                    "no-color", "quiet", "certify", "heatmap", "journal", "help", "version",
                 ];
                 let options_usize = ["cl", "crl", "stat", "ecl", "evl", "evo"];
-                let options_f64 = ["timeout", "cdr", "cr1", "cr2", "vdr", "vds"];
+                let options_f64 = ["timeout", "cdr", "cr1", "cr2", "rlt", "vdr", "vds"];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
                 match seg.len() {
@@ -158,8 +166,8 @@ impl Config {
                                 "no-color" => self.no_color = true,
                                 "quiet" => self.quiet_mode = true,
                                 "certify" => self.use_certification = true,
+                                "heatmap" => self.show_cdb_heatmap = true,
                                 "journal" => self.show_journal = true,
-                                "log" => self.use_log = true,
                                 "help" => help = true,
                                 "version" => version = true,
                                 _ => panic!("invalid flag: {name}"),
@@ -189,6 +197,7 @@ impl Config {
                                         "cdr" => self.crw_dcy_rat = val,
                                         "cr1" => self.cls_rdc_rm1 = val,
                                         "cr2" => self.cls_rdc_rm2 = val,
+                                        "rlt" => self.rst_lbd_thr = val,
                                         "vdr" => self.vrw_dcy_rat = val,
                                         "vds" => self.vrw_dcy_stp = val,
 
@@ -216,11 +225,11 @@ impl Config {
                         }
                     }
                     _ => {
-                        println!("connected long arg: {:?} = {:?}", seg[0], seg[1]);
+                        panic!("connected long arg: {:?} = {:?}", seg[0], seg[1]);
                     }
                 }
             } else if let Some(name) = arg.strip_prefix('-') {
-                let flags = ["C", "q", "c", "j", "l", "h", "V"];
+                let flags = ["C", "q", "c", "j", "H", "h", "V"];
                 let options_path = ["o", "p", "r", "t"];
                 if flags.contains(&name) {
                     match name {
@@ -228,7 +237,7 @@ impl Config {
                         "q" => self.quiet_mode = true,
                         "c" => self.use_certification = true,
                         "j" => self.show_journal = true,
-                        "l" => self.use_log = true,
+                        "H" => self.show_cdb_heatmap = true,
                         "h" => help = true,
                         "V" => version = true,
                         _ => panic!("invalid flag: {name}"),
@@ -272,8 +281,6 @@ impl Config {
                 "EMA calibration",
                 #[cfg(feature = "EVSIDS")]
                 "EVSIDS rewarding",
-                #[cfg(feature = "incremental_solver")]
-                "incremental solver",
                 #[cfg(feature = "just_used")]
                 "use 'just used' flag",
                 #[cfg(feature = "LRB_rewarding")]
@@ -334,19 +341,20 @@ FLAGS:
   -C, --no-color            Disable coloring
   -q, --quiet               Disable any progress message
   -c, --certify             Writes a DRAT UNSAT certification file
+  -H, --heatmap             Shows clause heatmap
   -j, --journal             Shows log about restart stages
-  -l, --log                 Uses Glucose-like progress report
   -V, --version             Prints version information
 OPTIONS:
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
 {}{}{}{}      --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
       --evo <elm-var-occ>   Max #cls for var elimination   {:>10}
+      --rlt <rst-lbd-thr>   LBD trend threshold to restart    {:>10.2}
+      --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
   -o, --dir <io-outdir>     Output directory                {:>10}
   -p, --proof <io-pfile>    DRAT Cert. filename                 {:>10}
   -r, --result <io-rfile>   Result filename/stdout              {:>10}
   -t, --timeout <timeout>   CPU time limit in sec.         {:>10}
-      --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
 {}ARGS:
   <cnf-file>    DIMACS CNF file
 ",
@@ -374,11 +382,12 @@ OPTIONS:
         config.elm_cls_lim,
         config.elm_grw_lim,
         config.elm_var_occ,
+        config.rst_lbd_thr,
+        config.vrw_dcy_rat,
         config.io_odir.to_string_lossy(),
         config.io_pfile.to_string_lossy(),
         config.io_rfile.to_string_lossy(),
         config.c_timeout,
-        config.vrw_dcy_rat,
         OPTION!(
             "EVSIDS",
             config.vrw_dcy_stp,

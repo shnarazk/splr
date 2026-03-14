@@ -1,0 +1,17 @@
+// Project-local debug tasks
+//
+// For more documentation on how to configure debug tasks,
+// see: https://zed.dev/docs/debugger
+[
+  {
+    "label": "Build & Run with v360(UNSAT)",
+    "build": {
+      "command": "cargo",
+      "args": ["build"]
+    },
+    "program": "$ZED_WORKTREE_ROOT/.cargo/target/debug/splr",
+    "args": ["cnfs/unif-k3-r4.25-v360-c1530-S1028159446-096.cnf"],
+    "request": "launch",
+    "adapter": "CodeLLDB"
+  }
+]

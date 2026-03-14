@@ -2,11 +2,11 @@
 /// SAT solver for Propositional Logic in Rust, which can't be compiled with feature 'no_IO'
 use {
     splr::{
-        assign, cdb,
+        Config, EmaIF, PropertyDereference, PropertyReference, SolverError, VERSION, assign,
+        cdb::{self, ClauseDBIF},
         config::{self, CERTIFICATION_DEFAULT_FILENAME},
         solver::*,
         state::{self, LogF64Id, LogUsizeId},
-        Config, EmaIF, PropertyDereference, PropertyReference, SolverError, VERSION,
     },
     std::{
         borrow::Cow,
@@ -63,23 +63,25 @@ fn main() {
     if config.io_pfile.to_string_lossy() != CERTIFICATION_DEFAULT_FILENAME
         && !config.use_certification
     {
-        println!("Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good.");
+        println!(
+            "Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good."
+        );
         return;
     }
-    if let Ok(val) = env::var("SPLR_TIMEOUT") {
-        if let Ok(timeout) = val.parse::<u64>() {
-            let input = cnf_file.as_ref().to_string();
-            let no_color = config.no_color;
-            thread::spawn(move || {
-                thread::sleep(Duration::from_millis(timeout * 1000));
-                println!(
-                    "{} (TimeOut): {}",
-                    colored(Err(&SolverError::TimeOut), no_color),
-                    input
-                );
-                std::process::exit(0);
-            });
-        }
+    if let Ok(val) = env::var("SPLR_TIMEOUT")
+        && let Ok(timeout) = val.parse::<u64>()
+    {
+        let input = cnf_file.as_ref().to_string();
+        let no_color = config.no_color;
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(timeout * 1000));
+            println!(
+                "{} (TimeOut): {}",
+                colored(Err(&SolverError::TimeOut), no_color),
+                input
+            );
+            std::process::exit(0);
+        });
     }
     let mut s = match Solver::build(&config) {
         Err(SolverError::EmptyClause | SolverError::RootLevelConflict(_)) => {
@@ -341,7 +343,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             .as_bytes(),
         )?;
     }
-    for key in &cdb::property::F64 {
+    for key in &cdb::property::F64S {
         out.write_all(
             format!(
                 "c   clause::{:<27}{:>19.3}\n",
@@ -361,6 +363,16 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             .as_bytes(),
         )?;
     }
+    for key in &state::property::F64S {
+        out.write_all(
+            format!(
+                "c   state::{:<28}{:>19.3}\n",
+                format!("{key:?}"),
+                s.state.derefer(*key),
+            )
+            .as_bytes(),
+        )?;
+    }
     for key in &state::property::EMAS {
         out.write_all(
             format!(
@@ -370,6 +382,24 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             )
             .as_bytes(),
         )?;
+    }
+    {
+        let heatmap = s.cdb.clause_heatmap();
+        for (i, l) in heatmap.iter().enumerate() {
+            let columns = l
+                .iter()
+                .skip(1)
+                .map(|v| format!("{v:.3}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            if i == heatmap.len() - 1 {
+                out.write_all(format!("c   LBD>{} ({:5.3}): {}\n", i, l[0], columns).as_bytes())?;
+            } else {
+                out.write_all(
+                    format!("c   LBD {} ({:5.3}): {}\n", i + 1, l[0], columns).as_bytes(),
+                )?;
+            }
+        }
     }
 
     out.write_all(b"c \n")?;

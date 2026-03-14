@@ -6,7 +6,7 @@ use {
     std::{
         env,
         fs::File,
-        io::{stdin, BufRead, BufReader, Result},
+        io::{BufRead, BufReader, Result, stdin},
         path::{Path, PathBuf},
     },
 };
@@ -40,7 +40,7 @@ impl TargetOpts {
     pub fn inject_from_args(&mut self) {
         let mut help = false;
         let mut version = false;
-        if let Some(ref cnf) = std::env::args().last() {
+        if let Some(ref cnf) = std::env::args().next_back() {
             let path = PathBuf::from(cnf.clone());
             if path.exists() {
                 self.problem = path;
@@ -148,23 +148,23 @@ fn main() {
                 .to_string_lossy()
         )));
     }
-    if let Some(f) = &args.assign {
-        if let Ok(d) = File::open(f.as_path()) {
-            if let Some(vec) = read_assignment(&mut BufReader::new(d), cnf, &args.assign) {
-                if s.inject_assignment(&vec).is_err() {
-                    println!(
-                        "{}{} seems an unsat problem but no proof.{}",
-                        blue,
-                        args.problem.to_str().unwrap(),
-                        RESET
-                    );
-                    return;
-                }
-            } else {
+    if let Some(f) = &args.assign
+        && let Ok(d) = File::open(f.as_path())
+    {
+        if let Some(vec) = read_assignment(&mut BufReader::new(d), cnf, &args.assign) {
+            if s.inject_assignment(&vec).is_err() {
+                println!(
+                    "{}{} seems an unsat problem but no proof.{}",
+                    blue,
+                    args.problem.to_str().unwrap(),
+                    RESET
+                );
                 return;
             }
-            found = true;
+        } else {
+            return;
         }
+        found = true;
     }
     if !found {
         if let Some(vec) = read_assignment(&mut BufReader::new(stdin()), cnf, &args.assign) {

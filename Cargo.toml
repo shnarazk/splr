@@ -1,9 +1,9 @@
 [package]
 name = "splr"
-version = "0.17.4"
+version = "0.18.0-dev2"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
-edition = "2021"
+edition = "2024"
 license = "MPL-2.0"
 readme = "README.md"
 repository = "https://github.com/shnarazk/splr"
@@ -11,7 +11,7 @@ homepage = "https://github.com/shnarazk/splr"
 keywords = ["SAT", "SAT-solver", "logic", "satisfiability"]
 categories = ["science", "mathematics"]
 default-run = "splr"
-rust-version = "1.84"
+rust-version = "1.94"
 
 [dependencies]
 bitflags = "^2.8"
@@ -19,38 +19,40 @@ instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
 
 [features]
 default = [
-        ### Essential
-        # "incremental_solver",
-        "unsafe_access",
+    ### Essential
+    "unsafe_access",
+    # "chrono_BT",
+    "trail_saving",
+    "BT_deepen",
 
-        ### Heuristics
-        # "bi_clause_completion",
-        # "clause_rewarding",
-        "dynamic_restart_threshold",
-        "LRB_rewarding",
-        "reason_side_rewarding",
-        "rephase",
-        "reward_annealing",
-        # "stochastic_local_search",
-        # "suppress_reason_chain",
-        "two_mode_reduction",
-        "trail_saving",
+    ### Heuristics
+    # "bi_clause_completion",
+    # "clause_rewarding",
+    "dynamic_restart_threshold",
+    "LRB_rewarding",
+    "reason_side_rewarding",
+    "rephase",
+    "reward_annealing",
+    # "stochastic_local_search",
+    # "suppress_reason_chain",
+    "two_mode_reduction",
 
-        ### Logic formula processor
-        "clause_elimination",
-        "clause_vivification",
+    ### Logic formula processor
+    "clause_elimination",
+    "clause_vivification",
 
-        ### For DEBUG
-        # "boundary_check",
-        # "maintain_watch_cache",
+    ### For DEBUG
+    # "boundary_check",
+    # "maintain_watch_cache",
 
-        ### platform dependency
-        # "platform_wasm"
+    ### platform dependency
+    # "platform_wasm"
 ]
 assign_rate = []                # for debug and study
 best_phases_tracking = []       # save the best-so-far assignment, used by 'rephase'
 bi_clause_completion = []       # this will increase memory pressure
 boundary_check = []             # for debug
+BT_deepen = []                   # backtrack drift
 chrono_BT = []                  # NOT WORK
 clause_elimination = []         # pre(in)-processor setting
 clause_rewarding = []           # clauses have activities w/ decay rate
@@ -58,23 +60,22 @@ clause_vivification = []        # pre(in)-processor setting
 debug_propagation = []          # for debug
 dynamic_restart_threshold = []  # control restart spans like Glucose
 EMA_calibration = []            # each exponential moving average has a calbration value
-EVSIDS = []                     # Eponential Variable State Independent Decaying Sum
-incremental_solver = []         # for all solution SAT sover, you can't use this with clause_elimination
+EVSIDS = []                     # Exponential Variable State Independent Decaying Sum
 just_used = []                  # Var and clause have 'just_used' flags
-LRB_rewarding = []              # Vearning Rate Based rewarding, a new var activity criteria
+LRB_rewarding = []              # Learning Rate Based rewarding, a new var activity criteria
 maintain_watch_cache = []       # for DEBUG
 no_IO = []                      # to embed Splr into non-std environments
 platform_wasm = [
-        "instant"               # use instant::Duration instead of std::time::Duration
+    "instant",                  # use instant::Duration instead of std::time::Duration
 ]
 reason_side_rewarding = []      # an idea used in Learning-rate based rewarding
 rephase = [                     # search around the best-so-far candidate repeatedly
-        "best_phases_tracking",
-        ]
+    "best_phases_tracking",
+]
 reward_annealing = []           # use bigger and smaller decay rates cycliclly
 stochastic_local_search = [     # since 0.17
-        # "reward_annealing",
-        "rephase",
+    # "reward_annealing",
+    "rephase",
 ]
 support_user_assumption = []    # NOT WORK (defined in Glucose)
 suppress_reason_chain = []      # make direct links between a dicision var and its implications
@@ -91,7 +92,3 @@ codegen-units = 1
 opt-level = 3
 panic = "abort"
 strip = true
-
-[[example]]
-name = "all-solutions"
-path = "misc/splr-all.rs"
