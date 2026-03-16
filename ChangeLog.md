@@ -1,3 +1,10 @@
+## 0.19.0
+
+- Switch to the O(1) Luby iterator. Now Luby sequence is used for
+  - trigger for restarts, clause elimination, and clause vivification
+  - clause DB size after clause reduction
+- `ClauseDBIF::reduce` can run at any decision level, and runs every 40,000 conflicts
+
 ## 0.18.0, 2026-03-14
 
 This would be no better than the previous implementations.

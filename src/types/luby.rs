@@ -60,6 +60,11 @@ impl LubySegment {
         }
         self
     }
+    pub fn reset(&mut self) {
+        self.as_n = 0;
+        self.seg_index = 1;
+        self.ix_in_seg = 0;
+    }
 }
 
 impl Iterator for LubySegment {

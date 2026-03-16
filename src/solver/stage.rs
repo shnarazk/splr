@@ -29,6 +29,7 @@ impl StageManager {
         self.next_is_new_envelope = true;
     }
     pub fn reset(&mut self) {
+        self.luby_iter.reset();
         self.envelope_hight = 1;
         self.end_of_span = 1;
         self.next_is_new_envelope = true;
@@ -53,7 +54,9 @@ impl StageManager {
         if self.envelope_hight == self.luby_iter.segment_len() as usize {
             self.next_is_new_envelope = true;
         }
-        self.end_of_span = now + self.current_span();
+        self.end_of_span = now
+            .checked_add(self.current_span())
+            .expect("overflow at L57");
         new_segment.then_some(new_envelope)
     }
     pub fn span_ended(&self, now: usize) -> bool {

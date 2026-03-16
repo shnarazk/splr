@@ -367,7 +367,5 @@ impl Clause {
         }
     }
     /// clear flags about vivification
-    fn vivified(&mut self) {
-        self.used = 0;
-    }
+    fn vivified(&mut self) {}
 }

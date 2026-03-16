@@ -65,6 +65,9 @@ pub struct ClauseDB {
     lbd_temp: Vec<usize>,
     pub(crate) lbd: ProgressLBD,
 
+    //## Reduction
+    leanrt_limit_ema: Ema,
+
     //
     //## statistics
     //
@@ -87,11 +90,6 @@ pub struct ClauseDB {
     pub(crate) lb_entanglement: Ema2,
     /// cutoff value used in the last `reduce`
     pub(crate) reduction_threshold: f64,
-
-    //
-    //## incremental solving
-    //
-    pub eliminated_permanent: Vec<Vec<Lit>>,
 }
 
 impl Default for ClauseDB {
@@ -116,6 +114,7 @@ impl Default for ClauseDB {
 
             lbd_temp: Vec::new(),
             lbd: ProgressLBD::default(),
+            leanrt_limit_ema: Ema::new(4).with_value(40_000.0),
 
             num_clause: 0,
             num_bi_clause: 0,
@@ -126,7 +125,6 @@ impl Default for ClauseDB {
             num_reregistration: 0,
             lb_entanglement: Ema2::new(1_000).with_slow(80_000).with_value(2.0),
             reduction_threshold: 0.0,
-            eliminated_permanent: Vec::new(),
         }
     }
 }
@@ -1028,7 +1026,7 @@ impl ClauseDBIF for ClauseDB {
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType, envelope: usize) {
         let ClauseDB {
             clause,
             lbd_temp,
@@ -1043,7 +1041,21 @@ impl ClauseDBIF for ClauseDB {
         *num_reduction += 1;
 
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
-        let mut alives = 0;
+        self.leanrt_limit_ema
+            .update(2_usize.pow(envelope as u32) as f64);
+        let limit: usize = self.leanrt_limit_ema.get() as usize;
+        if self.num_learnt < limit {
+            return;
+        }
+        for lit in asg.stack_iter() {
+            let Var { level, reason, .. } = asg.var(lit.vi());
+            if *level == asg.root_level() {
+                continue;
+            }
+            if let AssignReason::Implication(cid) = reason {
+                clause[NonZeroU32::get(cid.ordinal) as usize].turn_on(FlagClause::ASSIGN_REASON);
+            }
+        }
         for (i, c) in clause
             .iter_mut()
             .enumerate()
@@ -1051,7 +1063,6 @@ impl ClauseDBIF for ClauseDB {
             .filter(|(_, c)| !c.is_dead())
         {
             c.update_lbd(asg, lbd_temp);
-
             #[cfg(feature = "clause_rewarding")]
             c.update_activity(*tick, *activity_decay, 0.0);
 
@@ -1065,25 +1076,22 @@ impl ClauseDBIF for ClauseDB {
                 asg.level(c.lit0().vi()),
                 asg.decision_level(),
             );
-            if !c.is(FlagClause::LEARNT) {
+            if c.is(FlagClause::ASSIGN_REASON) {
+                c.turn_off(FlagClause::ASSIGN_REASON);
+                c.used = 0;
                 continue;
             }
-            alives += 1;
-            if c.rank <= 4 {
+            if !c.is(FlagClause::LEARNT) {
+                c.used = 0;
+                continue;
+            }
+            if c.rank <= 4 || c.used > 4 {
+                c.used = 0;
                 continue;
             }
             match setting {
                 ReductionType::RASonADD(_) => {
                     perm.push(OrderedProxy::new(i, c.reverse_activity_sum(asg)));
-                }
-                ReductionType::RASonALL(cutoff, _) => {
-                    let value = c.reverse_activity_sum(asg);
-                    if cutoff < value.min(c.rank as f64) {
-                        perm.push(OrderedProxy::new(i, value));
-                    }
-                }
-                ReductionType::LBDonADD(_) => {
-                    perm.push(OrderedProxy::new(i, c.lbd()));
                 }
                 ReductionType::LBDonALL(cutoff, _) => {
                     let value = c.rank;
@@ -1092,21 +1100,18 @@ impl ClauseDBIF for ClauseDB {
                     }
                 }
             }
+            c.used = 0;
         }
-        let keep = match setting {
+        /* let keep = match setting {
             ReductionType::RASonADD(size) => perm.len().saturating_sub(size),
             ReductionType::RASonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
             ReductionType::LBDonADD(size) => perm.len().saturating_sub(size),
             ReductionType::LBDonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
-        };
-        self.reduction_threshold = match setting {
-            ReductionType::RASonADD(_) | ReductionType::RASonALL(_, _) => {
-                keep as f64 / alives as f64
-            }
-            ReductionType::LBDonADD(_) | ReductionType::LBDonALL(_, _) => {
-                -(keep as f64) / alives as f64
-            }
-        };
+        }; */
+        let keep = perm
+            .len()
+            .saturating_sub(self.num_learnt.saturating_sub(limit));
+        self.reduction_threshold = keep as f64 / self.num_learnt as f64;
         perm.sort();
         for i in perm.iter().skip(keep) {
             self.remove_clause(ClauseId::from(i.to()));
@@ -1431,8 +1436,5 @@ impl Clause {
     }
     fn reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
         self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
-    }
-    fn lbd(&self) -> f64 {
-        self.rank as f64
     }
 }

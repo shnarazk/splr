@@ -117,7 +117,7 @@ impl Default for Config {
             cls_rdc_lbd: 5,
             cls_rdc_rm1: 0.2,
             cls_rdc_rm2: 0.05,
-            rst_lbd_thr: 2.0,
+            rst_lbd_thr: 1.05,
 
             enable_eliminator: cfg!(feature = "clause_elimination"),
             elm_cls_lim: 64,

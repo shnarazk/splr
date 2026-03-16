@@ -233,6 +233,7 @@ fn search(
     let mut after_restart: usize = 0;
     let mut num_depression: usize = 0;
     let mut num_learnts: usize = 0;
+    let mut lbd_threshold: u16 = 0;
 
     state.stm.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -250,13 +251,34 @@ fn search(
         asg.update_activity_tick();
         #[cfg(feature = "clause_rewarding")]
         cdb.update_activity_tick();
-        if 1 < handle_conflict(asg, cdb, state, &cc)? {
+        let lbd = handle_conflict(asg, cdb, state, &cc)?;
+        if lbd == 0 {
+            state.stm.reset();
+            // after_restart = 0;
+            num_depression = 1;
+            lbd_threshold = 0;
+        } else if 1 < lbd {
             num_learnts += 1;
-        }
-        if after_restart >= 10
-            && cdb.refer(cdb::property::TEma::LBD).trend() > state.config.rst_lbd_thr
-        {
-            num_depression += 1;
+            if after_restart >= 10 {
+                // we don't want to use the current, depressing value of average LBD
+                if num_depression == 0 {
+                    lbd_threshold = cdb.refer(cdb::property::TEma::LBD).get_fast() as u16;
+                    // lbd_trend = cdb.refer(cdb::property::TEma::LBD).trend();
+                }
+                num_depression += (lbd > lbd_threshold) as usize;
+                /* if after_restart > state.stm.current_span() * 16 {
+                    num_depression = usize::MAX;
+                } */
+                // state.config.rst_lbd_thr
+            }
+            if num_learnts > 40_000 {
+                cdb.reduce(
+                    asg,
+                    ReductionType::RASonADD(state.stm.num_reducible(state.config.cls_rdc_rm1)),
+                    state.stm.envelop_index(),
+                );
+                num_learnts = 0;
+            }
         }
 
         if state.stm.span_ended(num_depression) {
@@ -269,6 +291,7 @@ fn search(
             }
             after_restart = 0;
             num_depression = 0;
+            lbd_threshold = 0;
             RESTART!(asg, cdb, state);
             asg.select_rephasing_target();
             asg.clear_asserted_literals(cdb)?;
@@ -277,6 +300,7 @@ fn search(
             cdb.check_consistency(asg, "before simplify");
 
             dump_stage(asg, cdb, state, previous_stage);
+            let last_span = state.stm.current_span();
             let new_span: Option<bool> = state.stm.prepare_new_span(num_depression);
             let segment_length = state.stm.current_segment_length();
             let max_scale = state.stm.max_scale();
@@ -292,10 +316,14 @@ fn search(
                     // if cfg!(feature = "two_mode_reduction") && num_learnts > 40_000 {
                     //     cdb.reduce(
                     //         asg,
-                    //         ReductionType::LBDonALL(
-                    //             state.config.cls_rdc_lbd,
-                    //             state.config.cls_rdc_rm2,
+                    //         ReductionType::RASonADD(
+                    //             state.stm.num_reducible(state.config.cls_rdc_rm1),
                     //         ),
+                    //         // ReductionType::LBDonALL(
+                    //         //     state.config.cls_rdc_lbd,
+                    //         //     state.config.cls_rdc_rm2,
+                    //         // ),
+                    //         state.stm.envelop_index(),
                     //     );
                     //     num_learnts = 0;
                     // }
@@ -354,7 +382,8 @@ fn search(
                     }
                     asg.select_rephasing_target();
                 }
-                if cfg!(feature = "clause_vivification") && num_learnts < 4000 {
+                if cfg!(feature = "clause_vivification") && num_learnts > 36_000 && last_span >= 128
+                {
                     cdb.vivify(asg, state)?;
                 }
                 if new_envelope {
@@ -363,7 +392,7 @@ fn search(
                         let decay_index: f64 = (20 + 2 * base) as f64;
                         asg.update_activity_decay((decay_index - 1.0) / decay_index);
                     }
-                    if cfg!(feature = "clause_elimination") {
+                    if cfg!(feature = "clause_elimination") && state.stm.envelop_index() >= 8 {
                         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                         state.flush("clause subsumption, ");
                         elim.simplify(asg, cdb, state, false)?;
@@ -383,6 +412,7 @@ fn search(
                             ReductionType::RASonADD(
                                 state.stm.num_reducible(state.config.cls_rdc_rm1),
                             ),
+                            state.stm.envelop_index(),
                         );
                         num_learnts = 0;
                     }
@@ -393,11 +423,11 @@ fn search(
                     cdb.reduce(
                         asg,
                         ReductionType::RASonADD(state.stm.num_reducible(state.config.cls_rdc_rm1)),
+                        state.stm.envelop_index(),
                     );
                     num_learnts = 0;
                 }
             }
-            state.progress(asg, cdb);
             asg.handle(SolverEvent::Stage(segment_length));
             state.restart.set_stage_parameters(segment_length);
             previous_stage = new_span;
@@ -406,6 +436,13 @@ fn search(
             //     cdb.refer(cdb::property::TEma::LBD),
             //     cdb.refer(cdb::property::TEma::Entanglement),
             // )
+        }
+        if num_learnts.is_multiple_of(10000) {
+            // if state.stm.current_segment_length() >= 4 {
+            state.progress(asg, cdb);
+            if state.stm.current_span() > 10_000 {
+                state.flush("deep thought...");
+            }
         }
         if let Some(na) = asg.best_assigned() {
             if current_core < na && core_was_rebuilt.is_none() {

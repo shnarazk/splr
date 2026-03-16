@@ -18,13 +18,15 @@ bitflags! {
     #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
     pub struct FlagClause: u8 {
         /// a clause is a generated clause by conflict analysis and is removable.
-        const LEARNT       = 0b0000_0001;
+        const LEARNT        = 0b0000_0001;
         /// used in conflict analyze
-        const USED         = 0b0000_0010;
+        const USED          = 0b0000_0010;
         /// a clause or var is enqueued for eliminator.
-        const ENQUEUED     = 0b0000_0100;
+        const ENQUEUED      = 0b0000_0100;
         /// a clause is registered in vars' occurrence list.
-        const OCCUR_LINKED = 0b0000_1000;
+        const OCCUR_LINKED  = 0b0000_1000;
+        /// a clause is registered in vars' assing list.
+        const ASSIGN_REASON = 0b0001_0000;
     }
 }
 
