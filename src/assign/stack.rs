@@ -1,6 +1,6 @@
 //! main struct AssignStack
 use {
-    super::{AssignIF, PropagateIF, Var, ema::ProgressASG, heap::VarHeapIF, heap::VarIdHeap},
+    super::{AssignIF, Var, ema::ProgressASG, heap::VarHeapIF, heap::VarIdHeap},
     crate::{cdb::ClauseDBIF, types::*},
     std::{
         fmt,
@@ -218,17 +218,6 @@ impl Instantiate for AssignStack {
                 self.num_vars += 1;
                 self.var.push(Var::default());
             }
-            SolverEvent::Reinitialize => {
-                self.cancel_until(self.root_level);
-                debug_assert_eq!(self.decision_level(), self.root_level);
-                #[cfg(feature = "trail_saving")]
-                self.clear_saved_trail();
-                // self.num_eliminated_vars = self
-                //     .var
-                //     .iter()
-                //     .filter(|v| v.is(FlagVar::ELIMINATED))
-                //     .count();
-            }
             e => panic!("don't call asg with {e:?}"),
         }
     }
@@ -381,7 +370,7 @@ impl fmt::Display for AssignStack {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assign::PropagateIF;
+    use crate::{assign::PropagateIF, cdb::ClauseDB};
 
     fn lit(i: i32) -> Lit {
         Lit::from(i)
@@ -394,20 +383,21 @@ mod tests {
             ..CNFDescription::default()
         };
         let mut asg = AssignStack::instantiate(&config, &cnf);
+        let mut cdb = ClauseDB::instantiate(&config, &cnf);
         // [] + 1 => [1]
-        assert!(asg.assign_at_root_level(lit(1)).is_ok());
+        assert!(asg.assign_at_root_level(&mut cdb, lit(1)).is_ok());
         assert_eq!(asg.trail, vec![lit(1)]);
 
         // [1] + 1 => [1]
-        assert!(asg.assign_at_root_level(lit(1)).is_ok());
+        assert!(asg.assign_at_root_level(&mut cdb, lit(1)).is_ok());
         assert_eq!(asg.trail, vec![lit(1)]);
 
         // [1] + 2 => [1, 2]
-        assert!(asg.assign_at_root_level(lit(2)).is_ok());
+        assert!(asg.assign_at_root_level(&mut cdb, lit(2)).is_ok());
         assert_eq!(asg.trail, vec![lit(1), lit(2)]);
 
         // [1, 2] + -1 => ABORT & [1, 2]
-        assert!(asg.assign_at_root_level(lit(-1)).is_err());
+        assert!(asg.assign_at_root_level(&mut cdb, lit(-1)).is_err());
         assert_eq!(asg.decision_level(), 0);
         assert_eq!(asg.stack_len(), 2);
 
@@ -432,7 +422,7 @@ mod tests {
                 asg.var[l.vi()].turn_on(Flag::PROPAGATED);
             } // simulate propagation
         }
-        asg.cancel_until(1);
+        asg.cancel_until(&mut cdb, 1);
         assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
         assert_eq!(asg.decision_level(), 1);
         assert_eq!(asg.stack_len(), 3);
@@ -448,7 +438,7 @@ mod tests {
         assert_eq!(asg.trail_lim, vec![2, 3]);
 
         // [1, 2, 3, 4] => [1, 2, -4]
-        asg.assign_at_root_level(Lit::from(-4i32))
+        asg.assign_at_root_level(&mut cdb, Lit::from(-4i32))
             .expect("impossible");
         assert_eq!(asg.trail, vec![lit(1), lit(2), lit(-4)]);
         assert_eq!(asg.decision_level(), 0);

@@ -18,7 +18,7 @@ pub trait PropagateIF {
     /// # Errors
     ///
     /// emit `SolverError::Inconsistent` exception if solver becomes inconsistent.
-    fn assign_at_root_level(&mut self, l: Lit) -> MaybeInconsistent;
+    fn assign_at_root_level(&mut self, cdb: &mut impl ClauseDBIF, l: Lit) -> MaybeInconsistent;
     /// unsafe enqueue (assign by implication); doesn't emit an exception.
     ///
     /// ## Warning
@@ -29,7 +29,7 @@ pub trait PropagateIF {
     /// Callers have to assure the consistency after this assignment.
     fn assign_by_decision(&mut self, l: Lit);
     /// execute *backjump*.
-    fn cancel_until(&mut self, lv: DecisionLevel);
+    fn cancel_until(&mut self, cdb: &mut impl ClauseDBIF, lv: DecisionLevel);
     /// execute backjump in vivification sandbox
     fn backtrack_sandbox(&mut self);
     /// execute *boolean constraint propagation* or *unit propagation*.
@@ -106,8 +106,8 @@ macro_rules! unset_assign {
 }
 
 impl PropagateIF for AssignStack {
-    fn assign_at_root_level(&mut self, l: Lit) -> MaybeInconsistent {
-        self.cancel_until(self.root_level);
+    fn assign_at_root_level(&mut self, cdb: &mut impl ClauseDBIF, l: Lit) -> MaybeInconsistent {
+        self.cancel_until(cdb, self.root_level);
         let vi = l.vi();
         debug_assert!(vi < self.var.len());
         debug_assert!(!self.var[vi].is(FlagVar::ELIMINATED));
@@ -150,6 +150,7 @@ impl PropagateIF for AssignStack {
         );
         debug_assert_eq!(self.var[vi].assign, None);
         debug_assert_eq!(self.var[vi].reason, AssignReason::None);
+        debug_assert_ne!(self.var[vi].reason, reason);
         debug_assert!(self.trail.iter().all(|rl| *rl != l));
         set_assign!(self, l);
 
@@ -194,7 +195,7 @@ impl PropagateIF for AssignStack {
         self.num_decision += 1;
         debug_assert!(self.q_head < self.trail.len());
     }
-    fn cancel_until(&mut self, lv: DecisionLevel) {
+    fn cancel_until(&mut self, cdb: &mut impl ClauseDBIF, lv: DecisionLevel) {
         if self.trail_lim.len() as u32 <= lv {
             return;
         }
@@ -254,6 +255,9 @@ impl PropagateIF for AssignStack {
             }
 
             unset_assign!(self, vi);
+            if let AssignReason::Implication(cid) = self.var[vi].reason {
+                cdb[cid].turn_off(FlagClause::ASSIGN_REASON);
+            }
             self.var[vi].reason = AssignReason::None;
 
             #[cfg(not(feature = "trail_saving"))]
@@ -550,6 +554,7 @@ impl PropagateIF for AssignStack {
                         dl
                     },
                 );
+                cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
                 check_in!(cid, Propagate::BecameUnit(self.num_conflict, cached));
             }
             from_saved_trail!();
@@ -738,6 +743,7 @@ impl PropagateIF for AssignStack {
                         dl
                     },
                 );
+                // no need to set FlagClause::ASSIGN_REASON
                 check_in!(cid, Propagate::SandboxBecameUnit(self.num_conflict));
             }
         }
@@ -795,7 +801,7 @@ impl AssignStack {
                     RefClause::UnitClause(lit) => {
                         debug_assert!(self.assigned(lit).is_none());
                         cdb.certificate_add_assertion(lit);
-                        self.assign_at_root_level(lit)?;
+                        self.assign_at_root_level(cdb, lit)?;
                         cdb.remove_clause(cid);
                     }
                 }

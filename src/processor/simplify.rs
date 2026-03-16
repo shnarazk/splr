@@ -1,8 +1,8 @@
 use {
     super::{
+        EliminateIF, Eliminator, EliminatorMode,
         eliminate::eliminate_var,
         heap::{LitOccurs, VarOccHeap, VarOrderIF},
-        EliminateIF, Eliminator, EliminatorMode,
     },
     crate::{
         assign::{self, AssignIF},
@@ -207,9 +207,6 @@ impl Instantiate for Eliminator {
                 self.var_queue.idxs.push(len as u32);
                 self.var_queue.idxs[0] = len as u32;
             }
-            SolverEvent::Reinitialize => {
-                self.elim_lits.clear();
-            }
             _ => (),
         }
     }
@@ -285,9 +282,10 @@ impl EliminateIF for Eliminator {
             self.eliminate_grow_limit = state.derefer(state::property::Tusize::IntervalScale) / 2;
             self.subsume_literal_limit = state.config.elm_cls_lim
                 + cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement) as usize;
-            debug_assert!(!cdb
-                .derefer(cdb::property::Tf64::LiteralBlockEntanglement)
-                .is_nan());
+            debug_assert!(
+                !cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement)
+                    .is_nan()
+            );
             // self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
             self.eliminate(asg, cdb, state)?;
         } else {

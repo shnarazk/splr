@@ -235,7 +235,6 @@ impl Instantiate for State {
             SolverEvent::Conflict => (),
             SolverEvent::Eliminate(_) => (),
             SolverEvent::Instantiate => (),
-            SolverEvent::Reinitialize => (),
             SolverEvent::Restart => {
                 self[Stat::Restart] += 1;
                 self.restart.handle(SolverEvent::Restart);

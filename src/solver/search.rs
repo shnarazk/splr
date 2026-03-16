@@ -25,7 +25,7 @@ pub trait SolveIF {
 
 macro_rules! RESTART {
     ($asg: expr, $cdb: expr, $state: expr) => {
-        $asg.cancel_until($asg.root_level());
+        $asg.cancel_until($cdb, $asg.root_level());
         $cdb.handle(SolverEvent::Restart);
         $state.handle(SolverEvent::Restart);
     };
@@ -103,14 +103,14 @@ impl SolveIF for Solver {
                             let l = Lit::from((vi, true));
                             debug_assert!(asg.assigned(l).is_none());
                             cdb.certificate_add_assertion(l);
-                            if asg.assign_at_root_level(l).is_err() {
+                            if asg.assign_at_root_level(cdb, l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
                         } else if p == 0 {
                             let l = Lit::from((vi, false));
                             debug_assert!(asg.assigned(l).is_none());
                             cdb.certificate_add_assertion(l);
-                            if asg.assign_at_root_level(l).is_err() {
+                            if asg.assign_at_root_level(cdb, l).is_err() {
                                 return Ok(Certificate::UNSAT);
                             }
                         }

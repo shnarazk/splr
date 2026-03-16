@@ -84,7 +84,7 @@ pub fn eliminate_var(
                         None => {
                             debug_assert!(asg.assigned(lit).is_none());
                             cdb.certificate_add_assertion(lit);
-                            asg.assign_at_root_level(lit)?;
+                            asg.assign_at_root_level(cdb, lit)?;
                         }
                     }
                 }
@@ -358,15 +358,17 @@ mod tests {
         elim.prepare(asg, cdb, true);
         eliminate_var(asg, cdb, &mut elim, state, vi, &mut timedout).expect("panic");
         assert!(asg.var(vi).is(FlagVar::ELIMINATED));
-        assert!(cdb
-            .iter()
-            .skip(1)
-            .filter(|c| c.is_dead())
-            .all(|c| c.is_empty()));
-        assert!(cdb
-            .iter()
-            .skip(1)
-            .all(|c| c.iter().all(|l| *l != Lit::from((vi, false)))
-                && c.iter().all(|l| *l != Lit::from((vi, false)))));
+        assert!(
+            cdb.iter()
+                .skip(1)
+                .filter(|c| c.is_dead())
+                .all(|c| c.is_empty())
+        );
+        assert!(
+            cdb.iter()
+                .skip(1)
+                .all(|c| c.iter().all(|l| *l != Lit::from((vi, false)))
+                    && c.iter().all(|l| *l != Lit::from((vi, false))))
+        );
     }
 }
