@@ -368,7 +368,7 @@ mod tests {
             cdb.iter()
                 .skip(1)
                 .all(|c| c.iter().all(|l| *l != Lit::from((vi, false)))
-                    && c.iter().all(|l| *l != Lit::from((vi, false))))
+                    && c.iter().all(|l| *l != Lit::from((vi, true))))
         );
     }
 }

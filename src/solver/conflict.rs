@@ -57,17 +57,16 @@ pub fn handle_conflict(
                 .iter()
                 .filter(|l| asg.level(l.vi()) == conflicting_level)
                 .count()
-            {
-                if let Some(second_level) = c
+                && let Some(second_level) = c
                     .iter()
                     .map(|l| asg.level(l.vi()))
                     .filter(|l| *l < conflicting_level)
                     .max()
-                {
-                    debug_assert!(0 < second_level);
-                    asg.cancel_until(second_level);
-                    return Ok(c.rank);
-                }
+            {
+                debug_assert!(0 < second_level);
+                let rank = c.rank;
+                asg.cancel_until(cdb, second_level);
+                return Ok(rank);
             }
         }
         _ => {
