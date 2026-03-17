@@ -2,14 +2,14 @@
 /// implement boolean constraint propagation, backjump
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{heap::VarHeapIF, AssignIF, AssignStack, PropagateIF, VarManipulateIF},
+    super::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, heap::VarHeapIF},
     crate::{cdb::ClauseDBIF, types::*},
 };
 
 /// Methods on trail saving.
 pub trait TrailSavingIF {
     fn save_trail(&mut self, to_lvl: DecisionLevel);
-    fn reuse_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult;
+    fn reuse_saved_trail(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult;
     fn clear_saved_trail(&mut self);
 }
 
@@ -50,7 +50,7 @@ impl TrailSavingIF for AssignStack {
             self.insert_heap(vi);
         }
     }
-    fn reuse_saved_trail(&mut self, cdb: &impl ClauseDBIF) -> PropagationResult {
+    fn reuse_saved_trail(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
         let q = self.stage_scale.trailing_zeros() as u16
             + (cdb.derefer(crate::cdb::property::Tf64::LiteralBlockEntanglement) as u16) / 2;
 
@@ -76,13 +76,16 @@ impl TrailSavingIF for AssignStack {
                 }
                 (None, AssignReason::Implication(cid)) => {
                     debug_assert_eq!(cdb[cid].lit0(), lit);
-                    debug_assert!(cdb[cid]
-                        .iter()
-                        .skip(1)
-                        .all(|l| self.assigned(*l) == Some(false)));
+                    debug_assert!(
+                        cdb[cid]
+                            .iter()
+                            .skip(1)
+                            .all(|l| self.assigned(*l) == Some(false))
+                    );
                     self.num_repropagation += 1;
 
                     self.assign_by_implication(lit, old_reason, dl);
+                    cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
                 }
                 (Some(false), AssignReason::BinaryLink(link)) => {
                     debug_assert_ne!(link.vi(), lit.vi());

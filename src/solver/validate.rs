@@ -40,8 +40,9 @@ impl ValidateIF for Solver {
         if vec.is_empty() {
             return Err(SolverError::Inconsistent);
         }
+        let Solver { asg, cdb, .. } = self;
         for i in vec {
-            self.asg.assign_at_root_level(Lit::from(*i))?;
+            asg.assign_at_root_level(cdb, Lit::from(*i))?;
         }
         Ok(())
     }

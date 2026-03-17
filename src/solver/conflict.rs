@@ -57,24 +57,23 @@ pub fn handle_conflict(
                 .iter()
                 .filter(|l| asg.level(l.vi()) == conflicting_level)
                 .count()
-            {
-                if let Some(second_level) = c
+                && let Some(second_level) = c
                     .iter()
                     .map(|l| asg.level(l.vi()))
                     .filter(|l| *l < conflicting_level)
                     .max()
-                {
-                    debug_assert!(0 < second_level);
-                    asg.cancel_until(second_level);
-                    return Ok(c.rank);
-                }
+            {
+                debug_assert!(0 < second_level);
+                let rank = c.rank;
+                asg.cancel_until(cdb, second_level);
+                return Ok(rank);
             }
         }
         _ => {
             panic!();
         }
     }
-    asg.cancel_until(conflicting_level);
+    asg.cancel_until(cdb, conflicting_level);
     asg.handle(SolverEvent::Conflict);
 
     let assign_level = conflict_analyze(asg, cdb, state, cc).max(asg.root_level());
@@ -108,7 +107,7 @@ pub fn handle_conflict(
             _ => {
                 // dump to certified even if it's a literal.
                 cdb.certificate_add_assertion(l0);
-                if asg.assign_at_root_level(l0).is_err() {
+                if asg.assign_at_root_level(cdb, l0).is_err() {
                     unreachable!("handle_conflict::root_level_conflict_by_assertion");
                 }
                 let vi = l0.vi();
@@ -187,10 +186,10 @@ pub fn handle_conflict(
     };
     if let Some(b) = bt_drift {
         if b {
-            asg.cancel_until(conflicting_level - 1);
+            asg.cancel_until(cdb, conflicting_level - 1);
             state.bt_drift_average.update(1.0);
         } else {
-            asg.cancel_until(assign_level - 1);
+            asg.cancel_until(cdb, assign_level - 1);
             state.bt_drift_average.update(-1.0);
         }
         #[cfg(feature = "trail_saving")]
@@ -202,7 +201,7 @@ pub fn handle_conflict(
             state.num_chrono_bt += 1;
         }
     } else {
-        asg.cancel_until(assign_level);
+        asg.cancel_until(cdb, assign_level);
         state.bt_drift_average.update(0.0);
     }
     // debug_assert_eq!(asg.assigned(l0), None);
@@ -237,6 +236,7 @@ pub fn handle_conflict(
             if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
                 cdb[cid].used = cdb[cid].used.saturating_add(1);
+                cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
             }
             rank = cdb[cid].rank;
         }

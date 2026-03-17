@@ -1040,6 +1040,36 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         *num_reduction += 1;
 
+        /* {
+            let mut used: std::collections::HashSet<ClauseId> = std::collections::HashSet::new();
+            for v in asg.var_iter() {
+                if let AssignReason::Implication(cid) = v.reason {
+                    used.insert(cid);
+                }
+            }
+            for (cid, c) in clause.iter().enumerate().skip(1) {
+                if c.is_dead() {
+                    continue;
+                }
+                if c.is(FlagClause::ASSIGN_REASON) != used.contains(&ClauseId::from(cid)) {
+                    dbg!(asg.decision_level());
+                    dbg!(cid, c);
+                    for (i, v) in asg.var_iter().enumerate() {
+                        if let AssignReason::Implication(c) = v.reason
+                            && c == ClauseId::from(cid)
+                        {
+                            dbg!(i, v);
+                        }
+                    }
+                    panic!("done");
+                }
+                // assert_eq!(
+                //     c.is(FlagClause::ASSIGN_REASON),
+                //     used.contains(&ClauseId::from(cid))
+                // );
+            }
+        } */
+
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
         self.leanrt_limit_ema
             .update(2_usize.pow(envelope as u32) as f64);
@@ -1047,15 +1077,16 @@ impl ClauseDBIF for ClauseDB {
         if self.num_learnt < limit {
             return;
         }
-        for lit in asg.stack_iter() {
-            let Var { level, reason, .. } = asg.var(lit.vi());
-            if *level == asg.root_level() {
-                continue;
-            }
-            if let AssignReason::Implication(cid) = reason {
-                clause[NonZeroU32::get(cid.ordinal) as usize].turn_on(FlagClause::ASSIGN_REASON);
-            }
-        }
+        // for lit in asg.stack_iter() {
+        //     let Var { level, reason, .. } = asg.var(lit.vi());
+        //     if *level == asg.root_level() {
+        //         continue;
+        //     }
+        //     if let AssignReason::Implication(cid) = reason {
+        //         clause[NonZeroU32::get(cid.ordinal) as usize].turn_on(FlagClause::ASSIGN_REASON);
+        //         clause[NonZeroU32::get(cid.ordinal) as usize].turn_on(FlagClause::ASSIGN_REASON);
+        //     }
+        // }
         for (i, c) in clause
             .iter_mut()
             .enumerate()
@@ -1077,7 +1108,7 @@ impl ClauseDBIF for ClauseDB {
                 asg.decision_level(),
             );
             if c.is(FlagClause::ASSIGN_REASON) {
-                c.turn_off(FlagClause::ASSIGN_REASON);
+                // c.turn_off(FlagClause::ASSIGN_REASON);
                 c.used = 0;
                 continue;
             }

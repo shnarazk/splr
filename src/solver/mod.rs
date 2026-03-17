@@ -51,8 +51,6 @@ pub enum SolverEvent {
     Instantiate,
     /// increment the number of vars.
     NewVar,
-    /// re-initialization for incremental solving.
-    Reinitialize,
     /// restart
     Restart,
     /// start a new stage of Luby stabilization. It holds new scale.
