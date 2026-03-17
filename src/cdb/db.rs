@@ -1039,7 +1039,8 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         *num_reduction += 1;
-        {
+
+        /* {
             let mut used: std::collections::HashSet<ClauseId> = std::collections::HashSet::new();
             for v in asg.var_iter() {
                 if let AssignReason::Implication(cid) = v.reason {
@@ -1067,7 +1068,7 @@ impl ClauseDBIF for ClauseDB {
                 //     used.contains(&ClauseId::from(cid))
                 // );
             }
-        }
+        } */
 
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
         self.leanrt_limit_ema
