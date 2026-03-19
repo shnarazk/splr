@@ -2,7 +2,9 @@
   description = "A modern SAT solver in Rust";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs";
   inputs.sat-bench.url = "github:shnarazk/SAT-bench";
-  outputs = { self, nixpkgs, sat-bench }:
+  inputs.home.url = "github:shnarazk/flakes";
+
+  outputs = { self, nixpkgs, sat-bench, home }:
   {
     packages = builtins.listToAttrs
       (map
@@ -40,6 +42,7 @@
                 packages = [
                   bashInteractive
                   drat-trim
+                  home.packages.${system}.kissat
                   samply
                   tokei
                   # cargo-watch
