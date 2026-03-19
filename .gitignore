@@ -14,3 +14,4 @@
 *.ipynb
 /result
 .cargo
+proof.drat
