@@ -1108,7 +1108,6 @@ impl ClauseDBIF for ClauseDB {
                 asg.decision_level(),
             );
             if c.is(FlagClause::ASSIGN_REASON) {
-                // c.turn_off(FlagClause::ASSIGN_REASON);
                 c.used = 0;
                 continue;
             }
@@ -1121,10 +1120,10 @@ impl ClauseDBIF for ClauseDB {
                 continue;
             }
             match setting {
-                ReductionType::RASonADD(_) => {
+                ReductionType::RASonADD => {
                     perm.push(OrderedProxy::new(i, c.reverse_activity_sum(asg)));
                 }
-                ReductionType::LBDonALL(cutoff, _) => {
+                ReductionType::LBDonALL(cutoff) => {
                     let value = c.rank;
                     if cutoff < value {
                         perm.push(OrderedProxy::new(i, value as f64));
@@ -1133,12 +1132,6 @@ impl ClauseDBIF for ClauseDB {
             }
             c.used = 0;
         }
-        /* let keep = match setting {
-            ReductionType::RASonADD(size) => perm.len().saturating_sub(size),
-            ReductionType::RASonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
-            ReductionType::LBDonADD(size) => perm.len().saturating_sub(size),
-            ReductionType::LBDonALL(_, scale) => (perm.len() as f64).powf(1.0 - scale) as usize,
-        }; */
         let keep = perm
             .len()
             .saturating_sub(self.num_learnt.saturating_sub(limit));

@@ -271,12 +271,8 @@ fn search(
                 } */
                 // state.config.rst_lbd_thr
             }
-            if num_learnts > 40_000 {
-                cdb.reduce(
-                    asg,
-                    ReductionType::RASonADD(state.stm.num_reducible(state.config.cls_rdc_rm1)),
-                    state.stm.envelop_index(),
-                );
+            if num_learnts > restart_period {
+                cdb.reduce(asg, ReductionType::RASonADD, state.stm.envelop_index());
                 num_learnts = 0;
             }
         }
@@ -406,25 +402,15 @@ fn search(
                 }
             } else {
                 {
-                    if cfg!(feature = "two_mode_reduction") && num_learnts > 40_000 {
-                        cdb.reduce(
-                            asg,
-                            ReductionType::RASonADD(
-                                state.stm.num_reducible(state.config.cls_rdc_rm1),
-                            ),
-                            state.stm.envelop_index(),
-                        );
+                    if cfg!(feature = "two_mode_reduction") && num_learnts > restart_period {
+                        cdb.reduce(asg, ReductionType::RASonADD, state.stm.envelop_index());
                         num_learnts = 0;
                     }
                 }
             }
             {
-                if !cfg!(feature = "two_mode_reduction") && num_learnts > 40_000 {
-                    cdb.reduce(
-                        asg,
-                        ReductionType::RASonADD(state.stm.num_reducible(state.config.cls_rdc_rm1)),
-                        state.stm.envelop_index(),
-                    );
+                if !cfg!(feature = "two_mode_reduction") && num_learnts > restart_period {
+                    cdb.reduce(asg, ReductionType::RASonADD, state.stm.envelop_index());
                     num_learnts = 0;
                 }
             }

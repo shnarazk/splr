@@ -39,9 +39,9 @@ use std::path::Path;
 #[derive(Clone, Debug)]
 pub enum ReductionType {
     /// weight by Reverse Activity Sum over the added clauses
-    RASonADD(usize),
+    RASonADD,
     /// weight by Literal Block Distance over all learnt clauses
-    LBDonALL(u16, f64),
+    LBDonALL(u16),
 }
 
 /// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`remove_clause`](`crate::cdb::ClauseDBIF::remove_clause`), and so on.
