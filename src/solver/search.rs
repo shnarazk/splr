@@ -234,6 +234,8 @@ fn search(
     let mut num_depression: usize = 0;
     let mut num_learnts: usize = 0;
     let mut lbd_threshold: u16 = 0;
+    let restart_period: usize = 40_000;
+    let cooling_period: usize = 10;
 
     state.stm.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -259,7 +261,7 @@ fn search(
             lbd_threshold = 0;
         } else if 1 < lbd {
             num_learnts += 1;
-            if after_restart >= 10 {
+            if after_restart >= cooling_period {
                 // we don't want to use the current, depressing value of average LBD
                 if num_depression == 0 {
                     lbd_threshold = cdb.refer(cdb::property::TEma::LBD).get_fast() as u16;
@@ -423,8 +425,8 @@ fn search(
             //     cdb.refer(cdb::property::TEma::Entanglement),
             // )
         }
-        if num_learnts.is_multiple_of(10000) {
-            // if state.stm.current_segment_length() >= 4 {
+        if num_learnts == 0 {
+            // run after restart
             state.progress(asg, cdb);
             if state.stm.current_span() > 10_000 {
                 state.flush("deep thought...");
