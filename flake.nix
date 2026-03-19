@@ -39,6 +39,7 @@
             value = mkShell {
                 packages = [
                   bashInteractive
+                  drat-trim
                   samply
                   tokei
                   # cargo-watch
