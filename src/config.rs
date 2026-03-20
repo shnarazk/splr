@@ -285,6 +285,8 @@ impl Config {
                 "suppress reason chain",
                 #[cfg(feature = "trail_saving")]
                 "trail saving",
+                #[cfg(feature = "BT_deepen")]
+                "backtrack-to-deeper-level",
                 #[cfg(feature = "unsafe_access")]
                 "unsafe access",
             ];
