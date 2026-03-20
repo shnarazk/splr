@@ -1461,4 +1461,12 @@ impl Clause {
     fn reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
         self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
     }
+    fn _reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
+        let mut ranks: HashMap<u32, f64> = HashMap::new();
+        for l in self.iter() {
+            let a = ranks.entry(asg.var(l.vi()).level).or_insert(1.0);
+            *a = a.min(1.0 - asg.activity(l.vi()));
+        }
+        ranks.values().sum()
+    }
 }
