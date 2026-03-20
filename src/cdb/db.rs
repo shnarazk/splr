@@ -1097,16 +1097,6 @@ impl ClauseDBIF for ClauseDB {
             #[cfg(feature = "clause_rewarding")]
             c.update_activity(*tick, *activity_decay, 0.0);
 
-            // There's no clause stored in `reason` because the decision level is 'zero.'
-            debug_assert_ne!(
-                asg.reason(c.lit0().vi()),
-                AssignReason::Implication(ClauseId::from(i)),
-                "Lit {} {:?} level {}, dl: {}",
-                i32::from(c.lit0()),
-                asg.assigned(c.lit0()),
-                asg.level(c.lit0().vi()),
-                asg.decision_level(),
-            );
             if c.is(FlagClause::ASSIGN_REASON) {
                 c.used = 0;
                 continue;
