@@ -1119,7 +1119,7 @@ impl ClauseDBIF for ClauseDB {
                 c.used = 0;
                 continue;
             }
-            perm.push(OrderedProxy::new(i, c.reverse_activity_sum(asg)));
+            perm.push(OrderedProxy::new(i, c.inactivity_sum(asg)));
             c.used = 0;
         }
         let keep = perm
@@ -1448,7 +1448,7 @@ impl Clause {
         }
         falsified
     }
-    fn reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
+    fn inactivity_sum(&self, asg: &impl AssignIF) -> f64 {
         self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
     }
     fn _reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
