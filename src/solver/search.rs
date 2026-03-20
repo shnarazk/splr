@@ -429,7 +429,7 @@ fn search(
             // run after restart
             state.progress(asg, cdb);
             if state.stm.current_span() > 10_000 {
-                state.flush("deep thought...");
+                state.flush("deep search...");
             }
         }
         if let Some(na) = asg.best_assigned() {
