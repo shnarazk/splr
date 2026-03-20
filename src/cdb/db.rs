@@ -1,6 +1,6 @@
 use {
     super::{
-        BinaryLinkDB, CertificationStore, ClauseDBIF, ClauseId, ReductionType, RefClause,
+        BinaryLinkDB, CertificationStore, ClauseDBIF, ClauseId, RefClause,
         binary::{BinaryLinkIF, BinaryLinkList},
         ema::ProgressLBD,
         property,
@@ -1026,7 +1026,7 @@ impl ClauseDBIF for ClauseDB {
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType, envelope: usize) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, envelope: usize) {
         let ClauseDB {
             clause,
             lbd_temp,
@@ -1119,17 +1119,7 @@ impl ClauseDBIF for ClauseDB {
                 c.used = 0;
                 continue;
             }
-            match setting {
-                ReductionType::RASonADD => {
-                    perm.push(OrderedProxy::new(i, c.reverse_activity_sum(asg)));
-                }
-                ReductionType::LBDonALL(cutoff) => {
-                    let value = c.rank;
-                    if cutoff < value {
-                        perm.push(OrderedProxy::new(i, value as f64));
-                    }
-                }
-            }
+            perm.push(OrderedProxy::new(i, c.reverse_activity_sum(asg)));
             c.used = 0;
         }
         let keep = perm

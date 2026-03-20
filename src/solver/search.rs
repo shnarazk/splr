@@ -6,7 +6,7 @@ use {
     },
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
-        cdb::{self, ClauseDB, ClauseDBIF, ReductionType, VivifyIF},
+        cdb::{self, ClauseDB, ClauseDBIF, VivifyIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
         types::*,
@@ -274,7 +274,7 @@ fn search(
                 // state.config.rst_lbd_thr
             }
             if num_learnts > restart_period {
-                cdb.reduce(asg, ReductionType::RASonADD, state.stm.envelop_index());
+                cdb.reduce(asg, state.stm.envelop_index());
                 num_learnts = 0;
             }
         }
@@ -391,7 +391,7 @@ fn search(
             }
 
             if num_learnts > restart_period {
-                cdb.reduce(asg, ReductionType::RASonADD, state.stm.envelop_index());
+                cdb.reduce(asg, state.stm.envelop_index());
                 num_learnts = 0;
             }
 

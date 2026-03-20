@@ -36,14 +36,6 @@ use {
 #[cfg(not(feature = "no_IO"))]
 use std::path::Path;
 
-#[derive(Clone, Debug)]
-pub enum ReductionType {
-    /// weight by Reverse Activity Sum over the added clauses
-    RASonADD,
-    /// weight by Literal Block Distance over all learnt clauses
-    LBDonALL(u16),
-}
-
 /// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`remove_clause`](`crate::cdb::ClauseDBIF::remove_clause`), and so on.
 pub trait ClauseDBIF:
     Instantiate
@@ -114,7 +106,7 @@ pub trait ClauseDBIF:
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType, envelope: usize);
+    fn reduce(&mut self, asg: &mut impl AssignIF, envelope: usize);
     /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.
