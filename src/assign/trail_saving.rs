@@ -70,6 +70,12 @@ impl TrailSavingIF for AssignStack {
                     self.assign_by_implication(lit, old_reason, dl);
                 }
                 // reason refinement by ignoring this dependecy
+                (None, AssignReason::Implication(c)) if cdb[c].is_dead() => {
+                    // The clause was removed (by reduce, vivify, or simplification)
+                    // between saving and reusing the trail. Stop reusing from here.
+                    self.insert_heap(vi);
+                    return self.truncate_trail_saved(i + 1);
+                }
                 (None, AssignReason::Implication(c)) if q < cdb[c].rank => {
                     self.insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
@@ -93,6 +99,12 @@ impl TrailSavingIF for AssignStack {
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_saved_trail();
                     return Err((lit, old_reason));
+                }
+                (Some(false), AssignReason::Implication(cid)) if cdb[cid].is_dead() => {
+                    // The clause was removed between saving and reusing the trail.
+                    // No conflict from a dead clause; stop reusing from here.
+                    self.insert_heap(vi);
+                    return self.truncate_trail_saved(i + 1);
                 }
                 (Some(false), AssignReason::Implication(cid)) => {
                     debug_assert!(cdb[cid].iter().all(|l| self.assigned(*l) == Some(false)));
