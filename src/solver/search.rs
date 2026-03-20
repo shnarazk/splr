@@ -311,20 +311,6 @@ fn search(
                 // a beginning of a new cycle
                 {
                     state.exploration_rate_ema.update(1.0);
-                    // if cfg!(feature = "two_mode_reduction") && num_learnts > 40_000 {
-                    //     cdb.reduce(
-                    //         asg,
-                    //         ReductionType::RASonADD(
-                    //             state.stm.num_reducible(state.config.cls_rdc_rm1),
-                    //         ),
-                    //         // ReductionType::LBDonALL(
-                    //         //     state.config.cls_rdc_lbd,
-                    //         //     state.config.cls_rdc_rm2,
-                    //         // ),
-                    //         state.stm.envelop_index(),
-                    //     );
-                    //     num_learnts = 0;
-                    // }
                 }
                 #[cfg(feature = "rephase")]
                 {
@@ -402,20 +388,13 @@ fn search(
                         state.restart.set_segment_parameters(max_scale);
                     }
                 }
-            } else {
-                {
-                    if cfg!(feature = "two_mode_reduction") && num_learnts > restart_period {
-                        cdb.reduce(asg, ReductionType::RASonADD, state.stm.envelop_index());
-                        num_learnts = 0;
-                    }
-                }
             }
-            {
-                if !cfg!(feature = "two_mode_reduction") && num_learnts > restart_period {
-                    cdb.reduce(asg, ReductionType::RASonADD, state.stm.envelop_index());
-                    num_learnts = 0;
-                }
+
+            if num_learnts > restart_period {
+                cdb.reduce(asg, ReductionType::RASonADD, state.stm.envelop_index());
+                num_learnts = 0;
             }
+
             asg.handle(SolverEvent::Stage(segment_length));
             state.restart.set_stage_parameters(segment_length);
             previous_stage = new_span;

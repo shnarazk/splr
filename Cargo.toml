@@ -35,7 +35,6 @@ default = [
     "reward_annealing",
     # "stochastic_local_search",
     # "suppress_reason_chain",
-    "two_mode_reduction",
 
     ### Logic formula processor
     "clause_elimination",
@@ -83,7 +82,6 @@ trace_analysis = []             # for debug
 trace_elimination = []          # for debug
 trace_equivalency = []          # for debug
 trail_saving = []               # reduce propagation cost by reusing propagation chain
-two_mode_reduction = []         # exploration mode and exploitation mode since 0.17
 unsafe_access = []              # access elements of vectors without boundary checking
 
 [profile.release]

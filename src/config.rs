@@ -58,10 +58,6 @@ pub struct Config {
     pub crw_dcy_rat: f64,
     // clause reduction LBD threshold for mode 2: exploration
     pub cls_rdc_lbd: u16,
-    // clause reduction ratio for mode 1: exploitation
-    pub cls_rdc_rm1: f64,
-    // clause reduction ratio for mode 2: exploration
-    pub cls_rdc_rm2: f64,
 
     //
     //## restart
@@ -115,8 +111,6 @@ impl Default for Config {
 
             crw_dcy_rat: 0.95,
             cls_rdc_lbd: 5,
-            cls_rdc_rm1: 0.2,
-            cls_rdc_rm2: 0.05,
             rst_lbd_thr: 1.05,
 
             enable_eliminator: cfg!(feature = "clause_elimination"),
@@ -155,7 +149,7 @@ impl Config {
                     "no-color", "quiet", "certify", "heatmap", "journal", "help", "version",
                 ];
                 let options_usize = ["cl", "crl", "stat", "ecl", "evl", "evo"];
-                let options_f64 = ["timeout", "cdr", "cr1", "cr2", "rlt", "vdr", "vds"];
+                let options_f64 = ["timeout", "cdr", "rlt", "vdr", "vds"];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
                 match seg.len() {
@@ -195,8 +189,6 @@ impl Config {
                                     match name {
                                         "timeout" => self.c_timeout = val,
                                         "cdr" => self.crw_dcy_rat = val,
-                                        "cr1" => self.cls_rdc_rm1 = val,
-                                        "cr2" => self.cls_rdc_rm2 = val,
                                         "rlt" => self.rst_lbd_thr = val,
                                         "vdr" => self.vrw_dcy_rat = val,
                                         "vds" => self.vrw_dcy_stp = val,
@@ -291,8 +283,6 @@ impl Config {
                 "stage-based re-phasing",
                 #[cfg(feature = "suppress_reason_chain")]
                 "suppress reason chain",
-                #[cfg(feature = "two_mode_reduction")]
-                "two-mode reduction",
                 #[cfg(feature = "trail_saving")]
                 "trail saving",
                 #[cfg(feature = "unsafe_access")]
@@ -346,7 +336,8 @@ FLAGS:
   -V, --version             Prints version information
 OPTIONS:
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
-{}{}{}{}      --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
+{}      --crl <clr-rdc-lbd>   LBD for clause reduction       {:>10}
+      --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
       --evo <elm-var-occ>   Max #cls for var elimination   {:>10}
       --rlt <rst-lbd-thr>   LBD trend threshold to restart    {:>10.2}
@@ -364,21 +355,7 @@ OPTIONS:
             config.crw_dcy_rat,
             "      --cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}\n"
         ),
-        OPTION!(
-            "two_mode_reduction",
-            config.cls_rdc_lbd,
-            "      --crl <cls-rdc-lbd>   Clause reduction LBD threshold {:>10}\n"
-        ),
-        OPTION!(
-            "two_mode_reduction",
-            config.cls_rdc_rm1,
-            "      --cr1 <cls-rdc-rm1>   Clause reduction ratio for mode1  {:>10.2}\n"
-        ),
-        OPTION!(
-            "two_mode_reduction",
-            config.cls_rdc_rm2,
-            "      --cr2 <cls-rdc-rm2>   Clause reduction ratio for mode2  {:>10.2}\n"
-        ),
+        config.cls_rdc_lbd,
         config.elm_cls_lim,
         config.elm_grw_lim,
         config.elm_var_occ,

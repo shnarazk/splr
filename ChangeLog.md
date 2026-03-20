@@ -4,6 +4,7 @@
   - trigger for restarts, clause elimination, and clause vivification
   - clause DB size after clause reduction
 - `ClauseDBIF::reduce` can run at any decision level, and runs every 40,000 conflicts
+- remove feature 'two_mode_reduction'
 
 ## 0.18.0, 2026-03-14
 
