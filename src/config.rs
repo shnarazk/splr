@@ -87,8 +87,6 @@ pub struct Config {
     //
     /// Var Reward Decay Rate
     pub vrw_dcy_rat: f64,
-    /// Decay increment step.
-    pub vrw_dcy_stp: f64,
 }
 
 impl Default for Config {
@@ -118,14 +116,7 @@ impl Default for Config {
             elm_grw_lim: 0,
             elm_var_occ: 20000,
 
-            #[cfg(feature = "EVSIDS")]
-            vrw_dcy_rat: 0.98,
-            #[cfg(feature = "LRB_rewarding")]
             vrw_dcy_rat: 0.96,
-            #[cfg(feature = "EVSIDS")]
-            vrw_dcy_stp: 0.0001,
-            #[cfg(feature = "LRB_rewarding")]
-            vrw_dcy_stp: 0.0,
         }
     }
 }
@@ -149,7 +140,7 @@ impl Config {
                     "no-color", "quiet", "certify", "heatmap", "journal", "help", "version",
                 ];
                 let options_usize = ["cl", "crl", "stat", "ecl", "evl", "evo"];
-                let options_f64 = ["timeout", "cdr", "rlt", "vdr", "vds"];
+                let options_f64 = ["timeout", "cdr", "rlt", "vdr"];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
                 match seg.len() {
@@ -191,8 +182,6 @@ impl Config {
                                         "cdr" => self.crw_dcy_rat = val,
                                         "rlt" => self.rst_lbd_thr = val,
                                         "vdr" => self.vrw_dcy_rat = val,
-                                        "vds" => self.vrw_dcy_stp = val,
-
                                         _ => panic!("invalid option: {name}"),
                                     }
                                 } else {
@@ -342,7 +331,7 @@ OPTIONS:
   -p, --proof <io-pfile>    DRAT Cert. filename                 {:>10}
   -r, --result <io-rfile>   Result filename/stdout              {:>10}
   -t, --timeout <timeout>   CPU time limit in sec.         {:>10}
-{}ARGS:
+ARGS:
   <cnf-file>    DIMACS CNF file
 ",
         config.c_cls_lim,
@@ -361,11 +350,6 @@ OPTIONS:
         config.io_pfile.to_string_lossy(),
         config.io_rfile.to_string_lossy(),
         config.c_timeout,
-        OPTION!(
-            "EVSIDS",
-            config.vrw_dcy_stp,
-            "      --vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}\n"
-        ),
     )
 }
 

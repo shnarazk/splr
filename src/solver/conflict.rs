@@ -1,7 +1,5 @@
 //! Conflict Analysis
 
-#[cfg(feature = "boundary_check")]
-use crate::assign::DebugReportIF;
 #[cfg(feature = "trail_saving")]
 use crate::assign::TrailSavingIF;
 
@@ -80,15 +78,6 @@ pub fn handle_conflict(
     let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
     if learnt_len == 0 {
-        #[cfg(feature = "boundary_check")]
-        {
-            println!(
-                "empty learnt at {}({}) by {:?}",
-                cl,
-                asg.reason(asg.decision_vi(cl)).is_none(),
-                asg.dump(asg, &cdb[ci]),
-            );
-        }
         return Err(SolverError::EmptyClause);
     }
     let l0 = new_learnt[0];
@@ -212,9 +201,6 @@ pub fn handle_conflict(
     let rank: u16;
     match cdb.new_clause(asg, new_learnt, true) {
         RefClause::Clause(cid) if learnt_len == 2 => {
-            #[cfg(feature = "boundary_check")]
-            cdb[cid].set_birth(asg.num_conflict);
-
             debug_assert_eq!(l0, cdb[cid].lit0());
             debug_assert_eq!(l1, cdb[cid].lit1());
             debug_assert_eq!(asg.assigned(l0), None);
@@ -229,9 +215,6 @@ pub fn handle_conflict(
             cdb.complete_bi_clauses(asg);
         }
         RefClause::Clause(cid) => {
-            #[cfg(feature = "boundary_check")]
-            cdb[cid].set_birth(asg.num_conflict);
-
             debug_assert_eq!(cdb[cid].lit0(), l0);
             if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
@@ -336,26 +319,6 @@ fn conflict_analyze(
         ($vi: expr) => {
             debug_assert!(!asg.var($vi).is(FlagVar::CA_SEEN));
             asg.var_mut($vi).turn_on(FlagVar::CA_SEEN);
-        };
-    }
-    macro_rules! boundary_check {
-        ($condition: expr, $($arg: expr),+) => {
-            #[cfg(feature = "boundary_check")]
-            {
-                if !$condition {
-                    dbg!(cc);
-                    dbg!(dl);
-                    tracer(asg, cdb);
-                    println!("Learnt clause so far: {}",
-                             learnt.report(asg)
-                             .iter()
-                             .map(|r| format!("  {:?}", r))
-                             .collect::<Vec<String>>()
-                             .join("\n")
-                    );
-                    panic!($($arg),*);
-                }
-            }
         };
     }
 
@@ -464,20 +427,7 @@ fn conflict_analyze(
                     }
                 }
             }
-            AssignReason::Decision(_) | AssignReason::None => {
-                boundary_check!(
-                    false,
-                    "found a strange var {:?}:: path_cnt {}\nDecisionMap\n{}",
-                    reason,
-                    path_cnt,
-                    asg.stack_iter()
-                        .skip(trail_index)
-                        .filter(|l| matches!(asg.reason(l.vi()), AssignReason::Decision(_)))
-                        .map(|l| format!("{:?}", l.report(asg)))
-                        .collect::<Vec<String>>()
-                        .join("\n")
-                );
-            }
+            AssignReason::Decision(_) | AssignReason::None => {}
         }
         //
         // set the index of the next literal to trail_index
@@ -485,23 +435,13 @@ fn conflict_analyze(
         #[allow(clippy::blocks_in_conditions)]
         while {
             let vi = asg.stack(trail_index).vi();
-            boundary_check!(
-                0 < vi && vi < asg.num_vars,
-                "trail[{}] has an invalid var index {}",
-                trail_index,
-                asg.stack(trail_index)
-            );
+
             let lvl = asg.level(vi);
             let v = asg.var(vi);
             !v.is(FlagVar::CA_SEEN) || lvl != dl
         } {
             trace_lit!(asg.stack(trail_index), "skip, not flagged");
-            boundary_check!(
-                0 < trail_index,
-                "Broke the bottom:: path_cnt {} scanned to {}",
-                path_cnt,
-                asg.stack_len() - trail_index
-            );
+
             trail_index -= 1;
         }
         p = asg.stack(trail_index);
@@ -719,41 +659,4 @@ fn dumper(asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
         .unwrap();
     }
     s
-}
-
-#[cfg(feature = "boundary_check")]
-fn tracer(asg: &AssignStack, cdb: &ClauseDB) {
-    use std::io::{self, Write};
-    loop {
-        let mut input = String::new();
-        print!("cid(or 0 for quit): ");
-        std::io::stdout().flush().expect("IO error");
-        io::stdin().read_line(&mut input).expect("IO error");
-        if input.is_empty() {
-            break;
-        }
-        let Ok(cid) = input.trim().parse::<usize>() else {
-            continue;
-        };
-        if cid == 0 {
-            break;
-        }
-        println!(
-            "{}",
-            cdb[ClauseId::from(cid)]
-                .report(asg)
-                .iter()
-                .map(|r| format!(
-                    " {}{:?}",
-                    asg.var(Lit::from(r.lit).vi())
-                        .is(FlagVar::CA_SEEN)
-                        .then(|| "S")
-                        .unwrap_or(" "),
-                    r
-                ))
-                .collect::<Vec<String>>()
-                .join("\n"),
-        );
-    }
-    panic!("done");
 }

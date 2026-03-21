@@ -1,7 +1,7 @@
 //! Var struct and Database management API
 use {
     // super::{heap::VarHeapIF, stack::AssignStack, AssignIF},
-    crate::types::{flags::FlagIF, flags::FlagVar, AssignReason, DecisionLevel},
+    crate::types::{AssignReason, DecisionLevel, flags::FlagIF, flags::FlagVar},
     std::fmt,
 };
 
@@ -19,15 +19,9 @@ pub struct Var {
     pub(crate) reason_saved: AssignReason,
     /// the `Flag`s (8 bits)
     pub(crate) flags: FlagVar,
-    /// a dynamic evaluation criterion like EVSIDS or ACID.
+    /// a dynamic evaluation criterion.
     pub(crate) reward: f64,
     // reward_ema: Ema2,
-    #[cfg(feature = "boundary_check")]
-    pub propagated_at: usize,
-    #[cfg(feature = "boundary_check")]
-    pub timestamp: usize,
-    #[cfg(feature = "boundary_check")]
-    pub state: VarState,
 }
 
 impl Default for Var {
@@ -41,12 +35,6 @@ impl Default for Var {
             flags: FlagVar::empty(),
             reward: 0.0,
             // reward_ema: Ema2::new(200).with_slow(4_000),
-            #[cfg(feature = "boundary_check")]
-            propagated_at: 0,
-            #[cfg(feature = "boundary_check")]
-            timestamp: 0,
-            #[cfg(feature = "boundary_check")]
-            state: VarState::Unassigned(0),
         }
     }
 }
@@ -97,14 +85,4 @@ impl FlagIF for Var {
     fn toggle(&mut self, flag: Self::FlagType) {
         self.flags.toggle(flag);
     }
-}
-
-#[cfg(feature = "boundary_check")]
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum VarState {
-    AssertedSandbox(usize),
-    Assigned(usize),
-    AssignedSandbox(usize),
-    Propagated(usize),
-    Unassigned(usize),
 }

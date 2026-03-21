@@ -90,13 +90,8 @@ pub struct AssignStack {
     //
     /// var activity decay
     pub(super) activity_decay: f64,
-    /// the default value of var activity decay in configuration
-    #[cfg(feature = "EVSIDS")]
-    activity_decay_default: f64,
     /// its diff
     pub(super) activity_anti_decay: f64,
-    #[cfg(feature = "EVSIDS")]
-    activity_decay_step: f64,
 }
 
 impl Default for AssignStack {
@@ -145,13 +140,7 @@ impl Default for AssignStack {
 
             activity_decay: 0.94,
 
-            #[cfg(feature = "EVSIDS")]
-            activity_decay_default: 0.94,
-
             activity_anti_decay: 0.06,
-
-            #[cfg(feature = "EVSIDS")]
-            activity_decay_step: 0.1,
         }
     }
 }
@@ -184,17 +173,9 @@ impl Instantiate for AssignStack {
             assign_rate: ProgressASG::instantiate(config, cnf),
             var: Var::new_vars(nv),
 
-            #[cfg(feature = "EVSIDS")]
-            activity_decay: config.vrw_dcy_rat * 0.6,
-            #[cfg(not(feature = "EVSIDS"))]
             activity_decay: config.vrw_dcy_rat,
 
-            #[cfg(feature = "EVSIDS")]
-            activity_decay_default: config.vrw_dcy_rat,
-
             activity_anti_decay: 1.0 - config.vrw_dcy_rat,
-            #[cfg(feature = "EVSIDS")]
-            activity_decay_step: config.vrw_dcy_stp,
 
             ..AssignStack::default()
         }
@@ -454,11 +435,6 @@ impl VarManipulateIF for AssignStack {
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
 
-        #[cfg(feature = "boundary_check")]
-        {
-            self.var[vi].timestamp = self.tick;
-        }
-
         #[cfg(feature = "best_phases_tracking")]
         self.check_best_phase(vi);
     }
@@ -470,11 +446,6 @@ impl VarManipulateIF for AssignStack {
             debug_assert_eq!(self.decision_level(), self.root_level);
             self.trail.retain(|l| l.vi() != vi);
             self.num_eliminated_vars += 1;
-
-            #[cfg(feature = "boundary_check")]
-            {
-                self.var[vi].timestamp = self.tick;
-            }
 
             #[cfg(feature = "trace_elimination")]
             {
@@ -496,9 +467,6 @@ impl VarManipulateIF for AssignStack {
                     self.root_level < self.var[vi].level || self.var[vi].assign.is_none()
                 );
             }
-        } else {
-            #[cfg(feature = "boundary_check")]
-            panic!("double elimination");
         }
     }
 }

@@ -133,14 +133,7 @@ pub trait ClauseDBIF:
     //
     //## for debug
     //
-    #[cfg(feature = "boundary_check")]
-    /// return true if cid is included in watching literals
-    fn watch_cache_contains(&self, lit: Lit, cid: ClauseId) -> bool;
-    #[cfg(feature = "boundary_check")]
-    /// return a clause's watches
-    fn watch_caches(&self, cid: ClauseId, message: &str) -> (Vec<Lit>, Vec<Lit>);
-    #[cfg(feature = "boundary_check")]
-    fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool>;
+
     #[cfg(not(feature = "no_IO"))]
     /// dump all active clauses and assertions as a CNF file.
     fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);

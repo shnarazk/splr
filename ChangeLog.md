@@ -9,6 +9,9 @@
 - remove feature 'trace_equivalency'
 - remove feature 'reward_annealing'
 - remove feature 'just_used'
+- remove feature 'boundary_check'
+- remove feature 'EVSIDS'
+- remove feature 'maintain_watch_cache'
 
 ## 0.18.0, 2026-03-14
 
