@@ -233,9 +233,10 @@ fn search(
     let mut after_restart: usize = 0;
     let mut num_depression: usize = 0;
     let mut num_learnts: usize = 0;
-    let mut lbd_threshold: u16 = 0;
+    let mut lbd_threshold: f64 = 0.0;
+    let mut last_lbd: u16 = 1;
     let restart_period: usize = 40_000;
-    let cooling_period: usize = 10;
+    let cooling_period: usize = 8;
 
     state.stm.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -289,9 +290,14 @@ fn search(
             }
             after_restart = 0;
             num_depression = 0;
-            lbd_threshold = 0;
+            cdb.lbd.set_value(lbd_threshold);
+            cdb.lbd.update(last_lbd);
+            lbd_threshold = 0.0;
             RESTART!(asg, cdb, state);
-            asg.select_rephasing_target();
+            #[cfg(feature = "rephase")]
+            {
+                asg.select_rephasing_target();
+            }
             asg.clear_asserted_literals(cdb)?;
 
             #[cfg(feature = "trace_equivalency")]
@@ -364,7 +370,10 @@ fn search(
                             sls!(assignment, steps);
                         }
                     }
-                    asg.select_rephasing_target();
+                    #[cfg(feature = "rephase")]
+                    {
+                        asg.select_rephasing_target();
+                    }
                 }
                 if cfg!(feature = "clause_vivification") && num_learnts > 36_000 && last_span >= 128
                 {

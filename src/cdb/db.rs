@@ -263,9 +263,7 @@ impl Instantiate for ClauseDB {
     fn handle(&mut self, e: SolverEvent) {
         #[allow(clippy::single_match)]
         match e {
-            SolverEvent::Assert(_) => {
-                self.lbd.update(0);
-            }
+            SolverEvent::Assert(_) => {}
             SolverEvent::NewVar => {
                 self.binary_link.add_new_var();
                 // for negated literal
@@ -1110,6 +1108,7 @@ impl ClauseDBIF for ClauseDB {
                 continue;
             }
             perm.push(OrderedProxy::new(i, c.inactivity_sum(asg)));
+            // perm.push(OrderedProxy::new(i, c.rank as f64));
             c.used = 0;
         }
         let keep = perm
@@ -1441,7 +1440,7 @@ impl Clause {
     fn inactivity_sum(&self, asg: &impl AssignIF) -> f64 {
         self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
     }
-    fn _reverse_activity_sum(&self, asg: &impl AssignIF) -> f64 {
+    fn _inactivity_sum(&self, asg: &impl AssignIF) -> f64 {
         let mut ranks: HashMap<u32, f64> = HashMap::new();
         for l in self.iter() {
             let a = ranks.entry(asg.var(l.vi()).level).or_insert(1.0);
