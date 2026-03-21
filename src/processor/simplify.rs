@@ -199,15 +199,12 @@ impl Instantiate for Eliminator {
         }
     }
     fn handle(&mut self, e: SolverEvent) {
-        match e {
-            SolverEvent::NewVar => {
-                let len = self.var_queue.heap.len();
-                self.var.push(LitOccurs::default());
-                self.var_queue.heap.push(len as u32);
-                self.var_queue.idxs.push(len as u32);
-                self.var_queue.idxs[0] = len as u32;
-            }
-            _ => (),
+        if let SolverEvent::NewVar = e {
+            let len = self.var_queue.heap.len();
+            self.var.push(LitOccurs::default());
+            self.var_queue.heap.push(len as u32);
+            self.var_queue.idxs.push(len as u32);
+            self.var_queue.idxs[0] = len as u32;
         }
     }
 }

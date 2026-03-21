@@ -367,88 +367,6 @@ impl fmt::Display for AssignStack {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{assign::PropagateIF, cdb::ClauseDB};
-
-    fn lit(i: i32) -> Lit {
-        Lit::from(i)
-    }
-    #[test]
-    fn test_propagation() {
-        let config = Config::default();
-        let cnf = CNFDescription {
-            num_of_variables: 4,
-            ..CNFDescription::default()
-        };
-        let mut asg = AssignStack::instantiate(&config, &cnf);
-        let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        // [] + 1 => [1]
-        assert!(asg.assign_at_root_level(&mut cdb, lit(1)).is_ok());
-        assert_eq!(asg.trail, vec![lit(1)]);
-
-        // [1] + 1 => [1]
-        assert!(asg.assign_at_root_level(&mut cdb, lit(1)).is_ok());
-        assert_eq!(asg.trail, vec![lit(1)]);
-
-        // [1] + 2 => [1, 2]
-        assert!(asg.assign_at_root_level(&mut cdb, lit(2)).is_ok());
-        assert_eq!(asg.trail, vec![lit(1), lit(2)]);
-
-        // [1, 2] + -1 => ABORT & [1, 2]
-        assert!(asg.assign_at_root_level(&mut cdb, lit(-1)).is_err());
-        assert_eq!(asg.decision_level(), 0);
-        assert_eq!(asg.stack_len(), 2);
-
-        // [1, 2] + 3 => [1, 2, 3]
-        asg.assign_by_decision(lit(3));
-        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
-        assert_eq!(asg.decision_level(), 1);
-        assert_eq!(asg.stack_len(), 3);
-        assert_eq!(asg.len_upto(0), 2);
-
-        // [1, 2, 3] + 4 => [1, 2, 3, 4]
-        asg.assign_by_decision(lit(4));
-        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
-        assert_eq!(asg.decision_level(), 2);
-        assert_eq!(asg.stack_len(), 4);
-        assert_eq!(asg.len_upto(1), 3);
-
-        // [1, 2, 3] => [1, 2]
-        #[cfg(feature = "debug_propagation")]
-        {
-            for l in asg.trail.iter() {
-                asg.var[l.vi()].turn_on(Flag::PROPAGATED);
-            } // simulate propagation
-        }
-        asg.cancel_until(&mut cdb, 1);
-        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
-        assert_eq!(asg.decision_level(), 1);
-        assert_eq!(asg.stack_len(), 3);
-        assert_eq!(asg.trail_lim, vec![2]);
-        assert_eq!(asg.assigned(lit(1)), Some(true));
-        assert_eq!(asg.assigned(lit(-1)), Some(false));
-        assert_eq!(asg.assigned(lit(4)), None);
-
-        // [1, 2, 3] => [1, 2, 3, 4]
-        asg.assign_by_decision(lit(4));
-        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
-        assert_eq!(asg.var[lit(4).vi()].level, 2);
-        assert_eq!(asg.trail_lim, vec![2, 3]);
-
-        // [1, 2, 3, 4] => [1, 2, -4]
-        asg.assign_at_root_level(&mut cdb, Lit::from(-4i32))
-            .expect("impossible");
-        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(-4)]);
-        assert_eq!(asg.decision_level(), 0);
-        assert_eq!(asg.stack_len(), 3);
-
-        assert_eq!(asg.assigned(lit(-4)), Some(true));
-        assert_eq!(asg.assigned(lit(-3)), None);
-    }
-}
-
 /// Var manipulation
 pub trait VarManipulateIF {
     /// return the assignment of var.
@@ -601,5 +519,87 @@ impl AssignStack {
             }
         }
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{assign::PropagateIF, cdb::ClauseDB};
+
+    fn lit(i: i32) -> Lit {
+        Lit::from(i)
+    }
+    #[test]
+    fn test_propagation() {
+        let config = Config::default();
+        let cnf = CNFDescription {
+            num_of_variables: 4,
+            ..CNFDescription::default()
+        };
+        let mut asg = AssignStack::instantiate(&config, &cnf);
+        let mut cdb = ClauseDB::instantiate(&config, &cnf);
+        // [] + 1 => [1]
+        assert!(asg.assign_at_root_level(&mut cdb, lit(1)).is_ok());
+        assert_eq!(asg.trail, vec![lit(1)]);
+
+        // [1] + 1 => [1]
+        assert!(asg.assign_at_root_level(&mut cdb, lit(1)).is_ok());
+        assert_eq!(asg.trail, vec![lit(1)]);
+
+        // [1] + 2 => [1, 2]
+        assert!(asg.assign_at_root_level(&mut cdb, lit(2)).is_ok());
+        assert_eq!(asg.trail, vec![lit(1), lit(2)]);
+
+        // [1, 2] + -1 => ABORT & [1, 2]
+        assert!(asg.assign_at_root_level(&mut cdb, lit(-1)).is_err());
+        assert_eq!(asg.decision_level(), 0);
+        assert_eq!(asg.stack_len(), 2);
+
+        // [1, 2] + 3 => [1, 2, 3]
+        asg.assign_by_decision(lit(3));
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
+        assert_eq!(asg.decision_level(), 1);
+        assert_eq!(asg.stack_len(), 3);
+        assert_eq!(asg.len_upto(0), 2);
+
+        // [1, 2, 3] + 4 => [1, 2, 3, 4]
+        asg.assign_by_decision(lit(4));
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
+        assert_eq!(asg.decision_level(), 2);
+        assert_eq!(asg.stack_len(), 4);
+        assert_eq!(asg.len_upto(1), 3);
+
+        // [1, 2, 3] => [1, 2]
+        #[cfg(feature = "debug_propagation")]
+        {
+            for l in asg.trail.iter() {
+                asg.var[l.vi()].turn_on(Flag::PROPAGATED);
+            } // simulate propagation
+        }
+        asg.cancel_until(&mut cdb, 1);
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
+        assert_eq!(asg.decision_level(), 1);
+        assert_eq!(asg.stack_len(), 3);
+        assert_eq!(asg.trail_lim, vec![2]);
+        assert_eq!(asg.assigned(lit(1)), Some(true));
+        assert_eq!(asg.assigned(lit(-1)), Some(false));
+        assert_eq!(asg.assigned(lit(4)), None);
+
+        // [1, 2, 3] => [1, 2, 3, 4]
+        asg.assign_by_decision(lit(4));
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
+        assert_eq!(asg.var[lit(4).vi()].level, 2);
+        assert_eq!(asg.trail_lim, vec![2, 3]);
+
+        // [1, 2, 3, 4] => [1, 2, -4]
+        asg.assign_at_root_level(&mut cdb, Lit::from(-4i32))
+            .expect("impossible");
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(-4)]);
+        assert_eq!(asg.decision_level(), 0);
+        assert_eq!(asg.stack_len(), 3);
+
+        assert_eq!(asg.assigned(lit(-4)), Some(true));
+        assert_eq!(asg.assigned(lit(-3)), None);
     }
 }

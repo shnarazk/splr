@@ -80,7 +80,6 @@ support_user_assumption = []    # NOT WORK (defined in Glucose)
 suppress_reason_chain = []      # make direct links between a dicision var and its implications
 trace_analysis = []             # for debug
 trace_elimination = []          # for debug
-trace_equivalency = []          # for debug
 trail_saving = []               # reduce propagation cost by reusing propagation chain
 unsafe_access = []              # access elements of vectors without boundary checking
 

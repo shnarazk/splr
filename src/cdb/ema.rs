@@ -1,12 +1,13 @@
 use crate::types::*;
 
-pub const LBD_EWA_LEN: usize = 16;
-const LBD_EWA_SLOW: usize = 8192;
+pub const LBD_EMA_LEN: usize = 64;
+// const LBD_EWA_LEN: usize = 16;
+const LBD_EMA_LONG: usize = 8192;
 
 /// An EMA of learnt clauses' LBD, used for forcing restart.
 #[derive(Clone, Debug)]
 pub struct ProgressLBD {
-    ema: Ewa2<LBD_EWA_LEN>,
+    ema: Ema2,
     num: usize,
     sum: usize,
 }
@@ -14,7 +15,7 @@ pub struct ProgressLBD {
 impl Default for ProgressLBD {
     fn default() -> ProgressLBD {
         ProgressLBD {
-            ema: Ewa2::new(0.0),
+            ema: Ema2::new(LBD_EMA_LEN),
             num: 0,
             sum: 0,
         }
@@ -24,7 +25,7 @@ impl Default for ProgressLBD {
 impl Instantiate for ProgressLBD {
     fn instantiate(_config: &Config, _: &CNFDescription) -> Self {
         ProgressLBD {
-            ema: Ewa2::new(0.0).with_slow(LBD_EWA_SLOW),
+            ema: Ema2::new(LBD_EMA_LEN).with_slow(LBD_EMA_LONG),
             ..ProgressLBD::default()
         }
     }

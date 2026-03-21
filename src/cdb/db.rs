@@ -411,7 +411,8 @@ impl ClauseDBIF for ClauseDB {
         } else {
             c.update_lbd(asg, lbd_temp);
         }
-        self.lbd.update(c.rank);
+        // cdb.lbd is updated only in `solver.search`; we need to track seach mode
+        // self.lbd.update(c.rank);
         *num_clause += 1;
         if learnt {
             if len2 {

@@ -165,9 +165,6 @@ impl SolveIF for Solver {
         state.progress(asg, cdb);
         match answer {
             Ok(true) => {
-                #[cfg(feature = "trace_equivalency")]
-                asg.dump_cnf(cdb, "last-step.cnf");
-
                 // As a preparation for incremental solving, we need to backtrack to the
                 // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
@@ -225,18 +222,18 @@ fn search(
     cdb: &mut ClauseDB,
     state: &mut State,
 ) -> Result<bool, SolverError> {
-    let mut previous_stage: Option<bool> = Some(true);
+    let mut previous_span: Option<bool> = Some(true);
     let mut current_core: usize = 999_999;
     let mut core_was_rebuilt: Option<usize> = None;
     #[cfg(feature = "rephase")]
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
     let mut after_restart: usize = 0;
-    let mut num_depression: usize = 0;
     let mut num_learnts: usize = 0;
+    let mut processing_pressure: usize = 0;
+    let mut restart_pressure: usize = 0;
     let mut lbd_threshold: f64 = 0.0;
-    let mut last_lbd: u16 = 1;
-    let restart_period: usize = 40_000;
-    let cooling_period: usize = 8;
+    let restart_interval: usize = 40_000;
+    let cooling_length: usize = 8;
 
     state.stm.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -257,30 +254,28 @@ fn search(
         let lbd = handle_conflict(asg, cdb, state, &cc)?;
         if lbd == 0 {
             state.stm.reset();
-            // after_restart = 0;
-            num_depression = 1;
-            lbd_threshold = 0;
+            restart_pressure = 1;
+            lbd_threshold = 0.0;
         } else if 1 < lbd {
             num_learnts += 1;
-            if after_restart >= cooling_period {
-                // we don't want to use the current, depressing value of average LBD
-                if num_depression == 0 {
-                    lbd_threshold = cdb.refer(cdb::property::TEma::LBD).get_fast() as u16;
-                    // lbd_trend = cdb.refer(cdb::property::TEma::LBD).trend();
+            if after_restart >= cooling_length {
+                if restart_pressure == 0 {
+                    lbd_threshold = cdb.lbd.get_fast();
+                    cdb.lbd.update(lbd);
                 }
-                num_depression += (lbd > lbd_threshold) as usize;
-                /* if after_restart > state.stm.current_span() * 16 {
-                    num_depression = usize::MAX;
-                } */
-                // state.config.rst_lbd_thr
+                restart_pressure += (lbd > lbd_threshold as u16) as usize;
+            } else {
+                // we don't want to use the value under the extended search mode
+                cdb.lbd.update(lbd);
             }
-            if num_learnts > restart_period {
+            if num_learnts > restart_interval {
                 cdb.reduce(asg, state.stm.envelop_index());
                 num_learnts = 0;
             }
         }
+        processing_pressure += 1;
 
-        if state.stm.span_ended(num_depression) {
+        if state.stm.span_ended(restart_pressure) {
             if let Some(p) = state.elapsed() {
                 if 1.0 <= p {
                     return Err(SolverError::TimeOut);
@@ -289,9 +284,7 @@ fn search(
                 return Err(SolverError::UndescribedError);
             }
             after_restart = 0;
-            num_depression = 0;
-            cdb.lbd.set_value(lbd_threshold);
-            cdb.lbd.update(last_lbd);
+            restart_pressure = 0;
             lbd_threshold = 0.0;
             RESTART!(asg, cdb, state);
             #[cfg(feature = "rephase")]
@@ -300,12 +293,8 @@ fn search(
             }
             asg.clear_asserted_literals(cdb)?;
 
-            #[cfg(feature = "trace_equivalency")]
-            cdb.check_consistency(asg, "before simplify");
-
-            dump_stage(asg, cdb, state, previous_stage);
-            let last_span = state.stm.current_span();
-            let new_span: Option<bool> = state.stm.prepare_new_span(num_depression);
+            dump_stage(asg, cdb, state, previous_span);
+            let new_span: Option<bool> = state.stm.prepare_new_span(restart_pressure);
             let segment_length = state.stm.current_segment_length();
             let max_scale = state.stm.max_scale();
             if cfg!(feature = "reward_annealing") {
@@ -315,9 +304,6 @@ fn search(
             }
             if let Some(new_envelope) = new_span {
                 // a beginning of a new cycle
-                {
-                    state.exploration_rate_ema.update(1.0);
-                }
                 #[cfg(feature = "rephase")]
                 {
                     if cfg!(feature = "stochastic_local_search") {
@@ -370,22 +356,13 @@ fn search(
                             sls!(assignment, steps);
                         }
                     }
-                    #[cfg(feature = "rephase")]
-                    {
-                        asg.select_rephasing_target();
-                    }
+                    asg.select_rephasing_target();
                 }
-                if cfg!(feature = "clause_vivification") && num_learnts > 36_000 && last_span >= 128
-                {
-                    cdb.vivify(asg, state)?;
-                }
-                if new_envelope {
-                    {
-                        let base = state.stm.current_segment();
-                        let decay_index: f64 = (20 + 2 * base) as f64;
-                        asg.update_activity_decay((decay_index - 1.0) / decay_index);
+                if processing_pressure >= 40_000 {
+                    if cfg!(feature = "clause_vivification") {
+                        cdb.vivify(asg, state)?;
                     }
-                    if cfg!(feature = "clause_elimination") && state.stm.envelop_index() >= 8 {
+                    if cfg!(feature = "clause_elimination") {
                         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                         state.flush("clause subsumption, ");
                         elim.simplify(asg, cdb, state, false)?;
@@ -393,25 +370,28 @@ fn search(
                         state[Stat::Simplify] += 1;
                         state[Stat::SubsumedClause] = elim.num_subsumed;
                     }
+                    processing_pressure = 0;
+                }
+                if new_envelope {
+                    {
+                        let base = state.stm.current_segment();
+                        let decay_index: f64 = (20 + 2 * base) as f64;
+                        asg.update_activity_decay((decay_index - 1.0) / decay_index);
+                    }
                     if cfg!(feature = "dynamic_restart_threshold") {
                         state.restart.set_segment_parameters(max_scale);
                     }
                 }
             }
 
-            if num_learnts > restart_period {
+            if num_learnts > restart_interval {
                 cdb.reduce(asg, state.stm.envelop_index());
                 num_learnts = 0;
             }
 
             asg.handle(SolverEvent::Stage(segment_length));
             state.restart.set_stage_parameters(segment_length);
-            previous_stage = new_span;
-            // Old condition was superseded by a simpler code based on experiments.
-            // state.restart.restart(
-            //     cdb.refer(cdb::property::TEma::LBD),
-            //     cdb.refer(cdb::property::TEma::Entanglement),
-            // )
+            previous_span = new_span;
         }
         if num_learnts == 0 {
             // run after restart
