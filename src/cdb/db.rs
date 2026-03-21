@@ -640,19 +640,9 @@ impl ClauseDBIF for ClauseDB {
                 if old_l1 == l0 {
                     debug_assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
                     watch_cache[!l1].insert_watch(cid, l0);
-
-                    #[cfg(feature = "maintain_watch_cache")]
-                    {
-                        watch_cache[!l0].update_watch(cid, l1);
-                    }
                 } else if old_l1 == l1 {
                     debug_assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
                     watch_cache[!l0].insert_watch(cid, l1);
-
-                    #[cfg(feature = "maintain_watch_cache")]
-                    {
-                        watch_cache[!l1].update_watch(cid, l0);
-                    }
                 } else {
                     unreachable!("transform_by_elimination");
                 }
@@ -661,19 +651,9 @@ impl ClauseDBIF for ClauseDB {
                 if old_l0 == l0 {
                     debug_assert!(watch_cache[!l1].iter().all(|e| e.0 != cid));
                     watch_cache[!l1].insert_watch(cid, l0);
-
-                    #[cfg(feature = "maintain_watch_cache")]
-                    {
-                        watch_cache[!l0].update_watch(cid, l1);
-                    }
                 } else if old_l0 == l1 {
                     debug_assert!(watch_cache[!l0].iter().all(|e| e.0 != cid));
                     watch_cache[!l0].insert_watch(cid, l1);
-
-                    #[cfg(feature = "maintain_watch_cache")]
-                    {
-                        watch_cache[!l1].update_watch(cid, l0);
-                    }
                 } else {
                     unreachable!("transform_by_elimination");
                 }
@@ -681,21 +661,6 @@ impl ClauseDBIF for ClauseDB {
                 debug_assert_eq!(old_l0, l0);
                 debug_assert_eq!(old_l1, l1);
             }
-
-            #[cfg(feature = "maintain_watch_cache")]
-            {
-                debug_assert!(
-                    watch_cache[!c.lits[0]]
-                        .iter()
-                        .any(|wc| wc.0 == cid && wc.1 == c.lits[1])
-                );
-                debug_assert!(
-                    watch_cache[!c.lits[1]]
-                        .iter()
-                        .any(|wc| wc.0 == cid && wc.1 == c.lits[0])
-                );
-            }
-
             // self.watches(cid, "after strengthen_by_elimination case:3-3");
         }
         if certification_store.is_active() {
@@ -907,11 +872,6 @@ impl ClauseDBIF for ClauseDB {
                 let l1 = c.lit1();
 
                 if old_l0 == l0 && old_l1 == l1 {
-                    #[cfg(feature = "maintain_watch_cache")]
-                    {
-                        watch_cache[!l0].update_watch(cid, l1);
-                        watch_cache[!l1].update_watch(cid, l0);
-                    }
                 } else if old_l0 == l0 {
                     // assert_ne!(old_l1, l1);
                     watch_cache[!old_l1].remove_watch(&cid);
@@ -995,13 +955,6 @@ impl ClauseDBIF for ClauseDB {
         //## Step:2
         // assert!(watch_cache[!c.lits[new]].iter().all(|e| e.0 != cid));
         watch_cache[!c.lits[new]].insert_watch(cid, c.lits[other]);
-
-        #[cfg(feature = "maintain_watch_cache")]
-        {
-            //## Step:3
-            watch_cache[!c.lits[other]].update_watch(cid, c.lits[new]);
-        }
-
         c.lits.swap(old, new);
 
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));

@@ -40,7 +40,6 @@ default = [
 
     ### For DEBUG
     # "boundary_check",
-    # "maintain_watch_cache",
 
     ### platform dependency
     # "platform_wasm"
@@ -59,7 +58,6 @@ EMA_calibration = []            # each exponential moving average has a calbrati
 EVSIDS = []                     # Exponential Variable State Independent Decaying Sum
 just_used = []                  # Var and clause have 'just_used' flags
 LRB_rewarding = []              # Learning Rate Based rewarding, a new var activity criteria
-maintain_watch_cache = []       # for DEBUG
 no_IO = []                      # to embed Splr into non-std environments
 platform_wasm = [
     "instant",                  # use instant::Duration instead of std::time::Duration
