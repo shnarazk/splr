@@ -12,6 +12,8 @@
 - remove feature 'boundary_check'
 - remove feature 'EVSIDS'
 - remove feature 'maintain_watch_cache'
+- remove feature 'bi_clause_completion'
+- rename feature 'debug_propagation' to 'trace_propagation'
 
 ## 0.18.0, 2026-03-14
 

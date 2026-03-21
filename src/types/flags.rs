@@ -43,7 +43,7 @@ bitflags! {
         /// a var is checked during in the current conflict analysis.
         const CA_SEEN      = 0b0001_0000;
 
-        #[cfg(feature = "debug_propagation")]
+        #[cfg(feature = "trace_propagation")]
         /// check propagation
         const PROPAGATED   = 0b0010_0000;
     }

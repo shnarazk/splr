@@ -211,8 +211,6 @@ pub fn handle_conflict(
                 cdb[cid].used = cdb[cid].used.saturating_add(1);
             }
             rank = 1;
-            #[cfg(feature = "bi_clause_completion")]
-            cdb.complete_bi_clauses(asg);
         }
         RefClause::Clause(cid) => {
             debug_assert_eq!(cdb[cid].lit0(), l0);

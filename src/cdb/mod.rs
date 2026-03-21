@@ -127,8 +127,6 @@ pub trait ClauseDBIF:
     fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId>;
     /// minimize a clause.
     fn minimize_with_bi_clauses(&mut self, asg: &impl AssignIF, vec: &mut Vec<Lit>);
-    /// complete bi-clause network
-    fn complete_bi_clauses(&mut self, asg: &mut impl AssignIF);
 
     //
     //## for debug
@@ -147,7 +145,6 @@ pub mod property {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tusize {
         NumBiClause,
-        NumBiClauseCompletion,
         NumBiLearnt,
         NumClause,
         NumLBD2,
@@ -157,9 +154,8 @@ pub mod property {
         Timestamp,
     }
 
-    pub const USIZES: [Tusize; 9] = [
+    pub const USIZES: [Tusize; 8] = [
         Tusize::NumBiClause,
-        Tusize::NumBiClauseCompletion,
         Tusize::NumBiLearnt,
         Tusize::NumClause,
         Tusize::NumLBD2,
@@ -175,7 +171,6 @@ pub mod property {
             match k {
                 Tusize::NumClause => self.num_clause,
                 Tusize::NumBiClause => self.num_bi_clause,
-                Tusize::NumBiClauseCompletion => self.num_bi_clause_completion,
                 Tusize::NumBiLearnt => self.num_bi_learnt,
                 Tusize::NumLBD2 => self.num_lbd2,
                 Tusize::NumLearnt => self.num_learnt,

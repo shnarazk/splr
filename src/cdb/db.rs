@@ -43,10 +43,6 @@ pub struct ClauseDB {
     // not in use
     // lbd_frozen_clause: usize,
 
-    // bi-clause completion
-    bi_clause_completion_queue: Vec<Lit>,
-    pub(crate) num_bi_clause_completion: usize,
-
     //
     //## clause rewarding
     //
@@ -102,8 +98,7 @@ impl Default for ClauseDB {
             certification_store: CertificationStore::default(),
             soft_limit: 0, // 248_000_000
             co_lbd_bound: 4,
-            bi_clause_completion_queue: Vec::new(),
-            num_bi_clause_completion: 0,
+
             // lbd_frozen_clause: 30,
             #[cfg(feature = "clause_rewarding")]
             tick: 0,
@@ -373,8 +368,6 @@ impl ClauseDBIF for ClauseDB {
         };
 
         let ClauseDB {
-            #[cfg(feature = "bi_clause_completion")]
-            bi_clause_completion_queue,
             clause,
             lbd_temp,
             num_clause,
@@ -399,15 +392,6 @@ impl ClauseDBIF for ClauseDB {
         let len2 = c.lits.len() == 2;
         if len2 {
             c.rank = 1;
-
-            #[cfg(feature = "bi_clause_completion")]
-            if learnt {
-                for lit in c.iter() {
-                    if !bi_clause_completion_queue.contains(lit) {
-                        bi_clause_completion_queue.push(*lit);
-                    }
-                }
-            }
         } else {
             c.update_lbd(asg, lbd_temp);
         }
@@ -1146,11 +1130,6 @@ impl ClauseDBIF for ClauseDB {
             vec.retain(|l| self.lbd_temp[l.vi()] == key);
         }
     }
-    fn complete_bi_clauses(&mut self, asg: &mut impl AssignIF) {
-        while let Some(lit) = self.bi_clause_completion_queue.pop() {
-            self.complete_bi_clauses_with(asg, lit);
-        }
-    }
 
     #[cfg(not(feature = "no_IO"))]
     /// dump all active clauses and assertions as a CNF file.
@@ -1214,27 +1193,6 @@ impl ClauseDBIF for ClauseDB {
 }
 
 impl ClauseDB {
-    /// formula: -a => b and b => c implies -a => c
-    /// clause: [a, b] and [-b, c] deduces [a, c]
-    /// map: [a].get(b), [!b].get(c), [a].get(c)
-    /// rename: [lit].get(other), [!other].get(third), [a].get(third)
-    fn complete_bi_clauses_with(&mut self, asg: &mut impl AssignIF, lit: Lit) {
-        let mut vec: Vec<Vec<Lit>> = Vec::new();
-        // [lit, other]
-        for (other, _) in self.binary_link.connect_with(lit) {
-            // [!other, third]
-            for (third, _) in self.binary_link.connect_with(!*other) {
-                if lit.vi() != third.vi() && self.binary_link.search(lit, *third).is_none() {
-                    // the new [lit, third] should be added.
-                    vec.push(vec![lit, *third]);
-                }
-            }
-        }
-        for pair in vec.iter_mut() {
-            self.new_clause(asg, pair, false);
-            self.num_bi_clause_completion += 1;
-        }
-    }
     /// return `true` if a literal pair `(l0, l1)` is registered.
     ///```ignore
     /// use splr::types::*;

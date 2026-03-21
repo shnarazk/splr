@@ -213,7 +213,7 @@ impl PropagateIF for AssignStack {
                 &self.var[l.vi()],
             );
             let vi = l.vi();
-            #[cfg(feature = "debug_propagation")]
+            #[cfg(feature = "trace_propagation")]
             debug_assert!(
                 self.q_head <= i || self.var[vi].is(Flag::PROPAGATED),
                 "unpropagated assigned level-{} var {:?},{:?} (loc:{} in trail{:?}) found, staying at level {}",
@@ -235,7 +235,7 @@ impl PropagateIF for AssignStack {
             }
 
             let v = &mut self.var[vi];
-            #[cfg(feature = "debug_propagation")]
+            #[cfg(feature = "trace_propagation")]
             v.turn_off(FlagVar::PROPAGATED);
             v.set(FlagVar::PHASE, v.assign.unwrap());
 
@@ -283,7 +283,7 @@ impl PropagateIF for AssignStack {
         debug_assert!(
             self.q_head == 0 || self.var[self.trail[self.q_head - 1].vi()].assign.is_some()
         );
-        #[cfg(feature = "debug_propagation")]
+        #[cfg(feature = "trace_propagation")]
         debug_assert!(
             self.q_head == 0 || self.var[self.trail[self.q_head - 1].vi()].is(FlagVar::PROPAGATED)
         );
@@ -362,7 +362,7 @@ impl PropagateIF for AssignStack {
         while let Some(p) = self.trail.get(self.q_head) {
             self.num_propagation += 1;
             self.q_head += 1;
-            #[cfg(feature = "debug_propagation")]
+            #[cfg(feature = "trace_propagation")]
             {
                 assert!(!self.var[p.vi()].is(FlagVar::PROPAGATED));
                 self.var[p.vi()].turn_on(FlagVar::PROPAGATED);
@@ -530,10 +530,11 @@ impl PropagateIF for AssignStack {
         let dl = self.decision_level();
         while let Some(p) = self.trail.get(self.q_head) {
             self.q_head += 1;
-            #[cfg(feature = "debug_propagation")]
-            assert!(!self.var[p.vi()].is(Flag::PROPAGATED));
-            #[cfg(feature = "debug_propagation")]
-            self.var[p.vi()].turn_on(Flag::PROPAGATED);
+            #[cfg(feature = "trace_propagation")]
+            {
+                assert!(!self.var[p.vi()].is(Flag::PROPAGATED));
+                self.var[p.vi()].turn_on(Flag::PROPAGATED);
+            }
             let propagating = Lit::from(usize::from(*p));
             let false_lit = !*p;
 

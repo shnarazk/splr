@@ -5,11 +5,10 @@
 mod ema;
 /// Heap
 mod heap;
+/// Var rewarding
+mod learning_rate;
 /// Boolean constraint propagation
 mod propagate;
-/// Var rewarding
-#[cfg_attr(feature = "LRB_rewarding", path = "learning_rate.rs")]
-mod reward;
 /// Decision var selection
 mod select;
 /// assignment management

@@ -248,8 +248,6 @@ impl Config {
             let features = [
                 #[cfg(feature = "best_phases_tracking")]
                 "best phase tracking",
-                #[cfg(feature = "bi_clause_completion")]
-                "binary clause completion",
                 #[cfg(feature = "chrono_BT")]
                 "chrono BT",
                 #[cfg(feature = "clause_elimination")]
@@ -258,8 +256,6 @@ impl Config {
                 "stage-based clause vivification",
                 #[cfg(feature = "EMA_calibration")]
                 "EMA calibration",
-                #[cfg(feature = "LRB_rewarding")]
-                "Learning-Rate Based rewarding",
                 #[cfg(feature = "reason_side_rewarding")]
                 "reason-side rewarding",
                 #[cfg(feature = "rephase")]

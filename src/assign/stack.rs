@@ -539,7 +539,7 @@ mod tests {
         assert_eq!(asg.len_upto(1), 3);
 
         // [1, 2, 3] => [1, 2]
-        #[cfg(feature = "debug_propagation")]
+        #[cfg(feature = "trace_propagation")]
         {
             for l in asg.trail.iter() {
                 asg.var[l.vi()].turn_on(Flag::PROPAGATED);
