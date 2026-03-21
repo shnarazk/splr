@@ -5,6 +5,8 @@
   - clause DB size after clause reduction
 - `ClauseDBIF::reduce` can run at any decision level, and runs every 40,000 conflicts
 - remove feature 'two_mode_reduction'
+- remove feature 'dynamic_restart_threshold'
+- remove feature 'trace_equivalency'
 
 ## 0.18.0, 2026-03-14
 

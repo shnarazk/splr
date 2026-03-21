@@ -378,9 +378,6 @@ fn search(
                         let decay_index: f64 = (20 + 2 * base) as f64;
                         asg.update_activity_decay((decay_index - 1.0) / decay_index);
                     }
-                    if cfg!(feature = "dynamic_restart_threshold") {
-                        state.restart.set_segment_parameters(max_scale);
-                    }
                 }
             }
 

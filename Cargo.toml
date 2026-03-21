@@ -28,7 +28,6 @@ default = [
     ### Heuristics
     # "bi_clause_completion",
     # "clause_rewarding",
-    "dynamic_restart_threshold",
     "LRB_rewarding",
     "reason_side_rewarding",
     "rephase",
@@ -57,7 +56,6 @@ clause_elimination = []         # pre(in)-processor setting
 clause_rewarding = []           # clauses have activities w/ decay rate
 clause_vivification = []        # pre(in)-processor setting
 debug_propagation = []          # for debug
-dynamic_restart_threshold = []  # control restart spans like Glucose
 EMA_calibration = []            # each exponential moving average has a calbration value
 EVSIDS = []                     # Exponential Variable State Independent Decaying Sum
 just_used = []                  # Var and clause have 'just_used' flags

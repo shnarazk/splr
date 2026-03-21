@@ -267,8 +267,6 @@ impl Config {
                 "stage-based clause elimination",
                 #[cfg(feature = "clause_vivification")]
                 "stage-based clause vivification",
-                #[cfg(feature = "dynamic_restart_threshold")]
-                "stage-based dynamic restart threshold",
                 #[cfg(feature = "EMA_calibration")]
                 "EMA calibration",
                 #[cfg(feature = "EVSIDS")]
