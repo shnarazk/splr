@@ -58,9 +58,6 @@ impl SolveIF for Solver {
         {
             state.flush("vivifying...");
             if cdb.vivify(asg, state).is_err() {
-                #[cfg(feature = "support_user_assumption")]
-                analyze_final(asg, state, &cdb[ci]);
-
                 state.log(None, "By vivifier as a pre-possessor");
                 return Ok(Certificate::UNSAT);
             }
@@ -195,9 +192,6 @@ impl SolveIF for Solver {
                 Ok(Certificate::SAT(vals))
             }
             Ok(false) | Err(SolverError::EmptyClause | SolverError::RootLevelConflict(_)) => {
-                #[cfg(feature = "support_user_assumption")]
-                analyze_final(asg, state, &cdb[ci]);
-
                 RESTART!(asg, cdb, state);
                 Ok(Certificate::UNSAT)
             }
@@ -431,39 +425,4 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: O
         },
         format!("{span:>7}, fuel:{fuel:>9.2}, cpr:{cpr:>8.2}, vdr:{vdr:>3.2}, cdt:{cdt:>5.2}"),
     );
-}
-
-#[cfg(feature = "support_user_assumption")]
-// Build a conflict clause caused by *assumed* literals UNDER ROOT_LEVEL.
-// So we use zero instead of root_level sometimes in this function.
-fn analyze_final(asg: &mut AssignStack, state: &mut State, c: &Clause) {
-    let mut seen = vec![false; asg.num_vars + 1];
-    state.conflicts.clear();
-    if asg.decision_level() == 0 {
-        return;
-    }
-    // ??
-    // for l in &c.lits {
-    //     let vi = l.vi();
-    //     if asg.root_level < asg.level(vi) {
-    //         asg.var_mut(vi).turn_on(Flag::CA_SEEN);
-    //     }
-    // }
-    // FIXME: asg.stack_range().rev() is correct.
-    for l in asg.stack_range(0..asg.len_upto(asg.root_level)) {
-        let vi = l.vi();
-        if seen[vi] {
-            if let AssignReason::Decision(_) = asg.reason(vi) {
-                state.conflicts.push(!*l);
-            } else {
-                for l in &c[(c.len() != 2) as usize..] {
-                    let vj = l.vi();
-                    if 0 < asg.level(vj) {
-                        seen[vj] = true;
-                    }
-                }
-            }
-        }
-        seen[vi] = false;
-    }
 }

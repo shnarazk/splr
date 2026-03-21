@@ -1,6 +1,6 @@
 //! main struct AssignStack
 use {
-    super::{AssignIF, Var, ema::ProgressASG, heap::VarHeapIF, heap::VarIdHeap},
+    super::{AssignIF, Var, heap::VarHeapIF, heap::VarIdHeap},
     crate::{cdb::ClauseDBIF, types::*},
     std::{
         fmt,
@@ -68,8 +68,7 @@ pub struct AssignStack {
     pub(super) num_propagation: usize,
     pub num_conflict: usize,
     pub(super) num_restart: usize,
-    /// Assign rate EMA
-    pub(super) assign_rate: ProgressASG,
+
     /// Decisions Per Conflict
     pub(super) dpc_ema: EmaSU,
     /// Propagations Per Conflict
@@ -130,7 +129,7 @@ impl Default for AssignStack {
             num_propagation: 0,
             num_conflict: 0,
             num_restart: 0,
-            assign_rate: ProgressASG::default(),
+
             dpc_ema: EmaSU::new(100),
             ppc_ema: EmaSU::new(100),
             cpr_ema: EmaSU::new(100),
@@ -170,7 +169,7 @@ impl Instantiate for AssignStack {
             trail_saved: Vec::with_capacity(nv),
 
             num_vars: cnf.num_of_variables,
-            assign_rate: ProgressASG::instantiate(config, cnf),
+
             var: Var::new_vars(nv),
 
             activity_decay: config.vrw_dcy_rat,

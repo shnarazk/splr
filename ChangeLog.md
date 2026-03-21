@@ -4,15 +4,16 @@
   - trigger for restarts, clause elimination, and clause vivification
   - clause DB size after clause reduction
 - `ClauseDBIF::reduce` can run at any decision level, and runs every 40,000 conflicts
-- remove feature 'two_mode_reduction'
-- remove feature 'dynamic_restart_threshold'
-- remove feature 'trace_equivalency'
-- remove feature 'reward_annealing'
-- remove feature 'just_used'
-- remove feature 'boundary_check'
-- remove feature 'EVSIDS'
-- remove feature 'maintain_watch_cache'
+- remove feature 'assign_rate'
 - remove feature 'bi_clause_completion'
+- remove feature 'boundary_check'
+- remove feature 'dynamic_restart_threshold'
+- remove feature 'EVSIDS'
+- remove feature 'just_used'
+- remove feature 'maintain_watch_cache'
+- remove feature 'reward_annealing'
+- remove feature 'trace_equivalency'
+- remove feature 'two_mode_reduction'
 - rename feature 'debug_propagation' to 'trace_propagation'
 
 ## 0.18.0, 2026-03-14

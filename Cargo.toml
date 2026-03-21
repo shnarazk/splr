@@ -40,7 +40,7 @@ default = [
     ### platform dependency
     # "platform_wasm"
 ]
-assign_rate = []                # for debug and study
+
 best_phases_tracking = []       # save the best-so-far assignment, used by 'rephase'
 
 BT_deepen = []                   # backtrack drift
@@ -60,7 +60,7 @@ rephase = [                     # search around the best-so-far candidate repeat
 stochastic_local_search = [     # since 0.17
     "rephase",
 ]
-support_user_assumption = []    # NOT WORK (defined in Glucose)
+
 suppress_reason_chain = []      # make direct links between a dicision var and its implications
 trace_analysis = []             # for debug
 trace_elimination = []          # for debug

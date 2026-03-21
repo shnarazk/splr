@@ -1,8 +1,6 @@
 // Module `assign` implements Boolean Constraint Propagation and decision var selection.
 // This version can handle Chronological and Non Chronological Backtrack.
 
-/// Ema
-mod ema;
 /// Heap
 mod heap;
 /// Var rewarding
@@ -204,7 +202,6 @@ pub mod property {
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum TEma {
-        AssignRate,
         DecisionPerConflict,
         PropagationPerConflict,
         ConflictPerRestart,
@@ -212,8 +209,7 @@ pub mod property {
         BestPhaseDivergenceRate,
     }
 
-    pub const EMAS: [TEma; 6] = [
-        TEma::AssignRate,
+    pub const EMAS: [TEma; 5] = [
         TEma::DecisionPerConflict,
         TEma::PropagationPerConflict,
         TEma::ConflictPerRestart,
@@ -225,7 +221,6 @@ pub mod property {
         #[inline]
         fn refer(&self, k: TEma) -> &EmaView {
             match k {
-                TEma::AssignRate => self.assign_rate.as_view(),
                 TEma::DecisionPerConflict => self.dpc_ema.as_view(),
                 TEma::PropagationPerConflict => self.ppc_ema.as_view(),
                 TEma::ConflictPerRestart => self.cpr_ema.as_view(),

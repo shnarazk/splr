@@ -270,14 +270,6 @@ impl PropagateIF for AssignStack {
         if lv == self.root_level {
             self.num_restart += 1;
             self.cpr_ema.update(self.num_conflict);
-        } else {
-            #[cfg(feature = "assign_rate")]
-            self.assign_rate.update(
-                self.num_vars
-                    - self.num_asserted_vars
-                    - self.num_eliminated_vars
-                    - self.trail.len(),
-            );
         }
 
         debug_assert!(

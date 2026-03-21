@@ -117,10 +117,6 @@ pub struct State {
     /// EMA of backtrack level drift caused by chrono_BT or BT_deepen
     pub bt_drift_average: Ema,
 
-    #[cfg(feature = "support_user_assumption")]
-    /// hold conflicting user-defined *assumed* literals for UNSAT problems
-    pub conflicts: Vec<Lit>,
-
     #[cfg(feature = "chrono_BT")]
     /// chronoBT threshold
     pub chrono_bt_threshold: DecisionLevel,
@@ -159,9 +155,6 @@ impl Default for State {
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
             bt_drift_average: Ema::new(1000),
-
-            #[cfg(feature = "support_user_assumption")]
-            conflicts: Vec::new(),
 
             #[cfg(feature = "chrono_BT")]
             chrono_bt_threshold: 100,
@@ -474,7 +467,6 @@ impl StateIF for State {
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
         let cdb_lb_ent: f64 = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
         let rst_num_rst: usize = self[Stat::Restart];
-        let rst_asg: &EmaView = asg.refer(assign::property::TEma::AssignRate);
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
         let rst_eng: f64 = self.restart.penetration_energy_charged;
         let stg_segment: usize = self.stm.current_segment();
@@ -549,7 +541,6 @@ impl StateIF for State {
         );
         self[LogUsizeId::StageSegment] = stg_segment;
         self[LogF64Id::RestartEnergy] = rst_eng;
-        self[LogF64Id::TrendASG] = rst_asg.trend();
         println!(
             "\x1B[2K    Conflict|entg:{}, cLvl:{}, bLvl:{}, /cpr:{}",
             fm!(
@@ -776,7 +767,6 @@ impl State {
         self[LogF64Id::DecisionPerConflict] =
             asg.refer(assign::property::TEma::DecisionPerConflict).get();
 
-        self[LogF64Id::TrendASG] = asg.refer(assign::property::TEma::AssignRate).trend();
         self[LogF64Id::CLevel] = self.c_lvl.get();
         self[LogF64Id::BLevel] = self.b_lvl.get();
         self[LogF64Id::PropagationPerConflict] = asg
@@ -929,11 +919,9 @@ pub enum LogUsizeId {
 #[derive(Clone, Copy, Debug)]
 pub enum LogF64Id {
     Progress = 0,
-    EmaASG,
     EmaCCC,
     EmaLBD,
     EmaMLD,
-    TrendASG,
     TrendLBD,
     BLevel,
     CLevel,
