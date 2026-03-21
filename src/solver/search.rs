@@ -1,8 +1,8 @@
 //! Conflict-Driven Clause Learning Search engine
 use {
     super::{
-        Certificate, Solver, SolverEvent, SolverResult, conflict::handle_conflict,
-        restart::RestartIF,
+        conflict::handle_conflict, restart::RestartIF, Certificate, Solver, SolverEvent,
+        SolverResult,
     },
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
@@ -296,12 +296,6 @@ fn search(
             dump_stage(asg, cdb, state, previous_span);
             let new_span: Option<bool> = state.stm.prepare_new_span(restart_pressure);
             let segment_length = state.stm.current_segment_length();
-            let max_scale = state.stm.max_scale();
-            if cfg!(feature = "reward_annealing") {
-                let base = state.stm.current_segment() - state.stm.envelope_starting_segment();
-                let decay_index: f64 = (20 + 2 * base) as f64;
-                asg.update_activity_decay((decay_index - 1.0) / decay_index);
-            }
             if let Some(new_envelope) = new_span {
                 // a beginning of a new cycle
                 #[cfg(feature = "rephase")]

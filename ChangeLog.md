@@ -7,6 +7,7 @@
 - remove feature 'two_mode_reduction'
 - remove feature 'dynamic_restart_threshold'
 - remove feature 'trace_equivalency'
+- remove feature 'reward_annealing
 
 ## 0.18.0, 2026-03-14
 

@@ -31,7 +31,6 @@ default = [
     "LRB_rewarding",
     "reason_side_rewarding",
     "rephase",
-    "reward_annealing",
     # "stochastic_local_search",
     # "suppress_reason_chain",
 
@@ -69,9 +68,7 @@ reason_side_rewarding = []      # an idea used in Learning-rate based rewarding
 rephase = [                     # search around the best-so-far candidate repeatedly
     "best_phases_tracking",
 ]
-reward_annealing = []           # use bigger and smaller decay rates cycliclly
 stochastic_local_search = [     # since 0.17
-    # "reward_annealing",
     "rephase",
 ]
 support_user_assumption = []    # NOT WORK (defined in Glucose)
