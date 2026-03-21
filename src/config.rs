@@ -269,10 +269,6 @@ impl Config {
                 "stage-based clause vivification",
                 #[cfg(feature = "EMA_calibration")]
                 "EMA calibration",
-                #[cfg(feature = "EVSIDS")]
-                "EVSIDS rewarding",
-                #[cfg(feature = "just_used")]
-                "use 'just used' flag",
                 #[cfg(feature = "LRB_rewarding")]
                 "Learning-Rate Based rewarding",
                 #[cfg(feature = "reason_side_rewarding")]

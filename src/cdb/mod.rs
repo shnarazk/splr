@@ -293,8 +293,6 @@ mod tests {
         assert_eq!(c.rank, 3);
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
-        #[cfg(feature = "just_used")]
-        assert!(!c.is(Flag::USED));
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
             .as_cid();
@@ -302,8 +300,6 @@ mod tests {
         assert_eq!(c.rank, 3);
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
-        #[cfg(feature = "just_used")]
-        assert!(!c.is(Flag::USED));
     }
     #[test]
     fn test_clause_equality() {

@@ -1014,8 +1014,6 @@ impl ClauseDBIF for ClauseDB {
         let rank = c.update_lbd(asg, &mut self.lbd_temp);
         let learnt = c.is(FlagClause::LEARNT);
         if learnt {
-            #[cfg(feature = "just_used")]
-            c.turn_on(FlagClause::USED);
             #[cfg(feature = "clause_rewarding")]
             self.reward_at_analysis(cid);
         }
