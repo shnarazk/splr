@@ -12,6 +12,7 @@
 - remove feature 'just_used'
 - remove feature 'maintain_watch_cache'
 - remove feature 'reward_annealing'
+- remove feature 'suppress_reason_chain'
 - remove feature 'trace_equivalency'
 - remove feature 'two_mode_reduction'
 - rename feature 'debug_propagation' to 'trace_propagation'

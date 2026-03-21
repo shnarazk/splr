@@ -314,23 +314,6 @@ impl PropagateIF for AssignStack {
             };
         }
 
-        #[cfg(feature = "suppress_reason_chain")]
-        macro_rules! minimized_reason {
-            ($lit: expr) => {
-                if let r @ AssignReason::BinaryLink(_) = self.reason[$lit.vi()] {
-                    r
-                } else {
-                    AssignReason::BinaryLink($lit)
-                }
-            };
-        }
-        #[cfg(not(feature = "suppress_reason_chain"))]
-        macro_rules! minimized_reason {
-            ($lit: expr) => {
-                AssignReason::BinaryLink($lit)
-            };
-        }
-
         #[cfg(feature = "trail_saving")]
         macro_rules! from_saved_trail {
             () => {
@@ -379,13 +362,13 @@ impl PropagateIF for AssignStack {
                 match lit_assign!(self, blocker) {
                     Some(true) => (),
                     Some(false) => {
-                        conflict_path!(blocker, minimized_reason!(propagating));
+                        conflict_path!(blocker, AssignReason::BinaryLink(propagating));
                     }
                     None => {
                         debug_assert!(cdb[cid].lit0() == false_lit || cdb[cid].lit1() == false_lit);
                         self.assign_by_implication(
                             blocker,
-                            minimized_reason!(propagating),
+                            AssignReason::BinaryLink(propagating),
                             if cfg!(feature = "chrono_BT") {
                                 self.var[propagating.vi()].level
                             } else {
