@@ -217,13 +217,16 @@ fn search(
     let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
     let mut after_restart: usize = 0;
     let mut num_learnts: usize = 0;
-    let mut processing_pressure: usize = 0;
     let mut restart_pressure: usize = 0;
-    let mut lbd_threshold: f64 = 0.0;
     let restart_interval: usize = 40_000;
-    let cooling_length: usize = 8;
+    let mut lbd_threshold: f64 = 0.0;
+    let mut processing_pressure: usize = 0;
+    let processing_interval: usize = 80_000;
+    let cooling_length: usize = 4;
+    let mut count: usize = 0;
 
     state.stm.reset();
+    asg.update_activity_decay(0.98);
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
             let lit = asg.select_decision_literal();
@@ -232,6 +235,7 @@ fn search(
         let Err(cc) = asg.propagate(cdb) else {
             continue;
         };
+        count += 1;
         after_restart += 1;
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
@@ -241,9 +245,7 @@ fn search(
         cdb.update_activity_tick();
         let lbd = handle_conflict(asg, cdb, state, &cc)?;
         if lbd == 0 {
-            state.stm.reset();
-            restart_pressure = 1;
-            lbd_threshold = 0.0;
+            restart_pressure += 1;
         } else if 1 < lbd {
             num_learnts += 1;
             if after_restart >= cooling_length {
@@ -251,12 +253,12 @@ fn search(
                     lbd_threshold = cdb.lbd.get_fast();
                     cdb.lbd.update(lbd);
                 }
-                restart_pressure += (lbd > lbd_threshold as u16) as usize;
+                restart_pressure += (lbd >= lbd_threshold as u16) as usize;
             } else {
                 // we don't want to use the value under the extended search mode
                 cdb.lbd.update(lbd);
             }
-            if num_learnts > restart_interval {
+            if num_learnts >= restart_interval.max(state.stm.envelop_index() * 10_000) {
                 cdb.reduce(asg, state.stm.envelop_index());
                 num_learnts = 0;
             }
@@ -286,6 +288,15 @@ fn search(
             let segment_length = state.stm.current_segment_length();
             if let Some(new_envelope) = new_span {
                 // a beginning of a new cycle
+                {
+                    // Longer segments reduces learning rates to search deeper space.
+                    let index_e = 10.0;
+                    let index_s =
+                        state.stm.current_segment() - state.stm.envelope_starting_segment();
+                    let decay_index: f64 = index_e + index_s as f64;
+                    asg.update_activity_decay(1.0 - 1.0 / decay_index);
+                }
+
                 #[cfg(feature = "rephase")]
                 {
                     if cfg!(feature = "stochastic_local_search") {
@@ -340,7 +351,7 @@ fn search(
                     }
                     asg.select_rephasing_target();
                 }
-                if processing_pressure >= 40_000 {
+                if processing_pressure >= processing_interval {
                     if cfg!(feature = "clause_vivification") {
                         cdb.vivify(asg, state)?;
                     }
@@ -372,10 +383,9 @@ fn search(
             state.restart.set_stage_parameters(segment_length);
             previous_span = new_span;
         }
-        if num_learnts == 0 {
-            // run after restart
+        if count.is_multiple_of(10_000) {
             state.progress(asg, cdb);
-            if state.stm.current_span() > 10_000 {
+            if state.stm.current_span() >= 8192 {
                 state.flush("deep search...");
             }
         }
