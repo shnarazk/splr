@@ -377,7 +377,7 @@ fn conflict_analyze(
                 debug_assert!(!cdb[cid].is_dead() && 2 < cdb[cid].len());
                 // if !cdb.update_at_analysis(asg, cid) {
                 if !cdb[cid].is(FlagClause::LEARNT) {
-                    cdb[cid].used = cdb[cid].used.saturating_add(1);
+                    // cdb[cid].used = cdb[cid].used.saturating_add(1);
                 }
                 if max_lbd < cdb[cid].rank {
                     max_lbd = cdb[cid].rank;

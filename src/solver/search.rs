@@ -291,14 +291,17 @@ fn search(
             dump_stage(asg, cdb, state, previous_span);
             let new_span: Option<bool> = state.stm.prepare_new_span(restart_pressure);
             let segment_length = state.stm.current_segment_length();
+            #[cfg(feature = "rephase")]
+            {
+                if state.stm.current_span() == 1 {
+                    asg.select_rephasing_target();
+                }
+            }
             if let Some(new_envelope) = new_span {
                 // a beginning of a new cycle
                 #[cfg(feature = "rephase")]
                 {
-                    if to_rephase {
-                        to_rephase = !new_envelope;
-                        asg.select_rephasing_target();
-                    }
+                    to_rephase = false;
                 }
                 {
                     // Longer segments reduces learning rates to search deeper space.
@@ -360,8 +363,8 @@ fn search(
                             let mut assignment = asg.best_phases_ref(Some(false));
                             sls!(assignment, steps);
                         }
+                        asg.select_rephasing_target();
                     }
-                    asg.select_rephasing_target();
                 }
                 if processing_pressure >= processing_interval {
                     if cfg!(feature = "clause_vivification") {
@@ -406,6 +409,7 @@ fn search(
             {
                 to_rephase = na < current_core;
             }
+            state.stm.extend(10_000);
             if current_core < na && core_was_rebuilt.is_none() {
                 core_was_rebuilt = Some(current_core);
             }

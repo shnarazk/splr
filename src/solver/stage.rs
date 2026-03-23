@@ -62,6 +62,9 @@ impl StageManager {
     pub fn span_ended(&self, now: usize) -> bool {
         self.end_of_span <= now
     }
+    pub fn extend(&mut self, add: usize) {
+        self.end_of_span += add;
+    }
     /// returns the number of conflicts in the current stage
     /// Note: we need not to make a strong correlation between this value and
     /// scale defined by Luby series. So this is fine.
