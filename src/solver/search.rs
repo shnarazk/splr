@@ -224,6 +224,8 @@ fn search(
     let processing_interval: usize = 80_000;
     let cooling_length: usize = 4;
     let mut count: usize = 0;
+    #[cfg(feature = "rephase")]
+    let mut to_rephase: bool = false;
 
     state.stm.reset();
     asg.update_activity_decay(0.98);
@@ -253,6 +255,13 @@ fn search(
                     lbd_threshold = cdb.lbd.get_fast();
                     cdb.lbd.update(lbd);
                 }
+                if lbd > lbd_threshold as u16 {
+                    // cdb.lbd.update(lbd_threshold as u16);
+                    restart_pressure += 1;
+                } else {
+                    cdb.lbd.update(lbd);
+                    lbd_threshold = cdb.lbd.get_fast();
+                }
                 restart_pressure += (lbd >= lbd_threshold as u16) as usize;
             } else {
                 // we don't want to use the value under the extended search mode
@@ -277,10 +286,6 @@ fn search(
             restart_pressure = 0;
             lbd_threshold = 0.0;
             RESTART!(asg, cdb, state);
-            #[cfg(feature = "rephase")]
-            {
-                asg.select_rephasing_target();
-            }
             asg.clear_asserted_literals(cdb)?;
 
             dump_stage(asg, cdb, state, previous_span);
@@ -288,6 +293,13 @@ fn search(
             let segment_length = state.stm.current_segment_length();
             if let Some(new_envelope) = new_span {
                 // a beginning of a new cycle
+                #[cfg(feature = "rephase")]
+                {
+                    if to_rephase {
+                        to_rephase = !new_envelope;
+                        asg.select_rephasing_target();
+                    }
+                }
                 {
                     // Longer segments reduces learning rates to search deeper space.
                     let index_e = 10.0;
@@ -390,6 +402,10 @@ fn search(
             }
         }
         if let Some(na) = asg.best_assigned() {
+            #[cfg(feature = "rephase")]
+            {
+                to_rephase = na < current_core;
+            }
             if current_core < na && core_was_rebuilt.is_none() {
                 core_was_rebuilt = Some(current_core);
             }

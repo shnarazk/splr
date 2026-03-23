@@ -462,6 +462,7 @@ fn conflict_analyze(
     // debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);
     learnt[0] = !p;
+    // asg.var_mut(p.vi()).turn_off(FlagVar::USED);
     trace!(
         "appending {}, the final (but not minimized) learnt is {:?}",
         learnt[0], learnt

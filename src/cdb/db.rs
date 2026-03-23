@@ -1039,12 +1039,12 @@ impl ClauseDBIF for ClauseDB {
                 c.used = 0;
                 continue;
             }
-            if c.rank <= 4 || c.used > 4 {
+            let rank = c.inactivity_sum(asg);
+            if rank <= 5.0 {
                 c.used = 0;
                 continue;
             }
-            perm.push(OrderedProxy::new(i, c.inactivity_sum(asg)));
-            // perm.push(OrderedProxy::new(i, c.rank as f64));
+            perm.push(OrderedProxy::new(i, rank));
             c.used = 0;
         }
         let keep = perm
@@ -1273,13 +1273,16 @@ impl Clause {
         }
         falsified
     }
-    fn inactivity_sum(&self, asg: &impl AssignIF) -> f64 {
+    fn _inactivity_sum(&self, asg: &impl AssignIF) -> f64 {
         self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
     }
-    /* fn inactivity_sum(&self, _asg: &impl AssignIF) -> f64 {
+    fn __inactivity_sum(&self, _asg: &impl AssignIF) -> f64 {
         self.rank as f64
     }
-    fn inactivity_sum(&self, asg: &impl AssignIF) -> f64 {
+    fn inactivity_sum(&self, _asg: &impl AssignIF) -> f64 {
+        (self.rank as f64) - (self.used as f64)
+    }
+    /* fn inactivity_sum(&self, asg: &impl AssignIF) -> f64 {
         let mut ranks: HashMap<u32, f64> = HashMap::new();
         for l in self.iter() {
             let a = ranks.entry(asg.var(l.vi()).level).or_insert(1.0);
