@@ -220,7 +220,8 @@ fn search(
     let mut lbd_threshold: f64 = 0.0;
     let mut processing_pressure: usize = 0;
     let processing_interval: usize = 80_000;
-    let mut cooling_length: usize = 6;
+    let cooling_length_base: usize = 2;
+    let mut cooling_length: usize = cooling_length_base;
     let mut count: usize = 0;
 
     state.stm.reset();
@@ -244,19 +245,22 @@ fn search(
         let lbd = handle_conflict(asg, cdb, state, &cc)?;
         if lbd == 0 {
             restart_pressure += 1;
+            cooling_length = cooling_length_base;
         } else if 1 < lbd {
             num_learnts += 1;
             if after_restart >= cooling_length {
                 if restart_pressure == 0 {
-                    lbd_threshold = cdb.lbd.get_fast();
+                    lbd_threshold = cdb.lbd.get();
                     cdb.lbd.update(lbd);
+                    // lbd_threshold = lbd_threshold.min(cdb.lbd.get());
                 }
                 if lbd > lbd_threshold as u16 {
-                    // cdb.lbd.update(lbd_threshold as u16);
                     restart_pressure += 1;
+                    cdb.lbd.update(lbd_threshold as u16);
+                    // lbd_threshold = cdb.lbd.get();
                 } else {
                     cdb.lbd.update(lbd);
-                    lbd_threshold = cdb.lbd.get_fast();
+                    // lbd_threshold = cdb.lbd.get_fast();
                 }
                 restart_pressure += (lbd >= lbd_threshold as u16) as usize;
             } else {
@@ -372,7 +376,6 @@ fn search(
                     processing_pressure = 0;
                 }
                 if new_envelope {
-                    cooling_length = 6;
                     {
                         let base = state.stm.current_segment();
                         let decay_index: f64 = (20 + 2 * base) as f64;
@@ -398,11 +401,9 @@ fn search(
         }
         if let Some(na) = asg.best_assigned() {
             if na < current_core {
-                cooling_length *= 2;
-            } else {
-                cooling_length = 6;
+                cooling_length += 1;
+                state.stm.extend(10_000);
             }
-            // state.stm.extend(10_000);
             if current_core < na && core_was_rebuilt.is_none() {
                 core_was_rebuilt = Some(current_core);
             }

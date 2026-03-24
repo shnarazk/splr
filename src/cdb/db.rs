@@ -963,7 +963,7 @@ impl ClauseDBIF for ClauseDB {
     fn reduce(&mut self, asg: &mut impl AssignIF, envelope: usize) {
         let ClauseDB {
             clause,
-            lbd_temp,
+            // lbd_temp,
             num_reduction,
 
             #[cfg(feature = "clause_rewarding")]
@@ -1027,7 +1027,7 @@ impl ClauseDBIF for ClauseDB {
             .skip(1)
             .filter(|(_, c)| !c.is_dead())
         {
-            c.update_lbd(asg, lbd_temp);
+            // c.update_lbd(asg, lbd_temp);
             #[cfg(feature = "clause_rewarding")]
             c.update_activity(*tick, *activity_decay, 0.0);
 
@@ -1272,10 +1272,11 @@ impl Clause {
         }
         falsified
     }
-    fn inactivity_sum(&self, asg: &impl AssignIF) -> f64 {
-        self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
+    fn _inactivity_sum(&self, asg: &impl AssignIF) -> f64 {
+        // self.iter().map(|l| 1.0 - asg.activity(l.vi())).sum()
+        self.iter().map(|l| asg.level(l.vi())).max().unwrap() as f64
     }
-    fn __inactivity_sum(&self, _asg: &impl AssignIF) -> f64 {
+    fn inactivity_sum(&self, _asg: &impl AssignIF) -> f64 {
         self.rank as f64
     }
     /* fn inactivity_sum(&self, asg: &impl AssignIF) -> f64 {
