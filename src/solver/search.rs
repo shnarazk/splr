@@ -213,8 +213,6 @@ fn search(
     let mut previous_span: Option<bool> = Some(true);
     let mut current_core: usize = 999_999;
     let mut core_was_rebuilt: Option<usize> = None;
-    #[cfg(feature = "rephase")]
-    let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
     let mut after_restart: usize = 0;
     let mut num_learnts: usize = 0;
     let mut restart_pressure: usize = 0;
@@ -222,10 +220,8 @@ fn search(
     let mut lbd_threshold: f64 = 0.0;
     let mut processing_pressure: usize = 0;
     let processing_interval: usize = 80_000;
-    let cooling_length: usize = 4;
+    let mut cooling_length: usize = 6;
     let mut count: usize = 0;
-    #[cfg(feature = "rephase")]
-    let mut to_rephase: bool = false;
 
     state.stm.reset();
     asg.update_activity_decay(0.98);
@@ -299,72 +295,67 @@ fn search(
             }
             if let Some(new_envelope) = new_span {
                 // a beginning of a new cycle
-                #[cfg(feature = "rephase")]
-                {
-                    to_rephase = false;
-                }
                 {
                     // Longer segments reduces learning rates to search deeper space.
-                    let index_e = 10.0;
+                    let index_e = 20.0;
                     let index_s =
                         state.stm.current_segment() - state.stm.envelope_starting_segment();
                     let decay_index: f64 = index_e + index_s as f64;
                     asg.update_activity_decay(1.0 - 1.0 / decay_index);
                 }
 
-                #[cfg(feature = "rephase")]
+                #[cfg(feature = "stochastic_local_search")]
                 {
-                    if cfg!(feature = "stochastic_local_search") {
-                        use cdb::StochasticLocalSearchIF;
-                        macro_rules! sls {
-                            ($assign: expr, $limit: expr) => {
-                                state.sls_index += 1;
-                                state.flush(format!(
-                                    "SLS(#{}, core: {}, steps: {})",
-                                    state.sls_index, sls_core, $limit
-                                ));
-                                let cls = cdb.stochastic_local_search(asg, &mut $assign, $limit);
+                    use cdb::StochasticLocalSearchIF;
+                    let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
+                    macro_rules! sls {
+                        ($assign: expr, $limit: expr) => {
+                            state.sls_index += 1;
+                            state.flush(format!(
+                                "SLS(#{}, core: {}, steps: {})",
+                                state.sls_index, sls_core, $limit
+                            ));
+                            let cls = cdb.stochastic_local_search(asg, &mut $assign, $limit);
+                            asg.override_rephasing_target(&$assign);
+                            sls_core = sls_core.min(cls.1);
+                        };
+                        ($assign: expr, $improved: expr, $limit: expr) => {
+                            state.sls_index += 1;
+                            state.flush(format!(
+                                "SLS(#{}, core: {}, steps: {})",
+                                state.sls_index, sls_core, $limit
+                            ));
+                            let cls = cdb.stochastic_local_search(asg, &mut $assign, $limit);
+                            asg.reward_by_sls(&$assign);
+                            if $improved(cls) {
                                 asg.override_rephasing_target(&$assign);
-                                sls_core = sls_core.min(cls.1);
-                            };
-                            ($assign: expr, $improved: expr, $limit: expr) => {
-                                state.sls_index += 1;
-                                state.flush(format!(
-                                    "SLS(#{}, core: {}, steps: {})",
-                                    state.sls_index, sls_core, $limit
-                                ));
-                                let cls = cdb.stochastic_local_search(asg, &mut $assign, $limit);
-                                asg.reward_by_sls(&$assign);
-                                if $improved(cls) {
-                                    asg.override_rephasing_target(&$assign);
-                                }
-                                sls_core = sls_core.min(cls.1);
-                            };
-                        }
-                        macro_rules! scale {
-                            ($a: expr, $b: expr) => {
-                                ($a.saturating_sub($b.next_power_of_two().trailing_zeros()) as f64)
-                                    .powf(1.75) as usize
-                                    + 1
-                            };
-                        }
-                        let ent = cdb.refer(cdb::property::TEma::Entanglement).get() as usize;
-                        let n = cdb.derefer(cdb::property::Tusize::NumClause);
-                        if let Some(c) = core_was_rebuilt {
-                            core_was_rebuilt = None;
-                            if c < current_core {
-                                let steps = scale!(27_u32, c) * scale!(24_u32, n) / ent;
-                                let mut assignment = asg.best_phases_ref(Some(false));
-                                sls!(assignment, steps);
                             }
-                        } else if new_envelope {
-                            let n = cdb.derefer(cdb::property::Tusize::NumClause);
-                            let steps = scale!(27_u32, current_core) * scale!(24_u32, n) / ent;
+                            sls_core = sls_core.min(cls.1);
+                        };
+                    }
+                    macro_rules! scale {
+                        ($a: expr, $b: expr) => {
+                            ($a.saturating_sub($b.next_power_of_two().trailing_zeros()) as f64)
+                                .powf(1.75) as usize
+                                + 1
+                        };
+                    }
+                    let ent = cdb.refer(cdb::property::TEma::Entanglement).get() as usize;
+                    let n = cdb.derefer(cdb::property::Tusize::NumClause);
+                    if let Some(c) = core_was_rebuilt {
+                        core_was_rebuilt = None;
+                        if c < current_core {
+                            let steps = scale!(27_u32, c) * scale!(24_u32, n) / ent;
                             let mut assignment = asg.best_phases_ref(Some(false));
                             sls!(assignment, steps);
                         }
-                        asg.select_rephasing_target();
+                    } else if new_envelope {
+                        let n = cdb.derefer(cdb::property::Tusize::NumClause);
+                        let steps = scale!(27_u32, current_core) * scale!(24_u32, n) / ent;
+                        let mut assignment = asg.best_phases_ref(Some(false));
+                        sls!(assignment, steps);
                     }
+                    asg.select_rephasing_target();
                 }
                 if processing_pressure >= processing_interval {
                     if cfg!(feature = "clause_vivification") {
@@ -381,6 +372,7 @@ fn search(
                     processing_pressure = 0;
                 }
                 if new_envelope {
+                    cooling_length = 6;
                     {
                         let base = state.stm.current_segment();
                         let decay_index: f64 = (20 + 2 * base) as f64;
@@ -405,11 +397,12 @@ fn search(
             }
         }
         if let Some(na) = asg.best_assigned() {
-            #[cfg(feature = "rephase")]
-            {
-                to_rephase = na < current_core;
+            if na < current_core {
+                cooling_length *= 2;
+            } else {
+                cooling_length = 6;
             }
-            state.stm.extend(10_000);
+            // state.stm.extend(10_000);
             if current_core < na && core_was_rebuilt.is_none() {
                 core_was_rebuilt = Some(current_core);
             }
