@@ -217,7 +217,7 @@ fn search(
     let mut num_learnts: usize = 0;
     let mut restart_pressure: usize = 0;
     let restart_interval: usize = 40_000;
-    let mut lbd_threshold: f64 = 0.0;
+    let mut lbd_threshold: u16 = 0;
     let mut processing_pressure: usize = 0;
     let processing_interval: usize = 80_000;
     let cooling_length_base: usize = 2;
@@ -242,31 +242,24 @@ fn search(
         asg.update_activity_tick();
         #[cfg(feature = "clause_rewarding")]
         cdb.update_activity_tick();
-        let lbd = handle_conflict(asg, cdb, state, &cc)?;
+        let mut lbd = handle_conflict(asg, cdb, state, &cc)?;
         if lbd == 0 {
             restart_pressure += 1;
             cooling_length = cooling_length_base;
+            lbd_threshold = cdb.lbd.get_slow() as u16;
         } else if 1 < lbd {
             num_learnts += 1;
             if after_restart >= cooling_length {
                 if restart_pressure == 0 {
-                    lbd_threshold = cdb.lbd.get();
-                    cdb.lbd.update(lbd);
-                    // lbd_threshold = lbd_threshold.min(cdb.lbd.get());
+                    lbd_threshold = cdb.lbd.get_slow() as u16;
                 }
-                if lbd > lbd_threshold as u16 {
+                if lbd > lbd_threshold {
                     restart_pressure += 1;
-                    cdb.lbd.update(lbd_threshold as u16);
-                    // lbd_threshold = cdb.lbd.get();
-                } else {
-                    cdb.lbd.update(lbd);
-                    // lbd_threshold = cdb.lbd.get_fast();
+                    lbd = lbd_threshold;
                 }
-                restart_pressure += (lbd >= lbd_threshold as u16) as usize;
-            } else {
-                // we don't want to use the value under the extended search mode
-                cdb.lbd.update(lbd);
             }
+            cdb.lbd.update(lbd);
+            // lbd_threshold = lbd_threshold.min(cdb.lbd.get() as u16);
             if num_learnts >= restart_interval.max(state.stm.envelop_index() * 10_000) {
                 cdb.reduce(asg, state.stm.envelop_index());
                 num_learnts = 0;
@@ -284,7 +277,7 @@ fn search(
             }
             after_restart = 0;
             restart_pressure = 0;
-            lbd_threshold = 0.0;
+            lbd_threshold = 0;
             RESTART!(asg, cdb, state);
             asg.clear_asserted_literals(cdb)?;
 
