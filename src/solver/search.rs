@@ -213,14 +213,11 @@ fn search(
     let mut previous_span: Option<bool> = Some(true);
     let mut current_core: usize = 999_999;
     let mut core_was_rebuilt: Option<usize> = None;
-    let mut after_restart: usize = 0;
     let mut num_learnts: usize = 0;
     let mut restart_pressure: usize = 0;
     let restart_interval: usize = 40_000;
-    let mut lbd_threshold: u16 = 0;
     let mut processing_pressure: usize = 0;
     let processing_interval: usize = 80_000;
-    let cooling_length: usize = 12;
     let mut count: usize = 0;
 
     state.stm.reset();
@@ -233,7 +230,6 @@ fn search(
             continue;
         };
         count += 1;
-        after_restart += 1;
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }
@@ -241,16 +237,25 @@ fn search(
         #[cfg(feature = "clause_rewarding")]
         cdb.update_activity_tick();
         let lbd = handle_conflict(asg, cdb, state, &cc)?;
-        if after_restart == cooling_length {
-            lbd_threshold = cdb.lbd.get_fast() as u16;
-            restart_pressure = 0;
-        }
-        if lbd == 0 {
-            // lbd_threshold = cdb.lbd.get_fast() as u16;
-        } else if 1 < lbd {
+        if 1 < lbd {
             num_learnts += 1;
-            if after_restart >= cooling_length && lbd > lbd_threshold {
-                restart_pressure += 1;
+            {
+                let conflict_activity: f64 = asg.var(cc.0.vi()).reward;
+                let mut prev_activity = f64::MAX;
+                for lv in 1..asg.decision_level() {
+                    let va = asg.var(asg.decision_vi(lv)).reward;
+                    if va < conflict_activity {
+                        asg.cancel_until(cdb, lv);
+                        restart_pressure += 1;
+                        break;
+                    }
+                    if prev_activity < va {
+                        restart_pressure += 1;
+                        break;
+                    }
+                    prev_activity = va;
+                }
+                // restart_pressure = usize::MAX;
             }
             cdb.lbd.update(lbd);
             if num_learnts >= restart_interval.max(state.stm.envelop_index() * 10_000) {
@@ -268,14 +273,11 @@ fn search(
             } else {
                 return Err(SolverError::UndescribedError);
             }
-            after_restart = 0;
             restart_pressure = 0;
-            lbd_threshold = 0;
             RESTART!(asg, cdb, state);
             asg.clear_asserted_literals(cdb)?;
-
             dump_stage(asg, cdb, state, previous_span);
-            let new_span: Option<bool> = state.stm.prepare_new_span(restart_pressure);
+            let new_segment: Option<bool> = state.stm.prepare_new_span(restart_pressure);
             let segment_length = state.stm.current_segment_length();
             #[cfg(feature = "rephase")]
             {
@@ -283,16 +285,15 @@ fn search(
                     asg.select_rephasing_target();
                 }
             }
-            if let Some(new_envelope) = new_span {
-                // a beginning of a new cycle
-                /* {
+            if let Some(_new_envelope) = new_segment {
+                {
                     // Longer segments reduces learning rates to search deeper space.
                     let index_e = 20.0;
                     let index_s =
                         state.stm.current_segment() - state.stm.envelope_starting_segment();
                     let decay_index: f64 = index_e + index_s as f64;
                     asg.update_activity_decay(1.0 - 1.0 / decay_index);
-                } */
+                }
 
                 #[cfg(feature = "stochastic_local_search")]
                 {
@@ -377,7 +378,7 @@ fn search(
 
             asg.handle(SolverEvent::Stage(segment_length));
             state.restart.set_stage_parameters(segment_length);
-            previous_span = new_span;
+            previous_span = new_segment;
         }
         if count.is_multiple_of(10_000) {
             state.progress(asg, cdb);
