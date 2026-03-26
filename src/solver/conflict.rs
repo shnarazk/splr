@@ -71,11 +71,22 @@ pub fn handle_conflict(
             panic!();
         }
     }
+    // FIXME: this is for chrono_BT, right?
     asg.cancel_until(cdb, conflicting_level);
     asg.handle(SolverEvent::Conflict);
 
     let assign_level = conflict_analyze(asg, cdb, state, cc).max(asg.root_level());
     let new_learnt = &mut state.new_learnt;
+    /* {
+        let lbd_tmp = new_learnt
+            .iter()
+            .skip(1)
+            .map(|l| asg.level(l.vi()))
+            .collect::<std::collections::HashSet<_>>()
+            .len();
+        let decay: f64 = 1.0 - 0.1 / ((lbd_tmp + 1) as f64).log2();
+        asg.update_activity_decay(decay);
+    } */
     let learnt_len = new_learnt.len();
     if learnt_len == 0 {
         return Err(SolverError::EmptyClause);

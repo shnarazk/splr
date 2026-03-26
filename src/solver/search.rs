@@ -220,12 +220,10 @@ fn search(
     let mut lbd_threshold: u16 = 0;
     let mut processing_pressure: usize = 0;
     let processing_interval: usize = 80_000;
-    let cooling_length_base: usize = 2;
-    let mut cooling_length: usize = cooling_length_base;
+    let cooling_length: usize = 12;
     let mut count: usize = 0;
 
     state.stm.reset();
-    asg.update_activity_decay(0.98);
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
             let lit = asg.select_decision_literal();
@@ -242,24 +240,19 @@ fn search(
         asg.update_activity_tick();
         #[cfg(feature = "clause_rewarding")]
         cdb.update_activity_tick();
-        let mut lbd = handle_conflict(asg, cdb, state, &cc)?;
+        let lbd = handle_conflict(asg, cdb, state, &cc)?;
+        if after_restart == cooling_length {
+            lbd_threshold = cdb.lbd.get_fast() as u16;
+            restart_pressure = 0;
+        }
         if lbd == 0 {
-            restart_pressure += 1;
-            cooling_length = cooling_length_base;
-            lbd_threshold = cdb.lbd.get_slow() as u16;
+            // lbd_threshold = cdb.lbd.get_fast() as u16;
         } else if 1 < lbd {
             num_learnts += 1;
-            if after_restart >= cooling_length {
-                if restart_pressure == 0 {
-                    lbd_threshold = cdb.lbd.get_slow() as u16;
-                }
-                if lbd > lbd_threshold {
-                    restart_pressure += 1;
-                    lbd = lbd_threshold;
-                }
+            if after_restart >= cooling_length && lbd > lbd_threshold {
+                restart_pressure += 1;
             }
             cdb.lbd.update(lbd);
-            // lbd_threshold = lbd_threshold.min(cdb.lbd.get() as u16);
             if num_learnts >= restart_interval.max(state.stm.envelop_index() * 10_000) {
                 cdb.reduce(asg, state.stm.envelop_index());
                 num_learnts = 0;
@@ -292,14 +285,14 @@ fn search(
             }
             if let Some(new_envelope) = new_span {
                 // a beginning of a new cycle
-                {
+                /* {
                     // Longer segments reduces learning rates to search deeper space.
                     let index_e = 20.0;
                     let index_s =
                         state.stm.current_segment() - state.stm.envelope_starting_segment();
                     let decay_index: f64 = index_e + index_s as f64;
                     asg.update_activity_decay(1.0 - 1.0 / decay_index);
-                }
+                } */
 
                 #[cfg(feature = "stochastic_local_search")]
                 {
@@ -368,13 +361,13 @@ fn search(
                     }
                     processing_pressure = 0;
                 }
-                if new_envelope {
-                    {
-                        let base = state.stm.current_segment();
-                        let decay_index: f64 = (20 + 2 * base) as f64;
-                        asg.update_activity_decay((decay_index - 1.0) / decay_index);
-                    }
-                }
+                // if new_envelope {
+                //     {
+                //         let base = state.stm.current_segment();
+                //         let decay_index: f64 = (20 + 2 * base) as f64;
+                //         asg.update_activity_decay((decay_index - 1.0) / decay_index);
+                //     }
+                // }
             }
 
             if num_learnts > restart_interval {
@@ -393,10 +386,6 @@ fn search(
             }
         }
         if let Some(na) = asg.best_assigned() {
-            if na < current_core {
-                cooling_length += 1;
-                state.stm.extend(10_000);
-            }
             if current_core < na && core_was_rebuilt.is_none() {
                 core_was_rebuilt = Some(current_core);
             }
