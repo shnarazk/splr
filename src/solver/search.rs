@@ -236,6 +236,30 @@ fn search(
         asg.update_activity_tick();
         #[cfg(feature = "clause_rewarding")]
         cdb.update_activity_tick();
+        {
+            // f(1) = 1
+            // f(10) = 0.999
+            // f(20) = 0.994
+            // f(40) = 0.91
+            // f(80) = 0.80
+            fn f(x: f64) -> f64 {
+                let t = (x - 1.0).max(0.0);
+                let s = 30.0;
+                let k = 6.0;
+                let m = 0.055;
+                (1.0 + (t / s).powf(k)).powf(-m)
+            }
+            // fn f(x: f64) -> f64 {
+            //     // let t = (x - 1.0).max(0.0);
+            //     let t = x - 1.0;
+            //     (1.0 + 4.57e-6 * t * t).powf(-0.921)
+            // }
+            // let index: f64 = state.c_lvl.get();
+            let index: f64 = asg.decision_level() as f64;
+            let decay: f64 = f(index);
+            // let index = 1.0 - state.c_lvl.get().log2() / 32.0;
+            asg.update_activity_decay(decay);
+        }
         let lbd = handle_conflict(asg, cdb, state, &cc)?;
         if 1 < lbd {
             num_learnts += 1;
@@ -286,14 +310,14 @@ fn search(
                 }
             }
             if let Some(_new_envelope) = new_segment {
-                {
+                /* {
                     // Longer segments reduces learning rates to search deeper space.
                     let index_e = 20.0;
                     let index_s =
                         state.stm.current_segment() - state.stm.envelope_starting_segment();
                     let decay_index: f64 = index_e + index_s as f64;
                     asg.update_activity_decay(1.0 - 1.0 / decay_index);
-                }
+                } */
 
                 #[cfg(feature = "stochastic_local_search")]
                 {
@@ -362,13 +386,12 @@ fn search(
                     }
                     processing_pressure = 0;
                 }
-                // if new_envelope {
-                //     {
-                //         let base = state.stm.current_segment();
-                //         let decay_index: f64 = (20 + 2 * base) as f64;
-                //         asg.update_activity_decay((decay_index - 1.0) / decay_index);
-                //     }
-                // }
+                /* if new_envelope {
+                    let _l = 10.0 /* state.c_lvl.get() */
+                        / asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64;
+                    asg.update_activity_decay(0.99);
+                    // asg.update_activity_decay(1.0 - 1.0 / (10 + state.stm.envelop_index()) as f64);
+                } */
             }
 
             if num_learnts > restart_interval {
