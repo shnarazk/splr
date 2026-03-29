@@ -91,6 +91,8 @@ pub struct AssignStack {
     pub(super) activity_decay: f64,
     /// its diff
     pub(super) activity_anti_decay: f64,
+    /// ordering_mode
+    pub(crate) ordering_by_conflict: bool,
 }
 
 impl Default for AssignStack {
@@ -140,6 +142,7 @@ impl Default for AssignStack {
             activity_decay: 0.94,
 
             activity_anti_decay: 0.06,
+            ordering_by_conflict: false,
         }
     }
 }
