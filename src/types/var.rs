@@ -21,7 +21,8 @@ pub struct Var {
     pub(crate) flags: FlagVar,
     /// a dynamic evaluation criterion.
     pub(crate) reward: f64,
-    // reward_ema: Ema2,
+    /// the last conflict by this
+    pub(crate) last_conflict: usize,
 }
 
 impl Default for Var {
@@ -34,7 +35,7 @@ impl Default for Var {
             reason_saved: AssignReason::None,
             flags: FlagVar::empty(),
             reward: 0.0,
-            // reward_ema: Ema2::new(200).with_slow(4_000),
+            last_conflict: 0,
         }
     }
 }
