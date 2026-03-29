@@ -264,7 +264,7 @@ impl EliminateIF for Eliminator {
             if !force_run && self.mode == EliminatorMode::Dormant {
                 self.prepare(asg, cdb, true);
             }
-            self.eliminate_grow_limit = state.derefer(state::property::Tusize::IntervalScale) / 2;
+            self.eliminate_grow_limit = state.derefer(state::property::Tusize::SegmentLength) / 2;
             self.subsume_literal_limit = state.config.elm_cls_lim
                 + cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement) as usize;
             debug_assert!(

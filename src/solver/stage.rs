@@ -81,6 +81,10 @@ impl StageManager {
     pub fn current_segment_length(&self) -> usize {
         self.luby_iter.segment_len() as usize
     }
+    /// returns the zero-based index in the current segment
+    pub fn current_index_in_segment(&self) -> usize {
+        self.luby_iter.ix_in_seg as usize
+    }
     /// returns a recommending number of redicible learnt clauses, based on
     /// the length of span.
     pub fn num_reducible(&self, reducing_factor: f64) -> usize {
@@ -94,9 +98,6 @@ impl StageManager {
     /// None: `luby_iter.max_value` holds the maximum value so far.
     /// This means it is the value found at the last segment.
     /// So the current value should be the next value, which is the double.
-    pub fn max_scale(&self) -> usize {
-        self.envelope_hight
-    }
     pub fn envelope_starting_segment(&self) -> usize {
         self.envelope_starting_segment
     }

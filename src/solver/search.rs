@@ -219,9 +219,8 @@ fn search(
     let restart_interval: usize = 40_000;
     let mut lbd_threshold: u16 = 0;
     let mut processing_pressure: usize = 0;
-    let processing_interval: usize = 80_000;
-    let cooling_length_base: usize = 2;
-    let mut cooling_length: usize = cooling_length_base;
+    let processing_interval: usize = 40_000;
+    let cooling_length: usize = 0;
     let mut count: usize = 0;
     let mut unreachable_ema: Ema2 = Ema2::new(80).with_slow(1000);
     let mut unreachable_threshold: usize = 0;
@@ -247,7 +246,6 @@ fn search(
         let mut lbd = handle_conflict(asg, cdb, state, &cc)?;
         if lbd == 0 {
             restart_pressure += 1;
-            cooling_length = cooling_length_base;
             lbd_threshold = cdb.lbd.get_slow() as u16;
         } else {
             if 1 < lbd {
@@ -255,25 +253,14 @@ fn search(
             }
             let num_unassigns = asg.derefer(assign::property::Tusize::NumUnassignedVar);
             unreachable_ema.update(num_unassigns as f64);
-            if !asg.ordering_by_conflict
-                && ((num_unassigns as f64).log10() * 2.0) as usize + num_unassigns
-                    < unreachable_ema.get() as usize
-            {
-                state.flush("");
-                state.flush("switch to stable search mode");
-                asg.ordering_by_conflict = true;
-                asg.rebuild_order();
-                // state.stm.extend(1000);
-                unreachable_threshold = num_unassigns;
-            }
-            if asg.ordering_by_conflict {
-                if num_unassigns > unreachable_threshold {
-                    restart_pressure += 1;
+            if after_restart >= cooling_length {
+                if asg.ordering_by_conflict {
+                    if num_unassigns > unreachable_threshold {
+                        restart_pressure += 1;
+                    } else {
+                        unreachable_threshold = num_unassigns;
+                    }
                 } else {
-                    unreachable_threshold = num_unassigns;
-                }
-            } else {
-                if after_restart >= cooling_length {
                     if restart_pressure == 0 {
                         lbd_threshold = cdb.lbd.get_slow() as u16;
                     }
@@ -304,43 +291,54 @@ fn search(
             restart_pressure = 0;
             lbd_threshold = 0;
             RESTART!(asg, cdb, state);
-            // if asg.ordering_by_conflict {
-            //     asg.ordering_by_conflict = false;
-            //     asg.rebuild_order();
-            // }
             asg.clear_asserted_literals(cdb)?;
 
             dump_stage(asg, cdb, state, previous_span);
+
+            // change search mode
+            {
+                let ei = state.stm.envelop_index();
+                let sl = state.stm.current_index_in_segment();
+                // dbg!(state.stm.envelop_index());
+                // dbg!(state.stm.current_index_in_segment());
+                if ei > 10 {
+                    if sl + 2 == ei && !asg.ordering_by_conflict {
+                        state.flush("");
+                        state.flush("switch to focused search mode");
+                        // println!("switch to focused search mode");
+                        asg.ordering_by_conflict = true;
+                        unreachable_threshold = usize::MAX;
+                        asg.update_activity_decay(1.0);
+                        asg.rebuild_order();
+                    } else if sl + 1 == ei {
+                        state.flush("");
+                        state.flush("switch to stable search mode");
+                        // println!("switch to stable search mode");
+                        asg.ordering_by_conflict = false;
+                        asg.update_activity_decay(state.config.vrw_dcy_rat);
+                        asg.rebuild_order();
+                    }
+                }
+            }
+
             let new_span: Option<bool> = state.stm.prepare_new_span(restart_pressure);
             let segment_length = state.stm.current_segment_length();
             #[cfg(feature = "rephase")]
             {
-                if state.stm.current_span() == 1 {
+                if !asg.ordering_by_conflict && state.stm.current_span() == 1 {
                     asg.select_rephasing_target();
                 }
             }
-            if let Some(new_envelope) = new_span {
+            if let Some(_new_envelope) = new_span {
                 // a beginning of a new cycle
                 {
                     // Longer segments reduces learning rates to search deeper space.
-                    let index_e = 20.0;
-                    let index_s =
-                        state.stm.current_segment() - state.stm.envelope_starting_segment();
-                    let decay_index: f64 = index_e + index_s as f64;
-                    asg.update_activity_decay(1.0 - 1.0 / decay_index);
-                    if new_envelope && asg.ordering_by_conflict {
-                        asg.ordering_by_conflict = false;
-                        asg.rebuild_order();
-                    }
-                    // if asg.ordering_by_conflict {
-                    //     asg.rebuild_order();
-                    // }
+                    // let index_e = 20.0;
+                    // let index_s =
+                    //     state.stm.current_segment() - state.stm.envelope_starting_segment();
+                    // let decay_index: f64 = index_e + index_s as f64;
+                    // asg.update_activity_decay(1.0 - 1.0 / decay_index);
                 }
-                // if new_envelope {
-                //     let base = state.stm.current_segment();
-                //     let decay_index: f64 = (20 + 2 * base) as f64;
-                //     asg.update_activity_decay((decay_index - 1.0) / decay_index);
-                // }
 
                 #[cfg(feature = "stochastic_local_search")]
                 {
@@ -410,13 +408,6 @@ fn search(
                     processing_pressure = 0;
                 }
             }
-            // if state.stm.current_span() >= 8192 {
-            //     stable_search = !stable_search;
-            //     asg.ordering_by_conflict = stable_search;
-            // } else {
-            //     asg.ordering_by_conflict = false;
-            // }
-
             if num_learnts > restart_interval {
                 cdb.reduce(asg, state.stm.envelop_index());
                 num_learnts = 0;
@@ -430,17 +421,17 @@ fn search(
             state.progress(asg, cdb);
             if state.stm.current_span() >= 8192 {
                 state.flush(if asg.ordering_by_conflict {
-                    "deep stable search..."
+                    "deep focused search..."
                 } else {
-                    "deep search..."
+                    "deep stable search..."
                 });
             } else {
                 state.flush(format!(
-                    "{}assign trend: {:.3}",
+                    "{} assign trend: {:.3}",
                     if asg.ordering_by_conflict {
-                        "stable "
+                        "focused"
                     } else {
-                        ""
+                        "stable"
                     },
                     1.0 / unreachable_ema.trend()
                 ));

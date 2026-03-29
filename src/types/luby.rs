@@ -3,8 +3,11 @@ use std::fmt;
 
 #[derive(Clone, Debug)]
 pub struct LubySegment {
+    /// the corresponding `N`
     pub as_n: usize,
+    /// one-based segment index
     pub seg_index: u32,
+    /// zero-based index in the current segment
     pub ix_in_seg: u32,
 }
 

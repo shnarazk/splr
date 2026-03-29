@@ -539,7 +539,7 @@ impl StateIF for State {
                 cdb_num_clause - cdb_num_learnt
             ),
         );
-        self[LogUsizeId::StageSegment] = stg_segment;
+        self[LogUsizeId::LubyEnvelope] = stg_segment;
         self[LogF64Id::RestartEnergy] = rst_eng;
         println!(
             "\x1B[2K    Conflict|entg:{}, cLvl:{}, bLvl:{}, /cpr:{}",
@@ -607,8 +607,7 @@ impl StateIF for State {
                 0.01
             ),
         );
-        self[LogUsizeId::Stage] = self.stm.current_segment();
-        self[LogUsizeId::StageCycle] = self.stm.envelop_index();
+        self[LogUsizeId::LubySegment] = self.stm.current_segment();
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
         if self.config.show_cdb_heatmap {
             let big_change = 0.002;
@@ -750,9 +749,8 @@ impl State {
         self[LogUsizeId::PermanentClause] =
             cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
         self[LogUsizeId::Restart] = self[Stat::Restart];
-        self[LogUsizeId::Stage] = self.stm.current_segment();
-        self[LogUsizeId::StageCycle] = self.stm.envelop_index();
-        self[LogUsizeId::StageSegment] = self.stm.max_scale();
+        self[LogUsizeId::LubySegment] = self.stm.current_segment();
+        self[LogUsizeId::LubyEnvelope] = self.stm.envelop_index();
         self[LogUsizeId::Simplify] = self[Stat::Simplify];
         self[LogUsizeId::SubsumedClause] = self[Stat::SubsumedClause];
         self[LogUsizeId::VivifiedClause] = self[Stat::VivifiedClause];
@@ -891,11 +889,10 @@ pub enum LogUsizeId {
     Restart,
 
     //
-    //## stage
+    //## Luby Segment
     //
-    Stage,
-    StageCycle,
-    StageSegment,
+    LubySegment,
+    LubyEnvelope,
 
     //
     //## pre(in)-processor
@@ -1082,8 +1079,8 @@ pub mod property {
         //
         NumCycle,
         NumStage,
-        IntervalScale,
-        IntervalScaleMax,
+        SegmentLength,
+        SegmentLengthMax,
     }
 
     pub const USIZES: [Tusize; 7] = [
@@ -1092,8 +1089,8 @@ pub mod property {
         Tusize::VivifiedVar,
         Tusize::NumCycle,
         Tusize::NumStage,
-        Tusize::IntervalScale,
-        Tusize::IntervalScaleMax,
+        Tusize::SegmentLength,
+        Tusize::SegmentLengthMax,
     ];
 
     impl PropertyDereference<Tusize, usize> for State {
@@ -1105,8 +1102,8 @@ pub mod property {
                 Tusize::VivifiedVar => self[Stat::VivifiedVar],
                 Tusize::NumCycle => self.stm.envelop_index(),
                 Tusize::NumStage => self.stm.current_segment(),
-                Tusize::IntervalScale => self.stm.current_segment_length(),
-                Tusize::IntervalScaleMax => self.stm.max_scale(),
+                Tusize::SegmentLength => self.stm.current_segment_length(),
+                Tusize::SegmentLengthMax => self.stm.envelop_index(),
             }
         }
     }
