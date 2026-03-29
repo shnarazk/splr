@@ -223,6 +223,8 @@ fn search(
     let cooling_length_base: usize = 2;
     let mut cooling_length: usize = cooling_length_base;
     let mut count: usize = 0;
+    let mut unreachable_ema: Ema2 = Ema2::new(80).with_slow(1000);
+    let mut unreachable_threshold: usize = 0;
 
     state.stm.reset();
     asg.update_activity_decay(0.98);
@@ -247,15 +249,38 @@ fn search(
             restart_pressure += 1;
             cooling_length = cooling_length_base;
             lbd_threshold = cdb.lbd.get_slow() as u16;
-        } else if 1 < lbd {
-            num_learnts += 1;
-            if after_restart >= cooling_length {
-                if restart_pressure == 0 {
-                    lbd_threshold = cdb.lbd.get_slow() as u16;
-                }
-                if lbd > lbd_threshold {
+        } else {
+            if 1 < lbd {
+                num_learnts += 1;
+            }
+            let num_unassigns = asg.derefer(assign::property::Tusize::NumUnassignedVar);
+            unreachable_ema.update(num_unassigns as f64);
+            if !asg.ordering_by_conflict
+                && ((num_unassigns as f64).log10() * 2.0) as usize + num_unassigns
+                    < unreachable_ema.get() as usize
+            {
+                state.flush("");
+                state.flush("switch to stable search mode");
+                asg.ordering_by_conflict = true;
+                asg.rebuild_order();
+                // state.stm.extend(1000);
+                unreachable_threshold = num_unassigns;
+            }
+            if asg.ordering_by_conflict {
+                if num_unassigns > unreachable_threshold {
                     restart_pressure += 1;
-                    lbd = lbd_threshold;
+                } else {
+                    unreachable_threshold = num_unassigns;
+                }
+            } else {
+                if after_restart >= cooling_length {
+                    if restart_pressure == 0 {
+                        lbd_threshold = cdb.lbd.get_slow() as u16;
+                    }
+                    if lbd > lbd_threshold {
+                        restart_pressure += 1;
+                        lbd = lbd_threshold;
+                    }
                 }
             }
             cdb.lbd.update(lbd);
@@ -279,6 +304,10 @@ fn search(
             restart_pressure = 0;
             lbd_threshold = 0;
             RESTART!(asg, cdb, state);
+            // if asg.ordering_by_conflict {
+            //     asg.ordering_by_conflict = false;
+            //     asg.rebuild_order();
+            // }
             asg.clear_asserted_literals(cdb)?;
 
             dump_stage(asg, cdb, state, previous_span);
@@ -299,7 +328,19 @@ fn search(
                         state.stm.current_segment() - state.stm.envelope_starting_segment();
                     let decay_index: f64 = index_e + index_s as f64;
                     asg.update_activity_decay(1.0 - 1.0 / decay_index);
+                    if new_envelope && asg.ordering_by_conflict {
+                        asg.ordering_by_conflict = false;
+                        asg.rebuild_order();
+                    }
+                    // if asg.ordering_by_conflict {
+                    //     asg.rebuild_order();
+                    // }
                 }
+                // if new_envelope {
+                //     let base = state.stm.current_segment();
+                //     let decay_index: f64 = (20 + 2 * base) as f64;
+                //     asg.update_activity_decay((decay_index - 1.0) / decay_index);
+                // }
 
                 #[cfg(feature = "stochastic_local_search")]
                 {
@@ -368,14 +409,13 @@ fn search(
                     }
                     processing_pressure = 0;
                 }
-                if new_envelope {
-                    {
-                        let base = state.stm.current_segment();
-                        let decay_index: f64 = (20 + 2 * base) as f64;
-                        asg.update_activity_decay((decay_index - 1.0) / decay_index);
-                    }
-                }
             }
+            // if state.stm.current_span() >= 8192 {
+            //     stable_search = !stable_search;
+            //     asg.ordering_by_conflict = stable_search;
+            // } else {
+            //     asg.ordering_by_conflict = false;
+            // }
 
             if num_learnts > restart_interval {
                 cdb.reduce(asg, state.stm.envelop_index());
@@ -389,14 +429,24 @@ fn search(
         if count.is_multiple_of(10_000) {
             state.progress(asg, cdb);
             if state.stm.current_span() >= 8192 {
-                state.flush("deep search...");
+                state.flush(if asg.ordering_by_conflict {
+                    "deep stable search..."
+                } else {
+                    "deep search..."
+                });
+            } else {
+                state.flush(format!(
+                    "{}assign trend: {:.3}",
+                    if asg.ordering_by_conflict {
+                        "stable "
+                    } else {
+                        ""
+                    },
+                    1.0 / unreachable_ema.trend()
+                ));
             }
         }
         if let Some(na) = asg.best_assigned() {
-            if na < current_core {
-                cooling_length += 1;
-                state.stm.extend(10_000);
-            }
             if current_core < na && core_was_rebuilt.is_none() {
                 core_was_rebuilt = Some(current_core);
             }
