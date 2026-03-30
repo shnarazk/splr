@@ -51,9 +51,7 @@ impl TrailSavingIF for AssignStack {
         }
     }
     fn reuse_saved_trail(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
-        let q = self.stage_scale.trailing_zeros() as u16
-            + (cdb.derefer(crate::cdb::property::Tf64::LiteralBlockEntanglement) as u16) / 2;
-
+        let q = cdb.derefer(crate::cdb::property::Tf64::LiteralBlockEntanglement) as u16;
         let dl = self.decision_level();
 
         for i in (0..self.trail_saved.len()).rev() {
