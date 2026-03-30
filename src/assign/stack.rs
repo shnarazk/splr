@@ -46,11 +46,6 @@ pub struct AssignStack {
     #[cfg(feature = "rephase")]
     pub(super) phase_age: usize,
 
-    //
-    //## Stage
-    //
-    pub stage_scale: usize,
-
     //## Elimanated vars
     //
     pub eliminated: Vec<Lit>,
@@ -121,7 +116,6 @@ impl Default for AssignStack {
             #[cfg(feature = "rephase")]
             phase_age: 0,
 
-            stage_scale: 1,
             eliminated: Vec::new(),
 
             num_vars: 0,
@@ -191,8 +185,7 @@ impl Instantiate for AssignStack {
             SolverEvent::Eliminate(vi) => {
                 self.make_var_eliminated(vi);
             }
-            SolverEvent::Stage(scale) => {
-                self.stage_scale = scale;
+            SolverEvent::Stage(_) => {
                 #[cfg(feature = "trail_saving")]
                 self.clear_saved_trail();
             }
@@ -305,6 +298,9 @@ impl AssignIF for AssignStack {
             }
         }
         false
+    }
+    fn ordering_by_reward(&self) -> bool {
+        !self.ordering_by_conflict
     }
 }
 

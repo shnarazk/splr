@@ -5,7 +5,8 @@ use instant::{Duration, Instant};
 use std::time::{Duration, Instant};
 use {
     crate::{
-        assign, cdb,
+        assign::{self, AssignIF},
+        cdb,
         cdb::ClauseDBIF,
         solver::{RestartManager, SolverEvent, StageManager},
         types::*,
@@ -31,7 +32,8 @@ pub trait StateIF {
     /// write stat data to stdio.
     fn progress<A, C>(&mut self, asg: &A, cdb: &C)
     where
-        A: PropertyDereference<assign::property::Tusize, usize>
+        A: AssignIF
+            + PropertyDereference<assign::property::Tusize, usize>
             + PropertyDereference<assign::property::Tf64, f64>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: ClauseDBIF
@@ -101,7 +103,8 @@ pub struct State {
     // Restart
     pub restart: RestartManager,
     /// StageManager
-    pub stm: StageManager,
+    pub focus_manager: StageManager,
+    pub restart_manager: StageManager,
     /// problem description
     pub target: CNFDescription,
     /// strategy adjustment interval in conflict
@@ -111,9 +114,9 @@ pub struct State {
     //## MISC
     //
     /// EMA of backjump levels
-    pub b_lvl: Ema,
+    pub b_lvl: Ema2,
     /// EMA of conflicting levels
-    pub c_lvl: Ema,
+    pub c_lvl: Ema2,
     /// EMA of backtrack level drift caused by chrono_BT or BT_deepen
     pub bt_drift_average: Ema,
 
@@ -148,12 +151,13 @@ impl Default for State {
             cnf: CNFDescription::default(),
             stats: [0; Stat::EndOfStatIndex as usize],
             restart: RestartManager::default(),
-            stm: StageManager::default(),
+            focus_manager: StageManager::default(),
+            restart_manager: StageManager::default(),
             target: CNFDescription::default(),
             reflection_interval: 10_000,
 
-            b_lvl: Ema::new(5_000),
-            c_lvl: Ema::new(5_000),
+            b_lvl: Ema2::new(12).with_slow(8192),
+            c_lvl: Ema2::new(12).with_slow(8192),
             bt_drift_average: Ema::new(1000),
 
             #[cfg(feature = "chrono_BT")]
@@ -204,7 +208,7 @@ impl Instantiate for State {
             config: config.clone(),
             cnf: cnf.clone(),
             restart: RestartManager::instantiate(config, cnf),
-            stm: StageManager::new(),
+            restart_manager: StageManager::new(),
             target: cnf.clone(),
             time_limit: config.c_timeout,
             progress_report_rows: PROGRESS_REPORT_ROWS
@@ -430,7 +434,8 @@ impl StateIF for State {
     #[allow(clippy::cognitive_complexity)]
     fn progress<A, C>(&mut self, asg: &A, cdb: &C)
     where
-        A: PropertyDereference<assign::property::Tusize, usize>
+        A: AssignIF
+            + PropertyDereference<assign::property::Tusize, usize>
             + PropertyDereference<assign::property::Tf64, f64>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: ClauseDBIF
@@ -469,7 +474,7 @@ impl StateIF for State {
         let rst_num_rst: usize = self[Stat::Restart];
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
         let rst_eng: f64 = self.restart.penetration_energy_charged;
-        let stg_segment: usize = self.stm.current_segment();
+        let stg_segment: usize = self.restart_manager.current_segment();
 
         self.progress_cnt += 1;
         // print!("\x1B[9A\x1B[1G");
@@ -574,7 +579,12 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|vivC:{}, btdf:{}, core:{}, /ppc:{}",
+            "\x1B[2K     {}|vivC:{}, btdf:{}, core:{}, /ppc:{}",
+            if asg.ordering_by_reward() {
+                " stable"
+            } else {
+                "focused"
+            },
             im!(
                 "{:>9}",
                 self,
@@ -607,8 +617,8 @@ impl StateIF for State {
                 0.01
             ),
         );
-        self[LogUsizeId::Stage] = self.stm.current_segment();
-        self[LogUsizeId::StageCycle] = self.stm.envelop_index();
+        self[LogUsizeId::Stage] = self.restart_manager.current_segment();
+        self[LogUsizeId::StageCycle] = self.restart_manager.envelop_index();
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
         if self.config.show_cdb_heatmap {
             let big_change = 0.002;
@@ -750,9 +760,9 @@ impl State {
         self[LogUsizeId::PermanentClause] =
             cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
         self[LogUsizeId::Restart] = self[Stat::Restart];
-        self[LogUsizeId::Stage] = self.stm.current_segment();
-        self[LogUsizeId::StageCycle] = self.stm.envelop_index();
-        self[LogUsizeId::StageSegment] = self.stm.max_scale();
+        self[LogUsizeId::Stage] = self.restart_manager.current_segment();
+        self[LogUsizeId::StageCycle] = self.restart_manager.envelop_index();
+        self[LogUsizeId::StageSegment] = self.restart_manager.max_scale();
         self[LogUsizeId::Simplify] = self[Stat::Simplify];
         self[LogUsizeId::SubsumedClause] = self[Stat::SubsumedClause];
         self[LogUsizeId::VivifiedClause] = self[Stat::VivifiedClause];
@@ -1103,10 +1113,10 @@ pub mod property {
                 Tusize::Vivification => self[Stat::Vivification],
                 Tusize::VivifiedClause => self[Stat::VivifiedClause],
                 Tusize::VivifiedVar => self[Stat::VivifiedVar],
-                Tusize::NumCycle => self.stm.envelop_index(),
-                Tusize::NumStage => self.stm.current_segment(),
-                Tusize::IntervalScale => self.stm.current_segment_length(),
-                Tusize::IntervalScaleMax => self.stm.max_scale(),
+                Tusize::NumCycle => self.restart_manager.envelop_index(),
+                Tusize::NumStage => self.restart_manager.current_segment(),
+                Tusize::IntervalScale => self.restart_manager.current_segment_length(),
+                Tusize::IntervalScaleMax => self.restart_manager.max_scale(),
             }
         }
     }

@@ -210,22 +210,30 @@ fn search(
     cdb: &mut ClauseDB,
     state: &mut State,
 ) -> Result<bool, SolverError> {
-    let mut previous_span: Option<bool> = Some(true);
     let mut current_core: usize = 999_999;
     let mut core_was_rebuilt: Option<usize> = None;
-    let mut after_restart: usize = 0;
+
+    // monotonic increment counter
+    let mut count_steps: usize = 0;
     let mut num_learnts: usize = 0;
+
     let mut restart_pressure: usize = 0;
+    let mut after_restart: usize = 0;
     let restart_interval: usize = 40_000;
-    let mut lbd_threshold: u16 = 0;
+    let restart_cooling_length: usize = 12;
+    let mut restart_threshold: u16 = 0;
+
+    let mut focus_pressure: usize = 0;
+    let mut after_focus: usize = 0;
+    let mut focus_cooling_length: usize = 1000;
+    let mut focus_threshold: usize = 0;
+
     let mut processing_pressure: usize = 0;
     let processing_interval: usize = 80_000;
-    let cooling_length_base: usize = 2;
-    let mut cooling_length: usize = cooling_length_base;
-    let mut count: usize = 0;
 
-    state.stm.reset();
-    asg.update_activity_decay(0.98);
+    state.focus_manager.reset();
+    state.restart_manager.reset();
+    asg.set_learning_rate(1.0 / 50.0);
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
             let lit = asg.select_decision_literal();
@@ -234,40 +242,112 @@ fn search(
         let Err(cc) = asg.propagate(cdb) else {
             continue;
         };
-        count += 1;
+        count_steps += 1;
         after_restart += 1;
+        after_focus += 1;
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }
         asg.update_activity_tick();
         #[cfg(feature = "clause_rewarding")]
-        cdb.update_activity_tick();
-        let mut lbd = handle_conflict(asg, cdb, state, &cc)?;
-        if lbd == 0 {
-            restart_pressure += 1;
-            cooling_length = cooling_length_base;
-            lbd_threshold = cdb.lbd.get_slow() as u16;
-        } else if 1 < lbd {
-            num_learnts += 1;
-            if after_restart >= cooling_length {
-                if restart_pressure == 0 {
-                    lbd_threshold = cdb.lbd.get_slow() as u16;
-                }
-                if lbd > lbd_threshold {
-                    restart_pressure += 1;
-                    lbd = lbd_threshold;
-                }
-            }
-            cdb.lbd.update(lbd);
-            // lbd_threshold = lbd_threshold.min(cdb.lbd.get() as u16);
-            if num_learnts >= restart_interval.max(state.stm.envelop_index() * 10_000) {
-                cdb.reduce(asg, state.stm.envelop_index());
-                num_learnts = 0;
+        {
+            cdb.update_activity_tick();
+        }
+        let lbd = handle_conflict(asg, cdb, state, &cc)?;
+        match lbd.cmp(&1) {
+            std::cmp::Ordering::Less => (),
+            std::cmp::Ordering::Equal => (),
+            std::cmp::Ordering::Greater => {
+                num_learnts += 1;
+                processing_pressure += 1;
+                cdb.lbd.update(lbd);
             }
         }
-        processing_pressure += 1;
+        match after_focus.cmp(&focus_cooling_length) {
+            std::cmp::Ordering::Less => (),
+            std::cmp::Ordering::Equal => {
+                focus_pressure = 0;
+                focus_threshold = asg.derefer(assign::property::Tusize::NumUnassignedVar);
+            }
+            std::cmp::Ordering::Greater => {
+                if asg.derefer(assign::property::Tusize::NumUnassignedVar) > focus_threshold {
+                    focus_pressure += 1;
+                }
+            }
+        }
+        match after_restart.cmp(&restart_cooling_length) {
+            std::cmp::Ordering::Less => (),
+            std::cmp::Ordering::Equal => {
+                restart_pressure = 0;
+                restart_threshold = (cdb.lbd.get_fast() + 0.5) as u16;
+            }
+            std::cmp::Ordering::Greater => {
+                if lbd > restart_threshold {
+                    restart_pressure += 1;
+                }
+            }
+        }
 
-        if state.stm.span_ended(restart_pressure) {
+        if num_learnts >= restart_interval.max(state.restart_manager.envelop_index() * 10_000) {
+            cdb.reduce(asg, state.restart_manager.envelop_index());
+            num_learnts = 0;
+        }
+
+        if state.focus_manager.span_ended(focus_pressure) {
+            asg.ordering_by_conflict = !asg.ordering_by_conflict;
+            asg.rebuild_order();
+            asg.set_learning_rate(if asg.ordering_by_reward() { 0.02 } else { 0.0 });
+
+            after_focus = 0;
+            focus_pressure = 0;
+            focus_cooling_length = 8000
+                * if asg.ordering_by_reward() {
+                    state.restart_manager.envelop_index()
+                } else {
+                    state.focus_manager.envelop_index()
+                };
+            state.focus_manager.prepare_new_span(focus_pressure);
+        }
+        if state.restart_manager.span_ended(restart_pressure) {
+            RESTART!(asg, cdb, state);
+            asg.clear_asserted_literals(cdb)?;
+
+            after_restart = 0;
+            restart_pressure = 0;
+            restart_threshold = 0;
+            let new_span: Option<bool> = state.restart_manager.prepare_new_span(restart_pressure);
+            // a begginign of a new span
+            #[cfg(feature = "rephase")]
+            {
+                if state.restart_manager.current_span() == 1 {
+                    asg.select_rephasing_target();
+                }
+            }
+            if asg.decision_level() == asg.root_level && processing_pressure >= processing_interval
+            {
+                if cfg!(feature = "clause_vivification") {
+                    cdb.vivify(asg, state)?;
+                }
+                if cfg!(feature = "clause_elimination") {
+                    let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+                    state.flush("clause subsumption, ");
+                    elim.simplify(asg, cdb, state, false)?;
+                    asg.eliminated.append(elim.eliminated_lits());
+                    state[Stat::Simplify] += 1;
+                    state[Stat::SubsumedClause] = elim.num_subsumed;
+                }
+                processing_pressure = 0;
+            }
+            let segment_length = state.restart_manager.current_segment_length();
+            asg.handle(SolverEvent::Stage(segment_length));
+            state.restart.set_stage_parameters(segment_length);
+            dump_stage(asg, cdb, state, new_span);
+        }
+        if count_steps.is_multiple_of(10_000) {
+            state.progress(asg, cdb);
+            if state.restart_manager.current_span() >= 8192 {
+                state.flush("deep search...");
+            }
             if let Some(p) = state.elapsed() {
                 if 1.0 <= p {
                     return Err(SolverError::TimeOut);
@@ -275,131 +355,12 @@ fn search(
             } else {
                 return Err(SolverError::UndescribedError);
             }
-            after_restart = 0;
-            restart_pressure = 0;
-            lbd_threshold = 0;
-            RESTART!(asg, cdb, state);
-            asg.clear_asserted_literals(cdb)?;
-
-            dump_stage(asg, cdb, state, previous_span);
-            let new_span: Option<bool> = state.stm.prepare_new_span(restart_pressure);
-            let segment_length = state.stm.current_segment_length();
-            #[cfg(feature = "rephase")]
-            {
-                if state.stm.current_span() == 1 {
-                    asg.select_rephasing_target();
-                }
-            }
-            if let Some(new_envelope) = new_span {
-                // a beginning of a new cycle
-                {
-                    // Longer segments reduces learning rates to search deeper space.
-                    let index_e = 20.0;
-                    let index_s =
-                        state.stm.current_segment() - state.stm.envelope_starting_segment();
-                    let decay_index: f64 = index_e + index_s as f64;
-                    asg.update_activity_decay(1.0 - 1.0 / decay_index);
-                }
-
-                #[cfg(feature = "stochastic_local_search")]
-                {
-                    use cdb::StochasticLocalSearchIF;
-                    let mut sls_core = cdb.derefer(cdb::property::Tusize::NumClause);
-                    macro_rules! sls {
-                        ($assign: expr, $limit: expr) => {
-                            state.sls_index += 1;
-                            state.flush(format!(
-                                "SLS(#{}, core: {}, steps: {})",
-                                state.sls_index, sls_core, $limit
-                            ));
-                            let cls = cdb.stochastic_local_search(asg, &mut $assign, $limit);
-                            asg.override_rephasing_target(&$assign);
-                            sls_core = sls_core.min(cls.1);
-                        };
-                        ($assign: expr, $improved: expr, $limit: expr) => {
-                            state.sls_index += 1;
-                            state.flush(format!(
-                                "SLS(#{}, core: {}, steps: {})",
-                                state.sls_index, sls_core, $limit
-                            ));
-                            let cls = cdb.stochastic_local_search(asg, &mut $assign, $limit);
-                            asg.reward_by_sls(&$assign);
-                            if $improved(cls) {
-                                asg.override_rephasing_target(&$assign);
-                            }
-                            sls_core = sls_core.min(cls.1);
-                        };
-                    }
-                    macro_rules! scale {
-                        ($a: expr, $b: expr) => {
-                            ($a.saturating_sub($b.next_power_of_two().trailing_zeros()) as f64)
-                                .powf(1.75) as usize
-                                + 1
-                        };
-                    }
-                    let ent = cdb.refer(cdb::property::TEma::Entanglement).get() as usize;
-                    let n = cdb.derefer(cdb::property::Tusize::NumClause);
-                    if let Some(c) = core_was_rebuilt {
-                        core_was_rebuilt = None;
-                        if c < current_core {
-                            let steps = scale!(27_u32, c) * scale!(24_u32, n) / ent;
-                            let mut assignment = asg.best_phases_ref(Some(false));
-                            sls!(assignment, steps);
-                        }
-                    } else if new_envelope {
-                        let n = cdb.derefer(cdb::property::Tusize::NumClause);
-                        let steps = scale!(27_u32, current_core) * scale!(24_u32, n) / ent;
-                        let mut assignment = asg.best_phases_ref(Some(false));
-                        sls!(assignment, steps);
-                    }
-                    asg.select_rephasing_target();
-                }
-                if processing_pressure >= processing_interval {
-                    if cfg!(feature = "clause_vivification") {
-                        cdb.vivify(asg, state)?;
-                    }
-                    if cfg!(feature = "clause_elimination") {
-                        let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-                        state.flush("clause subsumption, ");
-                        elim.simplify(asg, cdb, state, false)?;
-                        asg.eliminated.append(elim.eliminated_lits());
-                        state[Stat::Simplify] += 1;
-                        state[Stat::SubsumedClause] = elim.num_subsumed;
-                    }
-                    processing_pressure = 0;
-                }
-                if new_envelope {
-                    {
-                        let base = state.stm.current_segment();
-                        let decay_index: f64 = (20 + 2 * base) as f64;
-                        asg.update_activity_decay((decay_index - 1.0) / decay_index);
-                    }
-                }
-            }
-
-            if num_learnts > restart_interval {
-                cdb.reduce(asg, state.stm.envelop_index());
-                num_learnts = 0;
-            }
-
-            asg.handle(SolverEvent::Stage(segment_length));
-            state.restart.set_stage_parameters(segment_length);
-            previous_span = new_span;
-        }
-        if count.is_multiple_of(10_000) {
-            state.progress(asg, cdb);
-            if state.stm.current_span() >= 8192 {
-                state.flush("deep search...");
-            }
         }
         if let Some(na) = asg.best_assigned() {
-            if na < current_core {
-                cooling_length += 1;
-                state.stm.extend(10_000);
-            }
             if current_core < na && core_was_rebuilt.is_none() {
                 core_was_rebuilt = Some(current_core);
             }
+            focus_pressure = usize::MAX;
             current_core = na;
             state.flush("");
             state.flush(format!("unreachable core: {na} "));
@@ -422,10 +383,10 @@ fn search(
 /// display the current stats. before updating stabiliation parameters
 fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: Option<bool>) {
     let active = true; // state.rst.enable;
-    let cycle = state.stm.envelop_index();
-    let span = state.stm.current_span();
-    let stage = state.stm.current_segment();
-    let segment = state.stm.current_segment();
+    let cycle = state.restart_manager.envelop_index();
+    let span = state.restart_manager.current_span();
+    let stage = state.restart_manager.current_segment();
+    let segment = state.restart_manager.current_segment();
     let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
     let vdr = asg.derefer(assign::property::Tf64::VarDecayRate);
     let cdt = cdb.derefer(cdb::property::Tf64::ReductionThreshold);
