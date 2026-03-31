@@ -218,21 +218,13 @@ fn search(
 
     // monotonic increment counter
     let mut count_steps: usize = 0;
-    let mut stats: (Ema, Ema, Ema, Ema) = (
-        Ema::new(2048),
-        Ema::new(2048),
-        Ema::new(2048),
-        Ema::new(2048),
-    );
-
     let mut span_len: usize = 1;
-    let mut cooling_len: usize = 1000;
-    let mut mode_threshold: f64 = 1.0;
-
-    let mut lbd_ema: Ema2 = Ema2::new(cooling_len).with_slow(8 * cooling_len);
-    let mut core_ema: Ema2 = Ema2::new(cooling_len)
-        .with_slow(8 * cooling_len)
-        .with_value(asg.num_vars as f64);
+    let mut cooling_len: usize = 20;
+    let mut mode_ratio: (Ema2, Ema2, Ema2) = (
+        Ema2::new(100).with_slow(1000).with_value(0.33),
+        Ema2::new(100).with_slow(1000).with_value(0.33),
+        Ema2::new(100).with_slow(1000).with_value(0.33),
+    );
 
     let mut processing_pressure: usize = 0;
     let mut ruduction_pressure: usize = 0;
@@ -253,7 +245,6 @@ fn search(
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }
-        core_ema.update(asg.stack_len() as f64);
         asg.update_activity_tick();
         #[cfg(feature = "clause_rewarding")]
         {
@@ -267,10 +258,9 @@ fn search(
                 ruduction_pressure += 1;
                 processing_pressure += 1;
                 cdb.lbd.update(lbd);
-                lbd_ema.update(lbd as f64);
             }
         }
-        if ruduction_pressure >= processing_interval && !asg.ordering_by_conflict {
+        if ruduction_pressure >= processing_interval {
             cdb.reduce(asg, state.span_manager.envelop_index());
             ruduction_pressure = 0;
         }
@@ -279,89 +269,46 @@ fn search(
             .span_manager
             .span_ended(span_len.saturating_sub(cooling_len))
         {
-            match (core_ema.trend() < mode_threshold, lbd_ema.trend() < 1.1) {
-                (false, false) => {
-                    // unfocus
-                    let f = asg.ordering_by_conflict;
-                    asg.ordering_by_conflict = false;
-                    asg.set_learning_rate(0.04);
-                    if f {
-                        asg.rebuild_order();
-                    }
-                    // restart
-                    RESTART!(asg, cdb, state);
-                    asg.clear_asserted_literals(cdb)?;
-
-                    cooling_len = 6;
-
-                    stats.0.update(1.0);
-                    stats.1.update(0.0);
-                    stats.2.update(0.0);
-                    stats.3.update(0.0);
-                }
-                (false, true) => {
-                    // unfocus
-                    let f = asg.ordering_by_conflict;
-                    asg.ordering_by_conflict = false;
-                    asg.set_learning_rate(0.04);
-                    if f {
-                        asg.rebuild_order();
-                    }
-                    // no restart
-
-                    cooling_len = 6;
-
-                    stats.0.update(0.0);
-                    stats.1.update(1.0);
-                    stats.2.update(0.0);
-                    stats.3.update(0.0);
-                }
-                (true, false) => {
-                    // focus
-                    let f = asg.ordering_by_conflict;
-                    asg.ordering_by_conflict = true;
-                    asg.set_learning_rate(0.0);
-                    if !f {
-                        asg.rebuild_order();
-                    }
-                    // restart
-                    RESTART!(asg, cdb, state);
-                    asg.clear_asserted_literals(cdb)?;
-
-                    cooling_len = 1000 * state.span_manager.envelop_index();
-
-                    stats.0.update(0.0);
-                    stats.1.update(0.0);
-                    stats.2.update(1.0);
-                    stats.3.update(0.0);
-                }
-                (true, true) => {
-                    // focus
-                    let f = asg.ordering_by_conflict;
-                    asg.ordering_by_conflict = true;
-                    asg.set_learning_rate(0.0);
-                    if !f {
-                        asg.rebuild_order();
-                    }
-                    // no restart
-
-                    cooling_len = 1000 * state.span_manager.envelop_index();
-
-                    stats.0.update(0.0);
-                    stats.1.update(0.0);
-                    stats.2.update(0.0);
-                    stats.3.update(1.0);
-                }
+            let vaa = asg.activity_diffusion.trend();
+            let mut to_focus = false;
+            if vaa > 1.4 {
+                to_focus = true;
+                mode_ratio.0.update(1.0);
+                mode_ratio.1.update(0.0);
+                mode_ratio.2.update(0.0);
+            } else if vaa >= 0.75 {
+                mode_ratio.0.update(0.0);
+                mode_ratio.1.update(1.0);
+                mode_ratio.2.update(0.0);
+            } else {
+                RESTART!(asg, cdb, state);
+                asg.clear_asserted_literals(cdb)?;
+                mode_ratio.0.update(0.0);
+                mode_ratio.1.update(0.0);
+                mode_ratio.2.update(1.0);
             }
-
             span_len = 0;
+
             let new_span = state.span_manager.prepare_new_span(span_len);
-            // a begginign of a new span
-            {
-                let l = cooling_len + state.span_manager.current_span();
-                core_ema.set_spans(l, 8 * l);
-                lbd_ema.set_spans(l, 8 * l);
-            }
+
+            if to_focus {
+                let f = asg.ordering_by_conflict;
+                asg.ordering_by_conflict = true;
+                asg.set_learning_rate(0.0);
+                if !f {
+                    asg.rebuild_order();
+                }
+                cooling_len = 2 * state.span_manager.current_span();
+            } else {
+                let f = asg.ordering_by_conflict;
+                asg.ordering_by_conflict = false;
+                asg.set_learning_rate(0.04);
+                if f {
+                    asg.rebuild_order();
+                }
+                cooling_len = 20;
+            };
+
             dump_stage(asg, cdb, state, new_span);
             #[cfg(feature = "rephase")]
             {
@@ -390,21 +337,15 @@ fn search(
         }
         if count_steps.is_multiple_of(10_000) {
             state.progress(asg, cdb);
-            if stats.0.get() * 0.1 < stats.3.get() {
-                mode_threshold *= 0.998;
-            } else if stats.0.get() * 0.05 > stats.3.get() {
-                mode_threshold *= 1.002;
-            }
             {
                 state.flush("");
                 state.flush(format!(
-                    "{:>.3}| {:>.3}, {:>.3}, {:>.3}, {:>.3}",
-                    mode_threshold,
-                    stats.0.get(),
-                    stats.1.get(),
-                    stats.2.get(),
-                    stats.3.get(),
-                ));
+                    "{:>.3} | f{:>.3}, ={:>.3}, r{:>.3}",
+                    asg.activity_diffusion.trend(),
+                    mode_ratio.0.get(),
+                    mode_ratio.1.get(),
+                    mode_ratio.2.get(),
+                ))
             }
             // if state.span_manager.current_span() >= 8192 {
             //     state.flush("deep search...");

@@ -30,6 +30,12 @@ pub struct AssignStack {
     pub(super) num_repropagation: usize,
 
     //
+    //## Hotspot handling
+    //
+    pub(crate) activity_diffusion: Ema2,
+    pub(crate) activity_diffusion_tmp: (usize, usize),
+
+    //
     //## Phase handling
     //
     pub(super) best_assign: bool,
@@ -101,6 +107,8 @@ impl Default for AssignStack {
 
             num_reconflict: 0,
             num_repropagation: 0,
+            activity_diffusion: Ema2::new(40).with_slow(128),
+            activity_diffusion_tmp: (0, 0),
 
             best_assign: false,
             build_best_at: 0,
