@@ -110,6 +110,8 @@ pub struct State {
     //
     //## MISC
     //
+    /// search mode (focus, deep, restart) ratio
+    pub search_mode_ratio: (Ema2, Ema2, Ema2),
     /// EMA of backjump levels
     pub b_lvl: Ema2,
     /// EMA of conflicting levels
@@ -151,6 +153,11 @@ impl Default for State {
             target: CNFDescription::default(),
             reflection_interval: 10_000,
 
+            search_mode_ratio: (
+                Ema2::new(100).with_slow(1000).with_value(0.33),
+                Ema2::new(100).with_slow(1000).with_value(0.33),
+                Ema2::new(100).with_slow(1000).with_value(0.33),
+            ),
             b_lvl: Ema2::new(12).with_slow(8192),
             c_lvl: Ema2::new(12).with_slow(8192),
             bt_drift_average: Ema::new(1000),
