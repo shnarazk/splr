@@ -225,7 +225,6 @@ fn search(
     let processing_interval: usize = 40_000;
 
     state.span_manager.reset();
-    asg.set_learning_rate(1.0 / 50.0);
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
             let lit = asg.select_decision_literal();
@@ -289,7 +288,7 @@ fn search(
                 asg.set_learning_rate(0.0);
                 cooling_len = 2 * state.span_manager.current_span();
             } else {
-                asg.set_learning_rate(0.04);
+                asg.set_learning_rate(state.config.vrw_learning_rate);
                 cooling_len = 20;
             };
             asg.toggle_order(!to_focus);

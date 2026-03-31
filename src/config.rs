@@ -83,10 +83,10 @@ pub struct Config {
     //
 
     //
-    //## var rewarding
+    //## learning-rate-based var rewarding:
     //
     /// Var Reward Decay Rate
-    pub vrw_dcy_rat: f64,
+    pub vrw_learning_rate: f64,
 }
 
 impl Default for Config {
@@ -116,7 +116,7 @@ impl Default for Config {
             elm_grw_lim: 0,
             elm_var_occ: 20000,
 
-            vrw_dcy_rat: 0.96,
+            vrw_learning_rate: 0.04,
         }
     }
 }
@@ -140,7 +140,7 @@ impl Config {
                     "no-color", "quiet", "certify", "heatmap", "journal", "help", "version",
                 ];
                 let options_usize = ["cl", "crl", "stat", "ecl", "evl", "evo"];
-                let options_f64 = ["timeout", "cdr", "rlt", "vdr"];
+                let options_f64 = ["timeout", "cdr", "rlt", "vlr"];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
                 match seg.len() {
@@ -181,7 +181,7 @@ impl Config {
                                         "timeout" => self.c_timeout = val,
                                         "cdr" => self.crw_dcy_rat = val,
                                         "rlt" => self.rst_lbd_thr = val,
-                                        "vdr" => self.vrw_dcy_rat = val,
+                                        "vlr" => self.vrw_learning_rate = val,
                                         _ => panic!("invalid option: {name}"),
                                     }
                                 } else {
@@ -320,7 +320,7 @@ OPTIONS:
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
       --evo <elm-var-occ>   Max #cls for var elimination   {:>10}
       --rlt <rst-lbd-thr>   LBD trend threshold to restart    {:>10.2}
-      --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
+      --vlr <vrw-lrn-rat>   Var reward learning rate          {:>10.2}
   -o, --dir <io-outdir>     Output directory                {:>10}
   -p, --proof <io-pfile>    DRAT Cert. filename                 {:>10}
   -r, --result <io-rfile>   Result filename/stdout              {:>10}
@@ -339,7 +339,7 @@ ARGS:
         config.elm_grw_lim,
         config.elm_var_occ,
         config.rst_lbd_thr,
-        config.vrw_dcy_rat,
+        config.vrw_learning_rate,
         config.io_odir.to_string_lossy(),
         config.io_pfile.to_string_lossy(),
         config.io_rfile.to_string_lossy(),
@@ -389,13 +389,13 @@ pub mod property {
     pub enum Tf64 {
         #[cfg(feature = "clause_rewarding")]
         ClauseRewardDecayRate,
-        VarRewardDecayRate,
+        VarRewardLearningRate,
     }
 
     #[cfg(not(feature = "clause_rewarding"))]
-    pub const F64S: [Tf64; 1] = [Tf64::VarRewardDecayRate];
+    pub const F64S: [Tf64; 1] = [Tf64::VarRewardLearningRate];
     #[cfg(feature = "clause_rewarding")]
-    pub const F64S: [Tf64; 2] = [Tf64::ClauseRewardDecayRate, Tf64::VarRewardDecayRate];
+    pub const F64S: [Tf64; 2] = [Tf64::ClauseRewardDecayRate, Tf64::VarRewardLearningRate];
 
     impl PropertyDereference<Tf64, f64> for Config {
         #[inline]
@@ -403,7 +403,7 @@ pub mod property {
             match k {
                 #[cfg(feature = "clause_rewarding")]
                 Tf64::ClauseRewardDecayRate => self.crw_dcy_rat,
-                Tf64::VarRewardDecayRate => self.vrw_dcy_rat,
+                Tf64::VarRewardLearningRate => self.vrw_learning_rate,
             }
         }
     }
