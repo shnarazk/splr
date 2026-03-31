@@ -225,7 +225,6 @@ fn search(
         Ema2::new(100).with_slow(1000).with_value(0.33),
         Ema2::new(100).with_slow(1000).with_value(0.33),
     );
-
     let mut processing_pressure: usize = 0;
     let mut ruduction_pressure: usize = 0;
     let processing_interval: usize = 40_000;
@@ -292,47 +291,34 @@ fn search(
             let new_span = state.span_manager.prepare_new_span(span_len);
 
             if to_focus {
-                let f = asg.ordering_by_conflict;
-                asg.ordering_by_conflict = true;
                 asg.set_learning_rate(0.0);
-                if !f {
-                    asg.rebuild_order();
-                }
                 cooling_len = 2 * state.span_manager.current_span();
             } else {
-                let f = asg.ordering_by_conflict;
-                asg.ordering_by_conflict = false;
                 asg.set_learning_rate(0.04);
-                if f {
-                    asg.rebuild_order();
-                }
                 cooling_len = 20;
             };
+            asg.toggle_order(!to_focus);
 
             dump_stage(asg, cdb, state, new_span);
-            #[cfg(feature = "rephase")]
-            {
-                if !asg.ordering_by_conflict
-                    && asg.decision_level() == asg.root_level
-                    && state.span_manager.current_span() == 1
+            if asg.decision_level() == asg.root_level {
+                #[cfg(feature = "rephase")]
                 {
-                    asg.select_rephasing_target();
+                    if !asg.ordering_by_conflict && state.span_manager.current_span() == 1 {
+                        asg.select_rephasing_target();
+                    }
                 }
-            }
-            if asg.decision_level() == asg.root_level && processing_pressure >= processing_interval
-            {
-                if cfg!(feature = "clause_vivification") {
-                    cdb.vivify(asg, state)?;
+                if processing_pressure >= processing_interval {
+                    if cfg!(feature = "clause_vivification") {
+                        cdb.vivify(asg, state)?;
+                    }
+                    if cfg!(feature = "clause_elimination") {
+                        let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+                        state.flush("clause subsumption, ");
+                        elim.simplify(asg, cdb, state, false)?;
+                        asg.eliminated.append(elim.eliminated_lits());
+                    }
+                    processing_pressure = 0;
                 }
-                if cfg!(feature = "clause_elimination") {
-                    let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-                    state.flush("clause subsumption, ");
-                    elim.simplify(asg, cdb, state, false)?;
-                    asg.eliminated.append(elim.eliminated_lits());
-                    state[Stat::Simplify] += 1;
-                    state[Stat::SubsumedClause] = elim.num_subsumed;
-                }
-                processing_pressure = 0;
             }
         }
         if count_steps.is_multiple_of(10_000) {
