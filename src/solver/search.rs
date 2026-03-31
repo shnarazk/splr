@@ -1,9 +1,8 @@
 //! Conflict-Driven Clause Learning Search engine
+#[cfg(feature = "trail_saving")]
+use crate::assign::TrailSavingIF;
 use {
-    super::{
-        Certificate, Solver, SolverEvent, SolverResult, conflict::handle_conflict,
-        restart::RestartIF,
-    },
+    super::{Certificate, Solver, SolverEvent, SolverResult, conflict::handle_conflict},
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
         cdb::{self, ClauseDB, ClauseDBIF, VivifyIF},
@@ -26,6 +25,10 @@ pub trait SolveIF {
 macro_rules! RESTART {
     ($asg: expr, $cdb: expr, $state: expr) => {
         $asg.cancel_until($cdb, $asg.root_level());
+        #[cfg(feature = "trail_saving")]
+        {
+            $asg.clear_saved_trail();
+        }
         $cdb.handle(SolverEvent::Restart);
         $state.handle(SolverEvent::Restart);
     };
@@ -215,24 +218,27 @@ fn search(
 
     // monotonic increment counter
     let mut count_steps: usize = 0;
-    let mut num_learnts: usize = 0;
+    let mut stats: (Ema, Ema, Ema, Ema) = (
+        Ema::new(2048),
+        Ema::new(2048),
+        Ema::new(2048),
+        Ema::new(2048),
+    );
 
-    let mut restart_pressure: usize = 0;
-    let mut after_restart: usize = 0;
-    let restart_interval: usize = 40_000;
-    let restart_cooling_length: usize = 12;
-    let mut restart_threshold: u16 = 0;
+    let mut span_len: usize = 1;
+    let mut cooling_len: usize = 1000;
+    let mut mode_threshold: f64 = 1.0;
 
-    let mut focus_pressure: usize = 0;
-    let mut after_focus: usize = 0;
-    let mut focus_cooling_length: usize = 1000;
-    let mut focus_threshold: usize = 0;
+    let mut lbd_ema: Ema2 = Ema2::new(cooling_len).with_slow(8 * cooling_len);
+    let mut core_ema: Ema2 = Ema2::new(cooling_len)
+        .with_slow(8 * cooling_len)
+        .with_value(asg.num_vars as f64);
 
     let mut processing_pressure: usize = 0;
-    let processing_interval: usize = 80_000;
+    let mut ruduction_pressure: usize = 0;
+    let processing_interval: usize = 40_000;
 
-    state.focus_manager.reset();
-    state.restart_manager.reset();
+    state.span_manager.reset();
     asg.set_learning_rate(1.0 / 50.0);
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
@@ -243,11 +249,11 @@ fn search(
             continue;
         };
         count_steps += 1;
-        after_restart += 1;
-        after_focus += 1;
+        span_len += 1;
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }
+        core_ema.update(asg.stack_len() as f64);
         asg.update_activity_tick();
         #[cfg(feature = "clause_rewarding")]
         {
@@ -258,68 +264,111 @@ fn search(
             std::cmp::Ordering::Less => (),
             std::cmp::Ordering::Equal => (),
             std::cmp::Ordering::Greater => {
-                num_learnts += 1;
+                ruduction_pressure += 1;
                 processing_pressure += 1;
                 cdb.lbd.update(lbd);
+                lbd_ema.update(lbd as f64);
             }
         }
-        match after_focus.cmp(&focus_cooling_length) {
-            std::cmp::Ordering::Less => (),
-            std::cmp::Ordering::Equal => {
-                focus_pressure = 0;
-                focus_threshold = asg.derefer(assign::property::Tusize::NumUnassignedVar);
-            }
-            std::cmp::Ordering::Greater => {
-                if asg.derefer(assign::property::Tusize::NumUnassignedVar) > focus_threshold {
-                    focus_pressure += 1;
+        if ruduction_pressure >= processing_interval && !asg.ordering_by_conflict {
+            cdb.reduce(asg, state.span_manager.envelop_index());
+            ruduction_pressure = 0;
+        }
+
+        if state
+            .span_manager
+            .span_ended(span_len.saturating_sub(cooling_len))
+        {
+            match (core_ema.trend() < mode_threshold, lbd_ema.trend() < 1.1) {
+                (false, false) => {
+                    // unfocus
+                    let f = asg.ordering_by_conflict;
+                    asg.ordering_by_conflict = false;
+                    asg.set_learning_rate(0.04);
+                    if f {
+                        asg.rebuild_order();
+                    }
+                    // restart
+                    RESTART!(asg, cdb, state);
+                    asg.clear_asserted_literals(cdb)?;
+
+                    cooling_len = 6;
+
+                    stats.0.update(1.0);
+                    stats.1.update(0.0);
+                    stats.2.update(0.0);
+                    stats.3.update(0.0);
+                }
+                (false, true) => {
+                    // unfocus
+                    let f = asg.ordering_by_conflict;
+                    asg.ordering_by_conflict = false;
+                    asg.set_learning_rate(0.04);
+                    if f {
+                        asg.rebuild_order();
+                    }
+                    // no restart
+
+                    cooling_len = 6;
+
+                    stats.0.update(0.0);
+                    stats.1.update(1.0);
+                    stats.2.update(0.0);
+                    stats.3.update(0.0);
+                }
+                (true, false) => {
+                    // focus
+                    let f = asg.ordering_by_conflict;
+                    asg.ordering_by_conflict = true;
+                    asg.set_learning_rate(0.0);
+                    if !f {
+                        asg.rebuild_order();
+                    }
+                    // restart
+                    RESTART!(asg, cdb, state);
+                    asg.clear_asserted_literals(cdb)?;
+
+                    cooling_len = 1000 * state.span_manager.envelop_index();
+
+                    stats.0.update(0.0);
+                    stats.1.update(0.0);
+                    stats.2.update(1.0);
+                    stats.3.update(0.0);
+                }
+                (true, true) => {
+                    // focus
+                    let f = asg.ordering_by_conflict;
+                    asg.ordering_by_conflict = true;
+                    asg.set_learning_rate(0.0);
+                    if !f {
+                        asg.rebuild_order();
+                    }
+                    // no restart
+
+                    cooling_len = 1000 * state.span_manager.envelop_index();
+
+                    stats.0.update(0.0);
+                    stats.1.update(0.0);
+                    stats.2.update(0.0);
+                    stats.3.update(1.0);
                 }
             }
-        }
-        match after_restart.cmp(&restart_cooling_length) {
-            std::cmp::Ordering::Less => (),
-            std::cmp::Ordering::Equal => {
-                restart_pressure = 0;
-                restart_threshold = (cdb.lbd.get_fast() + 0.5) as u16;
-            }
-            std::cmp::Ordering::Greater => {
-                if lbd > restart_threshold {
-                    restart_pressure += 1;
-                }
-            }
-        }
 
-        if num_learnts >= restart_interval.max(state.restart_manager.envelop_index() * 10_000) {
-            cdb.reduce(asg, state.restart_manager.envelop_index());
-            num_learnts = 0;
-        }
-
-        if state.focus_manager.span_ended(focus_pressure) {
-            asg.ordering_by_conflict = !asg.ordering_by_conflict;
-            asg.rebuild_order();
-            asg.set_learning_rate(if asg.ordering_by_reward() { 0.02 } else { 0.0 });
-
-            after_focus = 0;
-            focus_pressure = 0;
-            focus_cooling_length = 8000
-                * if asg.ordering_by_reward() {
-                    state.restart_manager.envelop_index()
-                } else {
-                    state.focus_manager.envelop_index()
-                };
-            state.focus_manager.prepare_new_span(focus_pressure);
-        }
-        if state.restart_manager.span_ended(restart_pressure) {
-            RESTART!(asg, cdb, state);
-            asg.clear_asserted_literals(cdb)?;
-
-            after_restart = 0;
-            restart_pressure = 0;
-            restart_threshold = 0;
-            let new_span: Option<bool> = state.restart_manager.prepare_new_span(restart_pressure);
+            span_len = 0;
+            let new_span = state.span_manager.prepare_new_span(span_len);
             // a begginign of a new span
+            {
+                let l = cooling_len + state.span_manager.current_span();
+                core_ema.set_spans(l, 8 * l);
+                lbd_ema.set_spans(l, 8 * l);
+            }
+            dump_stage(asg, cdb, state, new_span);
             #[cfg(feature = "rephase")]
             {
-                if state.restart_manager.current_span() == 1 {
+                if !asg.ordering_by_conflict
+                    && asg.decision_level() == asg.root_level
+                    && state.span_manager.current_span() == 1
+                {
                     asg.select_rephasing_target();
                 }
             }
@@ -338,16 +387,28 @@ fn search(
                 }
                 processing_pressure = 0;
             }
-            let segment_length = state.restart_manager.current_segment_length();
-            asg.handle(SolverEvent::Stage(segment_length));
-            state.restart.set_stage_parameters(segment_length);
-            dump_stage(asg, cdb, state, new_span);
         }
         if count_steps.is_multiple_of(10_000) {
             state.progress(asg, cdb);
-            if state.restart_manager.current_span() >= 8192 {
-                state.flush("deep search...");
+            if stats.0.get() * 0.1 < stats.3.get() {
+                mode_threshold *= 0.998;
+            } else if stats.0.get() * 0.05 > stats.3.get() {
+                mode_threshold *= 1.002;
             }
+            {
+                state.flush("");
+                state.flush(format!(
+                    "{:>.3}| {:>.3}, {:>.3}, {:>.3}, {:>.3}",
+                    mode_threshold,
+                    stats.0.get(),
+                    stats.1.get(),
+                    stats.2.get(),
+                    stats.3.get(),
+                ));
+            }
+            // if state.span_manager.current_span() >= 8192 {
+            //     state.flush("deep search...");
+            // }
             if let Some(p) = state.elapsed() {
                 if 1.0 <= p {
                     return Err(SolverError::TimeOut);
@@ -360,7 +421,6 @@ fn search(
             if current_core < na && core_was_rebuilt.is_none() {
                 core_was_rebuilt = Some(current_core);
             }
-            focus_pressure = usize::MAX;
             current_core = na;
             state.flush("");
             state.flush(format!("unreachable core: {na} "));
@@ -383,10 +443,10 @@ fn search(
 /// display the current stats. before updating stabiliation parameters
 fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: Option<bool>) {
     let active = true; // state.rst.enable;
-    let cycle = state.restart_manager.envelop_index();
-    let span = state.restart_manager.current_span();
-    let stage = state.restart_manager.current_segment();
-    let segment = state.restart_manager.current_segment();
+    let cycle = state.span_manager.envelop_index();
+    let span = state.span_manager.current_span();
+    let stage = state.span_manager.current_segment();
+    let segment = state.span_manager.current_segment();
     let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
     let vdr = asg.derefer(assign::property::Tf64::VarDecayRate);
     let cdt = cdb.derefer(cdb::property::Tf64::ReductionThreshold);

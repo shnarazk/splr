@@ -103,8 +103,7 @@ pub struct State {
     // Restart
     pub restart: RestartManager,
     /// StageManager
-    pub focus_manager: StageManager,
-    pub restart_manager: StageManager,
+    pub span_manager: StageManager,
     /// problem description
     pub target: CNFDescription,
     /// strategy adjustment interval in conflict
@@ -151,8 +150,7 @@ impl Default for State {
             cnf: CNFDescription::default(),
             stats: [0; Stat::EndOfStatIndex as usize],
             restart: RestartManager::default(),
-            focus_manager: StageManager::default(),
-            restart_manager: StageManager::default(),
+            span_manager: StageManager::default(),
             target: CNFDescription::default(),
             reflection_interval: 10_000,
 
@@ -208,7 +206,7 @@ impl Instantiate for State {
             config: config.clone(),
             cnf: cnf.clone(),
             restart: RestartManager::instantiate(config, cnf),
-            restart_manager: StageManager::new(),
+            span_manager: StageManager::new(),
             target: cnf.clone(),
             time_limit: config.c_timeout,
             progress_report_rows: PROGRESS_REPORT_ROWS
@@ -229,7 +227,6 @@ impl Instantiate for State {
                 self[Stat::Restart] += 1;
                 self.restart.handle(SolverEvent::Restart);
             }
-            SolverEvent::Stage(_) => (),
 
             #[cfg(feature = "clause_vivification")]
             SolverEvent::Vivify(_) => (),
@@ -474,7 +471,7 @@ impl StateIF for State {
         let rst_num_rst: usize = self[Stat::Restart];
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
         let rst_eng: f64 = self.restart.penetration_energy_charged;
-        let stg_segment: usize = self.restart_manager.current_segment();
+        let stg_segment: usize = self.span_manager.current_segment();
 
         self.progress_cnt += 1;
         // print!("\x1B[9A\x1B[1G");
@@ -617,8 +614,8 @@ impl StateIF for State {
                 0.01
             ),
         );
-        self[LogUsizeId::Stage] = self.restart_manager.current_segment();
-        self[LogUsizeId::StageCycle] = self.restart_manager.envelop_index();
+        self[LogUsizeId::LubySpan] = self.span_manager.current_segment();
+        self[LogUsizeId::StageCycle] = self.span_manager.envelop_index();
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
         if self.config.show_cdb_heatmap {
             let big_change = 0.002;
@@ -760,9 +757,9 @@ impl State {
         self[LogUsizeId::PermanentClause] =
             cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
         self[LogUsizeId::Restart] = self[Stat::Restart];
-        self[LogUsizeId::Stage] = self.restart_manager.current_segment();
-        self[LogUsizeId::StageCycle] = self.restart_manager.envelop_index();
-        self[LogUsizeId::StageSegment] = self.restart_manager.max_scale();
+        self[LogUsizeId::LubySpan] = self.span_manager.current_segment();
+        self[LogUsizeId::StageCycle] = self.span_manager.envelop_index();
+        self[LogUsizeId::StageSegment] = self.span_manager.max_scale();
         self[LogUsizeId::Simplify] = self[Stat::Simplify];
         self[LogUsizeId::SubsumedClause] = self[Stat::SubsumedClause];
         self[LogUsizeId::VivifiedClause] = self[Stat::VivifiedClause];
@@ -901,9 +898,9 @@ pub enum LogUsizeId {
     Restart,
 
     //
-    //## stage
+    //## Luby segment
     //
-    Stage,
+    LubySpan,
     StageCycle,
     StageSegment,
 
@@ -1113,10 +1110,10 @@ pub mod property {
                 Tusize::Vivification => self[Stat::Vivification],
                 Tusize::VivifiedClause => self[Stat::VivifiedClause],
                 Tusize::VivifiedVar => self[Stat::VivifiedVar],
-                Tusize::NumCycle => self.restart_manager.envelop_index(),
-                Tusize::NumStage => self.restart_manager.current_segment(),
-                Tusize::IntervalScale => self.restart_manager.current_segment_length(),
-                Tusize::IntervalScaleMax => self.restart_manager.max_scale(),
+                Tusize::NumCycle => self.span_manager.envelop_index(),
+                Tusize::NumStage => self.span_manager.current_segment(),
+                Tusize::IntervalScale => self.span_manager.current_segment_length(),
+                Tusize::IntervalScaleMax => self.span_manager.max_scale(),
             }
         }
     }
