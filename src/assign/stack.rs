@@ -12,9 +12,6 @@ use {
 #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
 use std::collections::HashMap;
 
-#[cfg(feature = "trail_saving")]
-use super::TrailSavingIF;
-
 /// A record of assignment. It's called 'trail' in Glucose.
 #[derive(Clone, Debug)]
 pub struct AssignStack {
@@ -184,10 +181,6 @@ impl Instantiate for AssignStack {
             SolverEvent::Conflict => (),
             SolverEvent::Eliminate(vi) => {
                 self.make_var_eliminated(vi);
-            }
-            SolverEvent::Stage(_) => {
-                #[cfg(feature = "trail_saving")]
-                self.clear_saved_trail();
             }
             SolverEvent::NewVar => {
                 self.expand_heap();

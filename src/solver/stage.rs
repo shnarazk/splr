@@ -100,4 +100,7 @@ impl StageManager {
     pub fn envelope_starting_segment(&self) -> usize {
         self.envelope_starting_segment
     }
+    pub fn as_n(&self) -> usize {
+        self.luby_iter.as_n
+    }
 }

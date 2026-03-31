@@ -122,6 +122,10 @@ impl Ema {
         self.val.slow = x;
         self
     }
+    /// set scale
+    pub fn set_span(&mut self, len: usize) {
+        self.sca = 1.0 / (len as f64);
+    }
 }
 
 /// Exponential Moving Average pair, with a calibrator if feature `EMA_calibration` is on.
@@ -236,6 +240,10 @@ impl Ema2 {
             self.cals = 1.0;
         }
         self
+    }
+    pub fn set_spans(&mut self, ls: usize, ll: usize) {
+        self.fe = 1.0 / ls as f64;
+        self.se = 1.0 / ll as f64;
     }
 }
 

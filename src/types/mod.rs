@@ -55,7 +55,7 @@ pub trait ActivityIF<Ix> {
     /// modify one's activity at value un-assignment in [`cancel_until`](`crate::assign::PropagateIF::cancel_until`).
     fn reward_at_unassign(&mut self, _ix: Ix) {}
     /// set the learning rate. It's a small float like 1/100.
-    fn set_learning_rate(&mut self, _decay: f64);
+    fn set_learning_rate(&mut self, learning_rate: f64);
     /// update internal counter.
     fn update_activity_tick(&mut self);
 }
