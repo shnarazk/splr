@@ -1,5 +1,6 @@
 ## 0.19.0
 
+- Adopt three search mode model: focus, stable, restart
 - Switch to the O(1) Luby iterator. Now Luby sequence is used for
   - trigger for restarts, clause elimination, and clause vivification
   - clause DB size after clause reduction
@@ -16,6 +17,7 @@
 - remove feature 'trace_equivalency'
 - remove feature 'two_mode_reduction'
 - rename feature 'debug_propagation' to 'trace_propagation'
+- remove src/solver/restart.rs
 
 ## 0.18.0, 2026-03-14
 
