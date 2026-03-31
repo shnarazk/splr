@@ -174,9 +174,9 @@ impl Instantiate for AssignStack {
 
             var: Var::new_vars(nv),
 
-            activity_decay: config.vrw_dcy_rat,
+            activity_decay: 1.0 - config.vrw_learning_rate,
 
-            activity_anti_decay: 1.0 - config.vrw_dcy_rat,
+            activity_anti_decay: config.vrw_learning_rate,
 
             ..AssignStack::default()
         }
