@@ -47,6 +47,8 @@ pub trait VarSelectIF {
     fn update_order(&mut self, v: VarId);
     /// rebuild the internal var_order
     fn rebuild_order(&mut self);
+    /// change ordering criteria
+    fn toggle_order(&mut self, to_reward_order: bool);
 }
 
 impl VarSelectIF for AssignStack {
@@ -105,10 +107,11 @@ impl VarSelectIF for AssignStack {
             self.best_phases.clear();
             return;
         }
-        debug_assert!(self
-            .best_phases
-            .iter()
-            .all(|(vi, b)| self.var[*vi].assign != Some(!b.0)));
+        debug_assert!(
+            self.best_phases
+                .iter()
+                .all(|(vi, b)| self.var[*vi].assign != Some(!b.0))
+        );
         self.num_rephase += 1;
         for (vi, (b, _)) in self.best_phases.iter() {
             let v = &mut self.var[*vi];
@@ -139,6 +142,12 @@ impl VarSelectIF for AssignStack {
             if var_assign!(self, vi).is_none() && !self.var[vi].is(FlagVar::ELIMINATED) {
                 self.insert_heap(vi);
             }
+        }
+    }
+    fn toggle_order(&mut self, to_reward_order: bool) {
+        if self.ordering_by_conflict == to_reward_order {
+            self.ordering_by_conflict = !to_reward_order;
+            self.rebuild_order();
         }
     }
 }
