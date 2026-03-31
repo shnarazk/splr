@@ -8,7 +8,7 @@ use {
         assign::{self, AssignIF},
         cdb,
         cdb::ClauseDBIF,
-        solver::{RestartManager, SolverEvent, StageManager},
+        solver::{SolverEvent, StageManager},
         types::*,
     },
     std::{
@@ -100,8 +100,6 @@ pub struct State {
     pub cnf: CNFDescription,
     /// collection of statistics data
     pub stats: [usize; Stat::EndOfStatIndex as usize],
-    // Restart
-    pub restart: RestartManager,
     /// StageManager
     pub span_manager: StageManager,
     /// problem description
@@ -149,7 +147,6 @@ impl Default for State {
             config: Config::default(),
             cnf: CNFDescription::default(),
             stats: [0; Stat::EndOfStatIndex as usize],
-            restart: RestartManager::default(),
             span_manager: StageManager::default(),
             target: CNFDescription::default(),
             reflection_interval: 10_000,
@@ -205,7 +202,6 @@ impl Instantiate for State {
         State {
             config: config.clone(),
             cnf: cnf.clone(),
-            restart: RestartManager::instantiate(config, cnf),
             span_manager: StageManager::new(),
             target: cnf.clone(),
             time_limit: config.c_timeout,
@@ -225,7 +221,6 @@ impl Instantiate for State {
             SolverEvent::Instantiate => (),
             SolverEvent::Restart => {
                 self[Stat::Restart] += 1;
-                self.restart.handle(SolverEvent::Restart);
             }
 
             #[cfg(feature = "clause_vivification")]
@@ -470,7 +465,6 @@ impl StateIF for State {
         let cdb_lb_ent: f64 = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
         let rst_num_rst: usize = self[Stat::Restart];
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
-        let rst_eng: f64 = self.restart.penetration_energy_charged;
         let stg_segment: usize = self.span_manager.current_segment();
 
         self.progress_cnt += 1;
@@ -542,7 +536,6 @@ impl StateIF for State {
             ),
         );
         self[LogUsizeId::StageSegment] = stg_segment;
-        self[LogF64Id::RestartEnergy] = rst_eng;
         println!(
             "\x1B[2K    Conflict|entg:{}, cLvl:{}, bLvl:{}, /cpr:{}",
             fm!(
@@ -937,7 +930,6 @@ pub enum LogF64Id {
     ConflictPerRestart,
     PropagationPerConflict,
     LiteralBlockEntanglement,
-    RestartEnergy,
     ChronologicalBacktrackPercentage,
     CdbHeatmap0,
     CdbHeatmap1,

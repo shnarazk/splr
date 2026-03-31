@@ -369,7 +369,6 @@ fn search(
 
 /// display the current stats. before updating stabiliation parameters
 fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: Option<bool>) {
-    let active = true; // state.rst.enable;
     let cycle = state.span_manager.envelop_index();
     let span = state.span_manager.current_span();
     let stage = state.span_manager.current_segment();
@@ -377,17 +376,12 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: O
     let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
     let vdr = asg.derefer(assign::property::Tf64::VarDecayRate);
     let cdt = cdb.derefer(cdb::property::Tf64::ReductionThreshold);
-    let fuel = if active {
-        state.restart.penetration_energy_charged
-    } else {
-        f64::NAN
-    };
     state.log(
         match shift {
             None => Some((None, None, stage)),
             Some(false) => Some((None, Some(cycle), stage)),
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
-        format!("{span:>7}, fuel:{fuel:>9.2}, cpr:{cpr:>8.2}, vdr:{vdr:>3.2}, cdt:{cdt:>5.2}"),
+        format!("{span:>7}, cpr:{cpr:>8.2}, vdr:{vdr:>3.2}, cdt:{cdt:>5.2}"),
     );
 }
