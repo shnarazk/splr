@@ -367,7 +367,7 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: O
     let stage = state.span_manager.current_segment();
     let segment = state.span_manager.current_segment();
     let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
-    let vdr = asg.derefer(assign::property::Tf64::VarDecayRate);
+    let vlr = asg.derefer(assign::property::Tf64::VarLearningRate);
     let cdt = cdb.derefer(cdb::property::Tf64::ReductionThreshold);
     state.log(
         match shift {
@@ -375,6 +375,6 @@ fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: O
             Some(false) => Some((None, Some(cycle), stage)),
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
-        format!("{span:>7}, cpr:{cpr:>8.2}, vdr:{vdr:>3.2}, cdt:{cdt:>5.2}"),
+        format!("{span:>7}, cpr:{cpr:>8.2}, vlr:{vlr:>3.2}, cdt:{cdt:>5.2}"),
     );
 }

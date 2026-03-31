@@ -182,13 +182,13 @@ pub mod property {
     pub enum Tf64 {
         AverageVarActivity,
         CurrentWorkingSetSize,
-        VarDecayRate,
+        VarLearningRate,
     }
 
     pub const F64S: [Tf64; 3] = [
         Tf64::AverageVarActivity,
         Tf64::CurrentWorkingSetSize,
-        Tf64::VarDecayRate,
+        Tf64::VarLearningRate,
     ];
 
     impl PropertyDereference<Tf64, f64> for AssignStack {
@@ -197,7 +197,7 @@ pub mod property {
             match k {
                 Tf64::AverageVarActivity => 0.0,    // self.activity_averaged,
                 Tf64::CurrentWorkingSetSize => 0.0, // self.cwss,
-                Tf64::VarDecayRate => self.activity_decay,
+                Tf64::VarLearningRate => 1.0 - self.activity_decay,
             }
         }
     }
