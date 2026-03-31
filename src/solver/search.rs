@@ -220,11 +220,6 @@ fn search(
     let mut count_steps: usize = 0;
     let mut span_len: usize = 1;
     let mut cooling_len: usize = 20;
-    let mut mode_ratio: (Ema2, Ema2, Ema2) = (
-        Ema2::new(100).with_slow(1000).with_value(0.33),
-        Ema2::new(100).with_slow(1000).with_value(0.33),
-        Ema2::new(100).with_slow(1000).with_value(0.33),
-    );
     let mut processing_pressure: usize = 0;
     let mut ruduction_pressure: usize = 0;
     let processing_interval: usize = 40_000;
@@ -272,24 +267,24 @@ fn search(
             let mut to_focus = false;
             if vaa > 1.4 {
                 to_focus = true;
-                mode_ratio.0.update(1.0);
-                mode_ratio.1.update(0.0);
-                mode_ratio.2.update(0.0);
+                state.search_mode_ratio.0.update(1.0);
+                state.search_mode_ratio.1.update(0.0);
+                state.search_mode_ratio.2.update(0.0);
             } else if vaa >= 0.75 {
-                mode_ratio.0.update(0.0);
-                mode_ratio.1.update(1.0);
-                mode_ratio.2.update(0.0);
+                state.search_mode_ratio.0.update(0.0);
+                state.search_mode_ratio.1.update(1.0);
+                state.search_mode_ratio.2.update(0.0);
             } else {
                 RESTART!(asg, cdb, state);
                 asg.clear_asserted_literals(cdb)?;
-                mode_ratio.0.update(0.0);
-                mode_ratio.1.update(0.0);
-                mode_ratio.2.update(1.0);
+                state.search_mode_ratio.0.update(0.0);
+                state.search_mode_ratio.1.update(0.0);
+                state.search_mode_ratio.2.update(1.0);
             }
             span_len = 0;
 
             let new_span = state.span_manager.prepare_new_span(span_len);
-
+            dump_stage(asg, cdb, state, new_span);
             if to_focus {
                 asg.set_learning_rate(0.0);
                 cooling_len = 2 * state.span_manager.current_span();
@@ -299,7 +294,6 @@ fn search(
             };
             asg.toggle_order(!to_focus);
 
-            dump_stage(asg, cdb, state, new_span);
             if asg.decision_level() == asg.root_level {
                 #[cfg(feature = "rephase")]
                 {
@@ -328,9 +322,9 @@ fn search(
                 state.flush(format!(
                     "{:>.3} | f{:>.3}, ={:>.3}, r{:>.3}",
                     asg.activity_diffusion.trend(),
-                    mode_ratio.0.get(),
-                    mode_ratio.1.get(),
-                    mode_ratio.2.get(),
+                    state.search_mode_ratio.0.get(),
+                    state.search_mode_ratio.1.get(),
+                    state.search_mode_ratio.2.get(),
                 ))
             }
             // if state.span_manager.current_span() >= 8192 {
