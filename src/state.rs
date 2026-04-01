@@ -576,26 +576,55 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     {}|vivC:{}, btdf:{}, core:{}, /ppc:{}",
-            if asg.ordering_by_reward() {
-                " stable"
-            } else {
-                "focused"
+            "\x1B[2K {} {}|fcs.:{}, jmp.:{}, core:{}, /ppc:{}",
+            {
+                if self.span_manager.current_span() >= 16384 {
+                    "Long"
+                } else {
+                    "    "
+                }
             },
-            im!(
-                "{:>9}",
+            {
+                let s0 = self.search_mode_ratio.0.get();
+                let s1 = self.search_mode_ratio.1.get();
+                let s2 = self.search_mode_ratio.2.get();
+                if s0 >= s1 && s0 >= s2 {
+                    " Focus"
+                } else if s1 >= s2 {
+                    "Stable"
+                } else {
+                    " Jumpy"
+                }
+            },
+            // fm!(
+            //     "{:>9.2}",
+            //     self,
+            //     LogF64Id::ConflictDistanceAverage,
+            //     asg.refer(assign::property::TEma::ConlictDistanceAverage)
+            //         .trend()
+            // ),
+            fm!(
+                "{:>9.4}",
                 self,
-                LogUsizeId::VivifiedClause,
-                self[Stat::VivifiedClause]
+                LogF64Id::ConflictDistanceAverage0,
+                self.search_mode_ratio.0.get(),
+                0.1
             ),
             fm!(
                 "{:>9.4}",
                 self,
-                LogF64Id::BacktrackDriftRate,
-                // 100.0 * self.num_chrono_bt as f64 / self[LogUsizeId::NumConflict] as f64
-                self.bt_drift_average.get(),
-                0.0001
+                LogF64Id::ConflictDistanceAverage2,
+                self.search_mode_ratio.2.get(),
+                0.1
             ),
+            // fm!(
+            //     "{:>9.4}",
+            //     self,
+            //     LogF64Id::BacktrackDriftRate,
+            //     // 100.0 * self.num_chrono_bt as f64 / self[LogUsizeId::NumConflict] as f64
+            //     self.bt_drift_average.get(),
+            //     0.0001
+            // ),
             im!(
                 "{:>9}",
                 self,
@@ -933,6 +962,10 @@ pub enum LogF64Id {
     BLevel,
     CLevel,
     BacktrackDriftRate,
+    ConflictDistanceAverage,
+    ConflictDistanceAverage0,
+    ConflictDistanceAverage1,
+    ConflictDistanceAverage2,
     DecisionPerConflict,
     ConflictPerRestart,
     PropagationPerConflict,

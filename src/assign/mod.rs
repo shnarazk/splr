@@ -209,14 +209,16 @@ pub mod property {
         ConflictPerRestart,
         ConflictPerBaseRestart,
         BestPhaseDivergenceRate,
+        ConlictDistanceAverage,
     }
 
-    pub const EMAS: [TEma; 5] = [
+    pub const EMAS: [TEma; 6] = [
         TEma::DecisionPerConflict,
         TEma::PropagationPerConflict,
         TEma::ConflictPerRestart,
         TEma::ConflictPerBaseRestart,
         TEma::BestPhaseDivergenceRate,
+        TEma::ConlictDistanceAverage,
     ];
 
     impl PropertyReference<TEma, EmaView> for AssignStack {
@@ -228,6 +230,7 @@ pub mod property {
                 TEma::ConflictPerRestart => self.cpr_ema.as_view(),
                 TEma::ConflictPerBaseRestart => self.cpr_ema.as_view(),
                 TEma::BestPhaseDivergenceRate => self.bp_divergence_ema.as_view(),
+                TEma::ConlictDistanceAverage => self.activity_diffusion.as_view(),
             }
         }
     }
