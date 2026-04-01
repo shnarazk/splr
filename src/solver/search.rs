@@ -217,12 +217,13 @@ fn search(
     let mut core_was_rebuilt: Option<usize> = None;
 
     // monotonic increment counter
-    let mut count_steps: usize = 0;
     let mut span_len: usize = 1;
     let mut cooling_len: usize = 20;
     let mut processing_pressure: usize = 0;
     let mut ruduction_pressure: usize = 0;
     let processing_interval: usize = 40_000;
+    let mut progress_pressure: usize = 0;
+    let progress_interval: usize = 10_000;
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -233,7 +234,7 @@ fn search(
         let Err(cc) = asg.propagate(cdb) else {
             continue;
         };
-        count_steps += 1;
+        progress_pressure += 1;
         span_len += 1;
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
@@ -262,9 +263,9 @@ fn search(
             .span_manager
             .span_ended(span_len.saturating_sub(cooling_len))
         {
-            let vaa = asg.activity_diffusion.trend();
+            let vaa = asg.conflict_distance_average.trend();
             let mut to_focus = false;
-            if vaa > 1.4 {
+            if vaa >= 1.4 {
                 to_focus = true;
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
@@ -281,7 +282,6 @@ fn search(
                 state.search_mode_ratio.2.update(1.0);
             }
             span_len = 0;
-
             let new_span = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, cdb, state, new_span);
             if to_focus {
@@ -314,7 +314,7 @@ fn search(
                 }
             }
         }
-        if count_steps.is_multiple_of(10_000) {
+        if progress_pressure >= progress_interval {
             state.progress(asg, cdb);
             if let Some(p) = state.elapsed() {
                 if 1.0 <= p {
@@ -323,6 +323,7 @@ fn search(
             } else {
                 return Err(SolverError::UndescribedError);
             }
+            progress_pressure = 0;
         }
         if let Some(na) = asg.best_assigned() {
             if current_core < na && core_was_rebuilt.is_none() {
