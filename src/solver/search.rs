@@ -263,7 +263,8 @@ fn search(
             .span_manager
             .span_ended(span_len.saturating_sub(cooling_len))
         {
-            let vaa = asg.conflict_distance_average.trend();
+            let vaa = asg.conflict_distance_average.0.trend();
+            let val = asg.conflict_distance_average.1.trend();
             let mut to_focus = false;
             /* if (1.0..=1.1).contains(&vaa) || (asg.ordering_by_conflict && vaa >= 0.8) {
                 to_focus = true;
@@ -281,7 +282,7 @@ fn search(
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(1.0);
             } */
-            if vaa >= 1.4 || (asg.ordering_by_conflict && vaa >= 0.85) {
+            if (vaa < 1.0 && val > 1.1) || (asg.ordering_by_conflict && vaa >= 0.8) {
                 to_focus = true;
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
