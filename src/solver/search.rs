@@ -316,19 +316,6 @@ fn search(
         }
         if count_steps.is_multiple_of(10_000) {
             state.progress(asg, cdb);
-            {
-                state.flush("");
-                state.flush(format!(
-                    "{:>.3} | f{:>.3}, ={:>.3}, r{:>.3}",
-                    asg.activity_diffusion.trend(),
-                    state.search_mode_ratio.0.get(),
-                    state.search_mode_ratio.1.get(),
-                    state.search_mode_ratio.2.get(),
-                ))
-            }
-            // if state.span_manager.current_span() >= 8192 {
-            //     state.flush("deep search...");
-            // }
             if let Some(p) = state.elapsed() {
                 if 1.0 <= p {
                     return Err(SolverError::TimeOut);
