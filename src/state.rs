@@ -576,24 +576,21 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K {} {}|fcs.:{}, jmp.:{}, core:{}, /ppc:{}",
-            {
-                if self.span_manager.current_span() >= 16384 {
-                    "Long"
-                } else {
-                    "    "
-                }
-            },
+            "\x1B[2K  {}|fcsd:{}, jump:{}, core:{}, /ppc:{}",
             {
                 let s0 = self.search_mode_ratio.0.get();
                 let s1 = self.search_mode_ratio.1.get();
                 let s2 = self.search_mode_ratio.2.get();
                 if s0 >= s1 && s0 >= s2 {
-                    " Focus"
+                    if self.span_manager.current_span() >= 16384 {
+                        "Long focus"
+                    } else {
+                        "     Focus"
+                    }
                 } else if s1 >= s2 {
-                    "Stable"
+                    "    Stable"
                 } else {
-                    " Jumpy"
+                    "     Jumpy"
                 }
             },
             // fm!(
