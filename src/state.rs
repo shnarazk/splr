@@ -576,7 +576,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K  {}|fcsd:{}, jump:{}, core:{}, /ppc:{}",
+            "\x1B[2K  {}|fcs%:{}, jmp%:{}, core:{}, /ppc:{}",
             {
                 let s0 = self.search_mode_ratio.0.get();
                 let s1 = self.search_mode_ratio.1.get();
@@ -601,18 +601,18 @@ impl StateIF for State {
             //         .trend()
             // ),
             fm!(
-                "{:>9.4}",
+                "{:>9.2}",
                 self,
                 LogF64Id::ConflictDistanceAverage0,
-                self.search_mode_ratio.0.get(),
-                0.1
+                100.0 * self.search_mode_ratio.0.get(),
+                10.0
             ),
             fm!(
-                "{:>9.4}",
+                "{:>9.2}",
                 self,
                 LogF64Id::ConflictDistanceAverage2,
-                self.search_mode_ratio.2.get(),
-                0.1
+                100.0 * self.search_mode_ratio.2.get(),
+                10.0
             ),
             // fm!(
             //     "{:>9.4}",
