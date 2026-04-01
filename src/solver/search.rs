@@ -218,7 +218,7 @@ fn search(
 
     // monotonic increment counter
     let mut span_len: usize = 1;
-    let mut cooling_len: usize = 20;
+    let cooling_len: usize = 20;
     let mut processing_pressure: usize = 0;
     let mut ruduction_pressure: usize = 0;
     let processing_interval: usize = 40_000;
@@ -265,12 +265,28 @@ fn search(
         {
             let vaa = asg.conflict_distance_average.trend();
             let mut to_focus = false;
-            if vaa >= 1.4 {
+            /* if (1.0..=1.1).contains(&vaa) || (asg.ordering_by_conflict && vaa >= 0.8) {
                 to_focus = true;
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if vaa >= 0.75 {
+            } else if vaa > 1.0 {
+                state.search_mode_ratio.0.update(0.0);
+                state.search_mode_ratio.1.update(1.0);
+                state.search_mode_ratio.2.update(0.0);
+            } else {
+                RESTART!(asg, cdb, state);
+                asg.clear_asserted_literals(cdb)?;
+                state.search_mode_ratio.0.update(0.0);
+                state.search_mode_ratio.1.update(0.0);
+                state.search_mode_ratio.2.update(1.0);
+            } */
+            if vaa >= 1.4 || (asg.ordering_by_conflict && vaa >= 0.85) {
+                to_focus = true;
+                state.search_mode_ratio.0.update(1.0);
+                state.search_mode_ratio.1.update(0.0);
+                state.search_mode_ratio.2.update(0.0);
+            } else if vaa >= 0.8 {
                 state.search_mode_ratio.0.update(0.0);
                 state.search_mode_ratio.1.update(1.0);
                 state.search_mode_ratio.2.update(0.0);
@@ -286,10 +302,8 @@ fn search(
             dump_stage(asg, cdb, state, new_span);
             if to_focus {
                 asg.set_learning_rate(0.0);
-                cooling_len = 2 * state.span_manager.current_span();
             } else {
                 asg.set_learning_rate(state.config.vrw_learning_rate);
-                cooling_len = 20;
             };
             asg.toggle_order(!to_focus);
 
