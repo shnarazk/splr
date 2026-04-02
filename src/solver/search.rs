@@ -2,7 +2,7 @@
 #[cfg(feature = "trail_saving")]
 use crate::assign::TrailSavingIF;
 use {
-    super::{conflict::handle_conflict, Certificate, Solver, SolverEvent, SolverResult},
+    super::{Certificate, Solver, SolverEvent, SolverResult, conflict::handle_conflict},
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
         cdb::{self, ClauseDB, ClauseDBIF, VivifyIF},
@@ -273,7 +273,7 @@ fn search(
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if cda >= 0.75 && cdl >= 0.9 {
+            } else if cda >= 0.9 || cdl >= 0.95 {
                 state.search_mode_ratio.0.update(0.0);
                 state.search_mode_ratio.1.update(1.0);
                 state.search_mode_ratio.2.update(0.0);
