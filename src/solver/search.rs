@@ -2,7 +2,7 @@
 #[cfg(feature = "trail_saving")]
 use crate::assign::TrailSavingIF;
 use {
-    super::{Certificate, Solver, SolverEvent, SolverResult, conflict::handle_conflict},
+    super::{conflict::handle_conflict, Certificate, Solver, SolverEvent, SolverResult},
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
         cdb::{self, ClauseDB, ClauseDBIF, VivifyIF},
@@ -263,17 +263,17 @@ fn search(
             .span_manager
             .span_ended(span_len.saturating_sub(cooling_len))
         {
-            let vaa = asg.conflict_distance_average.0.trend();
-            let val = asg.conflict_distance_average.1.trend();
+            let cda = asg.conflict_distance_average.0.trend();
+            let cdl = asg.conflict_distance_average.1.trend();
             let mut to_focus = false;
-            if (!asg.ordering_by_conflict && vaa < 1.0 && val > 1.1)
-                || (asg.ordering_by_conflict && vaa >= 0.8)
+            if (!asg.ordering_by_conflict && cda < 1.0 && cdl > 1.1)
+                || (asg.ordering_by_conflict && cda >= 0.8)
             {
                 to_focus = true;
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if vaa >= 0.85 {
+            } else if cda >= 0.75 && cdl >= 0.9 {
                 state.search_mode_ratio.0.update(0.0);
                 state.search_mode_ratio.1.update(1.0);
                 state.search_mode_ratio.2.update(0.0);
@@ -292,7 +292,7 @@ fn search(
             } else {
                 asg.set_learning_rate(state.config.vrw_learning_rate);
             };
-            asg.toggle_order(!to_focus);
+            asg.use_conflict_order(to_focus);
 
             if asg.decision_level() == asg.root_level {
                 #[cfg(feature = "rephase")]
