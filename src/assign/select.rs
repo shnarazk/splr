@@ -48,7 +48,7 @@ pub trait VarSelectIF {
     /// rebuild the internal var_order
     fn rebuild_order(&mut self);
     /// change ordering criteria
-    fn toggle_order(&mut self, to_reward_order: bool);
+    fn use_conflict_order(&mut self, to_reward_order: bool);
 }
 
 impl VarSelectIF for AssignStack {
@@ -144,9 +144,9 @@ impl VarSelectIF for AssignStack {
             }
         }
     }
-    fn toggle_order(&mut self, to_reward_order: bool) {
-        if self.ordering_by_conflict == to_reward_order {
-            self.ordering_by_conflict = !to_reward_order;
+    fn use_conflict_order(&mut self, activate: bool) {
+        if self.ordering_by_conflict != activate {
+            self.ordering_by_conflict = activate;
             self.rebuild_order();
         }
     }
