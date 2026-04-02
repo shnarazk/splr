@@ -33,9 +33,7 @@ pub struct AssignStack {
     //## Hotspot handling
     //
     /// weighted confllict distance average
-    pub(crate) conflict_distance_average: (Ema2, Ema2),
-    // weighted conflict distance average working memory
-    // pub(crate) cda_tmp: (usize, usize),
+    pub(crate) conflict_interval_average: (Ema2, Ema2),
 
     //
     //## Phase handling
@@ -109,8 +107,7 @@ impl Default for AssignStack {
 
             num_reconflict: 0,
             num_repropagation: 0,
-            conflict_distance_average: (Ema2::new(40).with_slow(80), Ema2::new(40).with_slow(160)),
-            // cda_tmp: (0, 0),
+            conflict_interval_average: (Ema2::new(40).with_slow(80), Ema2::new(40).with_slow(160)),
             best_assign: false,
             build_best_at: 0,
             num_best_assign: 0,

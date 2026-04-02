@@ -2,7 +2,7 @@
 #[cfg(feature = "trail_saving")]
 use crate::assign::TrailSavingIF;
 use {
-    super::{conflict::handle_conflict, Certificate, Solver, SolverEvent, SolverResult},
+    super::{Certificate, Solver, SolverEvent, SolverResult, conflict::handle_conflict},
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
         cdb::{self, ClauseDB, ClauseDBIF, VivifyIF},
@@ -263,17 +263,17 @@ fn search(
             .span_manager
             .span_ended(span_len.saturating_sub(cooling_len))
         {
-            let cda = asg.conflict_distance_average.0.trend();
-            let cdl = asg.conflict_distance_average.1.trend();
+            let cia = asg.conflict_interval_average.0.trend();
+            let cil = asg.conflict_interval_average.1.trend();
             let mut to_focus = false;
-            if (!asg.ordering_by_conflict && cda < 1.0 && cdl > 1.1)
-                || (asg.ordering_by_conflict && cda >= 0.8)
+            if (!asg.ordering_by_conflict && cia < 1.0 && cil > 1.1)
+                || (asg.ordering_by_conflict && cia >= 0.8)
             {
                 to_focus = true;
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if cda + cdl >= 1.95 {
+            } else if cia + cil >= 1.95 {
                 state.search_mode_ratio.0.update(0.0);
                 state.search_mode_ratio.1.update(1.0);
                 state.search_mode_ratio.2.update(0.0);
