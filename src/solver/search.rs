@@ -2,7 +2,7 @@
 #[cfg(feature = "trail_saving")]
 use crate::assign::TrailSavingIF;
 use {
-    super::{Certificate, Solver, SolverEvent, SolverResult, conflict::handle_conflict},
+    super::{conflict::handle_conflict, Certificate, Solver, SolverEvent, SolverResult},
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
         cdb::{self, ClauseDB, ClauseDBIF, VivifyIF},
@@ -266,8 +266,8 @@ fn search(
             let cia = asg.conflict_interval_average.0.trend();
             let cil = asg.conflict_interval_average.1.trend();
             let mut to_focus = false;
-            if (!asg.ordering_by_conflict && cia < 1.0 && cil > 1.1)
-                || (asg.ordering_by_conflict && cia >= 0.8)
+            if (!asg.ordering_by_conflict && cia < 1.0 && cil > 1.05)
+                || (asg.ordering_by_conflict && cia >= 0.6)
             {
                 to_focus = true;
                 state.search_mode_ratio.0.update(1.0);
