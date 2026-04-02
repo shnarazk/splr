@@ -335,7 +335,6 @@ fn conflict_analyze(
     let mut trail_index = asg.stack_len() - 1;
     let mut max_lbd: u16 = 0;
     let mut cid_with_max_lbd: Option<ClauseId> = None;
-    // asg.cda_tmp = (0, 0);
     loop {
         match reason {
             AssignReason::BinaryLink(l) => {
@@ -459,11 +458,6 @@ fn conflict_analyze(
     if let Some(cid) = cid_with_max_lbd {
         cdb.update_at_analysis(asg, cid);
     }
-    // {
-    //     let d = asg.cda_tmp.0 as f64 / asg.cda_tmp.1 as f64;
-    //     asg.conflict_distance_average.0.update(d);
-    //     asg.conflict_distance_average.1.update(d);
-    // }
     // debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);
     learnt[0] = !p;
