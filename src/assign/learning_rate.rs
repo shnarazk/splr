@@ -16,11 +16,11 @@ impl ActivityIF<VarId> for AssignStack {
         self.var[vi].reward = val;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
-        if !self.var[vi].is(FlagVar::USED) {
-            self.cda_tmp.0 += 1;
-            self.cda_tmp.1 += self.num_conflict - self.var[vi].last_conflict;
-            self.var[vi].last_conflict = self.num_conflict;
-        }
+        // if !self.var[vi].is(FlagVar::USED) {
+        //     self.cda_tmp.0 += 1;
+        //     self.cda_tmp.1 += self.num_conflict - self.var[vi].last_conflict;
+        //     self.var[vi].last_conflict = self.num_conflict;
+        // }
         self.var[vi].turn_on(FlagVar::USED);
     }
     #[inline]
