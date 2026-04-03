@@ -13,7 +13,7 @@ use {
     },
     std::{
         fmt,
-        io::{Write, stdout},
+        io::{stdout, Write},
         ops::{Index, IndexMut},
     },
 };
@@ -110,7 +110,7 @@ pub struct State {
     //
     //## MISC
     //
-    /// search mode (focus, deep, restart) ratio
+    /// search mode (focus, pursue, explore) ratio
     pub search_mode_ratio: (Ema2, Ema2, Ema2),
     /// EMA of backjump levels
     pub b_lvl: Ema2,
@@ -576,21 +576,21 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K  {}|fcs%:{}, jmp%:{}, core:{}, /ppc:{}",
+            "\x1B[2K {}|fcs%:{}, exp%:{}, core:{}, /ppc:{}",
             {
                 let s0 = self.search_mode_ratio.0.get();
                 let s1 = self.search_mode_ratio.1.get();
                 let s2 = self.search_mode_ratio.2.get();
                 if s0 >= s1 && s0 >= s2 {
                     if self.span_manager.current_span() >= 16384 {
-                        "Long focus"
+                        " Long focus"
                     } else {
-                        "     Focus"
+                        "      Focus"
                     }
                 } else if s1 >= s2 {
-                    "    Stable"
+                    "     Pursue"
                 } else {
-                    "     Jumpy"
+                    "    Explore"
                 }
             },
             // fm!(

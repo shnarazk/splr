@@ -1,6 +1,7 @@
 ## 0.19.0
 
-- Adopt three search mode model: focus, stable, restart
+- Adopt three search mode model: focus, pursue, explore
+- Adopt *Variable Move To queue First* for focus mode and *LearningRate-based Rewarding* for the other modes
 - Switch to the O(1) Luby iterator. Now Luby sequence is used for
   - trigger for restarts, clause elimination, and clause vivification
   - clause DB size after clause reduction
