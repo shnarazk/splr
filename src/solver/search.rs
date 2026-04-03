@@ -266,7 +266,7 @@ fn search(
         {
             let cia = asg.conflict_interval_average.0.trend();
             let cil = asg.conflict_interval_average.1.trend();
-            if (!focused && cia < 1.0 && cil > 1.05) || (focused && cia > 1.0 && cil < 0.95) {
+            if (!focused && cia < 1.0 && cil > 1.02) || (focused && cia > 1.0 && cil < 0.98) {
                 focused = true;
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
