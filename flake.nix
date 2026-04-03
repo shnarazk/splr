@@ -48,6 +48,8 @@
                   # cargo-watch
                   # nixpkgs.lldb_19
                   sat-bench.packages.${system}.default
+                  tinymist
+                  typst
                 ];
             };
           }
