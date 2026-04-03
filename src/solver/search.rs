@@ -224,7 +224,7 @@ fn search(
     let processing_interval: usize = 40_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
-    let mut focused = false;
+    let mut focusing = false;
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -266,18 +266,18 @@ fn search(
         {
             let cia = asg.conflict_interval_average.0.trend();
             let cil = asg.conflict_interval_average.1.trend();
-            if (!focused && cia < 1.0 && cil > 1.02) || (focused && cia > 1.0 && cil < 0.98) {
-                focused = true;
+            if (!focusing && cia < 1.0 && cil > 1.02) || (focusing && cia > 1.0 && cil < 0.98) {
+                focusing = true;
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
             } else if cia + cil >= 1.95 {
-                focused = false;
+                focusing = false;
                 state.search_mode_ratio.0.update(0.0);
                 state.search_mode_ratio.1.update(1.0);
                 state.search_mode_ratio.2.update(0.0);
             } else {
-                focused = false;
+                focusing = false;
                 RESTART!(asg, cdb, state);
                 asg.clear_asserted_literals(cdb)?;
                 state.search_mode_ratio.0.update(0.0);
@@ -287,17 +287,17 @@ fn search(
             span_len = 0;
             let new_span = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, cdb, state, new_span);
-            if focused {
+            if focusing {
                 asg.set_learning_rate(0.0);
             } else {
                 asg.set_learning_rate(state.config.vrw_learning_rate);
             };
-            asg.use_conflict_order(focused);
+            asg.use_conflict_order(focusing);
 
             if asg.decision_level() == asg.root_level {
                 #[cfg(feature = "rephase")]
                 {
-                    if !focused && state.span_manager.current_span() == 1 {
+                    if !focusing && state.span_manager.current_span() == 1 {
                         asg.select_rephasing_target();
                     }
                 }
