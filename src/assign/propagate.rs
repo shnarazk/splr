@@ -311,8 +311,8 @@ impl PropagateIF for AssignStack {
                 self.ppc_ema.update(self.num_propagation);
                 self.num_conflict += 1;
                 {
-                    let d: f64 = (self.num_conflict - self.var[$lit.vi()].last_conflict) as f64;
-                    let f: f64 = 1.0 / d.log2();
+                    let d = self.num_conflict - self.var[$lit.vi()].last_conflict;
+                    let f: f64 = 1.0 / ((d + 1) as f64).log2();
                     self.conflict_interval_average.0.update(f);
                     self.conflict_interval_average.1.update(f);
                 }
