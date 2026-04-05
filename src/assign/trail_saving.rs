@@ -78,8 +78,13 @@ impl TrailSavingIF for AssignStack {
                     self.insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
+                // Somehow this pass exists if BT_deepen is activated.
+                (None, AssignReason::Implication(cid)) if cdb[cid].lit0() != lit => {
+                    self.insert_heap(vi);
+                    return self.truncate_trail_saved(i + 1);
+                }
+
                 (None, AssignReason::Implication(cid)) => {
-                    debug_assert_eq!(cdb[cid].lit0(), lit);
                     debug_assert!(
                         cdb[cid]
                             .iter()
