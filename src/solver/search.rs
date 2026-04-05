@@ -224,7 +224,7 @@ fn search(
     let processing_interval: usize = 40_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
-    let mut focusing = false;
+    let mut focusing: Option<bool> = None;
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -264,20 +264,52 @@ fn search(
             .span_manager
             .span_ended(span_len.saturating_sub(cooling_len))
         {
+            let h = asg.conflict_interval_average.0.get();
+            let hs = asg.conflict_interval_average.0.get_slow();
+            let l = asg.conflict_interval_average.1.get();
+            let ls = asg.conflict_interval_average.1.get_slow();
             let cia = asg.conflict_interval_average.0.trend();
             let cil = asg.conflict_interval_average.1.trend();
-            if (!focusing && cia <= 1.0 && cil > 1.0) || (focusing && cia >= 1.0 && cil < 1.0) {
-                focusing = true;
+            // (!focusing && cia <= 1.0 && cil > 1.0) || (focusing && cia >= 1.0 && cil < 1.0)
+            // (!focusing && l > 0.45) || (focusing && l < w)
+            if (focusing.is_none() && h < ls) || (focusing == Some(false) && cia > 1.0 && cil > 1.0)
+            {
+                if focusing != Some(false) {
+                    focusing = Some(false);
+                    // asg.conflict_interval_average.0.set_value(20.0);
+                    asg.set_learning_rate(0.0);
+                    asg.use_conflict_order(true);
+                }
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if cia + cil >= 1.96 {
-                focusing = false;
+            } else if (focusing.is_none() && l > hs)
+                || (focusing == Some(true) && cia < 1.0 && cil < 1.0)
+            {
+                if focusing != Some(true) {
+                    focusing = Some(true);
+                    // asg.conflict_interval_average.0.set_value(20.0);
+                    asg.set_learning_rate(0.0);
+                    asg.use_conflict_order(true);
+                }
+                state.search_mode_ratio.0.update(1.0);
+                state.search_mode_ratio.1.update(0.0);
+                state.search_mode_ratio.2.update(0.0);
+            } else if cia + cil >= 2.0 {
+                if focusing.is_some() {
+                    focusing = None;
+                    asg.set_learning_rate(state.config.vrw_learning_rate);
+                    asg.use_conflict_order(false);
+                }
                 state.search_mode_ratio.0.update(0.0);
                 state.search_mode_ratio.1.update(1.0);
                 state.search_mode_ratio.2.update(0.0);
             } else {
-                focusing = false;
+                if focusing.is_some() {
+                    focusing = None;
+                    asg.set_learning_rate(state.config.vrw_learning_rate);
+                    asg.use_conflict_order(false);
+                }
                 RESTART!(asg, cdb, state);
                 asg.clear_asserted_literals(cdb)?;
                 state.search_mode_ratio.0.update(0.0);
@@ -287,12 +319,6 @@ fn search(
             span_len = 0;
             let new_span = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, cdb, state, new_span);
-            if focusing {
-                asg.set_learning_rate(0.0);
-            } else {
-                asg.set_learning_rate(state.config.vrw_learning_rate);
-            };
-            asg.use_conflict_order(focusing);
 
             if asg.decision_level() == asg.root_level {
                 #[cfg(feature = "rephase")]
