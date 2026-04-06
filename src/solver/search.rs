@@ -270,13 +270,10 @@ fn search(
             let ls = asg.conflict_interval_average.1.get_slow();
             let cia = asg.conflict_interval_average.0.trend();
             let cil = asg.conflict_interval_average.1.trend();
-            // (!focusing && cia <= 1.0 && cil > 1.0) || (focusing && cia >= 1.0 && cil < 1.0)
-            // (!focusing && l > 0.45) || (focusing && l < w)
             if (focusing.is_none() && h < ls) || (focusing == Some(false) && cia > 1.0 && cil > 1.0)
             {
                 if focusing != Some(false) {
                     focusing = Some(false);
-                    // asg.conflict_interval_average.0.set_value(20.0);
                     asg.set_learning_rate(0.0);
                     asg.use_conflict_order(true);
                 }
@@ -288,7 +285,6 @@ fn search(
             {
                 if focusing != Some(true) {
                     focusing = Some(true);
-                    // asg.conflict_interval_average.0.set_value(20.0);
                     asg.set_learning_rate(0.0);
                     asg.use_conflict_order(true);
                 }
