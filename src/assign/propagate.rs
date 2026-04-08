@@ -314,19 +314,7 @@ impl PropagateIF for AssignStack {
                     let d = self.num_conflict - self.var[$lit.vi()].last_conflict;
                     let f: f64 = 1.0 / (d as f64 + 1.0).log2();
                     // let f: f64 = 1.0 / d as f64;
-
-                    let h = self.conflict_interval_average.0.get();
-                    let l = self.conflict_interval_average.1.get();
-                    if f > h {
-                        self.conflict_interval_average.0.update(f);
-                    } else {
-                        self.conflict_interval_average.0.update((f + h) / 2.0);
-                    }
-                    if f < l {
-                        self.conflict_interval_average.1.update(f);
-                    } else {
-                        self.conflict_interval_average.1.update((f + l) / 2.0);
-                    }
+                    self.conflict_interval_average.0.update(f);
                 }
                 self.var[$lit.vi()].last_conflict = self.num_conflict;
                 return Err(($lit, $reason));

@@ -9,6 +9,8 @@ pub mod cnf;
 pub mod ema;
 /// methods on flags used in Var and Clause
 pub mod flags;
+/// estimated distribution
+pub mod histgram;
 /// types used as index
 pub mod idx;
 /// methods on literals

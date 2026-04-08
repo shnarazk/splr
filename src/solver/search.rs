@@ -1,6 +1,7 @@
 //! Conflict-Driven Clause Learning Search engine
 #[cfg(feature = "trail_saving")]
 use crate::assign::TrailSavingIF;
+use crate::histgram::Histgram;
 use {
     super::{Certificate, Solver, SolverEvent, SolverResult, conflict::handle_conflict},
     crate::{
@@ -225,6 +226,8 @@ fn search(
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
     let mut focusing: Option<bool> = None;
+    let mut lbd_ema: Ema2 = Ema2::new(20).with_slow(1024);
+    let mut cii_hist: Histgram = Histgram::default();
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -253,25 +256,23 @@ fn search(
                 ruduction_pressure += 1;
                 processing_pressure += 1;
                 cdb.lbd.update(lbd);
+                if focusing.is_none() {
+                    lbd_ema.update(1.0 / lbd as f64);
+                }
             }
         }
         if ruduction_pressure >= processing_interval {
             cdb.reduce(asg, state.span_manager.envelop_index());
             ruduction_pressure = 0;
+            cii_hist.rescale(0.95);
         }
 
         if state
             .span_manager
             .span_ended(span_len.saturating_sub(cooling_len))
         {
-            let h = asg.conflict_interval_average.0.get();
-            let hs = asg.conflict_interval_average.0.get_slow();
-            let l = asg.conflict_interval_average.1.get();
-            let ls = asg.conflict_interval_average.1.get_slow();
-            let cia = asg.conflict_interval_average.0.trend();
-            let cil = asg.conflict_interval_average.1.trend();
-            if (focusing.is_none() && h < ls) || (focusing == Some(false) && cia > 1.0 && cil > 1.0)
-            {
+            let r = cii_hist.add(asg.conflict_interval_average.0.get_slow());
+            if (focusing.is_none() && r < 0.01) || (focusing == Some(false) && r < 0.6) {
                 if focusing != Some(false) {
                     focusing = Some(false);
                     asg.set_learning_rate(0.0);
@@ -280,9 +281,7 @@ fn search(
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if (focusing.is_none() && l > hs)
-                || (focusing == Some(true) && cia < 1.0 && cil < 1.0)
-            {
+            } else if (focusing.is_none() && r > 0.97) || (focusing == Some(true) && r > 0.45) {
                 if focusing != Some(true) {
                     focusing = Some(true);
                     asg.set_learning_rate(0.0);
@@ -291,7 +290,7 @@ fn search(
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if cia + cil >= 2.0 {
+            } else if r > 0.7 {
                 if focusing.is_some() {
                     focusing = None;
                     asg.set_learning_rate(state.config.vrw_learning_rate);
