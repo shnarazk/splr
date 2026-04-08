@@ -10,7 +10,7 @@ pub mod ema;
 /// methods on flags used in Var and Clause
 pub mod flags;
 /// estimated distribution
-pub mod histgram;
+pub mod histogram;
 /// types used as index
 pub mod idx;
 /// methods on literals
@@ -23,7 +23,8 @@ pub mod ordered_proxy;
 pub mod var;
 
 pub use self::{
-    clause::*, cnf::*, ema::*, flags::*, idx::*, lit::*, luby::*, ordered_proxy::*, var::*,
+    clause::*, cnf::*, ema::*, flags::*, histogram::*, idx::*, lit::*, luby::*, ordered_proxy::*,
+    var::*,
 };
 
 pub use crate::{assign::AssignReason, config::Config, solver::SolverEvent};

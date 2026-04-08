@@ -1,7 +1,6 @@
 //! Conflict-Driven Clause Learning Search engine
 #[cfg(feature = "trail_saving")]
 use crate::assign::TrailSavingIF;
-use crate::histgram::Histgram;
 use {
     super::{Certificate, Solver, SolverEvent, SolverResult, conflict::handle_conflict},
     crate::{
@@ -227,7 +226,7 @@ fn search(
     let progress_interval: usize = 10_000;
     let mut focusing: Option<bool> = None;
     let mut lbd_ema: Ema2 = Ema2::new(20).with_slow(1024);
-    let mut cii_hist: Histgram = Histgram::default();
+    let mut cii_hist: Histogram = Histogram::default();
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
