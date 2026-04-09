@@ -15,6 +15,7 @@ rust-version = "1.94"
 
 [dependencies]
 bitflags = "^2.8"
+cpu-time = "1.0"
 instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
 
 [features]

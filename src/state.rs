@@ -1,8 +1,13 @@
 /// Module `state` is a collection of internal data.
 #[cfg(feature = "platform_wasm")]
 use instant::{Duration, Instant};
+#[cfg(feature = "platform_wasm")]
+type StartTime = Instant;
 #[cfg(not(feature = "platform_wasm"))]
-use std::time::{Duration, Instant};
+use {cpu_time::ProcessTime, std::time::Duration};
+#[cfg(not(feature = "platform_wasm"))]
+type StartTime = ProcessTime;
+
 use {
     crate::{
         assign::{self, AssignIF},
@@ -13,7 +18,7 @@ use {
     },
     std::{
         fmt,
-        io::{stdout, Write},
+        io::{Write, stdout},
         ops::{Index, IndexMut},
     },
 };
@@ -135,7 +140,7 @@ pub struct State {
     /// progress of SLS
     pub sls_index: usize,
     /// start clock for timeout handling
-    pub start: Instant,
+    pub start: StartTime,
     /// upper limit for timeout handling
     pub time_limit: f64,
     /// logging facility.
@@ -171,7 +176,7 @@ impl Default for State {
             progress_cnt: 0,
             record: ProgressRecord::default(),
             sls_index: 0,
-            start: Instant::now(),
+            start: StartTime::now(),
             time_limit: 0.0,
             log_messages: Vec::new(),
             progress_report_rows: PROGRESS_REPORT_ROWS,
@@ -385,6 +390,7 @@ impl StateIF for State {
                 / Duration::from_secs(self.config.c_timeout as u64).as_secs_f64(),
         )
     }
+
     fn progress_header(&mut self) {
         if !self.config.splr_interface || self.config.quiet_mode {
             return;
