@@ -230,7 +230,7 @@ pub mod property {
                 TEma::ConflictPerRestart => self.cpr_ema.as_view(),
                 TEma::ConflictPerBaseRestart => self.cpr_ema.as_view(),
                 TEma::BestPhaseDivergenceRate => self.bp_divergence_ema.as_view(),
-                TEma::ConlictDistanceAverage => self.conflict_interval_average.0.as_view(),
+                TEma::ConlictDistanceAverage => self.conflict_interval_index.as_view(),
             }
         }
     }
