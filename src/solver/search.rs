@@ -225,8 +225,9 @@ fn search(
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
     let mut focusing: Option<bool> = None;
-    let mut lbd_ema: Ema2 = Ema2::new(20).with_slow(1024);
     let mut cii_hist: Histogram = Histogram::default();
+    let mut core_ema: Ema2 = Ema2::new(20).with_slow(1024);
+    let mut core_hist: Histogram = Histogram::default();
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -247,6 +248,11 @@ fn search(
         {
             cdb.update_activity_tick();
         }
+        {
+            let n = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+            let s = asg.len_upto(asg.decision_level().saturating_sub(1));
+            core_ema.update(s as f64 / n as f64);
+        }
         let lbd = handle_conflict(asg, cdb, state, &cc)?;
         match lbd.cmp(&1) {
             std::cmp::Ordering::Less => (),
@@ -255,23 +261,23 @@ fn search(
                 ruduction_pressure += 1;
                 processing_pressure += 1;
                 cdb.lbd.update(lbd);
-                if focusing.is_none() {
-                    lbd_ema.update(1.0 / lbd as f64);
-                }
             }
         }
         if ruduction_pressure >= processing_interval {
             cdb.reduce(asg, state.span_manager.envelop_index());
             ruduction_pressure = 0;
             cii_hist.rescale(0.95);
+            core_hist.rescale(0.95);
         }
 
         if state
             .span_manager
             .span_ended(span_len.saturating_sub(cooling_len))
         {
-            let r = cii_hist.add(asg.conflict_interval_average.0.get_slow());
-            if (focusing.is_none() && r < 0.01) || (focusing == Some(false) && r < 0.6) {
+            let r = cii_hist.add(asg.conflict_interval_index.get_slow());
+            let s = core_hist.add(core_ema.get_slow());
+            if (focusing.is_none() && 1.0 - s > 0.95) || (focusing == Some(false) && 1.0 - s > 0.7)
+            {
                 if focusing != Some(false) {
                     focusing = Some(false);
                     asg.set_learning_rate(0.0);
@@ -280,7 +286,7 @@ fn search(
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if (focusing.is_none() && r > 0.97) || (focusing == Some(true) && r > 0.45) {
+            } else if (focusing.is_none() && r > 0.95) || (focusing == Some(true) && r > 0.7) {
                 if focusing != Some(true) {
                     focusing = Some(true);
                     asg.set_learning_rate(0.0);
