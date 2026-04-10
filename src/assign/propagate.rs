@@ -1,7 +1,6 @@
 // implement boolean constraint propagation, backjump
 // This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::stack::{BOTTOM, FALSE, TRUE, lit_val_to_option},
     super::{AssignIF, AssignStack, VarManipulateIF, heap::VarHeapIF},
     crate::{cdb::ClauseDBIF, types::*},
 };
@@ -44,13 +43,13 @@ pub trait PropagateIF {
 #[cfg(feature = "unsafe_access")]
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
-        unsafe { lit_val_to_option(*$asg.lit_val.get_unchecked(2 * $var + 1)) }
+        unsafe { *$asg.lit_val.get_unchecked(2 * $var + 1) }
     };
 }
 #[cfg(not(feature = "unsafe_access"))]
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
-        lit_val_to_option($asg.lit_val[2 * $var + 1])
+        $asg.lit_val[2 * $var + 1]
     };
 }
 
@@ -58,7 +57,7 @@ macro_rules! var_assign {
 macro_rules! lit_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
-            l => unsafe { lit_val_to_option(*$asg.lit_val.get_unchecked(usize::from(l))) },
+            l => unsafe { *$asg.lit_val.get_unchecked(usize::from(l)) },
         }
     };
 }
@@ -66,7 +65,7 @@ macro_rules! lit_assign {
 macro_rules! lit_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
-            l => lit_val_to_option($asg.lit_val[usize::from(l)]),
+            l => $asg.lit_val[usize::from(l)],
         }
     };
 }
@@ -77,8 +76,8 @@ macro_rules! set_assign {
         match $lit {
             l => unsafe {
                 let ord = usize::from(l);
-                *$asg.lit_val.get_unchecked_mut(ord) = TRUE;
-                *$asg.lit_val.get_unchecked_mut(ord ^ 1) = FALSE;
+                *$asg.lit_val.get_unchecked_mut(ord) = Some(true);
+                *$asg.lit_val.get_unchecked_mut(ord ^ 1) = Some(false);
             },
         }
     };
@@ -89,18 +88,19 @@ macro_rules! set_assign {
         match $lit {
             l => {
                 let ord = usize::from(l);
-                $asg.lit_val[ord] = TRUE;
-                $asg.lit_val[ord ^ 1] = FALSE;
+                $asg.lit_val[ord] = Some(true);
+                $asg.lit_val[ord ^ 1] = Some(false);
             }
         }
     };
 }
 
 macro_rules! unset_assign {
-    ($asg: expr, $var: expr) => {
-        $asg.lit_val[2 * $var] = BOTTOM;
-        $asg.lit_val[2 * $var + 1] = BOTTOM;
-    };
+    ($asg: expr, $lit: expr) => {{
+        let ord = usize::from($lit);
+        $asg.lit_val[ord] = None;
+        $asg.lit_val[ord ^ 1] = None;
+    }};
 }
 
 impl PropagateIF for AssignStack {
@@ -205,7 +205,7 @@ impl PropagateIF for AssignStack {
         for i in lim..self.trail.len() {
             let l = self.trail[i];
             debug_assert!(
-                self.lit_val[2 * l.vi()] != BOTTOM || self.lit_val[2 * l.vi() + 1] != BOTTOM,
+                self.lit_val[usize::from(l)].is_some(),
                 "cancel_until found unassigned var in trail {}{:?}",
                 l.vi(),
                 &self.var[l.vi()],
@@ -232,13 +232,13 @@ impl PropagateIF for AssignStack {
                 continue;
             }
 
-            let phase = self.lit_val[2 * vi + 1] == TRUE;
+            let phase = bool::from(l);
             let v = &mut self.var[vi];
             #[cfg(feature = "trace_propagation")]
             v.turn_off(FlagVar::PROPAGATED);
             v.set(FlagVar::PHASE, phase);
 
-            unset_assign!(self, vi);
+            unset_assign!(self, l);
             if let AssignReason::Implication(cid) = self.var[vi].reason {
                 cdb[cid].turn_off(FlagClause::ASSIGN_REASON);
             }
@@ -286,7 +286,7 @@ impl PropagateIF for AssignStack {
             let l = self.trail[i];
             let vi = l.vi();
             debug_assert!(self.root_level < self.var[vi].level);
-            unset_assign!(self, vi);
+            unset_assign!(self, l);
             self.var[vi].reason = AssignReason::None;
             self.insert_heap(vi);
         }
@@ -732,11 +732,8 @@ impl AssignStack {
             self.best_phases.clear();
             for l in self.trail.iter().skip(self.len_upto(self.root_level)) {
                 let vi = l.vi();
-                let val = self.lit_val[2 * vi + 1];
-                if val != BOTTOM {
-                    let b = val == TRUE;
-                    self.best_phases.insert(vi, (b, self.var[vi].reason));
-                }
+                self.best_phases
+                    .insert(vi, (bool::from(*l), self.var[vi].reason));
             }
         }
         self.build_best_at = self.num_propagation;

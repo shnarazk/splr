@@ -12,23 +12,6 @@ use {
 #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
 use std::collections::HashMap;
 
-/// Literal value: unassigned
-pub(super) const BOTTOM: u8 = 0;
-/// Literal value: satisfied (literal evaluates to true)
-pub(super) const TRUE: u8 = 1;
-/// Literal value: falsified (literal evaluates to false)
-pub(super) const FALSE: u8 = 2;
-
-/// Convert a `lit_val` byte to `Option<bool>`.
-#[inline(always)]
-pub(super) fn lit_val_to_option(v: u8) -> Option<bool> {
-    match v {
-        TRUE => Some(true),
-        FALSE => Some(false),
-        _ => None,
-    }
-}
-
 /// A record of assignment. It's called 'trail' in Glucose.
 #[derive(Clone, Debug)]
 pub struct AssignStack {
@@ -100,8 +83,7 @@ pub struct AssignStack {
     pub(super) var: Vec<Var>,
     /// Literal-indexed assignment cache (SoA).
     /// Indexed by `Lit` ordinal: `lit_val[usize::from(lit)]`.
-    /// Values: BOTTOM (unassigned), TRUE (satisfied), FALSE (falsified).
-    pub(super) lit_val: Vec<u8>,
+    pub(super) lit_val: Vec<Option<bool>>,
 
     //
     //## Var Rewarding
@@ -193,7 +175,7 @@ impl Instantiate for AssignStack {
             num_vars: cnf.num_of_variables,
 
             var: Var::new_vars(nv),
-            lit_val: vec![BOTTOM; 2 * (nv + 1)],
+            lit_val: vec![None; 2 * (nv + 1)],
 
             activity_decay: 1.0 - config.vrw_learning_rate,
 
@@ -215,8 +197,8 @@ impl Instantiate for AssignStack {
                 self.expand_heap();
                 self.num_vars += 1;
                 self.var.push(Var::default());
-                self.lit_val.push(BOTTOM); // negative literal slot
-                self.lit_val.push(BOTTOM); // positive literal slot
+                self.lit_val.push(None); // negative literal slot
+                self.lit_val.push(None); // positive literal slot
             }
             e => panic!("don't call asg with {e:?}"),
         }
@@ -256,9 +238,7 @@ impl AssignIF for AssignStack {
         self.q_head < self.trail.len()
     }
     fn assign_ref(&self) -> Vec<Option<bool>> {
-        (0..self.var.len())
-            .map(|vi| lit_val_to_option(self.lit_val[2 * vi + 1]))
-            .collect()
+        self.lit_val.iter().skip(1).step_by(2).copied().collect()
     }
     fn best_assigned(&mut self) -> Option<usize> {
         (self.build_best_at == self.num_propagation).then_some(self.num_vars - self.num_best_assign)
@@ -398,16 +378,16 @@ pub trait VarManipulateIF {
 
 impl VarManipulateIF for AssignStack {
     fn assigned(&self, l: Lit) -> Option<bool> {
-        lit_val_to_option(self.lit_val[usize::from(l)])
+        self.lit_val[usize::from(l)]
     }
     #[inline]
     fn assign(&self, vi: VarId) -> Option<bool> {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            lit_val_to_option(*self.lit_val.get_unchecked(2 * vi + 1))
+            *self.lit_val.get_unchecked(2 * vi + 1)
         }
         #[cfg(not(feature = "unsafe_access"))]
-        lit_val_to_option(self.lit_val[2 * vi + 1])
+        self.lit_val[2 * vi + 1]
     }
     #[inline]
     fn level(&self, vi: VarId) -> DecisionLevel {
