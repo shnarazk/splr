@@ -221,13 +221,15 @@ fn search(
     let cooling_len: usize = 20;
     let mut processing_pressure: usize = 0;
     let mut ruduction_pressure: usize = 0;
-    let processing_interval: usize = 40_000;
+    let reduction_interval: usize = 40_000;
+    let processing_interval: usize = 30_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
     let mut focusing: Option<bool> = None;
     let mut cii_hist: Histogram = Histogram::default();
-    let mut core_ema: Ema2 = Ema2::new(20).with_slow(1024);
+    let mut core_ema: Ema = Ema::new(20);
     let mut core_hist: Histogram = Histogram::default();
+    let mut lbd_hist: Histogram = Histogram::default();
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -263,21 +265,22 @@ fn search(
                 cdb.lbd.update(lbd);
             }
         }
-        if ruduction_pressure >= processing_interval {
+        if ruduction_pressure >= reduction_interval {
             cdb.reduce(asg, state.span_manager.envelop_index());
             ruduction_pressure = 0;
             cii_hist.rescale(0.95);
             core_hist.rescale(0.95);
+            lbd_hist.rescale(0.95);
         }
 
         if state
             .span_manager
             .span_ended(span_len.saturating_sub(cooling_len))
         {
-            let r = cii_hist.add(asg.conflict_interval_index.get_slow());
-            let s = core_hist.add(core_ema.get_slow());
-            if (focusing.is_none() && 1.0 - s > 0.95) || (focusing == Some(false) && 1.0 - s > 0.7)
-            {
+            let r = cii_hist.add(asg.conflict_interval_index.get());
+            // let s = core_hist.add(core_ema.get());
+            let t = lbd_hist.add(1.0 / cdb.lbd.get());
+            if (focusing.is_none() && 1.0 - r > 0.9) || (focusing == Some(false) && 1.0 - r > 0.5) {
                 if focusing != Some(false) {
                     focusing = Some(false);
                     asg.set_learning_rate(0.0);
@@ -286,7 +289,7 @@ fn search(
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if (focusing.is_none() && r > 0.95) || (focusing == Some(true) && r > 0.7) {
+            } else if (focusing.is_none() && r > 0.9) || (focusing == Some(true) && r > 0.5) {
                 if focusing != Some(true) {
                     focusing = Some(true);
                     asg.set_learning_rate(0.0);
@@ -295,7 +298,9 @@ fn search(
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if r > 0.7 {
+            } else if
+            /* r + s + */
+            t > 0.8 {
                 if focusing.is_some() {
                     focusing = None;
                     asg.set_learning_rate(state.config.vrw_learning_rate);
