@@ -311,10 +311,21 @@ impl PropagateIF for AssignStack {
                     // let d = self.num_conflict - self.var[$lit.vi()].last_conflict;
                     // let f: f64 = 1.0 / (d as f64 + 1.0).log2();
                     // let f: f64 = 1.0 / d as f64;
-                    let f = self.var[$lit.vi()].reward;
+                    let vi = $lit.vi();
+                    #[cfg(feature = "unsafe_access")]
+                    let f = unsafe { self.var.get_unchecked(vi).reward };
+                    #[cfg(not(feature = "unsafe_access"))]
+                    let f = self.var[vi].reward;
                     self.conflict_interval_index.update(f);
+                    #[cfg(feature = "unsafe_access")]
+                    unsafe {
+                        self.var.get_unchecked_mut(vi).last_conflict = self.num_conflict
+                    };
+                    #[cfg(not(feature = "unsafe_access"))]
+                    {
+                        self.var[vi].last_conflict = self.num_conflict;
+                    }
                 }
-                self.var[$lit.vi()].last_conflict = self.num_conflict;
                 return Err(($lit, $reason));
             };
         }
@@ -375,6 +386,11 @@ impl PropagateIF for AssignStack {
                             blocker,
                             AssignReason::BinaryLink(propagating),
                             if cfg!(feature = "chrono_BT") {
+                                #[cfg(feature = "unsafe_access")]
+                                unsafe {
+                                    self.var.get_unchecked(propagating.vi()).level
+                                }
+                                #[cfg(not(feature = "unsafe_access"))]
                                 self.var[propagating.vi()].level
                             } else {
                                 dl
@@ -470,7 +486,14 @@ impl PropagateIF for AssignStack {
                         cdb[cid]
                             .iter()
                             .skip(1)
-                            .map(|l| self.var[l.vi()].level)
+                            .map(|l| {
+                                #[cfg(feature = "unsafe_access")]
+                                unsafe {
+                                    self.var.get_unchecked(l.vi()).level
+                                }
+                                #[cfg(not(feature = "unsafe_access"))]
+                                self.var[l.vi()].level
+                            })
                             .max()
                             .unwrap_or(self.root_level)
                     } else {
