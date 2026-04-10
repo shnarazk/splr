@@ -221,10 +221,15 @@ fn search(
     let cooling_len: usize = 20;
     let mut processing_pressure: usize = 0;
     let mut ruduction_pressure: usize = 0;
-    let processing_interval: usize = 40_000;
+    let reduction_interval: usize = 40_000;
+    let processing_interval: usize = 30_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
-    let mut focusing = false;
+    let mut focusing: Option<bool> = None;
+    let mut cii_hist: Histogram = Histogram::default();
+    let mut core_ema: Ema = Ema::new(20);
+    let mut core_hist: Histogram = Histogram::default();
+    let mut lbd_hist: Histogram = Histogram::default();
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -245,6 +250,11 @@ fn search(
         {
             cdb.update_activity_tick();
         }
+        {
+            let n = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+            let s = asg.len_upto(asg.decision_level().saturating_sub(1));
+            core_ema.update(s as f64 / n as f64);
+        }
         let lbd = handle_conflict(asg, cdb, state, &cc)?;
         match lbd.cmp(&1) {
             std::cmp::Ordering::Less => (),
@@ -255,29 +265,56 @@ fn search(
                 cdb.lbd.update(lbd);
             }
         }
-        if ruduction_pressure >= processing_interval {
+        if ruduction_pressure >= reduction_interval {
             cdb.reduce(asg, state.span_manager.envelop_index());
             ruduction_pressure = 0;
+            cii_hist.rescale(0.95);
+            core_hist.rescale(0.95);
+            lbd_hist.rescale(0.95);
         }
 
         if state
             .span_manager
             .span_ended(span_len.saturating_sub(cooling_len))
         {
-            let cia = asg.conflict_interval_average.0.trend();
-            let cil = asg.conflict_interval_average.1.trend();
-            if (!focusing && cia <= 1.0 && cil > 1.0) || (focusing && cia >= 1.0 && cil < 1.0) {
-                focusing = true;
+            let r = cii_hist.add(asg.conflict_interval_index.get());
+            // let s = core_hist.add(core_ema.get());
+            let t = lbd_hist.add(1.0 / cdb.lbd.get());
+            if (focusing.is_none() && 1.0 - r > 0.9) || (focusing == Some(false) && 1.0 - r > 0.5) {
+                if focusing != Some(false) {
+                    focusing = Some(false);
+                    asg.set_learning_rate(0.0);
+                    asg.use_conflict_order(true);
+                }
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if cia + cil >= 1.96 {
-                focusing = false;
+            } else if (focusing.is_none() && r > 0.9) || (focusing == Some(true) && r > 0.5) {
+                if focusing != Some(true) {
+                    focusing = Some(true);
+                    asg.set_learning_rate(0.0);
+                    asg.use_conflict_order(true);
+                }
+                state.search_mode_ratio.0.update(1.0);
+                state.search_mode_ratio.1.update(0.0);
+                state.search_mode_ratio.2.update(0.0);
+            } else if
+            /* r + s + */
+            t > 0.8 {
+                if focusing.is_some() {
+                    focusing = None;
+                    asg.set_learning_rate(state.config.vrw_learning_rate);
+                    asg.use_conflict_order(false);
+                }
                 state.search_mode_ratio.0.update(0.0);
                 state.search_mode_ratio.1.update(1.0);
                 state.search_mode_ratio.2.update(0.0);
             } else {
-                focusing = false;
+                if focusing.is_some() {
+                    focusing = None;
+                    asg.set_learning_rate(state.config.vrw_learning_rate);
+                    asg.use_conflict_order(false);
+                }
                 RESTART!(asg, cdb, state);
                 asg.clear_asserted_literals(cdb)?;
                 state.search_mode_ratio.0.update(0.0);
@@ -287,12 +324,6 @@ fn search(
             span_len = 0;
             let new_span = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, cdb, state, new_span);
-            if focusing {
-                asg.set_learning_rate(0.0);
-            } else {
-                asg.set_learning_rate(state.config.vrw_learning_rate);
-            };
-            asg.use_conflict_order(focusing);
 
             if asg.decision_level() == asg.root_level {
                 #[cfg(feature = "rephase")]

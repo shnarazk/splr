@@ -978,6 +978,7 @@ impl ClauseDBIF for ClauseDB {
         self.leanrt_limit_ema
             .update(2_usize.pow(envelope as u32) as f64);
         let limit: usize = self.leanrt_limit_ema.get() as usize;
+        let mut nprotect: usize = 0;
         if self.num_learnt < limit {
             return;
         }
@@ -992,7 +993,8 @@ impl ClauseDBIF for ClauseDB {
             c.update_activity(*tick, *activity_decay, 0.0);
 
             if c.is(FlagClause::ASSIGN_REASON) {
-                c.used = 0;
+                // c.used = 0;
+                nprotect += 1;
                 continue;
             }
             if !c.is(FlagClause::LEARNT) {
@@ -1011,7 +1013,7 @@ impl ClauseDBIF for ClauseDB {
             .saturating_sub(self.num_learnt.saturating_sub(limit));
         self.reduction_threshold = keep as f64 / self.num_learnt as f64;
         perm.sort();
-        for i in perm.iter().skip(keep) {
+        for i in perm.iter().skip(keep + nprotect) {
             self.remove_clause(ClauseId::from(i.to()));
         }
     }
