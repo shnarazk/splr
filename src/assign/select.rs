@@ -4,6 +4,7 @@
 use super::property;
 
 use {
+    super::stack::lit_val_to_option,
     super::{heap::VarHeapIF, stack::AssignStack},
     crate::types::*,
     std::collections::HashMap,
@@ -15,13 +16,13 @@ use {
 #[cfg(feature = "unsafe_access")]
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
-        unsafe { $asg.var.get_unchecked($var).assign }
+        unsafe { lit_val_to_option(*$asg.lit_val.get_unchecked(2 * $var + 1)) }
     };
 }
 #[cfg(not(feature = "unsafe_access"))]
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
-        $asg.assign[$var]
+        lit_val_to_option($asg.lit_val[2 * $var + 1])
     };
 }
 
@@ -64,7 +65,8 @@ impl VarSelectIF for AssignStack {
                     Some((
                         vi,
                         self.best_phases.get(&vi).map_or(
-                            self.var[vi].assign.unwrap_or_else(|| v.is(FlagVar::PHASE)),
+                            lit_val_to_option(self.lit_val[2 * vi + 1])
+                                .unwrap_or_else(|| v.is(FlagVar::PHASE)),
                             |(b, _)| *b,
                         ),
                     ))
@@ -110,7 +112,7 @@ impl VarSelectIF for AssignStack {
         debug_assert!(
             self.best_phases
                 .iter()
-                .all(|(vi, b)| self.var[*vi].assign != Some(!b.0))
+                .all(|(vi, b)| lit_val_to_option(self.lit_val[2 * *vi + 1]) != Some(!b.0))
         );
         self.num_rephase += 1;
         for (vi, (b, _)) in self.best_phases.iter() {
@@ -123,7 +125,7 @@ impl VarSelectIF for AssignStack {
         if self
             .best_phases
             .iter()
-            .any(|(vi, b)| self.var[*vi].assign == Some(!b.0))
+            .any(|(vi, b)| lit_val_to_option(self.lit_val[2 * *vi + 1]) == Some(!b.0))
         {
             self.best_phases.clear();
             self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;

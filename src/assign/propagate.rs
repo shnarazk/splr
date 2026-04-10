@@ -1,6 +1,7 @@
 // implement boolean constraint propagation, backjump
 // This version can handle Chronological and Non Chronological Backtrack.
 use {
+    super::stack::{BOTTOM, FALSE, TRUE, lit_val_to_option},
     super::{AssignIF, AssignStack, VarManipulateIF, heap::VarHeapIF},
     crate::{cdb::ClauseDBIF, types::*},
 };
@@ -43,13 +44,13 @@ pub trait PropagateIF {
 #[cfg(feature = "unsafe_access")]
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
-        unsafe { $asg.var.get_unchecked($var).assign }
+        unsafe { lit_val_to_option(*$asg.lit_val.get_unchecked(2 * $var + 1)) }
     };
 }
 #[cfg(not(feature = "unsafe_access"))]
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
-        $asg.assign[$var]
+        lit_val_to_option($asg.lit_val[2 * $var + 1])
     };
 }
 
@@ -57,10 +58,7 @@ macro_rules! var_assign {
 macro_rules! lit_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
-            l => match unsafe { $asg.var.get_unchecked(l.vi()).assign } {
-                Some(x) if !bool::from(l) => Some(!x),
-                x => x,
-            },
+            l => unsafe { lit_val_to_option(*$asg.lit_val.get_unchecked(usize::from(l))) },
         }
     };
 }
@@ -68,10 +66,7 @@ macro_rules! lit_assign {
 macro_rules! lit_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
-            l => match $asg.assign[l.vi()] {
-                Some(x) if !bool::from(l) => Some(!x),
-                x => x,
-            },
+            l => lit_val_to_option($asg.lit_val[usize::from(l)]),
         }
     };
 }
@@ -81,8 +76,9 @@ macro_rules! set_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
             l => unsafe {
-                let vi = l.vi();
-                $asg.var.get_unchecked_mut(vi).assign = Some(bool::from(l));
+                let ord = usize::from(l);
+                *$asg.lit_val.get_unchecked_mut(ord) = TRUE;
+                *$asg.lit_val.get_unchecked_mut(ord ^ 1) = FALSE;
             },
         }
     };
@@ -92,8 +88,9 @@ macro_rules! set_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
             l => {
-                let vi = l.vi();
-                $asg.assign[vi] = Some(bool::from(l));
+                let ord = usize::from(l);
+                $asg.lit_val[ord] = TRUE;
+                $asg.lit_val[ord ^ 1] = FALSE;
             }
         }
     };
@@ -101,7 +98,8 @@ macro_rules! set_assign {
 
 macro_rules! unset_assign {
     ($asg: expr, $var: expr) => {
-        $asg.var[$var].assign = None;
+        $asg.lit_val[2 * $var] = BOTTOM;
+        $asg.lit_val[2 * $var + 1] = BOTTOM;
     };
 }
 
@@ -142,10 +140,10 @@ impl PropagateIF for AssignStack {
             var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none(),
             "wrong assignmentto {:?}: {:?} by {:?} ",
             l,
-            self.var[vi].assign,
+            var_assign!(self, vi),
             reason
         );
-        debug_assert_eq!(self.var[vi].assign, None);
+        debug_assert_eq!(var_assign!(self, vi), None);
         debug_assert_eq!(self.var[vi].reason, AssignReason::None);
         debug_assert_ne!(self.var[vi].reason, reason);
         debug_assert!(self.trail.iter().all(|rl| *rl != l));
@@ -177,7 +175,7 @@ impl PropagateIF for AssignStack {
         let v = &mut self.var[vi];
         v.level = dl;
         debug_assert!(!v.is(FlagVar::ELIMINATED));
-        debug_assert_eq!(self.var[vi].assign, None);
+        debug_assert_eq!(var_assign!(self, vi), None);
         debug_assert_eq!(self.var[vi].reason, AssignReason::None);
         set_assign!(self, l);
         self.var[vi].reason = AssignReason::Decision(self.decision_level());
@@ -207,7 +205,7 @@ impl PropagateIF for AssignStack {
         for i in lim..self.trail.len() {
             let l = self.trail[i];
             debug_assert!(
-                self.var[l.vi()].assign.is_some(),
+                self.lit_val[2 * l.vi()] != BOTTOM || self.lit_val[2 * l.vi() + 1] != BOTTOM,
                 "cancel_until found unassigned var in trail {}{:?}",
                 l.vi(),
                 &self.var[l.vi()],
@@ -234,10 +232,11 @@ impl PropagateIF for AssignStack {
                 continue;
             }
 
+            let phase = self.lit_val[2 * vi + 1] == TRUE;
             let v = &mut self.var[vi];
             #[cfg(feature = "trace_propagation")]
             v.turn_off(FlagVar::PROPAGATED);
-            v.set(FlagVar::PHASE, v.assign.unwrap());
+            v.set(FlagVar::PHASE, phase);
 
             unset_assign!(self, vi);
             if let AssignReason::Implication(cid) = self.var[vi].reason {
@@ -272,9 +271,7 @@ impl PropagateIF for AssignStack {
             self.cpr_ema.update(self.num_conflict);
         }
 
-        debug_assert!(
-            self.q_head == 0 || self.var[self.trail[self.q_head - 1].vi()].assign.is_some()
-        );
+        debug_assert!(self.q_head == 0 || self.assign(self.trail[self.q_head - 1].vi()).is_some());
         #[cfg(feature = "trace_propagation")]
         debug_assert!(
             self.q_head == 0 || self.var[self.trail[self.q_head - 1].vi()].is(FlagVar::PROPAGATED)
@@ -469,7 +466,7 @@ impl PropagateIF for AssignStack {
                     cached,
                     AssignReason::Implication(cid),
                     if cfg!(feature = "chrono_BT") {
-                        debug_assert!(self.var[cdb[cid].lit0().vi()].assign.is_none());
+                        debug_assert!(self.assign(cdb[cid].lit0().vi()).is_none());
                         cdb[cid]
                             .iter()
                             .skip(1)
@@ -712,7 +709,9 @@ impl AssignStack {
             self.best_phases.clear();
             for l in self.trail.iter().skip(self.len_upto(self.root_level)) {
                 let vi = l.vi();
-                if let Some(b) = self.var[vi].assign {
+                let val = self.lit_val[2 * vi + 1];
+                if val != BOTTOM {
+                    let b = val == TRUE;
                     self.best_phases.insert(vi, (b, self.var[vi].reason));
                 }
             }
