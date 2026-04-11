@@ -21,7 +21,6 @@ instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
 [features]
 default = [
     ### Essential
-    "unsafe_access",
     # "chrono_BT",
     "trail_saving",
     "BT_deepen",
@@ -65,7 +64,6 @@ trace_analysis = []             # for debug
 trace_elimination = []          # for debug
 trace_propagation = []          # for debug
 trail_saving = []               # reduce propagation cost by reusing propagation chain
-unsafe_access = []              # access elements of vectors without boundary checking
 
 [profile.release]
 lto = "fat"

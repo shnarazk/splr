@@ -17,6 +17,7 @@
 - remove feature 'suppress_reason_chain'
 - remove feature 'trace_equivalency'
 - remove feature 'two_mode_reduction'
+- remove feature 'unsafe_access'
 - rename feature 'debug_propagation' to 'trace_propagation'
 - remove src/solver/restart.rs
 

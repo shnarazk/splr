@@ -12,16 +12,9 @@ use {
 /// ```ignore
 /// let x: Option<bool> = var_assign!(self, lit.vi());
 /// ```
-#[cfg(feature = "unsafe_access")]
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
         unsafe { *$asg.lit_val.get_unchecked(2 * $var + 1) }
-    };
-}
-#[cfg(not(feature = "unsafe_access"))]
-macro_rules! var_assign {
-    ($asg: expr, $var: expr) => {
-        $asg.lit_val[2 * $var + 1]
     };
 }
 

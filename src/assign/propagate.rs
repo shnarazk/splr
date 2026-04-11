@@ -40,20 +40,12 @@ pub trait PropagateIF {
     fn clear_asserted_literals(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent;
 }
 
-#[cfg(feature = "unsafe_access")]
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
         unsafe { *$asg.lit_val.get_unchecked(2 * $var + 1) }
     };
 }
-#[cfg(not(feature = "unsafe_access"))]
-macro_rules! var_assign {
-    ($asg: expr, $var: expr) => {
-        $asg.lit_val[2 * $var + 1]
-    };
-}
 
-#[cfg(feature = "unsafe_access")]
 macro_rules! lit_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
@@ -61,16 +53,7 @@ macro_rules! lit_assign {
         }
     };
 }
-#[cfg(not(feature = "unsafe_access"))]
-macro_rules! lit_assign {
-    ($asg: expr, $lit: expr) => {
-        match $lit {
-            l => $asg.lit_val[usize::from(l)],
-        }
-    };
-}
 
-#[cfg(feature = "unsafe_access")]
 macro_rules! set_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
@@ -79,18 +62,6 @@ macro_rules! set_assign {
                 *$asg.lit_val.get_unchecked_mut(ord) = Some(true);
                 *$asg.lit_val.get_unchecked_mut(ord ^ 1) = Some(false);
             },
-        }
-    };
-}
-#[cfg(not(feature = "unsafe_access"))]
-macro_rules! set_assign {
-    ($asg: expr, $lit: expr) => {
-        match $lit {
-            l => {
-                let ord = usize::from(l);
-                $asg.lit_val[ord] = Some(true);
-                $asg.lit_val[ord ^ 1] = Some(false);
-            }
         }
     };
 }
@@ -374,12 +345,7 @@ impl PropagateIF for AssignStack {
                             blocker,
                             AssignReason::BinaryLink(propagating),
                             if cfg!(feature = "chrono_BT") {
-                                #[cfg(feature = "unsafe_access")]
-                                unsafe {
-                                    self.var.get_unchecked(propagating.vi()).level
-                                }
-                                #[cfg(not(feature = "unsafe_access"))]
-                                self.var[propagating.vi()].level
+                                unsafe { self.var.get_unchecked(propagating.vi()).level }
                             } else {
                                 dl
                             },
@@ -474,14 +440,7 @@ impl PropagateIF for AssignStack {
                         cdb[cid]
                             .iter()
                             .skip(1)
-                            .map(|l| {
-                                #[cfg(feature = "unsafe_access")]
-                                unsafe {
-                                    self.var.get_unchecked(l.vi()).level
-                                }
-                                #[cfg(not(feature = "unsafe_access"))]
-                                self.var[l.vi()].level
-                            })
+                            .map(|l| unsafe { self.var.get_unchecked(l.vi()).level })
                             .max()
                             .unwrap_or(self.root_level)
                     } else {

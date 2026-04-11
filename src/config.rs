@@ -264,8 +264,6 @@ impl Config {
                 "trail saving",
                 #[cfg(feature = "BT_deepen")]
                 "backtrack-to-deeper-level",
-                #[cfg(feature = "unsafe_access")]
-                "unsafe access",
             ];
             println!(
                 "{}\nActivated features: {}\n{}",
