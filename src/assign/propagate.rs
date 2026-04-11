@@ -69,8 +69,10 @@ macro_rules! set_assign {
 macro_rules! unset_assign {
     ($asg: expr, $lit: expr) => {{
         let ord = usize::from($lit);
-        $asg.lit_val[ord] = None;
-        $asg.lit_val[ord ^ 1] = None;
+        unsafe {
+            *$asg.lit_val.get_unchecked_mut(ord) = None;
+            *$asg.lit_val.get_unchecked_mut(ord ^ 1) = None;
+        }
     }};
 }
 
@@ -120,8 +122,10 @@ impl PropagateIF for AssignStack {
         debug_assert!(self.trail.iter().all(|rl| *rl != l));
         set_assign!(self, l);
 
-        self.var[vi].level = lv;
-        self.var[vi].reason = reason;
+        // SAFETY: vi = l.vi(), already debug_assert!(l.vi() < self.var.len()) at top
+        let v = unsafe { self.var.get_unchecked_mut(vi) };
+        v.level = lv;
+        v.reason = reason;
         self.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
@@ -168,7 +172,8 @@ impl PropagateIF for AssignStack {
         let mut unpropagated: Vec<Lit> = Vec::new();
 
         // We assume that backtrack is never happened in level zero.
-        let lim = self.trail_lim[lv as usize];
+        // SAFETY: lv < trail_lim.len() is guaranteed by the early-return check above
+        let lim = unsafe { *self.trail_lim.get_unchecked(lv as usize) };
 
         #[cfg(feature = "trail_saving")]
         self.save_trail(lv);
@@ -182,6 +187,7 @@ impl PropagateIF for AssignStack {
                 &self.var[l.vi()],
             );
             let vi = l.vi();
+            debug_assert!(vi < self.var.len());
             #[cfg(feature = "trace_propagation")]
             debug_assert!(
                 self.q_head <= i || self.var[vi].is(Flag::PROPAGATED),
@@ -198,22 +204,23 @@ impl PropagateIF for AssignStack {
             );
 
             #[cfg(feature = "chrono_BT")]
-            if self.var[vi].level <= lv {
+            if unsafe { self.var.get_unchecked(vi) }.level <= lv {
                 unpropagated.push(l);
                 continue;
             }
 
             let phase = bool::from(l);
-            let v = &mut self.var[vi];
+            // SAFETY: vi < self.var.len() per debug_assert! above
+            let v = unsafe { self.var.get_unchecked_mut(vi) };
             #[cfg(feature = "trace_propagation")]
             v.turn_off(FlagVar::PROPAGATED);
             v.set(FlagVar::PHASE, phase);
 
             unset_assign!(self, l);
-            if let AssignReason::Implication(cid) = self.var[vi].reason {
+            if let AssignReason::Implication(cid) = unsafe { self.var.get_unchecked(vi) }.reason {
                 cdb[cid].turn_off(FlagClause::ASSIGN_REASON);
             }
-            self.var[vi].reason = AssignReason::None;
+            unsafe { self.var.get_unchecked_mut(vi) }.reason = AssignReason::None;
 
             #[cfg(not(feature = "trail_saving"))]
             {
