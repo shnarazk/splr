@@ -308,23 +308,11 @@ impl PropagateIF for AssignStack {
                 self.ppc_ema.update(self.num_propagation);
                 self.num_conflict += 1;
                 {
-                    // let d = self.num_conflict - self.var[$lit.vi()].last_conflict;
-                    // let f: f64 = 1.0 / (d as f64 + 1.0).log2();
-                    // let f: f64 = 1.0 / d as f64;
                     let vi = $lit.vi();
-                    #[cfg(feature = "unsafe_access")]
-                    let f = unsafe { self.var.get_unchecked(vi).reward };
-                    #[cfg(not(feature = "unsafe_access"))]
-                    let f = self.var[vi].reward;
+                    let d = self.num_conflict - unsafe { self.var.get_unchecked(vi).last_conflict };
+                    let f: f64 = 1.0 / (d as f64 + 1.0).log2();
                     self.conflict_interval_index.update(f);
-                    #[cfg(feature = "unsafe_access")]
-                    unsafe {
-                        self.var.get_unchecked_mut(vi).last_conflict = self.num_conflict
-                    };
-                    #[cfg(not(feature = "unsafe_access"))]
-                    {
-                        self.var[vi].last_conflict = self.num_conflict;
-                    }
+                    unsafe { self.var.get_unchecked_mut(vi).last_conflict = self.num_conflict };
                 }
                 return Err(($lit, $reason));
             };
