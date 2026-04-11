@@ -229,7 +229,7 @@ fn search(
     let mut cii_hist: Histogram = Histogram::default();
     let mut core_ema: Ema = Ema::new(20);
     let mut core_hist: Histogram = Histogram::default();
-    let mut lbd_hist: Histogram = Histogram::default();
+    // let mut lbd_hist: Histogram = Histogram::default();
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -263,6 +263,9 @@ fn search(
                 ruduction_pressure += 1;
                 processing_pressure += 1;
                 cdb.lbd.update(lbd);
+                // if focusing.is_none() {
+                //     cdb.lbd.update(lbd);
+                // }
             }
         }
         if ruduction_pressure >= reduction_interval {
@@ -270,7 +273,7 @@ fn search(
             ruduction_pressure = 0;
             cii_hist.rescale(0.95);
             core_hist.rescale(0.95);
-            lbd_hist.rescale(0.95);
+            // lbd_hist.rescale(0.95);
         }
 
         if state
@@ -278,9 +281,9 @@ fn search(
             .span_ended(span_len.saturating_sub(cooling_len))
         {
             let r = cii_hist.add(asg.conflict_interval_index.get());
-            // let s = core_hist.add(core_ema.get());
-            let t = lbd_hist.add(1.0 / cdb.lbd.get());
-            if (focusing.is_none() && 1.0 - r > 0.9) || (focusing == Some(false) && 1.0 - r > 0.5) {
+            let s = core_hist.add(core_ema.get());
+            // let t = lbd_hist.add(1.0 / cdb.lbd.get());
+            if (focusing.is_none() && r < 0.1) || (focusing == Some(false) && r < 0.2) {
                 if focusing != Some(false) {
                     focusing = Some(false);
                     asg.set_learning_rate(0.0);
@@ -289,7 +292,7 @@ fn search(
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if (focusing.is_none() && r > 0.9) || (focusing == Some(true) && r > 0.5) {
+            } else if (focusing.is_none() && r > 0.9) || (focusing == Some(true) && r > 0.8) {
                 if focusing != Some(true) {
                     focusing = Some(true);
                     asg.set_learning_rate(0.0);
@@ -298,9 +301,7 @@ fn search(
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if
-            /* r + s + */
-            t > 0.8 {
+            } else if !(0.25..0.75).contains(&s) {
                 if focusing.is_some() {
                     focusing = None;
                     asg.set_learning_rate(state.config.vrw_learning_rate);

@@ -8,8 +8,6 @@ use {
 /// Object representing a variable.
 #[derive(Clone, Debug)]
 pub struct Var {
-    /// assignment
-    pub(crate) assign: Option<bool>,
     /// decision level
     pub(crate) level: DecisionLevel,
     /// assign Reason
@@ -28,7 +26,6 @@ pub struct Var {
 impl Default for Var {
     fn default() -> Var {
         Var {
-            assign: None,
             level: 0,
             reason: AssignReason::None,
             #[cfg(feature = "trail_saving")]

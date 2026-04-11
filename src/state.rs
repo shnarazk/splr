@@ -75,24 +75,14 @@ impl Index<Stat> for [usize] {
     type Output = usize;
     #[inline]
     fn index(&self, i: Stat) -> &usize {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.get_unchecked(i as usize)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self[i as usize]
+        unsafe { self.get_unchecked(i as usize) }
     }
 }
 
 impl IndexMut<Stat> for [usize] {
     #[inline]
     fn index_mut(&mut self, i: Stat) -> &mut usize {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.get_unchecked_mut(i as usize)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self[i as usize]
+        unsafe { self.get_unchecked_mut(i as usize) }
     }
 }
 
@@ -188,24 +178,14 @@ impl Index<Stat> for State {
     type Output = usize;
     #[inline]
     fn index(&self, i: Stat) -> &usize {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.stats.get_unchecked(i as usize)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self.stats[i as usize]
+        unsafe { self.stats.get_unchecked(i as usize) }
     }
 }
 
 impl IndexMut<Stat> for State {
     #[inline]
     fn index_mut(&mut self, i: Stat) -> &mut usize {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.stats.get_unchecked_mut(i as usize)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self.stats[i as usize]
+        unsafe { self.stats.get_unchecked_mut(i as usize) }
     }
 }
 
@@ -852,24 +832,14 @@ impl Index<LogUsizeId> for State {
     type Output = usize;
     #[inline]
     fn index(&self, i: LogUsizeId) -> &Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.record.vali.get_unchecked(i as usize)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self.record.vali[i as usize]
+        unsafe { self.record.vali.get_unchecked(i as usize) }
     }
 }
 
 impl IndexMut<LogUsizeId> for State {
     #[inline]
     fn index_mut(&mut self, i: LogUsizeId) -> &mut Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.record.vali.get_unchecked_mut(i as usize)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self.record.vali[i as usize]
+        unsafe { self.record.vali.get_unchecked_mut(i as usize) }
     }
 }
 
@@ -877,24 +847,14 @@ impl Index<LogF64Id> for State {
     type Output = f64;
     #[inline]
     fn index(&self, i: LogF64Id) -> &Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.record.valf.get_unchecked(i as usize)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self.record.valf[i as usize]
+        unsafe { self.record.valf.get_unchecked(i as usize) }
     }
 }
 
 impl IndexMut<LogF64Id> for State {
     #[inline]
     fn index_mut(&mut self, i: LogF64Id) -> &mut Self::Output {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.record.valf.get_unchecked_mut(i as usize)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self.record.valf[i as usize]
+        unsafe { self.record.valf.get_unchecked_mut(i as usize) }
     }
 }
 
@@ -1061,24 +1021,14 @@ impl Index<LogUsizeId> for ProgressRecord {
     type Output = usize;
     #[inline]
     fn index(&self, i: LogUsizeId) -> &usize {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.vali.get_unchecked(i as usize)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self.vali[i as usize]
+        unsafe { self.vali.get_unchecked(i as usize) }
     }
 }
 
 impl IndexMut<LogUsizeId> for ProgressRecord {
     #[inline]
     fn index_mut(&mut self, i: LogUsizeId) -> &mut usize {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.vali.get_unchecked_mut(i as usize)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self.vali[i as usize]
+        unsafe { self.vali.get_unchecked_mut(i as usize) }
     }
 }
 
@@ -1086,24 +1036,14 @@ impl Index<LogF64Id> for ProgressRecord {
     type Output = f64;
     #[inline]
     fn index(&self, i: LogF64Id) -> &f64 {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.valf.get_unchecked(i as usize)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self.valf[i as usize]
+        unsafe { self.valf.get_unchecked(i as usize) }
     }
 }
 
 impl IndexMut<LogF64Id> for ProgressRecord {
     #[inline]
     fn index_mut(&mut self, i: LogF64Id) -> &mut f64 {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.valf.get_unchecked_mut(i as usize)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self.valf[i as usize]
+        unsafe { self.valf.get_unchecked_mut(i as usize) }
     }
 }
 

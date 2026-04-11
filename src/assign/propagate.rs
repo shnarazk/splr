@@ -40,69 +40,40 @@ pub trait PropagateIF {
     fn clear_asserted_literals(&mut self, cdb: &mut impl ClauseDBIF) -> MaybeInconsistent;
 }
 
-#[cfg(feature = "unsafe_access")]
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
-        unsafe { $asg.var.get_unchecked($var).assign }
-    };
-}
-#[cfg(not(feature = "unsafe_access"))]
-macro_rules! var_assign {
-    ($asg: expr, $var: expr) => {
-        $asg.assign[$var]
+        unsafe { *$asg.lit_val.get_unchecked(2 * $var + 1) }
     };
 }
 
-#[cfg(feature = "unsafe_access")]
 macro_rules! lit_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
-            l => match unsafe { $asg.var.get_unchecked(l.vi()).assign } {
-                Some(x) if !bool::from(l) => Some(!x),
-                x => x,
-            },
-        }
-    };
-}
-#[cfg(not(feature = "unsafe_access"))]
-macro_rules! lit_assign {
-    ($asg: expr, $lit: expr) => {
-        match $lit {
-            l => match $asg.assign[l.vi()] {
-                Some(x) if !bool::from(l) => Some(!x),
-                x => x,
-            },
+            l => unsafe { *$asg.lit_val.get_unchecked(usize::from(l)) },
         }
     };
 }
 
-#[cfg(feature = "unsafe_access")]
 macro_rules! set_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
             l => unsafe {
-                let vi = l.vi();
-                $asg.var.get_unchecked_mut(vi).assign = Some(bool::from(l));
+                let ord = usize::from(l);
+                *$asg.lit_val.get_unchecked_mut(ord) = Some(true);
+                *$asg.lit_val.get_unchecked_mut(ord ^ 1) = Some(false);
             },
-        }
-    };
-}
-#[cfg(not(feature = "unsafe_access"))]
-macro_rules! set_assign {
-    ($asg: expr, $lit: expr) => {
-        match $lit {
-            l => {
-                let vi = l.vi();
-                $asg.assign[vi] = Some(bool::from(l));
-            }
         }
     };
 }
 
 macro_rules! unset_assign {
-    ($asg: expr, $var: expr) => {
-        $asg.var[$var].assign = None;
-    };
+    ($asg: expr, $lit: expr) => {{
+        let ord = usize::from($lit);
+        unsafe {
+            *$asg.lit_val.get_unchecked_mut(ord) = None;
+            *$asg.lit_val.get_unchecked_mut(ord ^ 1) = None;
+        }
+    }};
 }
 
 impl PropagateIF for AssignStack {
@@ -142,17 +113,19 @@ impl PropagateIF for AssignStack {
             var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none(),
             "wrong assignmentto {:?}: {:?} by {:?} ",
             l,
-            self.var[vi].assign,
+            var_assign!(self, vi),
             reason
         );
-        debug_assert_eq!(self.var[vi].assign, None);
+        debug_assert_eq!(var_assign!(self, vi), None);
         debug_assert_eq!(self.var[vi].reason, AssignReason::None);
         debug_assert_ne!(self.var[vi].reason, reason);
         debug_assert!(self.trail.iter().all(|rl| *rl != l));
         set_assign!(self, l);
 
-        self.var[vi].level = lv;
-        self.var[vi].reason = reason;
+        // SAFETY: vi = l.vi(), already debug_assert!(l.vi() < self.var.len()) at top
+        let v = unsafe { self.var.get_unchecked_mut(vi) };
+        v.level = lv;
+        v.reason = reason;
         self.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
@@ -177,7 +150,7 @@ impl PropagateIF for AssignStack {
         let v = &mut self.var[vi];
         v.level = dl;
         debug_assert!(!v.is(FlagVar::ELIMINATED));
-        debug_assert_eq!(self.var[vi].assign, None);
+        debug_assert_eq!(var_assign!(self, vi), None);
         debug_assert_eq!(self.var[vi].reason, AssignReason::None);
         set_assign!(self, l);
         self.var[vi].reason = AssignReason::Decision(self.decision_level());
@@ -199,7 +172,8 @@ impl PropagateIF for AssignStack {
         let mut unpropagated: Vec<Lit> = Vec::new();
 
         // We assume that backtrack is never happened in level zero.
-        let lim = self.trail_lim[lv as usize];
+        // SAFETY: lv < trail_lim.len() is guaranteed by the early-return check above
+        let lim = unsafe { *self.trail_lim.get_unchecked(lv as usize) };
 
         #[cfg(feature = "trail_saving")]
         self.save_trail(lv);
@@ -207,12 +181,13 @@ impl PropagateIF for AssignStack {
         for i in lim..self.trail.len() {
             let l = self.trail[i];
             debug_assert!(
-                self.var[l.vi()].assign.is_some(),
+                self.lit_val[usize::from(l)].is_some(),
                 "cancel_until found unassigned var in trail {}{:?}",
                 l.vi(),
                 &self.var[l.vi()],
             );
             let vi = l.vi();
+            debug_assert!(vi < self.var.len());
             #[cfg(feature = "trace_propagation")]
             debug_assert!(
                 self.q_head <= i || self.var[vi].is(Flag::PROPAGATED),
@@ -229,21 +204,23 @@ impl PropagateIF for AssignStack {
             );
 
             #[cfg(feature = "chrono_BT")]
-            if self.var[vi].level <= lv {
+            if unsafe { self.var.get_unchecked(vi) }.level <= lv {
                 unpropagated.push(l);
                 continue;
             }
 
-            let v = &mut self.var[vi];
+            let phase = bool::from(l);
+            // SAFETY: vi < self.var.len() per debug_assert! above
+            let v = unsafe { self.var.get_unchecked_mut(vi) };
             #[cfg(feature = "trace_propagation")]
             v.turn_off(FlagVar::PROPAGATED);
-            v.set(FlagVar::PHASE, v.assign.unwrap());
+            v.set(FlagVar::PHASE, phase);
 
-            unset_assign!(self, vi);
-            if let AssignReason::Implication(cid) = self.var[vi].reason {
+            unset_assign!(self, l);
+            if let AssignReason::Implication(cid) = unsafe { self.var.get_unchecked(vi) }.reason {
                 cdb[cid].turn_off(FlagClause::ASSIGN_REASON);
             }
-            self.var[vi].reason = AssignReason::None;
+            unsafe { self.var.get_unchecked_mut(vi) }.reason = AssignReason::None;
 
             #[cfg(not(feature = "trail_saving"))]
             {
@@ -272,9 +249,7 @@ impl PropagateIF for AssignStack {
             self.cpr_ema.update(self.num_conflict);
         }
 
-        debug_assert!(
-            self.q_head == 0 || self.var[self.trail[self.q_head - 1].vi()].assign.is_some()
-        );
+        debug_assert!(self.q_head == 0 || self.assign(self.trail[self.q_head - 1].vi()).is_some());
         #[cfg(feature = "trace_propagation")]
         debug_assert!(
             self.q_head == 0 || self.var[self.trail[self.q_head - 1].vi()].is(FlagVar::PROPAGATED)
@@ -289,7 +264,7 @@ impl PropagateIF for AssignStack {
             let l = self.trail[i];
             let vi = l.vi();
             debug_assert!(self.root_level < self.var[vi].level);
-            unset_assign!(self, vi);
+            unset_assign!(self, l);
             self.var[vi].reason = AssignReason::None;
             self.insert_heap(vi);
         }
@@ -311,13 +286,12 @@ impl PropagateIF for AssignStack {
                 self.ppc_ema.update(self.num_propagation);
                 self.num_conflict += 1;
                 {
-                    // let d = self.num_conflict - self.var[$lit.vi()].last_conflict;
-                    // let f: f64 = 1.0 / (d as f64 + 1.0).log2();
-                    // let f: f64 = 1.0 / d as f64;
-                    let f = self.var[$lit.vi()].reward;
+                    let vi = $lit.vi();
+                    let d = self.num_conflict - unsafe { self.var.get_unchecked(vi).last_conflict };
+                    let f: f64 = 1.0 / (d as f64 + 1.0).log2();
                     self.conflict_interval_index.update(f);
+                    unsafe { self.var.get_unchecked_mut(vi).last_conflict = self.num_conflict };
                 }
-                self.var[$lit.vi()].last_conflict = self.num_conflict;
                 return Err(($lit, $reason));
             };
         }
@@ -378,7 +352,7 @@ impl PropagateIF for AssignStack {
                             blocker,
                             AssignReason::BinaryLink(propagating),
                             if cfg!(feature = "chrono_BT") {
-                                self.var[propagating.vi()].level
+                                unsafe { self.var.get_unchecked(propagating.vi()).level }
                             } else {
                                 dl
                             },
@@ -469,11 +443,11 @@ impl PropagateIF for AssignStack {
                     cached,
                     AssignReason::Implication(cid),
                     if cfg!(feature = "chrono_BT") {
-                        debug_assert!(self.var[cdb[cid].lit0().vi()].assign.is_none());
+                        debug_assert!(self.assign(cdb[cid].lit0().vi()).is_none());
                         cdb[cid]
                             .iter()
                             .skip(1)
-                            .map(|l| self.var[l.vi()].level)
+                            .map(|l| unsafe { self.var.get_unchecked(l.vi()).level })
                             .max()
                             .unwrap_or(self.root_level)
                     } else {
@@ -712,9 +686,8 @@ impl AssignStack {
             self.best_phases.clear();
             for l in self.trail.iter().skip(self.len_upto(self.root_level)) {
                 let vi = l.vi();
-                if let Some(b) = self.var[vi].assign {
-                    self.best_phases.insert(vi, (b, self.var[vi].reason));
-                }
+                self.best_phases
+                    .insert(vi, (bool::from(*l), self.var[vi].reason));
             }
         }
         self.build_best_at = self.num_propagation;

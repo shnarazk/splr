@@ -384,8 +384,8 @@ fn conflict_analyze(
                 }
                 for q in cdb[cid].iter().skip(1) {
                     let vi = q.vi();
-                    debug_assert!(asg.var(vi).assign.is_some());
-                    // if asg.var(vi).assign.is_none() {
+                    debug_assert!(asg.assign(vi).is_some());
+                    // if asg.assign(vi).is_none() {
                     //     println!(
                     //         "Implication clause contains non-assinged lit (cc: {:?}, at level: {:?})",
                     //         cc,
@@ -398,7 +398,7 @@ fn conflict_analyze(
                     //         cid,
                     //         cdb[cid]
                     //             .iter()
-                    //             // .filter(|l| asg.var(l.vi()).assign.is_none())
+                    //             // .filter(|l| asg.assign(l.vi()).is_none())
                     //             .map(|l| (l, asg.var(l.vi()).level))
                     //             .collect::<Vec<_>>()
                     //     );

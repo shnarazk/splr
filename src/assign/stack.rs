@@ -81,6 +81,9 @@ pub struct AssignStack {
     pub(super) tick: usize,
     /// vars
     pub(super) var: Vec<Var>,
+    /// Literal-indexed assignment cache (SoA).
+    /// Indexed by `Lit` ordinal: `lit_val[usize::from(lit)]`.
+    pub(super) lit_val: Vec<Option<bool>>,
 
     //
     //## Var Rewarding
@@ -135,6 +138,7 @@ impl Default for AssignStack {
 
             tick: 0,
             var: Vec::new(),
+            lit_val: Vec::new(),
 
             activity_decay: 0.94,
 
@@ -171,6 +175,7 @@ impl Instantiate for AssignStack {
             num_vars: cnf.num_of_variables,
 
             var: Var::new_vars(nv),
+            lit_val: vec![None; 2 * (nv + 1)],
 
             activity_decay: 1.0 - config.vrw_learning_rate,
 
@@ -192,6 +197,8 @@ impl Instantiate for AssignStack {
                 self.expand_heap();
                 self.num_vars += 1;
                 self.var.push(Var::default());
+                self.lit_val.push(None); // negative literal slot
+                self.lit_val.push(None); // positive literal slot
             }
             e => panic!("don't call asg with {e:?}"),
         }
@@ -231,7 +238,7 @@ impl AssignIF for AssignStack {
         self.q_head < self.trail.len()
     }
     fn assign_ref(&self) -> Vec<Option<bool>> {
-        self.var.iter().map(|v| v.assign).collect::<Vec<_>>()
+        self.lit_val.iter().skip(1).step_by(2).copied().collect()
     }
     fn best_assigned(&mut self) -> Option<usize> {
         (self.build_best_at == self.num_propagation).then_some(self.num_vars - self.num_best_assign)
@@ -371,55 +378,27 @@ pub trait VarManipulateIF {
 
 impl VarManipulateIF for AssignStack {
     fn assigned(&self, l: Lit) -> Option<bool> {
-        match self.var[l.vi()].assign {
-            Some(x) if !bool::from(l) => Some(!x),
-            x => x,
-        }
+        self.lit_val[usize::from(l)]
     }
     #[inline]
     fn assign(&self, vi: VarId) -> Option<bool> {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.var.get_unchecked(vi).assign
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        self.var[vi].assign
+        unsafe { *self.lit_val.get_unchecked(2 * vi + 1) }
     }
     #[inline]
     fn level(&self, vi: VarId) -> DecisionLevel {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.var.get_unchecked(vi).level
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        self.var[vi].level
+        unsafe { self.var.get_unchecked(vi).level }
     }
     #[inline]
     fn reason(&self, vi: VarId) -> AssignReason {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.var.get_unchecked(vi).reason
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        self.var[vi].reason
+        unsafe { self.var.get_unchecked(vi).reason }
     }
     #[inline]
     fn var(&self, vi: VarId) -> &Var {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.var.get_unchecked(vi)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &self.var[vi]
+        unsafe { self.var.get_unchecked(vi) }
     }
     #[inline]
     fn var_mut(&mut self, vi: VarId) -> &mut Var {
-        #[cfg(feature = "unsafe_access")]
-        unsafe {
-            self.var.get_unchecked_mut(vi)
-        }
-        #[cfg(not(feature = "unsafe_access"))]
-        &mut self.var[vi]
+        unsafe { self.var.get_unchecked_mut(vi) }
     }
     fn var_iter(&self) -> Iter<'_, Var> {
         self.var.iter()
@@ -447,22 +426,20 @@ impl VarManipulateIF for AssignStack {
             #[cfg(feature = "trace_elimination")]
             {
                 let lv = self.var[vi].level;
-                if self.root_level == self.var[vi].level && self.var[vi].assign.is_some() {
+                if self.root_level == self.var[vi].level && self.assign(vi).is_some() {
                     panic!("v:{}, dl:{}", self.var[vi], self.decision_level());
                 }
-                if !(self.root_level < self.var[vi].level || self.var[vi].assign.is_none()) {
+                if !(self.root_level < self.var[vi].level || self.assign(vi).is_none()) {
                     panic!(
                         "v:{}, lvl:{} => {}, dl:{}, assign:{:?} ",
                         self.var[vi],
                         lv,
                         self.var[vi].level,
                         self.decision_level(),
-                        self.var[vi].assign,
+                        self.assign(vi),
                     );
                 }
-                debug_assert!(
-                    self.root_level < self.var[vi].level || self.var[vi].assign.is_none()
-                );
+                debug_assert!(self.root_level < self.var[vi].level || self.assign(vi).is_none());
             }
         }
     }
@@ -474,8 +451,8 @@ impl AssignStack {
     /// return `true` if the current best phase got invalid.
     fn check_best_phase(&mut self, vi: VarId) -> bool {
         if let Some((b, _)) = self.best_phases.get(&vi) {
-            debug_assert!(self.var[vi].assign.is_some());
-            if self.var[vi].assign != Some(*b) {
+            debug_assert!(self.assign(vi).is_some());
+            if self.assign(vi) != Some(*b) {
                 if self.root_level == self.var[vi].level {
                     self.best_phases.clear();
                     self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
