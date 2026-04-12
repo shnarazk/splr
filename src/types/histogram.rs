@@ -1,12 +1,14 @@
+const HBANDS: usize = 128;
+
 pub struct Histogram {
-    pub bands: [usize; 100],
+    pub bands: [usize; HBANDS],
     pub samples: usize,
 }
 
 impl Default for Histogram {
     fn default() -> Self {
         Self {
-            bands: [0; 100],
+            bands: [0; HBANDS],
             samples: 0,
         }
     }
@@ -14,15 +16,15 @@ impl Default for Histogram {
 
 impl Histogram {
     pub fn add(&mut self, d: f64) -> f64 {
-        let index = ((100.0 * d) as usize).clamp(0, 99);
+        let index = (((HBANDS as f64) * d) as usize).clamp(0, HBANDS - 1);
         self.bands[index] += 1;
         self.samples += 1;
-        if index < 50 {
+        if index < HBANDS / 2 {
             let med = (0..index).map(|l| self.bands[l]).sum::<usize>() + self.bands[index] / 2;
             med as f64 / (self.samples as f64)
         } else {
             let med =
-                (index + 1..100).map(|l| self.bands[l]).sum::<usize>() + self.bands[index] / 2;
+                (index + 1..HBANDS).map(|l| self.bands[l]).sum::<usize>() + self.bands[index] / 2;
             1.0 - med as f64 / (self.samples as f64)
         }
     }
