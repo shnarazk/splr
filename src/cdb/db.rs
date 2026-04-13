@@ -395,6 +395,7 @@ impl ClauseDBIF for ClauseDB {
         } else {
             c.update_lbd(asg, lbd_temp);
         }
+        c.lbd_ema.set_value(c.rank as f64);
         // cdb.lbd is updated only in `solver.search`; we need to track seach mode
         // self.lbd.update(c.rank);
         *num_clause += 1;
@@ -470,6 +471,7 @@ impl ClauseDBIF for ClauseDB {
             c.update_lbd(asg, lbd_temp);
             c.turn_on(FlagClause::LEARNT);
         }
+        c.lbd_ema.set_value(c.rank as f64);
         let l0 = c.lits[0];
         let l1 = c.lits[1];
         if len2 {
@@ -949,6 +951,7 @@ impl ClauseDBIF for ClauseDB {
         // Updating LBD at every analysis seems redundant.
         // But it's crucial. Don't remove the below.
         let rank = c.update_lbd(asg, &mut self.lbd_temp);
+        c.lbd_ema.set_value(rank as f64);
         let learnt = c.is(FlagClause::LEARNT);
         if learnt {
             #[cfg(feature = "clause_rewarding")]
@@ -960,7 +963,7 @@ impl ClauseDBIF for ClauseDB {
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, _asg: &mut impl AssignIF, envelope: usize) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, envelope: usize) {
         let ClauseDB {
             clause,
             // lbd_temp,
@@ -970,6 +973,7 @@ impl ClauseDBIF for ClauseDB {
             ref tick,
             #[cfg(feature = "clause_rewarding")]
             ref activity_decay,
+            lbd_temp,
             ..
         } = self;
         *num_reduction += 1;
@@ -992,20 +996,22 @@ impl ClauseDBIF for ClauseDB {
             #[cfg(feature = "clause_rewarding")]
             c.update_activity(*tick, *activity_decay, 0.0);
 
+            if !c.is(FlagClause::LEARNT) {
+                c.used = 0;
+                continue;
+            }
+            c.update_lbd(asg, lbd_temp);
+            c.lbd_ema.update(c.rank as f64);
             if c.is(FlagClause::ASSIGN_REASON) {
                 // c.used = 0;
                 nprotect += 1;
-                continue;
-            }
-            if !c.is(FlagClause::LEARNT) {
-                c.used = 0;
                 continue;
             }
             if c.used > 0 {
                 c.used = 0;
                 continue;
             }
-            perm.push(OrderedProxy::new(i, c.rank as f64));
+            perm.push(OrderedProxy::new(i, c.lbd_ema.get()));
             c.used = 0;
         }
         let keep = perm
