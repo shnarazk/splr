@@ -98,9 +98,19 @@ pub trait ClauseDBIF:
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn remove_clause_sandbox(&mut self, cid: ClauseId);
     /// update watches of the clause
-    fn transform_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause;
+    fn transform_by_elimination(
+        &mut self,
+        asg: &mut impl AssignIF,
+        cid: ClauseId,
+        p: Lit,
+    ) -> RefClause;
     /// generic clause transformer (not in use)
-    fn transform_by_replacement(&mut self, cid: ClauseId, vec: &mut Vec<Lit>) -> RefClause;
+    fn transform_by_replacement(
+        &mut self,
+        asg: &mut impl AssignIF,
+        cid: ClauseId,
+        vec: &mut Vec<Lit>,
+    ) -> RefClause;
     /// check satisfied and nullified literals in a clause
     fn transform_by_simplification(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> RefClause;
     /// reduce learnt clauses
@@ -109,9 +119,6 @@ pub trait ClauseDBIF:
     fn reduce(&mut self, asg: &mut impl AssignIF, envelope: usize);
     /// remove all learnt clauses.
     fn reset(&mut self);
-    /// update flags.
-    /// return `true` if it's learnt.
-    fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool;
     /// record an asserted literal to unsat certification.
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.
@@ -188,22 +195,16 @@ pub mod property {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tf64 {
         LiteralBlockDistance,
-        LiteralBlockEntanglement,
         ReductionThreshold,
     }
 
-    pub const F64S: [Tf64; 3] = [
-        Tf64::LiteralBlockDistance,
-        Tf64::LiteralBlockEntanglement,
-        Tf64::ReductionThreshold,
-    ];
+    pub const F64S: [Tf64; 2] = [Tf64::LiteralBlockDistance, Tf64::ReductionThreshold];
 
     impl PropertyDereference<Tf64, f64> for ClauseDB {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
                 Tf64::LiteralBlockDistance => self.lbd.get(),
-                Tf64::LiteralBlockEntanglement => self.lb_entanglement.get(),
                 Tf64::ReductionThreshold => self.reduction_threshold,
             }
         }
@@ -211,17 +212,15 @@ pub mod property {
 
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub enum TEma {
-        Entanglement,
         LBD,
     }
 
-    pub const EMAS: [TEma; 2] = [TEma::Entanglement, TEma::LBD];
+    pub const EMAS: [TEma; 1] = [TEma::LBD];
 
     impl PropertyReference<TEma, EmaView> for ClauseDB {
         #[inline]
         fn refer(&self, k: TEma) -> &EmaView {
             match k {
-                TEma::Entanglement => self.lb_entanglement.as_view(),
                 TEma::LBD => self.lbd.as_view(),
             }
         }
@@ -268,8 +267,6 @@ mod tests {
         let c0 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
             .as_cid();
-        assert_eq!(cdb[c0].rank, 4);
-
         asg.assign_by_decision(lit(-2)); // at level 1
         asg.assign_by_decision(lit(1)); // at level 2
         // Now `asg.level` = [_, 2, 1, 3, 4, 5, 6].
@@ -278,14 +275,12 @@ mod tests {
             .as_cid();
         let c = &cdb[c1];
 
-        assert_eq!(c.rank, 3);
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
             .as_cid();
         let c = &cdb[c2];
-        assert_eq!(c.rank, 3);
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
     }

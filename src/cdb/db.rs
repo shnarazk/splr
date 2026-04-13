@@ -57,8 +57,6 @@ pub struct ClauseDB {
     //
     //## LBD
     //
-    /// a working buffer for LBD calculation
-    lbd_temp: Vec<usize>,
     pub(crate) lbd: ProgressLBD,
 
     //## Reduction
@@ -81,11 +79,11 @@ pub struct ClauseDB {
     pub(crate) num_reduction: usize,
     /// the number of reregistration of a bi-clause
     pub(crate) num_reregistration: usize,
-    /// Literal Block Entanglement
-    /// EMA of LBD of clauses used in conflict analysis (dependency graph)
-    pub(crate) lb_entanglement: Ema2,
     /// cutoff value used in the last `reduce`
     pub(crate) reduction_threshold: f64,
+
+    /// a working buffer for some calculation
+    var_map_tmp: Vec<usize>,
 }
 
 impl Default for ClauseDB {
@@ -107,7 +105,6 @@ impl Default for ClauseDB {
             #[cfg(feature = "clause_rewarding")]
             activity_anti_decay: 0.01,
 
-            lbd_temp: Vec::new(),
             lbd: ProgressLBD::default(),
             leanrt_limit_ema: Ema::new(4).with_value(40_000.0),
 
@@ -118,8 +115,9 @@ impl Default for ClauseDB {
             num_learnt: 0,
             num_reduction: 0,
             num_reregistration: 0,
-            lb_entanglement: Ema2::new(1_000).with_slow(80_000).with_value(2.0),
             reduction_threshold: 0.0,
+
+            var_map_tmp: Vec::new(),
         }
     }
 }
@@ -251,7 +249,7 @@ impl Instantiate for ClauseDB {
             #[cfg(feature = "clause_rewarding")]
             activity_anti_decay: 1.0 - config.crw_dcy_rat,
 
-            lbd_temp: vec![0; nv + 1],
+            var_map_tmp: vec![0; nv + 1],
             ..ClauseDB::default()
         }
     }
@@ -265,10 +263,9 @@ impl Instantiate for ClauseDB {
                 self.watch_cache.push(WatchCache::new());
                 // for positive literal
                 self.watch_cache.push(WatchCache::new());
-                self.lbd_temp.push(0);
+                self.var_map_tmp.push(0);
             }
             SolverEvent::Restart => {
-                // self.lbd.reset_to(self.lb_entanglement.get());
                 // self.lbd.reset_to(0.0);
             }
             _ => (),
@@ -369,7 +366,6 @@ impl ClauseDBIF for ClauseDB {
 
         let ClauseDB {
             clause,
-            lbd_temp,
             num_clause,
             num_bi_clause,
             num_bi_learnt,
@@ -390,14 +386,7 @@ impl ClauseDBIF for ClauseDB {
             c.timestamp = *tick;
         }
         let len2 = c.lits.len() == 2;
-        if len2 {
-            c.rank = 1;
-        } else {
-            c.update_lbd(asg, lbd_temp);
-        }
-        c.lbd_ema.set_value(c.rank as f64);
-        // cdb.lbd is updated only in `solver.search`; we need to track seach mode
-        // self.lbd.update(c.rank);
+        let lbd = asg.literal_block_distance(&c.lits);
         *num_clause += 1;
         if learnt {
             if len2 {
@@ -405,7 +394,7 @@ impl ClauseDBIF for ClauseDB {
             } else {
                 c.turn_on(FlagClause::LEARNT);
                 *num_learnt += 1;
-                if c.rank <= 2 {
+                if lbd <= 2 {
                     *num_lbd2 += 1;
                 }
             }
@@ -419,7 +408,7 @@ impl ClauseDBIF for ClauseDB {
             watch_cache[!l0].insert_watch(cid, l1);
             watch_cache[!l1].insert_watch(cid, l0);
         }
-        RefClause::Clause(cid)
+        RefClause::Clause(cid, lbd)
     }
     fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, vec: &mut Vec<Lit>) -> RefClause {
         debug_assert!(1 < vec.len());
@@ -449,7 +438,6 @@ impl ClauseDBIF for ClauseDB {
 
         let ClauseDB {
             clause,
-            lbd_temp,
             binary_link,
             #[cfg(feature = "clause_rewarding")]
             tick,
@@ -464,23 +452,17 @@ impl ClauseDBIF for ClauseDB {
             c.timestamp = *tick;
         }
 
-        let len2 = c.lits.len() == 2;
-        if len2 {
-            c.rank = 1;
-        } else {
-            c.update_lbd(asg, lbd_temp);
-            c.turn_on(FlagClause::LEARNT);
-        }
-        c.lbd_ema.set_value(c.rank as f64);
+        let lbd = asg.literal_block_distance(&c.lits);
         let l0 = c.lits[0];
         let l1 = c.lits[1];
-        if len2 {
+        if c.lits.len() == 2 {
             binary_link.add(l0, l1, cid);
         } else {
+            c.turn_on(FlagClause::LEARNT);
             watch_cache[!l0].insert_watch(cid, l1);
             watch_cache[!l1].insert_watch(cid, l0);
         }
-        RefClause::Clause(cid)
+        RefClause::Clause(cid, lbd)
     }
     /// ## Warning
     /// this function is the only function that makes dead clauses
@@ -547,7 +529,12 @@ impl ClauseDBIF for ClauseDB {
         iter.restore_entry();
     }
     // return a Lit if the clause becomes a unit clause.
-    fn transform_by_elimination(&mut self, cid: ClauseId, p: Lit) -> RefClause {
+    fn transform_by_elimination(
+        &mut self,
+        asg: &mut impl AssignIF,
+        cid: ClauseId,
+        p: Lit,
+    ) -> RefClause {
         //
         //## Clause transform rules
         //
@@ -653,10 +640,16 @@ impl ClauseDBIF for ClauseDB {
             certification_store.add_clause(&c.lits);
             certification_store.delete_clause(&new_lits);
         }
-        RefClause::Clause(cid)
+        let lbd = asg.literal_block_distance(&self[cid].lits);
+        RefClause::Clause(cid, lbd)
     }
     // Not in use so far
-    fn transform_by_replacement(&mut self, cid: ClauseId, new_lits: &mut Vec<Lit>) -> RefClause {
+    fn transform_by_replacement(
+        &mut self,
+        asg: &mut impl AssignIF,
+        cid: ClauseId,
+        new_lits: &mut Vec<Lit>,
+    ) -> RefClause {
         debug_assert!(1 < new_lits.len());
         //
         //## Clause transform rules
@@ -759,7 +752,8 @@ impl ClauseDBIF for ClauseDB {
                 certification_store.delete_clause(&c.lits);
             }
         }
-        RefClause::Clause(cid)
+        let lbd = asg.literal_block_distance(&self[cid].lits);
+        RefClause::Clause(cid, lbd)
     }
     // only used in `propagate_at_root_level`
     fn transform_by_simplification(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> RefClause {
@@ -797,7 +791,8 @@ impl ClauseDBIF for ClauseDB {
             //
             //## Case:2
             //
-            return RefClause::Clause(cid);
+            let lbd = asg.literal_block_distance(&self[cid].lits);
+            return RefClause::Clause(cid, lbd);
         }
         let ClauseDB {
             clause,
@@ -845,7 +840,8 @@ impl ClauseDBIF for ClauseDB {
                     certification_store.add_clause(&c.lits);
                     certification_store.delete_clause(&new_lits);
                 }
-                RefClause::Clause(cid)
+                let lbd = asg.literal_block_distance(&c.lits);
+                RefClause::Clause(cid, lbd)
             }
             _ => {
                 //
@@ -896,7 +892,8 @@ impl ClauseDBIF for ClauseDB {
                     certification_store.add_clause(&c.lits);
                     certification_store.delete_clause(&new_lits);
                 }
-                RefClause::Clause(cid)
+                let lbd = asg.literal_block_distance(&c.lits);
+                RefClause::Clause(cid, lbd)
             }
         }
     }
@@ -946,34 +943,16 @@ impl ClauseDBIF for ClauseDB {
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
     }
-    fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool {
-        let c = &mut self.clause[NonZeroU32::get(cid.ordinal) as usize];
-        // Updating LBD at every analysis seems redundant.
-        // But it's crucial. Don't remove the below.
-        let rank = c.update_lbd(asg, &mut self.lbd_temp);
-        c.lbd_ema.set_value(rank as f64);
-        let learnt = c.is(FlagClause::LEARNT);
-        if learnt {
-            #[cfg(feature = "clause_rewarding")]
-            self.reward_at_analysis(cid);
-        }
-        if 1 < rank {
-            self.lb_entanglement.update(rank as f64);
-        }
-        learnt
-    }
     /// reduce the number of 'learnt' or *removable* clauses.
     fn reduce(&mut self, asg: &mut impl AssignIF, envelope: usize) {
         let ClauseDB {
             clause,
-            // lbd_temp,
             num_reduction,
 
             #[cfg(feature = "clause_rewarding")]
             ref tick,
             #[cfg(feature = "clause_rewarding")]
             ref activity_decay,
-            lbd_temp,
             ..
         } = self;
         *num_reduction += 1;
@@ -992,7 +971,6 @@ impl ClauseDBIF for ClauseDB {
             .skip(1)
             .filter(|(_, c)| !c.is_dead())
         {
-            // c.update_lbd(asg, lbd_temp);
             #[cfg(feature = "clause_rewarding")]
             c.update_activity(*tick, *activity_decay, 0.0);
 
@@ -1000,8 +978,7 @@ impl ClauseDBIF for ClauseDB {
                 c.used = 0;
                 continue;
             }
-            c.update_lbd(asg, lbd_temp);
-            c.lbd_ema.update(c.rank as f64);
+            let lbd = asg.literal_block_distance(&c.lits);
             if c.is(FlagClause::ASSIGN_REASON) {
                 // c.used = 0;
                 nprotect += 1;
@@ -1011,7 +988,7 @@ impl ClauseDBIF for ClauseDB {
                 c.used = 0;
                 continue;
             }
-            perm.push(OrderedProxy::new(i, c.lbd_ema.get()));
+            perm.push(OrderedProxy::new(i, lbd as f64));
             c.used = 0;
         }
         let keep = perm
@@ -1075,10 +1052,10 @@ impl ClauseDBIF for ClauseDB {
         if vec.len() <= 1 {
             return;
         }
-        self.lbd_temp[0] += 1;
-        let key = self.lbd_temp[0];
+        self.var_map_tmp[0] += 1;
+        let key = self.var_map_tmp[0];
         for l in &vec[1..] {
-            self.lbd_temp[l.vi() as usize] = key;
+            self.var_map_tmp[l.vi() as usize] = key;
         }
         let l0 = vec[0];
         let mut num_sat = 0;
@@ -1087,14 +1064,14 @@ impl ClauseDBIF for ClauseDB {
             debug_assert!(c[0] == l0 || c[1] == l0);
             let other = c[(c[0] == l0) as usize];
             let vi = other.vi();
-            if self.lbd_temp[vi] == key && asg.assigned(other) == Some(true) {
+            if self.var_map_tmp[vi] == key && asg.assigned(other) == Some(true) {
                 num_sat += 1;
-                self.lbd_temp[vi] = key - 1;
+                self.var_map_tmp[vi] = key - 1;
             }
         }
         if 0 < num_sat {
-            self.lbd_temp[l0.vi()] = key;
-            vec.retain(|l| self.lbd_temp[l.vi()] == key);
+            self.var_map_tmp[l0.vi()] = key;
+            vec.retain(|l| self.var_map_tmp[l.vi()] == key);
         }
     }
 
@@ -1139,7 +1116,7 @@ impl ClauseDBIF for ClauseDB {
                 nc += 1;
                 let u = c.used.saturating_add(1).ilog2().min(7);
                 *stats
-                    .entry((c.rank.min(7).saturating_sub(1), u))
+                    .entry((c.len().saturating_sub(2).clamp(0, 6) as u16, u))
                     .or_default() += 1;
             }
         }

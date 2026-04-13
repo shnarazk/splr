@@ -475,7 +475,6 @@ impl StateIF for State {
         let cdb_num_bi_clause = cdb.derefer(cdb::property::Tusize::NumBiClause);
         let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
-        let cdb_lb_ent: f64 = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
         let rst_num_rst: usize = self[Stat::Restart];
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
         let stg_segment: usize = self.span_manager.current_segment();
@@ -555,7 +554,7 @@ impl StateIF for State {
                 "{:>9.2}",
                 self,
                 LogF64Id::LiteralBlockEntanglement,
-                cdb_lb_ent,
+                0.0,
                 0.01
             ),
             fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get(), 0.01),
@@ -801,8 +800,6 @@ impl State {
         self[LogF64Id::EmaLBD] = rst_lbd.get_fast();
         self[LogF64Id::TrendLBD] = rst_lbd.trend();
 
-        self[LogF64Id::LiteralBlockEntanglement] =
-            cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
         self[LogF64Id::DecisionPerConflict] =
             asg.refer(assign::property::TEma::DecisionPerConflict).get();
 

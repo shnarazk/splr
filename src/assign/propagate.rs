@@ -683,7 +683,7 @@ impl AssignStack {
                         .all(|l| !self.var[l.vi()].is(FlagVar::ELIMINATED))
                 );
                 match cdb.transform_by_simplification(self, cid) {
-                    RefClause::Clause(_) => (),
+                    RefClause::Clause(_, _) => (),
                     RefClause::Dead => (), // was a satisfied clause
                     RefClause::EmptyClause => return Err(SolverError::EmptyClause),
                     RefClause::RegisteredClause(_) => (),

@@ -14,10 +14,6 @@ pub struct Clause {
     pub(crate) lits: Vec<Lit>,
     /// Flags (8 bits)
     pub(crate) flags: FlagClause,
-    /// A static clause evaluation criterion like LBD, NDD, or something.
-    pub rank: u16,
-    /// LBD average
-    pub lbd_ema: Ema,
     /// The number of propagation.
     pub used: u16,
     /// the index from which `propagate` starts searching an un-falsified literal.
@@ -60,8 +56,6 @@ impl Default for Clause {
         Clause {
             lits: vec![],
             flags: FlagClause::empty(),
-            rank: 0,
-            lbd_ema: Ema::new(6),
             used: 0,
             search_from: 2,
 
@@ -265,39 +259,12 @@ impl fmt::Display for Clause {
     }
 }
 
-impl Clause {
-    /// update rank field with the present LBD.
-    // If it's big enough, skip the loop.
-    pub fn update_lbd(&mut self, asg: &impl AssignIF, lbd_temp: &mut [usize]) -> usize {
-        if 8192 * 2 <= self.lits.len() {
-            self.rank = u16::MAX;
-            return u16::MAX as usize;
-        }
-        let key: usize = lbd_temp[0] + 1;
-        lbd_temp[0] = key;
-        let mut cnt = 0;
-        for l in &self.lits {
-            let lv = asg.level(l.vi());
-            if lv == 0 {
-                continue;
-            }
-            let p = &mut lbd_temp[lv as usize];
-            if *p != key {
-                *p = key;
-                cnt += 1;
-            }
-        }
-        self.rank = cnt;
-        cnt as usize
-    }
-}
-
 // A generic reference to a clause or something else.
 // we can use DEAD for simply satisfied form, f.e. an empty forms,
 // while EmptyClause can be used for simply UNSAT form.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RefClause {
-    Clause(ClauseId),
+    Clause(ClauseId, DecisionLevel),
     Dead,
     EmptyClause,
     RegisteredClause(ClauseId),
@@ -307,14 +274,14 @@ pub enum RefClause {
 impl RefClause {
     pub fn as_cid(&self) -> ClauseId {
         match self {
-            RefClause::Clause(cid) => *cid,
+            RefClause::Clause(cid, _) => *cid,
             RefClause::RegisteredClause(cid) => *cid,
             _ => panic!("invalid reference to clause"),
         }
     }
     pub fn is_new(&self) -> Option<ClauseId> {
         match self {
-            RefClause::Clause(cid) => Some(*cid),
+            RefClause::Clause(cid, _) => Some(*cid),
             RefClause::RegisteredClause(_) => None,
             RefClause::EmptyClause => None,
             RefClause::Dead => None,

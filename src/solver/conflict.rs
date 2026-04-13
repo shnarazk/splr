@@ -23,7 +23,7 @@ pub fn handle_conflict(
     cdb: &mut ClauseDB,
     state: &mut State,
     cc: &ConflictContext,
-) -> Result<u16, SolverError> {
+) -> Result<DecisionLevel, SolverError> {
     // `conflicting_level` should be calculated from cc.1 instead of cc.0.
     // Because the conflicting_literal has two values assigned at different levels.
     // We need larger one.
@@ -197,9 +197,9 @@ pub fn handle_conflict(
     //     new_learnt.iter().skip(1).map(|l| asg.level(l.vi())).max(),
     //     Some(assign_level)
     // );
-    let rank: u16;
+    let rank: DecisionLevel;
     match cdb.new_clause(asg, new_learnt, true) {
-        RefClause::Clause(cid) if learnt_len == 2 => {
+        RefClause::Clause(cid, _) if learnt_len == 2 => {
             debug_assert_eq!(l0, cdb[cid].lit0());
             debug_assert_eq!(l1, cdb[cid].lit1());
             debug_assert_eq!(asg.assigned(l0), None);
@@ -211,14 +211,14 @@ pub fn handle_conflict(
             }
             rank = 1;
         }
-        RefClause::Clause(cid) => {
+        RefClause::Clause(cid, lbd) => {
             debug_assert_eq!(cdb[cid].lit0(), l0);
             if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
                 cdb[cid].used = cdb[cid].used.saturating_add(1);
                 cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
             }
-            rank = cdb[cid].rank;
+            rank = lbd;
         }
         RefClause::RegisteredClause(cid) => {
             debug_assert_eq!(learnt_len, 2);
@@ -333,8 +333,6 @@ fn conflict_analyze(
         }
     }
     let mut trail_index = asg.stack_len() - 1;
-    let mut max_lbd: u16 = 0;
-    let mut cid_with_max_lbd: Option<ClauseId> = None;
     loop {
         match reason {
             AssignReason::BinaryLink(l) => {
@@ -374,14 +372,6 @@ fn conflict_analyze(
                     p
                 );
                 debug_assert!(!cdb[cid].is_dead() && 2 < cdb[cid].len());
-                // if !cdb.update_at_analysis(asg, cid) {
-                if !cdb[cid].is(FlagClause::LEARNT) {
-                    // cdb[cid].used = cdb[cid].used.saturating_add(1);
-                }
-                if max_lbd < cdb[cid].rank {
-                    max_lbd = cdb[cid].rank;
-                    cid_with_max_lbd = Some(cid);
-                }
                 for q in cdb[cid].iter().skip(1) {
                     let vi = q.vi();
                     debug_assert!(asg.var(vi).assign.is_some());
@@ -454,9 +444,6 @@ fn conflict_analyze(
         debug_assert!(0 < trail_index);
         trail_index -= 1;
         reason = asg.reason(p.vi());
-    }
-    if let Some(cid) = cid_with_max_lbd {
-        cdb.update_at_analysis(asg, cid);
     }
     // debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);

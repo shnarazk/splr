@@ -322,7 +322,7 @@ fn search(
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if s < 0.4 {
+            } else if s < 0.45 {
                 if focusing != SearchMode::Pursue {
                     focusing = SearchMode::Pursue;
                     asg.set_learning_rate(state.config.vrw_learning_rate);
@@ -370,6 +370,7 @@ fn search(
                             state.flush("clause subsumption, ");
                             elim.simplify(asg, cdb, state, false)?;
                             asg.eliminated.append(elim.eliminated_lits());
+                            state.flush("");
                         }
                     }
                     processing_pressure = 0;

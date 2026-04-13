@@ -139,6 +139,7 @@ impl VivifyIF for ClauseDB {
                                     }
                                     #[cfg(not(feature = "clause_rewarding"))]
                                     self.new_clause(asg, &mut vec, is_learnt);
+
                                     self.remove_clause(cid);
                                     num_shrink += 1;
                                 }
@@ -345,26 +346,15 @@ impl Clause {
     /// return `true` if the clause should try vivification.
     /// smaller is better.
     fn to_vivify(&self, initial_stage: Option<u16>) -> Option<f64> {
-        if let Some(n) = initial_stage {
-            if n == 0 {
-                (
-                    !self.is_dead() && self.rank <= 4
-                    // && (self.rank as usize) * 2 <= self.len()
-                    // && self.is(FlagClause::LEARNT)
-                )
-                .then(|| -((self.len() as f64 - self.rank as f64) / self.rank as f64))
-            } else {
-                (!self.is_dead() && self.rank == n && self.used >= 4).then(|| {
-                    if (self.rank as usize) < self.len() {
-                        -(self.len() as f64) / self.rank as f64
-                    } else {
-                        0.0
-                    }
-                })
-            }
-        } else {
-            (!self.is_dead()).then(|| self.len() as f64)
+        if self.is_dead() {
+            return None;
         }
+        let n = initial_stage?;
+        let len = self.len();
+        if (len / 2) as u16 == n + 1 {
+            return Some(-(self.used as f64));
+        }
+        Some(0.0)
     }
     /// clear flags about vivification
     fn vivified(&mut self) {}
