@@ -209,25 +209,15 @@ fn select_targets(
         clauses
     } else {
         let n = state[Stat::Vivification] % 32;
-        let mut skips = 0;
         let mut clauses: Vec<OrderedProxy<ClauseId>> = cdb
             .iter()
             .enumerate()
             .skip(1)
             .filter_map(|(i, c)| {
-                c.to_vivify(Some(n as u16)).and_then(|r| {
-                    if r == 0.0 {
-                        skips += 1;
-                        None
-                    } else {
-                        Some(OrderedProxy::new_invert(ClauseId::from(i), r))
-                    }
-                })
+                c.to_vivify(Some(n as u16))
+                    .map(|r| OrderedProxy::new_invert(ClauseId::from(i), r))
             })
             .collect::<Vec<_>>();
-        // if skips < clauses.len() {
-        //     return vec![];
-        // }
         if let Some(max_len) = len
             && max_len < clauses.len()
         {
@@ -349,12 +339,18 @@ impl Clause {
         if self.is_dead() {
             return None;
         }
-        let n = initial_stage?;
         let len = self.len();
-        if (len / 2) as u16 == n + 1 {
-            return Some(-(self.used as f64));
+        if let Some(n) = initial_stage {
+            if len as u16 == n + 3 {
+                Some(len.saturating_sub(self.used as usize) as f64)
+            } else {
+                None
+            }
+        } else if (3..6).contains(&len) {
+            Some(len as f64)
+        } else {
+            None
         }
-        Some(0.0)
     }
     /// clear flags about vivification
     fn vivified(&mut self) {}

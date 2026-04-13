@@ -232,7 +232,7 @@ fn search(
     let mut processing_pressure: usize = 0;
     let mut ruduction_pressure: usize = 0;
     let reduction_interval: usize = 40_000;
-    let processing_interval: usize = 40_000;
+    let processing_interval: usize = 60_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
     let mut focusing: SearchMode = SearchMode::Explore;
@@ -300,7 +300,7 @@ fn search(
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(1.0);
             } else */
-            if (focusing != SearchMode::FocusAtBottom && r < -0.1)
+            if (focusing != SearchMode::FocusAtBottom && r < 0.1)
                 || (focusing == SearchMode::FocusAtBottom && r < 0.2)
             {
                 if focusing != SearchMode::FocusAtBottom {
@@ -322,7 +322,7 @@ fn search(
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if s < 0.45 {
+            } else if s < 0.35 {
                 if focusing != SearchMode::Pursue {
                     focusing = SearchMode::Pursue;
                     asg.set_learning_rate(state.config.vrw_learning_rate);

@@ -978,7 +978,6 @@ impl ClauseDBIF for ClauseDB {
                 c.used = 0;
                 continue;
             }
-            let lbd = asg.literal_block_distance(&c.lits);
             if c.is(FlagClause::ASSIGN_REASON) {
                 // c.used = 0;
                 nprotect += 1;
@@ -988,6 +987,7 @@ impl ClauseDBIF for ClauseDB {
                 c.used = 0;
                 continue;
             }
+            let lbd = asg.literal_block_distance(&c.lits);
             perm.push(OrderedProxy::new(i, lbd as f64));
             c.used = 0;
         }
