@@ -8,7 +8,7 @@ use {
 };
 
 /// A representation of 'clause'
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Debug)]
 pub struct Clause {
     /// The literals in a clause.
     pub(crate) lits: Vec<Lit>,
@@ -16,6 +16,8 @@ pub struct Clause {
     pub(crate) flags: FlagClause,
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: u16,
+    /// LBD average
+    pub lbd_ema: Ema,
     /// The number of propagation.
     pub used: u16,
     /// the index from which `propagate` starts searching an un-falsified literal.
@@ -59,6 +61,7 @@ impl Default for Clause {
             lits: vec![],
             flags: FlagClause::empty(),
             rank: 0,
+            lbd_ema: Ema::new(6),
             used: 0,
             search_from: 2,
 
@@ -266,7 +269,7 @@ impl Clause {
     /// update rank field with the present LBD.
     // If it's big enough, skip the loop.
     pub fn update_lbd(&mut self, asg: &impl AssignIF, lbd_temp: &mut [usize]) -> usize {
-        if 8192 <= self.lits.len() {
+        if 8192 * 2 <= self.lits.len() {
             self.rank = u16::MAX;
             return u16::MAX as usize;
         }

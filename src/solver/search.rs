@@ -207,6 +207,16 @@ impl SolveIF for Solver {
     }
 }
 
+#[derive(Default, Eq, PartialEq)]
+enum SearchMode {
+    // TraceCore,
+    FocusAtTop,
+    FocusAtBottom,
+    Pursue,
+    #[default]
+    Explore,
+}
+
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
 fn search(
     asg: &mut AssignStack,
@@ -222,14 +232,13 @@ fn search(
     let mut processing_pressure: usize = 0;
     let mut ruduction_pressure: usize = 0;
     let reduction_interval: usize = 40_000;
-    let processing_interval: usize = 30_000;
+    let processing_interval: usize = 40_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
-    let mut focusing: Option<bool> = None;
+    let mut focusing: SearchMode = SearchMode::Explore;
     let mut cii_hist: Histogram = Histogram::default();
     let mut core_ema: Ema = Ema::new(20);
     let mut core_hist: Histogram = Histogram::default();
-    let mut lbd_hist: Histogram = Histogram::default();
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -270,7 +279,6 @@ fn search(
             ruduction_pressure = 0;
             cii_hist.rescale(0.95);
             core_hist.rescale(0.95);
-            lbd_hist.rescale(0.95);
         }
 
         if state
@@ -278,31 +286,45 @@ fn search(
             .span_ended(span_len.saturating_sub(cooling_len))
         {
             let r = cii_hist.add(asg.conflict_interval_index.get());
-            // let s = core_hist.add(core_ema.get());
-            let t = lbd_hist.add(1.0 / cdb.lbd.get());
-            if (focusing.is_none() && 1.0 - r > 0.9) || (focusing == Some(false) && 1.0 - r > 0.5) {
-                if focusing != Some(false) {
-                    focusing = Some(false);
+            let s = core_hist.add(core_ema.get());
+            // let t = lbd_hist.add(1.0 / cdb.lbd.get());
+            /* if current_core * 2 < asg.decision_level() as usize {
+                if focusing != SearchMode::TraceCore {
+                    focusing = SearchMode::TraceCore;
+                    asg.set_learning_rate(0.1);
+                    asg.use_conflict_order(false);
+                }
+                RESTART!(asg, cdb, state);
+                asg.clear_asserted_literals(cdb)?;
+                state.search_mode_ratio.0.update(0.0);
+                state.search_mode_ratio.1.update(0.0);
+                state.search_mode_ratio.2.update(1.0);
+            } else */
+            if (focusing != SearchMode::FocusAtBottom && r < -0.1)
+                || (focusing == SearchMode::FocusAtBottom && r < 0.2)
+            {
+                if focusing != SearchMode::FocusAtBottom {
+                    focusing = SearchMode::FocusAtBottom;
                     asg.set_learning_rate(0.0);
                     asg.use_conflict_order(true);
                 }
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if (focusing.is_none() && r > 0.9) || (focusing == Some(true) && r > 0.5) {
-                if focusing != Some(true) {
-                    focusing = Some(true);
+            } else if (focusing != SearchMode::FocusAtTop && r > 0.95)
+                || (focusing == SearchMode::FocusAtTop && r > 0.45)
+            {
+                if focusing != SearchMode::FocusAtTop {
+                    focusing = SearchMode::FocusAtTop;
                     asg.set_learning_rate(0.0);
                     asg.use_conflict_order(true);
                 }
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if
-            /* r + s + */
-            t > 0.8 {
-                if focusing.is_some() {
-                    focusing = None;
+            } else if s < 0.4 {
+                if focusing != SearchMode::Pursue {
+                    focusing = SearchMode::Pursue;
                     asg.set_learning_rate(state.config.vrw_learning_rate);
                     asg.use_conflict_order(false);
                 }
@@ -310,8 +332,8 @@ fn search(
                 state.search_mode_ratio.1.update(1.0);
                 state.search_mode_ratio.2.update(0.0);
             } else {
-                if focusing.is_some() {
-                    focusing = None;
+                if focusing != SearchMode::Explore {
+                    focusing = SearchMode::Explore;
                     asg.set_learning_rate(state.config.vrw_learning_rate);
                     asg.use_conflict_order(false);
                 }
@@ -328,19 +350,27 @@ fn search(
             if asg.decision_level() == asg.root_level {
                 #[cfg(feature = "rephase")]
                 {
-                    if !focusing && state.span_manager.current_span() == 1 {
+                    if focusing.is_none() && state.span_manager.current_span() == 1 {
                         asg.select_rephasing_target();
                     }
                 }
                 if processing_pressure >= processing_interval {
-                    if cfg!(feature = "clause_vivification") {
-                        cdb.vivify(asg, state)?;
-                    }
-                    if cfg!(feature = "clause_elimination") {
-                        let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-                        state.flush("clause subsumption, ");
-                        elim.simplify(asg, cdb, state, false)?;
-                        asg.eliminated.append(elim.eliminated_lits());
+                    let mut n = usize::MAX;
+                    while asg.derefer(assign::property::Tusize::NumUnassertedVar) < n {
+                        n = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+                        if cfg!(feature = "clause_vivification") {
+                            let mut m = usize::MAX;
+                            while asg.derefer(assign::property::Tusize::NumUnassertedVar) < m {
+                                m = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+                                cdb.vivify(asg, state)?;
+                            }
+                        }
+                        if cfg!(feature = "clause_elimination") {
+                            let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+                            state.flush("clause subsumption, ");
+                            elim.simplify(asg, cdb, state, false)?;
+                            asg.eliminated.append(elim.eliminated_lits());
+                        }
                     }
                     processing_pressure = 0;
                 }
