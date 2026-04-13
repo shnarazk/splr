@@ -2,7 +2,7 @@
 #[cfg(feature = "trail_saving")]
 use crate::assign::TrailSavingIF;
 use {
-    super::{conflict::handle_conflict, Certificate, Solver, SolverEvent, SolverResult},
+    super::{Certificate, Solver, SolverEvent, SolverResult, conflict::handle_conflict},
     crate::{
         assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
         cdb::{self, ClauseDB, ClauseDBIF, VivifyIF},
@@ -359,7 +359,11 @@ fn search(
                     while asg.derefer(assign::property::Tusize::NumUnassertedVar) < n {
                         n = asg.derefer(assign::property::Tusize::NumUnassertedVar);
                         if cfg!(feature = "clause_vivification") {
-                            cdb.vivify(asg, state)?;
+                            let mut m = usize::MAX;
+                            while asg.derefer(assign::property::Tusize::NumUnassertedVar) < m {
+                                m = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+                                cdb.vivify(asg, state)?;
+                            }
                         }
                         if cfg!(feature = "clause_elimination") {
                             let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
