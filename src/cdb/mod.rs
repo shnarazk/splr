@@ -264,9 +264,7 @@ mod tests {
         let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         // Now `asg.level` = [_, 1, 2, 3, 4, 5, 6].
-        let c0 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
-            .as_cid();
+        cdb.new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false);
         asg.assign_by_decision(lit(-2)); // at level 1
         asg.assign_by_decision(lit(1)); // at level 2
         // Now `asg.level` = [_, 2, 1, 3, 4, 5, 6].

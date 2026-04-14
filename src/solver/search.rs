@@ -209,9 +209,7 @@ impl SolveIF for Solver {
 
 #[derive(Default, Eq, PartialEq)]
 enum SearchMode {
-    // TraceCore,
-    FocusAtTop,
-    FocusAtBottom,
+    Focus,
     Pursue,
     #[default]
     Explore,
@@ -287,42 +285,20 @@ fn search(
         {
             let r = cii_hist.add(asg.conflict_interval_index.get());
             let s = core_hist.add(core_ema.get());
-            // let t = lbd_hist.add(1.0 / cdb.lbd.get());
-            /* if current_core * 2 < asg.decision_level() as usize {
-                if focusing != SearchMode::TraceCore {
-                    focusing = SearchMode::TraceCore;
-                    asg.set_learning_rate(0.1);
-                    asg.use_conflict_order(false);
-                }
-                RESTART!(asg, cdb, state);
-                asg.clear_asserted_literals(cdb)?;
-                state.search_mode_ratio.0.update(0.0);
-                state.search_mode_ratio.1.update(0.0);
-                state.search_mode_ratio.2.update(1.0);
-            } else */
-            if (focusing != SearchMode::FocusAtBottom && r < 0.1)
-                || (focusing == SearchMode::FocusAtBottom && r < 0.2)
+            if (focusing != SearchMode::Focus && r < 0.05)
+                || (focusing == SearchMode::Focus && r < 0.2)
             {
-                if focusing != SearchMode::FocusAtBottom {
-                    focusing = SearchMode::FocusAtBottom;
+                if focusing != SearchMode::Focus {
+                    focusing = SearchMode::Focus;
                     asg.set_learning_rate(0.0);
                     asg.use_conflict_order(true);
                 }
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
-            } else if (focusing != SearchMode::FocusAtTop && r > 0.95)
-                || (focusing == SearchMode::FocusAtTop && r > 0.45)
+            } else if (focusing != SearchMode::Pursue && r > 0.95)
+                || (focusing == SearchMode::Pursue && r > 0.8)
             {
-                if focusing != SearchMode::FocusAtTop {
-                    focusing = SearchMode::FocusAtTop;
-                    asg.set_learning_rate(0.0);
-                    asg.use_conflict_order(true);
-                }
-                state.search_mode_ratio.0.update(1.0);
-                state.search_mode_ratio.1.update(0.0);
-                state.search_mode_ratio.2.update(0.0);
-            } else if s < 0.35 {
                 if focusing != SearchMode::Pursue {
                     focusing = SearchMode::Pursue;
                     asg.set_learning_rate(state.config.vrw_learning_rate);
@@ -349,10 +325,8 @@ fn search(
 
             if asg.decision_level() == asg.root_level {
                 #[cfg(feature = "rephase")]
-                {
-                    if focusing.is_none() && state.span_manager.current_span() == 1 {
-                        asg.select_rephasing_target();
-                    }
+                if focusing == SearchMode::Explore && s < 0.3 {
+                    asg.select_rephasing_target();
                 }
                 if processing_pressure >= processing_interval {
                     let mut n = usize::MAX;
