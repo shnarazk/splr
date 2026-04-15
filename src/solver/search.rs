@@ -226,7 +226,6 @@ fn search(
 
     // monotonic increment counter
     let mut span_len: usize = 1;
-    let cooling_len: usize = 20;
     let mut processing_pressure: usize = 0;
     let mut ruduction_pressure: usize = 0;
     let reduction_interval: usize = 40_000;
@@ -259,7 +258,6 @@ fn search(
             AssignReason::None => (),
         }
         progress_pressure += 1;
-        span_len += 1;
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }
@@ -289,13 +287,9 @@ fn search(
             cdb.reduce(asg, state.span_manager.envelop_index());
             ruduction_pressure = 0;
         }
-
-        if state
-            .span_manager
-            .span_ended(span_len.saturating_sub(cooling_len))
-        {
-            // let r = cii_hist.add(asg.conflict_interval_index.get());
-            // let s = core_hist.add(core_ema.get());
+        span_len += 1;
+        if span_len == 1 {
+            span_len = 0;
             let ent = state.entanglement.get_slow();
             let env = state.envelope.get_slow();
             let gap = env - ent;
@@ -317,26 +311,25 @@ fn search(
                     asg.use_conflict_order(false);
                 }
                 let dl = asg.decision_level();
-                if dl > 1 {
+                if dl > 1 && cdb.lbd.trend() > 1.0 {
                     let r1 = asg.var(asg.decision_vi(1)).reward;
                     let r = asg.var(asg.decision_vi(dl)).reward;
-                    assert_ne!(asg.var(asg.decision_vi(dl)).assign, None);
-                    if env * 2.0 < ent || r > 0.95 * r1 {
-                        RESTART!(asg, cdb, state);
-                        asg.clear_asserted_literals(cdb)?;
+                    if env * 2.0 < ent || r > 0.98 * r1 {
+                        span_len = 1;
                     }
                 }
                 state.search_mode_ratio.0.update(0.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(1.0);
             }
-
+        } else if span_len == 2 || state.span_manager.span_ended(span_len) {
             span_len = 0;
+            RESTART!(asg, cdb, state);
+            asg.clear_asserted_literals(cdb)?;
             let new_span = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, cdb, state, new_span);
 
-            if asg.decision_level() == asg.root_level && processing_pressure >= processing_interval
-            {
+            if processing_pressure >= processing_interval {
                 #[cfg(feature = "rephase")]
                 if focusing == SearchMode::Pursue && state.span_manager.current_span() == 1 {
                     asg.select_rephasing_target();
