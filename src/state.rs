@@ -123,6 +123,9 @@ pub struct State {
     pub c_lvl: Ema2,
     /// EMA of backtrack level drift caused by chrono_BT or BT_deepen
     pub bt_drift_average: Ema,
+    /// entanglement
+    pub entanglement: Ema2,
+    pub envelope: Ema2,
 
     #[cfg(feature = "chrono_BT")]
     /// chronoBT threshold
@@ -166,6 +169,8 @@ impl Default for State {
             b_lvl: Ema2::new(12).with_slow(8192),
             c_lvl: Ema2::new(12).with_slow(8192),
             bt_drift_average: Ema::new(1000),
+            entanglement: Ema2::new(2).with_slow(8192),
+            envelope: Ema2::new(2).with_slow(8192),
 
             #[cfg(feature = "chrono_BT")]
             chrono_bt_threshold: 100,
@@ -554,11 +559,23 @@ impl StateIF for State {
                 "{:>9.2}",
                 self,
                 LogF64Id::LiteralBlockEntanglement,
-                0.0,
+                self.entanglement.get_slow(),
                 0.01
             ),
-            fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get(), 0.01),
-            fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get(), 0.01),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::CLevel,
+                self.c_lvl.get_slow(),
+                0.01
+            ),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::BLevel,
+                self.b_lvl.get_slow(),
+                0.01
+            ),
             fm!(
                 "{:>9.2}",
                 self,
@@ -568,8 +585,14 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K    Learning| LBD:{}, trnd:{}, #RST:{}, /dpc:{}",
-            fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get_fast(), 0.01),
+            "\x1B[2K    Learning| env:{}, trnd:{}, #RST:{}, /dpc:{}",
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::EmaLBD,
+                self.envelope.get_slow(),
+                0.01
+            ),
             fm!("{:>9.2}", self, LogF64Id::TrendLBD, rst_lbd.trend(), 0.01),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
             fm!(

@@ -30,7 +30,7 @@ default = [
 
     # "clause_rewarding",
     "reason_side_rewarding",
-    "rephase",
+    # "rephase",
     # "stochastic_local_search",
 
     ### Logic formula processor

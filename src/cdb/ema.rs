@@ -36,7 +36,7 @@ impl EmaIF for ProgressLBD {
         self.ema.get_fast()
     }
     fn get_slow(&self) -> f64 {
-        self.ema.get_fast()
+        self.ema.get_slow()
     }
     fn trend(&self) -> f64 {
         self.ema.trend()
