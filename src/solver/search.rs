@@ -266,7 +266,10 @@ fn search(
         {
             cdb.update_activity_tick();
         }
+        asg.max_reward_of_canceled_vars = 0.0;
         let lbd: DecisionLevel = handle_conflict(asg, cdb, state, &cc)?;
+        let rebuild_pressure = asg.max_reward_of_canceled_vars;
+
         match lbd.cmp(&1) {
             std::cmp::Ordering::Less => (),
             std::cmp::Ordering::Equal => state.envelope.update(lbd as f64),
@@ -287,71 +290,69 @@ fn search(
             cdb.reduce(asg, state.span_manager.envelop_index());
             ruduction_pressure = 0;
         }
+        let ent = state.entanglement.get_slow();
+        let env = state.envelope.get_slow();
         span_len += 1;
         if span_len == 1 {
             span_len = 0;
-            let ent = state.entanglement.get_slow();
-            let env = state.envelope.get_slow();
-            let gap = env - ent;
-            if (focusing != SearchMode::Focus && gap > 5.0)
-                || (focusing == SearchMode::Focus && gap > 4.5)
-            {
-                if focusing != SearchMode::Focus {
-                    focusing = SearchMode::Focus;
-                    asg.set_learning_rate(0.0);
-                    asg.use_conflict_order(true);
-                }
-                state.search_mode_ratio.0.update(1.0);
-                state.search_mode_ratio.1.update(0.0);
-                state.search_mode_ratio.2.update(0.0);
-            } else {
-                if focusing != SearchMode::Explore {
-                    focusing = SearchMode::Explore;
-                    asg.set_learning_rate(state.config.vrw_learning_rate);
-                    asg.use_conflict_order(false);
-                }
-                let dl = asg.decision_level();
-                if dl > 1 && cdb.lbd.trend() > 1.0 {
-                    let r1 = asg.var(asg.decision_vi(1)).reward;
-                    let r = asg.var(asg.decision_vi(dl)).reward;
-                    if env * 2.0 < ent || r > 0.98 * r1 {
-                        span_len = 1;
+            let dl = asg.decision_level();
+            if dl > 0 {
+                if rebuild_pressure > asg.var(asg.decision_vi(1)).reward {
+                    span_len = 1;
+                    if focusing != SearchMode::Explore {
+                        focusing = SearchMode::Explore;
+                        asg.set_learning_rate(state.config.vrw_learning_rate);
+                        asg.use_conflict_order(false);
+                        state.search_mode_ratio.0.update(0.0);
+                        state.search_mode_ratio.1.update(0.0);
+                        state.search_mode_ratio.2.update(1.0);
+                    }
+                } else if rebuild_pressure > asg.var(cc.0.vi()).reward {
+                    span_len = 1;
+                    if focusing != SearchMode::Focus {
+                        focusing = SearchMode::Focus;
+                        asg.set_learning_rate(0.0);
+                        asg.use_conflict_order(true);
+                        state.search_mode_ratio.0.update(1.0);
+                        state.search_mode_ratio.1.update(0.0);
+                        state.search_mode_ratio.2.update(0.0);
                     }
                 }
-                state.search_mode_ratio.0.update(0.0);
-                state.search_mode_ratio.1.update(0.0);
-                state.search_mode_ratio.2.update(1.0);
             }
-        } else if span_len == 2 || state.span_manager.span_ended(span_len) {
-            span_len = 0;
-            RESTART!(asg, cdb, state);
-            asg.clear_asserted_literals(cdb)?;
-            let new_span = state.span_manager.prepare_new_span(span_len);
-            dump_stage(asg, cdb, state, new_span);
+        } else if env > ent {
+            if state.span_manager.span_ended(span_len) {
+                span_len = 0;
+                RESTART!(asg, cdb, state);
+                asg.clear_asserted_literals(cdb)?;
+                let new_span = state.span_manager.prepare_new_span(span_len);
+                dump_stage(asg, cdb, state, new_span);
 
-            if processing_pressure >= processing_interval {
-                #[cfg(feature = "rephase")]
-                if focusing == SearchMode::Pursue && state.span_manager.current_span() == 1 {
-                    asg.select_rephasing_target();
-                }
-                if cfg!(feature = "clause_vivification") {
-                    let mut m = 0;
-                    let mut c: usize = 0;
-                    while m < state[Stat::VivifiedVar] && c < 32 {
-                        m = state[Stat::VivifiedVar];
-                        c += 1;
-                        cdb.vivify(asg, state)?;
+                if processing_pressure >= processing_interval {
+                    #[cfg(feature = "rephase")]
+                    if focusing == SearchMode::Pursue && state.span_manager.current_span() == 1 {
+                        asg.select_rephasing_target();
                     }
+                    if cfg!(feature = "clause_vivification") {
+                        let mut m = 0;
+                        let mut c: usize = 0;
+                        while m < state[Stat::VivifiedVar] && c < 32 {
+                            m = state[Stat::VivifiedVar];
+                            c += 1;
+                            cdb.vivify(asg, state)?;
+                        }
+                    }
+                    if cfg!(feature = "clause_elimination") {
+                        let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+                        state.flush("clause subsumption, ");
+                        elim.simplify(asg, cdb, state, false)?;
+                        asg.eliminated.append(elim.eliminated_lits());
+                        state.flush("");
+                    }
+                    processing_pressure = 0;
                 }
-                if cfg!(feature = "clause_elimination") {
-                    let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-                    state.flush("clause subsumption, ");
-                    elim.simplify(asg, cdb, state, false)?;
-                    asg.eliminated.append(elim.eliminated_lits());
-                    state.flush("");
-                }
-                processing_pressure = 0;
             }
+        } else {
+            span_len -= 1;
         }
         if progress_pressure >= progress_interval {
             state.progress(asg, cdb);

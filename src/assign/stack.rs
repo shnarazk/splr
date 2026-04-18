@@ -34,6 +34,7 @@ pub struct AssignStack {
     //
     /// weighted confllict distance average
     pub(crate) conflict_interval_index: Ema2,
+    pub(crate) max_reward_of_canceled_vars: f64,
 
     //
     //## Phase handling
@@ -110,12 +111,13 @@ impl Default for AssignStack {
 
             num_reconflict: 0,
             num_repropagation: 0,
-            conflict_interval_index: Ema2::new(20).with_slow(1024),
+            conflict_interval_index: Ema2::default(),
+            max_reward_of_canceled_vars: 0.0,
             best_assign: false,
             build_best_at: 0,
             num_best_assign: 0,
             num_rephase: 0,
-            bp_divergence_ema: Ema::new(10),
+            bp_divergence_ema: Ema::default(),
 
             #[cfg(feature = "best_phases_tracking")]
             best_phases: HashMap::new(),
@@ -132,9 +134,9 @@ impl Default for AssignStack {
             num_conflict: 0,
             num_restart: 0,
 
-            dpc_ema: EmaSU::new(100),
-            ppc_ema: EmaSU::new(100),
-            cpr_ema: EmaSU::new(100),
+            dpc_ema: EmaSU::default(),
+            ppc_ema: EmaSU::default(),
+            cpr_ema: EmaSU::default(),
 
             tick: 0,
             var: Vec::new(),

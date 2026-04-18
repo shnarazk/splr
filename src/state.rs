@@ -161,17 +161,12 @@ impl Default for State {
             target: CNFDescription::default(),
             reflection_interval: 10_000,
 
-            search_mode_ratio: (
-                Ema2::new(100).with_slow(1000).with_value(0.33),
-                Ema2::new(100).with_slow(1000).with_value(0.33),
-                Ema2::new(100).with_slow(1000).with_value(0.33),
-            ),
-            b_lvl: Ema2::new(12).with_slow(8192),
-            c_lvl: Ema2::new(12).with_slow(8192),
-            bt_drift_average: Ema::new(1000),
-            entanglement: Ema2::new(2).with_slow(8192),
-            envelope: Ema2::new(2).with_slow(8192),
-
+            search_mode_ratio: (Ema2::default(), Ema2::default(), Ema2::default()),
+            b_lvl: Ema2::default(),
+            c_lvl: Ema2::default(),
+            bt_drift_average: Ema::default(),
+            entanglement: Ema2::default(),
+            envelope: Ema2::default(),
             #[cfg(feature = "chrono_BT")]
             chrono_bt_threshold: 100,
             num_chrono_bt: 0,
@@ -554,7 +549,7 @@ impl StateIF for State {
         );
         self[LogUsizeId::StageSegment] = stg_segment;
         println!(
-            "\x1B[2K    Conflict|entg:{}, cLvl:{}, bLvl:{}, /cpr:{}",
+            "\x1B[2K    Conflict| ent:{}, cLvl:{}, bLvl:{}, /cpr:{}",
             fm!(
                 "{:>9.2}",
                 self,
