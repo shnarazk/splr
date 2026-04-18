@@ -310,9 +310,6 @@ impl PropagateIF for AssignStack {
                 self.dpc_ema.update(self.num_decision);
                 self.ppc_ema.update(self.num_propagation);
                 self.num_conflict += 1;
-                let d = self.num_conflict - self.var[$lit.vi()].last_conflict;
-                let f: f64 = 1.0 / (d as f64 + 1.0).log2();
-                self.conflict_interval_index.update(f);
                 self.var[$lit.vi()].last_conflict = self.num_conflict;
                 return Err(($lit, $reason));
             };
@@ -683,7 +680,7 @@ impl AssignStack {
                         .all(|l| !self.var[l.vi()].is(FlagVar::ELIMINATED))
                 );
                 match cdb.transform_by_simplification(self, cid) {
-                    RefClause::Clause(_) => (),
+                    RefClause::Clause(_, _) => (),
                     RefClause::Dead => (), // was a satisfied clause
                     RefClause::EmptyClause => return Err(SolverError::EmptyClause),
                     RefClause::RegisteredClause(_) => (),

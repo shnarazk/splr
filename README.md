@@ -276,7 +276,6 @@ https://github.com/shnarazk/sudoku_sat/blob/4490b4358e5f3b72803a566323a6c8c19662
 | `LBD2`       | the accumulated number of learnt clauses which LBDs are 2                                 |
 | `BinC`       | the current number of binary learnt clauses                                               |
 | `Perm`       | the current number of given clauses and binary learnt clauses                             |
-| `entg`       | the current average of 'Literal Block entanglement'                                       |
 | `cLvl`       | the EMA of decision levels at which conflicts occur                                       |
 | `bLvl`       | the EMA of decision levels to which backjumps go                                          |
 | `/cpr`       | the EMA of conflicts per restart                                                          |

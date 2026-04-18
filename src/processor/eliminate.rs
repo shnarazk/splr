@@ -91,7 +91,7 @@ pub fn eliminate_var(
                 _ => {
                     debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
                     match cdb.new_clause(asg, vec, learnt_p && cdb[*n].is(FlagClause::LEARNT)) {
-                        RefClause::Clause(ci) => {
+                        RefClause::Clause(ci, _) => {
                             // the merged clause might be a duplicated clause.
                             elim.add_cid_occur(asg, ci, &mut cdb[ci], true);
 

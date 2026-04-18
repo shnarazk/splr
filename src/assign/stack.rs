@@ -34,6 +34,7 @@ pub struct AssignStack {
     //
     /// weighted confllict distance average
     pub(crate) conflict_interval_index: Ema2,
+    pub(crate) max_reward_of_canceled_vars: f64,
 
     //
     //## Phase handling
@@ -91,6 +92,9 @@ pub struct AssignStack {
     pub(super) activity_anti_decay: f64,
     /// ordering_mode
     pub(crate) ordering_by_conflict: bool,
+
+    /// working memory
+    lbd_temp: Vec<usize>,
 }
 
 impl Default for AssignStack {
@@ -107,12 +111,13 @@ impl Default for AssignStack {
 
             num_reconflict: 0,
             num_repropagation: 0,
-            conflict_interval_index: Ema2::new(20).with_slow(1024),
+            conflict_interval_index: Ema2::default(),
+            max_reward_of_canceled_vars: 0.0,
             best_assign: false,
             build_best_at: 0,
             num_best_assign: 0,
             num_rephase: 0,
-            bp_divergence_ema: Ema::new(10),
+            bp_divergence_ema: Ema::default(),
 
             #[cfg(feature = "best_phases_tracking")]
             best_phases: HashMap::new(),
@@ -129,9 +134,9 @@ impl Default for AssignStack {
             num_conflict: 0,
             num_restart: 0,
 
-            dpc_ema: EmaSU::new(100),
-            ppc_ema: EmaSU::new(100),
-            cpr_ema: EmaSU::new(100),
+            dpc_ema: EmaSU::default(),
+            ppc_ema: EmaSU::default(),
+            cpr_ema: EmaSU::default(),
 
             tick: 0,
             var: Vec::new(),
@@ -140,6 +145,8 @@ impl Default for AssignStack {
 
             activity_anti_decay: 0.06,
             ordering_by_conflict: false,
+
+            lbd_temp: Vec::new(),
         }
     }
 }
@@ -176,6 +183,8 @@ impl Instantiate for AssignStack {
 
             activity_anti_decay: config.vrw_learning_rate,
 
+            lbd_temp: vec![0; nv + 1],
+
             ..AssignStack::default()
         }
     }
@@ -192,6 +201,7 @@ impl Instantiate for AssignStack {
                 self.expand_heap();
                 self.num_vars += 1;
                 self.var.push(Var::default());
+                self.lbd_temp.push(0);
             }
             e => panic!("don't call asg with {e:?}"),
         }
@@ -300,6 +310,32 @@ impl AssignIF for AssignStack {
     }
     fn ordering_by_reward(&self) -> bool {
         !self.ordering_by_conflict
+    }
+    /// update rank field with the present LBD.
+    /// If it's big enough, skip the loop.
+    fn literal_block_distance(&mut self, lits: &[Lit]) -> DecisionLevel {
+        if lits.len() <= 2 {
+            1
+        } else {
+            if 8192 * 2 <= lits.len() {
+                return u32::MAX;
+            }
+            let key: usize = self.lbd_temp[0].wrapping_add(1);
+            self.lbd_temp[0] = key;
+            let mut cnt = 0;
+            for l in lits {
+                let lv = self.level(l.vi());
+                if lv == 0 {
+                    continue;
+                }
+                let p = &mut self.lbd_temp[lv as usize];
+                if *p != key {
+                    *p = key;
+                    cnt += 1;
+                }
+            }
+            cnt as DecisionLevel
+        }
     }
 }
 

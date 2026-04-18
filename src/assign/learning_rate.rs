@@ -16,6 +16,8 @@ impl ActivityIF<VarId> for AssignStack {
         self.var[vi].reward = val;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
+        self.max_reward_of_canceled_vars =
+            self.max_reward_of_canceled_vars.max(self.var[vi].reward);
         self.var[vi].turn_on(FlagVar::USED);
     }
     #[inline]

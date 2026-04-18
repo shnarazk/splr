@@ -40,7 +40,7 @@ pub trait EmaMutIF: EmaIF {
     fn set_value(&mut self, _x: f64) {}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct EmaView {
     fast: f64,
     slow: f64,
@@ -65,6 +65,17 @@ pub struct Ema {
     #[cfg(feature = "EMA_calibration")]
     cal: f64,
     sca: f64,
+}
+
+impl Default for Ema {
+    fn default() -> Self {
+        Self {
+            val: EmaView::default(),
+            #[cfg(feature = "EMA_calibration")]
+            cal: 0.0,
+            sca: 1.0 / 256.0,
+        }
+    }
 }
 
 impl EmaIF for Ema {
@@ -105,7 +116,7 @@ impl EmaMutIF for Ema {
 }
 
 impl Ema {
-    pub fn new(s: usize) -> Ema {
+    fn _new(s: usize) -> Ema {
         Ema {
             val: EmaView {
                 fast: 0.0,
@@ -138,6 +149,20 @@ pub struct Ema2 {
     cals: f64,
     fe: f64,
     se: f64,
+}
+
+impl Default for Ema2 {
+    fn default() -> Self {
+        Self {
+            ema: EmaView::default(),
+            #[cfg(feature = "EMA_calibration")]
+            calf: 0.0,
+            #[cfg(feature = "EMA_calibration")]
+            cals: 0.0,
+            fe: 1.0 / 256.0,
+            se: 1.0 / 16384.0,
+        }
+    }
 }
 
 impl EmaIF for Ema2 {
@@ -208,7 +233,7 @@ impl EmaMutIF for Ema2 {
 }
 
 impl Ema2 {
-    pub fn new(len: usize) -> Ema2 {
+    fn _new(len: usize) -> Ema2 {
         Ema2 {
             ema: EmaView {
                 fast: 0.0,
@@ -248,7 +273,7 @@ impl Ema2 {
 }
 
 /// Ema of Sequence of usize
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct EmaSU {
     last: f64,
     ema: Ema,
@@ -279,10 +304,10 @@ impl EmaMutIF for EmaSU {
 }
 
 impl EmaSU {
-    pub fn new(s: usize) -> Self {
+    fn _new(s: usize) -> Self {
         EmaSU {
             last: 0.0,
-            ema: Ema::new(s),
+            ema: Ema::_new(s),
         }
     }
     pub fn update_base(&mut self, x: usize) {
@@ -299,6 +324,16 @@ pub struct Ewa<const N: usize = 32> {
     ema: EmaView,
     pool: [f64; N],
     last: usize,
+}
+
+impl<const N: usize> Default for Ewa<N> {
+    fn default() -> Self {
+        Self {
+            ema: EmaView::default(),
+            pool: [0.0; N],
+            last: 0,
+        }
+    }
 }
 
 impl<const N: usize> EmaIF for Ewa<N> {
@@ -322,7 +357,7 @@ impl<const N: usize> EmaMutIF for Ewa<N> {
 }
 
 impl<const N: usize> Ewa<N> {
-    pub fn new(initial: f64) -> Self {
+    fn _new(initial: f64) -> Self {
         Ewa::<N> {
             ema: EmaView {
                 fast: initial,
@@ -344,6 +379,20 @@ pub struct Ewa2<const N: usize> {
     cals: f64,
     se: f64,
     sx: f64,
+}
+
+impl<const N: usize> Default for Ewa2<N> {
+    fn default() -> Self {
+        Self {
+            ema: EmaView::default(),
+            pool: [0.0; N],
+            last: 0,
+            #[cfg(feature = "EMA_calibration")]
+            cals: 0,
+            se: 1.0 / (N as f64),
+            sx: 1.0 - 1.0 / (N as f64),
+        }
+    }
 }
 
 impl<const N: usize> EmaIF for Ewa2<N> {
@@ -400,7 +449,7 @@ impl<const N: usize> EmaMutIF for Ewa2<N> {
 }
 
 impl<const N: usize> Ewa2<N> {
-    pub fn new(initial: f64) -> Ewa2<N> {
+    fn _new(initial: f64) -> Ewa2<N> {
         Ewa2::<N> {
             ema: EmaView {
                 fast: initial,

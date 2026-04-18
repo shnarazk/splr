@@ -139,6 +139,7 @@ impl VivifyIF for ClauseDB {
                                     }
                                     #[cfg(not(feature = "clause_rewarding"))]
                                     self.new_clause(asg, &mut vec, is_learnt);
+
                                     self.remove_clause(cid);
                                     num_shrink += 1;
                                 }
@@ -208,25 +209,15 @@ fn select_targets(
         clauses
     } else {
         let n = state[Stat::Vivification] % 32;
-        let mut skips = 0;
         let mut clauses: Vec<OrderedProxy<ClauseId>> = cdb
             .iter()
             .enumerate()
             .skip(1)
             .filter_map(|(i, c)| {
-                c.to_vivify(Some(n as u16)).and_then(|r| {
-                    if r == 0.0 {
-                        skips += 1;
-                        None
-                    } else {
-                        Some(OrderedProxy::new_invert(ClauseId::from(i), r))
-                    }
-                })
+                c.to_vivify(Some(n as u16))
+                    .map(|r| OrderedProxy::new_invert(ClauseId::from(i), r))
             })
             .collect::<Vec<_>>();
-        // if skips < clauses.len() {
-        //     return vec![];
-        // }
         if let Some(max_len) = len
             && max_len < clauses.len()
         {
@@ -345,25 +336,20 @@ impl Clause {
     /// return `true` if the clause should try vivification.
     /// smaller is better.
     fn to_vivify(&self, initial_stage: Option<u16>) -> Option<f64> {
+        if self.is_dead() {
+            return None;
+        }
+        let len = self.len();
         if let Some(n) = initial_stage {
-            if n == 0 {
-                (
-                    !self.is_dead() && self.rank <= 4
-                    // && (self.rank as usize) * 2 <= self.len()
-                    // && self.is(FlagClause::LEARNT)
-                )
-                .then(|| -((self.len() as f64 - self.rank as f64) / self.rank as f64))
+            if len as u16 == n + 3 {
+                Some(len.saturating_sub(self.used as usize) as f64)
             } else {
-                (!self.is_dead() && self.rank == n && self.used >= 4).then(|| {
-                    if (self.rank as usize) < self.len() {
-                        -(self.len() as f64) / self.rank as f64
-                    } else {
-                        0.0
-                    }
-                })
+                None
             }
+        } else if (3..6).contains(&len) {
+            Some(len as f64)
         } else {
-            (!self.is_dead()).then(|| self.len() as f64)
+            None
         }
     }
     /// clear flags about vivification

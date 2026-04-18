@@ -94,8 +94,8 @@ fn strengthen_clause(
 ) -> MaybeInconsistent {
     debug_assert!(!cdb[cid].is_dead());
     debug_assert!(1 < cdb[cid].len());
-    match cdb.transform_by_elimination(cid, l) {
-        RefClause::Clause(_ci) => {
+    match cdb.transform_by_elimination(asg, cid, l) {
+        RefClause::Clause(_ci, _) => {
             #[cfg(feature = "trace_elimination")]
             println!("cid {} drops literal {}", cid, l);
 

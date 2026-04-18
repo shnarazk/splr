@@ -79,6 +79,9 @@ pub trait AssignIF:
     fn satisfies(&self, c: &[Lit]) -> bool;
     /// return ordering mode
     fn ordering_by_reward(&self) -> bool;
+
+    /// return the Literal Block Distance of `lits`.
+    fn literal_block_distance(&mut self, lits: &[Lit]) -> DecisionLevel;
 }
 
 /// Reasons of assignments

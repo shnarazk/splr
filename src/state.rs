@@ -123,6 +123,9 @@ pub struct State {
     pub c_lvl: Ema2,
     /// EMA of backtrack level drift caused by chrono_BT or BT_deepen
     pub bt_drift_average: Ema,
+    /// entanglement
+    pub entanglement: Ema2,
+    pub envelope: Ema2,
 
     #[cfg(feature = "chrono_BT")]
     /// chronoBT threshold
@@ -158,15 +161,12 @@ impl Default for State {
             target: CNFDescription::default(),
             reflection_interval: 10_000,
 
-            search_mode_ratio: (
-                Ema2::new(100).with_slow(1000).with_value(0.33),
-                Ema2::new(100).with_slow(1000).with_value(0.33),
-                Ema2::new(100).with_slow(1000).with_value(0.33),
-            ),
-            b_lvl: Ema2::new(12).with_slow(8192),
-            c_lvl: Ema2::new(12).with_slow(8192),
-            bt_drift_average: Ema::new(1000),
-
+            search_mode_ratio: (Ema2::default(), Ema2::default(), Ema2::default()),
+            b_lvl: Ema2::default(),
+            c_lvl: Ema2::default(),
+            bt_drift_average: Ema::default(),
+            entanglement: Ema2::default(),
+            envelope: Ema2::default(),
             #[cfg(feature = "chrono_BT")]
             chrono_bt_threshold: 100,
             num_chrono_bt: 0,
@@ -475,7 +475,6 @@ impl StateIF for State {
         let cdb_num_bi_clause = cdb.derefer(cdb::property::Tusize::NumBiClause);
         let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
-        let cdb_lb_ent: f64 = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
         let rst_num_rst: usize = self[Stat::Restart];
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
         let stg_segment: usize = self.span_manager.current_segment();
@@ -550,16 +549,28 @@ impl StateIF for State {
         );
         self[LogUsizeId::StageSegment] = stg_segment;
         println!(
-            "\x1B[2K    Conflict|entg:{}, cLvl:{}, bLvl:{}, /cpr:{}",
+            "\x1B[2K    Conflict| ent:{}, cLvl:{}, bLvl:{}, /cpr:{}",
             fm!(
                 "{:>9.2}",
                 self,
                 LogF64Id::LiteralBlockEntanglement,
-                cdb_lb_ent,
+                self.entanglement.get_slow(),
                 0.01
             ),
-            fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get(), 0.01),
-            fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get(), 0.01),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::CLevel,
+                self.c_lvl.get_slow(),
+                0.01
+            ),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::BLevel,
+                self.b_lvl.get_slow(),
+                0.01
+            ),
             fm!(
                 "{:>9.2}",
                 self,
@@ -569,8 +580,14 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K    Learning| LBD:{}, trnd:{}, #RST:{}, /dpc:{}",
-            fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get_fast(), 0.01),
+            "\x1B[2K    Learning| env:{}, trnd:{}, #RST:{}, /dpc:{}",
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::EmaLBD,
+                self.envelope.get_slow(),
+                0.01
+            ),
             fm!("{:>9.2}", self, LogF64Id::TrendLBD, rst_lbd.trend(), 0.01),
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
             fm!(
@@ -801,8 +818,6 @@ impl State {
         self[LogF64Id::EmaLBD] = rst_lbd.get_fast();
         self[LogF64Id::TrendLBD] = rst_lbd.trend();
 
-        self[LogF64Id::LiteralBlockEntanglement] =
-            cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
         self[LogF64Id::DecisionPerConflict] =
             asg.refer(assign::property::TEma::DecisionPerConflict).get();
 
