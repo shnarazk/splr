@@ -16,8 +16,11 @@ impl ActivityIF<VarId> for AssignStack {
         self.var[vi].reward = val;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
-        self.max_reward_of_canceled_vars =
-            self.max_reward_of_canceled_vars.max(self.var[vi].reward);
+        self.max_reward_of_canceled_vars = self
+            .max_reward_of_canceled_vars
+            .max(self.reward_by_conflict_interval(vi));
+        // self.max_reward_of_canceled_vars =
+        //     self.max_reward_of_canceled_vars.max(self.var[vi].reward);
         self.var[vi].turn_on(FlagVar::USED);
     }
     #[inline]
@@ -36,6 +39,14 @@ impl ActivityIF<VarId> for AssignStack {
     #[inline]
     fn update_activity_tick(&mut self) {
         self.tick += 1;
+    }
+    fn reward_by_conflict_interval(&mut self, vi: VarId) -> f64 {
+        if self.num_conflict > self.var[vi].last_conflict {
+            let d = 1.0 / (self.num_conflict as f64 - self.var[vi].last_conflict as f64);
+            self.var[vi].conflict_interval_index.update(d);
+            self.var[vi].last_conflict = self.num_conflict;
+        }
+        self.var[vi].conflict_interval_index.get_slow()
     }
 }
 

@@ -290,17 +290,19 @@ fn search(
             cdb.reduce(asg, state.span_manager.envelop_index());
             ruduction_pressure = 0;
         }
-        let ent = state.entanglement.get_slow();
-        let env = state.envelope.get_slow();
+        let ent = state.entanglement.trend();
+        let env = state.envelope.trend();
         let dl = asg.decision_level();
         if dl > 0 {
             span_len += 1;
+            // dbg!(asg.conflict_interval_index.trend());
             if span_len == 1 {
                 span_len = 0;
                 match focusing {
                     SearchMode::Focus => {
                         // 1.05..1.2
-                        if !(0.05..1.0).contains(&asg.conflict_interval_index.trend()) {
+                        if !(0.0..1.0).contains(&asg.conflict_interval_index.trend()) {
+                            span_len = 1;
                             focusing = SearchMode::Explore;
                             asg.set_learning_rate(state.config.vrw_learning_rate);
                             asg.use_conflict_order(false);
@@ -315,7 +317,7 @@ fn search(
                     }
                     SearchMode::Explore => {
                         // 1.05..1.2
-                        if (0.05..0.99).contains(&asg.conflict_interval_index.trend()) {
+                        if (0.0..0.99).contains(&asg.conflict_interval_index.trend()) {
                             focusing = SearchMode::Focus;
                             asg.set_learning_rate(0.0);
                             asg.use_conflict_order(true);
@@ -326,6 +328,14 @@ fn search(
                             || rebuild_pressure > asg.var(cc.0.vi()).reward
                         {
                             span_len = 1;
+                            /* println!(
+                                "{:>.3},{:>.3},{:>.3}",
+                                rebuild_pressure,
+                                asg.reward_by_conflict_interval(asg.decision_vi(1)),
+                                // asg.var(asg.decision_vi(1)).reward,
+                                asg.reward_by_conflict_interval(cc.0.vi()),
+                                // asg.var(cc.0.vi()).reward
+                            ); */
                             state.search_mode_ratio.0.update(0.0);
                             state.search_mode_ratio.1.update(1.0);
                             state.search_mode_ratio.2.update(0.0);
@@ -336,7 +346,7 @@ fn search(
                         }
                     }
                 }
-            } else if env > ent && state.span_manager.span_ended(span_len) {
+            } else if (env > 1.0 && ent > 1.0) && state.span_manager.span_ended(span_len) {
                 // dbg!(asg.conflict_interval_index.trend());
                 span_len = 0;
                 RESTART!(asg, cdb, state);
@@ -375,6 +385,8 @@ fn search(
                     }
                     processing_pressure = 0;
                 }
+            } else if env < 1.0 && ent < 1.0 {
+                span_len = (span_len - 1).max(1);
             }
         }
         if progress_pressure >= progress_interval {

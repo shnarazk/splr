@@ -61,6 +61,7 @@ pub trait ActivityIF<Ix> {
     fn set_learning_rate(&mut self, learning_rate: f64);
     /// update internal counter.
     fn update_activity_tick(&mut self);
+    fn reward_by_conflict_interval(&mut self, vi: VarId) -> f64;
 }
 
 /// API for object instantiation based on `Configuration` and `CNFDescription`.

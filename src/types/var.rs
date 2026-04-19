@@ -1,7 +1,7 @@
 //! Var struct and Database management API
 use {
     // super::{heap::VarHeapIF, stack::AssignStack, AssignIF},
-    crate::types::{AssignReason, DecisionLevel, flags::FlagIF, flags::FlagVar},
+    crate::types::{AssignReason, DecisionLevel, Ema2, flags::FlagIF, flags::FlagVar},
     std::fmt,
 };
 
@@ -23,6 +23,8 @@ pub struct Var {
     pub(crate) reward: f64,
     /// the last conflict by this
     pub(crate) last_conflict: usize,
+    /// the new reward
+    pub(crate) conflict_interval_index: Ema2,
 }
 
 impl Default for Var {
@@ -36,6 +38,7 @@ impl Default for Var {
             flags: FlagVar::empty(),
             reward: 0.0,
             last_conflict: 0,
+            conflict_interval_index: Ema2::default(),
         }
     }
 }
