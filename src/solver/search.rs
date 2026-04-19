@@ -292,37 +292,62 @@ fn search(
         }
         let ent = state.entanglement.get_slow();
         let env = state.envelope.get_slow();
-        span_len += 1;
-        if span_len == 1 {
-            span_len = 0;
-            let dl = asg.decision_level();
-            if dl > 0 {
-                if rebuild_pressure > asg.var(asg.decision_vi(1)).reward {
-                    span_len = 1;
-                    if focusing != SearchMode::Explore {
-                        focusing = SearchMode::Explore;
-                        asg.set_learning_rate(state.config.vrw_learning_rate);
-                        asg.use_conflict_order(false);
-                        state.search_mode_ratio.0.update(0.0);
-                        state.search_mode_ratio.1.update(0.0);
-                        state.search_mode_ratio.2.update(1.0);
+        let dl = asg.decision_level();
+        if dl > 0 {
+            span_len += 1;
+            if span_len == 1 {
+                span_len = 0;
+                match focusing {
+                    SearchMode::Focus => {
+                        // 1.05..1.2
+                        if !(0.05..1.0).contains(&asg.conflict_interval_index.trend()) {
+                            focusing = SearchMode::Explore;
+                            asg.set_learning_rate(state.config.vrw_learning_rate);
+                            asg.use_conflict_order(false);
+                            state.search_mode_ratio.0.update(0.0);
+                            state.search_mode_ratio.1.update(0.0);
+                            state.search_mode_ratio.2.update(1.0);
+                        } else {
+                            state.search_mode_ratio.0.update(1.0);
+                            state.search_mode_ratio.1.update(0.0);
+                            state.search_mode_ratio.2.update(0.0);
+                        }
                     }
-                } else if rebuild_pressure > asg.var(cc.0.vi()).reward {
-                    span_len = 1;
-                    if focusing != SearchMode::Focus {
-                        focusing = SearchMode::Focus;
-                        asg.set_learning_rate(0.0);
-                        asg.use_conflict_order(true);
-                        state.search_mode_ratio.0.update(1.0);
-                        state.search_mode_ratio.1.update(0.0);
-                        state.search_mode_ratio.2.update(0.0);
+                    SearchMode::Explore => {
+                        // 1.05..1.2
+                        if (0.05..0.99).contains(&asg.conflict_interval_index.trend()) {
+                            focusing = SearchMode::Focus;
+                            asg.set_learning_rate(0.0);
+                            asg.use_conflict_order(true);
+                            state.search_mode_ratio.0.update(1.0);
+                            state.search_mode_ratio.1.update(0.0);
+                            state.search_mode_ratio.2.update(0.0);
+                        } else if rebuild_pressure > asg.var(asg.decision_vi(1)).reward
+                            || rebuild_pressure > asg.var(cc.0.vi()).reward
+                        {
+                            span_len = 1;
+                            state.search_mode_ratio.0.update(0.0);
+                            state.search_mode_ratio.1.update(1.0);
+                            state.search_mode_ratio.2.update(0.0);
+                        } else {
+                            state.search_mode_ratio.0.update(0.0);
+                            state.search_mode_ratio.1.update(0.0);
+                            state.search_mode_ratio.2.update(1.0);
+                        }
                     }
                 }
-            }
-        } else if env > ent {
-            if state.span_manager.span_ended(span_len) {
+            } else if env > ent && state.span_manager.span_ended(span_len) {
+                // dbg!(asg.conflict_interval_index.trend());
                 span_len = 0;
                 RESTART!(asg, cdb, state);
+                if focusing != SearchMode::Explore {
+                    focusing = SearchMode::Explore;
+                    asg.set_learning_rate(state.config.vrw_learning_rate);
+                    asg.use_conflict_order(false);
+                    state.search_mode_ratio.0.update(0.0);
+                    state.search_mode_ratio.1.update(0.0);
+                    state.search_mode_ratio.2.update(1.0);
+                }
                 asg.clear_asserted_literals(cdb)?;
                 let new_span = state.span_manager.prepare_new_span(span_len);
                 dump_stage(asg, cdb, state, new_span);
@@ -351,8 +376,6 @@ fn search(
                     processing_pressure = 0;
                 }
             }
-        } else {
-            span_len -= 1;
         }
         if progress_pressure >= progress_interval {
             state.progress(asg, cdb);
