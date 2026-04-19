@@ -301,7 +301,7 @@ fn search(
                 match focusing {
                     SearchMode::Focus => {
                         // 1.05..1.2
-                        if !(0.0..1.0).contains(&asg.conflict_interval_index.trend()) {
+                        if !(1.0..1.02).contains(&asg.conflict_interval_index.trend()) {
                             span_len = 1;
                             focusing = SearchMode::Explore;
                             asg.set_learning_rate(state.config.vrw_learning_rate);
@@ -317,15 +317,15 @@ fn search(
                     }
                     SearchMode::Explore => {
                         // 1.05..1.2
-                        if (0.0..0.99).contains(&asg.conflict_interval_index.trend()) {
+                        if (-0.99..-1.03).contains(&asg.conflict_interval_index.trend()) {
                             focusing = SearchMode::Focus;
                             asg.set_learning_rate(0.0);
                             asg.use_conflict_order(true);
                             state.search_mode_ratio.0.update(1.0);
                             state.search_mode_ratio.1.update(0.0);
                             state.search_mode_ratio.2.update(0.0);
-                        } else if rebuild_pressure > asg.var(asg.decision_vi(1)).reward
-                            || rebuild_pressure > asg.var(cc.0.vi()).reward
+                        } else if rebuild_pressure > asg.activity(asg.decision_vi(1))
+                        // || rebuild_pressure > asg.activity(cc.0.vi())
                         {
                             span_len = 1;
                             /* println!(
@@ -346,7 +346,9 @@ fn search(
                         }
                     }
                 }
-            } else if (env > 1.0 && ent > 1.0) && state.span_manager.span_ended(span_len) {
+            } else if
+            // true
+            (env > 1.0 && ent > 1.0) && state.span_manager.span_ended(span_len) {
                 // dbg!(asg.conflict_interval_index.trend());
                 span_len = 0;
                 RESTART!(asg, cdb, state);
