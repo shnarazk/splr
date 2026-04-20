@@ -7,10 +7,9 @@ impl ActivityIF<VarId> for AssignStack {
         if self.activity_decay == 1.0 || self.num_conflict == self.var[vi].last_conflict {
             self.var[vi].reward
         } else {
-            let r = self.activity_decay * self.var[vi].reward;
-            // let d = 1.0 / (self.num_conflict - self.var[vi].last_conflict) as f64;
-            // r + self.activity_anti_decay * d
-            r
+            // let d = ((2 + self.num_conflict - self.var[vi].last_conflict) as f64).log2();
+            let d = (self.num_conflict - self.var[vi].last_conflict) as f64;
+            self.activity_decay.powf(d) * self.var[vi].reward
         }
     }
     fn set_activity(&mut self, vi: VarId, val: f64) {
@@ -18,10 +17,12 @@ impl ActivityIF<VarId> for AssignStack {
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
         if self.activity_decay < 1.0 && self.num_conflict > self.var[vi].last_conflict {
-            self.var[vi].reward *= self.activity_decay;
-            self.var[vi].reward += 1.0 / (self.num_conflict - self.var[vi].last_conflict) as f64;
-            self.max_reward_of_canceled_vars =
-                self.max_reward_of_canceled_vars.max(self.var[vi].reward);
+            let d = (self.num_conflict - self.var[vi].last_conflict) as f64;
+            // let d = ((2 + self.num_conflict - self.var[vi].last_conflict) as f64).log2();
+            self.var[vi].reward *= self.activity_decay.powf(d);
+            self.var[vi].reward += self.activity_anti_decay;
+            self.var[vi].last_conflict = self.num_conflict;
+            self.max_reward_updated = self.max_reward_updated.max(self.var[vi].reward);
         }
     }
     #[inline]
