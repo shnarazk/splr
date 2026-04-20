@@ -313,7 +313,7 @@ fn search(
             }
             SearchMode::Explore => {
                 // 1.05..1.2
-                if (3.0..41.05).contains(&asg.conflict_interval_index.trend()) {
+                if (-300.0..-41.05).contains(&asg.conflict_interval_index.trend()) {
                     focusing = SearchMode::Focus;
                     // asg.set_learning_rate(0.0);
                     asg.use_conflict_order(true);
@@ -328,8 +328,8 @@ fn search(
             }
         }
         if state.span_manager.span_ended(span_len)
-            && asg.conflict_interval_index.trend() < 0.95
-            && (dl == 0 || asg.max_reward_updated > 1.0 * asg.activity(asg.decision_vi(dl / 2 + 1)))
+            // && asg.conflict_interval_index.trend() < 0.95
+            && (dl == 0 || asg.max_reward_updated > 1.0 * asg.activity(asg.decision_vi(1)))
         // || rebuild_pressure > asg.activity(cc.0.vi())
         {
             span_len = 0;
