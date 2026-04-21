@@ -22,7 +22,10 @@ impl ActivityIF<VarId> for AssignStack {
             self.var[vi].reward *= self.activity_decay.powf(d);
             self.var[vi].reward += self.activity_anti_decay;
             self.var[vi].last_conflict = self.num_conflict;
-            self.max_reward_updated = self.max_reward_updated.max(self.var[vi].reward);
+            if self.max_reward_updated.1 < self.var[vi].reward {
+                self.max_reward_updated.0 = self.var[vi].level;
+                self.max_reward_updated.1 = self.var[vi].reward;
+            }
         }
     }
     #[inline]
