@@ -24,11 +24,11 @@ impl ActivityIF<VarId> for AssignStack {
     fn reward_at_propagation(&mut self, _vi: VarId) {}
     #[inline]
     fn reward_at_unassign(&mut self, vi: VarId) {
-        self.var[vi].update_activity(self.activity_decay, self.activity_anti_decay);
+        self.var[vi].update_activity(self.activity_stay_rate, self.activity_learning_rate);
     }
     fn set_learning_rate(&mut self, scaling: f64) {
-        self.activity_decay = 1.0 - scaling;
-        self.activity_anti_decay = scaling;
+        self.activity_stay_rate = 1.0 - scaling;
+        self.activity_learning_rate = scaling;
     }
     // Note: `update_rewards` should be called before `cancel_until`
     #[inline]
