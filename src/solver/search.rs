@@ -268,6 +268,8 @@ fn search(
             let cil = asg.conflict_interval_average.1.trend();
             if (!focusing && cia <= 1.0 && cil > 1.0) || (focusing && cia >= 1.0 && cil < 1.0) {
                 focusing = true;
+                RESTART!(asg, cdb, state);
+                asg.clear_asserted_literals(cdb)?;
                 state.search_mode_ratio.0.update(1.0);
                 state.search_mode_ratio.1.update(0.0);
                 state.search_mode_ratio.2.update(0.0);
