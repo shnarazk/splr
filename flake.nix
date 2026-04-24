@@ -40,13 +40,12 @@
             name = system;
             value = mkShell {
                 packages = [
-                  bashInteractive
+                  cargo-watch
                   drat-trim
                   home.packages.${system}.kissat
+                  # nixpkgs.lldb_19
                   samply
                   tokei
-                  # cargo-watch
-                  # nixpkgs.lldb_19
                   sat-bench.packages.${system}.default
                   tinymist
                   typst
