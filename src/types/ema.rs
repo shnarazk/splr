@@ -1,7 +1,7 @@
 //! API for observing EMA.
 
 const SPAN_FST: usize = 16;
-const _SPAN_MID: usize = 256;
+const SPAN_MID: usize = 256;
 const _SPAN_SLW: usize = 16384;
 
 pub trait EmaIF {
@@ -121,7 +121,7 @@ impl EmaMutIF for Ema {
 }
 
 impl Ema {
-    fn new(s: usize) -> Ema {
+    fn _new(s: usize) -> Ema {
         Ema {
             val: EmaView {
                 fast: 0.0,
@@ -157,6 +157,15 @@ pub struct Ema2 {
     se: f64,
 }
 
+impl Default for Ema2 {
+    fn default() -> Self {
+        Self {
+            ema: EmaView::default(),
+            fe: 1.0 / SPAN_FST as f64,
+            se: 1.0 / SPAN_MID as f64,
+        }
+    }
+}
 impl EmaIF for Ema2 {
     #[cfg(feature = "EMA_calibration")]
     fn get_fast(&self) -> f64 {
@@ -225,7 +234,7 @@ impl EmaMutIF for Ema2 {
 }
 
 impl Ema2 {
-    pub fn new(len: usize) -> Ema2 {
+    fn _new(len: usize) -> Ema2 {
         Ema2 {
             ema: EmaView {
                 fast: 0.0,
@@ -238,6 +247,11 @@ impl Ema2 {
             fe: 1.0 / (len as f64),
             se: 1.0 / (len as f64),
         }
+    }
+    // set first EMA parameter
+    pub fn with_fast(mut self, f: usize) -> Ema2 {
+        self.fe = 1.0 / (f as f64);
+        self
     }
     // set secondary EMA parameter
     pub fn with_slow(mut self, s: usize) -> Ema2 {
@@ -299,7 +313,7 @@ impl EmaSU {
     pub fn new(s: usize) -> Self {
         EmaSU {
             last: 0.0,
-            ema: Ema::new(s),
+            ema: Ema::default().with_span(s),
         }
     }
     pub fn update_base(&mut self, x: usize) {

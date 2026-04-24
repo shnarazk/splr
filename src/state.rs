@@ -154,12 +154,12 @@ impl Default for State {
             reflection_interval: 10_000,
 
             search_mode_ratio: (
-                Ema2::new(100).with_slow(1000).with_value(0.33),
-                Ema2::new(100).with_slow(1000).with_value(0.33),
-                Ema2::new(100).with_slow(1000).with_value(0.33),
+                Ema2::default().with_value(0.33),
+                Ema2::default().with_value(0.33),
+                Ema2::default().with_value(0.33),
             ),
-            b_lvl: Ema2::new(12).with_slow(8192),
-            c_lvl: Ema2::new(12).with_slow(8192),
+            b_lvl: Ema2::default(),
+            c_lvl: Ema2::default(),
             bt_drift_average: Ema::default().with_span(1000),
 
             #[cfg(feature = "chrono_BT")]
