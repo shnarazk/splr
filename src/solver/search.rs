@@ -287,23 +287,30 @@ fn search(
             .span_ended(span_len.saturating_sub(cooling_len))
         {
             match asg.activity_scheme {
-                VarActivityScheme::CR if switch_pressure >= switch_interval => {
-                    asg.activity_scheme = VarActivityScheme::LRB;
-                    asg.set_learning_rate(0.0);
+                VarActivityScheme::LRB if switch_pressure >= 2 * switch_interval => {
+                    asg.activity_scheme = VarActivityScheme::VMTF;
+                    asg.set_learning_rate(state.config.vrw_learning_rate);
                     asg.rebuild_order();
                     switch_pressure = 0;
                 }
-                VarActivityScheme::LRB if switch_pressure >= 2 * switch_interval => {
+                VarActivityScheme::VMTF if switch_pressure >= switch_interval => {
                     asg.activity_scheme = VarActivityScheme::CR;
-                    asg.set_learning_rate(state.config.vrw_learning_rate);
+                    // asg.set_learning_rate(0.0);
+                    asg.rebuild_order();
+                    switch_pressure = 0;
+                }
+                VarActivityScheme::CR if switch_pressure >= switch_interval => {
+                    asg.activity_scheme = VarActivityScheme::LRB;
+                    // asg.set_learning_rate(0.0);
                     asg.rebuild_order();
                     switch_pressure = 0;
                 }
                 _ => (),
             }
-            let cia = asg.conflict_interval_average.0.trend();
-            let cil = asg.conflict_interval_average.1.trend();
-            if cia + cil < 1.96 {
+            // let cia = asg.conflict_interval_average.0.trend();
+            // let cil = asg.conflict_interval_average.1.trend();
+            // if cia + cil < 1.96 {
+            if cdb.lbd.trend() > 1.5 && asg.activity_scheme != VarActivityScheme::VMTF {
                 RESTART!(asg, cdb, state);
                 asg.clear_asserted_literals(cdb)?;
             }
