@@ -23,6 +23,7 @@ pub struct Var {
     pub(crate) reward: f64,
     /// the last conflict by this
     pub(crate) last_conflict: usize,
+    pub(crate) last_used: usize,
 }
 
 impl Default for Var {
@@ -36,6 +37,7 @@ impl Default for Var {
             flags: FlagVar::empty(),
             reward: 0.0,
             last_conflict: 0,
+            last_used: 0,
         }
     }
 }

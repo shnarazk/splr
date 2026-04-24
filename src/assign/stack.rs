@@ -34,7 +34,7 @@ pub struct AssignStack {
     //
     /// weighted confllict distance average
     pub(crate) conflict_interval_index: Ema2,
-    pub(crate) max_reward_of_canceled_vars: f64,
+    pub(crate) max_reward_updated: (DecisionLevel, f64),
 
     //
     //## Phase handling
@@ -112,7 +112,7 @@ impl Default for AssignStack {
             num_reconflict: 0,
             num_repropagation: 0,
             conflict_interval_index: Ema2::default(),
-            max_reward_of_canceled_vars: 0.0,
+            max_reward_updated: (0, 0.0),
             best_assign: false,
             build_best_at: 0,
             num_best_assign: 0,
