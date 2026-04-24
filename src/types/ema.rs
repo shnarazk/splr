@@ -1,4 +1,9 @@
-/// API for observing EMA.
+//! API for observing EMA.
+
+const SPAN_FST: usize = 16;
+const _SPAN_MID: usize = 256;
+const _SPAN_SLW: usize = 16384;
+
 pub trait EmaIF {
     /// return the current value.
     fn get_fast(&self) -> f64 {
@@ -40,7 +45,7 @@ pub trait EmaMutIF: EmaIF {
     fn set_value(&mut self, _x: f64) {}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct EmaView {
     fast: f64,
     slow: f64,
@@ -65,6 +70,17 @@ pub struct Ema {
     #[cfg(feature = "EMA_calibration")]
     cal: f64,
     sca: f64,
+}
+
+impl Default for Ema {
+    fn default() -> Self {
+        Self {
+            val: EmaView::default(),
+            #[cfg(feature = "EMA_calibration")]
+            cal: 0.0,
+            sca: 1.0 / SPAN_FST as f64,
+        }
+    }
 }
 
 impl EmaIF for Ema {
@@ -105,7 +121,7 @@ impl EmaMutIF for Ema {
 }
 
 impl Ema {
-    pub fn new(s: usize) -> Ema {
+    fn new(s: usize) -> Ema {
         Ema {
             val: EmaView {
                 fast: 0.0,
@@ -123,8 +139,9 @@ impl Ema {
         self
     }
     /// set scale
-    pub fn set_span(&mut self, len: usize) {
+    pub fn with_span(mut self, len: usize) -> Ema {
         self.sca = 1.0 / (len as f64);
+        self
     }
 }
 

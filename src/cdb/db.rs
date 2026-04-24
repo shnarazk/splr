@@ -109,7 +109,7 @@ impl Default for ClauseDB {
 
             lbd_temp: Vec::new(),
             lbd: ProgressLBD::default(),
-            leanrt_limit_ema: Ema::new(4).with_value(40_000.0),
+            leanrt_limit_ema: Ema::default().with_value(40_000.0),
 
             num_clause: 0,
             num_bi_clause: 0,
