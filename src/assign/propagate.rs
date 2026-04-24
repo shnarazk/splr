@@ -694,7 +694,7 @@ impl AssignStack {
                         debug_assert!(self.assigned(lit).is_none());
                         cdb.certificate_add_assertion(lit);
                         self.assign_at_root_level(cdb, lit)?;
-                        cdb.remove_clause(cid);
+                        cdb.remove_clause(self, cid);
                     }
                 }
             }

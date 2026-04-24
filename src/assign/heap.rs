@@ -93,56 +93,28 @@ impl VarHeapIF for AssignStack {
         let mut q = start;
         let vq = self.var_order.heap[q as usize];
         debug_assert!(0 < vq, "size of heap is too small");
-        if self.ordering_by_conflict {
-            let aq = self.var[vq as usize].last_conflict;
-            loop {
-                let p = q / 2;
-                if p == 0 {
+        let aq = self.activity(vq as usize);
+        loop {
+            let p = q / 2;
+            if p == 0 {
+                self.var_order.heap[q as usize] = vq;
+                debug_assert!(vq != 0, "Invalid index in percolate_up");
+                self.var_order.idxs[vq as usize] = q;
+                return;
+            } else {
+                let vp = self.var_order.heap[p as usize];
+                let ap = self.activity(vp as usize);
+                if ap < aq {
+                    // move down the current parent, and make it empty
+                    self.var_order.heap[q as usize] = vp;
+                    debug_assert!(vq != 0, "Invalid index in percolate_up");
+                    self.var_order.idxs[vp as usize] = q;
+                    q = p;
+                } else {
                     self.var_order.heap[q as usize] = vq;
                     debug_assert!(vq != 0, "Invalid index in percolate_up");
                     self.var_order.idxs[vq as usize] = q;
                     return;
-                } else {
-                    let vp = self.var_order.heap[p as usize];
-                    let ap = self.var[vp as usize].last_conflict;
-                    if ap < aq {
-                        // move down the current parent, and make it empty
-                        self.var_order.heap[q as usize] = vp;
-                        debug_assert!(vq != 0, "Invalid index in percolate_up");
-                        self.var_order.idxs[vp as usize] = q;
-                        q = p;
-                    } else {
-                        self.var_order.heap[q as usize] = vq;
-                        debug_assert!(vq != 0, "Invalid index in percolate_up");
-                        self.var_order.idxs[vq as usize] = q;
-                        return;
-                    }
-                }
-            }
-        } else {
-            let aq = self.activity(vq as usize);
-            loop {
-                let p = q / 2;
-                if p == 0 {
-                    self.var_order.heap[q as usize] = vq;
-                    debug_assert!(vq != 0, "Invalid index in percolate_up");
-                    self.var_order.idxs[vq as usize] = q;
-                    return;
-                } else {
-                    let vp = self.var_order.heap[p as usize];
-                    let ap = self.activity(vp as usize);
-                    if ap < aq {
-                        // move down the current parent, and make it empty
-                        self.var_order.heap[q as usize] = vp;
-                        debug_assert!(vq != 0, "Invalid index in percolate_up");
-                        self.var_order.idxs[vp as usize] = q;
-                        q = p;
-                    } else {
-                        self.var_order.heap[q as usize] = vq;
-                        debug_assert!(vq != 0, "Invalid index in percolate_up");
-                        self.var_order.idxs[vq as usize] = q;
-                        return;
-                    }
                 }
             }
         }
@@ -151,71 +123,36 @@ impl VarHeapIF for AssignStack {
         let n = self.var_order.len();
         let mut i = start;
         let vi = self.var_order.heap[i as usize];
-        if self.ordering_by_conflict {
-            let ai = self.var[vi as usize].last_conflict;
-            loop {
-                let l = 2 * i; // left
-                if l < n as u32 {
-                    let vl = self.var_order.heap[l as usize];
-                    let al = self.var[vl as usize].last_conflict;
-                    let r = l + 1; // right
-                    let (target, vc, ac) = if r < (n as u32)
-                        && al < self.var[self.var_order.heap[r as usize] as usize].last_conflict
-                    {
-                        let vr = self.var_order.heap[r as usize];
-                        (r, vr, self.var[vr as usize].last_conflict)
-                    } else {
-                        (l, vl, al)
-                    };
-                    if ai < ac {
-                        self.var_order.heap[i as usize] = vc;
-                        self.var_order.idxs[vc as usize] = i;
-                        i = target;
-                    } else {
-                        self.var_order.heap[i as usize] = vi;
-                        debug_assert!(vi != 0, "invalid index");
-                        self.var_order.idxs[vi as usize] = i;
-                        return;
-                    }
+        let ai = self.activity(vi as usize);
+        loop {
+            let l = 2 * i; // left
+            if l < n as u32 {
+                let vl = self.var_order.heap[l as usize];
+                let al = self.activity(vl as usize);
+                let r = l + 1; // right
+                let (target, vc, ac) = if r < (n as u32)
+                    && al < self.activity(self.var_order.heap[r as usize] as usize)
+                {
+                    let vr = self.var_order.heap[r as usize];
+                    (r, vr, self.activity(vr as usize))
+                } else {
+                    (l, vl, al)
+                };
+                if ai < ac {
+                    self.var_order.heap[i as usize] = vc;
+                    self.var_order.idxs[vc as usize] = i;
+                    i = target;
                 } else {
                     self.var_order.heap[i as usize] = vi;
                     debug_assert!(vi != 0, "invalid index");
                     self.var_order.idxs[vi as usize] = i;
                     return;
                 }
-            }
-        } else {
-            let ai = self.activity(vi as usize);
-            loop {
-                let l = 2 * i; // left
-                if l < n as u32 {
-                    let vl = self.var_order.heap[l as usize];
-                    let al = self.activity(vl as usize);
-                    let r = l + 1; // right
-                    let (target, vc, ac) = if r < (n as u32)
-                        && al < self.activity(self.var_order.heap[r as usize] as usize)
-                    {
-                        let vr = self.var_order.heap[r as usize];
-                        (r, vr, self.activity(vr as usize))
-                    } else {
-                        (l, vl, al)
-                    };
-                    if ai < ac {
-                        self.var_order.heap[i as usize] = vc;
-                        self.var_order.idxs[vc as usize] = i;
-                        i = target;
-                    } else {
-                        self.var_order.heap[i as usize] = vi;
-                        debug_assert!(vi != 0, "invalid index");
-                        self.var_order.idxs[vi as usize] = i;
-                        return;
-                    }
-                } else {
-                    self.var_order.heap[i as usize] = vi;
-                    debug_assert!(vi != 0, "invalid index");
-                    self.var_order.idxs[vi as usize] = i;
-                    return;
-                }
+            } else {
+                self.var_order.heap[i as usize] = vi;
+                debug_assert!(vi != 0, "invalid index");
+                self.var_order.idxs[vi as usize] = i;
+                return;
             }
         }
     }

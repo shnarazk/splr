@@ -139,7 +139,7 @@ impl VivifyIF for ClauseDB {
                                     }
                                     #[cfg(not(feature = "clause_rewarding"))]
                                     self.new_clause(asg, &mut vec, is_learnt);
-                                    self.remove_clause(cid);
+                                    self.remove_clause(asg, cid);
                                     num_shrink += 1;
                                 }
                             }

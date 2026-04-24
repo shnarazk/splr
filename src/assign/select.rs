@@ -47,8 +47,6 @@ pub trait VarSelectIF {
     fn update_order(&mut self, v: VarId);
     /// rebuild the internal var_order
     fn rebuild_order(&mut self);
-    /// change ordering criteria
-    fn use_conflict_order(&mut self, to_reward_order: bool);
 }
 
 impl VarSelectIF for AssignStack {
@@ -90,8 +88,8 @@ impl VarSelectIF for AssignStack {
             if v.is(FlagVar::PHASE) != *b {
                 num_flipped += 1;
                 v.set(FlagVar::PHASE, *b);
-                v.reward *= self.activity_stay_rate;
-                v.reward += self.activity_learning_rate;
+                v.lrb_reward *= self.activity_stay_rate;
+                v.lrb_reward += self.activity_learning_rate;
                 self.update_heap(*vi);
             }
         }
@@ -142,12 +140,6 @@ impl VarSelectIF for AssignStack {
             if var_assign!(self, vi).is_none() && !self.var[vi].is(FlagVar::ELIMINATED) {
                 self.insert_heap(vi);
             }
-        }
-    }
-    fn use_conflict_order(&mut self, activate: bool) {
-        if self.ordering_by_conflict != activate {
-            self.ordering_by_conflict = activate;
-            self.rebuild_order();
         }
     }
 }

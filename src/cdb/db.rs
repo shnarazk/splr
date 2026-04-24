@@ -421,6 +421,9 @@ impl ClauseDBIF for ClauseDB {
             watch_cache[!l0].insert_watch(cid, l1);
             watch_cache[!l1].insert_watch(cid, l0);
         }
+        for l in c.lits.iter() {
+            asg.var_mut(l.vi()).num_clauses += 1;
+        }
         RefClause::Clause(cid)
     }
     fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, vec: &mut Vec<Lit>) -> RefClause {
@@ -485,10 +488,14 @@ impl ClauseDBIF for ClauseDB {
     }
     /// ## Warning
     /// this function is the only function that makes dead clauses
-    fn remove_clause(&mut self, cid: ClauseId) {
-        // assert_eq!(self.clause.iter().skip(1).filter(|c| !c.is_dead()).count(), self.num_clause);
-        // if !self.clause[NonZeroU32::get(cid.ordinal) as usize].is_dead() {
-        // }
+    fn remove_clause(&mut self, asg: &mut impl AssignIF, cid: ClauseId) {
+        {
+            let c = &self.clause[NonZeroU32::get(cid.ordinal) as usize];
+            for l in c.lits.iter() {
+                let v = asg.var_mut(l.vi());
+                v.num_clauses = v.num_clauses.saturating_sub(1);
+            }
+        }
         let c = &mut self.clause[NonZeroU32::get(cid.ordinal) as usize];
         debug_assert!(!c.is_dead());
         debug_assert!(1 < c.lits.len());
@@ -782,7 +789,7 @@ impl ClauseDBIF for ClauseDB {
             debug_assert!(!asg.var(l.vi()).is(FlagVar::ELIMINATED));
             match asg.assigned(*l) {
                 Some(true) => {
-                    self.remove_clause(cid);
+                    self.remove_clause(asg, cid);
                     return RefClause::Dead;
                 }
                 Some(false) => {
@@ -826,7 +833,7 @@ impl ClauseDBIF for ClauseDB {
                     //
                     //## Case:3-0
                     //
-                    self.remove_clause(cid);
+                    self.remove_clause(asg, cid);
                     return RefClause::RegisteredClause(bid);
                 }
                 //
@@ -963,7 +970,7 @@ impl ClauseDBIF for ClauseDB {
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, _asg: &mut impl AssignIF, envelope: usize) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, envelope: usize) {
         let ClauseDB {
             clause,
             // lbd_temp,
@@ -1015,7 +1022,7 @@ impl ClauseDBIF for ClauseDB {
         self.reduction_threshold = keep as f64 / self.num_learnt as f64;
         perm.sort();
         for i in perm.iter().skip(keep) {
-            self.remove_clause(ClauseId::from(i.to()));
+            self.remove_clause(asg, ClauseId::from(i.to()));
         }
     }
     fn reset(&mut self) {

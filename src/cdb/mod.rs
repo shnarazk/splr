@@ -94,7 +94,7 @@ pub trait ClauseDBIF:
     fn new_clause(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
     fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>) -> RefClause;
     /// un-register a clause `cid` from clause database and make the clause dead.
-    fn remove_clause(&mut self, cid: ClauseId);
+    fn remove_clause(&mut self, asg: &mut impl AssignIF, cid: ClauseId);
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn remove_clause_sandbox(&mut self, cid: ClauseId);
     /// update watches of the clause
