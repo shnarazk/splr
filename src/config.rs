@@ -116,7 +116,7 @@ impl Default for Config {
             elm_grw_lim: 0,
             elm_var_occ: 20000,
 
-            vrw_learning_rate: 1.0 / 200.0, // 0.04,
+            vrw_learning_rate: 0.4, // 0.04,
         }
     }
 }

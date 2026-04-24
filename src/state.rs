@@ -161,7 +161,11 @@ impl Default for State {
             target: CNFDescription::default(),
             reflection_interval: 10_000,
 
-            search_mode_ratio: (Ema2::default(), Ema2::default(), Ema2::default()),
+            search_mode_ratio: (
+                Ema2::default().with_value(0.5),
+                Ema2::default(),
+                Ema2::default().with_value(0.5),
+            ),
             b_lvl: Ema2::default(),
             c_lvl: Ema2::default(),
             bt_drift_average: Ema::default(),

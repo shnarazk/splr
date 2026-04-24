@@ -207,9 +207,9 @@ impl SolveIF for Solver {
     }
 }
 
-#[derive(Default, Eq, PartialEq)]
+#[derive(Debug, Default, Eq, PartialEq)]
 enum SearchMode {
-    // Focus,
+    Focus,
     // Pursue,
     #[default]
     Explore,
@@ -221,7 +221,7 @@ fn search(
     cdb: &mut ClauseDB,
     state: &mut State,
 ) -> Result<bool, SolverError> {
-    let mut current_core: usize = 999_999;
+    let mut current_core: usize = 1_000_999;
     let mut core_was_rebuilt: Option<usize> = None;
 
     // monotonic increment counter
@@ -231,9 +231,10 @@ fn search(
     let processing_interval: usize = 60_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
-    let focusing: SearchMode = SearchMode::Explore;
-    // let mut focus_span: usize = 0;
-    // let focus_interval: usize = 20_000;
+    let mut focusing: SearchMode = SearchMode::Explore;
+    let focus_interval: usize = 20_000;
+    let mut span_len: usize = 0;
+    let mut lbd_ema: Ema2 = Ema2::default().with_fast(16).with_slow(256);
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -267,14 +268,13 @@ fn search(
         {
             cdb.update_activity_tick();
         }
-        asg.max_reward_updated = (0, 0.0);
+        asg.max_reward_updated = (asg.decision_level(), 0.0);
 
-        // let a = state.c_lvl.get();
+        // We want to evacuate from high lands.
+        // let a = 0.1 / state.c_lvl.get_slow().log2();
         // if !a.is_nan() {
-        //     asg.set_learning_rate(1.0 / a);
+        //     asg.set_learning_rate(0.1 - a);
         // }
-        // asg.set_learning_rate(1.0 - asg.conflict_interval_index.get());
-        asg.set_learning_rate(1.0 / asg.derefer(assign::property::Tusize::NumUnassertedVar) as f64);
         let lbd: DecisionLevel = handle_conflict(asg, cdb, state, &cc)?;
 
         match lbd.cmp(&1) {
@@ -284,6 +284,7 @@ fn search(
                 reduction_pressure += 1;
                 processing_pressure += 1;
                 cdb.lbd.update(lbd);
+                lbd_ema.update(lbd as f64);
                 let d = lbd as f64;
                 let e = state.envelope.get();
                 if d <= e {
@@ -297,73 +298,95 @@ fn search(
             cdb.reduce(asg, state.span_manager.envelop_index());
             reduction_pressure = 0;
         }
-        let dl = asg.decision_level();
-        // if reduction_pressure.is_multiple_of(1000) {
-        //     match focusing {
-        //         SearchMode::Focus => {
-        //             state.search_mode_ratio.0.update(1.0);
-        //             state.search_mode_ratio.1.update(0.0);
-        //             state.search_mode_ratio.2.update(0.0);
-        //         }
-        //         SearchMode::Explore => {
-        //             state.search_mode_ratio.0.update(0.0);
-        //             state.search_mode_ratio.1.update(0.0);
-        //             state.search_mode_ratio.2.update(1.0);
-        //         }
-        //     }
-        // }
-        // focus_span += 1;
-        // match focusing {
-        //     SearchMode::Focus => {
-        //         if focus_span >= focus_interval {
-        //             focus_span = 0;
-        //             focusing = SearchMode::Explore;
-        //             asg.set_learning_rate(state.config.vrw_learning_rate);
-        //             asg.use_conflict_order(false);
-        //         }
-        //     }
-        //     SearchMode::Explore => {
-        //         if focus_span >= 8 * focus_interval {
-        //             focus_span = 0;
-        //             // focusing = SearchMode::Focus;
-        //             // asg.set_learning_rate(0.0);
-        //             // asg.set_learning_rate(state.config.vrw_learning_rate);
-        //             // asg.use_conflict_order(true);
-        //         }
-        //     }
-        // }
-        if focusing == SearchMode::Explore {
-            let scale = 1.0; // (asg.conflict_interval_index.trend() - 1.0).abs() * 0.01 + 1.0;
-            let mut bumped = false;
-            for lv in 1..asg.max_reward_updated.0.min(dl.saturating_sub(1))
-            // .min(cdb.lbd.get_slow() as DecisionLevel)
-            {
-                // for lv in 1..dl.min(state.b_lvl.get_slow() as DecisionLevel) / 2 {
-                if asg.max_reward_updated.1 > scale * asg.activity(asg.decision_vi(lv)) {
-                    asg.cancel_until(cdb, lv - 1);
-                    bumped = true;
-                    break;
+        // let dl = asg.decision_level();
+        if reduction_pressure.is_multiple_of(200) {
+            match focusing {
+                SearchMode::Focus => {
+                    state.search_mode_ratio.0.update(1.0);
+                    state.search_mode_ratio.1.update(0.0);
+                    state.search_mode_ratio.2.update(0.0);
+                }
+                SearchMode::Explore => {
+                    state.search_mode_ratio.0.update(0.0);
+                    state.search_mode_ratio.1.update(0.0);
+                    state.search_mode_ratio.2.update(1.0);
                 }
             }
-            state
-                .search_mode_ratio
-                .0
-                .update((asg.decision_level() == 0) as u8 as f64);
-            state.search_mode_ratio.1.update(!bumped as u8 as f64);
-            state.search_mode_ratio.2.update(bumped as u8 as f64);
         }
-        // span_len += 1;
-        if
-        /* focusing == SearchMode::Explore
-        && focusing == SearchMode::Focus
-        && state.span_manager.span_ended(span_len)
-        && (dl == 0 || asg.max_reward_updated > 1.0 * asg.activity(asg.decision_vi(dl / 2 + 1))) */
-        asg.decision_level() == asg.root_level() {
+        let mut to_restart = false;
+        span_len += 1;
+        match focusing {
+            SearchMode::Focus if span_len >= focus_interval => {
+                span_len = 0;
+                focusing = SearchMode::Explore;
+                asg.set_learning_rate(state.config.vrw_learning_rate);
+                asg.use_conflict_order(false);
+                to_restart = true;
+            }
+            SearchMode::Focus if asg.decision_level() > 1 => {
+                // let mut bumped = false;
+                let trend = lbd_ema.trend();
+                if trend > 2.0 {
+                    let restarted = false;
+                    for lv in 1..2
+                    // 5.min(asg.decision_level())
+                    /* asg.decision_level().min(asg.max_reward_updated.0)*/
+                    {
+                        if asg.max_reward_updated.1 > asg.activity(asg.decision_vi(lv)) {
+                            // let a = asg.max_reward_updated.1 / asg.activity(asg.decision_vi(lv));
+                            // println!(
+                            //     "{a:>6.3}={:>6.3}/{:>6.3}",
+                            //     asg.max_reward_updated.1,
+                            //     asg.activity(asg.decision_vi(lv))
+                            // );
+                            to_restart = true;
+                            // restarted = true;
+                            break;
+                        }
+                    }
+                    if !restarted {
+                        for lv in 2..4.min(asg.decision_level()).min(asg.max_reward_updated.0) {
+                            if asg.max_reward_updated.1 > asg.activity(asg.decision_vi(lv)) {
+                                asg.cancel_until(cdb, lv - 1);
+                                break;
+                            }
+                        }
+                    }
+                } else if trend > 100.25 {
+                    for lv in 1..asg.decision_level().min(asg.max_reward_updated.0) {
+                        if asg.max_reward_updated.1 > asg.activity(asg.decision_vi(lv)) {
+                            asg.cancel_until(cdb, lv - 1);
+                            break;
+                        }
+                    }
+                }
+            }
+            SearchMode::Focus => {}
+            SearchMode::Explore if state.span_manager.span_ended(span_len) => {
+                span_len = 0;
+                if cdb.lbd.trend() < 0.0
+                    && asg.conflict_interval_index.trend() < 1.0
+                    && state.c_lvl.trend() > 1.5
+                {
+                    focusing = SearchMode::Focus;
+                    // asg.set_learning_rate(0.0);
+                    asg.set_learning_rate(state.config.vrw_learning_rate);
+                    asg.use_conflict_order(true);
+                } else if cdb.lbd.trend() > 1.25 {
+                    to_restart = true;
+                }
+                let new_span = state.span_manager.prepare_new_span(span_len);
+                dump_stage(asg, cdb, state, new_span);
+            }
+            SearchMode::Explore => {}
+        }
+        if to_restart {
             RESTART!(asg, cdb, state);
             asg.clear_asserted_literals(cdb)?;
-            // let new_span = state.span_manager.prepare_new_span(span_len);
-            // dump_stage(asg, cdb, state, new_span);
-
+        }
+        if asg.decision_level() == asg.root_level() {
+            // RESTART!(asg, cdb, state);
+            // asg.clear_asserted_literals(cdb)?;
             if processing_pressure >= processing_interval {
                 #[cfg(feature = "rephase")]
                 if focusing == SearchMode::Pursue && state.span_manager.current_span() == 1 {
@@ -423,7 +446,7 @@ fn search(
 }
 
 /// display the current stats. before updating stabiliation parameters
-fn _dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: Option<bool>) {
+fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: Option<bool>) {
     let cycle = state.span_manager.envelop_index();
     let span = state.span_manager.current_span();
     let stage = state.span_manager.current_segment();

@@ -29,7 +29,7 @@ default = [
     ### Heuristics
 
     # "clause_rewarding",
-    "reason_side_rewarding",
+    # "reason_side_rewarding",
     # "rephase",
     # "stochastic_local_search",
 
