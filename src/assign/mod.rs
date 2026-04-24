@@ -197,7 +197,7 @@ pub mod property {
             match k {
                 Tf64::AverageVarActivity => 0.0,    // self.activity_averaged,
                 Tf64::CurrentWorkingSetSize => 0.0, // self.cwss,
-                Tf64::VarLearningRate => 1.0 - self.activity_decay,
+                Tf64::VarLearningRate => 1.0 - self.activity_stay_rate,
             }
         }
     }

@@ -86,9 +86,9 @@ pub struct AssignStack {
     //## Var Rewarding
     //
     /// var activity decay
-    pub(super) activity_decay: f64,
+    pub(super) activity_stay_rate: f64,
     /// its diff
-    pub(super) activity_anti_decay: f64,
+    pub(super) activity_learning_rate: f64,
     /// ordering_mode
     pub(crate) ordering_by_conflict: bool,
 }
@@ -139,9 +139,9 @@ impl Default for AssignStack {
             tick: 0,
             var: Vec::new(),
 
-            activity_decay: 0.94,
+            activity_stay_rate: 0.94,
 
-            activity_anti_decay: 0.06,
+            activity_learning_rate: 0.06,
             ordering_by_conflict: false,
         }
     }
@@ -175,9 +175,9 @@ impl Instantiate for AssignStack {
 
             var: Var::new_vars(nv),
 
-            activity_decay: 1.0 - config.vrw_learning_rate,
+            activity_stay_rate: 1.0 - config.vrw_learning_rate,
 
-            activity_anti_decay: config.vrw_learning_rate,
+            activity_learning_rate: config.vrw_learning_rate,
 
             ..AssignStack::default()
         }
