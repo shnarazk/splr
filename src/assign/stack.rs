@@ -115,7 +115,7 @@ impl Default for AssignStack {
             build_best_at: 0,
             num_best_assign: 0,
             num_rephase: 0,
-            bp_divergence_ema: Ema::new(10),
+            bp_divergence_ema: Ema::default(),
 
             #[cfg(feature = "best_phases_tracking")]
             best_phases: HashMap::new(),

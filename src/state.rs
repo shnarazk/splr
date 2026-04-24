@@ -13,7 +13,7 @@ use {
     },
     std::{
         fmt,
-        io::{stdout, Write},
+        io::{Write, stdout},
         ops::{Index, IndexMut},
     },
 };
@@ -160,7 +160,7 @@ impl Default for State {
             ),
             b_lvl: Ema2::new(12).with_slow(8192),
             c_lvl: Ema2::new(12).with_slow(8192),
-            bt_drift_average: Ema::new(1000),
+            bt_drift_average: Ema::default().with_span(1000),
 
             #[cfg(feature = "chrono_BT")]
             chrono_bt_threshold: 100,
