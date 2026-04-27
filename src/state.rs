@@ -158,8 +158,14 @@ impl Default for State {
                 Ema2::default().with_value(0.33),
                 Ema2::default().with_value(0.33),
             ),
-            b_lvl: Ema2::default(),
-            c_lvl: Ema2::default(),
+            b_lvl: Ema2::default()
+                .with_fast(8_000)
+                .with_slow(80_000)
+                .with_value(100.0),
+            c_lvl: Ema2::default()
+                .with_fast(8_000)
+                .with_slow(80_000)
+                .with_value(200.0),
             bt_drift_average: Ema::default().with_span(1000),
 
             #[cfg(feature = "chrono_BT")]
@@ -632,21 +638,21 @@ impl StateIF for State {
                 self,
                 LogF64Id::ConflictDistanceAverage0,
                 100.0 * self.search_mode_ratio.0.get_slow(),
-                10.0
+                1.0
             ),
             fm!(
                 "{:>9.2}",
                 self,
                 LogF64Id::ConflictDistanceAverage1,
                 100.0 * self.search_mode_ratio.1.get_slow(),
-                10.0
+                1.0
             ),
             fm!(
                 "{:>9.2}",
                 self,
                 LogF64Id::ConflictDistanceAverage2,
                 100.0 * self.search_mode_ratio.2.get_slow(),
-                10.0
+                1.0
             ),
             // fm!(
             //     "{:>9.4}",

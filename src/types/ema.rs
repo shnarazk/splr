@@ -2,7 +2,7 @@
 
 const SPAN_FST: usize = 40;
 const SPAN_MID: usize = 800;
-// const _SPAN_SLW: usize = 8192;
+const SPAN_SLW: usize = 16384;
 
 pub trait EmaIF {
     /// return the fast averate value.
@@ -36,8 +36,8 @@ pub trait EmaMutIF: EmaIF {
     type Input;
     /// reset internal data.
     fn reset_to(&mut self, _: f64) {}
-    fn reset_fast(&mut self) {}
-    fn reset_slow(&mut self) {}
+    fn set_spans(&mut self, f: f64, s: f64);
+    fn rescale_span(&mut self, r: f64);
     /// catch up with the current state.
     fn update(&mut self, x: Self::Input);
     /// return a view.
@@ -119,6 +119,12 @@ impl EmaMutIF for Ema {
         self.val.fast = x;
         self.val.slow = x;
     }
+    fn set_spans(&mut self, f: f64, _: f64) {
+        self.sca = 1.0 / f;
+    }
+    fn rescale_span(&mut self, r: f64) {
+        self.sca *= r;
+    }
 }
 
 impl Ema {
@@ -132,6 +138,10 @@ impl Ema {
             cal: 0.0,
             sca: 1.0 / (s as f64),
         }
+    }
+    pub fn has_long(mut self) -> Self {
+        self.sca = 1.0 * SPAN_MID as f64;
+        self
     }
     /// set value.
     pub fn with_value(mut self, x: f64) -> Ema {
@@ -211,23 +221,13 @@ impl EmaMutIF for Ema2 {
     fn reset_to(&mut self, val: f64) {
         self.ema.fast = val;
     }
-    #[cfg(not(feature = "EMA_calibration"))]
-    fn reset_fast(&mut self) {
-        self.ema.fast = self.ema.slow;
+    fn set_spans(&mut self, f: f64, s: f64) {
+        self.fe = 1.0 / f;
+        self.se = 1.0 / s;
     }
-    #[cfg(feature = "EMA_calibration")]
-    fn reset_fast(&mut self) {
-        self.ema.fast = self.ema.slow;
-        self.calf = self.cals;
-    }
-    #[cfg(not(feature = "EMA_calibration"))]
-    fn reset_slow(&mut self) {
-        self.ema.slow = self.ema.fast;
-    }
-    #[cfg(feature = "EMA_calibration")]
-    fn reset_slow(&mut self) {
-        self.ema.slow = self.ema.fast;
-        self.cals = self.calf;
+    fn rescale_span(&mut self, r: f64) {
+        self.fe *= r;
+        self.se *= r;
     }
     fn as_view(&self) -> &EmaView {
         &self.ema
@@ -248,6 +248,11 @@ impl Ema2 {
             fe: 1.0 / (len as f64),
             se: 1.0 / (len as f64),
         }
+    }
+    pub fn has_long(mut self) -> Self {
+        self.fe = 1.0 * SPAN_MID as f64;
+        self.se = 1.0 * SPAN_SLW as f64;
+        self
     }
     // set first EMA parameter
     pub fn with_fast(mut self, f: usize) -> Ema2 {
@@ -272,10 +277,6 @@ impl Ema2 {
             self.cals = 1.0;
         }
         self
-    }
-    pub fn set_spans(&mut self, ls: usize, ll: usize) {
-        self.fe = 1.0 / ls as f64;
-        self.se = 1.0 / ll as f64;
     }
 }
 
@@ -307,6 +308,12 @@ impl EmaMutIF for EmaSU {
     }
     fn as_view(&self) -> &EmaView {
         self.ema.as_view()
+    }
+    fn set_spans(&mut self, f: f64, s: f64) {
+        self.ema.set_spans(f, s);
+    }
+    fn rescale_span(&mut self, r: f64) {
+        self.ema.rescale_span(r);
     }
 }
 
@@ -350,6 +357,12 @@ impl<const N: usize> EmaMutIF for Ewa<N> {
     }
     fn as_view(&self) -> &EmaView {
         &self.ema
+    }
+    fn set_spans(&mut self, _: f64, _: f64) {
+        unimplemented!()
+    }
+    fn rescale_span(&mut self, _: f64) {
+        unimplemented!()
     }
 }
 
@@ -406,28 +419,17 @@ impl<const N: usize> EmaMutIF for Ewa2<N> {
             self.cals = self.se + self.sx * self.cals;
         }
     }
+    fn set_spans(&mut self, _: f64, _: f64) {
+        unimplemented!()
+    }
     fn reset_to(&mut self, val: f64) {
         self.ema.fast = val;
     }
-    #[cfg(not(feature = "EMA_calibration"))]
-    fn reset_fast(&mut self) {
-        unimplemented!();
-    }
-    #[cfg(feature = "EMA_calibration")]
-    fn reset_fast(&mut self) {
-        unimplemented!();
-    }
-    #[cfg(not(feature = "EMA_calibration"))]
-    fn reset_slow(&mut self) {
-        self.ema.slow = self.ema.fast;
-    }
-    #[cfg(feature = "EMA_calibration")]
-    fn reset_slow(&mut self) {
-        self.ema.slow = self.fast.get();
-        self.cals = self.calf;
-    }
     fn as_view(&self) -> &EmaView {
         &self.ema
+    }
+    fn rescale_span(&mut self, _: f64) {
+        unimplemented!()
     }
 }
 

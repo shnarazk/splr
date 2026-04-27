@@ -4,8 +4,6 @@ mod activity;
 mod binary;
 /// methods on `ClauseDB`
 mod db;
-/// EMA
-mod ema;
 /// methods for Stochastic Local Search
 mod sls;
 /// methods for UNSAT certification

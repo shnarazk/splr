@@ -226,6 +226,7 @@ fn search(
     let progress_interval: usize = 10_000;
     // let mut switch_pressure: usize = 0;
     // let switch_interval: usize = 2_000;
+    let mut last_activity: f64 = 0.0;
 
     asg.activity_scheme = VarActivityScheme::LRB;
     asg.set_learning_rate(state.config.vrw_learning_rate);
@@ -274,7 +275,7 @@ fn search(
             std::cmp::Ordering::Greater => {
                 ruduction_pressure += 1;
                 processing_pressure += 1;
-                cdb.lbd.update(lbd);
+                cdb.lbd.update(lbd as f64);
             }
         }
         if ruduction_pressure >= processing_interval {
@@ -310,15 +311,24 @@ fn search(
                 }
                 _ => (),
             } */
-            if span_len >= conflicting_level as usize {
-                if asg.activity_scheme != VarActivityScheme::VMTF && cdb.lbd.trend() > 1.25
-                // conflicting_level >= state.c_lvl.get_slow() as DecisionLevel
+            /*if span_len >= conflicting_level as usize / 2 {
+            if (asg.activity_scheme == VarActivityScheme::CR && cdb.lbd.trend() > 1.5)
+                || (asg.activity_scheme == VarActivityScheme::LRB && cdb.lbd.trend() > 1.15)
+                || asg.activity_scheme == VarActivityScheme::VMTF
+            // conflicting_level >= state.c_lvl.get_slow() as DecisionLevel
+            */
+            if (asg.activity_scheme == VarActivityScheme::CR && cdb.lbd.trend() > 1.5)
+                || (asg.activity_scheme == VarActivityScheme::LRB
+                    && asg.activity(cc.0.vi()) < last_activity)
+                || (asg.activity_scheme == VarActivityScheme::VMTF && cdb.lbd.trend() > 1.25)
+            {
                 {
                     RESTART!(asg, cdb, state);
                     asg.clear_asserted_literals(cdb)?;
+                    last_activity = 0.0;
                 }
                 match asg.activity_scheme {
-                    VarActivityScheme::CR if state.c_lvl.trend() <= 1.1 => {
+                    VarActivityScheme::CR if cdb.lbd.trend() <= 1.4 => {
                         asg.activity_scheme = VarActivityScheme::LRB;
                         asg.set_learning_rate(state.config.vrw_learning_rate);
                         asg.rebuild_order();
@@ -330,12 +340,12 @@ fn search(
                         asg.rebuild_order();
                         // switch_pressure = 0;
                     }
-                    VarActivityScheme::LRB if cdb.lbd.trend() >= 2.2 => {
-                        asg.activity_scheme = VarActivityScheme::CR;
-                        asg.set_learning_rate(0.0);
-                        asg.rebuild_order();
-                        // switch_pressure = 0;
-                    }
+                    // VarActivityScheme::LRB if cdb.lbd.trend() >= 2.0 => {
+                    //     asg.activity_scheme = VarActivityScheme::CR;
+                    //     // asg.set_learning_rate(0.0);
+                    //     // asg.rebuild_order();
+                    //     // switch_pressure = 0;
+                    // }
                     VarActivityScheme::VMTF if cdb.lbd.trend() >= 1.1 => {
                         asg.activity_scheme = VarActivityScheme::LRB;
                         asg.set_learning_rate(state.config.vrw_learning_rate);
@@ -348,9 +358,13 @@ fn search(
                 let new_span = state.span_manager.prepare_new_span(span_len);
                 if new_span == Some(true) {
                     state.config.vrw_learning_rate *= 0.999;
+                    cdb.lbd
+                        .set_spans(0.5 * state.c_lvl.get_slow(), 8.0 * state.c_lvl.get_slow());
                 }
 
                 dump_stage(asg, cdb, state, new_span);
+            } else {
+                last_activity = asg.activity(cc.0.vi());
             }
             if asg.decision_level() == asg.root_level {
                 #[cfg(feature = "rephase")]
