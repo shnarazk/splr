@@ -1,7 +1,10 @@
 //! Var struct and Database management API
 use {
     // super::{heap::VarHeapIF, stack::AssignStack, AssignIF},
-    crate::types::{AssignReason, DecisionLevel, flags::FlagIF, flags::FlagVar},
+    crate::types::{
+        AssignReason, DecisionLevel,
+        flags::{FlagIF, FlagVar},
+    },
     std::fmt,
 };
 
@@ -89,12 +92,13 @@ impl FlagIF for Var {
 }
 
 /// Object representing a variable.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub enum VarActivityScheme {
+    /// The number of clauses which include var per the number of all clauses
+    #[default]
+    CR,
     /// LearningRate Based
     LRB,
     /// last conflict Var Moves To the queue First
     VMTF,
-    /// The number of clauses which include var per the number of all clauses
-    CR,
 }

@@ -218,16 +218,19 @@ fn search(
 
     // monotonic increment counter
     let mut span_len: usize = 1;
-    let cooling_len: usize = 20;
+    let cooling_len: usize = 0;
     let mut processing_pressure: usize = 0;
     let mut ruduction_pressure: usize = 0;
     let processing_interval: usize = 40_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
-    let mut switch_pressure: usize = 0;
-    let switch_interval: usize = 20_000;
+    // let mut switch_pressure: usize = 0;
+    // let switch_interval: usize = 2_000;
 
-    state.span_manager.reset();
+    asg.activity_scheme = VarActivityScheme::LRB;
+    asg.set_learning_rate(state.config.vrw_learning_rate);
+    asg.rebuild_order();
+
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
             let lit = asg.select_decision_literal();
@@ -238,7 +241,8 @@ fn search(
         };
         progress_pressure += 1;
         span_len += 1;
-        if asg.decision_level() == asg.root_level() {
+        let conflicting_level: DecisionLevel = asg.decision_level();
+        if conflicting_level == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }
         asg.cdb_num_clauses = cdb.derefer(cdb::property::Tusize::NumClause);
@@ -249,7 +253,23 @@ fn search(
         }
         let lbd = handle_conflict(asg, cdb, state, &cc)?;
         match lbd.cmp(&1) {
-            std::cmp::Ordering::Less => (),
+            std::cmp::Ordering::Less => match asg.activity_scheme {
+                VarActivityScheme::CR => {
+                    state.search_mode_ratio.0.update(1.0);
+                    state.search_mode_ratio.1.update(0.0);
+                    state.search_mode_ratio.2.update(0.0);
+                }
+                VarActivityScheme::LRB => {
+                    state.search_mode_ratio.0.update(0.0);
+                    state.search_mode_ratio.1.update(1.0);
+                    state.search_mode_ratio.2.update(0.0);
+                }
+                VarActivityScheme::VMTF => {
+                    state.search_mode_ratio.0.update(0.0);
+                    state.search_mode_ratio.1.update(0.0);
+                    state.search_mode_ratio.2.update(1.0);
+                }
+            },
             std::cmp::Ordering::Equal => (),
             std::cmp::Ordering::Greater => {
                 ruduction_pressure += 1;
@@ -261,97 +281,77 @@ fn search(
             cdb.reduce(asg, state.span_manager.envelop_index());
             ruduction_pressure = 0;
         }
-        switch_pressure += 1;
+        // switch_pressure += 1;
 
-        if switch_pressure.is_multiple_of(1000) {
-            match asg.activity_scheme {
-                VarActivityScheme::LRB => {
-                    state.search_mode_ratio.0.update(1.0);
-                    state.search_mode_ratio.1.update(0.0);
-                    state.search_mode_ratio.2.update(0.0);
-                }
-                VarActivityScheme::VMTF => {
-                    state.search_mode_ratio.0.update(0.0);
-                    state.search_mode_ratio.1.update(1.0);
-                    state.search_mode_ratio.2.update(0.0);
-                }
-                VarActivityScheme::CR => {
-                    state.search_mode_ratio.0.update(0.0);
-                    state.search_mode_ratio.1.update(0.0);
-                    state.search_mode_ratio.2.update(1.0);
-                }
-            }
-        }
         if state
             .span_manager
             .span_ended(span_len.saturating_sub(cooling_len))
         {
-            match asg.activity_scheme {
-                VarActivityScheme::LRB if switch_pressure >= 2 * switch_interval => {
+            /* match asg.activity_scheme {
+                VarActivityScheme::CR if switch_pressure >= switch_interval => {
                     asg.activity_scheme = VarActivityScheme::VMTF;
                     asg.set_learning_rate(state.config.vrw_learning_rate);
                     asg.rebuild_order();
                     switch_pressure = 0;
                 }
-                VarActivityScheme::VMTF if switch_pressure >= switch_interval => {
-                    asg.activity_scheme = VarActivityScheme::CR;
+                VarActivityScheme::LRB if switch_pressure >= switch_interval => {
+                    // asg.activity_scheme = VarActivityScheme::CR;
+                    asg.activity_scheme = VarActivityScheme::VMTF;
+                    // asg.set_learning_rate(state.config.vrw_learning_rate);
                     // asg.set_learning_rate(0.0);
                     asg.rebuild_order();
                     switch_pressure = 0;
                 }
-                VarActivityScheme::CR if switch_pressure >= switch_interval => {
-                    asg.activity_scheme = VarActivityScheme::LRB;
-                    // asg.set_learning_rate(0.0);
+                VarActivityScheme::VMTF if switch_pressure >= 10 * switch_interval => {
+                    asg.activity_scheme = VarActivityScheme::CR;
+                    asg.set_learning_rate(state.config.vrw_learning_rate);
                     asg.rebuild_order();
                     switch_pressure = 0;
                 }
                 _ => (),
-            }
-            // let cia = asg.conflict_interval_average.0.trend();
-            // let cil = asg.conflict_interval_average.1.trend();
-            // if cia + cil < 1.96 {
-            if cdb.lbd.trend() > 1.5 && asg.activity_scheme != VarActivityScheme::VMTF {
-                RESTART!(asg, cdb, state);
-                asg.clear_asserted_literals(cdb)?;
-            }
-            /*
-            if (!focusing && cia + cil >= 2.2) || (focusing && cia + cil >= 2.0) {
-                // if (!focusing && cia <= 1.0 && cil > 1.0) || (focusing && cia >= 1.0 && cil < 1.0) {
-                if !focusing {
-                    focusing = true;
-                    asg.set_learning_rate(0.0);
-                    asg.use_conflict_order(focusing);
+            } */
+            if span_len >= conflicting_level as usize {
+                if asg.activity_scheme != VarActivityScheme::VMTF && cdb.lbd.trend() > 1.25
+                // conflicting_level >= state.c_lvl.get_slow() as DecisionLevel
+                {
+                    RESTART!(asg, cdb, state);
+                    asg.clear_asserted_literals(cdb)?;
                 }
-                RESTART!(asg, cdb, state);
-                asg.clear_asserted_literals(cdb)?;
-                state.search_mode_ratio.0.update(1.0);
-                state.search_mode_ratio.1.update(0.0);
-                state.search_mode_ratio.2.update(0.0);
-            } else if cia + cil >= 1.96 {
-                if focusing {
-                    focusing = false;
-                    asg.set_learning_rate(state.config.vrw_learning_rate);
-                    asg.use_conflict_order(focusing);
+                match asg.activity_scheme {
+                    VarActivityScheme::CR if state.c_lvl.trend() <= 1.1 => {
+                        asg.activity_scheme = VarActivityScheme::LRB;
+                        asg.set_learning_rate(state.config.vrw_learning_rate);
+                        asg.rebuild_order();
+                        // switch_pressure = 0;
+                    }
+                    VarActivityScheme::LRB if cdb.lbd.trend() <= 0.6 => {
+                        asg.activity_scheme = VarActivityScheme::VMTF;
+                        asg.set_learning_rate(0.0);
+                        asg.rebuild_order();
+                        // switch_pressure = 0;
+                    }
+                    VarActivityScheme::LRB if cdb.lbd.trend() >= 2.2 => {
+                        asg.activity_scheme = VarActivityScheme::CR;
+                        asg.set_learning_rate(0.0);
+                        asg.rebuild_order();
+                        // switch_pressure = 0;
+                    }
+                    VarActivityScheme::VMTF if cdb.lbd.trend() >= 1.1 => {
+                        asg.activity_scheme = VarActivityScheme::LRB;
+                        asg.set_learning_rate(state.config.vrw_learning_rate);
+                        asg.rebuild_order();
+                        // switch_pressure = 0;
+                    }
+                    _ => (),
                 }
-                state.search_mode_ratio.0.update(0.0);
-                state.search_mode_ratio.1.update(1.0);
-                state.search_mode_ratio.2.update(0.0);
-            } else {
-                if focusing {
-                    focusing = false;
-                    asg.set_learning_rate(state.config.vrw_learning_rate);
-                    asg.use_conflict_order(focusing);
+                span_len = 0;
+                let new_span = state.span_manager.prepare_new_span(span_len);
+                if new_span == Some(true) {
+                    state.config.vrw_learning_rate *= 0.999;
                 }
-                RESTART!(asg, cdb, state);
-                asg.clear_asserted_literals(cdb)?;
-                state.search_mode_ratio.0.update(0.0);
-                state.search_mode_ratio.1.update(0.0);
-                state.search_mode_ratio.2.update(1.0);
+
+                dump_stage(asg, cdb, state, new_span);
             }
-            */
-            span_len = 0;
-            let new_span = state.span_manager.prepare_new_span(span_len);
-            dump_stage(asg, cdb, state, new_span);
             if asg.decision_level() == asg.root_level {
                 #[cfg(feature = "rephase")]
                 {
@@ -374,6 +374,9 @@ fn search(
             }
         }
         if progress_pressure >= progress_interval {
+            state.search_mode_ratio.0.update(0.0);
+            state.search_mode_ratio.1.update(0.0);
+            state.search_mode_ratio.2.update(0.0);
             state.progress(asg, cdb);
             if let Some(p) = state.elapsed() {
                 if 1.0 <= p {

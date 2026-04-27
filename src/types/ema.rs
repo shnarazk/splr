@@ -1,11 +1,11 @@
 //! API for observing EMA.
 
-const SPAN_FST: usize = 16;
-const SPAN_MID: usize = 256;
-const _SPAN_SLW: usize = 16384;
+const SPAN_FST: usize = 40;
+const SPAN_MID: usize = 800;
+// const _SPAN_SLW: usize = 8192;
 
 pub trait EmaIF {
-    /// return the current value.
+    /// return the fast averate value.
     fn get_fast(&self) -> f64 {
         unimplemented!()
     }
@@ -13,6 +13,7 @@ pub trait EmaIF {
     fn get(&self) -> f64 {
         self.get_fast()
     }
+    /// return the slow average value
     fn get_slow(&self) -> f64 {
         unimplemented!()
     }

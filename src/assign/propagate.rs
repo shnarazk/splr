@@ -310,12 +310,12 @@ impl PropagateIF for AssignStack {
                 self.dpc_ema.update(self.num_decision);
                 self.ppc_ema.update(self.num_propagation);
                 self.num_conflict += 1;
-                {
-                    let d = self.num_conflict - self.var[$lit.vi()].last_conflict;
-                    let f: f64 = 1.0 / ((d + 1) as f64).log2();
-                    self.conflict_interval_average.0.update(f);
-                    self.conflict_interval_average.1.update(f);
-                }
+                // {
+                //     let d = self.num_conflict - self.var[$lit.vi()].last_conflict;
+                //     let f: f64 = 1.0 / ((d + 1) as f64).log2();
+                //     self.conflict_interval_average.0.update(f);
+                //     self.conflict_interval_average.1.update(f);
+                // }
                 self.var[$lit.vi()].last_conflict = self.num_conflict;
                 return Err(($lit, $reason));
             };

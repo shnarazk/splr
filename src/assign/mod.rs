@@ -77,6 +77,8 @@ pub trait AssignIF:
     fn extend_model(&mut self, c: &mut impl ClauseDBIF) -> Vec<Option<bool>>;
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
+    /// return activity scheme
+    fn activity_scheme(&self) -> &VarActivityScheme;
 }
 
 /// Reasons of assignments

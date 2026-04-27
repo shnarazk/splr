@@ -138,7 +138,7 @@ impl Default for AssignStack {
             tick: 0,
             var: Vec::new(),
 
-            activity_scheme: VarActivityScheme::LRB,
+            activity_scheme: VarActivityScheme::default(),
             activity_stay_rate: 0.94,
             activity_learning_rate: 0.06,
             cdb_num_clauses: 0,
@@ -295,6 +295,9 @@ impl AssignIF for AssignStack {
             }
         }
         false
+    }
+    fn activity_scheme(&self) -> &VarActivityScheme {
+        &self.activity_scheme
     }
 }
 
