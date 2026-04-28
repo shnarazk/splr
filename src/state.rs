@@ -158,8 +158,14 @@ impl Default for State {
                 Ema2::default().with_value(0.33),
                 Ema2::default().with_value(0.33),
             ),
-            b_lvl: Ema2::default(),
-            c_lvl: Ema2::default(),
+            b_lvl: Ema2::default()
+                .with_fast(8_000)
+                .with_slow(80_000)
+                .with_value(100.0),
+            c_lvl: Ema2::default()
+                .with_fast(8_000)
+                .with_slow(80_000)
+                .with_value(200.0),
             bt_drift_average: Ema::default().with_span(1000),
 
             #[cfg(feature = "chrono_BT")]
@@ -462,7 +468,7 @@ impl StateIF for State {
         let asg_num_propagation = asg.derefer(assign::property::Tusize::NumPropagation);
         // let asg_cwss: f64 = asg.derefer(assign::property::Tf64::CurrentWorkingSetSize);
         let asg_dpc_ema = asg.refer(assign::property::TEma::DecisionPerConflict);
-        let asg_ppc_ema = asg.refer(assign::property::TEma::PropagationPerConflict);
+        // let asg_ppc_ema = asg.refer(assign::property::TEma::PropagationPerConflict);
         let asg_cpr_ema = asg.refer(assign::property::TEma::ConflictPerRestart);
 
         let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
@@ -576,43 +582,77 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K {}|fcs%:{}, exp%:{}, core:{}, /ppc:{}",
+            "\x1B[2K {}|  CR:{},  LRB:{}, VMTF:{}, core:{}",
+            // "\x1B[2K {}|VMTF:{},   CR:{}, core:{}, /ppc:{}",
             {
-                let s0 = self.search_mode_ratio.0.get();
-                let s1 = self.search_mode_ratio.1.get();
-                let s2 = self.search_mode_ratio.2.get();
-                if s0 >= s1 && s0 >= s2 {
-                    if self.span_manager.current_span() >= 16384 {
-                        " Long focus"
-                    } else {
-                        "      Focus"
+                match asg.activity_scheme() {
+                    VarActivityScheme::CR => {
+                        if self.span_manager.current_span() >= 16384 {
+                            "    Long CR"
+                        } else {
+                            "         CR"
+                        }
                     }
-                } else if s1 >= s2 {
-                    "     Pursue"
-                } else {
-                    "    Explore"
+                    VarActivityScheme::LRB => {
+                        if self.span_manager.current_span() >= 16384 {
+                            "   Long LRB"
+                        } else {
+                            "        LRB"
+                        }
+                    }
+                    VarActivityScheme::VMTF => {
+                        if self.span_manager.current_span() >= 16384 {
+                            "  Long VMTF"
+                        } else {
+                            "       VMTF"
+                        }
+                    }
                 }
             },
-            // fm!(
-            //     "{:>9.2}",
-            //     self,
-            //     LogF64Id::ConflictDistanceAverage,
-            //     asg.refer(assign::property::TEma::ConlictDistanceAverage)
-            //         .trend()
-            // ),
+            // {
+            //     let s0 = self.search_mode_ratio.0.get();
+            //     let s1 = self.search_mode_ratio.1.get();
+            //     let s2 = self.search_mode_ratio.2.get();
+            //     if s0 >= s1 && s0 >= s2 {
+            //         if self.span_manager.current_span() >= 16384 {
+            //             "   Long LRB"
+            //         } else {
+            //             "        LRB"
+            //         }
+            //     } else if s1 >= s2 {
+            //         if self.span_manager.current_span() >= 16384 {
+            //             "  Long VMTF"
+            //         } else {
+            //             "       VMTF"
+            //         }
+            //     } else {
+            //         if self.span_manager.current_span() >= 16384 {
+            //             "    Long CR"
+            //         } else {
+            //             "         CR"
+            //         }
+            //     }
+            // },
             fm!(
                 "{:>9.2}",
                 self,
                 LogF64Id::ConflictDistanceAverage0,
-                100.0 * self.search_mode_ratio.0.get(),
-                10.0
+                100.0 * self.search_mode_ratio.0.get_slow(),
+                1.0
+            ),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::ConflictDistanceAverage1,
+                100.0 * self.search_mode_ratio.1.get_slow(),
+                1.0
             ),
             fm!(
                 "{:>9.2}",
                 self,
                 LogF64Id::ConflictDistanceAverage2,
-                100.0 * self.search_mode_ratio.2.get(),
-                10.0
+                100.0 * self.search_mode_ratio.2.get_slow(),
+                1.0
             ),
             // fm!(
             //     "{:>9.4}",
@@ -632,13 +672,13 @@ impl StateIF for State {
                     asg_num_unreachables
                 }
             ),
-            fm!(
-                "{:>9.2}",
-                self,
-                LogF64Id::PropagationPerConflict,
-                asg_ppc_ema.get(),
-                0.01
-            ),
+            // fm!(
+            //     "{:>9.2}",
+            //     self,
+            //     LogF64Id::PropagationPerConflict,
+            //     asg_ppc_ema.get(),
+            //     0.01
+            // ),
         );
         self[LogUsizeId::LubySpan] = self.span_manager.current_segment();
         self[LogUsizeId::StageCycle] = self.span_manager.envelop_index();

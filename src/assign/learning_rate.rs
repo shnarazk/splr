@@ -1,22 +1,43 @@
 /// Var Rewarding based on Learning Rate Rewarding and Reason Side Rewarding
-use {
-    super::{stack::AssignStack, var::Var},
-    crate::types::*,
-};
+use {super::stack::AssignStack, crate::types::*};
 
 impl ActivityIF<VarId> for AssignStack {
     #[inline]
     fn activity(&self, vi: VarId) -> f64 {
-        self.var[vi].reward
+        match self.activity_scheme {
+            VarActivityScheme::CR => self.var[vi].num_clauses as f64,
+            VarActivityScheme::LRB => self.var[vi].lrb_reward,
+            VarActivityScheme::VMTF => self.var[vi].last_conflict as f64,
+        }
     }
     // fn activity_slow(&self, vi: VarId) -> f64 {
     //     self.var[vi].reward_ema.get()
     // }
     fn set_activity(&mut self, vi: VarId, val: f64) {
-        self.var[vi].reward = val;
+        self.var[vi].lrb_reward = val;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
         self.var[vi].turn_on(FlagVar::USED);
+    }
+    #[inline]
+    fn reward_at(&mut self, vi: VarId) -> f64 {
+        // Note: why the condition can be broken.
+        //
+        // 1. asg.ordinal += 1;
+        // 1. handle_conflict -> cancel_until -> reward_at_unassign
+        // 1. assign_by_implication -> v.timestamp = asg.ordinal
+        // 1. restart
+        // 1. cancel_until -> reward_at_unassign -> assertion failed
+        //
+        let decay = self.activity_stay_rate;
+        let reward = self.activity_learning_rate;
+        self.var[vi].lrb_reward *= decay;
+        if self.var[vi].is(FlagVar::USED) {
+            self.var[vi].lrb_reward += reward;
+            self.var[vi].turn_off(FlagVar::USED);
+        }
+        // self.var[vi].reward_ema.update(self.var[vi].reward);
+        self.var[vi].lrb_reward
     }
     #[inline]
     fn reward_at_assign(&mut self, _vi: VarId) {}
@@ -24,7 +45,7 @@ impl ActivityIF<VarId> for AssignStack {
     fn reward_at_propagation(&mut self, _vi: VarId) {}
     #[inline]
     fn reward_at_unassign(&mut self, vi: VarId) {
-        self.var[vi].update_activity(self.activity_stay_rate, self.activity_learning_rate);
+        self.reward_at(vi);
     }
     fn set_learning_rate(&mut self, scaling: f64) {
         self.activity_stay_rate = 1.0 - scaling;
@@ -40,7 +61,7 @@ impl ActivityIF<VarId> for AssignStack {
 impl AssignStack {
     pub fn rescale_activity(&mut self, scaling: f64) {
         for v in self.var.iter_mut().skip(1) {
-            v.reward *= scaling;
+            v.lrb_reward *= scaling;
         }
     }
     // pub fn set_activity_trend(&mut self) -> f64 {
@@ -64,24 +85,4 @@ impl AssignStack {
     //     // println!("inc rate:{:>6.4}", self.cwss);
     //     self.cwss
     // }
-}
-
-impl Var {
-    fn update_activity(&mut self, decay: f64, reward: f64) -> f64 {
-        // Note: why the condition can be broken.
-        //
-        // 1. asg.ordinal += 1;
-        // 1. handle_conflict -> cancel_until -> reward_at_unassign
-        // 1. assign_by_implication -> v.timestamp = asg.ordinal
-        // 1. restart
-        // 1. cancel_until -> reward_at_unassign -> assertion failed
-        //
-        self.reward *= decay;
-        if self.is(FlagVar::USED) {
-            self.reward += reward;
-            self.turn_off(FlagVar::USED);
-        }
-        // self.reward_ema.update(self.reward);
-        self.reward
-    }
 }

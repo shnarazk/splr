@@ -39,6 +39,12 @@ impl EmaMutIF for ProgressLBD {
     fn reset_to(&mut self, val: f64) {
         self.ema.reset_to(val);
     }
+    fn set_spans(&mut self, f: f64, s: f64) {
+        self.ema.set_spans(f, s);
+    }
+    fn rescale_span(&mut self, r: f64) {
+        self.ema.rescale_span(r)
+    }
     fn as_view(&self) -> &EmaView {
         self.ema.as_view()
     }

@@ -85,12 +85,14 @@ pub struct AssignStack {
     //
     //## Var Rewarding
     //
-    /// var activity decay
+    /// activity mode
+    pub(crate) activity_scheme: VarActivityScheme,
+    /// var activity decay for LRB
     pub(super) activity_stay_rate: f64,
-    /// its diff
+    /// its complimentary
     pub(super) activity_learning_rate: f64,
-    /// ordering_mode
-    pub(crate) ordering_by_conflict: bool,
+    /// number of clauses in the clause database (for occurrence-ratio activity)
+    pub(crate) cdb_num_clauses: usize,
 }
 
 impl Default for AssignStack {
@@ -136,10 +138,10 @@ impl Default for AssignStack {
             tick: 0,
             var: Vec::new(),
 
+            activity_scheme: VarActivityScheme::default(),
             activity_stay_rate: 0.94,
-
             activity_learning_rate: 0.06,
-            ordering_by_conflict: false,
+            cdb_num_clauses: 0,
         }
     }
 }
@@ -169,13 +171,9 @@ impl Instantiate for AssignStack {
             trail_saved: Vec::with_capacity(nv),
 
             num_vars: cnf.num_of_variables,
-
             var: Var::new_vars(nv),
-
             activity_stay_rate: 1.0 - config.vrw_learning_rate,
-
             activity_learning_rate: config.vrw_learning_rate,
-
             ..AssignStack::default()
         }
     }
@@ -298,8 +296,8 @@ impl AssignIF for AssignStack {
         }
         false
     }
-    fn ordering_by_reward(&self) -> bool {
-        !self.ordering_by_conflict
+    fn activity_scheme(&self) -> &VarActivityScheme {
+        &self.activity_scheme
     }
 }
 

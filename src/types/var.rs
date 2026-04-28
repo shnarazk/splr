@@ -1,7 +1,10 @@
 //! Var struct and Database management API
 use {
     // super::{heap::VarHeapIF, stack::AssignStack, AssignIF},
-    crate::types::{AssignReason, DecisionLevel, flags::FlagIF, flags::FlagVar},
+    crate::types::{
+        AssignReason, DecisionLevel,
+        flags::{FlagIF, FlagVar},
+    },
     std::fmt,
 };
 
@@ -20,7 +23,9 @@ pub struct Var {
     /// the `Flag`s (8 bits)
     pub(crate) flags: FlagVar,
     /// a dynamic evaluation criterion.
-    pub(crate) reward: f64,
+    pub(crate) lrb_reward: f64,
+    /// the number of clauses this var appears in.
+    pub(crate) num_clauses: usize,
     /// the last conflict by this
     pub(crate) last_conflict: usize,
 }
@@ -34,7 +39,8 @@ impl Default for Var {
             #[cfg(feature = "trail_saving")]
             reason_saved: AssignReason::None,
             flags: FlagVar::empty(),
-            reward: 0.0,
+            lrb_reward: 0.0,
+            num_clauses: 0,
             last_conflict: 0,
         }
     }
@@ -58,9 +64,6 @@ impl Var {
                 }
             })
             .collect::<Vec<_>>()
-    }
-    pub fn activity(&self) -> f64 {
-        self.reward
     }
 }
 
@@ -86,4 +89,16 @@ impl FlagIF for Var {
     fn toggle(&mut self, flag: Self::FlagType) {
         self.flags.toggle(flag);
     }
+}
+
+/// Object representing a variable.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub enum VarActivityScheme {
+    /// The number of clauses which include var per the number of all clauses
+    CR,
+    /// LearningRate Based
+    LRB,
+    /// last conflict Var Moves To the queue First
+    #[default]
+    VMTF,
 }

@@ -47,6 +47,8 @@ pub trait ActivityIF<Ix> {
     /// set activity
     fn set_activity(&mut self, ix: Ix, val: f64);
     /// modify one's activity at conflict analysis in `conflict_analyze` in [`solver`](`crate::solver`).
+    /// reward vi
+    fn reward_at(&mut self, vi: VarId) -> f64;
     fn reward_at_analysis(&mut self, _ix: Ix) {}
     /// modify one's activity at value assignment in assign.
     fn reward_at_assign(&mut self, _ix: Ix) {}

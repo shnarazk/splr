@@ -31,7 +31,7 @@ impl Eliminator {
                     cdb[cid].turn_off(FlagClause::LEARNT);
                 }
                 self.remove_cid_occur(asg, did, &mut cdb[did]);
-                cdb.remove_clause(did);
+                cdb.remove_clause(asg, did);
                 self.num_subsumed += 1;
             }
             // To avoid making a big clause, we have to add a condition for combining them.
@@ -99,19 +99,20 @@ fn strengthen_clause(
             #[cfg(feature = "trace_elimination")]
             println!("cid {} drops literal {}", cid, l);
 
+            asg.var_mut(l.vi()).num_clauses = asg.var_mut(l.vi()).num_clauses.saturating_sub(1);
             elim.enqueue_clause(cid, &mut cdb[cid]);
             elim.remove_lit_occur(asg, l, cid);
             Ok(())
         }
         RefClause::RegisteredClause(_) => {
             elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
-            cdb.remove_clause(cid);
+            cdb.remove_clause(asg, cid);
             Ok(())
         }
         RefClause::UnitClause(l0) => {
             cdb.certificate_add_assertion(l0);
             elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
-            cdb.remove_clause(cid);
+            cdb.remove_clause(asg, cid);
             match asg.assigned(l0) {
                 None => asg.assign_at_root_level(cdb, l0),
                 Some(true) => Ok(()),

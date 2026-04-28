@@ -120,14 +120,14 @@ pub fn eliminate_var(
             continue;
         }
         elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
-        cdb.remove_clause(*cid);
+        cdb.remove_clause(asg, *cid);
     }
     for cid in neg.iter() {
         if cdb[*cid].is_dead() {
             continue;
         }
         elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
-        cdb.remove_clause(*cid);
+        cdb.remove_clause(asg, *cid);
     }
     elim[vi].clear();
     asg.handle(SolverEvent::Eliminate(vi));
