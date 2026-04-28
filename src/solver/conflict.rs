@@ -23,7 +23,7 @@ pub fn handle_conflict(
     cdb: &mut ClauseDB,
     state: &mut State,
     cc: &ConflictContext,
-) -> Result<u16, SolverError> {
+) -> Result<DecisionLevel, SolverError> {
     // `conflicting_level` should be calculated from cc.1 instead of cc.0.
     // Because the conflicting_literal has two values assigned at different levels.
     // We need larger one.
@@ -197,7 +197,7 @@ pub fn handle_conflict(
     //     new_learnt.iter().skip(1).map(|l| asg.level(l.vi())).max(),
     //     Some(assign_level)
     // );
-    let rank: u16;
+    let rank: DecisionLevel;
     match cdb.new_clause(asg, new_learnt, true) {
         RefClause::Clause(cid) if learnt_len == 2 => {
             debug_assert_eq!(l0, cdb[cid].lit0());
@@ -218,7 +218,7 @@ pub fn handle_conflict(
                 cdb[cid].used = cdb[cid].used.saturating_add(1);
                 cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
             }
-            rank = cdb[cid].rank;
+            rank = cdb[cid].rank as DecisionLevel;
         }
         RefClause::RegisteredClause(cid) => {
             debug_assert_eq!(learnt_len, 2);
