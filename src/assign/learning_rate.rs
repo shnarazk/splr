@@ -5,10 +5,9 @@ impl ActivityIF<VarId> for AssignStack {
     #[inline]
     fn activity(&self, vi: VarId) -> f64 {
         match self.activity_scheme {
-            // VarActivityScheme::CR => self.var[vi].num_clauses as f64 / self.cdb_num_clauses as f64,
-            VarActivityScheme::CR => self.var[vi].last_conflict as f64 / self.num_conflict as f64,
+            VarActivityScheme::CR => self.var[vi].num_clauses as f64,
             VarActivityScheme::LRB => self.var[vi].lrb_reward,
-            VarActivityScheme::VMTF => self.var[vi].last_conflict as f64 / self.num_conflict as f64,
+            VarActivityScheme::VMTF => self.var[vi].last_conflict as f64,
         }
     }
     // fn activity_slow(&self, vi: VarId) -> f64 {

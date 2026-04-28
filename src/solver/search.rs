@@ -221,14 +221,16 @@ fn search(
     let cooling_len: usize = 0;
     let mut processing_pressure: usize = 0;
     let mut ruduction_pressure: usize = 0;
-    let processing_interval: usize = 40_000;
+    let processing_interval: usize = 30_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
-    // let mut switch_pressure: usize = 0;
-    // let switch_interval: usize = 2_000;
+    let mut switch_pressure: usize = 0;
+    let switch_interval: usize = 20_000;
     let mut last_activity: f64 = 0.0;
+    let _restart_pressure: usize = 0;
+    let mut lbd_ema: Ema2 = Ema2::default().has_long().with_value(10.0);
 
-    asg.activity_scheme = VarActivityScheme::LRB;
+    asg.activity_scheme = VarActivityScheme::VMTF;
     asg.set_learning_rate(state.config.vrw_learning_rate);
     asg.rebuild_order();
 
@@ -276,14 +278,33 @@ fn search(
                 ruduction_pressure += 1;
                 processing_pressure += 1;
                 cdb.lbd.update(lbd as f64);
+                if asg.activity_scheme != VarActivityScheme::VMTF {
+                    lbd_ema.update(lbd as f64);
+                }
             }
         }
         if ruduction_pressure >= processing_interval {
             cdb.reduce(asg, state.span_manager.envelop_index());
             ruduction_pressure = 0;
         }
-        // switch_pressure += 1;
+        switch_pressure += 1;
 
+        if
+        // (asg.activity_scheme == VarActivityScheme::CR && cdb.lbd.trend() > 1.5)
+        (asg.activity_scheme == VarActivityScheme::CR && asg.activity(cc.0.vi()) < last_activity)
+            || (asg.activity_scheme == VarActivityScheme::LRB
+                && asg.activity(cc.0.vi()) <= last_activity)
+        // || (asg.activity_scheme == VarActivityScheme::VMTF && asg.activity(cc.0.vi()) < last_activity)
+        // || (asg.activity_scheme == VarActivityScheme::VMTF && cdb.lbd.trend() > 1.25)
+        {
+            RESTART!(asg, cdb, state);
+            asg.clear_asserted_literals(cdb)?;
+            // restart_pressure = 0;
+            last_activity *= 0.8;
+        } else {
+            // restart_pressure += 1;
+            last_activity = asg.activity(cc.0.vi());
+        }
         if state
             .span_manager
             .span_ended(span_len.saturating_sub(cooling_len))
@@ -317,54 +338,53 @@ fn search(
                 || asg.activity_scheme == VarActivityScheme::VMTF
             // conflicting_level >= state.c_lvl.get_slow() as DecisionLevel
             */
-            if (asg.activity_scheme == VarActivityScheme::CR && cdb.lbd.trend() > 1.5)
+            if
+            // (asg.activity_scheme == VarActivityScheme::CR && cdb.lbd.trend() > 1.5)
+            (asg.activity_scheme == VarActivityScheme::CR
+                && asg.activity(cc.0.vi()) < last_activity)
                 || (asg.activity_scheme == VarActivityScheme::LRB
-                    && asg.activity(cc.0.vi()) < last_activity)
-                || (asg.activity_scheme == VarActivityScheme::VMTF && cdb.lbd.trend() > 1.25)
+                    && (lbd_ema.trend() > 0.9 + last_activity
+                        || asg.activity(cc.0.vi()) < last_activity))
+            // || (asg.activity_scheme == VarActivityScheme::VMTF && asg.activity(cc.0.vi()) < last_activity)
+            // || (asg.activity_scheme == VarActivityScheme::VMTF && cdb.lbd.trend() > 1.25)
             {
-                {
-                    RESTART!(asg, cdb, state);
-                    asg.clear_asserted_literals(cdb)?;
-                    last_activity = 0.0;
-                }
-                match asg.activity_scheme {
-                    VarActivityScheme::CR if cdb.lbd.trend() <= 1.4 => {
-                        asg.activity_scheme = VarActivityScheme::LRB;
-                        asg.set_learning_rate(state.config.vrw_learning_rate);
-                        asg.rebuild_order();
-                        // switch_pressure = 0;
-                    }
-                    VarActivityScheme::LRB if cdb.lbd.trend() <= 0.6 => {
-                        asg.activity_scheme = VarActivityScheme::VMTF;
-                        asg.set_learning_rate(0.0);
-                        asg.rebuild_order();
-                        // switch_pressure = 0;
-                    }
-                    // VarActivityScheme::LRB if cdb.lbd.trend() >= 2.0 => {
-                    //     asg.activity_scheme = VarActivityScheme::CR;
-                    //     // asg.set_learning_rate(0.0);
-                    //     // asg.rebuild_order();
-                    //     // switch_pressure = 0;
-                    // }
-                    VarActivityScheme::VMTF if cdb.lbd.trend() >= 1.1 => {
-                        asg.activity_scheme = VarActivityScheme::LRB;
-                        asg.set_learning_rate(state.config.vrw_learning_rate);
-                        asg.rebuild_order();
-                        // switch_pressure = 0;
-                    }
-                    _ => (),
-                }
-                span_len = 0;
-                let new_span = state.span_manager.prepare_new_span(span_len);
-                if new_span == Some(true) {
-                    state.config.vrw_learning_rate *= 0.999;
-                    cdb.lbd
-                        .set_spans(0.5 * state.c_lvl.get_slow(), 8.0 * state.c_lvl.get_slow());
-                }
-
-                dump_stage(asg, cdb, state, new_span);
+                RESTART!(asg, cdb, state);
+                asg.clear_asserted_literals(cdb)?;
+                // restart_pressure = 0;
+                last_activity *= 0.8;
             } else {
+                // restart_pressure += 1;
                 last_activity = asg.activity(cc.0.vi());
+            }
+            span_len = 0;
+            let new_span = state.span_manager.prepare_new_span(span_len);
+            // if new_span == Some(true) {
+            //     state.config.vrw_learning_rate *= 0.999;
+            //     cdb.lbd
+            //         .set_spans(0.5 * state.c_lvl.get_slow(), 8.0 * state.c_lvl.get_slow());
+            // }
+            dump_stage(asg, cdb, state, new_span);
+            match asg.activity_scheme {
+                VarActivityScheme::CR if switch_pressure >= switch_interval => {
+                    asg.activity_scheme = VarActivityScheme::LRB;
+                    asg.set_learning_rate(state.config.vrw_learning_rate * 0.1);
+                    asg.rebuild_order();
+                    switch_pressure = 0;
+                }
+                VarActivityScheme::LRB if switch_pressure >= switch_interval => {
+                    asg.activity_scheme = VarActivityScheme::VMTF;
+                    // asg.set_learning_rate(state.config.vrw_learning_rate);
+                    asg.set_learning_rate(0.0);
+                    asg.rebuild_order();
+                    switch_pressure = 0;
+                }
+                VarActivityScheme::VMTF if switch_pressure >= switch_interval => {
+                    asg.activity_scheme = VarActivityScheme::LRB;
+                    asg.set_learning_rate(state.config.vrw_learning_rate);
+                    asg.rebuild_order();
+                    switch_pressure = 0;
+                }
+                _ => (),
             }
             if asg.decision_level() == asg.root_level {
                 #[cfg(feature = "rephase")]

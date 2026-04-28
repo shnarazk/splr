@@ -250,8 +250,8 @@ impl Ema2 {
         }
     }
     pub fn has_long(mut self) -> Self {
-        self.fe = 1.0 * SPAN_MID as f64;
-        self.se = 1.0 * SPAN_SLW as f64;
+        self.fe = 1.0 / SPAN_MID as f64;
+        self.se = 1.0 / SPAN_SLW as f64;
         self
     }
     // set first EMA parameter

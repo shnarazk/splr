@@ -97,8 +97,8 @@ pub enum VarActivityScheme {
     /// The number of clauses which include var per the number of all clauses
     CR,
     /// LearningRate Based
-    #[default]
     LRB,
     /// last conflict Var Moves To the queue First
+    #[default]
     VMTF,
 }
