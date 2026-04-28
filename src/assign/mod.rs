@@ -77,6 +77,8 @@ pub trait AssignIF:
     fn extend_model(&mut self, c: &mut impl ClauseDBIF) -> Vec<Option<bool>>;
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
+    /// compute Literal Block Distance (LBD) of a slice of literals under the current assignment.
+    fn literal_block_distance(&mut self, lits: &[Lit]) -> DecisionLevel;
     /// return ordering mode
     fn ordering_by_reward(&self) -> bool;
 }

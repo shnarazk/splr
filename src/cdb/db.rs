@@ -372,7 +372,6 @@ impl ClauseDBIF for ClauseDB {
 
         let ClauseDB {
             clause,
-            lbd_temp,
             num_clause,
             num_bi_clause,
             num_bi_learnt,
@@ -396,7 +395,7 @@ impl ClauseDBIF for ClauseDB {
         if len2 {
             c.rank = 1;
         } else {
-            c.update_lbd(asg, lbd_temp);
+            c.rank = asg.literal_block_distance(&c.lits) as u16;
         }
         // cdb.lbd is updated only in `solver.search`; we need to track seach mode
         // self.lbd.update(c.rank);
@@ -451,7 +450,6 @@ impl ClauseDBIF for ClauseDB {
 
         let ClauseDB {
             clause,
-            lbd_temp,
             binary_link,
             #[cfg(feature = "clause_rewarding")]
             tick,
@@ -470,7 +468,7 @@ impl ClauseDBIF for ClauseDB {
         if len2 {
             c.rank = 1;
         } else {
-            c.update_lbd(asg, lbd_temp);
+            c.rank = asg.literal_block_distance(&c.lits) as u16;
             c.turn_on(FlagClause::LEARNT);
         }
         let l0 = c.lits[0];
@@ -947,11 +945,12 @@ impl ClauseDBIF for ClauseDB {
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
     }
-    fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool {
+    fn update_at_analysis(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> bool {
         let c = &mut self.clause[NonZeroU32::get(cid.ordinal) as usize];
         // Updating LBD at every analysis seems redundant.
         // But it's crucial. Don't remove the below.
-        let rank = c.update_lbd(asg, &mut self.lbd_temp);
+        let rank = asg.literal_block_distance(&c.lits) as usize;
+        c.rank = rank as u16;
         let learnt = c.is(FlagClause::LEARNT);
         if learnt {
             #[cfg(feature = "clause_rewarding")]

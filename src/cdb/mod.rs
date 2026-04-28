@@ -111,7 +111,7 @@ pub trait ClauseDBIF:
     fn reset(&mut self);
     /// update flags.
     /// return `true` if it's learnt.
-    fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool;
+    fn update_at_analysis(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> bool;
     /// record an asserted literal to unsat certification.
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.

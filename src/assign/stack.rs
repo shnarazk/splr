@@ -83,6 +83,12 @@ pub struct AssignStack {
     pub(super) var: Vec<Var>,
 
     //
+    //## LBD calculation
+    //
+    /// a working buffer for LBD calculation (indexed by decision level)
+    pub(super) lbd_temp: Vec<usize>,
+
+    //
     //## Var Rewarding
     //
     /// var activity decay
@@ -136,6 +142,8 @@ impl Default for AssignStack {
             tick: 0,
             var: Vec::new(),
 
+            lbd_temp: Vec::new(),
+
             activity_stay_rate: 0.94,
 
             activity_learning_rate: 0.06,
@@ -172,6 +180,8 @@ impl Instantiate for AssignStack {
 
             var: Var::new_vars(nv),
 
+            lbd_temp: vec![0; nv + 1],
+
             activity_stay_rate: 1.0 - config.vrw_learning_rate,
 
             activity_learning_rate: config.vrw_learning_rate,
@@ -192,6 +202,7 @@ impl Instantiate for AssignStack {
                 self.expand_heap();
                 self.num_vars += 1;
                 self.var.push(Var::default());
+                self.lbd_temp.push(0);
             }
             e => panic!("don't call asg with {e:?}"),
         }
@@ -201,6 +212,26 @@ impl Instantiate for AssignStack {
 impl AssignIF for AssignStack {
     fn root_level(&self) -> DecisionLevel {
         self.root_level
+    }
+    fn literal_block_distance(&mut self, lits: &[Lit]) -> DecisionLevel {
+        if 8192 <= lits.len() {
+            return u16::MAX as DecisionLevel;
+        }
+        let key: usize = self.lbd_temp[0] + 1;
+        self.lbd_temp[0] = key;
+        let mut cnt: DecisionLevel = 0;
+        for l in lits {
+            let lv = self.level(l.vi());
+            if lv == 0 {
+                continue;
+            }
+            let p = &mut self.lbd_temp[lv as usize];
+            if *p != key {
+                *p = key;
+                cnt += 1;
+            }
+        }
+        cnt
     }
     fn stack(&self, i: usize) -> Lit {
         self.trail[i]
