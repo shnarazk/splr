@@ -92,7 +92,6 @@ pub trait ClauseDBIF:
     /// This returns `true` if the clause became a unit clause.
     /// And this is called only from `Eliminator::strengthen_clause`.
     fn new_clause(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
-    fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>) -> RefClause;
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn remove_clause(&mut self, cid: ClauseId);
     /// un-register a clause `cid` from clause database and make the clause dead.

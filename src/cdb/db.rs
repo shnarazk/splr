@@ -422,65 +422,6 @@ impl ClauseDBIF for ClauseDB {
         }
         RefClause::Clause(cid)
     }
-    fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, vec: &mut Vec<Lit>) -> RefClause {
-        debug_assert!(1 < vec.len());
-        if vec.len() == 2
-            && let Some(&cid) = self.link_to_cid(vec[0], vec[1])
-        {
-            return RefClause::RegisteredClause(cid);
-        }
-
-        let cid;
-        if let Some(cid_used) = self.freelist.pop() {
-            cid = cid_used;
-            let c = &mut self[cid];
-            c.flags = FlagClause::empty();
-            c.used = 0;
-            std::mem::swap(&mut c.lits, vec);
-            c.search_from = 2;
-        } else {
-            cid = ClauseId::from(self.clause.len());
-            let mut c = Clause {
-                flags: FlagClause::empty(),
-                ..Clause::default()
-            };
-            std::mem::swap(&mut c.lits, vec);
-            self.clause.push(c);
-        };
-
-        let ClauseDB {
-            clause,
-            binary_link,
-            #[cfg(feature = "clause_rewarding")]
-            tick,
-            watch_cache,
-            ..
-        } = self;
-        let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
-        c.used = 0;
-
-        #[cfg(feature = "clause_rewarding")]
-        {
-            c.timestamp = *tick;
-        }
-
-        let len2 = c.lits.len() == 2;
-        if len2 {
-            c.rank = 1;
-        } else {
-            c.rank = asg.literal_block_distance(&c.lits) as u16;
-            c.turn_on(FlagClause::LEARNT);
-        }
-        let l0 = c.lits[0];
-        let l1 = c.lits[1];
-        if len2 {
-            binary_link.add(l0, l1, cid);
-        } else {
-            watch_cache[!l0].insert_watch(cid, l1);
-            watch_cache[!l1].insert_watch(cid, l0);
-        }
-        RefClause::Clause(cid)
-    }
     /// ## Warning
     /// this function is the only function that makes dead clauses
     fn remove_clause(&mut self, cid: ClauseId) {
