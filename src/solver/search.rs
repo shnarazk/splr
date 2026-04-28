@@ -245,7 +245,8 @@ fn search(
         {
             cdb.update_activity_tick();
         }
-        let lbd = handle_conflict(asg, cdb, state, &cc)?;
+        let cid = handle_conflict(asg, cdb, state, &cc)?;
+        let lbd: DecisionLevel = asg.literal_block_distance(&cdb[cid].lits);
         match lbd.cmp(&1) {
             std::cmp::Ordering::Less => (),
             std::cmp::Ordering::Equal => (),

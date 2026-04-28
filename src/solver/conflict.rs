@@ -23,7 +23,7 @@ pub fn handle_conflict(
     cdb: &mut ClauseDB,
     state: &mut State,
     cc: &ConflictContext,
-) -> Result<DecisionLevel, SolverError> {
+) -> Result<ClauseId, SolverError> {
     // `conflicting_level` should be calculated from cc.1 instead of cc.0.
     // Because the conflicting_literal has two values assigned at different levels.
     // We need larger one.
@@ -100,7 +100,7 @@ pub fn handle_conflict(
                     unreachable!("handle_conflict::root_level_conflict_by_assertion");
                 }
                 cdb.handle(SolverEvent::Assert(l0.vi()));
-                return Ok(0);
+                return Ok(ClauseId::default());
             }
         }
     }
@@ -197,7 +197,7 @@ pub fn handle_conflict(
     //     new_learnt.iter().skip(1).map(|l| asg.level(l.vi())).max(),
     //     Some(assign_level)
     // );
-    let rank: DecisionLevel;
+    let ret: ClauseId;
     match cdb.new_clause(asg, new_learnt, true) {
         RefClause::Clause(cid) if learnt_len == 2 => {
             debug_assert_eq!(l0, cdb[cid].lit0());
@@ -209,7 +209,7 @@ pub fn handle_conflict(
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
                 cdb[cid].used = cdb[cid].used.saturating_add(1);
             }
-            rank = 1;
+            ret = cid;
         }
         RefClause::Clause(cid) => {
             debug_assert_eq!(cdb[cid].lit0(), l0);
@@ -218,7 +218,7 @@ pub fn handle_conflict(
                 cdb[cid].used = cdb[cid].used.saturating_add(1);
                 cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
             }
-            rank = cdb[cid].rank as DecisionLevel;
+            ret = cid;
         }
         RefClause::RegisteredClause(cid) => {
             debug_assert_eq!(learnt_len, 2);
@@ -237,7 +237,7 @@ pub fn handle_conflict(
             //     }
             //     panic!("here we are!");
             // }
-            rank = 1;
+            ret = cid;
             if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
                 cdb[cid].used = cdb[cid].used.saturating_add(1);
@@ -249,7 +249,7 @@ pub fn handle_conflict(
     }
     state.c_lvl.update(conflicting_level as f64);
     state.b_lvl.update(assign_level as f64);
-    Ok(rank)
+    Ok(ret)
 }
 
 ///
