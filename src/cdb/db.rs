@@ -2,7 +2,6 @@ use {
     super::{
         BinaryLinkDB, CertificationStore, ClauseDBIF, ClauseId, RefClause,
         binary::{BinaryLinkIF, BinaryLinkList},
-        ema::ProgressLBD,
         property,
         watch_cache::*,
     },
@@ -59,7 +58,7 @@ pub struct ClauseDB {
     //
     /// a working buffer for LBD calculation
     lbd_temp: Vec<usize>,
-    pub(crate) lbd: ProgressLBD,
+    pub(crate) lbd: Ema2,
 
     //## Reduction
     leanrt_limit_ema: Ema,
@@ -108,7 +107,7 @@ impl Default for ClauseDB {
             activity_anti_decay: 0.01,
 
             lbd_temp: Vec::new(),
-            lbd: ProgressLBD::default(),
+            lbd: Ema2::default_extended(),
             leanrt_limit_ema: Ema::default().with_value(40_000.0),
 
             num_clause: 0,
@@ -247,7 +246,7 @@ impl Instantiate for ClauseDB {
             watch_cache: watcher,
             certification_store: CertificationStore::instantiate(config, cnf),
             soft_limit: config.c_cls_lim,
-            lbd: ProgressLBD::instantiate(config, cnf),
+            lbd: Ema2::default_extended(),
 
             #[cfg(feature = "clause_rewarding")]
             activity_decay: config.crw_dcy_rat,

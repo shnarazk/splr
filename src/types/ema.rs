@@ -2,7 +2,7 @@
 
 const SPAN_FST: usize = 16;
 const SPAN_MID: usize = 256;
-const _SPAN_SLW: usize = 16384;
+const SPAN_SLW: usize = 16384;
 
 pub trait EmaIF {
     /// return the current value.
@@ -236,16 +236,24 @@ impl EmaMutIF for Ema2 {
 impl Ema2 {
     fn _new(len: usize) -> Ema2 {
         Ema2 {
-            ema: EmaView {
-                fast: 0.0,
-                slow: 0.0,
-            },
+            ema: EmaView::default(),
             #[cfg(feature = "EMA_calibration")]
             calf: 0.0,
             #[cfg(feature = "EMA_calibration")]
             cals: 0.0,
             fe: 1.0 / (len as f64),
             se: 1.0 / (len as f64),
+        }
+    }
+    pub fn default_extended() -> Self {
+        Ema2 {
+            ema: EmaView::default(),
+            #[cfg(feature = "EMA_calibration")]
+            calf: 0.0,
+            #[cfg(feature = "EMA_calibration")]
+            cals: 0.0,
+            fe: 1.0 / (SPAN_MID as f64),
+            se: 1.0 / (SPAN_SLW as f64),
         }
     }
     // set first EMA parameter

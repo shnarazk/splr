@@ -253,7 +253,7 @@ fn search(
             std::cmp::Ordering::Greater => {
                 ruduction_pressure += 1;
                 processing_pressure += 1;
-                cdb.lbd.update(lbd as u16);
+                cdb.lbd.update(lbd as f64);
             }
         }
         if ruduction_pressure >= processing_interval {
