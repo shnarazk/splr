@@ -1,4 +1,9 @@
-/// API for observing EMA.
+//! API for observing EMA.
+
+const SPAN_FST: usize = 16;
+const SPAN_MID: usize = 256;
+const SPAN_SLW: usize = 16384;
+
 pub trait EmaIF {
     /// return the current value.
     fn get_fast(&self) -> f64 {
@@ -40,7 +45,7 @@ pub trait EmaMutIF: EmaIF {
     fn set_value(&mut self, _x: f64) {}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct EmaView {
     fast: f64,
     slow: f64,
@@ -65,6 +70,17 @@ pub struct Ema {
     #[cfg(feature = "EMA_calibration")]
     cal: f64,
     sca: f64,
+}
+
+impl Default for Ema {
+    fn default() -> Self {
+        Self {
+            val: EmaView::default(),
+            #[cfg(feature = "EMA_calibration")]
+            cal: 0.0,
+            sca: 1.0 / SPAN_FST as f64,
+        }
+    }
 }
 
 impl EmaIF for Ema {
@@ -105,7 +121,7 @@ impl EmaMutIF for Ema {
 }
 
 impl Ema {
-    pub fn new(s: usize) -> Ema {
+    fn _new(s: usize) -> Ema {
         Ema {
             val: EmaView {
                 fast: 0.0,
@@ -122,6 +138,11 @@ impl Ema {
         self.val.slow = x;
         self
     }
+    /// set scale
+    pub fn with_span(mut self, len: usize) -> Ema {
+        self.sca = 1.0 / (len as f64);
+        self
+    }
 }
 
 /// Exponential Moving Average pair, with a calibrator if feature `EMA_calibration` is on.
@@ -136,6 +157,15 @@ pub struct Ema2 {
     se: f64,
 }
 
+impl Default for Ema2 {
+    fn default() -> Self {
+        Self {
+            ema: EmaView::default(),
+            fe: 1.0 / SPAN_FST as f64,
+            se: 1.0 / SPAN_MID as f64,
+        }
+    }
+}
 impl EmaIF for Ema2 {
     #[cfg(feature = "EMA_calibration")]
     fn get_fast(&self) -> f64 {
@@ -204,12 +234,9 @@ impl EmaMutIF for Ema2 {
 }
 
 impl Ema2 {
-    pub fn new(len: usize) -> Ema2 {
+    fn _new(len: usize) -> Ema2 {
         Ema2 {
-            ema: EmaView {
-                fast: 0.0,
-                slow: 0.0,
-            },
+            ema: EmaView::default(),
             #[cfg(feature = "EMA_calibration")]
             calf: 0.0,
             #[cfg(feature = "EMA_calibration")]
@@ -217,6 +244,22 @@ impl Ema2 {
             fe: 1.0 / (len as f64),
             se: 1.0 / (len as f64),
         }
+    }
+    pub fn default_extended() -> Self {
+        Ema2 {
+            ema: EmaView::default(),
+            #[cfg(feature = "EMA_calibration")]
+            calf: 0.0,
+            #[cfg(feature = "EMA_calibration")]
+            cals: 0.0,
+            fe: 1.0 / (SPAN_MID as f64),
+            se: 1.0 / (SPAN_SLW as f64),
+        }
+    }
+    // set first EMA parameter
+    pub fn with_fast(mut self, f: usize) -> Ema2 {
+        self.fe = 1.0 / (f as f64);
+        self
     }
     // set secondary EMA parameter
     pub fn with_slow(mut self, s: usize) -> Ema2 {
@@ -236,6 +279,10 @@ impl Ema2 {
             self.cals = 1.0;
         }
         self
+    }
+    pub fn set_spans(&mut self, ls: usize, ll: usize) {
+        self.fe = 1.0 / ls as f64;
+        self.se = 1.0 / ll as f64;
     }
 }
 
@@ -274,7 +321,7 @@ impl EmaSU {
     pub fn new(s: usize) -> Self {
         EmaSU {
             last: 0.0,
-            ema: Ema::new(s),
+            ema: Ema::default().with_span(s),
         }
     }
     pub fn update_base(&mut self, x: usize) {

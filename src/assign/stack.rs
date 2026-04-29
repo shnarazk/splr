@@ -1,7 +1,10 @@
 //! main struct AssignStack
 use {
-    super::{AssignIF, PropagateIF, Var, ema::ProgressASG, heap::VarHeapIF, heap::VarIdHeap},
-    crate::{cdb::ClauseDBIF, types::*},
+    super::{
+        AssignIF, Var,
+        heap::{VarHeapIF, VarIdHeap},
+    },
+    crate::{assign::learning_rate::VarActivityScheme, cdb::ClauseDBIF, types::*},
     std::{
         fmt,
         ops::Range,
@@ -11,9 +14,6 @@ use {
 
 #[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
 use std::collections::HashMap;
-
-#[cfg(feature = "trail_saving")]
-use super::TrailSavingIF;
 
 /// A record of assignment. It's called 'trail' in Glucose.
 #[derive(Clone, Debug)]
@@ -33,6 +33,12 @@ pub struct AssignStack {
     pub(super) num_repropagation: usize,
 
     //
+    //## Hotspot handling
+    //
+    /// weighted confllict distance average
+    pub(crate) conflict_interval_average: (Ema2, Ema2),
+
+    //
     //## Phase handling
     //
     pub(super) best_assign: bool,
@@ -45,11 +51,6 @@ pub struct AssignStack {
     pub(super) best_phases: HashMap<VarId, (bool, AssignReason)>,
     #[cfg(feature = "rephase")]
     pub(super) phase_age: usize,
-
-    //
-    //## Stage
-    //
-    pub stage_scale: usize,
 
     //## Elimanated vars
     //
@@ -68,8 +69,7 @@ pub struct AssignStack {
     pub(super) num_propagation: usize,
     pub num_conflict: usize,
     pub(super) num_restart: usize,
-    /// Assign rate EMA
-    pub(super) assign_rate: ProgressASG,
+
     /// Decisions Per Conflict
     pub(super) dpc_ema: EmaSU,
     /// Propagations Per Conflict
@@ -86,17 +86,20 @@ pub struct AssignStack {
     pub(super) var: Vec<Var>,
 
     //
+    //## LBD calculation
+    //
+    /// a working buffer for LBD calculation (indexed by decision level)
+    pub(super) lbd_temp: Vec<usize>,
+
+    //
     //## Var Rewarding
     //
+    /// active var activity scheme
+    pub(crate) activity_scheme: VarActivityScheme,
     /// var activity decay
-    pub(super) activity_decay: f64,
-    /// the default value of var activity decay in configuration
-    #[cfg(feature = "EVSIDS")]
-    activity_decay_default: f64,
+    pub(super) activity_stay_rate: f64,
     /// its diff
-    pub(super) activity_anti_decay: f64,
-    #[cfg(feature = "EVSIDS")]
-    activity_decay_step: f64,
+    pub(super) activity_learning_rate: f64,
 }
 
 impl Default for AssignStack {
@@ -113,19 +116,18 @@ impl Default for AssignStack {
 
             num_reconflict: 0,
             num_repropagation: 0,
-
+            conflict_interval_average: (Ema2::default(), Ema2::default()),
             best_assign: false,
             build_best_at: 0,
             num_best_assign: 0,
             num_rephase: 0,
-            bp_divergence_ema: Ema::new(10),
+            bp_divergence_ema: Ema::default(),
 
             #[cfg(feature = "best_phases_tracking")]
             best_phases: HashMap::new(),
             #[cfg(feature = "rephase")]
             phase_age: 0,
 
-            stage_scale: 1,
             eliminated: Vec::new(),
 
             num_vars: 0,
@@ -135,7 +137,7 @@ impl Default for AssignStack {
             num_propagation: 0,
             num_conflict: 0,
             num_restart: 0,
-            assign_rate: ProgressASG::default(),
+
             dpc_ema: EmaSU::new(100),
             ppc_ema: EmaSU::new(100),
             cpr_ema: EmaSU::new(100),
@@ -143,15 +145,12 @@ impl Default for AssignStack {
             tick: 0,
             var: Vec::new(),
 
-            activity_decay: 0.94,
+            lbd_temp: Vec::new(),
 
-            #[cfg(feature = "EVSIDS")]
-            activity_decay_default: 0.94,
+            activity_stay_rate: 0.94,
 
-            activity_anti_decay: 0.06,
-
-            #[cfg(feature = "EVSIDS")]
-            activity_decay_step: 0.1,
+            activity_scheme: VarActivityScheme::default(),
+            activity_learning_rate: 0.06,
         }
     }
 }
@@ -181,20 +180,14 @@ impl Instantiate for AssignStack {
             trail_saved: Vec::with_capacity(nv),
 
             num_vars: cnf.num_of_variables,
-            assign_rate: ProgressASG::instantiate(config, cnf),
+
             var: Var::new_vars(nv),
 
-            #[cfg(feature = "EVSIDS")]
-            activity_decay: config.vrw_dcy_rat * 0.6,
-            #[cfg(not(feature = "EVSIDS"))]
-            activity_decay: config.vrw_dcy_rat,
+            lbd_temp: vec![0; nv + 1],
 
-            #[cfg(feature = "EVSIDS")]
-            activity_decay_default: config.vrw_dcy_rat,
+            activity_stay_rate: 1.0 - config.vrw_learning_rate,
 
-            activity_anti_decay: 1.0 - config.vrw_dcy_rat,
-            #[cfg(feature = "EVSIDS")]
-            activity_decay_step: config.vrw_dcy_stp,
+            activity_learning_rate: config.vrw_learning_rate,
 
             ..AssignStack::default()
         }
@@ -208,26 +201,11 @@ impl Instantiate for AssignStack {
             SolverEvent::Eliminate(vi) => {
                 self.make_var_eliminated(vi);
             }
-            SolverEvent::Stage(scale) => {
-                self.stage_scale = scale;
-                #[cfg(feature = "trail_saving")]
-                self.clear_saved_trail();
-            }
             SolverEvent::NewVar => {
                 self.expand_heap();
                 self.num_vars += 1;
                 self.var.push(Var::default());
-            }
-            SolverEvent::Reinitialize => {
-                self.cancel_until(self.root_level);
-                debug_assert_eq!(self.decision_level(), self.root_level);
-                #[cfg(feature = "trail_saving")]
-                self.clear_saved_trail();
-                // self.num_eliminated_vars = self
-                //     .var
-                //     .iter()
-                //     .filter(|v| v.is(FlagVar::ELIMINATED))
-                //     .count();
+                self.lbd_temp.push(0);
             }
             e => panic!("don't call asg with {e:?}"),
         }
@@ -334,6 +312,35 @@ impl AssignIF for AssignStack {
         }
         false
     }
+    fn literal_block_distance(&mut self, lits: &[Lit]) -> DecisionLevel {
+        if 8192 <= lits.len() {
+            return u16::MAX as DecisionLevel;
+        }
+        let key: usize = self.lbd_temp[0] + 1;
+        self.lbd_temp[0] = key;
+        let mut cnt: DecisionLevel = 0;
+        for l in lits {
+            let lv = self.level(l.vi());
+            if lv == 0 {
+                continue;
+            }
+            let p = &mut self.lbd_temp[lv as usize];
+            if *p != key {
+                *p = key;
+                cnt += 1;
+            }
+        }
+        cnt
+    }
+    fn literal_block_distance_(&self, lits: &[Lit]) -> usize {
+        lits.iter()
+            .map(|l| self.var[l.vi()].level)
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+    }
+    fn activity_scheme(&self) -> &VarActivityScheme {
+        &self.activity_scheme
+    }
 }
 
 impl fmt::Display for AssignStack {
@@ -375,87 +382,6 @@ impl fmt::Display for AssignStack {
                 self.num_eliminated_vars,
             )
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::assign::PropagateIF;
-
-    fn lit(i: i32) -> Lit {
-        Lit::from(i)
-    }
-    #[test]
-    fn test_propagation() {
-        let config = Config::default();
-        let cnf = CNFDescription {
-            num_of_variables: 4,
-            ..CNFDescription::default()
-        };
-        let mut asg = AssignStack::instantiate(&config, &cnf);
-        // [] + 1 => [1]
-        assert!(asg.assign_at_root_level(lit(1)).is_ok());
-        assert_eq!(asg.trail, vec![lit(1)]);
-
-        // [1] + 1 => [1]
-        assert!(asg.assign_at_root_level(lit(1)).is_ok());
-        assert_eq!(asg.trail, vec![lit(1)]);
-
-        // [1] + 2 => [1, 2]
-        assert!(asg.assign_at_root_level(lit(2)).is_ok());
-        assert_eq!(asg.trail, vec![lit(1), lit(2)]);
-
-        // [1, 2] + -1 => ABORT & [1, 2]
-        assert!(asg.assign_at_root_level(lit(-1)).is_err());
-        assert_eq!(asg.decision_level(), 0);
-        assert_eq!(asg.stack_len(), 2);
-
-        // [1, 2] + 3 => [1, 2, 3]
-        asg.assign_by_decision(lit(3));
-        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
-        assert_eq!(asg.decision_level(), 1);
-        assert_eq!(asg.stack_len(), 3);
-        assert_eq!(asg.len_upto(0), 2);
-
-        // [1, 2, 3] + 4 => [1, 2, 3, 4]
-        asg.assign_by_decision(lit(4));
-        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
-        assert_eq!(asg.decision_level(), 2);
-        assert_eq!(asg.stack_len(), 4);
-        assert_eq!(asg.len_upto(1), 3);
-
-        // [1, 2, 3] => [1, 2]
-        #[cfg(feature = "debug_propagation")]
-        {
-            for l in asg.trail.iter() {
-                asg.var[l.vi()].turn_on(Flag::PROPAGATED);
-            } // simulate propagation
-        }
-        asg.cancel_until(1);
-        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
-        assert_eq!(asg.decision_level(), 1);
-        assert_eq!(asg.stack_len(), 3);
-        assert_eq!(asg.trail_lim, vec![2]);
-        assert_eq!(asg.assigned(lit(1)), Some(true));
-        assert_eq!(asg.assigned(lit(-1)), Some(false));
-        assert_eq!(asg.assigned(lit(4)), None);
-
-        // [1, 2, 3] => [1, 2, 3, 4]
-        asg.assign_by_decision(lit(4));
-        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
-        assert_eq!(asg.var[lit(4).vi()].level, 2);
-        assert_eq!(asg.trail_lim, vec![2, 3]);
-
-        // [1, 2, 3, 4] => [1, 2, -4]
-        asg.assign_at_root_level(Lit::from(-4i32))
-            .expect("impossible");
-        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(-4)]);
-        assert_eq!(asg.decision_level(), 0);
-        assert_eq!(asg.stack_len(), 3);
-
-        assert_eq!(asg.assigned(lit(-4)), Some(true));
-        assert_eq!(asg.assigned(lit(-3)), None);
     }
 }
 
@@ -546,11 +472,6 @@ impl VarManipulateIF for AssignStack {
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
 
-        #[cfg(feature = "boundary_check")]
-        {
-            self.var[vi].timestamp = self.tick;
-        }
-
         #[cfg(feature = "best_phases_tracking")]
         self.check_best_phase(vi);
     }
@@ -562,11 +483,6 @@ impl VarManipulateIF for AssignStack {
             debug_assert_eq!(self.decision_level(), self.root_level);
             self.trail.retain(|l| l.vi() != vi);
             self.num_eliminated_vars += 1;
-
-            #[cfg(feature = "boundary_check")]
-            {
-                self.var[vi].timestamp = self.tick;
-            }
 
             #[cfg(feature = "trace_elimination")]
             {
@@ -588,9 +504,6 @@ impl VarManipulateIF for AssignStack {
                     self.root_level < self.var[vi].level || self.var[vi].assign.is_none()
                 );
             }
-        } else {
-            #[cfg(feature = "boundary_check")]
-            panic!("double elimination");
         }
     }
 }
@@ -611,5 +524,87 @@ impl AssignStack {
             }
         }
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{assign::PropagateIF, cdb::ClauseDB};
+
+    fn lit(i: i32) -> Lit {
+        Lit::from(i)
+    }
+    #[test]
+    fn test_propagation() {
+        let config = Config::default();
+        let cnf = CNFDescription {
+            num_of_variables: 4,
+            ..CNFDescription::default()
+        };
+        let mut asg = AssignStack::instantiate(&config, &cnf);
+        let mut cdb = ClauseDB::instantiate(&config, &cnf);
+        // [] + 1 => [1]
+        assert!(asg.assign_at_root_level(&mut cdb, lit(1)).is_ok());
+        assert_eq!(asg.trail, vec![lit(1)]);
+
+        // [1] + 1 => [1]
+        assert!(asg.assign_at_root_level(&mut cdb, lit(1)).is_ok());
+        assert_eq!(asg.trail, vec![lit(1)]);
+
+        // [1] + 2 => [1, 2]
+        assert!(asg.assign_at_root_level(&mut cdb, lit(2)).is_ok());
+        assert_eq!(asg.trail, vec![lit(1), lit(2)]);
+
+        // [1, 2] + -1 => ABORT & [1, 2]
+        assert!(asg.assign_at_root_level(&mut cdb, lit(-1)).is_err());
+        assert_eq!(asg.decision_level(), 0);
+        assert_eq!(asg.stack_len(), 2);
+
+        // [1, 2] + 3 => [1, 2, 3]
+        asg.assign_by_decision(lit(3));
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
+        assert_eq!(asg.decision_level(), 1);
+        assert_eq!(asg.stack_len(), 3);
+        assert_eq!(asg.len_upto(0), 2);
+
+        // [1, 2, 3] + 4 => [1, 2, 3, 4]
+        asg.assign_by_decision(lit(4));
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
+        assert_eq!(asg.decision_level(), 2);
+        assert_eq!(asg.stack_len(), 4);
+        assert_eq!(asg.len_upto(1), 3);
+
+        // [1, 2, 3] => [1, 2]
+        #[cfg(feature = "trace_propagation")]
+        {
+            for l in asg.trail.iter() {
+                asg.var[l.vi()].turn_on(Flag::PROPAGATED);
+            } // simulate propagation
+        }
+        asg.cancel_until(&mut cdb, 1);
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
+        assert_eq!(asg.decision_level(), 1);
+        assert_eq!(asg.stack_len(), 3);
+        assert_eq!(asg.trail_lim, vec![2]);
+        assert_eq!(asg.assigned(lit(1)), Some(true));
+        assert_eq!(asg.assigned(lit(-1)), Some(false));
+        assert_eq!(asg.assigned(lit(4)), None);
+
+        // [1, 2, 3] => [1, 2, 3, 4]
+        asg.assign_by_decision(lit(4));
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
+        assert_eq!(asg.var[lit(4).vi()].level, 2);
+        assert_eq!(asg.trail_lim, vec![2, 3]);
+
+        // [1, 2, 3, 4] => [1, 2, -4]
+        asg.assign_at_root_level(&mut cdb, Lit::from(-4i32))
+            .expect("impossible");
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(-4)]);
+        assert_eq!(asg.decision_level(), 0);
+        assert_eq!(asg.stack_len(), 3);
+
+        assert_eq!(asg.assigned(lit(-4)), Some(true));
+        assert_eq!(asg.assigned(lit(-3)), None);
     }
 }

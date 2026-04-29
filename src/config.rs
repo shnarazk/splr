@@ -58,10 +58,6 @@ pub struct Config {
     pub crw_dcy_rat: f64,
     // clause reduction LBD threshold for mode 2: exploration
     pub cls_rdc_lbd: u16,
-    // clause reduction ratio for mode 1: exploitation
-    pub cls_rdc_rm1: f64,
-    // clause reduction ratio for mode 2: exploration
-    pub cls_rdc_rm2: f64,
 
     //
     //## restart
@@ -87,12 +83,10 @@ pub struct Config {
     //
 
     //
-    //## var rewarding
+    //## learning-rate-based var rewarding:
     //
     /// Var Reward Decay Rate
-    pub vrw_dcy_rat: f64,
-    /// Decay increment step.
-    pub vrw_dcy_stp: f64,
+    pub vrw_learning_rate: f64,
 }
 
 impl Default for Config {
@@ -115,23 +109,14 @@ impl Default for Config {
 
             crw_dcy_rat: 0.95,
             cls_rdc_lbd: 5,
-            cls_rdc_rm1: 0.2,
-            cls_rdc_rm2: 0.05,
-            rst_lbd_thr: 2.0,
+            rst_lbd_thr: 1.05,
 
             enable_eliminator: cfg!(feature = "clause_elimination"),
             elm_cls_lim: 64,
             elm_grw_lim: 0,
             elm_var_occ: 20000,
 
-            #[cfg(feature = "EVSIDS")]
-            vrw_dcy_rat: 0.98,
-            #[cfg(feature = "LRB_rewarding")]
-            vrw_dcy_rat: 0.96,
-            #[cfg(feature = "EVSIDS")]
-            vrw_dcy_stp: 0.0001,
-            #[cfg(feature = "LRB_rewarding")]
-            vrw_dcy_stp: 0.0,
+            vrw_learning_rate: 0.04,
         }
     }
 }
@@ -155,7 +140,7 @@ impl Config {
                     "no-color", "quiet", "certify", "heatmap", "journal", "help", "version",
                 ];
                 let options_usize = ["cl", "crl", "stat", "ecl", "evl", "evo"];
-                let options_f64 = ["timeout", "cdr", "cr1", "cr2", "rlt", "vdr", "vds"];
+                let options_f64 = ["timeout", "cdr", "rlt", "vlr"];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
                 match seg.len() {
@@ -195,12 +180,8 @@ impl Config {
                                     match name {
                                         "timeout" => self.c_timeout = val,
                                         "cdr" => self.crw_dcy_rat = val,
-                                        "cr1" => self.cls_rdc_rm1 = val,
-                                        "cr2" => self.cls_rdc_rm2 = val,
                                         "rlt" => self.rst_lbd_thr = val,
-                                        "vdr" => self.vrw_dcy_rat = val,
-                                        "vds" => self.vrw_dcy_stp = val,
-
+                                        "vlr" => self.vrw_learning_rate = val,
                                         _ => panic!("invalid option: {name}"),
                                     }
                                 } else {
@@ -267,34 +248,22 @@ impl Config {
             let features = [
                 #[cfg(feature = "best_phases_tracking")]
                 "best phase tracking",
-                #[cfg(feature = "bi_clause_completion")]
-                "binary clause completion",
                 #[cfg(feature = "chrono_BT")]
                 "chrono BT",
                 #[cfg(feature = "clause_elimination")]
                 "stage-based clause elimination",
                 #[cfg(feature = "clause_vivification")]
                 "stage-based clause vivification",
-                #[cfg(feature = "dynamic_restart_threshold")]
-                "stage-based dynamic restart threshold",
                 #[cfg(feature = "EMA_calibration")]
                 "EMA calibration",
-                #[cfg(feature = "EVSIDS")]
-                "EVSIDS rewarding",
-                #[cfg(feature = "just_used")]
-                "use 'just used' flag",
-                #[cfg(feature = "LRB_rewarding")]
-                "Learning-Rate Based rewarding",
                 #[cfg(feature = "reason_side_rewarding")]
                 "reason-side rewarding",
                 #[cfg(feature = "rephase")]
                 "stage-based re-phasing",
-                #[cfg(feature = "suppress_reason_chain")]
-                "suppress reason chain",
-                #[cfg(feature = "two_mode_reduction")]
-                "two-mode reduction",
                 #[cfg(feature = "trail_saving")]
                 "trail saving",
+                #[cfg(feature = "BT_deepen")]
+                "backtrack-to-deeper-level",
                 #[cfg(feature = "unsafe_access")]
                 "unsafe access",
             ];
@@ -346,16 +315,17 @@ FLAGS:
   -V, --version             Prints version information
 OPTIONS:
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
-{}{}{}{}      --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
+{}      --crl <clr-rdc-lbd>   LBD for clause reduction       {:>10}
+      --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
       --evo <elm-var-occ>   Max #cls for var elimination   {:>10}
       --rlt <rst-lbd-thr>   LBD trend threshold to restart    {:>10.2}
-      --vdr <vrw-dcy-rat>   Var reward decay rate             {:>10.2}
+      --vlr <vrw-lrn-rat>   Var reward learning rate          {:>10.2}
   -o, --dir <io-outdir>     Output directory                {:>10}
   -p, --proof <io-pfile>    DRAT Cert. filename                 {:>10}
   -r, --result <io-rfile>   Result filename/stdout              {:>10}
   -t, --timeout <timeout>   CPU time limit in sec.         {:>10}
-{}ARGS:
+ARGS:
   <cnf-file>    DIMACS CNF file
 ",
         config.c_cls_lim,
@@ -364,35 +334,16 @@ OPTIONS:
             config.crw_dcy_rat,
             "      --cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}\n"
         ),
-        OPTION!(
-            "two_mode_reduction",
-            config.cls_rdc_lbd,
-            "      --crl <cls-rdc-lbd>   Clause reduction LBD threshold {:>10}\n"
-        ),
-        OPTION!(
-            "two_mode_reduction",
-            config.cls_rdc_rm1,
-            "      --cr1 <cls-rdc-rm1>   Clause reduction ratio for mode1  {:>10.2}\n"
-        ),
-        OPTION!(
-            "two_mode_reduction",
-            config.cls_rdc_rm2,
-            "      --cr2 <cls-rdc-rm2>   Clause reduction ratio for mode2  {:>10.2}\n"
-        ),
+        config.cls_rdc_lbd,
         config.elm_cls_lim,
         config.elm_grw_lim,
         config.elm_var_occ,
         config.rst_lbd_thr,
-        config.vrw_dcy_rat,
+        config.vrw_learning_rate,
         config.io_odir.to_string_lossy(),
         config.io_pfile.to_string_lossy(),
         config.io_rfile.to_string_lossy(),
         config.c_timeout,
-        OPTION!(
-            "EVSIDS",
-            config.vrw_dcy_stp,
-            "      --vds <vrw-dcy-stp>   Var reward decay change step      {:>10.2}\n"
-        ),
     )
 }
 
@@ -438,13 +389,13 @@ pub mod property {
     pub enum Tf64 {
         #[cfg(feature = "clause_rewarding")]
         ClauseRewardDecayRate,
-        VarRewardDecayRate,
+        VarRewardLearningRate,
     }
 
     #[cfg(not(feature = "clause_rewarding"))]
-    pub const F64S: [Tf64; 1] = [Tf64::VarRewardDecayRate];
+    pub const F64S: [Tf64; 1] = [Tf64::VarRewardLearningRate];
     #[cfg(feature = "clause_rewarding")]
-    pub const F64S: [Tf64; 2] = [Tf64::ClauseRewardDecayRate, Tf64::VarRewardDecayRate];
+    pub const F64S: [Tf64; 2] = [Tf64::ClauseRewardDecayRate, Tf64::VarRewardLearningRate];
 
     impl PropertyDereference<Tf64, f64> for Config {
         #[inline]
@@ -452,7 +403,7 @@ pub mod property {
             match k {
                 #[cfg(feature = "clause_rewarding")]
                 Tf64::ClauseRewardDecayRate => self.crw_dcy_rat,
-                Tf64::VarRewardDecayRate => self.vrw_dcy_rat,
+                Tf64::VarRewardLearningRate => self.vrw_learning_rate,
             }
         }
     }

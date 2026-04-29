@@ -47,27 +47,17 @@ pub trait ActivityIF<Ix> {
     /// set activity
     fn set_activity(&mut self, ix: Ix, val: f64);
     /// modify one's activity at conflict analysis in `conflict_analyze` in [`solver`](`crate::solver`).
-    fn reward_at_analysis(&mut self, _ix: Ix) {
-        #[cfg(feature = "boundary_check")]
-        todo!()
-    }
+    /// update reward of `vi`,
+    fn reward_to(&mut self, vi: VarId) -> f64;
+    fn reward_at_analysis(&mut self, _ix: Ix) {}
     /// modify one's activity at value assignment in assign.
-    fn reward_at_assign(&mut self, _ix: Ix) {
-        #[cfg(feature = "boundary_check")]
-        todo!()
-    }
+    fn reward_at_assign(&mut self, _ix: Ix) {}
     /// modify one's activity at value assignment in unit propagation.
-    fn reward_at_propagation(&mut self, _ix: Ix) {
-        #[cfg(feature = "boundary_check")]
-        todo!()
-    }
+    fn reward_at_propagation(&mut self, _ix: Ix) {}
     /// modify one's activity at value un-assignment in [`cancel_until`](`crate::assign::PropagateIF::cancel_until`).
-    fn reward_at_unassign(&mut self, _ix: Ix) {
-        #[cfg(feature = "boundary_check")]
-        todo!()
-    }
-    /// update reward decay.
-    fn update_activity_decay(&mut self, _decay: f64);
+    fn reward_at_unassign(&mut self, _ix: Ix) {}
+    /// set the learning rate. It's a small float like 1/100.
+    fn set_learning_rate(&mut self, learning_rate: f64);
     /// update internal counter.
     fn update_activity_tick(&mut self);
 }
@@ -174,20 +164,6 @@ impl Logger {
             println!("{mes}");
         }
     }
-}
-
-#[cfg(feature = "boundary_check")]
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub enum Propagate {
-    None,
-    CacheSatisfied(usize),
-    FindNewWatch(usize, Lit, Lit),
-    BecameUnit(usize, Lit),
-    EmitConflict(usize, Lit),
-    SandboxCacheSatisfied(usize),
-    SandboxFindNewWatch(usize, Lit, Lit),
-    SandboxBecameUnit(usize),
-    SandboxEmitConflict(usize, Lit),
 }
 
 pub const RED: &str = "\x1B[001m\x1B[031m";

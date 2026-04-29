@@ -88,8 +88,8 @@ impl VarSelectIF for AssignStack {
             if v.is(FlagVar::PHASE) != *b {
                 num_flipped += 1;
                 v.set(FlagVar::PHASE, *b);
-                v.reward *= self.activity_decay;
-                v.reward += self.activity_anti_decay;
+                v.reward *= self.activity_stay_rate;
+                v.reward += self.activity_learning_rate;
                 self.update_heap(*vi);
             }
         }
@@ -105,10 +105,11 @@ impl VarSelectIF for AssignStack {
             self.best_phases.clear();
             return;
         }
-        debug_assert!(self
-            .best_phases
-            .iter()
-            .all(|(vi, b)| self.var[*vi].assign != Some(!b.0)));
+        debug_assert!(
+            self.best_phases
+                .iter()
+                .all(|(vi, b)| self.var[*vi].assign != Some(!b.0))
+        );
         self.num_rephase += 1;
         for (vi, (b, _)) in self.best_phases.iter() {
             let v = &mut self.var[*vi];

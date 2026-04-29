@@ -1,8 +1,8 @@
 use {
     super::{
+        EliminateIF, Eliminator, EliminatorMode,
         eliminate::eliminate_var,
         heap::{LitOccurs, VarOccHeap, VarOrderIF},
-        EliminateIF, Eliminator, EliminatorMode,
     },
     crate::{
         assign::{self, AssignIF},
@@ -199,18 +199,12 @@ impl Instantiate for Eliminator {
         }
     }
     fn handle(&mut self, e: SolverEvent) {
-        match e {
-            SolverEvent::NewVar => {
-                let len = self.var_queue.heap.len();
-                self.var.push(LitOccurs::default());
-                self.var_queue.heap.push(len as u32);
-                self.var_queue.idxs.push(len as u32);
-                self.var_queue.idxs[0] = len as u32;
-            }
-            SolverEvent::Reinitialize => {
-                self.elim_lits.clear();
-            }
-            _ => (),
+        if let SolverEvent::NewVar = e {
+            let len = self.var_queue.heap.len();
+            self.var.push(LitOccurs::default());
+            self.var_queue.heap.push(len as u32);
+            self.var_queue.idxs.push(len as u32);
+            self.var_queue.idxs[0] = len as u32;
         }
     }
 }
@@ -265,19 +259,7 @@ impl EliminateIF for Eliminator {
         force_run: bool,
     ) -> MaybeInconsistent {
         debug_assert_eq!(asg.decision_level(), 0);
-        // we can reset all the reasons because decision level is zero.
-        #[cfg(feature = "boundary_check")]
-        {
-            for (i, _) in asg.var_iter().enumerate().skip(1) {
-                if asg.reason(i) != AssignReason::None {
-                    assert_eq!(
-                        asg.level(i),
-                        asg.derefer(assign::property::Tusize::RootLevel) as DecisionLevel
-                    );
-                    // asg.reason(v.index) = AssignReason::None;
-                }
-            }
-        }
+
         if self.enable {
             if !force_run && self.mode == EliminatorMode::Dormant {
                 self.prepare(asg, cdb, true);
@@ -285,9 +267,10 @@ impl EliminateIF for Eliminator {
             self.eliminate_grow_limit = state.derefer(state::property::Tusize::IntervalScale) / 2;
             self.subsume_literal_limit = state.config.elm_cls_lim
                 + cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement) as usize;
-            debug_assert!(!cdb
-                .derefer(cdb::property::Tf64::LiteralBlockEntanglement)
-                .is_nan());
+            debug_assert!(
+                !cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement)
+                    .is_nan()
+            );
             // self.eliminate_combination_limit = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
             self.eliminate(asg, cdb, state)?;
         } else {
@@ -302,6 +285,8 @@ impl EliminateIF for Eliminator {
         }
         self.var_queue.clear(asg);
         debug_assert!(self.clause_queue.is_empty());
+        state[state::Stat::Simplify] += 1;
+        state[state::Stat::SubsumedClause] = self.num_subsumed;
         cdb.check_size().map(|_| ())
     }
     fn sorted_iterator(&self) -> Iter<'_, u32> {

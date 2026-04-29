@@ -1,3 +1,25 @@
+## 0.19.0
+
+- Adopt three search mode model: focus, pursue, explore
+- Adopt *Variable Move To queue First* for focus mode and *LearningRate-based Rewarding* for the other modes
+- Switch to the O(1) Luby iterator. Now Luby sequence is used for
+  - trigger for restarts, clause elimination, and clause vivification
+  - clause DB size after clause reduction
+- `ClauseDBIF::reduce` can run at any decision level, and runs every 40,000 conflicts
+- remove feature 'assign_rate'
+- remove feature 'bi_clause_completion'
+- remove feature 'boundary_check'
+- remove feature 'dynamic_restart_threshold'
+- remove feature 'EVSIDS'
+- remove feature 'just_used'
+- remove feature 'maintain_watch_cache'
+- remove feature 'reward_annealing'
+- remove feature 'suppress_reason_chain'
+- remove feature 'trace_equivalency'
+- remove feature 'two_mode_reduction'
+- rename feature 'debug_propagation' to 'trace_propagation'
+- remove src/solver/restart.rs
+
 ## 0.18.0, 2026-03-14
 
 This would be no better than the previous implementations.

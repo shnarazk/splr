@@ -6,118 +6,80 @@ use crate::types::*;
 
 #[derive(Clone, Debug, Default)]
 pub struct StageManager {
-    cycle: usize,
-    stage: usize,
-    segment: usize,
-    unit_size: usize,
-    luby_iter: LubySeries,
-    max_scale_of_segment: usize,
-    scale: usize,
-    end_of_stage: usize,
-    next_is_new_segment: bool,
-    cycle_starting_stage: usize,
-    segment_starting_stage: usize,
-    segment_starting_cycle: usize,
-}
-
-impl Instantiate for StageManager {
-    fn instantiate(_: &Config, cnf: &CNFDescription) -> StageManager {
-        let unit_size = (cnf.num_of_variables as f64).sqrt() as usize;
-        StageManager {
-            unit_size,
-            max_scale_of_segment: 1,
-            scale: 1,
-            end_of_stage: unit_size,
-            next_is_new_segment: false,
-            ..StageManager::default()
-        }
-    }
-    fn handle(&mut self, _: SolverEvent) {}
+    luby_iter: LubySegment,
+    end_of_span: usize,
+    envelope_hight: usize,
+    envelope_starting_segment: usize,
+    next_is_new_envelope: bool,
 }
 
 impl StageManager {
-    pub fn new(unit_size: usize) -> Self {
+    pub fn new() -> Self {
         StageManager {
-            cycle: 0,
-            stage: 0,
-            segment: 0,
-            unit_size,
-            luby_iter: LubySeries::default(),
-            max_scale_of_segment: 1,
-            scale: 1,
-            end_of_stage: unit_size,
-            next_is_new_segment: false,
-            cycle_starting_stage: 0,
-            segment_starting_stage: 0,
-            segment_starting_cycle: 0,
+            luby_iter: LubySegment::default(),
+            envelope_hight: 1,
+            end_of_span: 1,
+            next_is_new_envelope: false,
+            envelope_starting_segment: 1,
         }
     }
-    pub fn initialize(&mut self, unit_size: usize) {
-        self.cycle = 0;
-        self.unit_size = unit_size;
-        self.scale = 1;
-        self.max_scale_of_segment = 1;
-        self.end_of_stage = unit_size;
-        self.next_is_new_segment = true;
+    pub fn initialize(&mut self) {
+        self.envelope_hight = 1;
+        self.end_of_span = 1;
+        self.next_is_new_envelope = true;
     }
     pub fn reset(&mut self) {
-        self.cycle = 0;
-        self.scale = 1;
-        self.max_scale_of_segment = 1;
-        self.end_of_stage = self.unit_size;
-        self.next_is_new_segment = true;
+        self.luby_iter.reset();
+        self.envelope_hight = 1;
+        self.end_of_span = 1;
+        self.next_is_new_envelope = true;
     }
     /// returns:
-    /// - Some(true): it's a beginning of a new cycle and a new segment, a 2nd-level group.
-    /// - Some(false): a beginning of a new cycle.
+    /// - Some(true): it's a beginning of a new envelope, a 2nd-level group.
+    /// - Some(false): a beginning of a new segment.
     /// - None: the other case.
-    pub fn prepare_new_stage(&mut self, now: usize) -> Option<bool> {
-        let mut new_cycle = false;
+    pub fn prepare_new_span(&mut self, now: usize) -> Option<bool> {
         let mut new_segment = false;
-        self.scale = self.luby_iter.next_unchecked();
-        self.stage += 1;
-        if self.scale == 1 {
-            self.cycle += 1;
-            self.cycle_starting_stage = self.stage;
-            new_cycle = true;
-            if self.next_is_new_segment {
-                self.segment += 1;
-                self.max_scale_of_segment *= 2;
-                self.next_is_new_segment = false;
-                self.segment_starting_stage = self.stage;
-                self.segment_starting_cycle = self.cycle;
-                new_segment = true;
+        let mut new_envelope = false;
+        self.luby_iter.shift();
+        if self.luby_iter.segment_len() == 1 {
+            self.envelope_starting_segment = self.luby_iter.seg_index as usize;
+            new_segment = true;
+            if self.next_is_new_envelope {
+                self.envelope_hight += 1;
+                self.next_is_new_envelope = false;
+                new_envelope = true;
             }
         }
-        if self.max_scale_of_segment == self.scale {
-            self.next_is_new_segment = true;
+        if self.envelope_hight == self.luby_iter.segment_len() as usize {
+            self.next_is_new_envelope = true;
         }
-        let span = self.current_span();
-        self.end_of_stage = now + span;
-        new_cycle.then_some(new_segment)
+        self.end_of_span = now
+            .checked_add(self.current_span())
+            .expect("overflow at L57");
+        new_segment.then_some(new_envelope)
     }
-    pub fn stage_ended(&self, now: usize) -> bool {
-        self.end_of_stage == now
+    pub fn span_ended(&self, now: usize) -> bool {
+        self.end_of_span <= now
+    }
+    pub fn extend(&mut self, add: usize) {
+        self.end_of_span += add;
     }
     /// returns the number of conflicts in the current stage
     /// Note: we need not to make a strong correlation between this value and
     /// scale defined by Luby series. So this is fine.
     pub fn current_span(&self) -> usize {
-        self.cycle * self.unit_size
+        self.luby_iter.luby() as usize
     }
-    pub fn current_stage(&self) -> usize {
-        self.stage
+    pub fn current_segment(&self) -> usize {
+        self.luby_iter.seg_index as usize
     }
-    pub fn current_cycle(&self) -> usize {
-        self.cycle
+    pub fn envelop_index(&self) -> usize {
+        self.envelope_hight
     }
     /// returns the scaling factor used in the current span
-    pub fn current_scale(&self) -> usize {
-        self.scale
-    }
-    /// returns the current index for the level 2 segments
-    pub fn current_segment(&self) -> usize {
-        self.segment
+    pub fn current_segment_length(&self) -> usize {
+        self.luby_iter.segment_len() as usize
     }
     /// returns a recommending number of redicible learnt clauses, based on
     /// the length of span.
@@ -133,15 +95,12 @@ impl StageManager {
     /// This means it is the value found at the last segment.
     /// So the current value should be the next value, which is the double.
     pub fn max_scale(&self) -> usize {
-        self.max_scale_of_segment
+        self.envelope_hight
     }
-    pub fn cycle_starting_stage(&self) -> usize {
-        self.cycle_starting_stage
+    pub fn envelope_starting_segment(&self) -> usize {
+        self.envelope_starting_segment
     }
-    pub fn segment_starting_cycle(&self) -> usize {
-        self.segment_starting_cycle
-    }
-    pub fn segment_starting_stage(&self) -> usize {
-        self.segment_starting_stage
+    pub fn as_n(&self) -> usize {
+        self.luby_iter.as_n
     }
 }

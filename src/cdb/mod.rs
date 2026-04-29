@@ -4,8 +4,6 @@ mod activity;
 mod binary;
 /// methods on `ClauseDB`
 mod db;
-/// EMA
-mod ema;
 /// methods for Stochastic Local Search
 mod sls;
 /// methods for UNSAT certification
@@ -35,18 +33,6 @@ use {
 
 #[cfg(not(feature = "no_IO"))]
 use std::path::Path;
-
-#[derive(Clone, Debug)]
-pub enum ReductionType {
-    /// weight by Reverse Activity Sum over the added clauses
-    RASonADD(usize),
-    /// weight by Reverse Activito Sum over all learnt clauses
-    RASonALL(f64, f64),
-    /// weight by Literal Block Distance over the added clauses
-    LBDonADD(usize),
-    /// weight by Literal Block Distance over all learnt clauses
-    LBDonALL(u16, f64),
-}
 
 /// API for clause management like [`reduce`](`crate::cdb::ClauseDBIF::reduce`), [`new_clause`](`crate::cdb::ClauseDBIF::new_clause`), [`remove_clause`](`crate::cdb::ClauseDBIF::remove_clause`), and so on.
 pub trait ClauseDBIF:
@@ -103,8 +89,7 @@ pub trait ClauseDBIF:
     /// Note this removes an eliminated Lit `p` from a clause. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
     /// And this is called only from `Eliminator::strengthen_clause`.
-    fn new_clause(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
-    fn new_clause_sandbox(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>) -> RefClause;
+    fn new_clause(&mut self, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn remove_clause(&mut self, cid: ClauseId);
     /// un-register a clause `cid` from clause database and make the clause dead.
@@ -118,12 +103,14 @@ pub trait ClauseDBIF:
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, setting: ReductionType);
+    fn reduce(&mut self, asg: &mut impl AssignIF, envelope: usize);
     /// remove all learnt clauses.
     fn reset(&mut self);
     /// update flags.
     /// return `true` if it's learnt.
-    fn update_at_analysis(&mut self, asg: &impl AssignIF, cid: ClauseId) -> bool;
+    fn update_at_analysis(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> bool;
+    /// increment `num_lbd2` if the clause is a non-binary learnt clause with LBD ≤ 2.
+    fn check_lbd(&mut self, cid: ClauseId, lbd: DecisionLevel);
     /// record an asserted literal to unsat certification.
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.
@@ -139,24 +126,15 @@ pub trait ClauseDBIF:
     fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId>;
     /// minimize a clause.
     fn minimize_with_bi_clauses(&mut self, asg: &impl AssignIF, vec: &mut Vec<Lit>);
-    /// complete bi-clause network
-    fn complete_bi_clauses(&mut self, asg: &mut impl AssignIF);
 
     //
     //## for debug
     //
-    #[cfg(feature = "boundary_check")]
-    /// return true if cid is included in watching literals
-    fn watch_cache_contains(&self, lit: Lit, cid: ClauseId) -> bool;
-    #[cfg(feature = "boundary_check")]
-    /// return a clause's watches
-    fn watch_caches(&self, cid: ClauseId, message: &str) -> (Vec<Lit>, Vec<Lit>);
-    #[cfg(feature = "boundary_check")]
-    fn is_garbage_collected(&mut self, cid: ClauseId) -> Option<bool>;
+
     #[cfg(not(feature = "no_IO"))]
     /// dump all active clauses and assertions as a CNF file.
     fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);
-    fn clause_heatmap(&self) -> [[f64; 9]; 7];
+    fn clause_heatmap(&self, asg: &impl AssignIF) -> [[f64; 9]; 7];
 }
 
 pub mod property {
@@ -166,7 +144,6 @@ pub mod property {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tusize {
         NumBiClause,
-        NumBiClauseCompletion,
         NumBiLearnt,
         NumClause,
         NumLBD2,
@@ -176,9 +153,8 @@ pub mod property {
         Timestamp,
     }
 
-    pub const USIZES: [Tusize; 9] = [
+    pub const USIZES: [Tusize; 8] = [
         Tusize::NumBiClause,
-        Tusize::NumBiClauseCompletion,
         Tusize::NumBiLearnt,
         Tusize::NumClause,
         Tusize::NumLBD2,
@@ -194,7 +170,6 @@ pub mod property {
             match k {
                 Tusize::NumClause => self.num_clause,
                 Tusize::NumBiClause => self.num_bi_clause,
-                Tusize::NumBiClauseCompletion => self.num_bi_clause_completion,
                 Tusize::NumBiLearnt => self.num_bi_learnt,
                 Tusize::NumLBD2 => self.num_lbd2,
                 Tusize::NumLearnt => self.num_learnt,
@@ -290,32 +265,28 @@ mod tests {
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         // Now `asg.level` = [_, 1, 2, 3, 4, 5, 6].
         let c0 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
+            .new_clause(&mut vec![lit(1), lit(2), lit(3), lit(4)], false)
             .as_cid();
-        assert_eq!(cdb[c0].rank, 4);
+        assert_eq!(asg.literal_block_distance(&cdb[c0].lits), 4);
 
         asg.assign_by_decision(lit(-2)); // at level 1
         asg.assign_by_decision(lit(1)); // at level 2
         // Now `asg.level` = [_, 2, 1, 3, 4, 5, 6].
         let c1 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
+            .new_clause(&mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
         let c = &cdb[c1];
 
-        assert_eq!(c.rank, 3);
+        assert_eq!(asg.literal_block_distance(&c.lits), 3);
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
-        #[cfg(feature = "just_used")]
-        assert!(!c.is(Flag::USED));
         let c2 = cdb
-            .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
+            .new_clause(&mut vec![lit(-1), lit(2), lit(3)], true)
             .as_cid();
         let c = &cdb[c2];
-        assert_eq!(c.rank, 3);
+        assert_eq!(asg.literal_block_distance(&c.lits), 3);
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
-        #[cfg(feature = "just_used")]
-        assert!(!c.is(Flag::USED));
     }
     #[test]
     fn test_clause_equality() {
@@ -324,14 +295,12 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
-        let mut asg = AssignStack::instantiate(&config, &cnf);
+        // let asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
+            .new_clause(&mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
-        let c2 = cdb
-            .new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false)
-            .as_cid();
+        let c2 = cdb.new_clause(&mut vec![lit(-1), lit(4)], false).as_cid();
         // cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_ne!(c1, c2);
@@ -345,10 +314,10 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
-        let mut asg = AssignStack::instantiate(&config, &cnf);
+        // let asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
+            .new_clause(&mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
         assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
         let mut iter = cdb[c1][0..].iter();

@@ -84,16 +84,18 @@ pub fn eliminate_var(
                         None => {
                             debug_assert!(asg.assigned(lit).is_none());
                             cdb.certificate_add_assertion(lit);
-                            asg.assign_at_root_level(lit)?;
+                            asg.assign_at_root_level(cdb, lit)?;
                         }
                     }
                 }
                 _ => {
                     debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
-                    match cdb.new_clause(asg, vec, learnt_p && cdb[*n].is(FlagClause::LEARNT)) {
+                    match cdb.new_clause(vec, learnt_p && cdb[*n].is(FlagClause::LEARNT)) {
                         RefClause::Clause(ci) => {
                             // the merged clause might be a duplicated clause.
                             elim.add_cid_occur(asg, ci, &mut cdb[ci], true);
+                            let lbd = asg.literal_block_distance(&cdb[ci].lits);
+                            cdb.check_lbd(ci, lbd);
 
                             #[cfg(feature = "trace_elimination")]
                             println!(
@@ -131,7 +133,6 @@ pub fn eliminate_var(
     }
     elim[vi].clear();
     asg.handle(SolverEvent::Eliminate(vi));
-    state.restart.handle(SolverEvent::Eliminate(vi));
     elim.backward_subsumption_check(asg, cdb, timedout)
 }
 
@@ -358,15 +359,17 @@ mod tests {
         elim.prepare(asg, cdb, true);
         eliminate_var(asg, cdb, &mut elim, state, vi, &mut timedout).expect("panic");
         assert!(asg.var(vi).is(FlagVar::ELIMINATED));
-        assert!(cdb
-            .iter()
-            .skip(1)
-            .filter(|c| c.is_dead())
-            .all(|c| c.is_empty()));
-        assert!(cdb
-            .iter()
-            .skip(1)
-            .all(|c| c.iter().all(|l| *l != Lit::from((vi, false)))
-                && c.iter().all(|l| *l != Lit::from((vi, false)))));
+        assert!(
+            cdb.iter()
+                .skip(1)
+                .filter(|c| c.is_dead())
+                .all(|c| c.is_empty())
+        );
+        assert!(
+            cdb.iter()
+                .skip(1)
+                .all(|c| c.iter().all(|l| *l != Lit::from((vi, false)))
+                    && c.iter().all(|l| *l != Lit::from((vi, true))))
+        );
     }
 }
