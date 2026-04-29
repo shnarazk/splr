@@ -216,19 +216,19 @@ fn search(
     cdb: &mut ClauseDB,
     state: &mut State,
 ) -> Result<bool, SolverError> {
-    let mut current_core: usize = 999_999;
-    let mut core_was_rebuilt: Option<usize> = None;
-
-    // monotonic increment counter
     let mut span_len: usize = 1;
     let mut processing_pressure: usize = 0;
-    let mut ruduction_pressure: usize = 0;
     let processing_interval: usize = 40_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
-    let mut lbd_threshold: DecisionLevel = 0;
+    let mut reduction_pressure: usize = 0;
+    let reduction_interval: usize = 40_000;
     let mut switch_pressure: usize = 0;
     let switch_interval: usize = 20_000;
+
+    let mut lbd_threshold: DecisionLevel = 0;
+    let mut current_core: usize = asg.derefer(assign::property::Tusize::NumUnassignedVar);
+    let mut core_was_rebuilt: Option<usize> = None;
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -268,14 +268,14 @@ fn search(
             if lbd_threshold > lbd {
                 lbd_threshold = (lbd_threshold + lbd) / 2;
             }
-            ruduction_pressure += 1;
+            reduction_pressure += 1;
             processing_pressure += 1;
             switch_pressure += 1;
             cdb.lbd.update(lbd as f64);
         }
-        if ruduction_pressure >= processing_interval {
+        if reduction_pressure >= reduction_interval {
             cdb.reduce(asg, state.span_manager.envelop_index());
-            ruduction_pressure = 0;
+            reduction_pressure = 0;
             state.search_mode_ratio.0.update(0.0);
             state.search_mode_ratio.1.update(0.0);
             state.search_mode_ratio.2.update(0.0);
