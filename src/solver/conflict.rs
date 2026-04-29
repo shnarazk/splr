@@ -23,7 +23,7 @@ pub fn handle_conflict(
     cdb: &mut ClauseDB,
     state: &mut State,
     cc: &ConflictContext,
-) -> Result<ClauseId, SolverError> {
+) -> Result<(ClauseId, DecisionLevel), SolverError> {
     // `conflicting_level` should be calculated from cc.1 instead of cc.0.
     // Because the conflicting_literal has two values assigned at different levels.
     // We need larger one.
@@ -100,7 +100,7 @@ pub fn handle_conflict(
                     unreachable!("handle_conflict::root_level_conflict_by_assertion");
                 }
                 cdb.handle(SolverEvent::Assert(l0.vi()));
-                return Ok(ClauseId::default());
+                return Ok((ClauseId::default(), 0));
             }
         }
     }
@@ -197,8 +197,8 @@ pub fn handle_conflict(
     //     new_learnt.iter().skip(1).map(|l| asg.level(l.vi())).max(),
     //     Some(assign_level)
     // );
-    let ret: ClauseId;
-    match cdb.new_clause(asg, new_learnt, true) {
+    let ret: (ClauseId, DecisionLevel);
+    match cdb.new_clause(new_learnt, true) {
         RefClause::Clause(cid) if learnt_len == 2 => {
             debug_assert_eq!(l0, cdb[cid].lit0());
             debug_assert_eq!(l1, cdb[cid].lit1());
@@ -209,7 +209,7 @@ pub fn handle_conflict(
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
                 cdb[cid].used = cdb[cid].used.saturating_add(1);
             }
-            ret = cid;
+            ret = (cid, 1);
         }
         RefClause::Clause(cid) => {
             debug_assert_eq!(cdb[cid].lit0(), l0);
@@ -218,7 +218,9 @@ pub fn handle_conflict(
                 cdb[cid].used = cdb[cid].used.saturating_add(1);
                 cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
             }
-            ret = cid;
+            let d = asg.literal_block_distance(&cdb[cid].lits);
+            cdb.check_lbd(cid, d);
+            ret = (cid, d);
         }
         RefClause::RegisteredClause(cid) => {
             debug_assert_eq!(learnt_len, 2);
@@ -237,7 +239,7 @@ pub fn handle_conflict(
             //     }
             //     panic!("here we are!");
             // }
-            ret = cid;
+            ret = (cid, asg.literal_block_distance(&cdb[cid].lits));
             if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
                 cdb[cid].used = cdb[cid].used.saturating_add(1);

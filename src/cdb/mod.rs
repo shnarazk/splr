@@ -89,7 +89,7 @@ pub trait ClauseDBIF:
     /// Note this removes an eliminated Lit `p` from a clause. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
     /// And this is called only from `Eliminator::strengthen_clause`.
-    fn new_clause(&mut self, asg: &mut impl AssignIF, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
+    fn new_clause(&mut self, v: &mut Vec<Lit>, learnt: bool) -> RefClause;
     /// un-register a clause `cid` from clause database and make the clause dead.
     fn remove_clause(&mut self, cid: ClauseId);
     /// un-register a clause `cid` from clause database and make the clause dead.
@@ -109,6 +109,8 @@ pub trait ClauseDBIF:
     /// update flags.
     /// return `true` if it's learnt.
     fn update_at_analysis(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> bool;
+    /// increment `num_lbd2` if the clause is a non-binary learnt clause with LBD ≤ 2.
+    fn check_lbd(&mut self, cid: ClauseId, lbd: DecisionLevel);
     /// record an asserted literal to unsat certification.
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.
@@ -263,7 +265,7 @@ mod tests {
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         // Now `asg.level` = [_, 1, 2, 3, 4, 5, 6].
         let c0 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
+            .new_clause(&mut vec![lit(1), lit(2), lit(3), lit(4)], false)
             .as_cid();
         assert_eq!(asg.literal_block_distance(&cdb[c0].lits), 4);
 
@@ -271,7 +273,7 @@ mod tests {
         asg.assign_by_decision(lit(1)); // at level 2
         // Now `asg.level` = [_, 2, 1, 3, 4, 5, 6].
         let c1 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
+            .new_clause(&mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
         let c = &cdb[c1];
 
@@ -279,7 +281,7 @@ mod tests {
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
         let c2 = cdb
-            .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
+            .new_clause(&mut vec![lit(-1), lit(2), lit(3)], true)
             .as_cid();
         let c = &cdb[c2];
         assert_eq!(asg.literal_block_distance(&c.lits), 3);
@@ -293,14 +295,12 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
-        let mut asg = AssignStack::instantiate(&config, &cnf);
+        // let asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
+            .new_clause(&mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
-        let c2 = cdb
-            .new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false)
-            .as_cid();
+        let c2 = cdb.new_clause(&mut vec![lit(-1), lit(4)], false).as_cid();
         // cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_ne!(c1, c2);
@@ -314,10 +314,10 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
-        let mut asg = AssignStack::instantiate(&config, &cnf);
+        // let asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb
-            .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false)
+            .new_clause(&mut vec![lit(1), lit(2), lit(3)], false)
             .as_cid();
         assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
         let mut iter = cdb[c1][0..].iter();

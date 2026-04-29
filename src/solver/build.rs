@@ -276,7 +276,7 @@ impl Solver {
                 asg.assign_at_root_level(cdb, l0)
                     .map_or(RefClause::EmptyClause, |_| RefClause::UnitClause(l0))
             }
-            _ => cdb.new_clause(asg, lits, false),
+            _ => cdb.new_clause(lits, false),
         }
     }
     #[cfg(not(feature = "no_IO"))]

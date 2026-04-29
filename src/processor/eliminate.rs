@@ -90,10 +90,12 @@ pub fn eliminate_var(
                 }
                 _ => {
                     debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)));
-                    match cdb.new_clause(asg, vec, learnt_p && cdb[*n].is(FlagClause::LEARNT)) {
+                    match cdb.new_clause(vec, learnt_p && cdb[*n].is(FlagClause::LEARNT)) {
                         RefClause::Clause(ci) => {
                             // the merged clause might be a duplicated clause.
                             elim.add_cid_occur(asg, ci, &mut cdb[ci], true);
+                            let lbd = asg.literal_block_distance(&cdb[ci].lits);
+                            cdb.check_lbd(ci, lbd);
 
                             #[cfg(feature = "trace_elimination")]
                             println!(

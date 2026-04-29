@@ -247,7 +247,7 @@ fn search(
         {
             cdb.update_activity_tick();
         }
-        let cid = handle_conflict(asg, cdb, state, &cc)?;
+        let (cid, lbd) = handle_conflict(asg, cdb, state, &cc)?;
         if cid == ClauseId::default() {
             match asg.activity_scheme {
                 VarActivityScheme::LRB => {
@@ -262,7 +262,6 @@ fn search(
                 }
             }
         } else {
-            let lbd: DecisionLevel = asg.literal_block_distance(&cdb[cid].lits);
             debug_assert_ne!(lbd, 0);
             ruduction_pressure += 1;
             processing_pressure += 1;

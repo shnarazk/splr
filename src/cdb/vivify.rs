@@ -131,14 +131,16 @@ impl VivifyIF for ClauseDB {
                                     num_assert += 1;
                                 }
                                 _ => {
+                                    let new_ci = self.new_clause(&mut vec, is_learnt).is_new();
+                                    if is_learnt && let Some(ci) = new_ci {
+                                        let lbd = asg.literal_block_distance(&self[ci].lits);
+                                        self.check_lbd(ci, lbd);
+                                    }
+
                                     #[cfg(feature = "clause_rewarding")]
-                                    if let Some(ci) =
-                                        self.new_clause(asg, &mut vec, is_learnt).is_new()
-                                    {
+                                    if let Some(ci) = new_ci {
                                         self.set_activity(ci, cp.value());
                                     }
-                                    #[cfg(not(feature = "clause_rewarding"))]
-                                    self.new_clause(asg, &mut vec, is_learnt);
                                     self.remove_clause(cid);
                                     num_shrink += 1;
                                 }

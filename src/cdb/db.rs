@@ -316,12 +316,7 @@ impl ClauseDBIF for ClauseDB {
     fn swap_watch(&mut self, cid: ClauseId) {
         self[cid].lits.swap(0, 1);
     }
-    fn new_clause(
-        &mut self,
-        asg: &mut impl AssignIF,
-        vec: &mut Vec<Lit>,
-        learnt: bool,
-    ) -> RefClause {
+    fn new_clause(&mut self, vec: &mut Vec<Lit>, learnt: bool) -> RefClause {
         debug_assert!(!vec.is_empty());
         debug_assert!(1 < vec.len());
         debug_assert!(vec.iter().all(|l| !vec.contains(&!*l)), "{vec:?}");
@@ -374,7 +369,6 @@ impl ClauseDBIF for ClauseDB {
             num_clause,
             num_bi_clause,
             num_bi_learnt,
-            num_lbd2,
             num_learnt,
             binary_link,
 
@@ -391,19 +385,13 @@ impl ClauseDBIF for ClauseDB {
             c.timestamp = *tick;
         }
         let len2 = c.lits.len() == 2;
-        // cdb.lbd is updated only in `solver.search`; we need to track seach mode
-        // self.lbd.update(c.rank);
         *num_clause += 1;
-        let lbd = asg.literal_block_distance(&c.lits) as u16;
         if learnt {
             if len2 {
                 *num_bi_learnt += 1;
             } else {
                 c.turn_on(FlagClause::LEARNT);
                 *num_learnt += 1;
-                if lbd <= 2 {
-                    *num_lbd2 += 1;
-                }
             }
         }
         let l0 = c.lits[0];
@@ -880,6 +868,11 @@ impl ClauseDBIF for ClauseDB {
 
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
+    }
+    fn check_lbd(&mut self, cid: ClauseId, lbd: DecisionLevel) {
+        if lbd <= 2 && self[cid].is(FlagClause::LEARNT) {
+            self.num_lbd2 += 1;
+        }
     }
     fn update_at_analysis(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> bool {
         let c = &mut self.clause[NonZeroU32::get(cid.ordinal) as usize];
