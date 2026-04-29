@@ -246,14 +246,16 @@ fn search(
             cdb.update_activity_tick();
         }
         let cid = handle_conflict(asg, cdb, state, &cc)?;
-        let lbd: DecisionLevel = asg.literal_block_distance(&cdb[cid].lits);
-        match lbd.cmp(&1) {
-            std::cmp::Ordering::Less => (),
-            std::cmp::Ordering::Equal => (),
-            std::cmp::Ordering::Greater => {
-                ruduction_pressure += 1;
-                processing_pressure += 1;
-                cdb.lbd.update(lbd as f64);
+        if cid != ClauseId::default() {
+            let lbd: DecisionLevel = asg.literal_block_distance(&cdb[cid].lits);
+            match lbd.cmp(&1) {
+                std::cmp::Ordering::Less => (),
+                std::cmp::Ordering::Equal => (),
+                std::cmp::Ordering::Greater => {
+                    ruduction_pressure += 1;
+                    processing_pressure += 1;
+                    cdb.lbd.update(lbd as f64);
+                }
             }
         }
         if ruduction_pressure >= processing_interval {
