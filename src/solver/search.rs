@@ -221,12 +221,14 @@ fn search(
 
     // monotonic increment counter
     let mut span_len: usize = 1;
-    let cooling_len: usize = 20;
     let mut processing_pressure: usize = 0;
     let mut ruduction_pressure: usize = 0;
     let processing_interval: usize = 40_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
+    let mut lbd_threshold: DecisionLevel = 0;
+    let mut switch_pressure: usize = 0;
+    let switch_interval: usize = 20_000;
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -263,8 +265,12 @@ fn search(
             }
         } else {
             debug_assert_ne!(lbd, 0);
+            if lbd_threshold > lbd {
+                lbd_threshold = (lbd_threshold + lbd) / 2;
+            }
             ruduction_pressure += 1;
             processing_pressure += 1;
+            switch_pressure += 1;
             cdb.lbd.update(lbd as f64);
         }
         if ruduction_pressure >= processing_interval {
@@ -275,36 +281,41 @@ fn search(
             state.search_mode_ratio.2.update(0.0);
         }
 
-        if state
-            .span_manager
-            .span_ended(span_len.saturating_sub(cooling_len))
-        {
-            let cia = asg.conflict_interval_average.0.trend();
-            let cil = asg.conflict_interval_average.1.trend();
-            if (asg.activity_scheme != VarActivityScheme::VMTF && cia <= 1.0 && cil > 1.0)
-                || (asg.activity_scheme == VarActivityScheme::VMTF && cia >= 1.0 && cil < 1.0)
-            {
-                if asg.activity_scheme != VarActivityScheme::VMTF {
+        if state.span_manager.span_ended(span_len) {
+            let _cia = asg.conflict_interval_average.0.trend();
+            let _cil = asg.conflict_interval_average.1.trend();
+            /* cia <= 1.0 && cil > 1.0 */
+            match asg.activity_scheme {
+                VarActivityScheme::LRB if state.c_lvl.trend() > 2.5 => {
                     asg.activity_scheme = VarActivityScheme::VMTF;
                     asg.set_learning_rate(0.0);
                     asg.rebuild_order();
+                    RESTART!(asg, cdb, state);
+                    asg.clear_asserted_literals(cdb)?;
+                    lbd_threshold = 0;
+                    switch_pressure = 0;
                 }
-                RESTART!(asg, cdb, state);
-                asg.clear_asserted_literals(cdb)?;
-            } else if cia + cil >= 1.96 {
-                if asg.activity_scheme != VarActivityScheme::LRB {
+                /* cia + cil < 1.96 || */
+                VarActivityScheme::LRB if lbd >= lbd_threshold => {
+                    RESTART!(asg, cdb, state);
+                    asg.clear_asserted_literals(cdb)?;
+                    lbd_threshold = 0;
+                }
+                /* || state.c_lvl.trend() < 0.5 ; cia >= 1.0 && cil < 1.0 */
+                VarActivityScheme::VMTF if switch_pressure >= switch_interval => {
                     asg.activity_scheme = VarActivityScheme::LRB;
                     asg.set_learning_rate(state.config.vrw_learning_rate);
                     asg.rebuild_order();
+                    RESTART!(asg, cdb, state);
+                    asg.clear_asserted_literals(cdb)?;
+                    lbd_threshold = 0;
                 }
-            } else {
-                if asg.activity_scheme != VarActivityScheme::LRB {
-                    asg.activity_scheme = VarActivityScheme::LRB;
-                    asg.set_learning_rate(state.config.vrw_learning_rate);
-                    asg.rebuild_order();
+                VarActivityScheme::VMTF if lbd > lbd_threshold => {
+                    RESTART!(asg, cdb, state);
+                    asg.clear_asserted_literals(cdb)?;
+                    lbd_threshold = 0;
                 }
-                RESTART!(asg, cdb, state);
-                asg.clear_asserted_literals(cdb)?;
+                _ => {}
             }
             span_len = 0;
             let new_span = state.span_manager.prepare_new_span(span_len);

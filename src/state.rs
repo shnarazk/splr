@@ -158,8 +158,8 @@ impl Default for State {
                 Ema2::default().with_value(0.33),
                 Ema2::default().with_value(0.33),
             ),
-            b_lvl: Ema2::default(),
-            c_lvl: Ema2::default(),
+            b_lvl: Ema2::default_extended(),
+            c_lvl: Ema2::default_extended(),
             bt_drift_average: Ema::default().with_span(1000),
 
             #[cfg(feature = "chrono_BT")]
