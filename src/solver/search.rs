@@ -248,28 +248,25 @@ fn search(
             cdb.update_activity_tick();
         }
         let cid = handle_conflict(asg, cdb, state, &cc)?;
-        if cid != ClauseId::default() {
-            let lbd: DecisionLevel = asg.literal_block_distance(&cdb[cid].lits);
-            match lbd.cmp(&1) {
-                std::cmp::Ordering::Less => match asg.activity_scheme {
-                    VarActivityScheme::LRB => {
-                        state.search_mode_ratio.0.update(0.0);
-                        state.search_mode_ratio.1.update(1.0);
-                        state.search_mode_ratio.2.update(0.0);
-                    }
-                    VarActivityScheme::VMTF => {
-                        state.search_mode_ratio.0.update(0.0);
-                        state.search_mode_ratio.1.update(0.0);
-                        state.search_mode_ratio.2.update(1.0);
-                    }
-                },
-                std::cmp::Ordering::Equal => (),
-                std::cmp::Ordering::Greater => {
-                    ruduction_pressure += 1;
-                    processing_pressure += 1;
-                    cdb.lbd.update(lbd as f64);
+        if cid == ClauseId::default() {
+            match asg.activity_scheme {
+                VarActivityScheme::LRB => {
+                    state.search_mode_ratio.0.update(0.0);
+                    state.search_mode_ratio.1.update(1.0);
+                    state.search_mode_ratio.2.update(0.0);
+                }
+                VarActivityScheme::VMTF => {
+                    state.search_mode_ratio.0.update(0.0);
+                    state.search_mode_ratio.1.update(0.0);
+                    state.search_mode_ratio.2.update(1.0);
                 }
             }
+        } else {
+            let lbd: DecisionLevel = asg.literal_block_distance(&cdb[cid].lits);
+            debug_assert_ne!(lbd, 0);
+            ruduction_pressure += 1;
+            processing_pressure += 1;
+            cdb.lbd.update(lbd as f64);
         }
         if ruduction_pressure >= processing_interval {
             cdb.reduce(asg, state.span_manager.envelop_index());
