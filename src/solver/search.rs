@@ -4,7 +4,10 @@ use crate::assign::TrailSavingIF;
 use {
     super::{Certificate, Solver, SolverEvent, SolverResult, conflict::handle_conflict},
     crate::{
-        assign::{self, AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarSelectIF},
+        assign::{
+            self, AssignIF, AssignStack, PropagateIF, VarActivityScheme, VarManipulateIF,
+            VarSelectIF,
+        },
         cdb::{self, ClauseDB, ClauseDBIF, VivifyIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
@@ -224,7 +227,6 @@ fn search(
     let processing_interval: usize = 40_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
-    let mut focusing = false;
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -249,7 +251,18 @@ fn search(
         if cid != ClauseId::default() {
             let lbd: DecisionLevel = asg.literal_block_distance(&cdb[cid].lits);
             match lbd.cmp(&1) {
-                std::cmp::Ordering::Less => (),
+                std::cmp::Ordering::Less => match asg.activity_scheme {
+                    VarActivityScheme::LRB => {
+                        state.search_mode_ratio.0.update(0.0);
+                        state.search_mode_ratio.1.update(1.0);
+                        state.search_mode_ratio.2.update(0.0);
+                    }
+                    VarActivityScheme::VMTF => {
+                        state.search_mode_ratio.0.update(0.0);
+                        state.search_mode_ratio.1.update(0.0);
+                        state.search_mode_ratio.2.update(1.0);
+                    }
+                },
                 std::cmp::Ordering::Equal => (),
                 std::cmp::Ordering::Greater => {
                     ruduction_pressure += 1;
@@ -261,6 +274,9 @@ fn search(
         if ruduction_pressure >= processing_interval {
             cdb.reduce(asg, state.span_manager.envelop_index());
             ruduction_pressure = 0;
+            state.search_mode_ratio.0.update(0.0);
+            state.search_mode_ratio.1.update(0.0);
+            state.search_mode_ratio.2.update(0.0);
         }
 
         if state
@@ -269,35 +285,34 @@ fn search(
         {
             let cia = asg.conflict_interval_average.0.trend();
             let cil = asg.conflict_interval_average.1.trend();
-            if (!focusing && cia <= 1.0 && cil > 1.0) || (focusing && cia >= 1.0 && cil < 1.0) {
-                focusing = true;
+            if (asg.activity_scheme != VarActivityScheme::VMTF && cia <= 1.0 && cil > 1.0)
+                || (asg.activity_scheme == VarActivityScheme::VMTF && cia >= 1.0 && cil < 1.0)
+            {
+                if asg.activity_scheme != VarActivityScheme::VMTF {
+                    asg.activity_scheme = VarActivityScheme::VMTF;
+                    asg.set_learning_rate(0.0);
+                    asg.rebuild_order();
+                }
                 RESTART!(asg, cdb, state);
                 asg.clear_asserted_literals(cdb)?;
-                state.search_mode_ratio.0.update(1.0);
-                state.search_mode_ratio.1.update(0.0);
-                state.search_mode_ratio.2.update(0.0);
             } else if cia + cil >= 1.96 {
-                focusing = false;
-                state.search_mode_ratio.0.update(0.0);
-                state.search_mode_ratio.1.update(1.0);
-                state.search_mode_ratio.2.update(0.0);
+                if asg.activity_scheme != VarActivityScheme::LRB {
+                    asg.activity_scheme = VarActivityScheme::LRB;
+                    asg.set_learning_rate(state.config.vrw_learning_rate);
+                    asg.rebuild_order();
+                }
             } else {
-                focusing = false;
+                if asg.activity_scheme != VarActivityScheme::LRB {
+                    asg.activity_scheme = VarActivityScheme::LRB;
+                    asg.set_learning_rate(state.config.vrw_learning_rate);
+                    asg.rebuild_order();
+                }
                 RESTART!(asg, cdb, state);
                 asg.clear_asserted_literals(cdb)?;
-                state.search_mode_ratio.0.update(0.0);
-                state.search_mode_ratio.1.update(0.0);
-                state.search_mode_ratio.2.update(1.0);
             }
             span_len = 0;
             let new_span = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, cdb, state, new_span);
-            if focusing {
-                asg.set_learning_rate(0.0);
-            } else {
-                asg.set_learning_rate(state.config.vrw_learning_rate);
-            };
-            asg.use_conflict_order(focusing);
 
             if asg.decision_level() == asg.root_level {
                 #[cfg(feature = "rephase")]

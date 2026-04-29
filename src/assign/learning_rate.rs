@@ -1,10 +1,20 @@
 /// Var Rewarding based on Learning Rate Rewarding and Reason Side Rewarding
 use {super::stack::AssignStack, crate::types::*};
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub enum VarActivityScheme {
+    #[default]
+    LRB,
+    VMTF,
+}
+
 impl ActivityIF<VarId> for AssignStack {
     #[inline]
     fn activity(&self, vi: VarId) -> f64 {
-        self.var[vi].reward
+        match self.activity_scheme {
+            VarActivityScheme::LRB => self.var[vi].reward,
+            VarActivityScheme::VMTF => self.var[vi].last_conflict as f64,
+        }
     }
     // fn activity_slow(&self, vi: VarId) -> f64 {
     //     self.var[vi].reward_ema.get()

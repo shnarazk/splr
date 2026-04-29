@@ -6,7 +6,7 @@ use crate::assign::TrailSavingIF;
 use {
     super::State,
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
+        assign::{AssignIF, AssignStack, PropagateIF, VarActivityScheme, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
     },
@@ -158,7 +158,7 @@ pub fn handle_conflict(
     {
         Some(true)
     } else if cfg!(feature = "BT_deepen")
-        && !asg.ordering_by_conflict
+        && asg.activity_scheme != VarActivityScheme::VMTF
         && assign_level > 0
         && new_learnt.len() > 2
         && new_learnt

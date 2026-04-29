@@ -1,7 +1,10 @@
 //! main struct AssignStack
 use {
-    super::{AssignIF, Var, heap::VarHeapIF, heap::VarIdHeap},
-    crate::{cdb::ClauseDBIF, types::*},
+    super::{
+        AssignIF, Var,
+        heap::{VarHeapIF, VarIdHeap},
+    },
+    crate::{assign::learning_rate::VarActivityScheme, cdb::ClauseDBIF, types::*},
     std::{
         fmt,
         ops::Range,
@@ -91,12 +94,12 @@ pub struct AssignStack {
     //
     //## Var Rewarding
     //
+    /// active var activity scheme
+    pub(crate) activity_scheme: VarActivityScheme,
     /// var activity decay
     pub(super) activity_stay_rate: f64,
     /// its diff
     pub(super) activity_learning_rate: f64,
-    /// ordering_mode
-    pub(crate) ordering_by_conflict: bool,
 }
 
 impl Default for AssignStack {
@@ -146,8 +149,8 @@ impl Default for AssignStack {
 
             activity_stay_rate: 0.94,
 
+            activity_scheme: VarActivityScheme::default(),
             activity_learning_rate: 0.06,
-            ordering_by_conflict: false,
         }
     }
 }
@@ -309,9 +312,6 @@ impl AssignIF for AssignStack {
         }
         false
     }
-    fn ordering_by_reward(&self) -> bool {
-        !self.ordering_by_conflict
-    }
     fn literal_block_distance(&mut self, lits: &[Lit]) -> DecisionLevel {
         if 8192 <= lits.len() {
             return u16::MAX as DecisionLevel;
@@ -337,6 +337,9 @@ impl AssignIF for AssignStack {
             .map(|l| self.var[l.vi()].level)
             .collect::<std::collections::HashSet<_>>()
             .len()
+    }
+    fn activity_scheme(&self) -> &VarActivityScheme {
+        &self.activity_scheme
     }
 }
 

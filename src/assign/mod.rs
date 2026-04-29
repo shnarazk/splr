@@ -15,6 +15,7 @@ mod stack;
 mod trail_saving;
 
 pub use self::{
+    learning_rate::VarActivityScheme,
     propagate::PropagateIF,
     property::*,
     select::VarSelectIF,
@@ -81,8 +82,8 @@ pub trait AssignIF:
     fn literal_block_distance(&mut self, lits: &[Lit]) -> DecisionLevel;
     /// compute Literal Block Distance (LBD) of a slice of literals under the current immutable assignment.
     fn literal_block_distance_(&self, lits: &[Lit]) -> usize;
-    /// return ordering mode
-    fn ordering_by_reward(&self) -> bool;
+    /// return current var activity scheme
+    fn activity_scheme(&self) -> &VarActivityScheme;
 }
 
 /// Reasons of assignments
