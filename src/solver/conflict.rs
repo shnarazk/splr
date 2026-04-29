@@ -333,8 +333,9 @@ fn conflict_analyze(
         }
     }
     let mut trail_index = asg.stack_len() - 1;
-    let mut max_lbd: u16 = 0;
-    let mut cid_with_max_lbd: Option<ClauseId> = None;
+    if let AssignReason::Implication(cid) = cc.1 {
+        cdb.update_at_analysis(asg, cid);
+    }
     loop {
         match reason {
             AssignReason::BinaryLink(l) => {
@@ -375,13 +376,9 @@ fn conflict_analyze(
                 );
                 debug_assert!(!cdb[cid].is_dead() && 2 < cdb[cid].len());
                 // if !cdb.update_at_analysis(asg, cid) {
-                if !cdb[cid].is(FlagClause::LEARNT) {
-                    // cdb[cid].used = cdb[cid].used.saturating_add(1);
-                }
-                if max_lbd < cdb[cid].rank {
-                    max_lbd = cdb[cid].rank;
-                    cid_with_max_lbd = Some(cid);
-                }
+                // if !cdb[cid].is(FlagClause::LEARNT) {
+                //     cdb[cid].used = cdb[cid].used.saturating_add(1);
+                // }
                 for q in cdb[cid].iter().skip(1) {
                     let vi = q.vi();
                     debug_assert!(asg.var(vi).assign.is_some());
@@ -454,9 +451,6 @@ fn conflict_analyze(
         debug_assert!(0 < trail_index);
         trail_index -= 1;
         reason = asg.reason(p.vi());
-    }
-    if let Some(cid) = cid_with_max_lbd {
-        cdb.update_at_analysis(asg, cid);
     }
     // debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);

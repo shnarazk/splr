@@ -134,7 +134,7 @@ pub trait ClauseDBIF:
     #[cfg(not(feature = "no_IO"))]
     /// dump all active clauses and assertions as a CNF file.
     fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path);
-    fn clause_heatmap(&self) -> [[f64; 9]; 7];
+    fn clause_heatmap(&self, asg: &impl AssignIF) -> [[f64; 9]; 7];
 }
 
 pub mod property {
@@ -267,7 +267,7 @@ mod tests {
         let c0 = cdb
             .new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3), lit(4)], false)
             .as_cid();
-        assert_eq!(cdb[c0].rank, 4);
+        assert_eq!(asg.literal_block_distance(&cdb[c0].lits), 4);
 
         asg.assign_by_decision(lit(-2)); // at level 1
         asg.assign_by_decision(lit(1)); // at level 2
@@ -277,14 +277,14 @@ mod tests {
             .as_cid();
         let c = &cdb[c1];
 
-        assert_eq!(c.rank, 3);
+        assert_eq!(asg.literal_block_distance(&c.lits), 3);
         assert!(!c.is_dead());
         assert!(!c.is(FlagClause::LEARNT));
         let c2 = cdb
             .new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true)
             .as_cid();
         let c = &cdb[c2];
-        assert_eq!(c.rank, 3);
+        assert_eq!(asg.literal_block_distance(&c.lits), 3);
         assert!(!c.is_dead());
         assert!(c.is(FlagClause::LEARNT));
     }

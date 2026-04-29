@@ -392,21 +392,17 @@ impl ClauseDBIF for ClauseDB {
             c.timestamp = *tick;
         }
         let len2 = c.lits.len() == 2;
-        if len2 {
-            c.rank = 1;
-        } else {
-            c.rank = asg.literal_block_distance(&c.lits) as u16;
-        }
         // cdb.lbd is updated only in `solver.search`; we need to track seach mode
         // self.lbd.update(c.rank);
         *num_clause += 1;
+        let lbd = asg.literal_block_distance(&c.lits) as u16;
         if learnt {
             if len2 {
                 *num_bi_learnt += 1;
             } else {
                 c.turn_on(FlagClause::LEARNT);
                 *num_learnt += 1;
-                if c.rank <= 2 {
+                if lbd <= 2 {
                     *num_lbd2 += 1;
                 }
             }
@@ -891,7 +887,6 @@ impl ClauseDBIF for ClauseDB {
         // Updating LBD at every analysis seems redundant.
         // But it's crucial. Don't remove the below.
         let rank = asg.literal_block_distance(&c.lits) as usize;
-        c.rank = rank as u16;
         let learnt = c.is(FlagClause::LEARNT);
         if learnt {
             #[cfg(feature = "clause_rewarding")]
@@ -903,7 +898,7 @@ impl ClauseDBIF for ClauseDB {
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, _asg: &mut impl AssignIF, envelope: usize) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, envelope: usize) {
         let ClauseDB {
             clause,
             // lbd_temp,
@@ -946,7 +941,8 @@ impl ClauseDBIF for ClauseDB {
                 c.used = 0;
                 continue;
             }
-            perm.push(OrderedProxy::new(i, c.rank as f64));
+            let lbd = asg.literal_block_distance(&c.lits);
+            perm.push(OrderedProxy::new(i, lbd as f64));
             c.used = 0;
         }
         let keep = perm
@@ -1066,15 +1062,20 @@ impl ClauseDBIF for ClauseDB {
                 .unwrap();
         }
     }
-    fn clause_heatmap(&self) -> [[f64; 9]; 7] {
-        let mut stats: HashMap<(u16, u32), usize> = HashMap::new();
+    fn clause_heatmap(&self, asg: &impl AssignIF) -> [[f64; 9]; 7] {
+        let mut stats: HashMap<(usize, u32), usize> = HashMap::new();
         let mut nc = 0;
         for c in self.clause.iter() {
             if !c.is_dead() {
                 nc += 1;
                 let u = c.used.saturating_add(1).ilog2().min(7);
                 *stats
-                    .entry((c.rank.min(7).saturating_sub(1), u))
+                    .entry((
+                        asg.literal_block_distance_(&c.lits)
+                            .min(7)
+                            .saturating_sub(1),
+                        u,
+                    ))
                     .or_default() += 1;
             }
         }
@@ -1083,7 +1084,7 @@ impl ClauseDBIF for ClauseDB {
         for (i, r) in ret.iter_mut().enumerate() {
             let mut subtotal = 0;
             for j in 0..8 {
-                if let Some(k) = stats.get(&((i as u16), j)) {
+                if let Some(k) = stats.get(&(i, j)) {
                     subtotal += k;
                     r[j as usize + 1] = (*k as f64) / total;
                 }

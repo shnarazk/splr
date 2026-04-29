@@ -14,8 +14,6 @@ pub struct Clause {
     pub(crate) lits: Vec<Lit>,
     /// Flags (8 bits)
     pub(crate) flags: FlagClause,
-    /// A static clause evaluation criterion like LBD, NDD, or something.
-    pub rank: u16,
     /// The number of propagation.
     pub used: u16,
     /// the index from which `propagate` starts searching an un-falsified literal.
@@ -58,7 +56,6 @@ impl Default for Clause {
         Clause {
             lits: vec![],
             flags: FlagClause::empty(),
-            rank: 0,
             used: 0,
             search_from: 2,
 

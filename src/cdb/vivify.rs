@@ -190,7 +190,7 @@ fn select_targets(
     if initial_stage {
         let mut seen: Vec<Option<OrderedProxy<ClauseId>>> = vec![None; 2 * (asg.num_vars + 1)];
         for (i, c) in cdb.iter().enumerate().skip(1) {
-            if let Some(rank) = c.to_vivify(None) {
+            if let Some(rank) = c.to_vivify(0) {
                 let p = &mut seen[usize::from(c.lit0())];
                 if p.as_ref().map_or(0.0, |r| r.value()) < rank {
                     *p = Some(OrderedProxy::new(ClauseId::from(i), rank));
@@ -214,7 +214,7 @@ fn select_targets(
             .enumerate()
             .skip(1)
             .filter_map(|(i, c)| {
-                c.to_vivify(Some(n as u16)).and_then(|r| {
+                c.to_vivify(n).and_then(|r| {
                     if r == 0.0 {
                         skips += 1;
                         None
@@ -344,27 +344,8 @@ impl AssignStack {
 impl Clause {
     /// return `true` if the clause should try vivification.
     /// smaller is better.
-    fn to_vivify(&self, initial_stage: Option<u16>) -> Option<f64> {
-        if let Some(n) = initial_stage {
-            if n == 0 {
-                (
-                    !self.is_dead() && self.rank <= 4
-                    // && (self.rank as usize) * 2 <= self.len()
-                    // && self.is(FlagClause::LEARNT)
-                )
-                .then(|| -((self.len() as f64 - self.rank as f64) / self.rank as f64))
-            } else {
-                (!self.is_dead() && self.rank == n && self.used >= 4).then(|| {
-                    if (self.rank as usize) < self.len() {
-                        -(self.len() as f64) / self.rank as f64
-                    } else {
-                        0.0
-                    }
-                })
-            }
-        } else {
-            (!self.is_dead()).then(|| self.len() as f64)
-        }
+    fn to_vivify(&self, n: usize) -> Option<f64> {
+        (!self.is_dead() && self.len() == n).then(|| self.len() as f64)
     }
     /// clear flags about vivification
     fn vivified(&mut self) {}

@@ -79,6 +79,8 @@ pub trait AssignIF:
     fn satisfies(&self, c: &[Lit]) -> bool;
     /// compute Literal Block Distance (LBD) of a slice of literals under the current assignment.
     fn literal_block_distance(&mut self, lits: &[Lit]) -> DecisionLevel;
+    /// compute Literal Block Distance (LBD) of a slice of literals under the current immutable assignment.
+    fn literal_block_distance_(&self, lits: &[Lit]) -> usize;
     /// return ordering mode
     fn ordering_by_reward(&self) -> bool;
 }

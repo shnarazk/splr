@@ -384,7 +384,10 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
         )?;
     }
     {
-        let heatmap = s.cdb.clause_heatmap();
+        let heatmap = {
+            let Solver { asg, cdb, .. } = s;
+            cdb.clause_heatmap(asg)
+        };
         for (i, l) in heatmap.iter().enumerate() {
             let columns = l
                 .iter()

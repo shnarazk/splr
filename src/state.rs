@@ -645,7 +645,7 @@ impl StateIF for State {
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
         if self.config.show_cdb_heatmap {
             let big_change = 0.002;
-            let heatmap = cdb.clause_heatmap();
+            let heatmap = cdb.clause_heatmap(asg);
             for (i, l) in heatmap.iter().enumerate() {
                 let row_label = match i {
                     0 => LogF64Id::CdbHeatmap0,

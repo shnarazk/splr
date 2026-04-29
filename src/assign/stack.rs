@@ -213,26 +213,6 @@ impl AssignIF for AssignStack {
     fn root_level(&self) -> DecisionLevel {
         self.root_level
     }
-    fn literal_block_distance(&mut self, lits: &[Lit]) -> DecisionLevel {
-        if 8192 <= lits.len() {
-            return u16::MAX as DecisionLevel;
-        }
-        let key: usize = self.lbd_temp[0] + 1;
-        self.lbd_temp[0] = key;
-        let mut cnt: DecisionLevel = 0;
-        for l in lits {
-            let lv = self.level(l.vi());
-            if lv == 0 {
-                continue;
-            }
-            let p = &mut self.lbd_temp[lv as usize];
-            if *p != key {
-                *p = key;
-                cnt += 1;
-            }
-        }
-        cnt
-    }
     fn stack(&self, i: usize) -> Lit {
         self.trail[i]
     }
@@ -331,6 +311,32 @@ impl AssignIF for AssignStack {
     }
     fn ordering_by_reward(&self) -> bool {
         !self.ordering_by_conflict
+    }
+    fn literal_block_distance(&mut self, lits: &[Lit]) -> DecisionLevel {
+        if 8192 <= lits.len() {
+            return u16::MAX as DecisionLevel;
+        }
+        let key: usize = self.lbd_temp[0] + 1;
+        self.lbd_temp[0] = key;
+        let mut cnt: DecisionLevel = 0;
+        for l in lits {
+            let lv = self.level(l.vi());
+            if lv == 0 {
+                continue;
+            }
+            let p = &mut self.lbd_temp[lv as usize];
+            if *p != key {
+                *p = key;
+                cnt += 1;
+            }
+        }
+        cnt
+    }
+    fn literal_block_distance_(&self, lits: &[Lit]) -> usize {
+        lits.iter()
+            .map(|l| self.var[l.vi()].level)
+            .collect::<std::collections::HashSet<_>>()
+            .len()
     }
 }
 

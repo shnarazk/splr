@@ -51,7 +51,6 @@ impl TrailSavingIF for AssignStack {
         }
     }
     fn reuse_saved_trail(&mut self, cdb: &mut impl ClauseDBIF) -> PropagationResult {
-        let q = cdb.derefer(crate::cdb::property::Tf64::LiteralBlockEntanglement) as u16;
         let dl = self.decision_level();
 
         for i in (0..self.trail_saved.len()).rev() {
@@ -71,10 +70,6 @@ impl TrailSavingIF for AssignStack {
                 (None, AssignReason::Implication(c)) if cdb[c].is_dead() => {
                     // The clause was removed (by reduce, vivify, or simplification)
                     // between saving and reusing the trail. Stop reusing from here.
-                    self.insert_heap(vi);
-                    return self.truncate_trail_saved(i + 1);
-                }
-                (None, AssignReason::Implication(c)) if q < cdb[c].rank => {
                     self.insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
