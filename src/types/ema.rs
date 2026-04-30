@@ -143,6 +143,11 @@ impl Ema {
         self.sca = 1.0 / (len as f64);
         self
     }
+    pub fn set_to(&mut self, span: usize, val: f64) {
+        self.sca = 1.0 / (span as f64);
+        self.val.fast = val;
+        self.val.slow = val;
+    }
 }
 
 /// Exponential Moving Average pair, with a calibrator if feature `EMA_calibration` is on.
