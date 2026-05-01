@@ -26,8 +26,16 @@ macro_rules! var_assign {
 
 /// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
-    // fn save_current_assignment(&self, phases: &mut [bool]);
-    // fn load_assignment(&mut self, phases: &[bool], flip: bool) -> Vec<bool>;
+    /// return a new vector to store phases.
+    fn new_phases_store(&self) -> Vec<Option<bool>>;
+    /// copy the current best phases to `phases`.
+    fn save_best_phases(&self, phases: &mut [bool]);
+    /// copy the current assignments to `phases`.
+    fn save_current_phases(&self, phases: &mut [bool]);
+    /// set `VarFlag::PHASE`s from `phases`.
+    fn load_phases(&mut self, phases: &[bool], flip: bool);
+    /// randomize `VarFlag::PHASE`s.
+    fn randomize_phases(&mut self);
     /// select rephasing target
     fn select_rephasing_target(&mut self);
     /// check the consistency
@@ -41,6 +49,39 @@ pub trait VarSelectIF {
 }
 
 impl VarSelectIF for AssignStack {
+    fn new_phases_store(&self) -> Vec<Option<bool>> {
+        vec![None; self.num_vars + 1]
+    }
+    fn save_best_phases(&self, phases: &mut [bool]) {
+        for (i, (a, _)) in self.best_phases.iter() {
+            phases[*i] = *a;
+        }
+    }
+    fn save_current_phases(&self, phases: &mut [bool]) {
+        for (i, v) in self.var.iter().enumerate().skip(1) {
+            phases[i] = v.assign.unwrap_or_default();
+        }
+    }
+    fn load_phases(&mut self, phases: &[bool], flip: bool) {
+        for (i, v) in self.var.iter_mut().enumerate().skip(1) {
+            if !v.is(FlagVar::ELIMINATED) && v.reason != AssignReason::Decision(0) {
+                v.assign = Some(phases[i] ^ flip);
+            }
+        }
+    }
+    fn randomize_phases(&mut self) {
+        let mut seed = self.num_vars + self.num_conflict;
+        seed = seed.saturating_mul(seed);
+        for (i, v) in self.var.iter_mut().enumerate().skip(1) {
+            if v.is(FlagVar::ELIMINATED) || v.reason == AssignReason::Decision(0) {
+                seed = seed.saturating_mul(7);
+            } else {
+                seed = seed.saturating_add(i + v.level as usize);
+                seed = seed.rotate_left(13);
+                v.assign = Some(seed.is_multiple_of(2));
+            }
+        }
+    }
     fn select_rephasing_target(&mut self) {
         if self.best_phases.is_empty() {
             return;
