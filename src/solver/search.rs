@@ -315,8 +315,10 @@ fn search(
                 _ => (),
             }
             if asg.decision_level() == asg.root_level {
-                #[cfg(feature = "rephase")]
-                if !focusing && state.span_manager.current_span() == 1 {
+                if cfg!(feature = "rephase")
+                    && asg.activity_scheme == VarActivityScheme::LRB
+                    && state.span_manager.current_span() == 1
+                {
                     asg.select_rephasing_target();
                 }
                 if processing_pressure >= processing_interval {

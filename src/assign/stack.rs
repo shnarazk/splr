@@ -49,8 +49,6 @@ pub struct AssignStack {
 
     #[cfg(feature = "best_phases_tracking")]
     pub(super) best_phases: HashMap<VarId, (bool, AssignReason)>,
-    #[cfg(feature = "rephase")]
-    pub(super) phase_age: usize,
 
     //## Elimanated vars
     //
@@ -125,8 +123,6 @@ impl Default for AssignStack {
 
             #[cfg(feature = "best_phases_tracking")]
             best_phases: HashMap::new(),
-            #[cfg(feature = "rephase")]
-            phase_age: 0,
 
             eliminated: Vec::new(),
 
@@ -249,10 +245,6 @@ impl AssignIF for AssignStack {
     }
     fn best_assigned(&mut self) -> Option<usize> {
         (self.build_best_at == self.num_propagation).then_some(self.num_vars - self.num_best_assign)
-    }
-    #[cfg(feature = "rephase")]
-    fn best_phases_invalid(&self) -> bool {
-        self.best_phases.is_empty()
     }
     #[allow(unused_variables)]
     fn extend_model(&mut self, cdb: &mut impl ClauseDBIF) -> Vec<Option<bool>> {

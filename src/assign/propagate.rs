@@ -718,9 +718,5 @@ impl AssignStack {
             }
         }
         self.build_best_at = self.num_propagation;
-        #[cfg(feature = "rephase")]
-        {
-            self.phase_age = 0;
-        }
     }
 }

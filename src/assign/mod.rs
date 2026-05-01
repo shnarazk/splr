@@ -71,9 +71,6 @@ pub trait AssignIF:
     fn assign_ref(&self) -> Vec<Option<bool>>;
     /// return the largest number of assigned vars.
     fn best_assigned(&mut self) -> Option<usize>;
-    /// return `true` if no best_phases
-    #[cfg(feature = "rephase")]
-    fn best_phases_invalid(&self) -> bool;
     /// inject assignments for eliminated vars.
     fn extend_model(&mut self, c: &mut impl ClauseDBIF) -> Vec<Option<bool>>;
     /// return `true` if the set of literals is satisfiable under the current assignment.
