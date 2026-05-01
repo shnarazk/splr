@@ -292,7 +292,7 @@ fn search(
             let new_span = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, cdb, state, new_span);
             match asg.activity_scheme {
-                VarActivityScheme::LRB if biclause_at - asg.num_conflict <= 2 => {
+                VarActivityScheme::LRB if asg.num_conflict - biclause_at <= 3 => {
                     asg.activity_scheme = VarActivityScheme::VMTF;
                     switch_pressure = 0;
                     asg.set_learning_rate(0.0); // Don't change this
