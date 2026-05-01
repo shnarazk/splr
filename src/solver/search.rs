@@ -218,17 +218,18 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut span_len: usize = 1;
     let mut processing_pressure: usize = 0;
-    let processing_interval: usize = 40_000;
+    let processing_interval: usize = 10_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
     let mut reduction_pressure: usize = 0;
     let reduction_interval: usize = 40_000;
     let mut switch_pressure: usize = 0;
-    let switch_interval: usize = 20_000;
+    let switch_interval: usize = 10_000;
 
-    let mut lbd_threshold: DecisionLevel = 0;
+    let mut lbd_ema: Ema2 = Ema2::default().with_fast(4).with_slow(10);
     let mut current_core: usize = asg.derefer(assign::property::Tusize::NumUnassignedVar);
     let mut core_was_rebuilt: Option<usize> = None;
+    let mut biclause_at: usize = 0;
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -263,16 +264,20 @@ fn search(
                     state.search_mode_ratio.2.update(1.0);
                 }
             }
+            processing_pressure += 1;
         } else {
             debug_assert_ne!(lbd, 0);
-            if lbd_threshold > lbd {
-                lbd_threshold = (lbd_threshold + lbd) / 2;
-            }
             reduction_pressure += 1;
-            processing_pressure += 1;
+            if lbd <= 6 {
+                processing_pressure += 1;
+                if lbd <= 2 && cdb[cid].len() == 2 {
+                    biclause_at = asg.num_conflict;
+                }
+            }
             switch_pressure += 1;
             cdb.lbd.update(lbd as f64);
         }
+        lbd_ema.update(lbd as f64);
         if reduction_pressure >= reduction_interval {
             cdb.reduce(asg, state.span_manager.envelop_index());
             reduction_pressure = 0;
@@ -280,53 +285,39 @@ fn search(
             state.search_mode_ratio.1.update(0.0);
             state.search_mode_ratio.2.update(0.0);
         }
-
-        if state.span_manager.span_ended(span_len) {
-            let _cia = asg.conflict_interval_average.0.trend();
-            let _cil = asg.conflict_interval_average.1.trend();
-            /* cia <= 1.0 && cil > 1.0 */
+        let _cia = asg.conflict_interval_average.0.trend();
+        let _cil = asg.conflict_interval_average.1.trend();
+        if state.span_manager.span_ended(span_len.saturating_sub(10)) {
+            span_len = 0;
+            let new_span = state.span_manager.prepare_new_span(span_len);
+            dump_stage(asg, cdb, state, new_span);
             match asg.activity_scheme {
-                VarActivityScheme::LRB if state.c_lvl.trend() > 2.5 => {
+                VarActivityScheme::LRB if biclause_at - asg.num_conflict <= 2 => {
                     asg.activity_scheme = VarActivityScheme::VMTF;
-                    asg.set_learning_rate(0.0);
-                    asg.rebuild_order();
-                    RESTART!(asg, cdb, state);
-                    asg.clear_asserted_literals(cdb)?;
-                    lbd_threshold = 0;
                     switch_pressure = 0;
+                    asg.set_learning_rate(0.0); // Don't change this
+                    asg.rebuild_order();
+                    state.flush("");
+                    state.flush("to VMTF");
                 }
-                /* cia + cil < 1.96 || */
-                VarActivityScheme::LRB if lbd >= lbd_threshold => {
-                    RESTART!(asg, cdb, state);
-                    asg.clear_asserted_literals(cdb)?;
-                    lbd_threshold = 0;
-                }
-                /* || state.c_lvl.trend() < 0.5 ; cia >= 1.0 && cil < 1.0 */
                 VarActivityScheme::VMTF if switch_pressure >= switch_interval => {
                     asg.activity_scheme = VarActivityScheme::LRB;
                     asg.set_learning_rate(state.config.vrw_learning_rate);
                     asg.rebuild_order();
+                    state.flush("");
+                    state.flush("to LRB");
+                }
+                VarActivityScheme::VMTF => {}
+                VarActivityScheme::LRB if lbd_ema.trend() > 1.0 => {
                     RESTART!(asg, cdb, state);
                     asg.clear_asserted_literals(cdb)?;
-                    lbd_threshold = 0;
                 }
-                VarActivityScheme::VMTF if lbd > lbd_threshold => {
-                    RESTART!(asg, cdb, state);
-                    asg.clear_asserted_literals(cdb)?;
-                    lbd_threshold = 0;
-                }
-                _ => {}
+                _ => (),
             }
-            span_len = 0;
-            let new_span = state.span_manager.prepare_new_span(span_len);
-            dump_stage(asg, cdb, state, new_span);
-
             if asg.decision_level() == asg.root_level {
                 #[cfg(feature = "rephase")]
-                {
-                    if !focusing && state.span_manager.current_span() == 1 {
-                        asg.select_rephasing_target();
-                    }
+                if !focusing && state.span_manager.current_span() == 1 {
+                    asg.select_rephasing_target();
                 }
                 if processing_pressure >= processing_interval {
                     if cfg!(feature = "clause_vivification") {

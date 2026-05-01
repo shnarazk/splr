@@ -116,7 +116,7 @@ impl Default for AssignStack {
 
             num_reconflict: 0,
             num_repropagation: 0,
-            conflict_interval_average: (Ema2::default(), Ema2::default()),
+            conflict_interval_average: (Ema2::default(), Ema2::default_extended()),
             best_assign: false,
             build_best_at: 0,
             num_best_assign: 0,
