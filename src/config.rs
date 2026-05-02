@@ -116,7 +116,7 @@ impl Default for Config {
             elm_grw_lim: 0,
             elm_var_occ: 20000,
 
-            vrw_learning_rate: 0.01,
+            vrw_learning_rate: 0.02,
         }
     }
 }
@@ -246,8 +246,6 @@ impl Config {
         }
         if help {
             let features = [
-                #[cfg(feature = "best_phases_tracking")]
-                "best phase tracking",
                 #[cfg(feature = "chrono_BT")]
                 "chrono BT",
                 #[cfg(feature = "clause_elimination")]

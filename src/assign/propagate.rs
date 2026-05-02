@@ -1,7 +1,7 @@
 // implement boolean constraint propagation, backjump
 // This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{AssignIF, AssignStack, VarManipulateIF, heap::VarHeapIF},
+    super::{AssignIF, AssignStack, PhaseRotation, VarManipulateIF, heap::VarHeapIF},
     crate::{cdb::ClauseDBIF, types::*},
 };
 
@@ -237,7 +237,30 @@ impl PropagateIF for AssignStack {
             let v = &mut self.var[vi];
             #[cfg(feature = "trace_propagation")]
             v.turn_off(FlagVar::PROPAGATED);
-            v.set(FlagVar::PHASE, v.assign.unwrap());
+            if cfg!(feature = "rephase") {
+                if !v.is(FlagVar::ELIMINATED) && v.reason != AssignReason::Decision(0) {
+                    v.set(
+                        FlagVar::PHASE,
+                        match self.phase_mode {
+                            PhaseRotation::Walk => v.assign.unwrap(),
+                            PhaseRotation::Original => false,
+                            PhaseRotation::Inverted => true,
+                            PhaseRotation::Best => {
+                                self.best_phases
+                                    .get(&vi)
+                                    .unwrap_or(&(false, AssignReason::None))
+                                    .0
+                            }
+                            PhaseRotation::Random => {
+                                ((v.reward * 1313.13) as usize).is_multiple_of(2)
+                            }
+                            PhaseRotation::Flipped => !v.assign.unwrap(),
+                        },
+                    );
+                }
+            } else {
+                v.set(FlagVar::PHASE, v.assign.unwrap());
+            }
 
             unset_assign!(self, vi);
             if let AssignReason::Implication(cid) = self.var[vi].reason {
@@ -707,14 +730,11 @@ impl AssignStack {
     }
     /// save the current assignments as the best phases
     fn save_best_phases(&mut self) {
-        #[cfg(feature = "best_phases_tracking")]
-        {
-            self.best_phases.clear();
-            for l in self.trail.iter().skip(self.len_upto(self.root_level)) {
-                let vi = l.vi();
-                if let Some(b) = self.var[vi].assign {
-                    self.best_phases.insert(vi, (b, self.var[vi].reason));
-                }
+        self.best_phases.clear();
+        for l in self.trail.iter().skip(self.len_upto(self.root_level)) {
+            let vi = l.vi();
+            if let Some(b) = self.var[vi].assign {
+                self.best_phases.insert(vi, (b, self.var[vi].reason));
             }
         }
         self.build_best_at = self.num_propagation;
