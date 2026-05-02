@@ -1,19 +1,17 @@
 //! main struct AssignStack
 use {
     super::{
-        AssignIF, Var,
+        AssignIF, PhaseRotation, Var,
         heap::{VarHeapIF, VarIdHeap},
     },
     crate::{assign::learning_rate::VarActivityScheme, cdb::ClauseDBIF, types::*},
     std::{
+        collections::HashMap,
         fmt,
         ops::Range,
         slice::{Iter, IterMut},
     },
 };
-
-#[cfg(any(feature = "best_phases_tracking", feature = "rephase"))]
-use std::collections::HashMap;
 
 /// A record of assignment. It's called 'trail' in Glucose.
 #[derive(Clone, Debug)]
@@ -41,13 +39,10 @@ pub struct AssignStack {
     //
     //## Phase handling
     //
+    pub(crate) phase_mode: PhaseRotation,
     pub(super) best_assign: bool,
     pub(super) build_best_at: usize,
     pub(super) num_best_assign: usize,
-    pub(super) num_rephase: usize,
-    pub(super) bp_divergence_ema: Ema,
-
-    #[cfg(feature = "best_phases_tracking")]
     pub(super) best_phases: HashMap<VarId, (bool, AssignReason)>,
 
     //## Elimanated vars
@@ -115,13 +110,11 @@ impl Default for AssignStack {
             num_reconflict: 0,
             num_repropagation: 0,
             conflict_interval_average: (Ema2::default(), Ema2::default_extended()),
+
+            phase_mode: PhaseRotation::default(),
             best_assign: false,
             build_best_at: 0,
             num_best_assign: 0,
-            num_rephase: 0,
-            bp_divergence_ema: Ema::default(),
-
-            #[cfg(feature = "best_phases_tracking")]
             best_phases: HashMap::new(),
 
             eliminated: Vec::new(),
@@ -464,7 +457,6 @@ impl VarManipulateIF for AssignStack {
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
 
-        #[cfg(feature = "best_phases_tracking")]
         self.check_best_phase(vi);
     }
     fn make_var_eliminated(&mut self, vi: VarId) {
@@ -500,7 +492,6 @@ impl VarManipulateIF for AssignStack {
     }
 }
 
-#[cfg(feature = "best_phases_tracking")]
 impl AssignStack {
     /// check usability of the saved best phase.
     /// return `true` if the current best phase got invalid.

@@ -18,7 +18,7 @@ pub use self::{
     learning_rate::VarActivityScheme,
     propagate::PropagateIF,
     property::*,
-    select::VarSelectIF,
+    select::{PhaseRotation, VarSelectIF},
     stack::{AssignStack, VarManipulateIF},
 };
 use {
@@ -117,7 +117,6 @@ pub mod property {
         NumConflict,
         NumDecision,
         NumPropagation,
-        NumRephase,
         NumRestart,
         //
         //## var stat
@@ -134,11 +133,10 @@ pub mod property {
         RootLevel,
     }
 
-    pub const USIZES: [Tusize; 14] = [
+    pub const USIZES: [Tusize; 13] = [
         Tusize::NumConflict,
         Tusize::NumDecision,
         Tusize::NumPropagation,
-        Tusize::NumRephase,
         Tusize::NumRestart,
         Tusize::NumVar,
         Tusize::NumAssertedVar,
@@ -158,7 +156,6 @@ pub mod property {
                 Tusize::NumConflict => self.num_conflict,
                 Tusize::NumDecision => self.num_decision,
                 Tusize::NumPropagation => self.num_propagation,
-                Tusize::NumRephase => self.num_rephase,
                 Tusize::NumRestart => self.num_restart,
                 Tusize::NumVar => self.num_vars,
                 Tusize::NumAssertedVar => self.num_asserted_vars,
@@ -210,16 +207,14 @@ pub mod property {
         PropagationPerConflict,
         ConflictPerRestart,
         ConflictPerBaseRestart,
-        BestPhaseDivergenceRate,
         ConlictDistanceAverage,
     }
 
-    pub const EMAS: [TEma; 6] = [
+    pub const EMAS: [TEma; 5] = [
         TEma::DecisionPerConflict,
         TEma::PropagationPerConflict,
         TEma::ConflictPerRestart,
         TEma::ConflictPerBaseRestart,
-        TEma::BestPhaseDivergenceRate,
         TEma::ConlictDistanceAverage,
     ];
 
@@ -231,7 +226,6 @@ pub mod property {
                 TEma::PropagationPerConflict => self.ppc_ema.as_view(),
                 TEma::ConflictPerRestart => self.cpr_ema.as_view(),
                 TEma::ConflictPerBaseRestart => self.cpr_ema.as_view(),
-                TEma::BestPhaseDivergenceRate => self.bp_divergence_ema.as_view(),
                 TEma::ConlictDistanceAverage => self.conflict_interval_average.0.as_view(),
             }
         }

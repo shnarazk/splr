@@ -5,8 +5,8 @@ use {
     super::{Certificate, Solver, SolverEvent, SolverResult, conflict::handle_conflict},
     crate::{
         assign::{
-            self, AssignIF, AssignStack, PropagateIF, VarActivityScheme, VarManipulateIF,
-            VarSelectIF,
+            self, AssignIF, AssignStack, PhaseRotation, PropagateIF, VarActivityScheme,
+            VarManipulateIF, VarSelectIF,
         },
         cdb::{self, ClauseDB, ClauseDBIF, VivifyIF},
         processor::{EliminateIF, Eliminator},
@@ -210,6 +210,21 @@ impl SolveIF for Solver {
     }
 }
 
+const PR_TBL: [(PhaseRotation, usize, usize); 12] = [
+    (PhaseRotation::Best, 4, 1),
+    (PhaseRotation::Walk, 20, 2),
+    (PhaseRotation::Original, 2, 3),
+    (PhaseRotation::Best, 4, 4),
+    (PhaseRotation::Walk, 20, 5),
+    (PhaseRotation::Inverted, 2, 6),
+    (PhaseRotation::Best, 4, 7),
+    (PhaseRotation::Walk, 20, 8),
+    (PhaseRotation::Random, 2, 9),
+    (PhaseRotation::Best, 4, 11),
+    (PhaseRotation::Walk, 20, 12),
+    (PhaseRotation::Flipped, 2, 0),
+];
+
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
 fn search(
     asg: &mut AssignStack,
@@ -223,8 +238,11 @@ fn search(
     let progress_interval: usize = 10_000;
     let mut reduction_pressure: usize = 0;
     let reduction_interval: usize = 40_000;
-    let mut switch_pressure: usize = 0;
-    let switch_interval: usize = 10_000;
+    // var activity scheme
+    let mut vas_switch_pressure: usize = 0;
+    let vas_switch_interval: usize = 10_000;
+    let mut phase_rotation_pressure: usize = 0;
+    let mut current_phase: &(PhaseRotation, usize, usize) = &PR_TBL[0];
 
     let mut lbd_ema: Ema2 = Ema2::default().with_fast(4).with_slow(10);
     let mut current_core: usize = asg.derefer(assign::property::Tusize::NumUnassignedVar);
@@ -274,7 +292,7 @@ fn search(
                     biclause_at = asg.num_conflict;
                 }
             }
-            switch_pressure += 1;
+            vas_switch_pressure += 1;
             cdb.lbd.update(lbd as f64);
         }
         lbd_ema.update(lbd as f64);
@@ -294,40 +312,45 @@ fn search(
             match asg.activity_scheme {
                 VarActivityScheme::LRB if asg.num_conflict - biclause_at <= 3 => {
                     asg.activity_scheme = VarActivityScheme::VMTF;
-                    switch_pressure = 0;
+                    vas_switch_pressure = 0;
                     asg.set_learning_rate(0.0); // Don't change this
                     asg.rebuild_order();
-                    state.flush("");
-                    state.flush("to VMTF");
+                    // state.flush("");
+                    // state.flush("to VMTF");
                 }
-                VarActivityScheme::VMTF if switch_pressure >= switch_interval => {
+                VarActivityScheme::VMTF if vas_switch_pressure >= vas_switch_interval => {
                     asg.activity_scheme = VarActivityScheme::LRB;
                     asg.set_learning_rate(state.config.vrw_learning_rate);
                     asg.rebuild_order();
-                    state.flush("");
-                    state.flush("to LRB");
+                    // state.flush("");
+                    // state.flush("to LRB");
                 }
                 VarActivityScheme::VMTF => {}
-                VarActivityScheme::LRB if lbd_ema.trend() > 1.0 => {
+                VarActivityScheme::LRB if lbd_ema.trend() > 0.98 => {
                     RESTART!(asg, cdb, state);
                     asg.clear_asserted_literals(cdb)?;
                 }
                 _ => (),
             }
-            if asg.decision_level() == asg.root_level {
-                if cfg!(feature = "rephase")
-                    && asg.activity_scheme == VarActivityScheme::LRB
-                    && state.span_manager.current_span() == 1
-                {
-                    asg.select_rephasing_target();
+            if cfg!(feature = "rephase") && new_span.is_some() {
+                phase_rotation_pressure += 1;
+                if phase_rotation_pressure >= current_phase.1 {
+                    current_phase = &PR_TBL[current_phase.2];
+                    asg.phase_mode = current_phase.0;
+                    phase_rotation_pressure = 0;
+                    if current_phase.0 == PhaseRotation::default() {
+                        state.flush(".");
+                    }
                 }
+            }
+            if asg.decision_level() == asg.root_level {
                 if processing_pressure >= processing_interval {
                     if cfg!(feature = "clause_vivification") {
                         cdb.vivify(asg, state)?;
                     }
                     if cfg!(feature = "clause_elimination") {
                         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-                        state.flush("clause subsumption, ");
+                        // state.flush("clause subsumption, ");
                         elim.simplify(asg, cdb, state, false)?;
                         asg.eliminated.append(elim.eliminated_lits());
                     }
