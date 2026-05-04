@@ -326,6 +326,9 @@ impl AssignIF for AssignStack {
     fn activity_scheme(&self) -> &VarActivityScheme {
         &self.activity_scheme
     }
+    fn phase_mode(&self) -> PhaseRotation {
+        self.phase_mode
+    }
 }
 
 impl fmt::Display for AssignStack {

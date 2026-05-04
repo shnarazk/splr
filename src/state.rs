@@ -3,6 +3,7 @@
 use instant::{Duration, Instant};
 #[cfg(not(feature = "platform_wasm"))]
 use std::time::{Duration, Instant};
+
 use {
     crate::{
         assign::{self, AssignIF, VarActivityScheme},
@@ -577,33 +578,34 @@ impl StateIF for State {
         );
 
         println!(
-            "\x1B[2K {}|  CR:{},  LRB:{}, VMTF:{}, core:{}",
+            "\x1B[2K {}({})|  CR:{},  LRB:{}, VMTF:{}, core:{}",
             // "\x1B[2K {}|VMTF:{},   CR:{}, core:{}, /ppc:{}",
             {
                 match asg.activity_scheme() {
                     // VarActivityScheme::CR => {
                     //     if self.span_manager.current_span() >= 16384 {
-                    //         "    Long CR"
+                    //         " Long CR"
                     //     } else {
-                    //         "         CR"
+                    //         "      CR"
                     //     }
                     // }
                     VarActivityScheme::LRB => {
                         if self.span_manager.current_span() >= 16384 {
-                            "   Long LRB"
+                            "Long LRB"
                         } else {
-                            "        LRB"
+                            "     LRB"
                         }
                     }
                     VarActivityScheme::VMTF => {
                         if self.span_manager.current_span() >= 16384 {
-                            "  Long VMTF"
+                            "LongVMTF"
                         } else {
-                            "       VMTF"
+                            "    VMTF"
                         }
                     }
                 }
             },
+            asg.phase_mode().as_mnemonic(),
             // {
             //     let s0 = self.search_mode_ratio.0.get();
             //     let s1 = self.search_mode_ratio.1.get();

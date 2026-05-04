@@ -8,12 +8,25 @@ use {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum PhaseRotation {
     #[default]
-    Walk,
-    Original,
-    Inverted,
+    Last,
     Best,
+    False,
+    True,
     Random,
-    Flipped,
+    Inverted,
+}
+
+impl PhaseRotation {
+    pub fn as_mnemonic(&self) -> &str {
+        match self {
+            PhaseRotation::Last => "*",
+            PhaseRotation::Best => "B",
+            PhaseRotation::False => "F",
+            PhaseRotation::True => "T",
+            PhaseRotation::Random => "R",
+            PhaseRotation::Inverted => "I",
+        }
+    }
 }
 
 /// ```ignore
