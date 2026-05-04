@@ -210,19 +210,35 @@ impl SolveIF for Solver {
     }
 }
 
-const PR_TBL: [(PhaseRotation, usize, usize); 12] = [
-    (PhaseRotation::Best, 4, 1),
-    (PhaseRotation::Walk, 20, 2),
-    (PhaseRotation::Original, 2, 3),
-    (PhaseRotation::Best, 4, 4),
-    (PhaseRotation::Walk, 20, 5),
-    (PhaseRotation::Inverted, 2, 6),
-    (PhaseRotation::Best, 4, 7),
-    (PhaseRotation::Walk, 20, 8),
-    (PhaseRotation::Random, 2, 9),
-    (PhaseRotation::Best, 4, 11),
-    (PhaseRotation::Walk, 20, 12),
-    (PhaseRotation::Flipped, 2, 0),
+// const PR_TBL: [(PhaseRotation, usize, usize); 4] = [
+//     (PhaseRotation::Last, 300, 1),
+//     (PhaseRotation::Best, 300, 2),
+//     (PhaseRotation::Last, 300, 3),
+//     (PhaseRotation::Random, 300, 0),
+// ];
+
+// const PR_TBL: [(PhaseRotation, usize, usize); 12] = [
+//     (PhaseRotation::Best, 10000, 1),
+//     (PhaseRotation::Last, 10000, 2),
+//     (PhaseRotation::False, 10000, 3),
+//     (PhaseRotation::Best, 10000, 4),
+//     (PhaseRotation::Last, 10000, 5),
+//     (PhaseRotation::True, 10000, 6),
+//     (PhaseRotation::Best, 10000, 7),
+//     (PhaseRotation::Last, 10000, 8),
+//     (PhaseRotation::Random, 10000, 9),
+//     (PhaseRotation::Best, 10000, 10),
+//     (PhaseRotation::Last, 10000, 11),
+//     (PhaseRotation::Inverted, 10000, 0),
+// ];
+
+const PR_TBL: [(PhaseRotation, usize, usize); 6] = [
+    (PhaseRotation::Last, 20000, 1),
+    (PhaseRotation::False, 20000, 2),
+    (PhaseRotation::True, 20000, 3),
+    (PhaseRotation::Random, 20000, 4),
+    (PhaseRotation::Inverted, 20000, 5),
+    (PhaseRotation::Best, 20000, 0),
 ];
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
@@ -238,16 +254,15 @@ fn search(
     let progress_interval: usize = 10_000;
     let mut reduction_pressure: usize = 0;
     let reduction_interval: usize = 40_000;
-    // var activity scheme
-    let mut vas_switch_pressure: usize = 0;
-    let vas_switch_interval: usize = 10_000;
     let mut phase_rotation_pressure: usize = 0;
     let mut current_phase: &(PhaseRotation, usize, usize) = &PR_TBL[0];
 
     let mut lbd_ema: Ema2 = Ema2::default().with_fast(4).with_slow(10);
+    // let mut extention_pressure: bool = false;
     let mut current_core: usize = asg.derefer(assign::property::Tusize::NumUnassignedVar);
     let mut core_was_rebuilt: Option<usize> = None;
-    let mut biclause_at: usize = 0;
+    let mut current_envelop_height: usize = state.span_manager.envelop_index();
+    let mut luby_scale: usize = 512;
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -282,80 +297,90 @@ fn search(
                     state.search_mode_ratio.2.update(1.0);
                 }
             }
-            processing_pressure += 1;
         } else {
             debug_assert_ne!(lbd, 0);
             reduction_pressure += 1;
-            if lbd <= 6 {
-                processing_pressure += 1;
-                if lbd <= 2 && cdb[cid].len() == 2 {
-                    biclause_at = asg.num_conflict;
-                }
-            }
-            vas_switch_pressure += 1;
+            // if cdb[cid].len() <= 3 {
+            //     extention_pressure = true;
+            // }
             cdb.lbd.update(lbd as f64);
+            lbd_ema.update(lbd as f64);
         }
-        lbd_ema.update(lbd as f64);
+        processing_pressure += (lbd <= 5) as usize;
         if reduction_pressure >= reduction_interval {
-            cdb.reduce(asg, state.span_manager.envelop_index());
+            cdb.reduce(asg, current_envelop_height);
             reduction_pressure = 0;
             state.search_mode_ratio.0.update(0.0);
             state.search_mode_ratio.1.update(0.0);
             state.search_mode_ratio.2.update(0.0);
         }
-        let _cia = asg.conflict_interval_average.0.trend();
-        let _cil = asg.conflict_interval_average.1.trend();
-        if state.span_manager.span_ended(span_len.saturating_sub(10)) {
-            span_len = 0;
-            let new_span = state.span_manager.prepare_new_span(span_len);
-            dump_stage(asg, cdb, state, new_span);
-            match asg.activity_scheme {
-                VarActivityScheme::LRB if asg.num_conflict - biclause_at <= 3 => {
+        let sp = if asg.activity_scheme == VarActivityScheme::VMTF {
+            span_len
+        } else {
+            span_len / luby_scale
+        };
+        phase_rotation_pressure += 1;
+        if cfg!(feature = "rephase") && phase_rotation_pressure >= current_phase.1 {
+            let last_phase = current_phase.0;
+            current_phase = &PR_TBL[current_phase.2];
+            asg.phase_mode = current_phase.0;
+            phase_rotation_pressure = 0;
+            match (last_phase, current_phase.0) {
+                (PhaseRotation::Best, PhaseRotation::Best) => {
+                    panic!();
+                }
+                (_, PhaseRotation::Best) => {
                     asg.activity_scheme = VarActivityScheme::VMTF;
-                    vas_switch_pressure = 0;
                     asg.set_learning_rate(0.0); // Don't change this
                     asg.rebuild_order();
-                    // state.flush("");
-                    // state.flush("to VMTF");
                 }
-                VarActivityScheme::VMTF if vas_switch_pressure >= vas_switch_interval => {
+                (PhaseRotation::Best, _) => {
                     asg.activity_scheme = VarActivityScheme::LRB;
                     asg.set_learning_rate(state.config.vrw_learning_rate);
                     asg.rebuild_order();
-                    // state.flush("");
-                    // state.flush("to LRB");
                 }
-                VarActivityScheme::VMTF => {}
-                VarActivityScheme::LRB if lbd_ema.trend() > 0.98 => {
+                _ => {}
+            }
+            state.flush(current_phase.0.as_mnemonic());
+        }
+        if state.span_manager.span_ended(sp) {
+            span_len = 0;
+            let new_segment = state.span_manager.prepare_new_span(span_len);
+            dump_stage(asg, cdb, state, new_segment);
+            match asg.activity_scheme {
+                VarActivityScheme::LRB => {
+                    RESTART!(asg, cdb, state);
+                    asg.clear_asserted_literals(cdb)?;
+                }
+                // VarActivityScheme::VMTF if extention_pressure => {
+                //     phase_rotation_pressure = 0;
+                // }
+                VarActivityScheme::VMTF if lbd_ema.get() > 8.0 => {
                     RESTART!(asg, cdb, state);
                     asg.clear_asserted_literals(cdb)?;
                 }
                 _ => (),
             }
-            if cfg!(feature = "rephase") && new_span.is_some() {
-                phase_rotation_pressure += 1;
-                if phase_rotation_pressure >= current_phase.1 {
-                    current_phase = &PR_TBL[current_phase.2];
-                    asg.phase_mode = current_phase.0;
-                    phase_rotation_pressure = 0;
-                    if current_phase.0 == PhaseRotation::default() {
-                        state.flush(".");
-                    }
+            // extention_pressure = false;
+            if asg.decision_level() == asg.root_level && processing_pressure >= processing_interval
+            {
+                if cfg!(feature = "clause_vivification") {
+                    cdb.vivify(asg, state)?;
                 }
+                if cfg!(feature = "clause_elimination") {
+                    let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+                    state.flush("clause subsumption, ");
+                    elim.simplify(asg, cdb, state, false)?;
+                    asg.eliminated.append(elim.eliminated_lits());
+                }
+                processing_pressure = 0;
             }
-            if asg.decision_level() == asg.root_level {
-                if processing_pressure >= processing_interval {
-                    if cfg!(feature = "clause_vivification") {
-                        cdb.vivify(asg, state)?;
-                    }
-                    if cfg!(feature = "clause_elimination") {
-                        let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-                        // state.flush("clause subsumption, ");
-                        elim.simplify(asg, cdb, state, false)?;
-                        asg.eliminated.append(elim.eliminated_lits());
-                    }
-                    processing_pressure = 0;
-                }
+            if new_segment == Some(true) {
+                current_envelop_height = state.span_manager.envelop_index();
+                state.config.vrw_learning_rate *= 1.0 - state.config.vrw_learning_rate;
+                luby_scale =
+                    32 * (state.c_lvl.get_slow().log2() + state.b_lvl.get_slow().log2()) as usize;
+                assert!(luby_scale < 10_000);
             }
         }
         if progress_pressure >= progress_interval {

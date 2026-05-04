@@ -237,29 +237,31 @@ impl PropagateIF for AssignStack {
             let v = &mut self.var[vi];
             #[cfg(feature = "trace_propagation")]
             v.turn_off(FlagVar::PROPAGATED);
-            if cfg!(feature = "rephase") {
-                if !v.is(FlagVar::ELIMINATED) && v.reason != AssignReason::Decision(0) {
+            if !v.is(FlagVar::ELIMINATED) && v.reason != AssignReason::Decision(0) {
+                if cfg!(feature = "rephase")
+                // && self.num_conflict - v.last_conflict <= 1000
+                {
                     v.set(
                         FlagVar::PHASE,
                         match self.phase_mode {
-                            PhaseRotation::Walk => v.assign.unwrap(),
-                            PhaseRotation::Original => false,
-                            PhaseRotation::Inverted => true,
+                            PhaseRotation::Last => v.assign.unwrap(),
+                            PhaseRotation::False => false,
+                            PhaseRotation::True => true,
                             PhaseRotation::Best => {
                                 self.best_phases
                                     .get(&vi)
-                                    .unwrap_or(&(false, AssignReason::None))
+                                    .unwrap_or(&(v.assign.unwrap(), AssignReason::None))
                                     .0
                             }
-                            PhaseRotation::Random => {
-                                ((v.reward * 1313.13) as usize).is_multiple_of(2)
-                            }
-                            PhaseRotation::Flipped => !v.assign.unwrap(),
+                            PhaseRotation::Random => ((v.last_conflict as f64 + 1.0 / v.reward)
+                                as usize)
+                                .is_multiple_of(2),
+                            PhaseRotation::Inverted => !v.assign.unwrap(),
                         },
                     );
+                } else {
+                    v.set(FlagVar::PHASE, v.assign.unwrap());
                 }
-            } else {
-                v.set(FlagVar::PHASE, v.assign.unwrap());
             }
 
             unset_assign!(self, vi);

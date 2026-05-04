@@ -71,9 +71,11 @@ impl StageManager {
     pub fn current_span(&self) -> usize {
         self.luby_iter.luby() as usize
     }
+    /// returns the index for the current segment
     pub fn current_segment(&self) -> usize {
         self.luby_iter.seg_index as usize
     }
+    /// returns the index of the current envelop, equals to the height of "tree".
     pub fn envelop_index(&self) -> usize {
         self.envelope_hight
     }
