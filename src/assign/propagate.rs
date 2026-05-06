@@ -244,7 +244,7 @@ impl PropagateIF for AssignStack {
                     v.set(
                         FlagVar::PHASE,
                         match self.phase_mode {
-                            PhaseRotation::Last => v.assign.unwrap(),
+                            PhaseRotation::Walk => v.assign.unwrap(),
                             PhaseRotation::False => false,
                             PhaseRotation::True => true,
                             PhaseRotation::Best => {

@@ -188,14 +188,9 @@ pub mod property {
     pub enum Tf64 {
         LiteralBlockDistance,
         LiteralBlockEntanglement,
-        ReductionThreshold,
     }
 
-    pub const F64S: [Tf64; 3] = [
-        Tf64::LiteralBlockDistance,
-        Tf64::LiteralBlockEntanglement,
-        Tf64::ReductionThreshold,
-    ];
+    pub const F64S: [Tf64; 2] = [Tf64::LiteralBlockDistance, Tf64::LiteralBlockEntanglement];
 
     impl PropertyDereference<Tf64, f64> for ClauseDB {
         #[inline]
@@ -203,7 +198,6 @@ pub mod property {
             match k {
                 Tf64::LiteralBlockDistance => self.lbd.get(),
                 Tf64::LiteralBlockEntanglement => self.lb_entanglement.get(),
-                Tf64::ReductionThreshold => self.reduction_threshold,
             }
         }
     }
