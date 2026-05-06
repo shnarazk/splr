@@ -5,7 +5,7 @@ use {
         property,
         watch_cache::*,
     },
-    crate::{assign::AssignIF, types::*},
+    crate::{SEEK_SPAN, assign::AssignIF, types::*},
     std::{
         collections::HashMap,
         num::NonZeroU32,
@@ -83,8 +83,6 @@ pub struct ClauseDB {
     /// Literal Block Entanglement
     /// EMA of LBD of clauses used in conflict analysis (dependency graph)
     pub(crate) lb_entanglement: Ema2,
-    /// cutoff value used in the last `reduce`
-    pub(crate) reduction_threshold: f64,
 }
 
 impl Default for ClauseDB {
@@ -121,7 +119,6 @@ impl Default for ClauseDB {
                 .with_fast(1_000)
                 .with_slow(80_000)
                 .with_value(2.0),
-            reduction_threshold: 0.0,
         }
     }
 }
@@ -906,7 +903,7 @@ impl ClauseDBIF for ClauseDB {
 
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
         self.leanrt_limit_ema
-            .update(2_usize.pow(envelope as u32) as f64);
+            .update(SEEK_SPAN as f64 * 2_usize.pow(envelope as u32) as f64);
         let limit: usize = self.leanrt_limit_ema.get() as usize;
         if self.num_learnt < limit {
             return;
@@ -922,28 +919,29 @@ impl ClauseDBIF for ClauseDB {
             c.update_activity(*tick, *activity_decay, 0.0);
 
             if c.is(FlagClause::ASSIGN_REASON) {
-                c.used = 0;
+                // c.used = 0;
                 continue;
             }
             if !c.is(FlagClause::LEARNT) {
-                c.used = 0;
+                // c.used = 0;
                 continue;
             }
             if c.used > 0 {
-                c.used = 0;
+                c.used -= 1;
                 continue;
             }
             let lbd = asg.literal_block_distance(&c.lits);
             perm.push(OrderedProxy::new(i, lbd as f64));
-            c.used = 0;
+            // c.used = 0;
         }
-        let keep = perm
-            .len()
-            .saturating_sub(self.num_learnt.saturating_sub(limit));
-        self.reduction_threshold = keep as f64 / self.num_learnt as f64;
-        perm.sort();
-        for i in perm.iter().skip(keep) {
-            self.remove_clause(ClauseId::from(i.to()));
+        // let keep = perm
+        //     .len()
+        //     .saturating_sub(self.num_learnt.saturating_sub(limit));
+        if perm.len() > limit {
+            perm.sort();
+            for i in perm.iter().skip(limit) {
+                self.remove_clause(ClauseId::from(i.to()));
+            }
         }
     }
     fn reset(&mut self) {

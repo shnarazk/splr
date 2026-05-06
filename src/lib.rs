@@ -74,3 +74,5 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[macro_use]
 extern crate bitflags;
+
+pub(crate) const SEEK_SPAN: usize = 8;

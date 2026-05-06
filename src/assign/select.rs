@@ -8,7 +8,7 @@ use {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum PhaseRotation {
     #[default]
-    Last,
+    Walk,
     Best,
     False,
     True,
@@ -19,12 +19,12 @@ pub enum PhaseRotation {
 impl PhaseRotation {
     pub fn as_mnemonic(&self) -> &str {
         match self {
-            PhaseRotation::Last => "*",
-            PhaseRotation::Best => "B",
-            PhaseRotation::False => "F",
-            PhaseRotation::True => "T",
-            PhaseRotation::Random => "R",
-            PhaseRotation::Inverted => "I",
+            PhaseRotation::Walk => "→",
+            PhaseRotation::Best => "*",
+            PhaseRotation::False => "⊥",
+            PhaseRotation::True => "⊤",
+            PhaseRotation::Random => "?",
+            PhaseRotation::Inverted => "¬",
         }
     }
 }

@@ -4,11 +4,12 @@ use crate::assign::TrailSavingIF;
 use {
     super::{Certificate, Solver, SolverEvent, SolverResult, conflict::handle_conflict},
     crate::{
+        SEEK_SPAN,
         assign::{
             self, AssignIF, AssignStack, PhaseRotation, PropagateIF, VarActivityScheme,
             VarManipulateIF, VarSelectIF,
         },
-        cdb::{self, ClauseDB, ClauseDBIF, VivifyIF},
+        cdb::{ClauseDB, ClauseDBIF, VivifyIF},
         processor::{EliminateIF, Eliminator},
         state::{Stat, State, StateIF},
         types::*,
@@ -26,7 +27,17 @@ pub trait SolveIF {
 }
 
 macro_rules! RESTART {
-    ($asg: expr, $cdb: expr, $state: expr) => {
+    ($asg: expr, $cdb: expr, $state: expr) => {{
+        $asg.cancel_until($cdb, $asg.root_level());
+        #[cfg(feature = "trail_saving")]
+        {
+            $asg.clear_saved_trail();
+        }
+        $cdb.handle(SolverEvent::Restart);
+        $state.handle(SolverEvent::Restart);
+        $asg.clear_asserted_literals($cdb)
+    }};
+    ($asg: expr, $cdb: expr, $state: expr, $_: expr) => {
         $asg.cancel_until($cdb, $asg.root_level());
         #[cfg(feature = "trail_saving")]
         {
@@ -194,15 +205,15 @@ impl SolveIF for Solver {
                         v.turn_off(FlagVar::ELIMINATED);
                     }
                 }
-                RESTART!(asg, cdb, state);
+                RESTART!(asg, cdb, state, {});
                 Ok(Certificate::SAT(vals))
             }
             Ok(false) | Err(SolverError::EmptyClause | SolverError::RootLevelConflict(_)) => {
-                RESTART!(asg, cdb, state);
+                RESTART!(asg, cdb, state, {});
                 Ok(Certificate::UNSAT)
             }
             Err(e) => {
-                RESTART!(asg, cdb, state);
+                RESTART!(asg, cdb, state, {});
                 state.progress(asg, cdb);
                 Err(e)
             }
@@ -210,36 +221,53 @@ impl SolveIF for Solver {
     }
 }
 
-// const PR_TBL: [(PhaseRotation, usize, usize); 4] = [
-//     (PhaseRotation::Last, 300, 1),
-//     (PhaseRotation::Best, 300, 2),
-//     (PhaseRotation::Last, 300, 3),
-//     (PhaseRotation::Random, 300, 0),
+// const PR_TBL: [(PhaseRotation, usize, usize); 15] = [
+//     // 1st wave
+//     (PhaseRotation::Best, 20000, 1),
+//     (PhaseRotation::Walk, 20000, 2),
+//     (PhaseRotation::False, 20000, 3),
+//     // 2nd wave
+//     (PhaseRotation::Best, 20000, 4),
+//     (PhaseRotation::Walk, 20000, 5),
+//     (PhaseRotation::True, 20000, 6),
+//     // 3rd wave
+//     (PhaseRotation::Best, 20000, 7),
+//     (PhaseRotation::Walk, 20000, 8),
+//     (PhaseRotation::Random, 20000, 9),
+//     // 4th wave
+//     (PhaseRotation::Best, 20000, 10),
+//     (PhaseRotation::Walk, 20000, 11),
+//     (PhaseRotation::Inverted, 20000, 12),
+//     // exxtra wave
+//     (PhaseRotation::Best, 20000, 13),
+//     (PhaseRotation::Walk, 20000, 14),
+//     (PhaseRotation::VMTF, 40000, 0),
 // ];
-
-// const PR_TBL: [(PhaseRotation, usize, usize); 12] = [
-//     (PhaseRotation::Best, 10000, 1),
-//     (PhaseRotation::Last, 10000, 2),
-//     (PhaseRotation::False, 10000, 3),
-//     (PhaseRotation::Best, 10000, 4),
-//     (PhaseRotation::Last, 10000, 5),
-//     (PhaseRotation::True, 10000, 6),
-//     (PhaseRotation::Best, 10000, 7),
-//     (PhaseRotation::Last, 10000, 8),
-//     (PhaseRotation::Random, 10000, 9),
-//     (PhaseRotation::Best, 10000, 10),
-//     (PhaseRotation::Last, 10000, 11),
-//     (PhaseRotation::Inverted, 10000, 0),
-// ];
-
-const PR_TBL: [(PhaseRotation, usize, usize); 6] = [
-    (PhaseRotation::Last, 20000, 1),
-    (PhaseRotation::False, 20000, 2),
-    (PhaseRotation::True, 20000, 3),
-    (PhaseRotation::Random, 20000, 4),
-    (PhaseRotation::Inverted, 20000, 5),
-    (PhaseRotation::Best, 20000, 0),
+//
+const PR_TBL: [(PhaseRotation, usize, usize); 9] = [
+    // 1st wave
+    (PhaseRotation::False, 10_000, 1),
+    (PhaseRotation::Best, 10_000, 2),
+    (PhaseRotation::Walk, 40_000, 3),
+    // 2nd wave
+    (PhaseRotation::True, 10_000, 4),
+    (PhaseRotation::Best, 10_000, 5),
+    (PhaseRotation::Walk, 40_000, 6),
+    // 3rd wave
+    // (PhaseRotation::Random, 10000, 5),
+    // (PhaseRotation::Walk, 10_000, 6),
+    (PhaseRotation::Inverted, 10_000, 7),
+    (PhaseRotation::Best, 10_000, 8),
+    (PhaseRotation::Walk, 40_000, 0),
 ];
+
+// const PR_TBL: [(PhaseRotation, usize, usize); 4] = [
+//     // 1st wave
+//     (PhaseRotation::False, 80000, 1),
+//     (PhaseRotation::True, 80000, 2),
+//     (PhaseRotation::Walk, 40000, 3),
+//     (PhaseRotation::Best, 20000, 2),
+// ];
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
 fn search(
@@ -257,12 +285,14 @@ fn search(
     let mut phase_rotation_pressure: usize = 0;
     let mut current_phase: &(PhaseRotation, usize, usize) = &PR_TBL[0];
 
-    let mut lbd_ema: Ema2 = Ema2::default().with_fast(4).with_slow(10);
-    // let mut extention_pressure: bool = false;
     let mut current_core: usize = asg.derefer(assign::property::Tusize::NumUnassignedVar);
     let mut core_was_rebuilt: Option<usize> = None;
     let mut current_envelop_height: usize = state.span_manager.envelop_index();
-    let mut luby_scale: usize = 512;
+    let mut luby_scale: usize = 8;
+    let mut lbd_ema: Ema = Ema::default().with_span(SEEK_SPAN);
+    let mut vmtf_pressure: usize = 0;
+    let vmtf_interval: usize = 40_000;
+    let mut reinitialization_goal = asg.derefer(assign::property::Tusize::NumUnassignedVar) / 2;
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -287,25 +317,27 @@ fn search(
         if cid == ClauseId::default() {
             match asg.activity_scheme {
                 VarActivityScheme::LRB => {
-                    state.search_mode_ratio.0.update(0.0);
-                    state.search_mode_ratio.1.update(1.0);
-                    state.search_mode_ratio.2.update(0.0);
+                    state.search_mode_ratio.0.update(1.0);
+                    state.search_mode_ratio.1.update(0.0);
                 }
                 VarActivityScheme::VMTF => {
                     state.search_mode_ratio.0.update(0.0);
-                    state.search_mode_ratio.1.update(0.0);
-                    state.search_mode_ratio.2.update(1.0);
+                    state.search_mode_ratio.1.update(1.0);
                 }
+            }
+            //
+            if asg.derefer(assign::property::Tusize::NumUnassignedVar) < reinitialization_goal {
+                state.span_manager.reset();
+                reinitialization_goal =
+                    64.max(asg.derefer(assign::property::Tusize::NumUnassignedVar) / 2);
+                // FIXME
             }
         } else {
             debug_assert_ne!(lbd, 0);
             reduction_pressure += 1;
-            // if cdb[cid].len() <= 3 {
-            //     extention_pressure = true;
-            // }
             cdb.lbd.update(lbd as f64);
-            lbd_ema.update(lbd as f64);
         }
+        lbd_ema.update(lbd as f64);
         processing_pressure += (lbd <= 5) as usize;
         if reduction_pressure >= reduction_interval {
             cdb.reduce(asg, current_envelop_height);
@@ -314,54 +346,40 @@ fn search(
             state.search_mode_ratio.1.update(0.0);
             state.search_mode_ratio.2.update(0.0);
         }
-        let sp = if asg.activity_scheme == VarActivityScheme::VMTF {
-            span_len
-        } else {
-            span_len / luby_scale
-        };
-        phase_rotation_pressure += 1;
-        if cfg!(feature = "rephase") && phase_rotation_pressure >= current_phase.1 {
-            let last_phase = current_phase.0;
-            current_phase = &PR_TBL[current_phase.2];
+        if asg.activity_scheme != VarActivityScheme::VMTF {
+            phase_rotation_pressure += 1;
+            if cfg!(feature = "rephase") && phase_rotation_pressure >= current_phase.1 {
+                current_phase = &PR_TBL[current_phase.2];
+                asg.phase_mode = current_phase.0;
+                phase_rotation_pressure = 0;
+            }
+        } else if vmtf_pressure >= vmtf_interval {
+            asg.activity_scheme = VarActivityScheme::LRB;
+            // phase_rotation_pressure = current_phase.1;
+            asg.set_learning_rate(state.config.vrw_learning_rate);
+            asg.rebuild_order();
+            current_phase = &PR_TBL[0];
             asg.phase_mode = current_phase.0;
             phase_rotation_pressure = 0;
-            match (last_phase, current_phase.0) {
-                (PhaseRotation::Best, PhaseRotation::Best) => {
-                    panic!();
+        } else {
+            vmtf_pressure += 1;
+        }
+        if state
+            .span_manager
+            .span_ended(span_len.saturating_sub(SEEK_SPAN) / luby_scale)
+        {
+            span_len = 0;
+            let new_segment = state.span_manager.prepare_new_span(span_len);
+            dump_stage(asg, state, new_segment);
+            match asg.activity_scheme {
+                VarActivityScheme::LRB if lbd_ema.get() >= 5.0 => {
+                    RESTART!(asg, cdb, state)?;
                 }
-                (_, PhaseRotation::Best) => {
-                    asg.activity_scheme = VarActivityScheme::VMTF;
-                    asg.set_learning_rate(0.0); // Don't change this
-                    asg.rebuild_order();
-                }
-                (PhaseRotation::Best, _) => {
-                    asg.activity_scheme = VarActivityScheme::LRB;
-                    asg.set_learning_rate(state.config.vrw_learning_rate);
-                    asg.rebuild_order();
+                VarActivityScheme::VMTF if lbd_ema.get() >= state.b_lvl.get_slow() * 1.25 => {
+                    RESTART!(asg, cdb, state)?;
                 }
                 _ => {}
             }
-            state.flush(current_phase.0.as_mnemonic());
-        }
-        if state.span_manager.span_ended(sp) {
-            span_len = 0;
-            let new_segment = state.span_manager.prepare_new_span(span_len);
-            dump_stage(asg, cdb, state, new_segment);
-            match asg.activity_scheme {
-                VarActivityScheme::LRB => {
-                    RESTART!(asg, cdb, state);
-                    asg.clear_asserted_literals(cdb)?;
-                }
-                // VarActivityScheme::VMTF if extention_pressure => {
-                //     phase_rotation_pressure = 0;
-                // }
-                VarActivityScheme::VMTF if lbd_ema.get() > 8.0 => {
-                    RESTART!(asg, cdb, state);
-                    asg.clear_asserted_literals(cdb)?;
-                }
-                _ => (),
-            }
-            // extention_pressure = false;
             if asg.decision_level() == asg.root_level && processing_pressure >= processing_interval
             {
                 if cfg!(feature = "clause_vivification") {
@@ -377,10 +395,9 @@ fn search(
             }
             if new_segment == Some(true) {
                 current_envelop_height = state.span_manager.envelop_index();
+                state.config.vrw_learning_rate *= 0.99;
+                luby_scale = current_envelop_height;
                 state.config.vrw_learning_rate *= 1.0 - state.config.vrw_learning_rate;
-                luby_scale =
-                    32 * (state.c_lvl.get_slow().log2() + state.b_lvl.get_slow().log2()) as usize;
-                assert!(luby_scale < 10_000);
             }
         }
         if progress_pressure >= progress_interval {
@@ -401,6 +418,12 @@ fn search(
             current_core = na;
             state.flush("");
             state.flush(format!("unreachable core: {na} "));
+            {
+                asg.activity_scheme = VarActivityScheme::VMTF;
+                asg.set_learning_rate(0.0); // Don't change this
+                asg.rebuild_order();
+                vmtf_pressure = 0;
+            }
         }
     }
     state.log(
@@ -418,20 +441,19 @@ fn search(
 }
 
 /// display the current stats. before updating stabiliation parameters
-fn dump_stage(asg: &AssignStack, cdb: &mut ClauseDB, state: &mut State, shift: Option<bool>) {
+fn dump_stage(asg: &AssignStack, state: &mut State, shift: Option<bool>) {
     let cycle = state.span_manager.envelop_index();
     let span = state.span_manager.current_span();
     let stage = state.span_manager.current_segment();
     let segment = state.span_manager.current_segment();
     let cpr = asg.refer(assign::property::TEma::ConflictPerRestart).get();
     let vlr = asg.derefer(assign::property::Tf64::VarLearningRate);
-    let cdt = cdb.derefer(cdb::property::Tf64::ReductionThreshold);
     state.log(
         match shift {
             None => Some((None, None, stage)),
             Some(false) => Some((None, Some(cycle), stage)),
             Some(true) => Some((Some(segment), Some(cycle), stage)),
         },
-        format!("{span:>7}, cpr:{cpr:>8.2}, vlr:{vlr:>3.2}, cdt:{cdt:>5.2}"),
+        format!("{span:>7}, cpr:{cpr:>8.2}, vlr:{vlr:>3.2}"),
     );
 }

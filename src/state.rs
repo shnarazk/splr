@@ -463,7 +463,7 @@ impl StateIF for State {
         let asg_num_propagation = asg.derefer(assign::property::Tusize::NumPropagation);
         // let asg_cwss: f64 = asg.derefer(assign::property::Tf64::CurrentWorkingSetSize);
         let asg_dpc_ema = asg.refer(assign::property::TEma::DecisionPerConflict);
-        // let asg_ppc_ema = asg.refer(assign::property::TEma::PropagationPerConflict);
+        let asg_ppc_ema = asg.refer(assign::property::TEma::PropagationPerConflict);
         let asg_cpr_ema = asg.refer(assign::property::TEma::ConflictPerRestart);
 
         let cdb_num_clause = cdb.derefer(cdb::property::Tusize::NumClause);
@@ -578,17 +578,10 @@ impl StateIF for State {
         );
 
         println!(
-            "\x1B[2K {}({})|  CR:{},  LRB:{}, VMTF:{}, core:{}",
+            "\x1B[2K {}({})| LRB:{}, VMTF:{}, core:{}, /ppc:{}",
             // "\x1B[2K {}|VMTF:{},   CR:{}, core:{}, /ppc:{}",
             {
                 match asg.activity_scheme() {
-                    // VarActivityScheme::CR => {
-                    //     if self.span_manager.current_span() >= 16384 {
-                    //         " Long CR"
-                    //     } else {
-                    //         "      CR"
-                    //     }
-                    // }
                     VarActivityScheme::LRB => {
                         if self.span_manager.current_span() >= 16384 {
                             "Long LRB"
@@ -644,13 +637,13 @@ impl StateIF for State {
                 100.0 * self.search_mode_ratio.1.get_slow(),
                 1.0
             ),
-            fm!(
-                "{:>9.2}",
-                self,
-                LogF64Id::ConflictDistanceAverage2,
-                100.0 * self.search_mode_ratio.2.get_slow(),
-                1.0
-            ),
+            // fm!(
+            //     "{:>9.2}",
+            //     self,
+            //     LogF64Id::ConflictDistanceAverage2,
+            //     100.0 * self.search_mode_ratio.2.get_slow(),
+            //     1.0
+            // ),
             // fm!(
             //     "{:>9.4}",
             //     self,
@@ -669,13 +662,13 @@ impl StateIF for State {
                     asg_num_unreachables
                 }
             ),
-            // fm!(
-            //     "{:>9.2}",
-            //     self,
-            //     LogF64Id::PropagationPerConflict,
-            //     asg_ppc_ema.get(),
-            //     0.01
-            // ),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::PropagationPerConflict,
+                asg_ppc_ema.get(),
+                0.01
+            ),
         );
         self[LogUsizeId::LubySpan] = self.span_manager.current_segment();
         self[LogUsizeId::StageCycle] = self.span_manager.envelop_index();
