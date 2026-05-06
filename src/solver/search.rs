@@ -221,53 +221,13 @@ impl SolveIF for Solver {
     }
 }
 
-// const PR_TBL: [(PhaseRotation, usize, usize); 15] = [
-//     // 1st wave
-//     (PhaseRotation::Best, 20000, 1),
-//     (PhaseRotation::Walk, 20000, 2),
-//     (PhaseRotation::False, 20000, 3),
-//     // 2nd wave
-//     (PhaseRotation::Best, 20000, 4),
-//     (PhaseRotation::Walk, 20000, 5),
-//     (PhaseRotation::True, 20000, 6),
-//     // 3rd wave
-//     (PhaseRotation::Best, 20000, 7),
-//     (PhaseRotation::Walk, 20000, 8),
-//     (PhaseRotation::Random, 20000, 9),
-//     // 4th wave
-//     (PhaseRotation::Best, 20000, 10),
-//     (PhaseRotation::Walk, 20000, 11),
-//     (PhaseRotation::Inverted, 20000, 12),
-//     // exxtra wave
-//     (PhaseRotation::Best, 20000, 13),
-//     (PhaseRotation::Walk, 20000, 14),
-//     (PhaseRotation::VMTF, 40000, 0),
-// ];
-//
-const PR_TBL: [(PhaseRotation, usize, usize); 9] = [
-    // 1st wave
-    (PhaseRotation::False, 10_000, 1),
-    (PhaseRotation::Best, 10_000, 2),
-    (PhaseRotation::Walk, 40_000, 3),
-    // 2nd wave
-    (PhaseRotation::True, 10_000, 4),
-    (PhaseRotation::Best, 10_000, 5),
-    (PhaseRotation::Walk, 40_000, 6),
-    // 3rd wave
-    // (PhaseRotation::Random, 10000, 5),
-    // (PhaseRotation::Walk, 10_000, 6),
-    (PhaseRotation::Inverted, 10_000, 7),
-    (PhaseRotation::Best, 10_000, 8),
-    (PhaseRotation::Walk, 40_000, 0),
+const PR_TBL: [(PhaseRotation, usize, usize); 5] = [
+    (PhaseRotation::Best, 40_000, 1),
+    (PhaseRotation::False, 40_000, 2),
+    (PhaseRotation::True, 40_000, 3),
+    (PhaseRotation::Inverted, 40_000, 4),
+    (PhaseRotation::Walk, 80_000, 4),
 ];
-
-// const PR_TBL: [(PhaseRotation, usize, usize); 4] = [
-//     // 1st wave
-//     (PhaseRotation::False, 80000, 1),
-//     (PhaseRotation::True, 80000, 2),
-//     (PhaseRotation::Walk, 40000, 3),
-//     (PhaseRotation::Best, 20000, 2),
-// ];
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
 fn search(
@@ -284,15 +244,37 @@ fn search(
     let reduction_interval: usize = 40_000;
     let mut phase_rotation_pressure: usize = 0;
     let mut current_phase: &(PhaseRotation, usize, usize) = &PR_TBL[0];
-
     let mut current_core: usize = asg.derefer(assign::property::Tusize::NumUnassignedVar);
     let mut core_was_rebuilt: Option<usize> = None;
     let mut current_envelop_height: usize = state.span_manager.envelop_index();
     let mut luby_scale: usize = 8;
     let mut lbd_ema: Ema = Ema::default().with_span(SEEK_SPAN);
     let mut vmtf_pressure: usize = 0;
-    let vmtf_interval: usize = 40_000;
+    let vmtf_interval: usize = 10_000;
     let mut reinitialization_goal = asg.derefer(assign::property::Tusize::NumUnassignedVar) / 2;
+    let mut assign_peak: usize = 0;
+
+    macro_rules! to_vmtf {
+        () => {
+            if asg.activity_scheme != VarActivityScheme::VMTF {
+                asg.activity_scheme = VarActivityScheme::VMTF;
+                asg.set_learning_rate(0.0); // Don't change this
+                asg.rebuild_order();
+                vmtf_pressure = 0;
+            }
+        };
+    }
+    macro_rules! from_vmtf {
+        () => {
+            asg.activity_scheme = VarActivityScheme::LRB;
+            asg.set_learning_rate(state.config.vrw_learning_rate);
+            asg.rebuild_order();
+            current_phase = &PR_TBL[0];
+            asg.phase_mode = current_phase.0;
+            asg.set_learning_rate(state.config.vrw_learning_rate);
+            phase_rotation_pressure = 0;
+        };
+    }
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -313,6 +295,10 @@ fn search(
         {
             cdb.update_activity_tick();
         }
+        if asg.stack_len() >= assign_peak {
+            assign_peak = asg.stack_len();
+            // to_vmtf!();
+        }
         let (cid, lbd) = handle_conflict(asg, cdb, state, &cc)?;
         if cid == ClauseId::default() {
             match asg.activity_scheme {
@@ -325,17 +311,17 @@ fn search(
                     state.search_mode_ratio.1.update(1.0);
                 }
             }
-            //
             if asg.derefer(assign::property::Tusize::NumUnassignedVar) < reinitialization_goal {
                 state.span_manager.reset();
-                reinitialization_goal =
-                    64.max(asg.derefer(assign::property::Tusize::NumUnassignedVar) / 2);
-                // FIXME
+                reinitialization_goal = asg.derefer(assign::property::Tusize::NumUnassignedVar) / 2;
             }
         } else {
             debug_assert_ne!(lbd, 0);
             reduction_pressure += 1;
             cdb.lbd.update(lbd as f64);
+            if cdb[cid].len() == 2 {
+                to_vmtf!();
+            }
         }
         lbd_ema.update(lbd as f64);
         processing_pressure += (lbd <= 5) as usize;
@@ -351,16 +337,11 @@ fn search(
             if cfg!(feature = "rephase") && phase_rotation_pressure >= current_phase.1 {
                 current_phase = &PR_TBL[current_phase.2];
                 asg.phase_mode = current_phase.0;
+                asg.set_learning_rate(state.config.vrw_learning_rate);
                 phase_rotation_pressure = 0;
             }
         } else if vmtf_pressure >= vmtf_interval {
-            asg.activity_scheme = VarActivityScheme::LRB;
-            // phase_rotation_pressure = current_phase.1;
-            asg.set_learning_rate(state.config.vrw_learning_rate);
-            asg.rebuild_order();
-            current_phase = &PR_TBL[0];
-            asg.phase_mode = current_phase.0;
-            phase_rotation_pressure = 0;
+            from_vmtf!();
         } else {
             vmtf_pressure += 1;
         }
@@ -372,10 +353,9 @@ fn search(
             let new_segment = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, state, new_segment);
             match asg.activity_scheme {
-                VarActivityScheme::LRB if lbd_ema.get() >= 5.0 => {
-                    RESTART!(asg, cdb, state)?;
-                }
-                VarActivityScheme::VMTF if lbd_ema.get() >= state.b_lvl.get_slow() * 1.25 => {
+                VarActivityScheme::LRB
+                    if lbd_ema.get() >= cdb.lb_entanglement.get_slow() && lbd_ema.get() > 4.0 =>
+                {
                     RESTART!(asg, cdb, state)?;
                 }
                 _ => {}
@@ -395,7 +375,7 @@ fn search(
             }
             if new_segment == Some(true) {
                 current_envelop_height = state.span_manager.envelop_index();
-                state.config.vrw_learning_rate *= 0.99;
+                // state.config.vrw_learning_rate *= 0.99;
                 luby_scale = current_envelop_height;
                 state.config.vrw_learning_rate *= 1.0 - state.config.vrw_learning_rate;
             }
@@ -416,14 +396,9 @@ fn search(
                 core_was_rebuilt = Some(current_core);
             }
             current_core = na;
+            assign_peak = 0;
             state.flush("");
             state.flush(format!("unreachable core: {na} "));
-            {
-                asg.activity_scheme = VarActivityScheme::VMTF;
-                asg.set_learning_rate(0.0); // Don't change this
-                asg.rebuild_order();
-                vmtf_pressure = 0;
-            }
         }
     }
     state.log(
