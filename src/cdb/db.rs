@@ -5,7 +5,7 @@ use {
         property,
         watch_cache::*,
     },
-    crate::{SEEK_SPAN, assign::AssignIF, types::*},
+    crate::{assign::AssignIF, types::*},
     std::{
         collections::HashMap,
         num::NonZeroU32,
@@ -903,7 +903,7 @@ impl ClauseDBIF for ClauseDB {
 
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
         self.leanrt_limit_ema
-            .update(SEEK_SPAN as f64 * 2_usize.pow(envelope as u32) as f64);
+            .update(1.2 * 2_usize.pow(envelope as u32) as f64);
         let limit: usize = self.leanrt_limit_ema.get() as usize;
         if self.num_learnt < limit {
             return;
@@ -928,6 +928,7 @@ impl ClauseDBIF for ClauseDB {
             }
             if c.used > 0 {
                 c.used -= 1;
+                c.used = 0;
                 continue;
             }
             let lbd = asg.literal_block_distance(&c.lits);
