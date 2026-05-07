@@ -37,8 +37,6 @@ pub struct ClauseDB {
     certification_store: CertificationStore,
     /// a number of clauses to emit out-of-memory exception
     soft_limit: usize,
-    /// 'small' clause threshold
-    co_lbd_bound: u16,
     // not in use
     // lbd_frozen_clause: usize,
 
@@ -94,7 +92,6 @@ impl Default for ClauseDB {
             freelist: Vec::new(),
             certification_store: CertificationStore::default(),
             soft_limit: 0, // 248_000_000
-            co_lbd_bound: 4,
 
             // lbd_frozen_clause: 30,
             #[cfg(feature = "clause_rewarding")]
@@ -935,26 +932,6 @@ impl ClauseDBIF for ClauseDB {
             perm.sort();
             for i in perm.iter().skip(limit) {
                 self.remove_clause(ClauseId::from(i.to()));
-            }
-        }
-    }
-    fn reset(&mut self) {
-        debug_assert!(1 < self.clause.len());
-        for (i, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
-            if c.is(FlagClause::LEARNT)
-                && !c.is_dead()
-                && (self.co_lbd_bound as usize) < c.lits.len()
-            {
-                remove_clause_fn(
-                    &mut self.certification_store,
-                    &mut self.binary_link,
-                    &mut self.watch_cache,
-                    &mut self.num_bi_clause,
-                    &mut self.num_clause,
-                    &mut self.num_learnt,
-                    ClauseId::from(i),
-                    c,
-                );
             }
         }
     }
