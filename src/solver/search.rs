@@ -246,7 +246,8 @@ fn search(
     let mut vmtf_span: usize = 0;
     let vmtf_interval: usize = 40_000;
     let mut assign_peak: usize = 0;
-    let mut luby_scale: usize = 2;
+    let luby_scale: usize = 3;
+    let mut span_scale: usize = luby_scale;
 
     macro_rules! to_vmtf {
         () => {
@@ -346,7 +347,7 @@ fn search(
             }
             processing_pressure = 0;
         }
-        if state.span_manager.span_ended(span_len / luby_scale) {
+        if state.span_manager.span_ended(span_len / span_scale) {
             span_len = 0;
             if asg.activity_scheme == VarActivityScheme::LRB {
                 RESTART!(asg, cdb, state)?;
@@ -355,7 +356,7 @@ fn search(
             dump_stage(asg, state, new_segment);
             if new_segment == Some(true) {
                 state.config.vrw_learning_rate *= 0.99;
-                luby_scale = 2 * state.span_manager.envelop_index();
+                span_scale = luby_scale * state.span_manager.envelop_index();
             }
         }
         if progress_pressure >= progress_interval {
