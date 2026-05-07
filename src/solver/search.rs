@@ -225,7 +225,7 @@ const PR_TBL: [(PhaseRotation, usize, usize); 5] = [
     (PhaseRotation::False, 40_000, 2),
     (PhaseRotation::True, 40_000, 3),
     (PhaseRotation::Inverted, 40_000, 4),
-    (PhaseRotation::Walk, 1_000_000, 0),
+    (PhaseRotation::Walk, 800_000, 0),
 ];
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
@@ -252,6 +252,7 @@ fn search(
         () => {
             if asg.activity_scheme != VarActivityScheme::VMTF {
                 asg.activity_scheme = VarActivityScheme::VMTF;
+                asg.phase_mode = PhaseRotation::Walk;
                 asg.set_learning_rate(0.0); // Don't change this
                 asg.rebuild_order();
                 vmtf_span = 0;
@@ -287,7 +288,7 @@ fn search(
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }
-        if assign_peak <= asg.stack_len() {
+        if assign_peak < asg.stack_len() {
             assign_peak = asg.stack_len();
             to_vmtf!();
         }
@@ -346,12 +347,14 @@ fn search(
             processing_pressure = 0;
         }
         if state.span_manager.span_ended(span_len / luby_scale) {
-            RESTART!(asg, cdb, state)?;
             span_len = 0;
+            if asg.activity_scheme == VarActivityScheme::LRB {
+                RESTART!(asg, cdb, state)?;
+            }
             let new_segment = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, state, new_segment);
             if new_segment == Some(true) {
-                // state.config.vrw_learning_rate *= 0.99;
+                state.config.vrw_learning_rate *= 0.99;
                 luby_scale = 2 * state.span_manager.envelop_index();
             }
         }
@@ -367,7 +370,6 @@ fn search(
             progress_pressure = 0;
         }
         if let Some(core_size) = asg.best_assigned() {
-            // reset_rephase_cycle!();
             assign_peak = 0;
             state.flush("");
             state.flush(format!("unreachable core: {core_size} "));
