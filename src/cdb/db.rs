@@ -903,7 +903,7 @@ impl ClauseDBIF for ClauseDB {
 
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
         self.leanrt_limit_ema
-            .update(1.2 * 2_usize.pow(envelope as u32) as f64);
+            .update(10.0 * 2_usize.pow(envelope as u32) as f64);
         let limit: usize = self.leanrt_limit_ema.get() as usize;
         if self.num_learnt < limit {
             return;
@@ -919,25 +919,18 @@ impl ClauseDBIF for ClauseDB {
             c.update_activity(*tick, *activity_decay, 0.0);
 
             if c.is(FlagClause::ASSIGN_REASON) {
-                // c.used = 0;
                 continue;
             }
             if !c.is(FlagClause::LEARNT) {
-                // c.used = 0;
                 continue;
             }
             if c.used > 0 {
                 c.used -= 1;
-                c.used = 0;
                 continue;
             }
             let lbd = asg.literal_block_distance(&c.lits);
             perm.push(OrderedProxy::new(i, lbd as f64));
-            // c.used = 0;
         }
-        // let keep = perm
-        //     .len()
-        //     .saturating_sub(self.num_learnt.saturating_sub(limit));
         if perm.len() > limit {
             perm.sort();
             for i in perm.iter().skip(limit) {

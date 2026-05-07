@@ -4,7 +4,6 @@ use crate::assign::TrailSavingIF;
 use {
     super::{Certificate, Solver, SolverEvent, SolverResult, conflict::handle_conflict},
     crate::{
-        SEEK_SPAN,
         assign::{
             self, AssignIF, AssignStack, PhaseRotation, PropagateIF, VarActivityScheme,
             VarManipulateIF, VarSelectIF,
@@ -226,7 +225,7 @@ const PR_TBL: [(PhaseRotation, usize, usize); 5] = [
     (PhaseRotation::False, 40_000, 2),
     (PhaseRotation::True, 40_000, 3),
     (PhaseRotation::Inverted, 40_000, 4),
-    (PhaseRotation::Walk, 80_000, 4),
+    (PhaseRotation::Walk, 1_000_000, 0),
 ];
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
@@ -244,15 +243,10 @@ fn search(
     let reduction_interval: usize = 40_000;
     let mut phase_rotation_pressure: usize = 0;
     let mut current_phase: &(PhaseRotation, usize, usize) = &PR_TBL[0];
-    let mut current_core: usize = asg.derefer(assign::property::Tusize::NumUnassignedVar);
-    let mut core_was_rebuilt: Option<usize> = None;
-    let mut current_envelop_height: usize = state.span_manager.envelop_index();
-    let mut luby_scale: usize = 8;
-    let mut lbd_ema: Ema = Ema::default().with_span(SEEK_SPAN);
-    let mut vmtf_pressure: usize = 0;
-    let vmtf_interval: usize = 10_000;
-    let mut reinitialization_goal = asg.derefer(assign::property::Tusize::NumUnassignedVar) / 2;
+    let mut vmtf_span: usize = 0;
+    let vmtf_interval: usize = 40_000;
     let mut assign_peak: usize = 0;
+    let mut luby_scale: usize = 2;
 
     macro_rules! to_vmtf {
         () => {
@@ -260,15 +254,18 @@ fn search(
                 asg.activity_scheme = VarActivityScheme::VMTF;
                 asg.set_learning_rate(0.0); // Don't change this
                 asg.rebuild_order();
-                vmtf_pressure = 0;
+                vmtf_span = 0;
             }
         };
     }
-    macro_rules! from_vmtf {
+    macro_rules! reset_rephase_cycle {
         () => {
-            asg.activity_scheme = VarActivityScheme::LRB;
-            asg.set_learning_rate(state.config.vrw_learning_rate);
-            asg.rebuild_order();
+            if asg.activity_scheme != VarActivityScheme::LRB {
+                asg.activity_scheme = VarActivityScheme::LRB;
+                asg.set_learning_rate(state.config.vrw_learning_rate);
+                asg.rebuild_order();
+                vmtf_span = 0;
+            }
             current_phase = &PR_TBL[0];
             asg.phase_mode = current_phase.0;
             asg.set_learning_rate(state.config.vrw_learning_rate);
@@ -290,14 +287,14 @@ fn search(
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }
+        if assign_peak <= asg.stack_len() {
+            assign_peak = asg.stack_len();
+            to_vmtf!();
+        }
         asg.update_activity_tick();
         #[cfg(feature = "clause_rewarding")]
         {
             cdb.update_activity_tick();
-        }
-        if asg.stack_len() >= assign_peak {
-            assign_peak = asg.stack_len();
-            // to_vmtf!();
         }
         let (cid, lbd) = handle_conflict(asg, cdb, state, &cc)?;
         if cid == ClauseId::default() {
@@ -311,26 +308,17 @@ fn search(
                     state.search_mode_ratio.1.update(1.0);
                 }
             }
-            if asg.derefer(assign::property::Tusize::NumUnassignedVar) < reinitialization_goal {
-                state.span_manager.reset();
-                reinitialization_goal = asg.derefer(assign::property::Tusize::NumUnassignedVar) / 2;
-            }
         } else {
-            debug_assert_ne!(lbd, 0);
             reduction_pressure += 1;
             cdb.lbd.update(lbd as f64);
-            if cdb[cid].len() == 2 {
-                to_vmtf!();
-            }
         }
-        lbd_ema.update(lbd as f64);
+
         processing_pressure += (lbd <= 5) as usize;
         if reduction_pressure >= reduction_interval {
-            cdb.reduce(asg, current_envelop_height);
+            cdb.reduce(asg, state.span_manager.envelop_index());
             reduction_pressure = 0;
             state.search_mode_ratio.0.update(0.0);
             state.search_mode_ratio.1.update(0.0);
-            state.search_mode_ratio.2.update(0.0);
         }
         if asg.activity_scheme != VarActivityScheme::VMTF {
             phase_rotation_pressure += 1;
@@ -340,44 +328,31 @@ fn search(
                 asg.set_learning_rate(state.config.vrw_learning_rate);
                 phase_rotation_pressure = 0;
             }
-        } else if vmtf_pressure >= vmtf_interval {
-            from_vmtf!();
+        } else if vmtf_span >= vmtf_interval {
+            reset_rephase_cycle!();
         } else {
-            vmtf_pressure += 1;
+            vmtf_span += 1;
         }
-        if state
-            .span_manager
-            .span_ended(span_len.saturating_sub(SEEK_SPAN) / luby_scale)
-        {
+        if asg.decision_level() == asg.root_level && processing_pressure >= processing_interval {
+            if cfg!(feature = "clause_vivification") {
+                cdb.vivify(asg, state)?;
+            }
+            if cfg!(feature = "clause_elimination") {
+                let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+                state.flush("clause subsumption, ");
+                elim.simplify(asg, cdb, state, false)?;
+                asg.eliminated.append(elim.eliminated_lits());
+            }
+            processing_pressure = 0;
+        }
+        if state.span_manager.span_ended(span_len / luby_scale) {
+            RESTART!(asg, cdb, state)?;
             span_len = 0;
             let new_segment = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, state, new_segment);
-            match asg.activity_scheme {
-                VarActivityScheme::LRB
-                    if lbd_ema.get() >= cdb.lb_entanglement.get_slow() && lbd_ema.get() > 4.0 =>
-                {
-                    RESTART!(asg, cdb, state)?;
-                }
-                _ => {}
-            }
-            if asg.decision_level() == asg.root_level && processing_pressure >= processing_interval
-            {
-                if cfg!(feature = "clause_vivification") {
-                    cdb.vivify(asg, state)?;
-                }
-                if cfg!(feature = "clause_elimination") {
-                    let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-                    state.flush("clause subsumption, ");
-                    elim.simplify(asg, cdb, state, false)?;
-                    asg.eliminated.append(elim.eliminated_lits());
-                }
-                processing_pressure = 0;
-            }
             if new_segment == Some(true) {
-                current_envelop_height = state.span_manager.envelop_index();
                 // state.config.vrw_learning_rate *= 0.99;
-                luby_scale = current_envelop_height;
-                state.config.vrw_learning_rate *= 1.0 - state.config.vrw_learning_rate;
+                luby_scale = 2 * state.span_manager.envelop_index();
             }
         }
         if progress_pressure >= progress_interval {
@@ -391,14 +366,11 @@ fn search(
             }
             progress_pressure = 0;
         }
-        if let Some(na) = asg.best_assigned() {
-            if current_core < na && core_was_rebuilt.is_none() {
-                core_was_rebuilt = Some(current_core);
-            }
-            current_core = na;
+        if let Some(core_size) = asg.best_assigned() {
+            // reset_rephase_cycle!();
             assign_peak = 0;
             state.flush("");
-            state.flush(format!("unreachable core: {na} "));
+            state.flush(format!("unreachable core: {core_size} "));
         }
     }
     state.log(
