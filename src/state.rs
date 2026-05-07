@@ -112,7 +112,7 @@ pub struct State {
     //## MISC
     //
     /// search mode (focus, pursue, explore) ratio
-    pub search_mode_ratio: (Ema2, Ema2, Ema2),
+    pub search_mode_ratio: (Ema2, Ema2),
     /// EMA of backjump levels
     pub b_lvl: Ema2,
     /// EMA of conflicting levels
@@ -155,9 +155,8 @@ impl Default for State {
             reflection_interval: 10_000,
 
             search_mode_ratio: (
-                Ema2::default().with_value(0.33),
-                Ema2::default().with_value(0.33),
-                Ema2::default().with_value(0.33),
+                Ema2::default().with_value(0.5),
+                Ema2::default().with_value(0.5),
             ),
             b_lvl: Ema2::default_extended(),
             c_lvl: Ema2::default_extended(),
@@ -553,8 +552,20 @@ impl StateIF for State {
                 cdb_lb_ent,
                 0.01
             ),
-            fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get(), 0.01),
-            fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get(), 0.01),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::CLevel,
+                self.c_lvl.get_slow(),
+                0.01
+            ),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::BLevel,
+                self.b_lvl.get_slow(),
+                0.01
+            ),
             fm!(
                 "{:>9.2}",
                 self,
