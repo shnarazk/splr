@@ -1,0 +1,90 @@
+#import "@preview/lovelace:0.3.1": *
+#set text(
+  font: ((name: "New Computer Modern", covers: "latin-in-cjk"), "Hiragino Mincho Pro"),
+  size: 11pt)
+#let title = [Search algorithms in Splr]
+
+#pseudocode-list(booktabs: true, hooks: 0.2em, line-gap: 6pt, stroke: 0.3pt, title: strong[Search in Splr-0.19])[
+  + *let* $n <- 0$ #sym.triangle.stroked.r Luby counter `int`
+  + *let* $i <- 0$ #sym.triangle.stroked.r step counter `int`
+  + *let* $c <-$ _EMA(Exponential Moving Average)_
+  + *let* $o <-$ _LearningRate-Based Rewarding_
+  + *while* _there is an unassignd or unpropagated var_ *do*
+    + `SelectDecisionVar`($o$)
+    + *if* `BCP`() $!=$ conflict *then*
+      + *continue*
+    + *if* _decision level_ $= 0$ *then*
+      + *return* UNSAT
+    + $c$.update(1 / _conflict interval of the conflicting literal_)
+    + `ConflictAnalysis`()
+    + `BackTrack`()
+    + $i <- i + 1$
+    + *if* $i < "Luby"(n)$ *then*
+      + *continue*
+    + $i <- 0$
+    + $n <- n + 1$
+    + *if* $c$ enters into a core *then*
+      + $o <-$ _Variable Move To queue Front_
+    + *else*
+      + *if* $c."trend" < 1$ *then*
+        + `Restart`()
+      + $o <-$ _LearningRate-Based Rewarding_
+    + run `Reduce`, `Vivify`, `Eliminate` periodically
+  + *return* SAT
+]
+
+#pagebreak()
+
+#pseudocode-list(booktabs: true, hooks: 0.2em, line-gap: 6pt, stroke: 0.3pt, title: strong[Search in Splr-0.18(?)])[
++ *Input*: CNF
++ *Output*: satisfiability of the given CNF
++ ``
++ *while* _there is an unassigned or unpropagated var_ *do*
+  + *if* _there is no unpropagated var_ *then*
+    + select a decision var and its phase
+  + *if* `BCP()` == conflict *then*
+    + *if* _decision level_ $=$ _root level_ *then*
+      + *return* UNSAT
+    + `ConflictAnalysis`()
+    + `Backtrack`()
+  + *if* _restart condition holds or the current stage ends_ *then*
+    + `Restart`()
+    + *if* _a new stage begins_ *then*
+        + `Reduce`()
+        + update restart conditions
+        + *if* _a new cycle begins_ *then*
+            + `Vivify`()
+            + select var phases (rephase)
+            + *if* _a new segment begins_ *then*
+              + `Eliminate`()
+              + rescale var activities
++ *return* SAT
+]
+
+#pagebreak()
+
+#pseudocode-list(booktabs: true, hooks: 0.2em, line-gap: 6pt, stroke: 0.3pt, title: strong[Search in Splr-0.17])[
++ *Input*: CNF
++ *Output*: satisfiability of the given CNF
++ ``
++ While([_there is an unassigned or unpropagated var_],
+  + If([_there is no unpropagated var_], kw3: none,
+    + Line([select a decision var and its phase])
+  + If([BCP() _returns an conflict_], kw3: none,
+    + If([_decision level is root level_], kw3: none,
+      + {Return[UNSAT]}
+    + ConflictAnalysis[]
+    + BackTrack[]
+  + If([_restart condition holds or the current stage ends_], kw3: none,
+    + Restart[]
+    + If([_a new stage begins_], kw3: none,
+      + Reduce[]
+      + Line([update restart condition])
+      + If([_a new cycle begins_], kw3: none,
+        + Vivify[]
+        + Line([select var phases])
+        + If([_a new segment begins_], kw3: none,
+          + Eliminate[]
+          + Line([rescale var activities])
+  + Return[SAT]
+]

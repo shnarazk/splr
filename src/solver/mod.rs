@@ -3,8 +3,6 @@
 mod build;
 /// Module 'conflict' handles conflicts.
 mod conflict;
-/// Module `restart` provides restart heuristics.
-pub mod restart;
 /// CDCL search engine
 mod search;
 /// Stage manger (was Stabilizer)
@@ -14,7 +12,6 @@ mod validate;
 
 pub use self::{
     build::SatSolverIF,
-    restart::{RestartIF, RestartManager},
     search::SolveIF,
     stage::StageManager,
     validate::ValidateIF,
@@ -51,12 +48,8 @@ pub enum SolverEvent {
     Instantiate,
     /// increment the number of vars.
     NewVar,
-    /// re-initialization for incremental solving.
-    Reinitialize,
     /// restart
     Restart,
-    /// start a new stage of Luby stabilization. It holds new scale.
-    Stage(usize),
 
     #[cfg(feature = "clause_vivification")]
     /// Vivification: `true` for start, `false` for end.

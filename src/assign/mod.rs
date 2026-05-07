@@ -1,16 +1,12 @@
 // Module `assign` implements Boolean Constraint Propagation and decision var selection.
 // This version can handle Chronological and Non Chronological Backtrack.
 
-/// Ema
-mod ema;
 /// Heap
 mod heap;
+/// Var rewarding
+mod learning_rate;
 /// Boolean constraint propagation
 mod propagate;
-/// Var rewarding
-#[cfg_attr(feature = "EVSIDS", path = "evsids.rs")]
-#[cfg_attr(feature = "LRB_rewarding", path = "learning_rate.rs")]
-mod reward;
 /// Decision var selection
 mod select;
 /// assignment management
@@ -19,9 +15,10 @@ mod stack;
 mod trail_saving;
 
 pub use self::{
+    learning_rate::VarActivityScheme,
     propagate::PropagateIF,
     property::*,
-    select::VarSelectIF,
+    select::{PhaseRotation, VarSelectIF},
     stack::{AssignStack, VarManipulateIF},
 };
 use {
@@ -74,13 +71,18 @@ pub trait AssignIF:
     fn assign_ref(&self) -> Vec<Option<bool>>;
     /// return the largest number of assigned vars.
     fn best_assigned(&mut self) -> Option<usize>;
-    /// return `true` if no best_phases
-    #[cfg(feature = "rephase")]
-    fn best_phases_invalid(&self) -> bool;
     /// inject assignments for eliminated vars.
     fn extend_model(&mut self, c: &mut impl ClauseDBIF) -> Vec<Option<bool>>;
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
+    /// compute Literal Block Distance (LBD) of a slice of literals under the current assignment.
+    fn literal_block_distance(&mut self, lits: &[Lit]) -> DecisionLevel;
+    /// compute Literal Block Distance (LBD) of a slice of literals under the current immutable assignment.
+    fn literal_block_distance_(&self, lits: &[Lit]) -> usize;
+    /// return the current var activity scheme
+    fn activity_scheme(&self) -> &VarActivityScheme;
+    /// return the current rephase scheme
+    fn phase_mode(&self) -> PhaseRotation;
 }
 
 /// Reasons of assignments
@@ -108,72 +110,6 @@ impl fmt::Display for AssignReason {
     }
 }
 
-#[cfg(feature = "boundary_check")]
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct Assign {
-    pub at: usize,
-    pub pos: Option<usize>,
-    pub lvl: DecisionLevel,
-    pub lit: i32,
-    pub val: Option<bool>,
-    pub by: AssignReason,
-    pub state: VarState,
-}
-
-#[cfg(feature = "boundary_check")]
-// return the list of composing literals:
-// 1. literal itself
-// 1. the value
-// 1. the position in trail
-// 1. last time propagated
-// 1. its level
-// 1. its assign reason
-pub trait DebugReportIF {
-    fn report(&self, asg: &AssignStack) -> Vec<Assign>;
-}
-
-#[cfg(feature = "boundary_check")]
-fn make_lit_report(asg: &AssignStack, lit: &Lit) -> Assign {
-    let vi = lit.vi();
-    Assign {
-        lit: i32::from(lit),
-        val: asg.assigned(*lit),
-        pos: asg.trail.iter().position(|l| vi == l.vi()),
-        lvl: asg.level(vi),
-        by: asg.reason(vi),
-        at: asg.var(vi).propagated_at,
-        state: asg.var[vi].state,
-    }
-}
-
-#[cfg(feature = "boundary_check")]
-impl DebugReportIF for Lit {
-    fn report(&self, asg: &AssignStack) -> Vec<Assign> {
-        vec![make_lit_report(asg, self)]
-    }
-}
-
-#[cfg(feature = "boundary_check")]
-impl DebugReportIF for [Lit] {
-    fn report(&self, asg: &AssignStack) -> Vec<Assign> {
-        self.iter()
-            .map(|l| make_lit_report(asg, l))
-            .collect::<Vec<_>>()
-    }
-}
-
-#[cfg(feature = "boundary_check")]
-impl DebugReportIF for Clause {
-    fn report(&self, asg: &AssignStack) -> Vec<Assign> {
-        let mut l = self
-            .iter()
-            .map(|l| make_lit_report(asg, l))
-            .collect::<Vec<_>>();
-        l.sort();
-        l
-    }
-}
-
 pub mod property {
     use super::stack::AssignStack;
     use crate::types::*;
@@ -183,7 +119,6 @@ pub mod property {
         NumConflict,
         NumDecision,
         NumPropagation,
-        NumRephase,
         NumRestart,
         //
         //## var stat
@@ -200,11 +135,10 @@ pub mod property {
         RootLevel,
     }
 
-    pub const USIZES: [Tusize; 14] = [
+    pub const USIZES: [Tusize; 13] = [
         Tusize::NumConflict,
         Tusize::NumDecision,
         Tusize::NumPropagation,
-        Tusize::NumRephase,
         Tusize::NumRestart,
         Tusize::NumVar,
         Tusize::NumAssertedVar,
@@ -224,7 +158,6 @@ pub mod property {
                 Tusize::NumConflict => self.num_conflict,
                 Tusize::NumDecision => self.num_decision,
                 Tusize::NumPropagation => self.num_propagation,
-                Tusize::NumRephase => self.num_rephase,
                 Tusize::NumRestart => self.num_restart,
                 Tusize::NumVar => self.num_vars,
                 Tusize::NumAssertedVar => self.num_asserted_vars,
@@ -250,13 +183,13 @@ pub mod property {
     pub enum Tf64 {
         AverageVarActivity,
         CurrentWorkingSetSize,
-        VarDecayRate,
+        VarLearningRate,
     }
 
     pub const F64S: [Tf64; 3] = [
         Tf64::AverageVarActivity,
         Tf64::CurrentWorkingSetSize,
-        Tf64::VarDecayRate,
+        Tf64::VarLearningRate,
     ];
 
     impl PropertyDereference<Tf64, f64> for AssignStack {
@@ -265,40 +198,37 @@ pub mod property {
             match k {
                 Tf64::AverageVarActivity => 0.0,    // self.activity_averaged,
                 Tf64::CurrentWorkingSetSize => 0.0, // self.cwss,
-                Tf64::VarDecayRate => self.activity_decay,
+                Tf64::VarLearningRate => 1.0 - self.activity_stay_rate,
             }
         }
     }
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum TEma {
-        AssignRate,
         DecisionPerConflict,
         PropagationPerConflict,
         ConflictPerRestart,
         ConflictPerBaseRestart,
-        BestPhaseDivergenceRate,
+        ConlictDistanceAverage,
     }
 
-    pub const EMAS: [TEma; 6] = [
-        TEma::AssignRate,
+    pub const EMAS: [TEma; 5] = [
         TEma::DecisionPerConflict,
         TEma::PropagationPerConflict,
         TEma::ConflictPerRestart,
         TEma::ConflictPerBaseRestart,
-        TEma::BestPhaseDivergenceRate,
+        TEma::ConlictDistanceAverage,
     ];
 
     impl PropertyReference<TEma, EmaView> for AssignStack {
         #[inline]
         fn refer(&self, k: TEma) -> &EmaView {
             match k {
-                TEma::AssignRate => self.assign_rate.as_view(),
                 TEma::DecisionPerConflict => self.dpc_ema.as_view(),
                 TEma::PropagationPerConflict => self.ppc_ema.as_view(),
                 TEma::ConflictPerRestart => self.cpr_ema.as_view(),
                 TEma::ConflictPerBaseRestart => self.cpr_ema.as_view(),
-                TEma::BestPhaseDivergenceRate => self.bp_divergence_ema.as_view(),
+                TEma::ConlictDistanceAverage => self.conflict_interval_average.0.as_view(),
             }
         }
     }

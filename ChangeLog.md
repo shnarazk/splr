@@ -1,3 +1,27 @@
+## 0.19.0
+
+- Adopt decision literal select heuristics:
+    - *Variable Move To queue First*
+    - *LearningRate-Based Rewarding* 
+- Adopt rephasing modes: Walk, Best, False(Original), True(Inverted), Random, Flipped
+- Switch to the O(1) Luby iterator. Now Luby sequence is used for
+  - trigger for restarts, clause elimination, and clause vivification
+  - clause DB size after clause reduction
+- `ClauseDBIF::reduce` can run at any decision level, and runs every 40,000 conflicts
+- Remove feature 'assign_rate'
+- Remove feature 'bi_clause_completion'
+- Remove feature 'boundary_check'
+- Remove feature 'dynamic_restart_threshold'
+- Remove feature 'EVSIDS'
+- Remove feature 'just_used'
+- Remove feature 'maintain_watch_cache'
+- Remove feature 'reward_annealing'
+- Remove feature 'suppress_reason_chain'
+- Remove feature 'trace_equivalency'
+- Remove feature 'two_mode_reduction'
+- rename feature 'debug_propagation' to 'trace_propagation'
+- Remove src/solver/restart.rs
+
 ## 0.18.0, 2026-03-14
 
 This would be no better than the previous implementations.

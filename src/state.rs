@@ -3,11 +3,13 @@
 use instant::{Duration, Instant};
 #[cfg(not(feature = "platform_wasm"))]
 use std::time::{Duration, Instant};
+
 use {
     crate::{
-        assign, cdb,
+        assign::{self, AssignIF, VarActivityScheme},
+        cdb,
         cdb::ClauseDBIF,
-        solver::{RestartManager, SolverEvent, StageManager},
+        solver::{SolverEvent, StageManager},
         types::*,
     },
     std::{
@@ -31,7 +33,8 @@ pub trait StateIF {
     /// write stat data to stdio.
     fn progress<A, C>(&mut self, asg: &A, cdb: &C)
     where
-        A: PropertyDereference<assign::property::Tusize, usize>
+        A: AssignIF
+            + PropertyDereference<assign::property::Tusize, usize>
             + PropertyDereference<assign::property::Tf64, f64>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: ClauseDBIF
@@ -98,10 +101,8 @@ pub struct State {
     pub cnf: CNFDescription,
     /// collection of statistics data
     pub stats: [usize; Stat::EndOfStatIndex as usize],
-    // Restart
-    pub restart: RestartManager,
     /// StageManager
-    pub stm: StageManager,
+    pub span_manager: StageManager,
     /// problem description
     pub target: CNFDescription,
     /// strategy adjustment interval in conflict
@@ -110,20 +111,14 @@ pub struct State {
     //
     //## MISC
     //
+    /// search mode (focus, pursue, explore) ratio
+    pub search_mode_ratio: (Ema2, Ema2),
     /// EMA of backjump levels
-    pub b_lvl: Ema,
+    pub b_lvl: Ema2,
     /// EMA of conflicting levels
-    pub c_lvl: Ema,
+    pub c_lvl: Ema2,
     /// EMA of backtrack level drift caused by chrono_BT or BT_deepen
     pub bt_drift_average: Ema,
-    /// EMA of c_lbd - b_lbd, or Exploration vs. Eploitation
-    pub e_mode: Ema2,
-    pub e_mode_threshold: f64,
-    pub exploration_rate_ema: Ema,
-
-    #[cfg(feature = "support_user_assumption")]
-    /// hold conflicting user-defined *assumed* literals for UNSAT problems
-    pub conflicts: Vec<Lit>,
 
     #[cfg(feature = "chrono_BT")]
     /// chronoBT threshold
@@ -155,20 +150,17 @@ impl Default for State {
             config: Config::default(),
             cnf: CNFDescription::default(),
             stats: [0; Stat::EndOfStatIndex as usize],
-            restart: RestartManager::default(),
-            stm: StageManager::default(),
+            span_manager: StageManager::default(),
             target: CNFDescription::default(),
             reflection_interval: 10_000,
 
-            b_lvl: Ema::new(5_000),
-            c_lvl: Ema::new(5_000),
-            bt_drift_average: Ema::new(1000),
-            e_mode: Ema2::new(40).with_slow(4_000).with_value(10.0),
-            e_mode_threshold: 1.20,
-            exploration_rate_ema: Ema::new(1000),
-
-            #[cfg(feature = "support_user_assumption")]
-            conflicts: Vec::new(),
+            search_mode_ratio: (
+                Ema2::default().with_value(0.5),
+                Ema2::default().with_value(0.5),
+            ),
+            b_lvl: Ema2::default_extended(),
+            c_lvl: Ema2::default_extended(),
+            bt_drift_average: Ema::default().with_span(1000),
 
             #[cfg(feature = "chrono_BT")]
             chrono_bt_threshold: 100,
@@ -217,8 +209,7 @@ impl Instantiate for State {
         State {
             config: config.clone(),
             cnf: cnf.clone(),
-            restart: RestartManager::instantiate(config, cnf),
-            stm: StageManager::instantiate(config, cnf),
+            span_manager: StageManager::new(),
             target: cnf.clone(),
             time_limit: config.c_timeout,
             progress_report_rows: PROGRESS_REPORT_ROWS
@@ -235,12 +226,9 @@ impl Instantiate for State {
             SolverEvent::Conflict => (),
             SolverEvent::Eliminate(_) => (),
             SolverEvent::Instantiate => (),
-            SolverEvent::Reinitialize => (),
             SolverEvent::Restart => {
                 self[Stat::Restart] += 1;
-                self.restart.handle(SolverEvent::Restart);
             }
-            SolverEvent::Stage(_) => (),
 
             #[cfg(feature = "clause_vivification")]
             SolverEvent::Vivify(_) => (),
@@ -445,7 +433,8 @@ impl StateIF for State {
     #[allow(clippy::cognitive_complexity)]
     fn progress<A, C>(&mut self, asg: &A, cdb: &C)
     where
-        A: PropertyDereference<assign::property::Tusize, usize>
+        A: AssignIF
+            + PropertyDereference<assign::property::Tusize, usize>
             + PropertyDereference<assign::property::Tf64, f64>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: ClauseDBIF
@@ -482,10 +471,8 @@ impl StateIF for State {
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
         let cdb_lb_ent: f64 = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
         let rst_num_rst: usize = self[Stat::Restart];
-        let rst_asg: &EmaView = asg.refer(assign::property::TEma::AssignRate);
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
-        let rst_eng: f64 = self.restart.penetration_energy_charged;
-        let stg_segment: usize = self.stm.current_segment();
+        let stg_segment: usize = self.span_manager.current_segment();
 
         self.progress_cnt += 1;
         // print!("\x1B[9A\x1B[1G");
@@ -556,8 +543,6 @@ impl StateIF for State {
             ),
         );
         self[LogUsizeId::StageSegment] = stg_segment;
-        self[LogF64Id::RestartEnergy] = rst_eng;
-        self[LogF64Id::TrendASG] = rst_asg.trend();
         println!(
             "\x1B[2K    Conflict|entg:{}, cLvl:{}, bLvl:{}, /cpr:{}",
             fm!(
@@ -567,8 +552,20 @@ impl StateIF for State {
                 cdb_lb_ent,
                 0.01
             ),
-            fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get(), 0.01),
-            fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get(), 0.01),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::CLevel,
+                self.c_lvl.get_slow(),
+                0.01
+            ),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::BLevel,
+                self.b_lvl.get_slow(),
+                0.01
+            ),
             fm!(
                 "{:>9.2}",
                 self,
@@ -590,25 +587,82 @@ impl StateIF for State {
                 0.01
             ),
         );
+
         println!(
-            "\x1B[2K        misc|vivC:{}, btdf:{}, core:{}, /ppc:{}",
-            im!(
-                "{:>9}",
+            "\x1B[2K {}({})| LRB:{}, VMTF:{}, core:{}, /ppc:{}",
+            // "\x1B[2K {}|VMTF:{},   CR:{}, core:{}, /ppc:{}",
+            {
+                match asg.activity_scheme() {
+                    VarActivityScheme::LRB => {
+                        if self.span_manager.current_span() >= 16384 {
+                            "Long LRB"
+                        } else {
+                            "     LRB"
+                        }
+                    }
+                    VarActivityScheme::VMTF => {
+                        if self.span_manager.current_span() >= 16384 {
+                            "LongVMTF"
+                        } else {
+                            "    VMTF"
+                        }
+                    }
+                }
+            },
+            asg.phase_mode().as_mnemonic(),
+            // {
+            //     let s0 = self.search_mode_ratio.0.get();
+            //     let s1 = self.search_mode_ratio.1.get();
+            //     let s2 = self.search_mode_ratio.2.get();
+            //     if s0 >= s1 && s0 >= s2 {
+            //         if self.span_manager.current_span() >= 16384 {
+            //             "   Long LRB"
+            //         } else {
+            //             "        LRB"
+            //         }
+            //     } else if s1 >= s2 {
+            //         if self.span_manager.current_span() >= 16384 {
+            //             "  Long VMTF"
+            //         } else {
+            //             "       VMTF"
+            //         }
+            //     } else {
+            //         if self.span_manager.current_span() >= 16384 {
+            //             "    Long CR"
+            //         } else {
+            //             "         CR"
+            //         }
+            //     }
+            // },
+            fm!(
+                "{:>9.2}",
                 self,
-                LogUsizeId::VivifiedClause,
-                self[Stat::VivifiedClause]
+                LogF64Id::ConflictDistanceAverage0,
+                100.0 * self.search_mode_ratio.0.get_slow(),
+                1.0
             ),
             fm!(
-                "{:>9.4}",
+                "{:>9.2}",
                 self,
-                LogF64Id::BacktrackDriftRate,
-                // LogF64Id::ExExTrend,
-                // self.e_mode.trend(),
-                // self.exploration_rate_ema.get() // , self.e_mode_threshold
-                // 100.0 * self.num_chrono_bt as f64 / self[LogUsizeId::NumConflict] as f64
-                self.bt_drift_average.get(),
-                0.0001
+                LogF64Id::ConflictDistanceAverage1,
+                100.0 * self.search_mode_ratio.1.get_slow(),
+                1.0
             ),
+            // fm!(
+            //     "{:>9.2}",
+            //     self,
+            //     LogF64Id::ConflictDistanceAverage2,
+            //     100.0 * self.search_mode_ratio.2.get_slow(),
+            //     1.0
+            // ),
+            // fm!(
+            //     "{:>9.4}",
+            //     self,
+            //     LogF64Id::BacktrackDriftRate,
+            //     // 100.0 * self.num_chrono_bt as f64 / self[LogUsizeId::NumConflict] as f64
+            //     self.bt_drift_average.get(),
+            //     0.0001
+            // ),
             im!(
                 "{:>9}",
                 self,
@@ -627,12 +681,12 @@ impl StateIF for State {
                 0.01
             ),
         );
-        self[LogUsizeId::Stage] = self.stm.current_stage();
-        self[LogUsizeId::StageCycle] = self.stm.current_cycle();
+        self[LogUsizeId::LubySpan] = self.span_manager.current_segment();
+        self[LogUsizeId::StageCycle] = self.span_manager.envelop_index();
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
         if self.config.show_cdb_heatmap {
             let big_change = 0.002;
-            let heatmap = cdb.clause_heatmap();
+            let heatmap = cdb.clause_heatmap(asg);
             for (i, l) in heatmap.iter().enumerate() {
                 let row_label = match i {
                     0 => LogF64Id::CdbHeatmap0,
@@ -770,9 +824,9 @@ impl State {
         self[LogUsizeId::PermanentClause] =
             cdb.derefer(cdb::property::Tusize::NumClause) - self[LogUsizeId::RemovableClause];
         self[LogUsizeId::Restart] = self[Stat::Restart];
-        self[LogUsizeId::Stage] = self.stm.current_stage();
-        self[LogUsizeId::StageCycle] = self.stm.current_cycle();
-        self[LogUsizeId::StageSegment] = self.stm.max_scale();
+        self[LogUsizeId::LubySpan] = self.span_manager.current_segment();
+        self[LogUsizeId::StageCycle] = self.span_manager.envelop_index();
+        self[LogUsizeId::StageSegment] = self.span_manager.max_scale();
         self[LogUsizeId::Simplify] = self[Stat::Simplify];
         self[LogUsizeId::SubsumedClause] = self[Stat::SubsumedClause];
         self[LogUsizeId::VivifiedClause] = self[Stat::VivifiedClause];
@@ -787,7 +841,6 @@ impl State {
         self[LogF64Id::DecisionPerConflict] =
             asg.refer(assign::property::TEma::DecisionPerConflict).get();
 
-        self[LogF64Id::TrendASG] = asg.refer(assign::property::TEma::AssignRate).trend();
         self[LogF64Id::CLevel] = self.c_lvl.get();
         self[LogF64Id::BLevel] = self.b_lvl.get();
         self[LogF64Id::PropagationPerConflict] = asg
@@ -912,9 +965,9 @@ pub enum LogUsizeId {
     Restart,
 
     //
-    //## stage
+    //## Luby segment
     //
-    Stage,
+    LubySpan,
     StageCycle,
     StageSegment,
 
@@ -940,21 +993,21 @@ pub enum LogUsizeId {
 #[derive(Clone, Copy, Debug)]
 pub enum LogF64Id {
     Progress = 0,
-    EmaASG,
     EmaCCC,
     EmaLBD,
     EmaMLD,
-    TrendASG,
     TrendLBD,
     BLevel,
     CLevel,
     BacktrackDriftRate,
-    ExExTrend,
+    ConflictDistanceAverage,
+    ConflictDistanceAverage0,
+    ConflictDistanceAverage1,
+    ConflictDistanceAverage2,
     DecisionPerConflict,
     ConflictPerRestart,
     PropagationPerConflict,
     LiteralBlockEntanglement,
-    RestartEnergy,
     ChronologicalBacktrackPercentage,
     CdbHeatmap0,
     CdbHeatmap1,
@@ -1127,10 +1180,10 @@ pub mod property {
                 Tusize::Vivification => self[Stat::Vivification],
                 Tusize::VivifiedClause => self[Stat::VivifiedClause],
                 Tusize::VivifiedVar => self[Stat::VivifiedVar],
-                Tusize::NumCycle => self.stm.current_cycle(),
-                Tusize::NumStage => self.stm.current_stage(),
-                Tusize::IntervalScale => self.stm.current_scale(),
-                Tusize::IntervalScaleMax => self.stm.max_scale(),
+                Tusize::NumCycle => self.span_manager.envelop_index(),
+                Tusize::NumStage => self.span_manager.current_segment(),
+                Tusize::IntervalScale => self.span_manager.current_segment_length(),
+                Tusize::IntervalScaleMax => self.span_manager.max_scale(),
             }
         }
     }
