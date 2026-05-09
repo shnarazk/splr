@@ -207,7 +207,7 @@ pub fn handle_conflict(
 
             if bt_drift.is_none() {
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
-                cdb[cid].used = cdb[cid].used.saturating_add(1);
+                cdb[cid].turn_on(FlagClause::PROPAGATOR);
             }
             ret = (cid, 1);
         }
@@ -215,7 +215,7 @@ pub fn handle_conflict(
             debug_assert_eq!(cdb[cid].lit0(), l0);
             if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
-                cdb[cid].used = cdb[cid].used.saturating_add(1);
+                cdb[cid].turn_on(FlagClause::PROPAGATOR);
                 cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
             }
             let d = asg.literal_block_distance(&cdb[cid].lits);
@@ -242,7 +242,7 @@ pub fn handle_conflict(
             ret = (cid, asg.literal_block_distance(&cdb[cid].lits));
             if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
-                cdb[cid].used = cdb[cid].used.saturating_add(1);
+                cdb[cid].turn_on(FlagClause::PROPAGATOR);
             }
         }
         RefClause::Dead => unreachable!("handle_conflict::RefClause::Dead"),

@@ -489,7 +489,7 @@ impl PropagateIF for AssignStack {
                 debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
                 debug_assert!(other_watch_value.is_none());
-                cdb[cid].used = cdb[cid].used.saturating_add(1);
+                cdb[cid].turn_on(FlagClause::PROPAGATOR);
                 self.assign_by_implication(
                     cached,
                     AssignReason::Implication(cid),

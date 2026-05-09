@@ -247,6 +247,8 @@ fn search(
     let mut assign_peak: usize = 0;
     let luby_scale: usize = 3;
     let mut span_scale: usize = luby_scale;
+    let mut va_scale: usize = 1;
+    let mut num_restarts: usize = 0;
 
     macro_rules! switch_rephase_cycle {
         () => {
@@ -261,6 +263,7 @@ fn search(
                 asg.activity_scheme = VarActivityScheme::LRB;
                 asg.set_learning_rate(state.config.vrw_learning_rate);
                 asg.rebuild_order();
+                va_scale = 1;
             }
             current_phase = &PR_TBL[0];
             asg.phase_mode = current_phase.0;
@@ -275,6 +278,7 @@ fn search(
                 // asg.phase_mode = PhaseRotation::Walk;
                 asg.set_learning_rate(0.0); // Don't change this
                 asg.rebuild_order();
+                va_scale = 2;
                 rephase_span = 0;
             }
         };
@@ -297,10 +301,6 @@ fn search(
             to_vmtf!();
         }
         asg.update_activity_tick();
-        #[cfg(feature = "clause_rewarding")]
-        {
-            cdb.update_activity_tick();
-        }
         let (cid, lbd) = handle_conflict(asg, cdb, state, &cc)?;
         if cid == ClauseId::default() {
             match asg.activity_scheme {
@@ -321,16 +321,24 @@ fn search(
         progress_pressure += 1;
         span_len += 1;
         rephase_span += 1;
-        let sp =
-            span_len / ((asg.activity_scheme == VarActivityScheme::VMTF) as usize + 1) * span_scale;
-        if state.span_manager.span_ended(sp) {
+        if state
+            .span_manager
+            .span_ended(span_len / (va_scale * span_scale))
+        {
             span_len = 0;
             RESTART!(asg, cdb, state)?;
             let new_segment = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, state, new_segment);
             if reduction_pressure >= reduction_interval {
+                let e = state.span_manager.envelop_index();
+                cdb.reduce(
+                    asg,
+                    e * 2_usize.pow(e as u32),
+                    state[Stat::Restart] - num_restarts,
+                );
+                num_restarts = state[Stat::Restart];
+                // cdb.reduce(asg, state.span_manager.envelop_index());
                 reduction_pressure = 0;
-                cdb.reduce(asg, state.span_manager.envelop_index());
                 state.search_mode_ratio.0.update(0.0);
                 state.search_mode_ratio.1.update(0.0);
             }

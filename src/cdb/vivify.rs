@@ -136,11 +136,6 @@ impl VivifyIF for ClauseDB {
                                         let lbd = asg.literal_block_distance(&self[ci].lits);
                                         self.check_lbd(ci, lbd);
                                     }
-
-                                    #[cfg(feature = "clause_rewarding")]
-                                    if let Some(ci) = new_ci {
-                                        self.set_activity(ci, cp.value());
-                                    }
                                     self.remove_clause(cid);
                                     num_shrink += 1;
                                 }

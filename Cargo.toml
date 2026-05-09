@@ -26,8 +26,6 @@ default = [
     "BT_deepen",
 
     ### Heuristics
-
-    # "clause_rewarding",
     "reason_side_rewarding",
     "rephase",
     # "stochastic_local_search",
@@ -43,7 +41,6 @@ default = [
 BT_deepen = []                   # backtrack drift
 chrono_BT = []                  # NOT WORK
 clause_elimination = []         # pre(in)-processor setting
-clause_rewarding = []           # clauses have activities w/ decay rate
 clause_vivification = []        # pre(in)-processor setting
 EMA_calibration = []            # each exponential moving average has a calbration value
 no_IO = []                      # to embed Splr into non-std environments

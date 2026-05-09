@@ -289,7 +289,7 @@ impl Config {
 }
 
 fn help_string() -> String {
-    macro_rules! OPTION {
+    macro_rules! _OPTION {
         ($feature: expr, $var: expr, $line: expr) => {
             if cfg!(feature = $feature) {
                 format!($line, $var)
@@ -313,7 +313,8 @@ FLAGS:
   -V, --version             Prints version information
 OPTIONS:
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
-{}      --crl <clr-rdc-lbd>   LBD for clause reduction       {:>10}
+      --cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}
+      --crl <clr-rdc-lbd>   LBD for clause reduction       {:>10}
       --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
       --evo <elm-var-occ>   Max #cls for var elimination   {:>10}
@@ -327,11 +328,7 @@ ARGS:
   <cnf-file>    DIMACS CNF file
 ",
         config.c_cls_lim,
-        OPTION!(
-            "clause_rewarding",
-            config.crw_dcy_rat,
-            "      --cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}\n"
-        ),
+        config.crw_dcy_rat,
         config.cls_rdc_lbd,
         config.elm_cls_lim,
         config.elm_grw_lim,
@@ -385,21 +382,16 @@ pub mod property {
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum Tf64 {
-        #[cfg(feature = "clause_rewarding")]
         ClauseRewardDecayRate,
         VarRewardLearningRate,
     }
 
-    #[cfg(not(feature = "clause_rewarding"))]
-    pub const F64S: [Tf64; 1] = [Tf64::VarRewardLearningRate];
-    #[cfg(feature = "clause_rewarding")]
     pub const F64S: [Tf64; 2] = [Tf64::ClauseRewardDecayRate, Tf64::VarRewardLearningRate];
 
     impl PropertyDereference<Tf64, f64> for Config {
         #[inline]
         fn derefer(&self, k: Tf64) -> f64 {
             match k {
-                #[cfg(feature = "clause_rewarding")]
                 Tf64::ClauseRewardDecayRate => self.crw_dcy_rat,
                 Tf64::VarRewardLearningRate => self.vrw_learning_rate,
             }

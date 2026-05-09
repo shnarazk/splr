@@ -8,25 +8,17 @@ use {
 };
 
 /// A representation of 'clause'
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Debug)]
 pub struct Clause {
     /// The literals in a clause.
     pub(crate) lits: Vec<Lit>,
     /// Flags (8 bits)
     pub(crate) flags: FlagClause,
-    /// The number of propagation.
-    pub used: u16,
     /// the index from which `propagate` starts searching an un-falsified literal.
     /// Since it's just a hint, we don't need u32 or usize.
     pub search_from: u16,
-
-    #[cfg(feature = "clause_rewarding")]
-    /// the number of conflicts at which this clause was used in `conflict_analyze`
-    timestamp: usize,
-
-    #[cfg(feature = "clause_rewarding")]
-    /// A dynamic clause evaluation criterion based on the number of references.
-    reward: f64,
+    /// A dynamic clause evaluation criterion based on the number of propagations.
+    pub(crate) reference_rate: f64,
 }
 
 /// API for Clause, providing literal accessors.
@@ -56,14 +48,8 @@ impl Default for Clause {
         Clause {
             lits: vec![],
             flags: FlagClause::empty(),
-            used: 0,
             search_from: 2,
-
-            #[cfg(feature = "clause_rewarding")]
-            timestamp: 0,
-
-            #[cfg(feature = "clause_rewarding")]
-            reward: 0.0,
+            reference_rate: 0.0,
         }
     }
 }

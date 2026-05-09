@@ -103,7 +103,7 @@ pub trait ClauseDBIF:
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, envelope: usize);
+    fn reduce(&mut self, asg: &mut impl AssignIF, limit: usize, restarts: usize);
     /// update flags.
     /// return `true` if it's learnt.
     fn update_at_analysis(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> bool;
@@ -148,10 +148,9 @@ pub mod property {
         NumLearnt,
         NumReduction,
         NumReRegistration,
-        Timestamp,
     }
 
-    pub const USIZES: [Tusize; 8] = [
+    pub const USIZES: [Tusize; 7] = [
         Tusize::NumBiClause,
         Tusize::NumBiLearnt,
         Tusize::NumClause,
@@ -159,7 +158,6 @@ pub mod property {
         Tusize::NumLearnt,
         Tusize::NumReduction,
         Tusize::NumReRegistration,
-        Tusize::Timestamp,
     ];
 
     impl PropertyDereference<Tusize, usize> for ClauseDB {
@@ -173,11 +171,6 @@ pub mod property {
                 Tusize::NumLearnt => self.num_learnt,
                 Tusize::NumReduction => self.num_reduction,
                 Tusize::NumReRegistration => self.num_reregistration,
-
-                #[cfg(feature = "clause_rewarding")]
-                Tusize::Timestamp => self.tick,
-                #[cfg(not(feature = "clause_rewarding"))]
-                Tusize::Timestamp => 0,
             }
         }
     }

@@ -37,19 +37,6 @@ pub struct ClauseDB {
     certification_store: CertificationStore,
     /// a number of clauses to emit out-of-memory exception
     soft_limit: usize,
-    // not in use
-    // lbd_frozen_clause: usize,
-
-    //
-    //## clause rewarding
-    //
-    /// an index for counting elapsed time
-    #[cfg(feature = "clause_rewarding")]
-    tick: usize,
-    #[cfg(feature = "clause_rewarding")]
-    activity_decay: f64,
-    #[cfg(feature = "clause_rewarding")]
-    activity_anti_decay: f64,
 
     //
     //## LBD
@@ -92,19 +79,9 @@ impl Default for ClauseDB {
             freelist: Vec::new(),
             certification_store: CertificationStore::default(),
             soft_limit: 0, // 248_000_000
-
-            // lbd_frozen_clause: 30,
-            #[cfg(feature = "clause_rewarding")]
-            tick: 0,
-            #[cfg(feature = "clause_rewarding")]
-            activity_decay: 0.99,
-            #[cfg(feature = "clause_rewarding")]
-            activity_anti_decay: 0.01,
-
             lbd_temp: Vec::new(),
             lbd: Ema2::default_extended(),
             leanrt_limit_ema: Ema::default().with_value(40_000.0),
-
             num_clause: 0,
             num_bi_clause: 0,
             num_bi_learnt: 0,
@@ -242,11 +219,8 @@ impl Instantiate for ClauseDB {
             soft_limit: config.c_cls_lim,
             lbd: Ema2::default_extended(),
 
-            #[cfg(feature = "clause_rewarding")]
-            activity_decay: config.crw_dcy_rat,
-            #[cfg(feature = "clause_rewarding")]
-            activity_anti_decay: 1.0 - config.crw_dcy_rat,
-
+            // activity_stay_rate: config.crw_dcy_rat,
+            // activity_learning_rate: 1.0 - config.crw_dcy_rat,
             lbd_temp: vec![0; nv + 1],
             ..ClauseDB::default()
         }
@@ -338,12 +312,7 @@ impl ClauseDBIF for ClauseDB {
             // }
             // assert!(c.is_dead());
             c.flags = FlagClause::empty();
-            c.used = 0;
-
-            #[cfg(feature = "clause_rewarding")]
-            {
-                c.reward = 0.0;
-            }
+            c.reference_rate = 1.0;
 
             debug_assert!(c.lits.is_empty()); // c.lits.clear();
             std::mem::swap(&mut c.lits, vec);
@@ -365,19 +334,11 @@ impl ClauseDBIF for ClauseDB {
             num_bi_learnt,
             num_learnt,
             binary_link,
-
-            #[cfg(feature = "clause_rewarding")]
-            tick,
-
             watch_cache,
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
-        c.used = 0;
-        #[cfg(feature = "clause_rewarding")]
-        {
-            c.timestamp = *tick;
-        }
+        c.turn_off(FlagClause::PROPAGATOR);
         let len2 = c.lits.len() == 2;
         *num_clause += 1;
         if learnt {
@@ -874,63 +835,55 @@ impl ClauseDBIF for ClauseDB {
         // But it's crucial. Don't remove the below.
         let rank = asg.literal_block_distance(&c.lits) as usize;
         let learnt = c.is(FlagClause::LEARNT);
-        if learnt {
-            #[cfg(feature = "clause_rewarding")]
-            self.reward_at_analysis(cid);
-        }
-        if 1 < rank {
-            self.lb_entanglement.update(rank as f64);
-        }
+        self.lb_entanglement.update(rank as f64);
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, envelope: usize) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, limit: usize, restarts: usize) {
         let ClauseDB {
             clause,
-            // lbd_temp,
             num_reduction,
-
-            #[cfg(feature = "clause_rewarding")]
-            ref tick,
-            #[cfg(feature = "clause_rewarding")]
-            ref activity_decay,
             ..
         } = self;
         *num_reduction += 1;
 
         let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
-        self.leanrt_limit_ema
-            .update(10.0 * 2_usize.pow(envelope as u32) as f64);
-        let limit: usize = self.leanrt_limit_ema.get() as usize;
-        if self.num_learnt < limit {
+        self.leanrt_limit_ema.update(limit as f64);
+        let lim: usize = self.leanrt_limit_ema.get() as usize;
+        if self.num_learnt < lim {
             return;
         }
+        // map restarts to reliability
+        let learning_rate = {
+            let r = restarts.pow(2) as f64;
+            r / (r + 400.0)
+        };
         for (i, c) in clause
             .iter_mut()
             .enumerate()
             .skip(1)
             .filter(|(_, c)| !c.is_dead())
         {
-            // c.update_lbd(asg, lbd_temp);
-            #[cfg(feature = "clause_rewarding")]
-            c.update_activity(*tick, *activity_decay, 0.0);
-
-            if c.is(FlagClause::ASSIGN_REASON) {
-                continue;
-            }
             if !c.is(FlagClause::LEARNT) {
                 continue;
             }
-            if c.used > 0 {
-                c.used -= 1;
+            c.reference_rate *= 1.0 - learning_rate;
+            if c.is(FlagClause::PROPAGATOR) {
+                c.reference_rate += learning_rate;
+                c.turn_off(FlagClause::PROPAGATOR);
+            }
+            if c.is(FlagClause::ASSIGN_REASON) {
+                continue;
+            }
+            if c.reference_rate >= 0.75 {
                 continue;
             }
             let lbd = asg.literal_block_distance(&c.lits);
-            perm.push(OrderedProxy::new(i, lbd as f64));
+            perm.push(OrderedProxy::new(i, c.len() as f64 - lbd as f64));
         }
-        if perm.len() > limit {
+        if perm.len() > lim {
             perm.sort();
-            for i in perm.iter().skip(limit) {
+            for i in perm.iter().skip(lim) {
                 self.remove_clause(ClauseId::from(i.to()));
             }
         }
@@ -1029,7 +982,11 @@ impl ClauseDBIF for ClauseDB {
         for c in self.clause.iter() {
             if !c.is_dead() {
                 nc += 1;
-                let u = c.used.saturating_add(1).ilog2().min(7);
+                let u = asg
+                    .literal_block_distance_(&c.lits)
+                    .saturating_add(1)
+                    .ilog2()
+                    .min(7);
                 *stats
                     .entry((
                         asg.literal_block_distance_(&c.lits)

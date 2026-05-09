@@ -50,6 +50,7 @@ pub trait StateIF {
 /// stat index.
 #[derive(Clone, Eq, PartialEq)]
 pub enum Stat {
+    //// the number or restarts
     Restart,
     /// the number of vivification
     Vivification,
