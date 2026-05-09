@@ -241,37 +241,42 @@ fn search(
     let progress_interval: usize = 10_000;
     let mut reduction_pressure: usize = 0;
     let reduction_interval: usize = 40_000;
-    let mut phase_rotation_pressure: usize = 0;
+    let mut rephase_span: usize = 0;
     let mut current_phase: &(PhaseRotation, usize, usize) = &PR_TBL[0];
-    let mut vmtf_span: usize = 0;
     let vmtf_interval: usize = 40_000;
     let mut assign_peak: usize = 0;
     let luby_scale: usize = 3;
     let mut span_scale: usize = luby_scale;
 
-    macro_rules! to_vmtf {
+    macro_rules! switch_rephase_cycle {
         () => {
-            if asg.activity_scheme != VarActivityScheme::VMTF {
-                asg.activity_scheme = VarActivityScheme::VMTF;
-                asg.phase_mode = PhaseRotation::Walk;
-                asg.set_learning_rate(0.0); // Don't change this
-                asg.rebuild_order();
-                vmtf_span = 0;
-            }
+            current_phase = &PR_TBL[current_phase.2];
+            asg.phase_mode = current_phase.0;
+            rephase_span = 0;
         };
     }
-    macro_rules! reset_rephase_cycle {
+    macro_rules! to_lrb {
         () => {
             if asg.activity_scheme != VarActivityScheme::LRB {
                 asg.activity_scheme = VarActivityScheme::LRB;
                 asg.set_learning_rate(state.config.vrw_learning_rate);
                 asg.rebuild_order();
-                vmtf_span = 0;
             }
             current_phase = &PR_TBL[0];
             asg.phase_mode = current_phase.0;
-            asg.set_learning_rate(state.config.vrw_learning_rate);
-            phase_rotation_pressure = 0;
+            rephase_span = 0;
+        };
+    }
+    macro_rules! to_vmtf {
+        () => {
+            if asg.activity_scheme != VarActivityScheme::VMTF {
+                asg.activity_scheme = VarActivityScheme::VMTF;
+                // No: we need to stay in the current rephase
+                // asg.phase_mode = PhaseRotation::Walk;
+                asg.set_learning_rate(0.0); // Don't change this
+                asg.rebuild_order();
+                rephase_span = 0;
+            }
         };
     }
 
@@ -284,8 +289,6 @@ fn search(
         let Err(cc) = asg.propagate(cdb) else {
             continue;
         };
-        progress_pressure += 1;
-        span_len += 1;
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }
@@ -314,46 +317,46 @@ fn search(
             reduction_pressure += 1;
             cdb.lbd.update(lbd as f64);
         }
-
         processing_pressure += (lbd <= 5) as usize;
-        if reduction_pressure >= reduction_interval {
-            cdb.reduce(asg, state.span_manager.envelop_index());
-            reduction_pressure = 0;
-            state.search_mode_ratio.0.update(0.0);
-            state.search_mode_ratio.1.update(0.0);
-        }
-        if asg.activity_scheme != VarActivityScheme::VMTF {
-            phase_rotation_pressure += 1;
-            if cfg!(feature = "rephase") && phase_rotation_pressure >= current_phase.1 {
-                current_phase = &PR_TBL[current_phase.2];
-                asg.phase_mode = current_phase.0;
-                asg.set_learning_rate(state.config.vrw_learning_rate);
-                phase_rotation_pressure = 0;
-            }
-        } else if vmtf_span >= vmtf_interval {
-            reset_rephase_cycle!();
-        } else {
-            vmtf_span += 1;
-        }
-        if asg.decision_level() == asg.root_level && processing_pressure >= processing_interval {
-            if cfg!(feature = "clause_vivification") {
-                cdb.vivify(asg, state)?;
-            }
-            if cfg!(feature = "clause_elimination") {
-                let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-                state.flush("clause subsumption, ");
-                elim.simplify(asg, cdb, state, false)?;
-                asg.eliminated.append(elim.eliminated_lits());
-            }
-            processing_pressure = 0;
-        }
-        if state.span_manager.span_ended(span_len / span_scale) {
+        progress_pressure += 1;
+        span_len += 1;
+        rephase_span += 1;
+        let sp =
+            span_len / ((asg.activity_scheme == VarActivityScheme::VMTF) as usize + 1) * span_scale;
+        if state.span_manager.span_ended(sp) {
             span_len = 0;
-            if asg.activity_scheme == VarActivityScheme::LRB {
-                RESTART!(asg, cdb, state)?;
-            }
+            RESTART!(asg, cdb, state)?;
             let new_segment = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, state, new_segment);
+            if reduction_pressure >= reduction_interval {
+                reduction_pressure = 0;
+                cdb.reduce(asg, state.span_manager.envelop_index());
+                state.search_mode_ratio.0.update(0.0);
+                state.search_mode_ratio.1.update(0.0);
+            }
+            if processing_pressure >= processing_interval {
+                if cfg!(feature = "clause_vivification") {
+                    cdb.vivify(asg, state)?;
+                }
+                if cfg!(feature = "clause_elimination") {
+                    let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+                    state.flush("clause subsumption, ");
+                    elim.simplify(asg, cdb, state, false)?;
+                    asg.eliminated.append(elim.eliminated_lits());
+                }
+                processing_pressure = 0;
+            }
+            if cfg!(feature = "rephase") {
+                match asg.activity_scheme {
+                    VarActivityScheme::LRB if rephase_span >= current_phase.1 => {
+                        switch_rephase_cycle!();
+                    }
+                    VarActivityScheme::VMTF if rephase_span >= vmtf_interval => {
+                        to_lrb!();
+                    }
+                    _ => (),
+                }
+            }
             if new_segment == Some(true) {
                 state.config.vrw_learning_rate *= 0.99;
                 span_scale = luby_scale * state.span_manager.envelop_index();

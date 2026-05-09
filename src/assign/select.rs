@@ -17,13 +17,14 @@ pub enum PhaseRotation {
 }
 
 impl PhaseRotation {
+    /// return a symbolic (Unicode) letter for each value of `PhaseRotation`.
     pub fn as_mnemonic(&self) -> &str {
         match self {
             PhaseRotation::Walk => "→",
-            PhaseRotation::Best => "*",
+            PhaseRotation::Best => "★",
             PhaseRotation::False => "⊥",
             PhaseRotation::True => "⊤",
-            PhaseRotation::Random => "?",
+            PhaseRotation::Random => "∼",
             PhaseRotation::Inverted => "¬",
         }
     }
