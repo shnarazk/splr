@@ -19,6 +19,8 @@ pub struct Clause {
     pub search_from: u16,
     /// A dynamic clause evaluation criterion based on the number of propagations.
     pub(crate) reference_rate: f64,
+    /// Sum of activated (used as propagated) duration
+    pub(crate) activated: usize,
 }
 
 /// API for Clause, providing literal accessors.
@@ -50,6 +52,7 @@ impl Default for Clause {
             flags: FlagClause::empty(),
             search_from: 2,
             reference_rate: 0.0,
+            activated: 0,
         }
     }
 }

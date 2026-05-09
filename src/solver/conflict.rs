@@ -36,7 +36,7 @@ pub fn handle_conflict(
     // at higher level due to the incoherence between the current level and conflicting
     // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
     {
-        if let AssignReason::Implication(cid) = cc.1
+        if let AssignReason::Implication(cid, _) = cc.1
             && cdb[cid].iter().all(|l| asg.level(l.vi()) == 0)
         {
             return Err(SolverError::RootLevelConflict(*cc));
@@ -133,7 +133,7 @@ pub fn handle_conflict(
                     bumped.push(vi);
                 }
             }
-            AssignReason::Implication(r) => {
+            AssignReason::Implication(r, _) => {
                 for l in cdb[r].iter() {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
@@ -207,15 +207,17 @@ pub fn handle_conflict(
 
             if bt_drift.is_none() {
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
-                cdb[cid].turn_on(FlagClause::PROPAGATOR);
             }
             ret = (cid, 1);
         }
         RefClause::Clause(cid) => {
             debug_assert_eq!(cdb[cid].lit0(), l0);
             if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
-                asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
-                cdb[cid].turn_on(FlagClause::PROPAGATOR);
+                asg.assign_by_implication(
+                    l0,
+                    AssignReason::Implication(cid, asg.num_conflict),
+                    assign_level,
+                );
                 cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
             }
             let d = asg.literal_block_distance(&cdb[cid].lits);
@@ -242,7 +244,6 @@ pub fn handle_conflict(
             ret = (cid, asg.literal_block_distance(&cdb[cid].lits));
             if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
-                cdb[cid].turn_on(FlagClause::PROPAGATOR);
             }
         }
         RefClause::Dead => unreachable!("handle_conflict::RefClause::Dead"),
@@ -335,7 +336,7 @@ fn conflict_analyze(
         }
     }
     let mut trail_index = asg.stack_len() - 1;
-    if let AssignReason::Implication(cid) = cc.1 {
+    if let AssignReason::Implication(cid, _) = cc.1 {
         cdb.update_at_analysis(asg, cid);
     }
     loop {
@@ -369,7 +370,7 @@ fn conflict_analyze(
                     }
                 }
             }
-            AssignReason::Implication(cid) => {
+            AssignReason::Implication(cid, _) => {
                 trace!(
                     "analyze clause {}(first literal: {}) for {}",
                     cid,
@@ -528,7 +529,7 @@ impl Lit {
                         // if asg.reason(vi) != AssignReason::Decision(_) && levels[lv as usize] {
                         if matches!(
                             asg.reason(vi),
-                            AssignReason::Implication(_) | AssignReason::BinaryLink(_)
+                            AssignReason::Implication(_, _) | AssignReason::BinaryLink(_)
                         ) && levels[lv as usize]
                         {
                             asg.var_mut(vi).turn_on(FlagVar::CA_SEEN);
@@ -544,7 +545,7 @@ impl Lit {
                         }
                     }
                 }
-                AssignReason::Implication(cid) => {
+                AssignReason::Implication(cid, _) => {
                     let c = &cdb[cid];
                     for q in &(*c)[1..] {
                         let vi = q.vi();
@@ -553,7 +554,7 @@ impl Lit {
                             // if asg.reason(vi) != AssignReason::default() && levels[lv as usize] {
                             if matches!(
                                 asg.reason(vi),
-                                AssignReason::BinaryLink(_) | AssignReason::Implication(_)
+                                AssignReason::BinaryLink(_) | AssignReason::Implication(_, _)
                             ) && levels[lv as usize]
                             {
                                 asg.var_mut(vi).turn_on(FlagVar::CA_SEEN);
@@ -600,7 +601,7 @@ fn lit_level(
     match asg.reason(lit.vi()) {
         AssignReason::Decision(0) => asg.root_level(),
         AssignReason::Decision(lvl) => lvl,
-        AssignReason::Implication(cid) => {
+        AssignReason::Implication(cid, _) => {
             assert_eq!(
                 cdb[cid].lit0(),
                 lit,
@@ -646,7 +647,7 @@ fn dumper(asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
             match asg.reason(l.vi()) {
                 AssignReason::Decision(_) => vec![],
                 AssignReason::BinaryLink(lit) => vec![*l, !lit],
-                AssignReason::Implication(cid) => cdb[cid].iter().copied().collect::<Vec<Lit>>(),
+                AssignReason::Implication(cid, _) => cdb[cid].iter().copied().collect::<Vec<Lit>>(),
                 AssignReason::None => vec![],
             },
         )

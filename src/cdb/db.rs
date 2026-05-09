@@ -338,7 +338,7 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
-        c.turn_off(FlagClause::PROPAGATOR);
+        c.reference_rate = 0.5;
         let len2 = c.lits.len() == 2;
         *num_clause += 1;
         if learnt {
@@ -839,7 +839,7 @@ impl ClauseDBIF for ClauseDB {
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, limit: usize, restarts: usize) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, limit: usize, span: usize) {
         let ClauseDB {
             clause,
             num_reduction,
@@ -854,10 +854,7 @@ impl ClauseDBIF for ClauseDB {
             return;
         }
         // map restarts to reliability
-        let learning_rate = {
-            let r = restarts.pow(2) as f64;
-            r / (r + 400.0)
-        };
+        let learning_rate = 0.4;
         for (i, c) in clause
             .iter_mut()
             .enumerate()
@@ -868,18 +865,28 @@ impl ClauseDBIF for ClauseDB {
                 continue;
             }
             c.reference_rate *= 1.0 - learning_rate;
-            if c.is(FlagClause::PROPAGATOR) {
-                c.reference_rate += learning_rate;
-                c.turn_off(FlagClause::PROPAGATOR);
-            }
+            c.reference_rate += learning_rate * c.activated as f64 / span as f64;
+            // if (10000..10040).contains(&i) && c.activated > 0 {
+            //     println!(
+            //         "{:5}{:5}:{:>.4}, {:>.4}",
+            //         i,
+            //         c.activated,
+            //         c.activated as f64 / span as f64,
+            //         c.reference_rate
+            //     );
+            // }
+            c.activated = 0;
             if c.is(FlagClause::ASSIGN_REASON) {
                 continue;
             }
-            if c.reference_rate >= 0.75 {
+            if c.reference_rate >= 0.2 {
                 continue;
             }
             let lbd = asg.literal_block_distance(&c.lits);
-            perm.push(OrderedProxy::new(i, c.len() as f64 - lbd as f64));
+            perm.push(OrderedProxy::new(
+                i,
+                1.0 - c.reference_rate - 1.0 / lbd as f64,
+            ));
         }
         if perm.len() > lim {
             perm.sort();

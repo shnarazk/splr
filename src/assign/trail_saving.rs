@@ -67,19 +67,19 @@ impl TrailSavingIF for AssignStack {
                     self.assign_by_implication(lit, old_reason, dl);
                 }
                 // reason refinement by ignoring this dependecy
-                (None, AssignReason::Implication(c)) if cdb[c].is_dead() => {
+                (None, AssignReason::Implication(c, _)) if cdb[c].is_dead() => {
                     // The clause was removed (by reduce, vivify, or simplification)
                     // between saving and reusing the trail. Stop reusing from here.
                     self.insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
                 // Somehow this pass exists if BT_deepen is activated.
-                (None, AssignReason::Implication(cid)) if cdb[cid].lit0() != lit => {
+                (None, AssignReason::Implication(cid, _)) if cdb[cid].lit0() != lit => {
                     self.insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
 
-                (None, AssignReason::Implication(cid)) => {
+                (None, AssignReason::Implication(cid, _)) => {
                     debug_assert!(
                         cdb[cid]
                             .iter()
@@ -88,7 +88,11 @@ impl TrailSavingIF for AssignStack {
                     );
                     self.num_repropagation += 1;
 
-                    self.assign_by_implication(lit, old_reason, dl);
+                    self.assign_by_implication(
+                        lit,
+                        AssignReason::Implication(cid, self.num_conflict),
+                        dl,
+                    );
                     cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
                 }
                 (Some(false), AssignReason::BinaryLink(link)) => {
@@ -98,17 +102,17 @@ impl TrailSavingIF for AssignStack {
                     self.clear_saved_trail();
                     return Err((lit, old_reason));
                 }
-                (Some(false), AssignReason::Implication(cid)) if cdb[cid].is_dead() => {
+                (Some(false), AssignReason::Implication(cid, _)) if cdb[cid].is_dead() => {
                     // The clause was removed between saving and reusing the trail.
                     // No conflict from a dead clause; stop reusing from here.
                     self.insert_heap(vi);
                     return self.truncate_trail_saved(i + 1);
                 }
-                (Some(false), AssignReason::Implication(cid)) => {
+                (Some(false), AssignReason::Implication(cid, starts_at)) => {
                     debug_assert!(cdb[cid].iter().all(|l| self.assigned(*l) == Some(false)));
                     let _ = self.truncate_trail_saved(i + 1); // reduce heap ops.
                     self.clear_saved_trail();
-                    return Err((cdb[cid].lit0(), AssignReason::Implication(cid)));
+                    return Err((cdb[cid].lit0(), AssignReason::Implication(cid, starts_at)));
                 }
                 (_, AssignReason::Decision(lvl)) => {
                     debug_assert_ne!(0, lvl);

@@ -25,8 +25,6 @@ bitflags! {
         const OCCUR_LINKED  = 0b0000_0100;
         /// a clause is registered in vars' assing list.
         const ASSIGN_REASON = 0b0000_1000;
-        /// a clause uesd in a propagation
-        const PROPAGATOR    = 0b0001_0000;
     }
 }
 

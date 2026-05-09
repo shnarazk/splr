@@ -248,7 +248,7 @@ fn search(
     let luby_scale: usize = 3;
     let mut span_scale: usize = luby_scale;
     let mut va_scale: usize = 1;
-    let mut num_restarts: usize = 0;
+    let mut last_restart: usize = 0;
 
     macro_rules! switch_rephase_cycle {
         () => {
@@ -334,9 +334,9 @@ fn search(
                 cdb.reduce(
                     asg,
                     e * 2_usize.pow(e as u32),
-                    state[Stat::Restart] - num_restarts,
+                    asg.num_conflict - last_restart,
                 );
-                num_restarts = state[Stat::Restart];
+                last_restart = asg.num_conflict;
                 // cdb.reduce(asg, state.span_manager.envelop_index());
                 reduction_pressure = 0;
                 state.search_mode_ratio.0.update(0.0);
