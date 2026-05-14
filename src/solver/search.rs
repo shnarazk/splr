@@ -245,10 +245,8 @@ fn search(
     let mut current_phase: &(PhaseRotation, usize, usize) = &PR_TBL[0];
     let vmtf_interval: usize = 40_000;
     let mut assign_peak: usize = 0;
-    // let mut conflict_peak: usize = usize::MAX;
     let luby_scale: usize = 8;
     let mut span_scale: usize = luby_scale;
-    let mut va_scale: usize = 2;
 
     macro_rules! switch_rephase_cycle {
         () => {
@@ -263,7 +261,6 @@ fn search(
                 asg.activity_scheme = VarActivityScheme::LRB;
                 asg.set_learning_rate(state.config.vrw_learning_rate);
                 asg.rebuild_order();
-                va_scale = 1;
             }
             current_phase = &PR_TBL[0];
             asg.phase_mode = current_phase.0;
@@ -278,7 +275,6 @@ fn search(
                 // asg.phase_mode = PhaseRotation::Walk;
                 asg.set_learning_rate(0.0); // Don't change this
                 asg.rebuild_order();
-                va_scale = 2;
                 rephase_span = 0;
             }
         };
@@ -326,27 +322,15 @@ fn search(
         } else {
             cdb.lbd.update(lbd as f64);
         }
-        // if conflict_peak < asg.stack_len() {
-        //     let dl = asg.decision_level() as usize;
-        //     conflict_peak = asg.stack_len();
-        //     for l in asg.stack_iter() {
-        //         if let AssignReason::Implication(cid) = asg.var(l.vi()).reason {
-        //             cdb[cid].activated += dl;
-        //         }
-        //     }
-        // }
-        reduction_pressure += (lbd >= 5) as usize;
+        reduction_pressure += (lbd > 4) as usize;
         processing_pressure += (lbd <= 5) as usize;
         progress_pressure += 1;
         span_len += 1;
         rephase_span += 1;
-        if reduction_pressure >= reduction_interval * 16 {
+        if reduction_pressure >= reduction_interval * 8 {
             reduce!();
         }
-        if state
-            .span_manager
-            .span_ended(span_len / (va_scale * span_scale))
-        {
+        if state.span_manager.span_ended(span_len / span_scale) {
             span_len = 0;
             let new_segment = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, state, new_segment);
@@ -378,9 +362,8 @@ fn search(
                 }
             }
             if new_segment == Some(true) {
-                let e = state.span_manager.envelop_index();
+                span_scale = luby_scale * state.span_manager.envelop_index();
                 // state.config.vrw_learning_rate *= 0.99;
-                span_scale = luby_scale * e;
             }
         }
         if progress_pressure >= progress_interval {

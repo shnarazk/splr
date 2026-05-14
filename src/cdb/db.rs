@@ -858,18 +858,14 @@ impl ClauseDBIF for ClauseDB {
                 continue;
             }
             let lbd = asg.literal_block_distance(&c.lits) as usize;
-            if lbd <= 4 || 2 * lbd <= act {
-                picks += lbd;
-            } else if
-            /* act > 0 && lbd <= 8 */
-            lbd <= act {
+            if lbd <= 4 || lbd <= act {
+                picks += act;
+            } else if 4 <= act {
                 tier2.push(OrderedProxy::new(i, lbd as f64 - act as f64));
-                // tier2.push(OrderedProxy::new(i, (lbd as f64) - act as f64));
             } else {
                 tier3.push(OrderedProxy::new(i, 0.0));
             }
         }
-        // picks += tier3.len() / 2;
         for c in tier3.iter() {
             self.remove_clause(ClauseId::from(c.to()));
         }

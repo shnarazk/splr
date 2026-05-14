@@ -298,9 +298,9 @@ impl AssignIF for AssignStack {
         false
     }
     fn literal_block_distance(&mut self, lits: &[Lit]) -> DecisionLevel {
-        if 8192 <= lits.len() {
-            return u16::MAX as DecisionLevel;
-        }
+        // if 8192 <= lits.len() {
+        //     return u16::MAX as DecisionLevel;
+        // }
         let key: usize = self.lbd_temp[0] + 1;
         self.lbd_temp[0] = key;
         let mut cnt: DecisionLevel = 0;
@@ -312,7 +312,7 @@ impl AssignIF for AssignStack {
             let p = &mut self.lbd_temp[lv as usize];
             if *p != key {
                 *p = key;
-                cnt += 1;
+                cnt = cnt.saturating_add(1);
             }
         }
         cnt
