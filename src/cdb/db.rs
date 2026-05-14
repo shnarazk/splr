@@ -45,9 +45,6 @@ pub struct ClauseDB {
     lbd_temp: Vec<usize>,
     pub(crate) lbd: Ema2,
 
-    //## Reduction
-    leanrt_limit_ema: Ema,
-
     //
     //## statistics
     //
@@ -81,7 +78,6 @@ impl Default for ClauseDB {
             soft_limit: 0, // 248_000_000
             lbd_temp: Vec::new(),
             lbd: Ema2::default_extended(),
-            leanrt_limit_ema: Ema::default().with_value(40_000.0),
             num_clause: 0,
             num_bi_clause: 0,
             num_bi_learnt: 0,
@@ -312,8 +308,6 @@ impl ClauseDBIF for ClauseDB {
             // }
             // assert!(c.is_dead());
             c.flags = FlagClause::empty();
-            c.reference_rate = 1.0;
-
             debug_assert!(c.lits.is_empty()); // c.lits.clear();
             std::mem::swap(&mut c.lits, vec);
             c.search_from = 2;
@@ -338,7 +332,6 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
-        c.reference_rate = 0.5;
         let len2 = c.lits.len() == 2;
         *num_clause += 1;
         if learnt {
@@ -839,7 +832,7 @@ impl ClauseDBIF for ClauseDB {
         learnt
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, limit: usize, span: usize) {
+    fn reduce(&mut self, asg: &mut impl AssignIF) {
         let ClauseDB {
             clause,
             num_reduction,
@@ -847,14 +840,9 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         *num_reduction += 1;
 
-        let mut perm: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
-        self.leanrt_limit_ema.update(limit as f64);
-        let lim: usize = self.leanrt_limit_ema.get() as usize;
-        if self.num_learnt < lim {
-            return;
-        }
-        // map restarts to reliability
-        let learning_rate = 0.4;
+        let mut tier2: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
+        let mut tier3: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
+        let mut picks: usize = 0;
         for (i, c) in clause
             .iter_mut()
             .enumerate()
@@ -864,34 +852,31 @@ impl ClauseDBIF for ClauseDB {
             if !c.is(FlagClause::LEARNT) {
                 continue;
             }
-            c.reference_rate *= 1.0 - learning_rate;
-            c.reference_rate += learning_rate * c.activated as f64 / span as f64;
-            // if (10000..10040).contains(&i) && c.activated > 0 {
-            //     println!(
-            //         "{:5}{:5}:{:>.4}, {:>.4}",
-            //         i,
-            //         c.activated,
-            //         c.activated as f64 / span as f64,
-            //         c.reference_rate
-            //     );
-            // }
+            let act = c.activated as usize;
             c.activated = 0;
             if c.is(FlagClause::ASSIGN_REASON) {
                 continue;
             }
-            if c.reference_rate >= 0.2 {
-                continue;
+            let lbd = asg.literal_block_distance(&c.lits) as usize;
+            if lbd <= 4 || 2 * lbd <= act {
+                picks += lbd;
+            } else if
+            /* act > 0 && lbd <= 8 */
+            lbd <= act {
+                tier2.push(OrderedProxy::new(i, lbd as f64 - act as f64));
+                // tier2.push(OrderedProxy::new(i, (lbd as f64) - act as f64));
+            } else {
+                tier3.push(OrderedProxy::new(i, 0.0));
             }
-            let lbd = asg.literal_block_distance(&c.lits);
-            perm.push(OrderedProxy::new(
-                i,
-                1.0 - c.reference_rate - 1.0 / lbd as f64,
-            ));
         }
-        if perm.len() > lim {
-            perm.sort();
-            for i in perm.iter().skip(lim) {
-                self.remove_clause(ClauseId::from(i.to()));
+        // picks += tier3.len() / 2;
+        for c in tier3.iter() {
+            self.remove_clause(ClauseId::from(c.to()));
+        }
+        if tier2.len() > picks {
+            tier2.sort();
+            for c in tier2.iter().skip(picks) {
+                self.remove_clause(ClauseId::from(c.to()));
             }
         }
     }

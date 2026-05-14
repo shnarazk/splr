@@ -99,7 +99,7 @@ impl VivifyIF for ClauseDB {
                                         asg.backtrack_sandbox();
                                     }
                                 }
-                                AssignReason::Implication(ci, _) => {
+                                AssignReason::Implication(ci) => {
                                     if ci == cid && clits.len() == decisions.len() {
                                         asg.backtrack_sandbox();
                                         continue 'next_clause;
@@ -289,7 +289,7 @@ impl AssignStack {
                 AssignReason::BinaryLink(bil) => {
                     seen[bil.vi()] = key;
                 }
-                AssignReason::Implication(cid, _) => {
+                AssignReason::Implication(cid) => {
                     for r in cdb[cid].iter().skip(1) {
                         seen[r.vi()] = key;
                     }

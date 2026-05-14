@@ -265,9 +265,8 @@ impl PropagateIF for AssignStack {
             }
 
             unset_assign!(self, vi);
-            if let AssignReason::Implication(cid, starts_at) = self.var[vi].reason {
+            if let AssignReason::Implication(cid) = self.var[vi].reason {
                 cdb[cid].turn_off(FlagClause::ASSIGN_REASON);
-                cdb[cid].activated += self.num_conflict + 1 - starts_at;
             }
             self.var[vi].reason = AssignReason::None;
 
@@ -484,7 +483,7 @@ impl PropagateIF for AssignStack {
                 }
                 cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
                 if other_watch_value == Some(false) {
-                    conflict_path!(cached, AssignReason::Implication(cid, self.num_conflict));
+                    conflict_path!(cached, AssignReason::Implication(cid));
                 }
 
                 debug_assert_eq!(cdb[cid].lit0(), cached);
@@ -492,7 +491,7 @@ impl PropagateIF for AssignStack {
                 debug_assert!(other_watch_value.is_none());
                 self.assign_by_implication(
                     cached,
-                    AssignReason::Implication(cid, self.num_conflict),
+                    AssignReason::Implication(cid),
                     if cfg!(feature = "chrono_BT") {
                         debug_assert!(self.var[cdb[cid].lit0().vi()].assign.is_none());
                         cdb[cid]
@@ -505,6 +504,7 @@ impl PropagateIF for AssignStack {
                         dl
                     },
                 );
+                // cdb[cid].activated = cdb[cid].activated.max(1);
                 cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
             }
             from_saved_trail!();
@@ -642,7 +642,7 @@ impl PropagateIF for AssignStack {
                 }
                 cdb.transform_by_restoring_watch_cache(propagating, &mut source, updated_cache);
                 if other_watch_value == Some(false) {
-                    return Err((cached, AssignReason::Implication(cid, self.num_conflict)));
+                    return Err((cached, AssignReason::Implication(cid)));
                 }
                 debug_assert_eq!(cdb[cid].lit0(), cached);
                 debug_assert_eq!(self.assigned(cached), None);
@@ -650,7 +650,7 @@ impl PropagateIF for AssignStack {
 
                 self.assign_by_implication(
                     cached,
-                    AssignReason::Implication(cid, self.num_conflict),
+                    AssignReason::Implication(cid),
                     if cfg!(feature = "chrono_BT") {
                         cdb[cid]
                             .iter()

@@ -17,8 +17,6 @@ pub struct Clause {
     /// the index from which `propagate` starts searching an un-falsified literal.
     /// Since it's just a hint, we don't need u32 or usize.
     pub search_from: u16,
-    /// A dynamic clause evaluation criterion based on the number of propagations.
-    pub(crate) reference_rate: f64,
     /// Sum of activated (used as propagated) duration
     pub(crate) activated: usize,
 }
@@ -51,7 +49,6 @@ impl Default for Clause {
             lits: vec![],
             flags: FlagClause::empty(),
             search_from: 2,
-            reference_rate: 0.0,
             activated: 0,
         }
     }

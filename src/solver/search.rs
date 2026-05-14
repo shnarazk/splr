@@ -240,15 +240,15 @@ fn search(
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
     let mut reduction_pressure: usize = 0;
-    let reduction_interval: usize = 40_000;
+    let reduction_interval: usize = 10_000;
     let mut rephase_span: usize = 0;
     let mut current_phase: &(PhaseRotation, usize, usize) = &PR_TBL[0];
     let vmtf_interval: usize = 40_000;
     let mut assign_peak: usize = 0;
-    let luby_scale: usize = 3;
+    // let mut conflict_peak: usize = usize::MAX;
+    let luby_scale: usize = 8;
     let mut span_scale: usize = luby_scale;
-    let mut va_scale: usize = 1;
-    let mut last_restart: usize = 0;
+    let mut va_scale: usize = 2;
 
     macro_rules! switch_rephase_cycle {
         () => {
@@ -283,6 +283,15 @@ fn search(
             }
         };
     }
+    macro_rules! reduce {
+        () => {
+            cdb.reduce(asg);
+            reduction_pressure = 0;
+            // conflict_peak = 0;
+            state.search_mode_ratio.0.update(0.0);
+            state.search_mode_ratio.1.update(0.0);
+        };
+    }
 
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
@@ -296,6 +305,7 @@ fn search(
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }
+        // track the minimul set of clauses that emit a conflict
         if assign_peak < asg.stack_len() {
             assign_peak = asg.stack_len();
             to_vmtf!();
@@ -314,34 +324,36 @@ fn search(
                 }
             }
         } else {
-            reduction_pressure += 1;
             cdb.lbd.update(lbd as f64);
         }
+        // if conflict_peak < asg.stack_len() {
+        //     let dl = asg.decision_level() as usize;
+        //     conflict_peak = asg.stack_len();
+        //     for l in asg.stack_iter() {
+        //         if let AssignReason::Implication(cid) = asg.var(l.vi()).reason {
+        //             cdb[cid].activated += dl;
+        //         }
+        //     }
+        // }
+        reduction_pressure += (lbd >= 5) as usize;
         processing_pressure += (lbd <= 5) as usize;
         progress_pressure += 1;
         span_len += 1;
         rephase_span += 1;
+        if reduction_pressure >= reduction_interval * 16 {
+            reduce!();
+        }
         if state
             .span_manager
             .span_ended(span_len / (va_scale * span_scale))
         {
             span_len = 0;
-            RESTART!(asg, cdb, state)?;
             let new_segment = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, state, new_segment);
             if reduction_pressure >= reduction_interval {
-                let e = state.span_manager.envelop_index();
-                cdb.reduce(
-                    asg,
-                    e * 2_usize.pow(e as u32),
-                    asg.num_conflict - last_restart,
-                );
-                last_restart = asg.num_conflict;
-                // cdb.reduce(asg, state.span_manager.envelop_index());
-                reduction_pressure = 0;
-                state.search_mode_ratio.0.update(0.0);
-                state.search_mode_ratio.1.update(0.0);
+                reduce!();
             }
+            RESTART!(asg, cdb, state)?;
             if processing_pressure >= processing_interval {
                 if cfg!(feature = "clause_vivification") {
                     cdb.vivify(asg, state)?;
@@ -366,8 +378,9 @@ fn search(
                 }
             }
             if new_segment == Some(true) {
-                state.config.vrw_learning_rate *= 0.99;
-                span_scale = luby_scale * state.span_manager.envelop_index();
+                let e = state.span_manager.envelop_index();
+                // state.config.vrw_learning_rate *= 0.99;
+                span_scale = luby_scale * e;
             }
         }
         if progress_pressure >= progress_interval {

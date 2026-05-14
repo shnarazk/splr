@@ -56,9 +56,11 @@ impl<T: Clone + Default + Sized + Ord> OrderedProxy<T> {
             body,
         }
     }
+    #[inline]
     pub fn to(&self) -> T {
         self.body.clone()
     }
+    #[inline]
     pub fn value(&self) -> f64 {
         self.index
     }

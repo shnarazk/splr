@@ -93,7 +93,7 @@ pub enum AssignReason {
     /// Assigned by decision
     Decision(DecisionLevel),
     /// Assigned by a non-binary clause.
-    Implication(ClauseId, usize),
+    Implication(ClauseId),
     /// None of the above.
     None,
 }
@@ -101,10 +101,10 @@ pub enum AssignReason {
 impl fmt::Display for AssignReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            &AssignReason::BinaryLink(_) => write!(f, "Implied by a binary clause"),
+            AssignReason::BinaryLink(_) => write!(f, "Implied by a binary clause"),
             AssignReason::Decision(0) => write!(f, "Asserted"),
             AssignReason::Decision(lvl) => write!(f, "Decided at level {lvl}"),
-            AssignReason::Implication(cid, _) => write!(f, "Implied by {cid}"),
+            AssignReason::Implication(cid) => write!(f, "Implied by {cid}"),
             AssignReason::None => write!(f, "Not assigned"),
         }
     }
