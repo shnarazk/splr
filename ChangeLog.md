@@ -1,9 +1,10 @@
-## 0.19.0
+## 0.19.0, 2026-0X-XX
 
 - Adopt decision literal select heuristics:
     - *Variable Move To queue First*
     - *LearningRate-Based Rewarding* 
 - Adopt rephasing modes: Walk, Best, False(Original), True(Inverted), Random, Flipped
+- Revise `ClauseDB::reduce` to remove much more clauses
 - Switch to the O(1) Luby iterator. Now Luby sequence is used for
   - trigger for restarts, clause elimination, and clause vivification
   - clause DB size after clause reduction
