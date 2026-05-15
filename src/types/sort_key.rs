@@ -2,36 +2,36 @@
 use std::cmp::Ordering;
 
 #[derive(Clone, Debug)]
-pub struct OrderedProxy<T: Clone + Default + Sized + Ord> {
+pub struct SortKey<T: Clone + Default + Sized + Ord> {
     index: f64,
     body: T,
 }
 
-impl<T: Clone + Default + Sized + Ord> Default for OrderedProxy<T> {
+impl<T: Clone + Default + Sized + Ord> Default for SortKey<T> {
     fn default() -> Self {
-        OrderedProxy {
+        SortKey {
             index: 0.0,
             body: T::default(),
         }
     }
 }
 
-impl<T: Clone + Default + Sized + Ord> PartialEq for OrderedProxy<T> {
-    fn eq(&self, other: &OrderedProxy<T>) -> bool {
+impl<T: Clone + Default + Sized + Ord> PartialEq for SortKey<T> {
+    fn eq(&self, other: &SortKey<T>) -> bool {
         self.index == other.index && self.body == other.body
     }
 }
 
-impl<T: Clone + Default + Sized + Ord> Eq for OrderedProxy<T> {}
+impl<T: Clone + Default + Sized + Ord> Eq for SortKey<T> {}
 
-impl<T: Clone + Default + PartialEq + Ord> PartialOrd for OrderedProxy<T> {
-    fn partial_cmp(&self, other: &OrderedProxy<T>) -> Option<Ordering> {
+impl<T: Clone + Default + PartialEq + Ord> PartialOrd for SortKey<T> {
+    fn partial_cmp(&self, other: &SortKey<T>) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<T: Clone + Default + PartialEq + Ord> Ord for OrderedProxy<T> {
-    fn cmp(&self, other: &OrderedProxy<T>) -> Ordering {
+impl<T: Clone + Default + PartialEq + Ord> Ord for SortKey<T> {
+    fn cmp(&self, other: &SortKey<T>) -> Ordering {
         if let Some(ord) = self.index.partial_cmp(&other.index) {
             ord
         } else {
@@ -45,13 +45,13 @@ impl<T: Clone + Default + PartialEq + Ord> Ord for OrderedProxy<T> {
     }
 }
 
-impl<T: Clone + Default + Sized + Ord> OrderedProxy<T> {
+impl<T: Clone + Default + Sized + Ord> SortKey<T> {
     pub fn new(body: T, index: f64) -> Self {
-        OrderedProxy { index, body }
+        SortKey { index, body }
     }
     /// TODO: just use std::cmp::Reverse?
     pub fn new_invert(body: T, rindex: f64) -> Self {
-        OrderedProxy {
+        SortKey {
             index: -rindex,
             body,
         }

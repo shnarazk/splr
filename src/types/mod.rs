@@ -16,13 +16,11 @@ pub mod lit;
 /// methods on binary link, namely binary clause
 pub mod luby;
 /// methods on f64 sort
-pub mod ordered_proxy;
+pub mod sort_key;
 /// methods on Var
 pub mod var;
 
-pub use self::{
-    clause::*, cnf::*, ema::*, flags::*, idx::*, lit::*, luby::*, ordered_proxy::*, var::*,
-};
+pub use self::{clause::*, cnf::*, ema::*, flags::*, idx::*, lit::*, luby::*, sort_key::*, var::*};
 
 pub use crate::{assign::AssignReason, config::Config, solver::SolverEvent};
 

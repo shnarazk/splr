@@ -840,8 +840,8 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         *num_reduction += 1;
 
-        let mut tier2: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
-        let mut tier3: Vec<OrderedProxy<usize>> = Vec::with_capacity(clause.len());
+        let mut tier2: Vec<SortKey<usize>> = Vec::with_capacity(clause.len());
+        let mut tier3: Vec<SortKey<usize>> = Vec::with_capacity(clause.len());
         let mut picks: usize = 0;
         for (i, c) in clause
             .iter_mut()
@@ -862,9 +862,9 @@ impl ClauseDBIF for ClauseDB {
             if lbd <= 4 || lbd <= act {
                 picks += act;
             } else if act >= 1 && aas > 0.15 {
-                tier2.push(OrderedProxy::new(i, lbd as f64));
+                tier2.push(SortKey::new(i, lbd as f64));
             } else {
-                tier3.push(OrderedProxy::new(i, 0.0));
+                tier3.push(SortKey::new(i, 0.0));
             }
         }
         for c in tier3.iter() {

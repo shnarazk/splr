@@ -24,7 +24,7 @@ impl VivifyIF for ClauseDB {
                 SolverError::RootLevelConflict(cc)
             })?;
         }
-        let mut clauses: Vec<OrderedProxy<ClauseId>> =
+        let mut clauses: Vec<SortKey<ClauseId>> =
             select_targets(asg, self, state, state[Stat::Restart] == 0, NUM_TARGETS);
         state[Stat::Vivification] += 1;
         if clauses.is_empty() {
@@ -184,14 +184,14 @@ fn select_targets(
     state: &State,
     initial_stage: bool,
     len: Option<usize>,
-) -> Vec<OrderedProxy<ClauseId>> {
+) -> Vec<SortKey<ClauseId>> {
     if initial_stage {
-        let mut seen: Vec<Option<OrderedProxy<ClauseId>>> = vec![None; 2 * (asg.num_vars + 1)];
+        let mut seen: Vec<Option<SortKey<ClauseId>>> = vec![None; 2 * (asg.num_vars + 1)];
         for (i, c) in cdb.iter().enumerate().skip(1) {
             if let Some(rank) = c.to_vivify(asg, 0) {
                 let p = &mut seen[usize::from(c.lit0())];
                 if p.as_ref().map_or(0.0, |r| r.value()) < rank {
-                    *p = Some(OrderedProxy::new(ClauseId::from(i), rank));
+                    *p = Some(SortKey::new(ClauseId::from(i), rank));
                 }
             }
         }
@@ -207,7 +207,7 @@ fn select_targets(
     } else {
         let n = state[Stat::Vivification] % VIVIFY_TARGET_MODULO;
         let mut skips = 0;
-        let mut clauses: Vec<OrderedProxy<ClauseId>> = cdb
+        let mut clauses: Vec<SortKey<ClauseId>> = cdb
             .iter()
             .enumerate()
             .skip(1)
@@ -217,7 +217,7 @@ fn select_targets(
                         skips += 1;
                         None
                     } else {
-                        Some(OrderedProxy::new_invert(ClauseId::from(i), r))
+                        Some(SortKey::new_invert(ClauseId::from(i), r))
                     }
                 })
             })
