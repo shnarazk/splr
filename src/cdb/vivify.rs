@@ -7,7 +7,7 @@ use crate::{
     types::*,
 };
 
-const VIVIFY_LIMIT: usize = 100_000;
+const VIVIFY_LIMIT: usize = 40_000;
 const VIVIFY_TARGET_MODULO: usize = 6;
 
 pub trait VivifyIF {
@@ -24,8 +24,7 @@ impl VivifyIF for ClauseDB {
                 SolverError::RootLevelConflict(cc)
             })?;
         }
-        let mut clauses: Vec<SortKey<ClauseId>> =
-            select_targets(asg, self, state, state[Stat::Restart] == 0, NUM_TARGETS);
+        let mut clauses: Vec<SortKey<ClauseId>> = select_targets(self, state, NUM_TARGETS);
         state[Stat::Vivification] += 1;
         if clauses.is_empty() {
             return Ok(());
@@ -178,62 +177,34 @@ impl VivifyIF for ClauseDB {
     }
 }
 
-fn select_targets(
-    asg: &mut AssignStack,
-    cdb: &mut ClauseDB,
-    state: &State,
-    initial_stage: bool,
-    len: Option<usize>,
-) -> Vec<SortKey<ClauseId>> {
-    if initial_stage {
-        let mut seen: Vec<Option<SortKey<ClauseId>>> = vec![None; 2 * (asg.num_vars + 1)];
-        for (i, c) in cdb.iter().enumerate().skip(1) {
-            if let Some(rank) = c.to_vivify(asg, 0) {
-                let p = &mut seen[usize::from(c.lit0())];
-                if p.as_ref().map_or(0.0, |r| r.value()) < rank {
-                    *p = Some(SortKey::new(ClauseId::from(i), rank));
+fn select_targets(cdb: &mut ClauseDB, state: &State, len: Option<usize>) -> Vec<SortKey<ClauseId>> {
+    let n = state[Stat::Vivification] % VIVIFY_TARGET_MODULO;
+    let mut skips = 0;
+    let mut clauses: Vec<SortKey<ClauseId>> = cdb
+        .iter()
+        .enumerate()
+        .skip(1)
+        .filter_map(|(i, c)| {
+            c.to_vivify(n).and_then(|r| {
+                if r == 0.0 {
+                    skips += 1;
+                    None
+                } else {
+                    Some(SortKey::new_invert(ClauseId::from(i), r))
                 }
-            }
-        }
-        let mut clauses = seen.iter().filter_map(|p| p.clone()).collect::<Vec<_>>();
-        if let Some(max_len) = len
-            && 10 * max_len < clauses.len()
-        {
-            clauses.sort();
-            clauses.truncate(max_len);
-        }
-
-        clauses
-    } else {
-        let n = state[Stat::Vivification] % VIVIFY_TARGET_MODULO;
-        let mut skips = 0;
-        let mut clauses: Vec<SortKey<ClauseId>> = cdb
-            .iter()
-            .enumerate()
-            .skip(1)
-            .filter_map(|(i, c)| {
-                c.to_vivify(asg, n).and_then(|r| {
-                    if r == 0.0 {
-                        skips += 1;
-                        None
-                    } else {
-                        Some(SortKey::new_invert(ClauseId::from(i), r))
-                    }
-                })
             })
-            .collect::<Vec<_>>();
-        // if skips < clauses.len() {
-        //     return vec![];
-        // }
-        if let Some(max_len) = len
-            && max_len < clauses.len()
-        {
-            clauses.sort();
-            clauses.truncate(max_len);
-        }
-
-        clauses
+        })
+        .collect::<Vec<_>>();
+    // if skips < clauses.len() {
+    //     return vec![];
+    // }
+    if let Some(max_len) = len
+        && max_len < clauses.len()
+    {
+        clauses.sort();
+        clauses.truncate(max_len);
     }
+    clauses
 }
 
 impl AssignStack {
@@ -342,9 +313,8 @@ impl AssignStack {
 impl Clause {
     /// return `true` if the clause should try vivification.
     /// smaller is better.
-    fn to_vivify(&self, asg: &AssignStack, n: usize) -> Option<f64> {
-        (!self.is_dead() && self.len() % VIVIFY_TARGET_MODULO == n)
-            .then(|| -asg.activity(self.lit0().vi()))
+    fn to_vivify(&self, n: usize) -> Option<f64> {
+        (!self.is_dead() && self.len() % VIVIFY_TARGET_MODULO == n).then(|| self.len() as f64)
     }
     /// clear flags about vivification
     fn vivified(&mut self) {}
