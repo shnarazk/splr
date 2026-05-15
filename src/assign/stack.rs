@@ -323,6 +323,9 @@ impl AssignIF for AssignStack {
             .collect::<std::collections::HashSet<_>>()
             .len()
     }
+    fn activity_sum(&mut self, lits: &[Lit]) -> f64 {
+        lits.iter().map(|l| self.activity(l.vi())).sum::<f64>()
+    }
     fn activity_scheme(&self) -> &VarActivityScheme {
         &self.activity_scheme
     }

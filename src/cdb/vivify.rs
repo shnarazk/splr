@@ -8,6 +8,7 @@ use crate::{
 };
 
 const VIVIFY_LIMIT: usize = 100_000;
+const VIVIFY_TARGET_MODULO: usize = 6;
 
 pub trait VivifyIF {
     fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent;
@@ -204,7 +205,7 @@ fn select_targets(
 
         clauses
     } else {
-        let n = state[Stat::Vivification] % 32 + 2;
+        let n = state[Stat::Vivification] % VIVIFY_TARGET_MODULO;
         let mut skips = 0;
         let mut clauses: Vec<OrderedProxy<ClauseId>> = cdb
             .iter()
@@ -225,10 +226,10 @@ fn select_targets(
         //     return vec![];
         // }
         if let Some(max_len) = len
-            && max_len < n * clauses.len()
+            && max_len < clauses.len()
         {
             clauses.sort();
-            clauses.truncate(max_len / n);
+            clauses.truncate(max_len);
         }
 
         clauses
@@ -342,7 +343,8 @@ impl Clause {
     /// return `true` if the clause should try vivification.
     /// smaller is better.
     fn to_vivify(&self, asg: &AssignStack, n: usize) -> Option<f64> {
-        (!self.is_dead() && self.len() == n).then(|| -asg.activity(self.lit0().vi()))
+        (!self.is_dead() && self.len() % VIVIFY_TARGET_MODULO == n)
+            .then(|| -asg.activity(self.lit0().vi()))
     }
     /// clear flags about vivification
     fn vivified(&mut self) {}

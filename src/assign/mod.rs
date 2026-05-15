@@ -79,6 +79,8 @@ pub trait AssignIF:
     fn literal_block_distance(&mut self, lits: &[Lit]) -> DecisionLevel;
     /// compute Literal Block Distance (LBD) of a slice of literals under the current immutable assignment.
     fn literal_block_distance_(&self, lits: &[Lit]) -> usize;
+    /// compute reward sum
+    fn activity_sum(&mut self, lits: &[Lit]) -> f64;
     /// return the current var activity scheme
     fn activity_scheme(&self) -> &VarActivityScheme;
     /// return the current rephase scheme
