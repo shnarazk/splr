@@ -859,12 +859,9 @@ impl ClauseDBIF for ClauseDB {
             }
             let lbd = asg.literal_block_distance(&c.lits) as usize;
             let aas = asg.activity_sum(&c.lits) / c.len() as f64;
-            // if aas < 0.1 {
-            //     println!("{aas:>.3}");
-            // }
             if lbd <= 4 || lbd <= act {
                 picks += act;
-            } else if act >= 1 && aas > 0.1 {
+            } else if act >= 1 && aas > 0.15 {
                 tier2.push(OrderedProxy::new(i, lbd as f64));
             } else {
                 tier3.push(OrderedProxy::new(i, 0.0));
