@@ -342,6 +342,7 @@ impl ClauseDBIF for ClauseDB {
                 *num_learnt += 1;
             }
         }
+        c.turn_on(FlagClause::YOUNG);
         let l0 = c.lits[0];
         let l1 = c.lits[1];
         if len2 {
@@ -840,8 +841,8 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         *num_reduction += 1;
 
-        let mut tier2: Vec<SortKey<usize>> = Vec::with_capacity(clause.len());
-        let mut tier3: Vec<SortKey<usize>> = Vec::with_capacity(clause.len());
+        let mut tier2: Vec<SortKey<ClauseId>> = Vec::new();
+        let mut tier3: Vec<ClauseId> = Vec::new();
         let mut picks: usize = 0;
         for (i, c) in clause
             .iter_mut()
@@ -850,6 +851,10 @@ impl ClauseDBIF for ClauseDB {
             .filter(|(_, c)| !c.is_dead())
         {
             if !c.is(FlagClause::LEARNT) {
+                continue;
+            }
+            if c.is(FlagClause::YOUNG) {
+                c.turn_off(FlagClause::YOUNG);
                 continue;
             }
             let act = c.activated as usize;
@@ -862,18 +867,18 @@ impl ClauseDBIF for ClauseDB {
             if lbd <= 4 || lbd <= act {
                 picks += act;
             } else if act >= 1 && aas > 0.15 {
-                tier2.push(SortKey::new(i, lbd as f64));
+                tier2.push(SortKey::new(ClauseId::from(i), lbd as f64));
             } else {
-                tier3.push(SortKey::new(i, 0.0));
+                tier3.push(ClauseId::from(i));
             }
         }
-        for c in tier3.iter() {
-            self.remove_clause(ClauseId::from(c.to()));
+        for cid in tier3.into_iter() {
+            self.remove_clause(cid);
         }
         if tier2.len() > picks {
             tier2.sort();
-            for c in tier2.iter().skip(picks) {
-                self.remove_clause(ClauseId::from(c.to()));
+            for c in tier2.into_iter().skip(picks) {
+                self.remove_clause(c.to());
             }
         }
     }
@@ -1056,8 +1061,8 @@ fn remove_clause_fn(
             .expect("Eror (remove_clause_fn#01)");
         *num_bi_clause -= 1;
     } else {
-        watcher[usize::from(!l0)].remove_watch(&cid); // .expect("db1076");
-        watcher[usize::from(!l1)].remove_watch(&cid); // .expect("db1077");
+        watcher[usize::from(!l0)].remove_watch(&cid);
+        watcher[usize::from(!l1)].remove_watch(&cid);
     }
     if c.is(FlagClause::LEARNT) {
         *num_learnt -= 1;

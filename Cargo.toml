@@ -23,7 +23,7 @@ default = [
     "unsafe_access",
     # "chrono_BT",
     "trail_saving",
-    "BT_deepen",
+    # "BT_deepen",
 
     ### Heuristics
     "reason_side_rewarding",
