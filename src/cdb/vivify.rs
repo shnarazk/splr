@@ -311,10 +311,13 @@ impl AssignStack {
 }
 
 impl Clause {
-    /// return `true` if the clause should try vivification.
-    /// smaller is better.
+    /// return `Some(value)` if the clause should try vivification.
+    /// smaller value is better.
     fn to_vivify(&self, n: usize) -> Option<f64> {
-        (!self.is_dead() && self.len() % VIVIFY_TARGET_MODULO == n).then(|| self.len() as f64)
+        (!self.is_dead()
+            && self.activated == 0 // This means this clause is not young.
+            && self.len() % VIVIFY_TARGET_MODULO == n)
+            .then(|| self.len() as f64)
     }
     /// clear flags about vivification
     fn vivified(&mut self) {}
