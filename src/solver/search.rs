@@ -221,11 +221,11 @@ impl SolveIF for Solver {
 }
 
 const PR_TBL: [(PhaseRotation, usize, usize); 5] = [
-    (PhaseRotation::Best, 40_000, 1),
-    (PhaseRotation::False, 40_000, 2),
-    (PhaseRotation::True, 40_000, 3),
-    (PhaseRotation::Inverted, 40_000, 4),
-    (PhaseRotation::Walk, 800_000, 0),
+    (PhaseRotation::Best, 20_000, 1),
+    (PhaseRotation::False, 20_000, 2),
+    (PhaseRotation::True, 20_000, 3),
+    (PhaseRotation::Inverted, 20_000, 4),
+    (PhaseRotation::Walk, 200_000, 0),
 ];
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
@@ -301,7 +301,7 @@ fn search(
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
         }
-        // track the minimul set of clauses that emit a conflict
+        // track the largest set of clauses that does not emit conflicts
         if assign_peak < asg.stack_len() {
             assign_peak = asg.stack_len();
             to_vmtf!();
@@ -363,7 +363,15 @@ fn search(
             }
             if new_segment == Some(true) {
                 span_scale = luby_scale * state.span_manager.envelop_index();
-                // state.config.vrw_learning_rate *= 0.99;
+            }
+            // Adapt LRB learning rate to the upcoming Luby span length:
+            // shorter spans → higher α (fast learning before the next restart),
+            // longer spans  → lower  α (stable estimates over more conflicts).
+            if asg.activity_scheme == VarActivityScheme::LRB {
+                let span = state.span_manager.current_span() as f64;
+                let adaptive_lr = (state.config.vrw_learning_rate / span.sqrt())
+                    .clamp(1e-4, state.config.vrw_learning_rate);
+                asg.set_learning_rate(adaptive_lr);
             }
         }
         if progress_pressure >= progress_interval {
