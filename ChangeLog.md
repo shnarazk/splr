@@ -9,6 +9,8 @@
   - trigger for restarts, clause elimination, and clause vivification
   - clause DB size after clause reduction
 - `ClauseDBIF::reduce` can run at any decision level, and runs every 40,000 conflicts
+- Change the definition of 'unreachable core' to the number of unsatisfied given clauses
+  from the number of unassigned variables
 - Remove feature 'assign_rate'
 - Remove feature 'bi_clause_completion'
 - Remove feature 'boundary_check'

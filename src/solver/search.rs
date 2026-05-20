@@ -299,6 +299,7 @@ fn search(
         };
     }
 
+    state.core_size = cdb.num_clause;
     state.span_manager.reset();
     while 0 < asg.derefer(assign::property::Tusize::NumUnassignedVar) || asg.remains() {
         if !asg.remains() {
@@ -310,11 +311,6 @@ fn search(
         };
         if asg.decision_level() == asg.root_level() {
             return Err(SolverError::RootLevelConflict(cc));
-        }
-        // track the largest set of clauses that does not emit conflicts
-        if assign_peak < asg.stack_len() {
-            assign_peak = asg.stack_len();
-            // to_vmtf!();
         }
         asg.update_activity_tick();
         let (cid, lbd) = handle_conflict(asg, cdb, state, &cc)?;
@@ -332,6 +328,34 @@ fn search(
         } else {
             cdb.lbd.update(lbd as f64);
         }
+
+        // track the largest set of clauses that does not emit conflicts
+        if assign_peak <= asg.stack_len() {
+            assign_peak = asg.stack_len();
+            let mut np: usize = 0;
+            let mut ns: usize = 0;
+            for c in cdb.iter().skip(1) {
+                if c.is_dead() {
+                    continue;
+                }
+                if c.is(FlagClause::LEARNT) {
+                    continue;
+                }
+                np += 1;
+                if c.is_satisfied_under(asg) {
+                    ns += 1;
+                }
+            }
+            state.core_size = np - ns;
+            asg.save_best_phases();
+            state.flush("");
+            state.flush(format!(
+                "unreachable core: {} ({:>.3}%)",
+                state.core_size,
+                ns as f64 / np as f64 * 100.0
+            ));
+        }
+
         reduction_pressure += (lbd > 4) as usize;
         processing_pressure += (lbd <= 5) as usize;
         progress_pressure += 1;
@@ -347,29 +371,6 @@ fn search(
             if reduction_pressure >= reduction_interval {
                 reduce!();
             }
-            /* {
-                let mut np: usize = 0;
-                let mut ns: usize = 0;
-                for c in cdb.iter().skip(1) {
-                    if c.is_dead() {
-                        continue;
-                    }
-                    if c.is(FlagClause::LEARNT) {
-                        continue;
-                    }
-                    np += 1;
-                    if c.is_satisfied_under(asg) {
-                        ns += 1;
-                    }
-                }
-                let r: f64 = ns as f64 / np as f64;
-                if r >= sat_clauses {
-                    sat_clauses = r;
-                    state.flush("");
-                    state.flush(format!("satisfiability: {r:>.3}"));
-                    asg.save_best_phases();
-                }
-            } */
             RESTART!(asg, cdb, state)?;
             if processing_pressure >= processing_interval {
                 if cfg!(feature = "clause_vivification") {
@@ -418,11 +419,6 @@ fn search(
             }
             progress_pressure = 0;
         }
-        // if let Some(core_size) = asg.best_assigned() {
-        //     assign_peak = 0;
-        //     state.flush("");
-        //     state.flush(format!("unreachable core: {core_size} "));
-        // }
     }
     state.log(
         None,
