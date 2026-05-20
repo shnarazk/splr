@@ -1,7 +1,7 @@
 //! Decision var selection
 
 use {
-    super::{heap::VarHeapIF, stack::AssignStack},
+    super::{AssignIF, heap::VarHeapIF, stack::AssignStack},
     crate::types::*,
 };
 
@@ -55,6 +55,8 @@ pub trait VarSelectIF {
     fn update_order(&mut self, v: VarId);
     /// rebuild the internal var_order
     fn rebuild_order(&mut self);
+    /// save the current assignments as the best phases
+    fn save_best_phases(&mut self);
 }
 
 impl VarSelectIF for AssignStack {
@@ -82,6 +84,16 @@ impl VarSelectIF for AssignStack {
                 self.insert_heap(vi);
             }
         }
+    }
+    fn save_best_phases(&mut self) {
+        self.best_phases.clear();
+        for l in self.trail.iter().skip(self.len_upto(self.root_level)) {
+            let vi = l.vi();
+            if let Some(b) = self.var[vi].assign {
+                self.best_phases.insert(vi, (b, self.var[vi].reason));
+            }
+        }
+        // self.build_best_at = self.num_propagation;
     }
 }
 

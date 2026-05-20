@@ -1,7 +1,7 @@
 // implement boolean constraint propagation, backjump
 // This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{AssignIF, AssignStack, PhaseRotation, VarManipulateIF, heap::VarHeapIF},
+    super::{AssignIF, AssignStack, PhaseRotation, VarManipulateIF, VarSelectIF, heap::VarHeapIF},
     crate::{cdb::ClauseDBIF, types::*},
 };
 
@@ -192,6 +192,7 @@ impl PropagateIF for AssignStack {
         }
         if self.best_assign {
             self.save_best_phases();
+            self.build_best_at = self.num_propagation;
             self.best_assign = false;
         }
 
@@ -729,16 +730,5 @@ impl AssignStack {
     }
     fn level_up(&mut self) {
         self.trail_lim.push(self.trail.len());
-    }
-    /// save the current assignments as the best phases
-    fn save_best_phases(&mut self) {
-        self.best_phases.clear();
-        for l in self.trail.iter().skip(self.len_upto(self.root_level)) {
-            let vi = l.vi();
-            if let Some(b) = self.var[vi].assign {
-                self.best_phases.insert(vi, (b, self.var[vi].reason));
-            }
-        }
-        self.build_best_at = self.num_propagation;
     }
 }

@@ -248,13 +248,6 @@ fn search(
     let luby_scale: usize = 8;
     let mut span_scale: usize = luby_scale;
 
-    macro_rules! switch_rephase_cycle {
-        () => {
-            current_phase = &PR_TBL[current_phase.2];
-            asg.phase_mode = current_phase.0;
-            rephase_span = 0;
-        };
-    }
     macro_rules! to_lrb {
         () => {
             if asg.activity_scheme != VarActivityScheme::LRB {
@@ -271,10 +264,21 @@ fn search(
         () => {
             if asg.activity_scheme != VarActivityScheme::VMTF {
                 asg.activity_scheme = VarActivityScheme::VMTF;
-                // No: we need to stay in the current rephase
-                // asg.phase_mode = PhaseRotation::Walk;
+                // ??? No: we need to stay in the current rephase ???
+                asg.phase_mode = PhaseRotation::Walk;
                 asg.set_learning_rate(0.0); // Don't change this
                 asg.rebuild_order();
+                rephase_span = 0;
+            }
+        };
+    }
+    macro_rules! rotate_rephase_mode {
+        () => {
+            if current_phase.2 == 0 {
+                to_vmtf!();
+            } else {
+                current_phase = &PR_TBL[current_phase.2];
+                asg.phase_mode = current_phase.0;
                 rephase_span = 0;
             }
         };
@@ -283,7 +287,6 @@ fn search(
         () => {
             cdb.reduce(asg);
             reduction_pressure = 0;
-            // conflict_peak = 0;
             state.search_mode_ratio.0.update(0.0);
             state.search_mode_ratio.1.update(0.0);
         };
@@ -304,7 +307,7 @@ fn search(
         // track the largest set of clauses that does not emit conflicts
         if assign_peak < asg.stack_len() {
             assign_peak = asg.stack_len();
-            to_vmtf!();
+            // to_vmtf!();
         }
         asg.update_activity_tick();
         let (cid, lbd) = handle_conflict(asg, cdb, state, &cc)?;
@@ -337,6 +340,29 @@ fn search(
             if reduction_pressure >= reduction_interval {
                 reduce!();
             }
+            /* {
+                let mut np: usize = 0;
+                let mut ns: usize = 0;
+                for c in cdb.iter().skip(1) {
+                    if c.is_dead() {
+                        continue;
+                    }
+                    if c.is(FlagClause::LEARNT) {
+                        continue;
+                    }
+                    np += 1;
+                    if c.is_satisfied_under(asg) {
+                        ns += 1;
+                    }
+                }
+                let r: f64 = ns as f64 / np as f64;
+                if r >= sat_clauses {
+                    sat_clauses = r;
+                    state.flush("");
+                    state.flush(format!("satisfiability: {r:>.3}"));
+                    asg.save_best_phases();
+                }
+            } */
             RESTART!(asg, cdb, state)?;
             if processing_pressure >= processing_interval {
                 if cfg!(feature = "clause_vivification") {
@@ -353,7 +379,7 @@ fn search(
             if cfg!(feature = "rephase") {
                 match asg.activity_scheme {
                     VarActivityScheme::LRB if rephase_span >= current_phase.1 => {
-                        switch_rephase_cycle!();
+                        rotate_rephase_mode!();
                     }
                     VarActivityScheme::VMTF if rephase_span >= vmtf_interval => {
                         to_lrb!();
