@@ -39,7 +39,6 @@ pub trait StateIF {
             + PropertyReference<assign::property::TEma, EmaView>,
         C: ClauseDBIF
             + PropertyDereference<cdb::property::Tusize, usize>
-            + PropertyDereference<cdb::property::Tf64, f64>
             + PropertyReference<cdb::property::TEma, EmaView>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
@@ -440,7 +439,6 @@ impl StateIF for State {
             + PropertyReference<assign::property::TEma, EmaView>,
         C: ClauseDBIF
             + PropertyDereference<cdb::property::Tusize, usize>
-            + PropertyDereference<cdb::property::Tf64, f64>
             + PropertyReference<cdb::property::TEma, EmaView>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
@@ -470,7 +468,6 @@ impl StateIF for State {
         let cdb_num_bi_clause = cdb.derefer(cdb::property::Tusize::NumBiClause);
         let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
-        let cdb_lb_ent: f64 = cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
         let rst_num_rst: usize = self[Stat::Restart];
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
         let stg_segment: usize = self.span_manager.current_segment();
@@ -545,14 +542,7 @@ impl StateIF for State {
         );
         self[LogUsizeId::StageSegment] = stg_segment;
         println!(
-            "\x1B[2K    Conflict|entg:{}, cLvl:{}, bLvl:{}, /cpr:{}",
-            fm!(
-                "{:>9.2}",
-                self,
-                LogF64Id::LiteralBlockEntanglement,
-                cdb_lb_ent,
-                0.01
-            ),
+            "\x1B[2K    Conflict|cLvl:{}, bLvl:{}, #RST:{}, /cpr:{}",
             fm!(
                 "{:>9.2}",
                 self,
@@ -567,6 +557,7 @@ impl StateIF for State {
                 self.b_lvl.get_slow(),
                 0.01
             ),
+            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
             fm!(
                 "{:>9.2}",
                 self,
@@ -576,10 +567,10 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K    Learning| LBD:{}, trnd:{}, #RST:{}, /dpc:{}",
+            "\x1B[2K    Learning| LBD:{}, ????:{}, ????:{}, /dpc:{}",
             fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get_fast(), 0.01),
-            fm!("{:>9.2}", self, LogF64Id::TrendLBD, rst_lbd.trend(), 0.01),
-            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
+            fm!("{:>9.2}", self, LogF64Id::End, 0.0, 0.01),
+            fm!("{:>9.2}", self, LogF64Id::End, 0.0, 0.01),
             fm!(
                 "{:>9.2}",
                 self,
@@ -806,7 +797,6 @@ impl State {
         A: PropertyDereference<assign::property::Tusize, usize>
             + PropertyReference<assign::property::TEma, EmaView>,
         C: PropertyDereference<cdb::property::Tusize, usize>
-            + PropertyDereference<cdb::property::Tf64, f64>
             + PropertyReference<cdb::property::TEma, EmaView>,
     {
         self[LogUsizeId::NumConflict] = asg.derefer(assign::property::Tusize::NumConflict);
@@ -837,8 +827,6 @@ impl State {
         self[LogF64Id::EmaLBD] = rst_lbd.get_fast();
         self[LogF64Id::TrendLBD] = rst_lbd.trend();
 
-        self[LogF64Id::LiteralBlockEntanglement] =
-            cdb.derefer(cdb::property::Tf64::LiteralBlockEntanglement);
         self[LogF64Id::DecisionPerConflict] =
             asg.refer(assign::property::TEma::DecisionPerConflict).get();
 
@@ -1008,7 +996,6 @@ pub enum LogF64Id {
     DecisionPerConflict,
     ConflictPerRestart,
     PropagationPerConflict,
-    LiteralBlockEntanglement,
     ChronologicalBacktrackPercentage,
     CdbHeatmap0,
     CdbHeatmap1,

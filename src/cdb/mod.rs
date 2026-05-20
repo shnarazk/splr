@@ -39,7 +39,7 @@ pub trait ClauseDBIF:
     Instantiate
     + IndexMut<ClauseId, Output = Clause>
     + PropertyDereference<property::Tusize, usize>
-    + PropertyDereference<property::Tf64, f64>
+    + PropertyReference<property::TEma, EmaView>
 {
     /// return the length of `clause`.
     fn len(&self) -> usize;
@@ -106,7 +106,7 @@ pub trait ClauseDBIF:
     fn reduce(&mut self, asg: &mut impl AssignIF);
     /// update flags.
     /// return `true` if it's learnt.
-    fn update_at_analysis(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> bool;
+    fn update_at_analysis(&mut self, cid: ClauseId) -> bool;
     /// increment `num_lbd2` if the clause is a non-binary learnt clause with LBD ≤ 2.
     fn check_lbd(&mut self, cid: ClauseId, lbd: DecisionLevel);
     /// record an asserted literal to unsat certification.
@@ -175,37 +175,17 @@ pub mod property {
         }
     }
 
-    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    pub enum Tf64 {
-        LiteralBlockDistance,
-        LiteralBlockEntanglement,
-    }
-
-    pub const F64S: [Tf64; 2] = [Tf64::LiteralBlockDistance, Tf64::LiteralBlockEntanglement];
-
-    impl PropertyDereference<Tf64, f64> for ClauseDB {
-        #[inline]
-        fn derefer(&self, k: Tf64) -> f64 {
-            match k {
-                Tf64::LiteralBlockDistance => self.lbd.get(),
-                Tf64::LiteralBlockEntanglement => self.lb_entanglement.get(),
-            }
-        }
-    }
-
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub enum TEma {
-        Entanglement,
         LBD,
     }
 
-    pub const EMAS: [TEma; 2] = [TEma::Entanglement, TEma::LBD];
+    pub const EMAS: [TEma; 1] = [TEma::LBD];
 
     impl PropertyReference<TEma, EmaView> for ClauseDB {
         #[inline]
         fn refer(&self, k: TEma) -> &EmaView {
             match k {
-                TEma::Entanglement => self.lb_entanglement.as_view(),
                 TEma::LBD => self.lbd.as_view(),
             }
         }

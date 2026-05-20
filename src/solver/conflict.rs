@@ -334,7 +334,7 @@ fn conflict_analyze(
     }
     let mut trail_index = asg.stack_len() - 1;
     if let AssignReason::Implication(cid) = cc.1 {
-        cdb.update_at_analysis(asg, cid);
+        cdb.update_at_analysis(cid);
     }
     loop {
         match reason {

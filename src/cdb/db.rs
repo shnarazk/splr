@@ -62,9 +62,6 @@ pub struct ClauseDB {
     pub(crate) num_reduction: usize,
     /// the number of reregistration of a bi-clause
     pub(crate) num_reregistration: usize,
-    /// Literal Block Entanglement
-    /// EMA of LBD of clauses used in conflict analysis (dependency graph)
-    pub(crate) lb_entanglement: Ema2,
 }
 
 impl Default for ClauseDB {
@@ -85,10 +82,6 @@ impl Default for ClauseDB {
             num_learnt: 0,
             num_reduction: 0,
             num_reregistration: 0,
-            lb_entanglement: Ema2::default()
-                .with_fast(1_000)
-                .with_slow(80_000)
-                .with_value(2.0),
         }
     }
 }
@@ -823,14 +816,11 @@ impl ClauseDBIF for ClauseDB {
             self.num_lbd2 += 1;
         }
     }
-    fn update_at_analysis(&mut self, asg: &mut impl AssignIF, cid: ClauseId) -> bool {
+    fn update_at_analysis(&mut self, cid: ClauseId) -> bool {
         let c = &mut self.clause[NonZeroU32::get(cid.ordinal) as usize];
         // Updating LBD at every analysis seems redundant.
         // But it's crucial. Don't remove the below.
-        let rank = asg.literal_block_distance(&c.lits) as usize;
-        let learnt = c.is(FlagClause::LEARNT);
-        self.lb_entanglement.update(rank as f64);
-        learnt
+        c.is(FlagClause::LEARNT)
     }
     /// reduce the number of 'learnt' or *removable* clauses.
     fn reduce(&mut self, asg: &mut impl AssignIF) {

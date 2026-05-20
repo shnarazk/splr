@@ -273,8 +273,8 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c     Conflict|entg:{:>9.4}, cLvl:{:>9.4}, bLvl:{:>9.4}, /cpr:{:>9.2},\n",
-            state[LogF64Id::LiteralBlockEntanglement],
+            "c     Conflict|????:{:>9.4}, cLvl:{:>9.4}, bLvl:{:>9.4}, /cpr:{:>9.2},\n",
+            state[LogF64Id::End],
             state[LogF64Id::CLevel],
             state[LogF64Id::BLevel],
             state[LogF64Id::ConflictPerRestart],
@@ -343,12 +343,12 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             .as_bytes(),
         )?;
     }
-    for key in &cdb::property::F64S {
+    for key in &cdb::property::EMAS {
         out.write_all(
             format!(
                 "c   clause::{:<27}{:>19.3}\n",
                 format!("{key:?}"),
-                s.cdb.derefer(*key),
+                s.cdb.refer(key.clone()).get(),
             )
             .as_bytes(),
         )?;
