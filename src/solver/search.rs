@@ -325,6 +325,8 @@ fn search(
                     state.search_mode_ratio.1.update(1.0);
                 }
             }
+            // assign_peak = assign_peak.saturating_sub(1);
+            assign_peak /= 2;
         } else {
             cdb.lbd.update(lbd as f64);
         }
@@ -370,6 +372,7 @@ fn search(
             }
             RESTART!(asg, cdb, state)?;
             if processing_pressure >= processing_interval {
+                let pre = asg.derefer(assign::property::Tusize::NumUnassertedVar);
                 if cfg!(feature = "clause_vivification") {
                     cdb.vivify(asg, state)?;
                 }
@@ -378,6 +381,11 @@ fn search(
                     state.flush("clause subsumption, ");
                     elim.simplify(asg, cdb, state, false)?;
                     asg.eliminated.append(elim.eliminated_lits());
+                }
+                let now = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+                if now < pre {
+                    // assign_peak = assign_peak.saturating_sub(diff);
+                    assign_peak /= 2;
                 }
                 processing_pressure = 0;
             }
