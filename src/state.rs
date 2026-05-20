@@ -470,6 +470,9 @@ impl StateIF for State {
         let cdb_num_bi_clause = cdb.derefer(cdb::property::Tusize::NumBiClause);
         let cdb_num_lbd2 = cdb.derefer(cdb::property::Tusize::NumLBD2);
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
+        let cdb_tier1 = cdb.refer(cdb::property::TEma::Tier1ClauseRatio);
+        let cdb_tier2 = cdb.refer(cdb::property::TEma::Tier2ClauseRatio);
+
         let rst_num_rst: usize = self[Stat::Restart];
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
         let stg_segment: usize = self.span_manager.current_segment();
@@ -569,10 +572,22 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K    Learning| LBD:{}, ????:{}, ????:{}, /dpc:{}",
+            "\x1B[2K    Learning| LBD:{}, ti1%:{}, ti2%:{}, /dpc:{}",
             fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get_fast(), 0.01),
-            fm!("{:>9.2}", self, LogF64Id::End, 0.0, 0.01),
-            fm!("{:>9.2}", self, LogF64Id::End, 0.0, 0.01),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::Tier1ClauseRatio,
+                100.0 * cdb_tier1.get(),
+                1.0
+            ),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::Tier2ClauseRatio,
+                100.0 * cdb_tier2.get(),
+                1.0
+            ),
             fm!(
                 "{:>9.2}",
                 self,
@@ -584,7 +599,6 @@ impl StateIF for State {
 
         println!(
             "\x1B[2K {}({})| LRB:{}, VMTF:{}, core:{}, /ppc:{}",
-            // "\x1B[2K {}|VMTF:{},   CR:{}, core:{}, /ppc:{}",
             {
                 match asg.activity_scheme() {
                     VarActivityScheme::LRB => {
@@ -1046,6 +1060,8 @@ pub enum LogF64Id {
     CdbHeatmapR6C6,
     CdbHeatmapR6C7,
     CdbHeatmapR6C8,
+    Tier1ClauseRatio,
+    Tier2ClauseRatio,
 
     End,
 }

@@ -178,15 +178,19 @@ pub mod property {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub enum TEma {
         LBD,
+        Tier1ClauseRatio,
+        Tier2ClauseRatio,
     }
 
-    pub const EMAS: [TEma; 1] = [TEma::LBD];
+    pub const EMAS: [TEma; 3] = [TEma::LBD, TEma::Tier1ClauseRatio, TEma::Tier2ClauseRatio];
 
     impl PropertyReference<TEma, EmaView> for ClauseDB {
         #[inline]
         fn refer(&self, k: TEma) -> &EmaView {
             match k {
                 TEma::LBD => self.lbd.as_view(),
+                TEma::Tier1ClauseRatio => self.tier1_clauses.as_view(),
+                TEma::Tier2ClauseRatio => self.tier2_clauses.as_view(),
             }
         }
     }

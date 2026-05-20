@@ -62,6 +62,10 @@ pub struct ClauseDB {
     pub(crate) num_reduction: usize,
     /// the number of reregistration of a bi-clause
     pub(crate) num_reregistration: usize,
+    /// the ratio of good learnt clauses
+    pub(crate) tier1_clauses: Ema,
+    /// the ratio of pretty good learnt clauses
+    pub(crate) tier2_clauses: Ema,
 }
 
 impl Default for ClauseDB {
@@ -82,6 +86,8 @@ impl Default for ClauseDB {
             num_learnt: 0,
             num_reduction: 0,
             num_reregistration: 0,
+            tier1_clauses: Ema::default(),
+            tier2_clauses: Ema::default(),
         }
     }
 }
@@ -831,6 +837,9 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         *num_reduction += 1;
 
+        let mut nlearnts: usize = 0;
+        let mut ntier1: usize = 0;
+        let mut ntier2: usize = 0;
         let mut tier2: Vec<SortKey<ClauseId>> = Vec::new();
         let mut tier3: Vec<ClauseId> = Vec::new();
         let mut picks: usize = 0;
@@ -843,18 +852,22 @@ impl ClauseDBIF for ClauseDB {
             if !c.is(FlagClause::LEARNT) {
                 continue;
             }
+            nlearnts += 1;
             if c.is(FlagClause::YOUNG) {
                 c.turn_off(FlagClause::YOUNG);
+                ntier2 += 1;
                 continue;
             }
             let act = c.activated;
             c.activated = 0;
             if c.is(FlagClause::ASSIGN_REASON) {
+                ntier1 += 1;
                 continue;
             }
             let lbd = asg.literal_block_distance(&c.lits) as usize;
             let aas = asg.activity_sum(&c.lits) / c.len() as f64;
             if lbd <= 4 || lbd <= act {
+                ntier1 += 1;
                 picks += act;
             } else if act >= 1 && aas > 0.15 {
                 tier2.push(SortKey::new(ClauseId::from(i), lbd as f64));
@@ -871,6 +884,9 @@ impl ClauseDBIF for ClauseDB {
                 self.remove_clause(c.to());
             }
         }
+        self.tier1_clauses.update(ntier1 as f64 / nlearnts as f64);
+        self.tier2_clauses
+            .update((picks + ntier2) as f64 / nlearnts as f64);
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);
