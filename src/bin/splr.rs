@@ -283,9 +283,9 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c      Learing|avrg:{:>9.4}, trnd:{:>9.4}, #RST:{:>9}, /dpc:{:>9.2},\n",
+            "c      Learing|avrg:{:>9.4}, ???:{:>9.4}, #RST:{:>9}, /dpc:{:>9.2},\n",
             state[LogF64Id::EmaLBD],
-            state[LogF64Id::TrendLBD],
+            state[LogF64Id::End],
             state[LogUsizeId::Restart],
             state[LogF64Id::DecisionPerConflict],
         )

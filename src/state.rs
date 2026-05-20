@@ -825,8 +825,6 @@ impl State {
         self[LogUsizeId::Vivify] = self[Stat::Vivification];
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
         self[LogF64Id::EmaLBD] = rst_lbd.get_fast();
-        self[LogF64Id::TrendLBD] = rst_lbd.trend();
-
         self[LogF64Id::DecisionPerConflict] =
             asg.refer(assign::property::TEma::DecisionPerConflict).get();
 
@@ -982,10 +980,7 @@ pub enum LogUsizeId {
 #[derive(Clone, Copy, Debug)]
 pub enum LogF64Id {
     Progress = 0,
-    EmaCCC,
     EmaLBD,
-    EmaMLD,
-    TrendLBD,
     BLevel,
     CLevel,
     BacktrackDriftRate,
