@@ -847,7 +847,7 @@ impl ClauseDBIF for ClauseDB {
                 c.turn_off(FlagClause::YOUNG);
                 continue;
             }
-            let act = c.activated as usize;
+            let act = c.activated;
             c.activated = 0;
             if c.is(FlagClause::ASSIGN_REASON) {
                 continue;
