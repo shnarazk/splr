@@ -220,12 +220,19 @@ impl SolveIF for Solver {
     }
 }
 
-const PR_TBL: [(PhaseRotation, usize, usize); 5] = [
-    (PhaseRotation::Best, 20_000, 1),
-    (PhaseRotation::False, 20_000, 2),
-    (PhaseRotation::True, 20_000, 3),
-    (PhaseRotation::Inverted, 20_000, 4),
-    (PhaseRotation::Walk, 200_000, 0),
+const PR_TBL: [(PhaseRotation, usize, usize); 12] = [
+    (PhaseRotation::Walk, 20_000, 1),
+    (PhaseRotation::Best, 20_000, 2),
+    (PhaseRotation::False, 20_000, 3),
+    (PhaseRotation::Walk, 20_000, 4),
+    (PhaseRotation::Best, 20_000, 5),
+    (PhaseRotation::True, 20_000, 6),
+    (PhaseRotation::Walk, 20_000, 7),
+    (PhaseRotation::Best, 20_000, 8),
+    (PhaseRotation::Inverted, 20_000, 9),
+    (PhaseRotation::Walk, 20_000, 10),
+    (PhaseRotation::Best, 20_000, 11),
+    (PhaseRotation::Random, 20_000, 0),
 ];
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
