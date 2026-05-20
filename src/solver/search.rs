@@ -221,18 +221,18 @@ impl SolveIF for Solver {
 }
 
 const PR_TBL: [(PhaseRotation, usize, usize); 12] = [
-    (PhaseRotation::Walk, 20_000, 1),
-    (PhaseRotation::Best, 20_000, 2),
-    (PhaseRotation::False, 20_000, 3),
-    (PhaseRotation::Walk, 20_000, 4),
-    (PhaseRotation::Best, 20_000, 5),
-    (PhaseRotation::True, 20_000, 6),
-    (PhaseRotation::Walk, 20_000, 7),
-    (PhaseRotation::Best, 20_000, 8),
-    (PhaseRotation::Inverted, 20_000, 9),
-    (PhaseRotation::Walk, 20_000, 10),
-    (PhaseRotation::Best, 20_000, 11),
-    (PhaseRotation::Random, 20_000, 0),
+    (PhaseRotation::Best, 40_000, 1),
+    (PhaseRotation::Walk, 40_000, 2),
+    (PhaseRotation::False, 40_000, 3),
+    (PhaseRotation::Best, 40_000, 4),
+    (PhaseRotation::Walk, 40_000, 5),
+    (PhaseRotation::True, 40_000, 6),
+    (PhaseRotation::Best, 40_000, 7),
+    (PhaseRotation::Walk, 40_000, 8),
+    (PhaseRotation::Random, 40_000, 9),
+    (PhaseRotation::Best, 40_000, 10),
+    (PhaseRotation::Walk, 40_000, 11),
+    (PhaseRotation::Inverted, 40_000, 0),
 ];
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
@@ -335,10 +335,7 @@ fn search(
             let mut np: usize = 0;
             let mut ns: usize = 0;
             for c in cdb.iter().skip(1) {
-                if c.is_dead() {
-                    continue;
-                }
-                if c.is(FlagClause::LEARNT) {
+                if c.is_dead() || c.is(FlagClause::LEARNT) {
                     continue;
                 }
                 np += 1;
@@ -352,7 +349,7 @@ fn search(
             state.flush(format!(
                 "unreachable core: {} ({:>.3}%)",
                 state.core_size,
-                ns as f64 / np as f64 * 100.0
+                100.0 * ns as f64 / np as f64,
             ));
         }
 
