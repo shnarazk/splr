@@ -67,7 +67,6 @@ impl VarSelectIF for AssignStack {
             .any(|(vi, b)| self.var[*vi].assign == Some(!b.0))
         {
             self.best_phases.clear();
-            self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
         }
     }
     fn select_decision_literal(&mut self) -> Lit {

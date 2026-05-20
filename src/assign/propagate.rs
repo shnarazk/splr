@@ -1,7 +1,7 @@
 // implement boolean constraint propagation, backjump
 // This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{AssignIF, AssignStack, PhaseRotation, VarManipulateIF, VarSelectIF, heap::VarHeapIF},
+    super::{AssignIF, AssignStack, PhaseRotation, VarManipulateIF, heap::VarHeapIF},
     crate::{cdb::ClauseDBIF, types::*},
 };
 
@@ -189,11 +189,6 @@ impl PropagateIF for AssignStack {
     fn cancel_until(&mut self, cdb: &mut impl ClauseDBIF, lv: DecisionLevel) {
         if self.trail_lim.len() as u32 <= lv {
             return;
-        }
-        if self.best_assign {
-            self.save_best_phases();
-            self.build_best_at = self.num_propagation;
-            self.best_assign = false;
         }
 
         #[cfg(feature = "chrono_BT")]
@@ -509,11 +504,6 @@ impl PropagateIF for AssignStack {
                 cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
             }
             from_saved_trail!();
-        }
-        let na = self.q_head + self.num_eliminated_vars + self.num_asserted_vars;
-        if self.num_best_assign <= na && 0 < dl {
-            self.best_assign = true;
-            self.num_best_assign = na;
         }
         Ok(())
     }

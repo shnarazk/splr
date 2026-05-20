@@ -119,6 +119,8 @@ pub struct State {
     pub c_lvl: Ema2,
     /// EMA of backtrack level drift caused by chrono_BT or BT_deepen
     pub bt_drift_average: Ema,
+    /// The unreachable core size
+    pub core_size: usize,
 
     #[cfg(feature = "chrono_BT")]
     /// chronoBT threshold
@@ -161,6 +163,7 @@ impl Default for State {
             b_lvl: Ema2::default_extended(),
             c_lvl: Ema2::default_extended(),
             bt_drift_average: Ema::default().with_span(1000),
+            core_size: 0,
 
             #[cfg(feature = "chrono_BT")]
             chrono_bt_threshold: 100,
@@ -454,7 +457,6 @@ impl StateIF for State {
         let asg_num_asserted_vars = asg.derefer(assign::property::Tusize::NumAssertedVar);
         let asg_num_eliminated_vars = asg.derefer(assign::property::Tusize::NumEliminatedVar);
         let asg_num_unasserted_vars = asg.derefer(assign::property::Tusize::NumUnassertedVar);
-        let asg_num_unreachables = asg.derefer(assign::property::Tusize::NumUnreachableVar);
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let asg_num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
         let asg_num_decision = asg.derefer(assign::property::Tusize::NumDecision);
@@ -655,16 +657,7 @@ impl StateIF for State {
             //     self.bt_drift_average.get(),
             //     0.0001
             // ),
-            im!(
-                "{:>9}",
-                self,
-                LogUsizeId::UnreachableCore,
-                if asg_num_unreachables == 0 {
-                    self[LogUsizeId::UnreachableCore]
-                } else {
-                    asg_num_unreachables
-                }
-            ),
+            im!("{:>9}", self, LogUsizeId::UnreachableCore, self.core_size),
             fm!(
                 "{:>9.2}",
                 self,
@@ -834,7 +827,7 @@ impl State {
             .refer(assign::property::TEma::PropagationPerConflict)
             .get();
         {
-            let core = asg.derefer(assign::property::Tusize::NumUnreachableVar);
+            let core = 0;
             if 0 < core {
                 self[LogUsizeId::UnreachableCore] = core;
             }

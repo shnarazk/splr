@@ -69,8 +69,6 @@ pub trait AssignIF:
     fn remains(&self) -> bool;
     /// return a reference to `assign`.
     fn assign_ref(&self) -> Vec<Option<bool>>;
-    /// return the largest number of assigned vars.
-    fn best_assigned(&mut self) -> Option<usize>;
     /// inject assignments for eliminated vars.
     fn extend_model(&mut self, c: &mut impl ClauseDBIF) -> Vec<Option<bool>>;
     /// return `true` if the set of literals is satisfiable under the current assignment.
@@ -133,11 +131,10 @@ pub mod property {
         /// the number of vars in `the unreachable core'
         NumUnassertedVar,
         NumUnassignedVar,
-        NumUnreachableVar,
         RootLevel,
     }
 
-    pub const USIZES: [Tusize; 13] = [
+    pub const USIZES: [Tusize; 12] = [
         Tusize::NumConflict,
         Tusize::NumDecision,
         Tusize::NumPropagation,
@@ -149,7 +146,6 @@ pub mod property {
         Tusize::NumRepropagation,
         Tusize::NumUnassertedVar,
         Tusize::NumUnassignedVar,
-        Tusize::NumUnreachableVar,
         Tusize::RootLevel,
     ];
 
@@ -175,7 +171,6 @@ pub mod property {
                         - self.num_eliminated_vars
                         - self.trail.len()
                 }
-                Tusize::NumUnreachableVar => self.num_vars - self.num_best_assign,
                 Tusize::RootLevel => self.root_level as usize,
             }
         }

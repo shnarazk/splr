@@ -40,9 +40,6 @@ pub struct AssignStack {
     //## Phase handling
     //
     pub(crate) phase_mode: PhaseRotation,
-    pub(super) best_assign: bool,
-    pub(super) build_best_at: usize,
-    pub(super) num_best_assign: usize,
     pub(super) best_phases: HashMap<VarId, (bool, AssignReason)>,
 
     //## Elimanated vars
@@ -112,9 +109,6 @@ impl Default for AssignStack {
             conflict_interval_average: (Ema2::default(), Ema2::default_extended()),
 
             phase_mode: PhaseRotation::default(),
-            best_assign: false,
-            build_best_at: 0,
-            num_best_assign: 0,
             best_phases: HashMap::new(),
 
             eliminated: Vec::new(),
@@ -235,9 +229,6 @@ impl AssignIF for AssignStack {
     }
     fn assign_ref(&self) -> Vec<Option<bool>> {
         self.var.iter().map(|v| v.assign).collect::<Vec<_>>()
-    }
-    fn best_assigned(&mut self) -> Option<usize> {
-        (self.build_best_at == self.num_propagation).then_some(self.num_vars - self.num_best_assign)
     }
     #[allow(unused_variables)]
     fn extend_model(&mut self, cdb: &mut impl ClauseDBIF) -> Vec<Option<bool>> {
@@ -507,7 +498,6 @@ impl AssignStack {
             if self.var[vi].assign != Some(*b) {
                 if self.root_level == self.var[vi].level {
                     self.best_phases.clear();
-                    self.num_best_assign = self.num_asserted_vars + self.num_eliminated_vars;
                 }
                 return true;
             }

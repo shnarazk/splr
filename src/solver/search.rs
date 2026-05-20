@@ -418,11 +418,11 @@ fn search(
             }
             progress_pressure = 0;
         }
-        if let Some(core_size) = asg.best_assigned() {
-            assign_peak = 0;
-            state.flush("");
-            state.flush(format!("unreachable core: {core_size} "));
-        }
+        // if let Some(core_size) = asg.best_assigned() {
+        //     assign_peak = 0;
+        //     state.flush("");
+        //     state.flush(format!("unreachable core: {core_size} "));
+        // }
     }
     state.log(
         None,
