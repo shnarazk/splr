@@ -335,26 +335,6 @@ fn search(
             assign_peak = asg.stack_len();
             asg.save_best_phases();
             state.core_size = asg.derefer(assign::property::Tusize::NumUnassignedVar);
-            // let mut np: usize = 0;
-            // let mut ns: usize = 0;
-            // for c in cdb.iter().skip(1) {
-            //     if c.is_dead() || c.is(FlagClause::LEARNT) {
-            //         continue;
-            //     }
-            //     np += 1;
-            //     if c.is_satisfied_under(asg) {
-            //         ns += 1;
-            //     }
-            // }
-            // state.core_size = np - ns;
-            // asg.save_best_phases();
-            // to_vmtf!();
-            // state.flush("");
-            // state.flush(format!(
-            //     "unreachable core: {} ({:>.3}%)",
-            //     state.core_size,
-            //     100.0 * ns as f64 / np as f64,
-            // ));
         }
 
         reduction_pressure += (lbd > 4) as usize;
