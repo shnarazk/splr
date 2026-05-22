@@ -325,8 +325,7 @@ fn search(
                     state.search_mode_ratio.1.update(1.0);
                 }
             }
-            // assign_peak = assign_peak.saturating_sub(1);
-            assign_peak /= 2;
+            assign_peak = assign_peak.saturating_sub(1);
         } else {
             cdb.lbd.update(lbd as f64);
         }
@@ -334,25 +333,28 @@ fn search(
         // track the largest set of clauses that does not emit conflicts
         if assign_peak <= asg.stack_len() {
             assign_peak = asg.stack_len();
-            let mut np: usize = 0;
-            let mut ns: usize = 0;
-            for c in cdb.iter().skip(1) {
-                if c.is_dead() || c.is(FlagClause::LEARNT) {
-                    continue;
-                }
-                np += 1;
-                if c.is_satisfied_under(asg) {
-                    ns += 1;
-                }
-            }
-            state.core_size = np - ns;
             asg.save_best_phases();
-            state.flush("");
-            state.flush(format!(
-                "unreachable core: {} ({:>.3}%)",
-                state.core_size,
-                100.0 * ns as f64 / np as f64,
-            ));
+            state.core_size = asg.derefer(assign::property::Tusize::NumUnassignedVar);
+            // let mut np: usize = 0;
+            // let mut ns: usize = 0;
+            // for c in cdb.iter().skip(1) {
+            //     if c.is_dead() || c.is(FlagClause::LEARNT) {
+            //         continue;
+            //     }
+            //     np += 1;
+            //     if c.is_satisfied_under(asg) {
+            //         ns += 1;
+            //     }
+            // }
+            // state.core_size = np - ns;
+            // asg.save_best_phases();
+            // to_vmtf!();
+            // state.flush("");
+            // state.flush(format!(
+            //     "unreachable core: {} ({:>.3}%)",
+            //     state.core_size,
+            //     100.0 * ns as f64 / np as f64,
+            // ));
         }
 
         reduction_pressure += (lbd > 4) as usize;
@@ -383,7 +385,7 @@ fn search(
                     asg.eliminated.append(elim.eliminated_lits());
                 }
                 let now = asg.derefer(assign::property::Tusize::NumUnassertedVar);
-                if now < pre {
+                if now != pre {
                     // assign_peak = assign_peak.saturating_sub(diff);
                     assign_peak /= 2;
                 }
