@@ -221,7 +221,6 @@ pub fn handle_conflict(
             // But since vars hold the last level even after unassignment,
             // we can have postponed the calculation.
             let d = asg.literal_block_distance(&cdb[cid].lits);
-            cdb[cid].lbd = d;
             ret = (cid, d);
         }
         RefClause::RegisteredClause(cid) => {
@@ -241,7 +240,7 @@ pub fn handle_conflict(
             //     }
             //     panic!("here we are!");
             // }
-            ret = (cid, cdb[cid].lbd);
+            ret = (cid, asg.literal_block_distance(&cdb[cid].lits));
             if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
             }
@@ -424,7 +423,6 @@ fn conflict_analyze(
                     }
                 }
                 cdb[cid].activated = cdb[cid].activated.saturating_add(1);
-                cdb[cid].lbd = cdb[cid].lbd.min(asg.literal_block_distance(&cdb[cid].lits));
             }
             AssignReason::Decision(_) | AssignReason::None => {}
         }
