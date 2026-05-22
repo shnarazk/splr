@@ -342,7 +342,6 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         c.turn_on(FlagClause::YOUNG);
-        c.lbd = c.lits.len() as DecisionLevel;
         let l0 = c.lits[0];
         let l1 = c.lits[1];
         if len2 {
@@ -848,38 +847,71 @@ impl ClauseDBIF for ClauseDB {
             .skip(1)
             .filter(|(_, c)| !c.is_dead())
         {
-            if c.lbd <= 2 {
+            let lbd = asg.literal_block_distance(&c.lits) as usize;
+            if lbd <= 2 {
                 *num_lbd2 += 1;
             }
             if !c.is(FlagClause::LEARNT) {
                 continue;
             }
             nlearnts += 1;
-            let act = c.activated;
-            c.activated = 0;
+            let act = c.activated + c.is(FlagClause::YOUNG) as usize;
+            // c.activated /= 2;
+            if c.activated <= 1 {
+                c.activated = 0;
+            } else {
+                c.activated = c.activated.ilog2() as usize;
+            }
+            // c.activated = 0;
 
             if c.is(FlagClause::YOUNG) {
                 c.turn_off(FlagClause::YOUNG);
-                if c.lbd <= 2 {
-                    ntier2 += 1;
-                    continue;
-                }
             }
             if c.is(FlagClause::ASSIGN_REASON) {
-                ntier1 += 1;
                 continue;
             }
-            let aas = asg.activity_sum(&c.lits) / c.len() as f64;
-            if c.lbd <= 2 && act > 0 {
+            // let _aas = asg.activity_sum(&c.lits) as f64;
+            // the ultimate and permanent criteria of good clauses
+            if c.len() <= 3 || lbd <= 2 {
                 ntier1 += 1;
-            } else if c.lbd as usize <= act {
+                picks += 4;
+                continue;
+            }
+            // The other clauses should removed if they aren't used.
+            if act == 0 {
+                tier3.push(ClauseId::from(i));
+                continue;
+            }
+
+            // tier 2 group: pretty small or frequently used clauses
+            // if c.lbd.get() <= 2.0 || act >= 16 {
+            // if c.lbd.get() <= act as f64 {
+            if c.len() <= act {
                 ntier2 += 1;
-                picks += act;
-            } else if act >= 1 && aas > 0.15 {
+                picks += 1;
+                continue;
+            }
+            // The others will be srceened
+            tier2.push(SortKey::new(ClauseId::from(i), lbd as f64));
+            //
+            /*
+            if c.len() <= 4 {
+                ntier1 += 1;
+                picks += 1;
+            } else if act >= 8 {
+                ntier2 += 1;
+                picks += 1;
+            } else if act > 0 {
                 tier2.push(SortKey::new(ClauseId::from(i), c.lbd as f64));
             } else {
                 tier3.push(ClauseId::from(i));
             }
+            */
+            // } else if c.lbd < act as u32 {
+            //     tier2.push(SortKey::new(ClauseId::from(i), c.lbd as f64));
+            // } else {
+            //     tier3.push(ClauseId::from(i));
+            // }
         }
         for cid in tier3.into_iter() {
             self.remove_clause(cid);
@@ -891,8 +923,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         self.tier1_clauses.update(ntier1 as f64 / nlearnts as f64);
-        self.tier2_clauses
-            .update((ntier2 + picks) as f64 / nlearnts as f64);
+        self.tier2_clauses.update((ntier2) as f64 / nlearnts as f64);
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);
