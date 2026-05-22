@@ -829,8 +829,10 @@ impl ClauseDBIF for ClauseDB {
         let ClauseDB {
             clause,
             num_reduction,
+            num_lbd2,
             ..
         } = self;
+        *num_lbd2 = 0;
         *num_reduction += 1;
 
         let mut nlearnts: usize = 0;
@@ -838,6 +840,7 @@ impl ClauseDBIF for ClauseDB {
         let mut ntier2: usize = 0;
         let mut tier2: Vec<SortKey<ClauseId>> = Vec::new();
         let mut tier3: Vec<ClauseId> = Vec::new();
+        // let mut tier3: Vec<SortKey<ClauseId>> = Vec::new();
         let mut picks: usize = 0;
         for (i, c) in clause
             .iter_mut()
@@ -845,28 +848,35 @@ impl ClauseDBIF for ClauseDB {
             .skip(1)
             .filter(|(_, c)| !c.is_dead())
         {
+            if c.lbd <= 2 {
+                *num_lbd2 += 1;
+            }
             if !c.is(FlagClause::LEARNT) {
                 continue;
             }
             nlearnts += 1;
-            if c.is(FlagClause::YOUNG) {
-                c.turn_off(FlagClause::YOUNG);
-                ntier2 += 1;
-                continue;
-            }
             let act = c.activated;
             c.activated = 0;
+
+            if c.is(FlagClause::YOUNG) {
+                c.turn_off(FlagClause::YOUNG);
+                if c.lbd <= 2 {
+                    ntier2 += 1;
+                    continue;
+                }
+            }
             if c.is(FlagClause::ASSIGN_REASON) {
                 ntier1 += 1;
                 continue;
             }
-            let lbd = asg.literal_block_distance(&c.lits) as usize;
             let aas = asg.activity_sum(&c.lits) / c.len() as f64;
-            if lbd <= 4 || lbd <= act {
+            if c.lbd <= 2 && act > 0 {
                 ntier1 += 1;
+            } else if c.lbd as usize <= act {
+                ntier2 += 1;
                 picks += act;
             } else if act >= 1 && aas > 0.15 {
-                tier2.push(SortKey::new(ClauseId::from(i), lbd as f64));
+                tier2.push(SortKey::new(ClauseId::from(i), c.lbd as f64));
             } else {
                 tier3.push(ClauseId::from(i));
             }
@@ -882,7 +892,7 @@ impl ClauseDBIF for ClauseDB {
         }
         self.tier1_clauses.update(ntier1 as f64 / nlearnts as f64);
         self.tier2_clauses
-            .update((picks + ntier2) as f64 / nlearnts as f64);
+            .update((ntier2 + picks) as f64 / nlearnts as f64);
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);
