@@ -289,21 +289,23 @@ impl AssignIF for AssignStack {
         false
     }
     fn literal_block_distance(&mut self, lits: &[Lit]) -> DecisionLevel {
-        // if 8192 <= lits.len() {
-        //     return u16::MAX as DecisionLevel;
-        // }
         let key: usize = self.lbd_temp[0] + 1;
         self.lbd_temp[0] = key;
         let mut cnt: DecisionLevel = 0;
         for l in lits {
-            let lv = self.level(l.vi());
+            let lv = self.best_level(l.vi());
             if lv == 0 {
                 continue;
             }
-            let p = &mut self.lbd_temp[lv as usize];
-            if *p != key {
-                *p = key;
-                cnt = cnt.saturating_add(1);
+            if lv == u32::MAX {
+                // Every unassign var has a unique level.
+                cnt += 1;
+            } else {
+                let p = &mut self.lbd_temp[lv as usize];
+                if *p != key {
+                    *p = key;
+                    cnt = cnt.saturating_add(1);
+                }
             }
         }
         cnt
@@ -375,6 +377,8 @@ pub trait VarManipulateIF {
     fn assigned(&self, l: Lit) -> Option<bool>;
     /// return the assign level of var.
     fn level(&self, vi: VarId) -> DecisionLevel;
+    /// return the assign level of var at the best assignment context
+    fn best_level(&self, vi: VarId) -> DecisionLevel;
     /// return the reason of assignment.
     fn reason(&self, vi: VarId) -> AssignReason;
     /// return the var.
@@ -415,6 +419,15 @@ impl VarManipulateIF for AssignStack {
         }
         #[cfg(not(feature = "unsafe_access"))]
         self.var[vi].level
+    }
+    #[inline]
+    fn best_level(&self, vi: VarId) -> DecisionLevel {
+        #[cfg(feature = "unsafe_access")]
+        unsafe {
+            self.var.get_unchecked(vi).best_level
+        }
+        #[cfg(not(feature = "unsafe_access"))]
+        self.var[vi].best_level
     }
     #[inline]
     fn reason(&self, vi: VarId) -> AssignReason {

@@ -90,6 +90,9 @@ impl VarSelectIF for AssignStack {
             let vi = l.vi();
             if let Some(b) = self.var[vi].assign {
                 self.best_phases.insert(vi, (b, self.var[vi].reason));
+                self.var[vi].best_level = self.var[vi].level;
+            } else {
+                self.var[vi].best_level = u32::MAX;
             }
         }
         // self.build_best_at = self.num_propagation;

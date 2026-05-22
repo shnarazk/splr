@@ -1,8 +1,11 @@
 //! Var struct and Database management API
 use {
     // super::{heap::VarHeapIF, stack::AssignStack, AssignIF},
-    crate::types::{AssignReason, DecisionLevel, flags::FlagIF, flags::FlagVar},
-    std::fmt,
+    crate::types::{
+        AssignReason, DecisionLevel,
+        flags::{FlagIF, FlagVar},
+    },
+    std::{fmt, u32},
 };
 
 /// Object representing a variable.
@@ -12,6 +15,8 @@ pub struct Var {
     pub(crate) assign: Option<bool>,
     /// decision level
     pub(crate) level: DecisionLevel,
+    /// decision level in the best assignment
+    pub(crate) best_level: DecisionLevel,
     /// assign Reason
     pub(crate) reason: AssignReason,
     /// last reason for assignment.
@@ -30,6 +35,7 @@ impl Default for Var {
         Var {
             assign: None,
             level: 0,
+            best_level: u32::MAX,
             reason: AssignReason::None,
             #[cfg(feature = "trail_saving")]
             reason_saved: AssignReason::None,
