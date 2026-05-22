@@ -19,8 +19,6 @@ pub struct Clause {
     pub search_from: u16,
     /// Sum of activated (used as propagated) duration
     pub(crate) activated: usize,
-    /// lbd
-    pub(crate) lbd: DecisionLevel,
 }
 
 /// API for Clause, providing literal accessors.
@@ -52,7 +50,6 @@ impl Default for Clause {
             flags: FlagClause::empty(),
             search_from: 2,
             activated: 0,
-            lbd: 0,
         }
     }
 }
