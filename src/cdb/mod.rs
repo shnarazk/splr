@@ -107,8 +107,6 @@ pub trait ClauseDBIF:
     /// update flags.
     /// return `true` if it's learnt.
     fn update_at_analysis(&mut self, cid: ClauseId) -> bool;
-    /// increment `num_lbd2` if the clause is a non-binary learnt clause with LBD ≤ 2.
-    fn check_lbd(&mut self, cid: ClauseId, lbd: DecisionLevel);
     /// record an asserted literal to unsat certification.
     fn certificate_add_assertion(&mut self, lit: Lit);
     /// save the certification record to a file.

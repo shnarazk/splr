@@ -217,8 +217,11 @@ pub fn handle_conflict(
                 cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
                 // cdb[cid].activated = cdb[cid].activated.max(1);
             }
+            // lbd should be calculated at conflict level, where all literals are assigned.
+            // But since vars hold the last level even after unassignment,
+            // we can have postponed the calculation.
             let d = asg.literal_block_distance(&cdb[cid].lits);
-            cdb.check_lbd(cid, d);
+            cdb[cid].lbd = d;
             ret = (cid, d);
         }
         RefClause::RegisteredClause(cid) => {
@@ -238,7 +241,7 @@ pub fn handle_conflict(
             //     }
             //     panic!("here we are!");
             // }
-            ret = (cid, asg.literal_block_distance(&cdb[cid].lits));
+            ret = (cid, cdb[cid].lbd);
             if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
             }
@@ -421,6 +424,7 @@ fn conflict_analyze(
                     }
                 }
                 cdb[cid].activated = cdb[cid].activated.saturating_add(1);
+                cdb[cid].lbd = cdb[cid].lbd.min(asg.literal_block_distance(&cdb[cid].lits));
             }
             AssignReason::Decision(_) | AssignReason::None => {}
         }

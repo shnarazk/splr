@@ -342,6 +342,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         c.turn_on(FlagClause::YOUNG);
+        c.lbd = c.lits.len() as DecisionLevel;
         let l0 = c.lits[0];
         let l1 = c.lits[1];
         if len2 {
@@ -816,11 +817,6 @@ impl ClauseDBIF for ClauseDB {
 
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[0]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[1]));
         // maintain_watch_literal \\ assert!(watch_cache[!c.lits[1]].iter().any(|wc| wc.0 == cid && wc.1 == c.lits[0]));
-    }
-    fn check_lbd(&mut self, cid: ClauseId, lbd: DecisionLevel) {
-        if lbd <= 2 && self[cid].is(FlagClause::LEARNT) {
-            self.num_lbd2 += 1;
-        }
     }
     fn update_at_analysis(&mut self, cid: ClauseId) -> bool {
         let c = &mut self.clause[NonZeroU32::get(cid.ordinal) as usize];
