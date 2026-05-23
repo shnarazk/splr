@@ -328,7 +328,7 @@ fn search(
             }
             // assert_eq!(asg.decision_level(), asg.root_level);
             state.core_size = asg.check_best_phases().unwrap_or_default();
-            assign_peak = assign_peak.saturating_sub(2)
+            assign_peak = assign_peak.saturating_sub(2);
         } else {
             cdb.lbd.update(lbd as f64);
         }
@@ -355,24 +355,26 @@ fn search(
             if reduction_pressure >= reduction_interval {
                 reduce!();
             }
-            RESTART!(asg, cdb, state)?;
-            if processing_pressure >= processing_interval {
-                let pre = asg.derefer(assign::property::Tusize::NumUnassertedVar);
-                if cfg!(feature = "clause_vivification") {
-                    cdb.vivify(asg, state)?;
+            {
+                let unasserted_pre = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+                RESTART!(asg, cdb, state)?;
+                if processing_pressure >= processing_interval {
+                    if cfg!(feature = "clause_vivification") {
+                        cdb.vivify(asg, state)?;
+                    }
+                    if cfg!(feature = "clause_elimination") {
+                        let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+                        state.flush("clause subsumption, ");
+                        elim.simplify(asg, cdb, state, false)?;
+                        asg.eliminated.append(elim.eliminated_lits());
+                    }
+                    processing_pressure = 0;
                 }
-                if cfg!(feature = "clause_elimination") {
-                    let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-                    state.flush("clause subsumption, ");
-                    elim.simplify(asg, cdb, state, false)?;
-                    asg.eliminated.append(elim.eliminated_lits());
-                }
-                let now = asg.derefer(assign::property::Tusize::NumUnassertedVar);
-                if now != pre {
-                    assign_peak = assign_peak.saturating_sub(2 * (pre - now));
+                let unasserted_now = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+                if unasserted_now != unasserted_pre {
+                    assign_peak = assign_peak.saturating_sub(2 * (unasserted_pre - unasserted_now));
                     state.core_size = asg.check_best_phases().unwrap_or_default();
                 }
-                processing_pressure = 0;
             }
             if cfg!(feature = "rephase") {
                 match asg.activity_scheme {
