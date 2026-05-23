@@ -42,7 +42,7 @@ macro_rules! var_assign {
 #[cfg(not(feature = "unsafe_access"))]
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
-        $asg.assign[$var]
+        $asg.var[$var].assign
     };
 }
 

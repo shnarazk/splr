@@ -273,29 +273,29 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c     Conflict|????:{:>9.4}, cLvl:{:>9.4}, bLvl:{:>9.4}, /cpr:{:>9.2},\n",
-            state[LogF64Id::End],
+            "c     Conflict|cLvl:{:>9.4}, bLvl:{:>9.4}, #RST:{:>9}, /cpr:{:>9.2},\n",
             state[LogF64Id::CLevel],
             state[LogF64Id::BLevel],
+            state[LogUsizeId::RemainingVar],
             state[LogF64Id::ConflictPerRestart],
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c      Learing|avrg:{:>9.4}, ???:{:>9.4}, #RST:{:>9}, /dpc:{:>9.2},\n",
+            "c      Learing| LBD:{:>9.4}, ti1%:{:>9.4}, ti2%:{:>9.2}, /dpc:{:>9.2},\n",
             state[LogF64Id::EmaLBD],
-            state[LogF64Id::End],
-            state[LogUsizeId::Restart],
+            state[LogF64Id::Tier1ClauseRatio],
+            state[LogF64Id::Tier2ClauseRatio],
             state[LogF64Id::DecisionPerConflict],
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c         misc|vivC:{:>9}, subC:{:>9}, core:{:>9}, /ppc:{:>9.2},\n",
-            state[LogUsizeId::VivifiedClause],
-            state[LogUsizeId::SubsumedClause],
+            "c         misc| LRB:{:>9.2}, VMTF:{:>9.2}, core:{:>9}, /ppc:{:>9.2},\n",
+            state[LogF64Id::ConflictDistanceAverage0],
+            state[LogF64Id::ConflictDistanceAverage1],
             state[LogUsizeId::UnreachableCore],
             state[LogF64Id::PropagationPerConflict],
         )
