@@ -334,7 +334,8 @@ fn search(
         }
 
         // track the largest set of clauses that does not emit conflicts
-        if assign_peak <= asg.stack_len() {
+        // not use '<=' to avoid an oscilation
+        if assign_peak < asg.stack_len() {
             assign_peak = asg.stack_len();
             state.core_size = asg.save_best_phases();
         }
