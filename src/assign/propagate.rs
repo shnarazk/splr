@@ -49,7 +49,7 @@ macro_rules! var_assign {
 #[cfg(not(feature = "unsafe_access"))]
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
-        $asg.assign[$var]
+        $asg.var[$var].assign
     };
 }
 
@@ -68,7 +68,7 @@ macro_rules! lit_assign {
 macro_rules! lit_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
-            l => match $asg.assign[l.vi()] {
+            l => match $asg.var[l.vi()].assign {
                 Some(x) if !bool::from(l) => Some(!x),
                 x => x,
             },
@@ -93,7 +93,7 @@ macro_rules! set_assign {
         match $lit {
             l => {
                 let vi = l.vi();
-                $asg.assign[vi] = Some(bool::from(l));
+                $asg.var[vi].assign = Some(bool::from(l));
             }
         }
     };
