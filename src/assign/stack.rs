@@ -6,7 +6,6 @@ use {
     },
     crate::{assign::learning_rate::VarActivityScheme, cdb::ClauseDBIF, types::*},
     std::{
-        collections::HashMap,
         fmt,
         ops::Range,
         slice::{Iter, IterMut},
@@ -40,7 +39,7 @@ pub struct AssignStack {
     //## Phase handling
     //
     pub(crate) phase_mode: PhaseRotation,
-    pub(super) best_phases: HashMap<VarId, (bool, AssignReason)>,
+    pub(super) best_phases: Vec<(Option<bool>, DecisionLevel)>,
 
     //## Elimanated vars
     //
@@ -109,7 +108,7 @@ impl Default for AssignStack {
             conflict_interval_average: (Ema2::default(), Ema2::default_extended()),
 
             phase_mode: PhaseRotation::default(),
-            best_phases: HashMap::new(),
+            best_phases: Vec::new(),
 
             eliminated: Vec::new(),
 
@@ -165,6 +164,7 @@ impl Instantiate for AssignStack {
             num_vars: cnf.num_of_variables,
 
             var: Var::new_vars(nv),
+            best_phases: vec![(None, DecisionLevel::MAX); nv + 1],
 
             lbd_temp: vec![0; nv + 1],
 
@@ -293,11 +293,11 @@ impl AssignIF for AssignStack {
         self.lbd_temp[0] = key;
         let mut cnt: DecisionLevel = 0;
         for l in lits {
-            let lv = self.best_level(l.vi());
+            let lv: DecisionLevel = self.best_level(l.vi());
             if lv == 0 {
                 continue;
             }
-            if lv == u32::MAX {
+            if lv == DecisionLevel::MAX {
                 // Every unassign var has a unique level.
                 cnt += 1;
             } else {
@@ -424,10 +424,10 @@ impl VarManipulateIF for AssignStack {
     fn best_level(&self, vi: VarId) -> DecisionLevel {
         #[cfg(feature = "unsafe_access")]
         unsafe {
-            self.var.get_unchecked(vi).best_level
+            self.best_phases.get_unchecked(vi).1
         }
         #[cfg(not(feature = "unsafe_access"))]
-        self.var[vi].best_level
+        self.best_phases[vi].1
     }
     #[inline]
     fn reason(&self, vi: VarId) -> AssignReason {
@@ -466,8 +466,6 @@ impl VarManipulateIF for AssignStack {
         self.var[vi].reason = AssignReason::Decision(0);
         self.set_activity(vi, 0.0);
         self.remove_from_heap(vi);
-
-        self.check_best_phase(vi);
     }
     fn make_var_eliminated(&mut self, vi: VarId) {
         if !self.var[vi].is(FlagVar::ELIMINATED) {
@@ -499,23 +497,6 @@ impl VarManipulateIF for AssignStack {
                 );
             }
         }
-    }
-}
-
-impl AssignStack {
-    /// check usability of the saved best phase.
-    /// return `true` if the current best phase got invalid.
-    fn check_best_phase(&mut self, vi: VarId) -> bool {
-        if let Some((b, _)) = self.best_phases.get(&vi) {
-            debug_assert!(self.var[vi].assign.is_some());
-            if self.var[vi].assign != Some(*b) {
-                if self.root_level == self.var[vi].level {
-                    self.best_phases.clear();
-                }
-                return true;
-            }
-        }
-        false
     }
 }
 

@@ -15,8 +15,6 @@ pub struct Var {
     pub(crate) assign: Option<bool>,
     /// decision level
     pub(crate) level: DecisionLevel,
-    /// decision level in the best assignment
-    pub(crate) best_level: DecisionLevel,
     /// assign Reason
     pub(crate) reason: AssignReason,
     /// last reason for assignment.
@@ -35,7 +33,6 @@ impl Default for Var {
         Var {
             assign: None,
             level: 0,
-            best_level: u32::MAX,
             reason: AssignReason::None,
             #[cfg(feature = "trail_saving")]
             reason_saved: AssignReason::None,

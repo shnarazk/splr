@@ -251,6 +251,7 @@ fn search(
     let mut rephase_span: usize = 0;
     let mut current_phase: &(PhaseRotation, usize, usize) = &PR_TBL[0];
     let vmtf_interval: usize = 40_000;
+    // a simple value checker
     let mut assign_peak: usize = 0;
     let luby_scale: usize = 8;
     let mut span_scale: usize = luby_scale;
@@ -325,7 +326,9 @@ fn search(
                     state.search_mode_ratio.1.update(1.0);
                 }
             }
-            assign_peak = assign_peak.saturating_sub(2);
+            // assert_eq!(asg.decision_level(), asg.root_level);
+            state.core_size = asg.check_best_phases().unwrap_or_default();
+            assign_peak = assign_peak.saturating_sub(2)
         } else {
             cdb.lbd.update(lbd as f64);
         }
@@ -333,8 +336,7 @@ fn search(
         // track the largest set of clauses that does not emit conflicts
         if assign_peak <= asg.stack_len() {
             assign_peak = asg.stack_len();
-            asg.save_best_phases();
-            state.core_size = asg.derefer(assign::property::Tusize::NumUnassignedVar);
+            state.core_size = asg.save_best_phases();
         }
 
         reduction_pressure += (lbd > 4) as usize;
@@ -366,8 +368,8 @@ fn search(
                 }
                 let now = asg.derefer(assign::property::Tusize::NumUnassertedVar);
                 if now != pre {
-                    assign_peak = assign_peak.saturating_sub(1 + pre - now);
-                    // assign_peak /= 2;
+                    assign_peak = assign_peak.saturating_sub(2 * (pre - now));
+                    state.core_size = asg.check_best_phases().unwrap_or_default();
                 }
                 processing_pressure = 0;
             }

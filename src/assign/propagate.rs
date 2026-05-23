@@ -244,10 +244,7 @@ impl PropagateIF for AssignStack {
                             PhaseRotation::False => false,
                             PhaseRotation::True => true,
                             PhaseRotation::Best => {
-                                self.best_phases
-                                    .get(&vi)
-                                    .unwrap_or(&(v.assign.unwrap(), AssignReason::None))
-                                    .0
+                                self.best_phases[vi].0.unwrap_or(v.assign.unwrap())
                             }
                             PhaseRotation::Random => ((v.last_conflict as f64 + 1.0 / v.reward)
                                 as usize)
