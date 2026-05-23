@@ -325,7 +325,7 @@ fn search(
                     state.search_mode_ratio.1.update(1.0);
                 }
             }
-            assign_peak = assign_peak.saturating_sub(1);
+            assign_peak = assign_peak.saturating_sub(2);
         } else {
             cdb.lbd.update(lbd as f64);
         }
@@ -366,8 +366,8 @@ fn search(
                 }
                 let now = asg.derefer(assign::property::Tusize::NumUnassertedVar);
                 if now != pre {
-                    // assign_peak = assign_peak.saturating_sub(diff);
-                    assign_peak /= 2;
+                    assign_peak = assign_peak.saturating_sub(1 + pre - now);
+                    // assign_peak /= 2;
                 }
                 processing_pressure = 0;
             }
