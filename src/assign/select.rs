@@ -1,7 +1,7 @@
 //! Decision var selection
 
 use {
-    super::{AssignIF, heap::VarHeapIF, stack::AssignStack},
+    super::{heap::VarHeapIF, stack::AssignStack},
     crate::types::*,
 };
 
@@ -48,25 +48,44 @@ macro_rules! var_assign {
 
 /// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
-    fn check_consistency_of_best_phases(&mut self);
+    /// return `None` if current assignment is not compatible with the values.
+    /// Othewise return `Some(the core size)`.
+    fn check_best_phases(&mut self) -> Option<usize>;
     /// select a new decision variable.
     fn select_decision_literal(&mut self) -> Lit;
     /// update the internal heap on var order.
     fn update_order(&mut self, v: VarId);
     /// rebuild the internal var_order
     fn rebuild_order(&mut self);
-    /// save the current assignments as the best phases
-    fn save_best_phases(&mut self);
+    /// save the current assignments as the best phases.
+    /// return the core size.
+    fn save_best_phases(&mut self) -> usize;
 }
 
 impl VarSelectIF for AssignStack {
-    fn check_consistency_of_best_phases(&mut self) {
-        if self
-            .best_phases
-            .iter()
-            .any(|(vi, b)| self.var[*vi].assign == Some(!b.0))
-        {
-            self.best_phases.clear();
+    fn check_best_phases(&mut self) -> Option<usize> {
+        let mut alives = 0;
+        let mut inconsistent: bool = false;
+        for (vi, b) in self.best_phases.iter_mut().enumerate().skip(1) {
+            match (b.0, self.var[vi].assign) {
+                (Some(_), None) => {
+                    alives += 1;
+                }
+                (Some(bp), Some(a)) if bp == a => {
+                    *b = (None, DecisionLevel::MAX);
+                }
+                (Some(_), Some(_)) => {
+                    inconsistent = true;
+                    break;
+                }
+                _ => (),
+            }
+        }
+        if inconsistent {
+            self.best_phases.fill((None, DecisionLevel::default()));
+            None
+        } else {
+            Some(self.num_vars - alives - self.num_asserted_vars - self.num_eliminated_vars)
         }
     }
     fn select_decision_literal(&mut self) -> Lit {
@@ -84,18 +103,19 @@ impl VarSelectIF for AssignStack {
             }
         }
     }
-    fn save_best_phases(&mut self) {
-        self.best_phases.clear();
-        for l in self.trail.iter().skip(self.len_upto(self.root_level)) {
-            let vi = l.vi();
-            if let Some(b) = self.var[vi].assign {
-                self.best_phases.insert(vi, (b, self.var[vi].reason));
-                self.var[vi].best_level = self.var[vi].level;
+    fn save_best_phases(&mut self) -> usize {
+        let mut alives: usize = 0;
+        for (vi, v) in self.var.iter_mut().enumerate().skip(1) {
+            if let Some(b) = v.assign
+                && v.level > self.root_level
+            {
+                self.best_phases[vi] = (Some(b), v.level);
+                alives += 1;
             } else {
-                self.var[vi].best_level = u32::MAX;
+                self.best_phases[vi] = (None, DecisionLevel::MAX);
             }
         }
-        // self.build_best_at = self.num_propagation;
+        self.num_vars - alives - self.num_asserted_vars - self.num_eliminated_vars
     }
 }
 
