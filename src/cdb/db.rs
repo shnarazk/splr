@@ -882,7 +882,7 @@ impl ClauseDBIF for ClauseDB {
             //     tier3.push(ClauseId::from(i));
             //     continue;
             // }
-            if len < act {
+            if len <= act {
                 // tier 2 group: pretty small or frequently used clauses
                 ntier2 += 1;
                 picks += len;
