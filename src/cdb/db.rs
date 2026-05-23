@@ -847,22 +847,22 @@ impl ClauseDBIF for ClauseDB {
             .skip(1)
             .filter(|(_, c)| !c.is_dead())
         {
+            if !c.is(FlagClause::LEARNT) {
+                continue;
+            }
             let lbd = asg.literal_block_distance(&c.lits) as usize;
             if lbd <= 2 {
                 *num_lbd2 += 1;
             }
-            if !c.is(FlagClause::LEARNT) {
-                continue;
-            }
             nlearnts += 1;
             let act = c.activated + c.is(FlagClause::YOUNG) as usize;
-            // c.activated /= 2;
-            if c.activated <= 1 {
-                c.activated = 0;
-            } else {
-                c.activated = c.activated.ilog2() as usize;
-            }
-            // c.activated = 0;
+            c.activated = 0;
+            // // c.activated /= 2;
+            // if c.activated <= 1 {
+            //     c.activated = 0;
+            // } else {
+            //     c.activated = c.activated.ilog2() as usize;
+            // }
 
             if c.is(FlagClause::YOUNG) {
                 c.turn_off(FlagClause::YOUNG);
@@ -870,48 +870,30 @@ impl ClauseDBIF for ClauseDB {
             if c.is(FlagClause::ASSIGN_REASON) {
                 continue;
             }
-            // let _aas = asg.activity_sum(&c.lits) as f64;
-            // the ultimate and permanent criteria of good clauses
-            if c.len() <= 3 || lbd <= 2 {
+            let len = c.len();
+            if len <= 4 || lbd <= 3 {
+                // the ultimate and permanent criteria of good clauses
                 ntier1 += 1;
-                picks += 4;
+                picks += len;
                 continue;
             }
-            // The other clauses should removed if they aren't used.
-            if act == 0 {
-                tier3.push(ClauseId::from(i));
-                continue;
-            }
-
-            // tier 2 group: pretty small or frequently used clauses
-            // if c.lbd.get() <= 2.0 || act >= 16 {
-            // if c.lbd.get() <= act as f64 {
-            if c.len() <= act {
+            // if act == 0 {
+            //     // The other clauses should removed if they aren't used.
+            //     tier3.push(ClauseId::from(i));
+            //     continue;
+            // }
+            if len < act {
+                // tier 2 group: pretty small or frequently used clauses
                 ntier2 += 1;
-                picks += 1;
+                picks += len;
                 continue;
             }
             // The others will be srceened
-            tier2.push(SortKey::new(ClauseId::from(i), lbd as f64));
-            //
-            /*
-            if c.len() <= 4 {
-                ntier1 += 1;
-                picks += 1;
-            } else if act >= 8 {
-                ntier2 += 1;
-                picks += 1;
-            } else if act > 0 {
-                tier2.push(SortKey::new(ClauseId::from(i), c.lbd as f64));
-            } else {
-                tier3.push(ClauseId::from(i));
+            if len <= 8 && act > 1 {
+                tier2.push(SortKey::new(ClauseId::from(i), lbd as f64));
+                continue;
             }
-            */
-            // } else if c.lbd < act as u32 {
-            //     tier2.push(SortKey::new(ClauseId::from(i), c.lbd as f64));
-            // } else {
-            //     tier3.push(ClauseId::from(i));
-            // }
+            tier3.push(ClauseId::from(i));
         }
         for cid in tier3.into_iter() {
             self.remove_clause(cid);
