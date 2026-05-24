@@ -1,11 +1,10 @@
 //! Var struct and Database management API
 use {
-    // super::{heap::VarHeapIF, stack::AssignStack, AssignIF},
     crate::types::{
         AssignReason, DecisionLevel,
         flags::{FlagIF, FlagVar},
     },
-    std::{fmt, u32},
+    std::fmt,
 };
 
 /// Object representing a variable.
