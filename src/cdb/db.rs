@@ -341,7 +341,6 @@ impl ClauseDBIF for ClauseDB {
                 *num_learnt += 1;
             }
         }
-        c.turn_on(FlagClause::YOUNG);
         let l0 = c.lits[0];
         let l1 = c.lits[1];
         if len2 {
@@ -855,18 +854,8 @@ impl ClauseDBIF for ClauseDB {
                 *num_lbd2 += 1;
             }
             nlearnts += 1;
-            let act = c.activated + c.is(FlagClause::YOUNG) as usize;
+            let act = c.activated;
             c.activated = 0;
-            // // c.activated /= 2;
-            // if c.activated <= 1 {
-            //     c.activated = 0;
-            // } else {
-            //     c.activated = c.activated.ilog2() as usize;
-            // }
-
-            if c.is(FlagClause::YOUNG) {
-                c.turn_off(FlagClause::YOUNG);
-            }
             if c.is(FlagClause::ASSIGN_REASON) {
                 continue;
             }
@@ -877,19 +866,14 @@ impl ClauseDBIF for ClauseDB {
                 picks += len;
                 continue;
             }
-            // if act == 0 {
-            //     // The other clauses should removed if they aren't used.
-            //     tier3.push(ClauseId::from(i));
-            //     continue;
-            // }
             if len <= act {
                 // tier 2 group: pretty small or frequently used clauses
                 ntier2 += 1;
                 picks += len;
                 continue;
             }
-            // The others will be srceened
             if len <= 8 && act > 1 {
+                // potentially good clauses in any circumstance
                 tier2.push(SortKey::new(ClauseId::from(i), lbd as f64));
                 continue;
             }
