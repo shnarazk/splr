@@ -856,9 +856,6 @@ impl ClauseDBIF for ClauseDB {
             nlearnts += 1;
             let act = c.activated;
             c.activated = 0;
-            if c.is(FlagClause::ASSIGN_REASON) {
-                continue;
-            }
             let len = c.len();
             if len <= 4 || lbd <= 3 {
                 // the ultimate and permanent criteria of good clauses
@@ -870,6 +867,9 @@ impl ClauseDBIF for ClauseDB {
                 // tier 2 group: pretty small or frequently used clauses
                 ntier2 += 1;
                 picks += len;
+                continue;
+            }
+            if c.is(FlagClause::ASSIGN_REASON) {
                 continue;
             }
             if len <= 8 && act > 1 {
