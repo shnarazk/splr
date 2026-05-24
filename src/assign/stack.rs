@@ -310,6 +310,28 @@ impl AssignIF for AssignStack {
         }
         cnt
     }
+    fn literal_block_distance_current(&mut self, lits: &[Lit]) -> DecisionLevel {
+        let key: usize = self.lbd_temp[0] + 1;
+        self.lbd_temp[0] = key;
+        let mut cnt: DecisionLevel = 0;
+        for l in lits {
+            let lv: DecisionLevel = self.level(l.vi());
+            if lv == 0 {
+                continue;
+            }
+            if lv == DecisionLevel::MAX {
+                // Every unassign var has a unique level.
+                cnt += 1;
+            } else {
+                let p = &mut self.lbd_temp[lv as usize];
+                if *p != key {
+                    *p = key;
+                    cnt = cnt.saturating_add(1);
+                }
+            }
+        }
+        cnt
+    }
     fn literal_block_distance_(&self, lits: &[Lit]) -> usize {
         lits.iter()
             .map(|l| self.var[l.vi()].level)
