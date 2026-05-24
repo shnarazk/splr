@@ -272,7 +272,6 @@ fn search(
         () => {
             if asg.activity_scheme != VarActivityScheme::VMTF {
                 asg.activity_scheme = VarActivityScheme::VMTF;
-                // ??? No: we need to stay in the current rephase ???
                 asg.phase_mode = PhaseRotation::Walk;
                 asg.set_learning_rate(0.0); // Don't change this
                 asg.rebuild_order();
@@ -297,6 +296,18 @@ fn search(
             reduction_pressure = 0;
             state.search_mode_ratio.0.update(0.0);
             state.search_mode_ratio.1.update(0.0);
+        };
+    }
+
+    macro_rules! update_core {
+        ($n: expr) => {
+            if let Some(core) = asg.check_best_phases() {
+                assign_peak = assign_peak.saturating_sub(2 * $n);
+                state.core_size = core;
+            } else {
+                assign_peak = 0;
+                state.core_size = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+            }
         };
     }
 
@@ -327,8 +338,7 @@ fn search(
                 }
             }
             // assert_eq!(asg.decision_level(), asg.root_level);
-            state.core_size = asg.check_best_phases().unwrap_or_default();
-            assign_peak = assign_peak.saturating_sub(2);
+            update_core!(1);
         } else {
             cdb.lbd.update(lbd as f64);
         }
@@ -372,8 +382,7 @@ fn search(
                 }
                 let unasserted_now = asg.derefer(assign::property::Tusize::NumUnassertedVar);
                 if unasserted_now != unasserted_pre {
-                    assign_peak = assign_peak.saturating_sub(2 * (unasserted_pre - unasserted_now));
-                    state.core_size = asg.check_best_phases().unwrap_or_default();
+                    update_core!(unasserted_pre - unasserted_now);
                 }
             }
             if cfg!(feature = "rephase") {
