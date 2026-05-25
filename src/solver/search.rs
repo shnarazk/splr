@@ -220,21 +220,6 @@ impl SolveIF for Solver {
     }
 }
 
-const _PR_TBL: [(PhaseRotation, usize, usize); 12] = [
-    (PhaseRotation::Best, 40_000, 1),
-    (PhaseRotation::Walk, 60_000, 2),
-    (PhaseRotation::False, 20_000, 3),
-    (PhaseRotation::Best, 40_000, 4),
-    (PhaseRotation::Walk, 60_000, 5),
-    (PhaseRotation::True, 20_000, 6),
-    (PhaseRotation::Best, 40_000, 7),
-    (PhaseRotation::Walk, 60_000, 8),
-    (PhaseRotation::Random, 20_000, 9),
-    (PhaseRotation::Best, 40_000, 10),
-    (PhaseRotation::Walk, 60_000, 11),
-    (PhaseRotation::Inverted, 20_000, 0),
-];
-
 const PR_TBL: [(PhaseRotation, usize, usize); 6] = [
     (PhaseRotation::Best, 100_000, 1),
     (PhaseRotation::False, 100_000, 2),
@@ -351,14 +336,11 @@ fn search(
         } else {
             cdb.lbd.update(lbd as f64);
         }
-
-        // track the largest set of clauses that does not emit conflicts
         // not use '<=' to avoid an oscilation
         if assign_peak < asg.stack_len() {
             assign_peak = asg.stack_len();
             state.core_size = asg.save_best_phases();
         }
-
         reduction_pressure += (lbd > 4) as usize;
         processing_pressure += (lbd <= 5) as usize;
         progress_pressure += 1;
