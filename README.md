@@ -25,11 +25,11 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 |# | target cnf selected from SAT Competition 2025                 |sat|valid|#var    |
 |-:|:--------------------------------------------------------------|:--|:---:|-------:|
 | 1|`04648cef5bed430ab6429991fa9e107d-ramsey_3_6_19.normalised.cnf`|TO |  -  |171     |
-| 2|`0c0430a68f147be18ab3fded07f30fdb-oddball_53_5_tto_zp.normalis`|SAT|     |57176   |
+| 2|`0c0430a68f147be18ab3fded07f30fdb-oddball_53_5_tto_zp.normalis`|SAT| ✅  |57176   |
 | 3|`0ccb0f855352783a972be45188bf3164-SCPC-500-12.cnf`             |UNS|     |500     |
-| 4|`0e1d562093d5f4fc9013cf4a14a03f70-Break_12_50.xml.cnf`         |SAT|     |14036   |
+| 4|`0e1d562093d5f4fc9013cf4a14a03f70-Break_12_50.xml.cnf`         |SAT| ✅  |14036   |
 | 5|`110f8eb8b9b80204fe955ea0973bbb00-clqcl_30_7_6.normalised.cnf` |TO |  -  |825     |
-| 6|`24bde22f729a988fb2394b644cb60d39-SC25_Timetable_C_481_E_49_Cl`|SAT|     |292405  |
+| 6|`24bde22f729a988fb2394b644cb60d39-SC25_Timetable_C_481_E_49_Cl`|SAT| ❌  |292405  |
 | 7|`2d0c041c0fe72dc32527bfbf34f63e61-170223547.cnf`               |TO |  -  |322     |
 | 8|`35b9091b90bd28a492c9556d6fc4348d-bp4_TCO_CSO_ZR.normalised.cn`|TO |  -  |77553   |
 | 9|`35ec95b9b2398fb522db178855016ae0-MVRoundRobin_n14_d10_v2.cnf` |TO |  -  |3640    |
