@@ -22,48 +22,48 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 
 #### Version 0.19.0
 
-|# | target cnf selected from SAT Competition 2025                 |sat|valid|#var |
-|-:|:--------------------------------------------------------------|:--|:---:|----:|
-| 1|`04648cef5bed430ab6429991fa9e107d-ramsey_3_6_19.normalised.cnf`|TO |  -  |     |
-| 2|`0c0430a68f147be18ab3fded07f30fdb-oddball_53_5_tto_zp.normalis`|SAT|     |     |
-| 3|`0ccb0f855352783a972be45188bf3164-SCPC-500-12.cnf`             |UNS|     |     |
-| 4|`0e1d562093d5f4fc9013cf4a14a03f70-Break_12_50.xml.cnf`         |SAT|     |     |
-| 5|`110f8eb8b9b80204fe955ea0973bbb00-clqcl_30_7_6.normalised.cnf` |TO |  -  |     |
-| 6|`24bde22f729a988fb2394b644cb60d39-SC25_Timetable_C_481_E_49_Cl`|SAT|     |     |
-| 7|`2d0c041c0fe72dc32527bfbf34f63e61-170223547.cnf`               |TO |  -  |     |
-| 8|`35b9091b90bd28a492c9556d6fc4348d-bp4_TCO_CSO_ZR.normalised.cn`|TO |  -  |     |
-| 9|`35ec95b9b2398fb522db178855016ae0-MVRoundRobin_n14_d10_v2.cnf` |TO |  -  |     |
-|10|`46a8727e27d848faafd83a990c2e01a7-case8.normalised.cnf`        |TO |  -  |     |
-|11|`482295be38dc1d63a16f3cf649ef7ef6-myciel6-cn.used-as.sat04-319`|UNS|     |     |
-|12|`53c21f3e78f060883026b5a12ba691d8-maximum_constrained_partitio`|SAT|     |     |
-|13|`57b478982ee9aba245ba792452b18fe3-VanDerWaerden_pd_2-3-22_462.`|SAT|     |     |
-|14|`6147e666b75f603a4c4490d21ab654cd-hid-uns-enc-6-1-0-0-0-0-1449`|UNS|     |     |
-|15|`65f7145996bbec02b90bd0fa64a20502-test_v7_r12_vr10_c1_s18160.s`|SAT|     |     |
-|16|`68e33d998466bbdd4bfb7249a5790e4f-arles_thres10_p10_r8180.cnf` |UNS|     |     |
-|17|`83aa254f7d17e1df7bee19322ac4752b-1.normalised.cnf`            |SAT|     |     |
-|18|`8e62c5d47920ffe36052f86177403e70-SC25_Timetable_C_393_E_45_Cl`|SAT|     |     |
-|19|`908433870bee8ba2c86f266d0b002fdb-MVRoundRobin_n20_d10_v2.cnf` |TO |  -  |     |
-|20|`918d9e7c2e197312517736421d728958-SCPC-500-1.cnf`              |UNS|     |     |
-|21|`91c429adc2dc8430461b6d87a9aef335-16_16_booth_wallace_mapped_a`|SAT|     |     |
-|22|`967b58fea99a99b8da592d3e2fe7139b-dubois50.cnf.mis-99.debugged`|SAT|     |     |
-|23|`98a9352230efc411c092f1dcdcdedcfc-bp4_BC012_IXA_LPI_FPBLE.norm`|TO |  -  |     |
-|24|`9b5f767eb5c14eb888d51acf70e045c8-uniqinv40prop.cnf`           |SAT|     |     |
-|25|`a0bcdaffb0ea36b678899fd86bdc7f18-arles_thres10_p10_r8186.cnf` |UNS|     |     |
-|26|`a1fdd60d2570f47fb14956ac9e96951f-oddball_22_5_ttf.normalised.`|UNS|     |     |
-|27|`a70883771fd1c210d94a916d52510a3a-gm28sparrc.cnf`              |UNS|     |     |
-|28|`b3d3680b3287a989ce61a6db1054efd2-case20.normalised.cnf`       |SAT|     |     |
-|29|`b9ed6fd14f4fc969ec966a4b54c36872-n320p5q2_n.apx_16.cnf`       |SAT|     |     |
-|30|`c21096fa2f550785c33dc862d83bc941-case17.normalised.cnf`       |SAT|     |     |
-|31|`cb950b9accfb53eb98f77b0f995ac0ae-rphp5_050_shuffled.cnf`      |TO |  -  |     |
-|32|`d5928883c1e1f70764a31a83aa419eaf-oski15a01b42s_opt.cnf`       |SAT|     |     |
-|33|`d8666a18cf3a32af0a606099f0070b4b-7.normalised.cnf`            |SAT|     |     |
-|34|`ddf9620410e6a4351f64c745670ef5d4-oddball_57_5_tto_zp.normalis`|SAT|     |     |
-|35|`e23edb67db2d1dfdbfe2f4c02d09c6c7-14.normalised.cnf`           |SAT|     |     |
-|36|`e430acf720b63044e5c825a00a76b0eb-rphp_p25_r25.cnf`            |TO |  -  |     |
-|37|`e442248e155eb81a811edd1deca8a2cd-sudoku-N30-23.cnf`           |SAT|     |     |
-|38|`f17dfbed8c18716a41b231702e127524-SC25_Timetable_C_406_E_45_Cl`|SAT|     |     |
-|39|`f25a1df88f89c6bcbe2602fa7f6e816b-1-TC-256-K-63.sanitized.cnf` |SAT|     |     |
-|40|`f33a6163305d6559043b7438a692dea9-simon-r17-1.sanitized.cnf`   |TO |  -  |     |
+|# | target cnf selected from SAT Competition 2025                 |sat|valid|#var    |
+|-:|:--------------------------------------------------------------|:--|:---:|-------:|
+| 1|`04648cef5bed430ab6429991fa9e107d-ramsey_3_6_19.normalised.cnf`|TO |  -  |171     |
+| 2|`0c0430a68f147be18ab3fded07f30fdb-oddball_53_5_tto_zp.normalis`|SAT|     |57176   |
+| 3|`0ccb0f855352783a972be45188bf3164-SCPC-500-12.cnf`             |UNS|     |500     |
+| 4|`0e1d562093d5f4fc9013cf4a14a03f70-Break_12_50.xml.cnf`         |SAT|     |14036   |
+| 5|`110f8eb8b9b80204fe955ea0973bbb00-clqcl_30_7_6.normalised.cnf` |TO |  -  |825     |
+| 6|`24bde22f729a988fb2394b644cb60d39-SC25_Timetable_C_481_E_49_Cl`|SAT|     |292405  |
+| 7|`2d0c041c0fe72dc32527bfbf34f63e61-170223547.cnf`               |TO |  -  |322     |
+| 8|`35b9091b90bd28a492c9556d6fc4348d-bp4_TCO_CSO_ZR.normalised.cn`|TO |  -  |77553   |
+| 9|`35ec95b9b2398fb522db178855016ae0-MVRoundRobin_n14_d10_v2.cnf` |TO |  -  |3640    |
+|10|`46a8727e27d848faafd83a990c2e01a7-case8.normalised.cnf`        |TO |  -  |15222   |
+|11|`482295be38dc1d63a16f3cf649ef7ef6-myciel6-cn.used-as.sat04-319`|UNS|     |2550    |
+|12|`53c21f3e78f060883026b5a12ba691d8-maximum_constrained_partitio`|SAT|     |30252   |
+|13|`57b478982ee9aba245ba792452b18fe3-VanDerWaerden_pd_2-3-22_462.`|SAT|     |231     |
+|14|`6147e666b75f603a4c4490d21ab654cd-hid-uns-enc-6-1-0-0-0-0-1449`|UNS|     |1908    |
+|15|`65f7145996bbec02b90bd0fa64a20502-test_v7_r12_vr10_c1_s18160.s`|SAT|     |314295  |
+|16|`68e33d998466bbdd4bfb7249a5790e4f-arles_thres10_p10_r8180.cnf` |UNS|     |4487    |
+|17|`83aa254f7d17e1df7bee19322ac4752b-1.normalised.cnf`            |SAT|     |29302780|
+|18|`8e62c5d47920ffe36052f86177403e70-SC25_Timetable_C_393_E_45_Cl`|SAT|     |213268  |
+|19|`908433870bee8ba2c86f266d0b002fdb-MVRoundRobin_n20_d10_v2.cnf` |TO |  -  |7600    |
+|20|`918d9e7c2e197312517736421d728958-SCPC-500-1.cnf`              |UNS|     |500     |
+|21|`91c429adc2dc8430461b6d87a9aef335-16_16_booth_wallace_mapped_a`|SAT|     |2964    |
+|22|`967b58fea99a99b8da592d3e2fe7139b-dubois50.cnf.mis-99.debugged`|SAT|     |14901   |
+|23|`98a9352230efc411c092f1dcdcdedcfc-bp4_BC012_IXA_LPI_FPBLE.norm`|TO |  -  |94479   |
+|24|`9b5f767eb5c14eb888d51acf70e045c8-uniqinv40prop.cnf`           |SAT|     |12526   |
+|25|`a0bcdaffb0ea36b678899fd86bdc7f18-arles_thres10_p10_r8186.cnf` |UNS|     |4487    |
+|26|`a1fdd60d2570f47fb14956ac9e96951f-oddball_22_5_ttf.normalised.`|UNS|     |12623   |
+|27|`a70883771fd1c210d94a916d52510a3a-gm28sparrc.cnf`              |UNS|     |81617   |
+|28|`b3d3680b3287a989ce61a6db1054efd2-case20.normalised.cnf`       |SAT|     |945     |
+|29|`b9ed6fd14f4fc969ec966a4b54c36872-n320p5q2_n.apx_16.cnf`       |SAT|     |960     |
+|30|`c21096fa2f550785c33dc862d83bc941-case17.normalised.cnf`       |SAT|     |550     |
+|31|`cb950b9accfb53eb98f77b0f995ac0ae-rphp5_050_shuffled.cnf`      |TO |  -  |500     |
+|32|`d5928883c1e1f70764a31a83aa419eaf-oski15a01b42s_opt.cnf`       |SAT|     |488231  |
+|33|`d8666a18cf3a32af0a606099f0070b4b-7.normalised.cnf`            |SAT|     |46901230|
+|34|`ddf9620410e6a4351f64c745670ef5d4-oddball_57_5_tto_zp.normalis`|SAT|     |63706   |
+|35|`e23edb67db2d1dfdbfe2f4c02d09c6c7-14.normalised.cnf`           |SAT|     |9357870 |
+|36|`e430acf720b63044e5c825a00a76b0eb-rphp_p25_r25.cnf`            |TO |  -  |1250    |
+|37|`e442248e155eb81a811edd1deca8a2cd-sudoku-N30-23.cnf`           |SAT|     |842116  |
+|38|`f17dfbed8c18716a41b231702e127524-SC25_Timetable_C_406_E_45_Cl`|SAT|     |217449  |
+|39|`f25a1df88f89c6bcbe2602fa7f6e816b-1-TC-256-K-63.sanitized.cnf` |SAT|     |14687   |
+|40|`f33a6163305d6559043b7438a692dea9-simon-r17-1.sanitized.cnf`   |TO |  -  |2848    |
 
 #### Version 0.17.0
 
