@@ -220,19 +220,28 @@ impl SolveIF for Solver {
     }
 }
 
-const PR_TBL: [(PhaseRotation, usize, usize); 12] = [
+const _PR_TBL: [(PhaseRotation, usize, usize); 12] = [
     (PhaseRotation::Best, 40_000, 1),
-    (PhaseRotation::Walk, 40_000, 2),
-    (PhaseRotation::False, 40_000, 3),
+    (PhaseRotation::Walk, 60_000, 2),
+    (PhaseRotation::False, 20_000, 3),
     (PhaseRotation::Best, 40_000, 4),
-    (PhaseRotation::Walk, 40_000, 5),
-    (PhaseRotation::True, 40_000, 6),
+    (PhaseRotation::Walk, 60_000, 5),
+    (PhaseRotation::True, 20_000, 6),
     (PhaseRotation::Best, 40_000, 7),
-    (PhaseRotation::Walk, 40_000, 8),
-    (PhaseRotation::Random, 40_000, 9),
+    (PhaseRotation::Walk, 60_000, 8),
+    (PhaseRotation::Random, 20_000, 9),
     (PhaseRotation::Best, 40_000, 10),
-    (PhaseRotation::Walk, 40_000, 11),
-    (PhaseRotation::Inverted, 40_000, 0),
+    (PhaseRotation::Walk, 60_000, 11),
+    (PhaseRotation::Inverted, 20_000, 0),
+];
+
+const PR_TBL: [(PhaseRotation, usize, usize); 6] = [
+    (PhaseRotation::Best, 100_000, 1),
+    (PhaseRotation::False, 100_000, 2),
+    (PhaseRotation::True, 100_000, 3),
+    (PhaseRotation::Random, 100_000, 4),
+    (PhaseRotation::Inverted, 100_000, 5),
+    (PhaseRotation::Walk, 100_000, 0),
 ];
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.

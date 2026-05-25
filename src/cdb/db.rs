@@ -877,6 +877,9 @@ impl ClauseDBIF for ClauseDB {
                 tier2.push(SortKey::new(ClauseId::from(i), lbd as f64));
                 continue;
             }
+            if asg.literal_block_distance_current(&c.lits) <= 2 {
+                continue;
+            }
             tier3.push(ClauseId::from(i));
         }
         for cid in tier3.into_iter() {
