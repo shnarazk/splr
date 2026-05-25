@@ -5,17 +5,14 @@
 #let title = [Search algorithms in Splr]
 
 #pseudocode-list(booktabs: true, hooks: 0.2em, line-gap: 6pt, stroke: 0.3pt, title: strong[Search in Splr-0.19])[
-  + *let* $n <- 0$ #sym.triangle.stroked.r Luby counter `int`
-  + *let* $i <- 0$ #sym.triangle.stroked.r step counter `int`
-  + *let* $c <-$ _EMA(Exponential Moving Average)_
-  + *let* $o <-$ _LearningRate-Based Rewarding_
+  + *let* $n: "int" <- 0$ #sym.triangle.stroked.r Luby counter
+  + *let* $i: "int" <- 0$ #sym.triangle.stroked.r step counter
   + *while* _there is an unassignd or unpropagated var_ *do*
     + `SelectDecisionVar`($o$)
     + *if* `BCP`() $!=$ conflict *then*
       + *continue*
     + *if* _decision level_ $= 0$ *then*
       + *return* UNSAT
-    + $c$.update(1 / _conflict interval of the conflicting literal_)
     + `ConflictAnalysis`()
     + `BackTrack`()
     + $i <- i + 1$
@@ -23,13 +20,8 @@
       + *continue*
     + $i <- 0$
     + $n <- n + 1$
-    + *if* $c$ enters into a core *then*
-      + $o <-$ _Variable Move To queue Front_
-    + *else*
-      + *if* $c."trend" < 1$ *then*
-        + `Restart`()
-      + $o <-$ _LearningRate-Based Rewarding_
-    + run `Reduce`, `Vivify`, `Eliminate` periodically
+    + `Restart`()
+    + run `Reduce`, `Vivify`, `Eliminate`, and `ChangeRephaseTarget` periodically
   + *return* SAT
 ]
 
