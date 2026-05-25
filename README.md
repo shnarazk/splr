@@ -22,7 +22,7 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 
 #### Version 0.19.0
 
-| target | sat | validate | time |
+| target cnf selected from SAT Competition 2025 | sat | validate | time |
 |:-------|:----|:---------|-----:|
 | 04648cef5bed430ab6429991fa9e107d-ramsey_3_6_19.normalised.cnf | | | |
 | 0c0430a68f147be18ab3fded07f30fdb-oddball_53_5_tto_zp.normalised.cnf | | | |
