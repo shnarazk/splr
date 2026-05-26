@@ -292,9 +292,9 @@ fn search(
             state.search_mode_ratio.1.update(0.0);
         };
     }
-
     macro_rules! update_core {
         ($n: expr) => {
+            asg.clear_asserted_literals(cdb)?;
             if let Some(core) = asg.check_best_phases() {
                 assign_peak = assign_peak.saturating_sub(2 * $n);
                 state.core_size = core;
@@ -331,7 +331,6 @@ fn search(
                     state.search_mode_ratio.1.update(1.0);
                 }
             }
-            // assert_eq!(asg.decision_level(), asg.root_level);
             update_core!(1);
         } else {
             cdb.lbd.update(lbd as f64);

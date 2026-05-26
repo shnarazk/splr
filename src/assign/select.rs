@@ -68,7 +68,7 @@ impl VarSelectIF for AssignStack {
         let mut inconsistent: bool = false;
         for (vi, b) in self.best_phases.iter_mut().enumerate().skip(1) {
             match (b.0, self.var[vi].assign) {
-                (Some(_), None) => {
+                (Some(_), None) if !self.var[vi].is(FlagVar::ELIMINATED) => {
                     alives += 1;
                 }
                 (Some(bp), Some(a)) if bp == a => {
