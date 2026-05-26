@@ -52,7 +52,7 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 |26|`a1fdd60d2570f47fb14956ac9e96951f-oddball_22_5_ttf.normalised.`|UNS|     |12623   |
 |27|`a70883771fd1c210d94a916d52510a3a-gm28sparrc.cnf`              |UNS|     |81617   |
 |28|`b3d3680b3287a989ce61a6db1054efd2-case20.normalised.cnf`       |SAT|     |945     |
-|29|`b9ed6fd14f4fc969ec966a4b54c36872-n320p5q2_n.apx_16.cnf`       |SAT|     |960     |
+|29|`b9ed6fd14f4fc969ec966a4b54c36872-n320p5q2_n.apx_16.cnf`       |SAT| ✅  |960     |
 |30|`c21096fa2f550785c33dc862d83bc941-case17.normalised.cnf`       |SAT|     |550     |
 |31|`cb950b9accfb53eb98f77b0f995ac0ae-rphp5_050_shuffled.cnf`      |TO |  -  |500     |
 |32|`d5928883c1e1f70764a31a83aa419eaf-oski15a01b42s_opt.cnf`       |SAT|     |488231  |
