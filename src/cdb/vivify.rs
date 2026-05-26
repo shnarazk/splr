@@ -53,6 +53,7 @@ impl VivifyIF for ClauseDB {
             if c.is_dead() {
                 continue;
             }
+            let is_learnt = c.is(FlagClause::LEARNT);
             c.vivified();
             let clits = c.iter().copied().collect::<Vec<Lit>>();
             if to_display <= num_check {
@@ -77,7 +78,7 @@ impl VivifyIF for ClauseDB {
                         asg.assign_by_decision(!lit);
                         //## Rule 3
                         if let Err(cc) = asg.propagate_sandbox(self) {
-                            let vec: Vec<Lit>;
+                            let mut vec: Vec<Lit>;
                             match cc.1 {
                                 AssignReason::BinaryLink(l) => {
                                     let cnfl_lits = vec![cc.0, !l];
@@ -130,6 +131,7 @@ impl VivifyIF for ClauseDB {
                                     num_assert += 1;
                                 }
                                 _ => {
+                                    self.new_clause(&mut vec, is_learnt);
                                     self.remove_clause(cid);
                                     num_shrink += 1;
                                 }
