@@ -6,7 +6,7 @@ use {
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum PhaseRotation {
+pub enum RephaseTarget {
     #[default]
     Walk,
     Best,
@@ -16,16 +16,16 @@ pub enum PhaseRotation {
     Inverted,
 }
 
-impl PhaseRotation {
+impl RephaseTarget {
     /// return a symbolic (Unicode) letter for each value of `PhaseRotation`.
     pub fn as_mnemonic(&self) -> &str {
         match self {
-            PhaseRotation::Walk => "→",
-            PhaseRotation::Best => "★",
-            PhaseRotation::False => "⊥",
-            PhaseRotation::True => "⊤",
-            PhaseRotation::Random => "∼",
-            PhaseRotation::Inverted => "¬",
+            RephaseTarget::Walk => "→",
+            RephaseTarget::Best => "★",
+            RephaseTarget::False => "⊥",
+            RephaseTarget::True => "⊤",
+            RephaseTarget::Random => "∼",
+            RephaseTarget::Inverted => "¬",
         }
     }
 }

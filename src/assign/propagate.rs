@@ -1,7 +1,7 @@
 // implement boolean constraint propagation, backjump
 // This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{AssignIF, AssignStack, PhaseRotation, VarManipulateIF, heap::VarHeapIF},
+    super::{AssignIF, AssignStack, RephaseTarget, VarManipulateIF, heap::VarHeapIF},
     crate::{cdb::ClauseDBIF, types::*},
 };
 
@@ -240,16 +240,16 @@ impl PropagateIF for AssignStack {
                     v.set(
                         FlagVar::PHASE,
                         match self.phase_mode {
-                            PhaseRotation::Walk => v.assign.unwrap(),
-                            PhaseRotation::False => false,
-                            PhaseRotation::True => true,
-                            PhaseRotation::Best => {
+                            RephaseTarget::Walk => v.assign.unwrap(),
+                            RephaseTarget::False => false,
+                            RephaseTarget::True => true,
+                            RephaseTarget::Best => {
                                 self.best_phases[vi].0.unwrap_or(v.assign.unwrap())
                             }
-                            PhaseRotation::Random => ((v.last_conflict as f64 + 1.0 / v.reward)
-                                as usize)
-                                .is_multiple_of(2),
-                            PhaseRotation::Inverted => !v.assign.unwrap(),
+                            RephaseTarget::Random => {
+                                (v.last_conflict + i + self.num_propagation).is_multiple_of(2)
+                            }
+                            RephaseTarget::Inverted => !v.assign.unwrap(),
                         },
                     );
                 } else {

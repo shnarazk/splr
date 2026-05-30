@@ -18,7 +18,7 @@ pub use self::{
     learning_rate::VarActivityScheme,
     propagate::PropagateIF,
     property::*,
-    select::{PhaseRotation, VarSelectIF},
+    select::{RephaseTarget, VarSelectIF},
     stack::{AssignStack, VarManipulateIF},
 };
 use {
@@ -84,7 +84,7 @@ pub trait AssignIF:
     /// return the current var activity scheme
     fn activity_scheme(&self) -> &VarActivityScheme;
     /// return the current rephase scheme
-    fn phase_mode(&self) -> PhaseRotation;
+    fn phase_mode(&self) -> RephaseTarget;
 }
 
 /// Reasons of assignments

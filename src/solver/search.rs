@@ -5,7 +5,7 @@ use {
     super::{Certificate, Solver, SolverEvent, SolverResult, conflict::handle_conflict},
     crate::{
         assign::{
-            self, AssignIF, AssignStack, PhaseRotation, PropagateIF, VarActivityScheme,
+            self, AssignIF, AssignStack, PropagateIF, RephaseTarget, VarActivityScheme,
             VarManipulateIF, VarSelectIF,
         },
         cdb::{ClauseDB, ClauseDBIF, VivifyIF},

@@ -1,7 +1,7 @@
 //! main struct AssignStack
 use {
     super::{
-        AssignIF, PhaseRotation, Var,
+        AssignIF, RephaseTarget, Var,
         heap::{VarHeapIF, VarIdHeap},
     },
     crate::{assign::learning_rate::VarActivityScheme, cdb::ClauseDBIF, types::*},
@@ -38,7 +38,7 @@ pub struct AssignStack {
     //
     //## Phase handling
     //
-    pub(crate) phase_mode: PhaseRotation,
+    pub(crate) phase_mode: RephaseTarget,
     pub(super) best_phases: Vec<(Option<bool>, DecisionLevel)>,
 
     //## Elimanated vars
@@ -107,7 +107,7 @@ impl Default for AssignStack {
             num_repropagation: 0,
             conflict_interval_average: (Ema2::default(), Ema2::default_extended()),
 
-            phase_mode: PhaseRotation::default(),
+            phase_mode: RephaseTarget::default(),
             best_phases: Vec::new(),
 
             eliminated: Vec::new(),
@@ -344,7 +344,7 @@ impl AssignIF for AssignStack {
     fn activity_scheme(&self) -> &VarActivityScheme {
         &self.activity_scheme
     }
-    fn phase_mode(&self) -> PhaseRotation {
+    fn phase_mode(&self) -> RephaseTarget {
         self.phase_mode
     }
 }
