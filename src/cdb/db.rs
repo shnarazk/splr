@@ -857,29 +857,30 @@ impl ClauseDBIF for ClauseDB {
             let act = c.activated;
             c.activated = 0;
             let len = c.len();
-            if len <= 4 || lbd <= 3 {
+            if lbd <= 3 {
                 // the ultimate and permanent criteria of good clauses
                 ntier1 += 1;
-                picks += len;
+                picks += 1;
                 continue;
             }
-            if len <= act {
+            if len <= 5 {
                 // tier 2 group: pretty small or frequently used clauses
                 ntier2 += 1;
-                picks += len;
+                picks += 1;
                 continue;
             }
             if c.is(FlagClause::ASSIGN_REASON) {
                 continue;
             }
-            if len <= 8 && act > 1 {
+            if asg.literal_block_distance_current(&c.lits) as usize <= act {
+                // if act > 1 {
                 // potentially good clauses in any circumstance
                 tier2.push(SortKey::new(ClauseId::from(i), lbd as f64));
                 continue;
             }
-            if asg.literal_block_distance_current(&c.lits) <= 2 {
-                continue;
-            }
+            // if asg.literal_block_distance_current(&c.lits) <= 2 {
+            //     continue;
+            // }
             tier3.push(ClauseId::from(i));
         }
         for cid in tier3.into_iter() {
