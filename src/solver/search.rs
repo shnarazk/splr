@@ -220,13 +220,14 @@ impl SolveIF for Solver {
     }
 }
 
-const PR_TBL: [(PhaseRotation, usize, usize); 6] = [
-    (PhaseRotation::Best, 100_000, 1),
-    (PhaseRotation::False, 100_000, 2),
-    (PhaseRotation::True, 100_000, 3),
-    (PhaseRotation::Random, 100_000, 4),
-    (PhaseRotation::Inverted, 100_000, 5),
-    (PhaseRotation::Walk, 100_000, 0),
+/// table of (RephaseTarget, span length, next index)
+const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 6] = [
+    (RephaseTarget::False, 80, 1),
+    (RephaseTarget::True, 80, 2),
+    (RephaseTarget::Walk, 400, 3),
+    (RephaseTarget::Inverted, 80, 4),
+    (RephaseTarget::Random, 80, 5),
+    (RephaseTarget::Best, 160, 0),
 ];
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
@@ -237,17 +238,16 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut span_len: usize = 1;
     let mut processing_pressure: usize = 0;
-    let processing_interval: usize = 10_000;
+    let processing_interval: usize = 20_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
     let mut reduction_pressure: usize = 0;
-    let reduction_interval: usize = 10_000;
-    let mut rephase_span: usize = 0;
-    let mut current_phase: &(PhaseRotation, usize, usize) = &PR_TBL[0];
-    let vmtf_interval: usize = 40_000;
-    // a simple value checker
+    let reduction_interval: usize = 2; // _000;
+    let mut rephase_rotation_pressure: usize = 0;
+    let mut current_phase: &(RephaseTarget, usize, usize) = &REPHASE_ROTATION[0];
+    let vmtf_interval: usize = 100;
     let mut assign_peak: usize = 0;
-    let luby_scale: usize = 8;
+    let luby_scale: usize = 64;
     let mut span_scale: usize = luby_scale;
 
     macro_rules! to_lrb {
@@ -257,19 +257,19 @@ fn search(
                 asg.set_learning_rate(state.config.vrw_learning_rate);
                 asg.rebuild_order();
             }
-            current_phase = &PR_TBL[0];
+            current_phase = &REPHASE_ROTATION[0];
             asg.phase_mode = current_phase.0;
-            rephase_span = 0;
+            rephase_rotation_pressure = 0;
         };
     }
     macro_rules! to_vmtf {
         () => {
             if asg.activity_scheme != VarActivityScheme::VMTF {
                 asg.activity_scheme = VarActivityScheme::VMTF;
-                asg.phase_mode = PhaseRotation::Walk;
+                asg.phase_mode = RephaseTarget::Walk;
                 asg.set_learning_rate(0.0); // Don't change this
                 asg.rebuild_order();
-                rephase_span = 0;
+                rephase_rotation_pressure = 0;
             }
         };
     }
@@ -278,18 +278,21 @@ fn search(
             if current_phase.2 == 0 {
                 to_vmtf!();
             } else {
-                current_phase = &PR_TBL[current_phase.2];
+                current_phase = &REPHASE_ROTATION[current_phase.2];
                 asg.phase_mode = current_phase.0;
-                rephase_span = 0;
+                rephase_rotation_pressure = 0;
             }
         };
     }
     macro_rules! reduce {
         () => {
-            cdb.reduce(asg);
-            reduction_pressure = 0;
-            state.search_mode_ratio.0.update(0.0);
-            state.search_mode_ratio.1.update(0.0);
+            reduction_pressure += 1;
+            if reduction_pressure >= reduction_interval {
+                cdb.reduce(asg);
+                reduction_pressure = 0;
+                state.search_mode_ratio.0.update(0.0);
+                state.search_mode_ratio.1.update(0.0);
+            }
         };
     }
     macro_rules! update_core {
@@ -340,21 +343,17 @@ fn search(
             assign_peak = asg.stack_len();
             state.core_size = asg.save_best_phases();
         }
-        reduction_pressure += (lbd > 4) as usize;
-        processing_pressure += (lbd <= 5) as usize;
+        processing_pressure += 1;
         progress_pressure += 1;
         span_len += 1;
-        rephase_span += 1;
-        if reduction_pressure >= reduction_interval * 8 {
-            reduce!();
-        }
+        // if reduction_pressure >= reduction_interval * 8 {
+        //     reduce!();
+        // }
         if state.span_manager.span_ended(span_len / span_scale) {
             span_len = 0;
             let new_segment = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, state, new_segment);
-            if reduction_pressure >= reduction_interval {
-                reduce!();
-            }
+            reduce!();
             {
                 let unasserted_pre = asg.derefer(assign::property::Tusize::NumUnassertedVar);
                 RESTART!(asg, cdb, state)?;
@@ -376,11 +375,12 @@ fn search(
                 }
             }
             if cfg!(feature = "rephase") {
+                rephase_rotation_pressure += 1;
                 match asg.activity_scheme {
-                    VarActivityScheme::LRB if rephase_span >= current_phase.1 => {
+                    VarActivityScheme::LRB if rephase_rotation_pressure >= current_phase.1 => {
                         rotate_rephase_mode!();
                     }
-                    VarActivityScheme::VMTF if rephase_span >= vmtf_interval => {
+                    VarActivityScheme::VMTF if rephase_rotation_pressure >= vmtf_interval => {
                         to_lrb!();
                     }
                     _ => (),
