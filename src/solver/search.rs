@@ -221,13 +221,17 @@ impl SolveIF for Solver {
 }
 
 /// table of (RephaseTarget, span length, next index)
-const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 6] = [
-    (RephaseTarget::False, 80, 1),
-    (RephaseTarget::True, 80, 2),
-    (RephaseTarget::Walk, 400, 3),
-    (RephaseTarget::Inverted, 80, 4),
-    (RephaseTarget::Random, 80, 5),
-    (RephaseTarget::Best, 160, 0),
+const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 10] = [
+    (RephaseTarget::False, 40_000, 1),
+    (RephaseTarget::True, 40_000, 2),
+    (RephaseTarget::Walk, 40_000, 3),
+    (RephaseTarget::Best, 40_000, 4),
+    (RephaseTarget::Walk, 40_000, 5),
+    (RephaseTarget::Inverted, 40_000, 6),
+    (RephaseTarget::Random, 40_000, 7),
+    (RephaseTarget::Walk, 40_000, 8),
+    (RephaseTarget::Best, 40_000, 9),
+    (RephaseTarget::Walk, 40_000, 0),
 ];
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
@@ -238,14 +242,14 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut span_len: usize = 1;
     let mut processing_pressure: usize = 0;
-    let processing_interval: usize = 20_000;
+    let processing_interval: usize = 40_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
-    let mut reduction_pressure: usize = 0;
-    let reduction_interval: usize = 2; // _000;
+    let mut reduction_pressure1: usize = 0;
+    let mut reduction_pressure2: usize = 0;
     let mut rephase_rotation_pressure: usize = 0;
     let mut current_phase: &(RephaseTarget, usize, usize) = &REPHASE_ROTATION[0];
-    let vmtf_interval: usize = 100;
+    let vmtf_interval: usize = 80;
     let mut assign_peak: usize = 0;
     let luby_scale: usize = 64;
     let mut span_scale: usize = luby_scale;
@@ -285,14 +289,12 @@ fn search(
         };
     }
     macro_rules! reduce {
-        () => {
-            reduction_pressure += 1;
-            if reduction_pressure >= reduction_interval {
-                cdb.reduce(asg);
-                reduction_pressure = 0;
-                state.search_mode_ratio.0.update(0.0);
-                state.search_mode_ratio.1.update(0.0);
-            }
+        ($in_span: expr) => {
+            cdb.reduce(asg, $in_span);
+            state.search_mode_ratio.0.update(0.0);
+            state.search_mode_ratio.1.update(0.0);
+            reduction_pressure1 = 0;
+            reduction_pressure2 = 0;
         };
     }
     macro_rules! update_core {
@@ -337,6 +339,7 @@ fn search(
             update_core!(1);
         } else {
             cdb.lbd.update(lbd as f64);
+            cdb[cid].turn_on(FlagClause::YOUNG);
         }
         // not use '<=' to avoid an oscilation
         if assign_peak < asg.stack_len() {
@@ -345,42 +348,49 @@ fn search(
         }
         processing_pressure += 1;
         progress_pressure += 1;
+        reduction_pressure1 += (lbd > 10) as usize;
+        reduction_pressure2 += (lbd <= 6) as usize;
+        rephase_rotation_pressure += 1;
         span_len += 1;
-        // if reduction_pressure >= reduction_interval * 8 {
-        //     reduce!();
+        if reduction_pressure1 > 200_000 || reduction_pressure2 > 100_000 {
+            reduce!(true);
+        }
+        // if span_len.is_multiple_of(80_000) {
+        //     reduce!(true);
+        // }
+        // if [8_000, 80_000].contains(&span_len) || span_len.is_multiple_of(200_000) {
+        //     reduce!(true);
         // }
         if state.span_manager.span_ended(span_len / span_scale) {
             span_len = 0;
             let new_segment = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, state, new_segment);
-            reduce!();
-            {
-                let unasserted_pre = asg.derefer(assign::property::Tusize::NumUnassertedVar);
-                RESTART!(asg, cdb, state)?;
-                if processing_pressure >= processing_interval {
-                    if cfg!(feature = "clause_vivification") {
-                        cdb.vivify(asg, state)?;
-                    }
-                    if cfg!(feature = "clause_elimination") {
-                        let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-                        state.flush("clause subsumption, ");
-                        elim.simplify(asg, cdb, state, false)?;
-                        asg.eliminated.append(elim.eliminated_lits());
-                    }
-                    processing_pressure = 0;
+            let unasserted_pre = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+            RESTART!(asg, cdb, state)?;
+            if processing_pressure >= processing_interval {
+                reduce!(false);
+                if cfg!(feature = "clause_vivification") {
+                    cdb.vivify(asg, state)?;
                 }
-                let unasserted_now = asg.derefer(assign::property::Tusize::NumUnassertedVar);
-                if unasserted_now != unasserted_pre {
-                    update_core!(unasserted_pre - unasserted_now);
+                if cfg!(feature = "clause_elimination") {
+                    let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+                    state.flush("clause subsumption, ");
+                    elim.simplify(asg, cdb, state, false)?;
+                    asg.eliminated.append(elim.eliminated_lits());
                 }
+                processing_pressure = 0;
+            }
+            let unasserted_now = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+            if unasserted_now != unasserted_pre {
+                update_core!(unasserted_pre - unasserted_now);
             }
             if cfg!(feature = "rephase") {
-                rephase_rotation_pressure += 1;
                 match asg.activity_scheme {
                     VarActivityScheme::LRB if rephase_rotation_pressure >= current_phase.1 => {
                         rotate_rephase_mode!();
                     }
                     VarActivityScheme::VMTF if rephase_rotation_pressure >= vmtf_interval => {
+                        reduce!(false);
                         to_lrb!();
                     }
                     _ => (),

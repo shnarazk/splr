@@ -103,7 +103,7 @@ pub trait ClauseDBIF:
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF);
+    fn reduce(&mut self, asg: &mut impl AssignIF, is_span: bool);
     /// update flags.
     /// return `true` if it's learnt.
     fn update_at_analysis(&mut self, cid: ClauseId) -> bool;

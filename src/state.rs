@@ -602,14 +602,14 @@ impl StateIF for State {
             {
                 match asg.activity_scheme() {
                     VarActivityScheme::LRB => {
-                        if self.span_manager.current_span() >= 16384 {
+                        if self.span_manager.current_span() >= 4098 {
                             "Long LRB"
                         } else {
                             "     LRB"
                         }
                     }
                     VarActivityScheme::VMTF => {
-                        if self.span_manager.current_span() >= 16384 {
+                        if self.span_manager.current_span() >= 4098 {
                             "LongVMTF"
                         } else {
                             "    VMTF"

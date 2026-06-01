@@ -823,7 +823,7 @@ impl ClauseDBIF for ClauseDB {
         c.is(FlagClause::LEARNT)
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, in_span: bool) {
         let ClauseDB {
             clause,
             num_reduction,
@@ -836,10 +836,11 @@ impl ClauseDBIF for ClauseDB {
         let mut nlearnts: usize = 0;
         let mut ntier1: usize = 0;
         let mut ntier2: usize = 0;
-        let mut tier2: Vec<SortKey<ClauseId>> = Vec::new();
-        let mut tier3: Vec<ClauseId> = Vec::new();
-        // let mut tier3: Vec<SortKey<ClauseId>> = Vec::new();
+        let mut tier3: Vec<SortKey<ClauseId>> = Vec::new();
+        // let mut tier4: Vec<SortKey<ClauseId>> = Vec::new();
         let mut picks: usize = 0;
+        let mut proceeded: bool = false;
+
         for (i, c) in clause
             .iter_mut()
             .enumerate()
@@ -849,7 +850,11 @@ impl ClauseDBIF for ClauseDB {
             if !c.is(FlagClause::LEARNT) {
                 continue;
             }
-            let lbd = asg.literal_block_distance(&c.lits) as usize;
+            let young = c.is(FlagClause::YOUNG);
+            if young {
+                c.turn_off(FlagClause::YOUNG);
+            };
+            let lbd = asg.literal_block_distance(&c.lits);
             if lbd <= 2 {
                 *num_lbd2 += 1;
             }
@@ -857,38 +862,45 @@ impl ClauseDBIF for ClauseDB {
             let act = c.activated;
             c.activated = 0;
             let len = c.len();
-            if lbd <= 3 {
-                // the ultimate and permanent criteria of good clauses
+            if len <= 4 {
+                // tier 1 group: permanently small clauses
                 ntier1 += 1;
                 picks += 1;
+                proceeded |= young;
                 continue;
             }
-            if len <= 5 {
-                // tier 2 group: pretty small or frequently used clauses
+            if lbd <= 3 {
+                // tier 2 group: the small clauses under the best assignment
                 ntier2 += 1;
                 picks += 1;
+                proceeded |= young;
                 continue;
             }
             if c.is(FlagClause::ASSIGN_REASON) {
                 continue;
             }
-            if asg.literal_block_distance_current(&c.lits) as usize <= act {
-                // if act > 1 {
-                // potentially good clauses in any circumstance
-                tier2.push(SortKey::new(ClauseId::from(i), lbd as f64));
-                continue;
+            {
+                // good clauses in the current assignment
+                let lbdl = asg.literal_block_distance_current(&c.lits);
+                let index = if in_span {
+                    (lbd as f64).min(lbdl as f64 + 3.0) + 1.0 / (1 + act) as f64
+                } else {
+                    // lbd as f64 - 1.0 / len as f64
+                    (lbd as f64).min(lbdl as f64 + 3.5) - (act > 0) as usize as f64
+                };
+                tier3.push(SortKey::new(ClauseId::from(i), index));
+                // continue;
             }
-            // if asg.literal_block_distance_current(&c.lits) <= 2 {
-            //     continue;
-            // }
-            tier3.push(ClauseId::from(i));
+            // tier4.push(SortKey::new(ClauseId::from(i), lbd as f64));
+            // tier4.push(ClauseId::from(i));
         }
-        for cid in tier3.into_iter() {
-            self.remove_clause(cid);
-        }
-        if tier2.len() > picks {
-            tier2.sort();
-            for c in tier2.into_iter().skip(picks) {
+        // for c in tier4.into_iter() {
+        //     self.remove_clause(c.to());
+        // }
+        picks *= 1 + !proceeded as usize + in_span as usize;
+        if tier3.len() > picks {
+            tier3.sort();
+            for c in tier3.into_iter().skip(picks) {
                 self.remove_clause(c.to());
             }
         }
