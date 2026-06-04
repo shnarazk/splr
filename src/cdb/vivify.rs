@@ -8,7 +8,6 @@ use crate::{
 };
 
 const VIVIFY_LIMIT: usize = 40_000;
-const VIVIFY_TARGET_MODULO: usize = 6;
 
 pub trait VivifyIF {
     fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent;
@@ -24,7 +23,7 @@ impl VivifyIF for ClauseDB {
                 SolverError::RootLevelConflict(cc)
             })?;
         }
-        let mut clauses: Vec<SortKey<ClauseId>> = select_targets(self, state, NUM_TARGETS);
+        let mut clauses: Vec<SortKey<ClauseId>> = select_targets(self, NUM_TARGETS);
         state[Stat::Vivification] += 1;
         if clauses.is_empty() {
             return Ok(());
@@ -53,6 +52,7 @@ impl VivifyIF for ClauseDB {
             if c.is_dead() {
                 continue;
             }
+            c.turn_off(FlagClause::TO_VIVIFY);
             let is_learnt = c.is(FlagClause::LEARNT);
             c.vivified();
             let clits = c.iter().copied().collect::<Vec<Lit>>();
@@ -173,15 +173,14 @@ impl VivifyIF for ClauseDB {
     }
 }
 
-fn select_targets(cdb: &mut ClauseDB, state: &State, len: Option<usize>) -> Vec<SortKey<ClauseId>> {
-    let n = state[Stat::Vivification] % VIVIFY_TARGET_MODULO;
+fn select_targets(cdb: &mut ClauseDB, len: Option<usize>) -> Vec<SortKey<ClauseId>> {
     let mut skips = 0;
     let mut clauses: Vec<SortKey<ClauseId>> = cdb
         .iter()
         .enumerate()
         .skip(1)
         .filter_map(|(i, c)| {
-            c.to_vivify(n).and_then(|r| {
+            c.to_vivify().and_then(|r| {
                 if r == 0.0 {
                     skips += 1;
                     None
@@ -309,11 +308,8 @@ impl AssignStack {
 impl Clause {
     /// return `Some(value)` if the clause should try vivification.
     /// smaller value is better.
-    fn to_vivify(&self, n: usize) -> Option<f64> {
-        (!self.is_dead()
-            && self.activated == 0 // This means this clause is not young.
-            && self.len() % VIVIFY_TARGET_MODULO == n)
-            .then(|| self.len() as f64)
+    fn to_vivify(&self) -> Option<f64> {
+        (!self.is_dead() && self.is(FlagClause::TO_VIVIFY)).then(|| self.len() as f64)
     }
     /// clear flags about vivification
     fn vivified(&mut self) {}

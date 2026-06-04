@@ -422,7 +422,7 @@ fn conflict_analyze(
                         trace!(q, " -- ignore flagged already");
                     }
                 }
-                cdb[cid].activated = cdb[cid].activated.saturating_add(1);
+                cdb[cid].refered_at = asg.num_conflict;
             }
             AssignReason::Decision(_) | AssignReason::None => {}
         }

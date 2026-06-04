@@ -5,7 +5,10 @@ use {
         property,
         watch_cache::*,
     },
-    crate::{assign::AssignIF, types::*},
+    crate::{
+        assign::{self, AssignIF},
+        types::*,
+    },
     std::{
         collections::HashMap,
         num::NonZeroU32,
@@ -834,12 +837,14 @@ impl ClauseDBIF for ClauseDB {
         *num_reduction += 1;
 
         let mut nlearnts: usize = 0;
+        // tier 1 group: the small clauses under the best assignment
         let mut ntier1: usize = 0;
+        // tier 2 group: the small clauses under the best assignment
         let mut ntier2: usize = 0;
-        let mut tier3: Vec<SortKey<ClauseId>> = Vec::new();
-        // let mut tier4: Vec<SortKey<ClauseId>> = Vec::new();
-        let mut picks: usize = 0;
-        let mut proceeded: bool = false;
+        let mut tier3: Vec<(ClauseId, usize, DecisionLevel)> = Vec::new();
+        let mut tier4: Vec<ClauseId> = Vec::new();
+        let mut newst_target: DecisionLevel = DecisionLevel::MAX;
+        let mut newest: usize = if in_span { usize::MAX } else { 0 };
 
         for (i, c) in clause
             .iter_mut()
@@ -847,65 +852,68 @@ impl ClauseDBIF for ClauseDB {
             .skip(1)
             .filter(|(_, c)| !c.is_dead())
         {
+            let lbd_g = asg.literal_block_distance(&c.lits);
+            let lbd_l = asg.literal_block_distance_current(&c.lits);
+            if in_span && lbd_l <= newst_target {
+                newst_target = lbd_l;
+                if c.refered_at > newest {
+                    newest = c.refered_at;
+                }
+            }
+            if lbd_g <= 2 {
+                *num_lbd2 += 1;
+            }
             if !c.is(FlagClause::LEARNT) {
                 continue;
             }
-            let young = c.is(FlagClause::YOUNG);
-            if young {
-                c.turn_off(FlagClause::YOUNG);
-            };
-            let lbd = asg.literal_block_distance(&c.lits);
-            if lbd <= 2 {
-                *num_lbd2 += 1;
-            }
             nlearnts += 1;
-            let act = c.activated;
-            c.activated = 0;
-            let len = c.len();
-            if len <= 4 {
-                // tier 1 group: permanently small clauses
-                ntier1 += 1;
-                picks += 1;
-                proceeded |= young;
-                continue;
+            match (lbd_g <= 3, lbd_l <= 4) {
+                (false, false) => (),
+                (false, true) => {
+                    ntier2 += 1;
+                    if in_span {
+                        continue;
+                    }
+                }
+                (true, false) => {
+                    ntier1 += 1;
+                    continue;
+                }
+                (true, true) => {
+                    ntier1 += 1;
+                    ntier2 += 1;
+                    continue;
+                }
             }
-            if lbd <= 3 {
-                // tier 2 group: the small clauses under the best assignment
-                ntier2 += 1;
-                picks += 1;
-                proceeded |= young;
+            if !in_span && lbd_g <= 6 {
                 continue;
             }
             if c.is(FlagClause::ASSIGN_REASON) {
                 continue;
             }
-            {
-                // good clauses in the current assignment
-                let lbdl = asg.literal_block_distance_current(&c.lits);
-                let index = if in_span {
-                    (lbd as f64).min(lbdl as f64 + 3.0) + 1.0 / (1 + act) as f64
-                } else {
-                    // lbd as f64 - 1.0 / len as f64
-                    (lbd as f64).min(lbdl as f64 + 3.5) - (act > 0) as usize as f64
-                };
-                tier3.push(SortKey::new(ClauseId::from(i), index));
-                // continue;
-            }
-            // tier4.push(SortKey::new(ClauseId::from(i), lbd as f64));
-            // tier4.push(ClauseId::from(i));
-        }
-        // for c in tier4.into_iter() {
-        //     self.remove_clause(c.to());
-        // }
-        picks *= 1 + !proceeded as usize + in_span as usize;
-        if tier3.len() > picks {
-            tier3.sort();
-            for c in tier3.into_iter().skip(picks) {
-                self.remove_clause(c.to());
+            if c.refered_at >= newest {
+                c.turn_on(FlagClause::TO_VIVIFY);
+                tier3.push((ClauseId::from(i), c.refered_at, lbd_l));
+            } else {
+                tier4.push(ClauseId::from(i));
             }
         }
-        self.tier1_clauses.update(ntier1 as f64 / nlearnts as f64);
-        self.tier2_clauses.update((ntier2) as f64 / nlearnts as f64);
+        for c in tier4.into_iter() {
+            self.remove_clause(c);
+        }
+        if let Some(lbd_max) = tier3.iter().map(|(_, _, l)| *l).max() {
+            let now = asg.derefer(assign::property::Tusize::NumConflict);
+            newest = newest.saturating_sub(now - newest);
+            for (c, t, l) in tier3.into_iter() {
+                if in_span || t < newest || l >= lbd_max {
+                    self.remove_clause(c);
+                }
+            }
+        }
+        if nlearnts > 0 {
+            self.tier1_clauses.update(ntier1 as f64 / nlearnts as f64);
+            self.tier2_clauses.update((ntier2) as f64 / nlearnts as f64);
+        }
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);
