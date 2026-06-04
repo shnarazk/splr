@@ -26,7 +26,7 @@ bitflags! {
         /// a clause is registered in vars' assing list.
         const ASSIGN_REASON = 0b0000_1000;
         /// a clause is born after the last reduction
-        const YOUNG         = 0b0001_0000;
+        const TO_VIVIFY     = 0b0001_0000;
     }
 }
 

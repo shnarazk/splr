@@ -221,17 +221,13 @@ impl SolveIF for Solver {
 }
 
 /// table of (RephaseTarget, span length, next index)
-const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 10] = [
-    (RephaseTarget::False, 40_000, 1),
-    (RephaseTarget::True, 40_000, 2),
-    (RephaseTarget::Walk, 40_000, 3),
-    (RephaseTarget::Best, 40_000, 4),
-    (RephaseTarget::Walk, 40_000, 5),
-    (RephaseTarget::Inverted, 40_000, 6),
-    (RephaseTarget::Random, 40_000, 7),
-    (RephaseTarget::Walk, 40_000, 8),
-    (RephaseTarget::Best, 40_000, 9),
-    (RephaseTarget::Walk, 40_000, 0),
+const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 6] = [
+    (RephaseTarget::Best, 160, 1),
+    (RephaseTarget::False, 40, 2),
+    (RephaseTarget::True, 40, 3),
+    (RephaseTarget::Walk, 40, 4),
+    (RephaseTarget::Inverted, 40, 5),
+    (RephaseTarget::Random, 40, 0),
 ];
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
@@ -242,11 +238,10 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut span_len: usize = 1;
     let mut processing_pressure: usize = 0;
-    let processing_interval: usize = 40_000;
+    let processing_interval: usize = 80_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
-    let mut reduction_pressure1: usize = 0;
-    let mut reduction_pressure2: usize = 0;
+    let mut reduction_pressure: usize = 0;
     let mut rephase_rotation_pressure: usize = 0;
     let mut current_phase: &(RephaseTarget, usize, usize) = &REPHASE_ROTATION[0];
     let vmtf_interval: usize = 80;
@@ -254,6 +249,14 @@ fn search(
     let luby_scale: usize = 64;
     let mut span_scale: usize = luby_scale;
 
+    macro_rules! reduce {
+        ($in_span: expr) => {{
+            state.search_mode_ratio.0.update(0.0);
+            state.search_mode_ratio.1.update(0.0);
+            reduction_pressure = 0;
+            cdb.reduce(asg, $in_span)
+        }};
+    }
     macro_rules! to_lrb {
         () => {
             if asg.activity_scheme != VarActivityScheme::LRB {
@@ -270,7 +273,8 @@ fn search(
         () => {
             if asg.activity_scheme != VarActivityScheme::VMTF {
                 asg.activity_scheme = VarActivityScheme::VMTF;
-                asg.phase_mode = RephaseTarget::Walk;
+                // asg.phase_mode = RephaseTarget::Walk;
+                // asg.phase_mode = RephaseTarget::Best;
                 asg.set_learning_rate(0.0); // Don't change this
                 asg.rebuild_order();
                 rephase_rotation_pressure = 0;
@@ -279,22 +283,16 @@ fn search(
     }
     macro_rules! rotate_rephase_mode {
         () => {
-            if current_phase.2 == 0 {
-                to_vmtf!();
-            } else {
-                current_phase = &REPHASE_ROTATION[current_phase.2];
-                asg.phase_mode = current_phase.0;
-                rephase_rotation_pressure = 0;
-            }
-        };
-    }
-    macro_rules! reduce {
-        ($in_span: expr) => {
-            cdb.reduce(asg, $in_span);
-            state.search_mode_ratio.0.update(0.0);
-            state.search_mode_ratio.1.update(0.0);
-            reduction_pressure1 = 0;
-            reduction_pressure2 = 0;
+            current_phase = &REPHASE_ROTATION[current_phase.2];
+            asg.phase_mode = current_phase.0;
+            rephase_rotation_pressure = 0;
+            // if current_phase.2 == 0 {
+            //     to_vmtf!();
+            // } else {
+            //     current_phase = &REPHASE_ROTATION[current_phase.2];
+            //     asg.phase_mode = current_phase.0;
+            //     rephase_rotation_pressure = 0;
+            // }
         };
     }
     macro_rules! update_core {
@@ -324,7 +322,8 @@ fn search(
             return Err(SolverError::RootLevelConflict(cc));
         }
         asg.update_activity_tick();
-        let (cid, lbd) = handle_conflict(asg, cdb, state, &cc)?;
+        let (cid, lbd_g) = handle_conflict(asg, cdb, state, &cc)?;
+        let lbd_l: DecisionLevel;
         if cid == ClauseId::default() {
             match asg.activity_scheme {
                 VarActivityScheme::LRB => {
@@ -337,30 +336,28 @@ fn search(
                 }
             }
             update_core!(1);
+            lbd_l = 0;
         } else {
-            cdb.lbd.update(lbd as f64);
-            cdb[cid].turn_on(FlagClause::YOUNG);
+            lbd_l = asg.literal_block_distance_current(&cdb[cid].lits);
+            cdb.lbd.update(lbd_g as f64);
         }
         // not use '<=' to avoid an oscilation
         if assign_peak < asg.stack_len() {
             assign_peak = asg.stack_len();
             state.core_size = asg.save_best_phases();
+            reduce!(false);
+            to_vmtf!();
+        } else if assign_peak == asg.stack_len() {
+            to_vmtf!();
         }
         processing_pressure += 1;
         progress_pressure += 1;
-        reduction_pressure1 += (lbd > 10) as usize;
-        reduction_pressure2 += (lbd <= 6) as usize;
+        reduction_pressure += (lbd_g <= lbd_l) as usize;
         rephase_rotation_pressure += 1;
         span_len += 1;
-        if reduction_pressure1 > 200_000 || reduction_pressure2 > 100_000 {
+        if reduction_pressure > span_scale {
             reduce!(true);
         }
-        // if span_len.is_multiple_of(80_000) {
-        //     reduce!(true);
-        // }
-        // if [8_000, 80_000].contains(&span_len) || span_len.is_multiple_of(200_000) {
-        //     reduce!(true);
-        // }
         if state.span_manager.span_ended(span_len / span_scale) {
             span_len = 0;
             let new_segment = state.span_manager.prepare_new_span(span_len);
@@ -368,7 +365,6 @@ fn search(
             let unasserted_pre = asg.derefer(assign::property::Tusize::NumUnassertedVar);
             RESTART!(asg, cdb, state)?;
             if processing_pressure >= processing_interval {
-                reduce!(false);
                 if cfg!(feature = "clause_vivification") {
                     cdb.vivify(asg, state)?;
                 }
@@ -386,11 +382,14 @@ fn search(
             }
             if cfg!(feature = "rephase") {
                 match asg.activity_scheme {
-                    VarActivityScheme::LRB if rephase_rotation_pressure >= current_phase.1 => {
+                    VarActivityScheme::LRB
+                        if rephase_rotation_pressure >= current_phase.1 * span_scale =>
+                    {
                         rotate_rephase_mode!();
                     }
-                    VarActivityScheme::VMTF if rephase_rotation_pressure >= vmtf_interval => {
-                        reduce!(false);
+                    VarActivityScheme::VMTF
+                        if rephase_rotation_pressure >= vmtf_interval * span_scale =>
+                    {
                         to_lrb!();
                     }
                     _ => (),
