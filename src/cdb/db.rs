@@ -40,6 +40,8 @@ pub struct ClauseDB {
     certification_store: CertificationStore,
     /// a number of clauses to emit out-of-memory exception
     soft_limit: usize,
+    /// last clause reduction
+    last_reduction: usize,
 
     //
     //## LBD
@@ -80,6 +82,7 @@ impl Default for ClauseDB {
             freelist: Vec::new(),
             certification_store: CertificationStore::default(),
             soft_limit: 0, // 248_000_000
+            last_reduction: 0,
             lbd_temp: Vec::new(),
             lbd: Ema2::default_extended(),
             num_clause: 0,
@@ -829,6 +832,7 @@ impl ClauseDBIF for ClauseDB {
     fn reduce(&mut self, asg: &mut impl AssignIF, in_span: bool) {
         let ClauseDB {
             clause,
+            last_reduction,
             num_reduction,
             num_lbd2,
             ..
@@ -841,10 +845,9 @@ impl ClauseDBIF for ClauseDB {
         let mut ntier1: usize = 0;
         // tier 2 group: the small clauses under the best assignment
         let mut ntier2: usize = 0;
-        let mut tier3: Vec<(ClauseId, usize, DecisionLevel)> = Vec::new();
-        let mut tier4: Vec<ClauseId> = Vec::new();
+        let mut tier3: Vec<(ClauseId, usize)> = Vec::new();
         let mut newst_target: DecisionLevel = DecisionLevel::MAX;
-        let mut newest: usize = if in_span { usize::MAX } else { 0 };
+        let mut wave_started_at: usize = if in_span { 0 } else { usize::MAX };
 
         for (i, c) in clause
             .iter_mut()
@@ -856,8 +859,8 @@ impl ClauseDBIF for ClauseDB {
             let lbd_l = asg.literal_block_distance_current(&c.lits);
             if in_span && lbd_l <= newst_target {
                 newst_target = lbd_l;
-                if c.refered_at > newest {
-                    newest = c.refered_at;
+                if c.refered_at > wave_started_at {
+                    wave_started_at = c.refered_at;
                 }
             }
             if lbd_g <= 2 {
@@ -867,13 +870,11 @@ impl ClauseDBIF for ClauseDB {
                 continue;
             }
             nlearnts += 1;
-            match (lbd_g <= 3, lbd_l <= 4) {
+            match (lbd_g <= 2, lbd_l <= 4) {
                 (false, false) => (),
                 (false, true) => {
                     ntier2 += 1;
-                    if in_span {
-                        continue;
-                    }
+                    continue;
                 }
                 (true, false) => {
                     ntier1 += 1;
@@ -882,33 +883,30 @@ impl ClauseDBIF for ClauseDB {
                 (true, true) => {
                     ntier1 += 1;
                     ntier2 += 1;
+                    if c.refered_at < *last_reduction {
+                        c.turn_on(FlagClause::TO_VIVIFY);
+                    }
                     continue;
                 }
             }
-            if !in_span && lbd_g <= 6 {
+            c.turn_on(FlagClause::TO_VIVIFY);
+            if !in_span && lbd_g <= 5 {
                 continue;
             }
             if c.is(FlagClause::ASSIGN_REASON) {
                 continue;
             }
-            if c.refered_at >= newest {
-                c.turn_on(FlagClause::TO_VIVIFY);
-                tier3.push((ClauseId::from(i), c.refered_at, lbd_l));
-            } else {
-                tier4.push(ClauseId::from(i));
-            }
+            tier3.push((ClauseId::from(i), c.refered_at));
         }
-        for c in tier4.into_iter() {
-            self.remove_clause(c);
-        }
-        if let Some(lbd_max) = tier3.iter().map(|(_, _, l)| *l).max() {
+        if in_span {
             let now = asg.derefer(assign::property::Tusize::NumConflict);
-            newest = newest.saturating_sub(now - newest);
-            for (c, t, l) in tier3.into_iter() {
-                if in_span || t < newest || l >= lbd_max {
-                    self.remove_clause(c);
-                }
+            wave_started_at = wave_started_at.saturating_sub(2 * (now - wave_started_at));
+        }
+        for (c, t) in tier3.iter() {
+            if *t >= wave_started_at {
+                continue;
             }
+            self.remove_clause(*c);
         }
         if nlearnts > 0 {
             self.tier1_clauses.update(ntier1 as f64 / nlearnts as f64);
