@@ -846,8 +846,9 @@ impl ClauseDBIF for ClauseDB {
         // tier 2 group: the small clauses under the best assignment
         let mut ntier2: usize = 0;
         let mut tier3: Vec<(ClauseId, usize)> = Vec::new();
+        let mut tier4: Vec<ClauseId> = Vec::new();
         let mut newst_target: DecisionLevel = DecisionLevel::MAX;
-        let mut wave_started_at: usize = if in_span { 0 } else { usize::MAX };
+        let mut slope_beg: usize = if in_span { 0 } else { usize::MAX };
 
         for (i, c) in clause
             .iter_mut()
@@ -859,8 +860,8 @@ impl ClauseDBIF for ClauseDB {
             let lbd_l = asg.literal_block_distance_current(&c.lits);
             if in_span && lbd_l <= newst_target {
                 newst_target = lbd_l;
-                if c.refered_at > wave_started_at {
-                    wave_started_at = c.refered_at;
+                if c.refered_at > slope_beg {
+                    slope_beg = c.refered_at;
                 }
             }
             if lbd_g <= 2 {
@@ -870,7 +871,7 @@ impl ClauseDBIF for ClauseDB {
                 continue;
             }
             nlearnts += 1;
-            match (lbd_g <= 2, lbd_l <= 4) {
+            match (lbd_g <= 2, lbd_l <= 5) {
                 (false, false) => (),
                 (false, true) => {
                     ntier2 += 1;
@@ -896,17 +897,24 @@ impl ClauseDBIF for ClauseDB {
             if c.is(FlagClause::ASSIGN_REASON) {
                 continue;
             }
+            if lbd_l >= 12 {
+                tier4.push(ClauseId::from(i));
+                continue;
+            }
             tier3.push((ClauseId::from(i), c.refered_at));
         }
         if in_span {
             let now = asg.derefer(assign::property::Tusize::NumConflict);
-            wave_started_at = wave_started_at.saturating_sub(2 * (now - wave_started_at));
+            slope_beg = slope_beg.saturating_sub(1 * (now - slope_beg));
         }
-        for (c, t) in tier3.iter() {
-            if *t >= wave_started_at {
+        for c in tier4.into_iter() {
+            self.remove_clause(c);
+        }
+        for (c, t) in tier3.into_iter() {
+            if t >= slope_beg {
                 continue;
             }
-            self.remove_clause(*c);
+            self.remove_clause(c);
         }
         if nlearnts > 0 {
             self.tier1_clauses.update(ntier1 as f64 / nlearnts as f64);

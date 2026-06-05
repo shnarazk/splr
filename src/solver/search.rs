@@ -222,11 +222,11 @@ impl SolveIF for Solver {
 
 /// table of (RephaseTarget, span length, next index)
 const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 5] = [
-    (RephaseTarget::Best, 4, 1),
-    (RephaseTarget::False, 4, 2),
-    (RephaseTarget::True, 4, 3),
-    (RephaseTarget::Walk, 4, 4),
-    (RephaseTarget::Inverted, 4, 0),
+    (RephaseTarget::Best, 500, 1),
+    (RephaseTarget::False, 400, 2),
+    (RephaseTarget::True, 400, 3),
+    (RephaseTarget::Walk, 500, 4),
+    (RephaseTarget::Inverted, 400, 0),
     // (RephaseTarget::Random, 4, 0),
 ];
 
