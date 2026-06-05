@@ -221,13 +221,13 @@ impl SolveIF for Solver {
 }
 
 /// table of (RephaseTarget, span length, next index)
-const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 6] = [
-    (RephaseTarget::Best, 160, 1),
-    (RephaseTarget::False, 40, 2),
-    (RephaseTarget::True, 40, 3),
-    (RephaseTarget::Walk, 40, 4),
-    (RephaseTarget::Inverted, 40, 5),
-    (RephaseTarget::Random, 40, 0),
+const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 5] = [
+    (RephaseTarget::Best, 4, 1),
+    (RephaseTarget::False, 4, 2),
+    (RephaseTarget::True, 4, 3),
+    (RephaseTarget::Walk, 4, 4),
+    (RephaseTarget::Inverted, 4, 0),
+    // (RephaseTarget::Random, 4, 0),
 ];
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
@@ -244,7 +244,7 @@ fn search(
     let mut reduction_pressure: usize = 0;
     let mut rephase_rotation_pressure: usize = 0;
     let mut current_phase: &(RephaseTarget, usize, usize) = &REPHASE_ROTATION[0];
-    let vmtf_interval: usize = 80;
+    let vmtf_interval: usize = 20;
     let mut assign_peak: usize = 0;
     let luby_scale: usize = 64;
     let mut span_scale: usize = luby_scale;
@@ -345,17 +345,15 @@ fn search(
         if assign_peak < asg.stack_len() {
             assign_peak = asg.stack_len();
             state.core_size = asg.save_best_phases();
-            reduce!(false);
-            to_vmtf!();
-        } else if assign_peak == asg.stack_len() {
-            to_vmtf!();
+            state.flush("");
+            state.flush(format!("core: {}", state.core_size));
         }
         processing_pressure += 1;
         progress_pressure += 1;
         reduction_pressure += (lbd_g <= lbd_l) as usize;
         rephase_rotation_pressure += 1;
         span_len += 1;
-        if reduction_pressure > span_scale {
+        if reduction_pressure > span_scale * 8 {
             reduce!(true);
         }
         if state.span_manager.span_ended(span_len / span_scale) {
@@ -379,6 +377,7 @@ fn search(
             let unasserted_now = asg.derefer(assign::property::Tusize::NumUnassertedVar);
             if unasserted_now != unasserted_pre {
                 update_core!(unasserted_pre - unasserted_now);
+                to_vmtf!();
             }
             if cfg!(feature = "rephase") {
                 match asg.activity_scheme {
