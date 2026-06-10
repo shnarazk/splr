@@ -311,6 +311,7 @@ impl ClauseDBIF for ClauseDB {
             std::mem::swap(&mut c.lits, vec);
             c.search_from = 2;
             c.refered_at = 0;
+            c.reference_distance = 0.0;
             c.vivify_age = 0;
             c.lbd = DecisionLevel::MAX;
         } else {
@@ -826,7 +827,7 @@ impl ClauseDBIF for ClauseDB {
         c.is(FlagClause::LEARNT)
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, in_span: bool) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, last_restart: usize) {
         let ClauseDB {
             clause,
             num_reduction,
@@ -841,12 +842,12 @@ impl ClauseDBIF for ClauseDB {
         let mut ntier1: usize = 0;
         // tier 2 group: the small clauses under the best assignment
         let mut ntier2: usize = 0;
-        let mut tier3: Vec<(ClauseId, usize, DecisionLevel)> = Vec::new();
-        let mut tier4: Vec<(ClauseId, DecisionLevel)> = Vec::new();
-        let mut peak_at: usize = 0;
-        let mut peak_level: DecisionLevel = 0;
+        let mut tier3: Vec<(ClauseId, f64, DecisionLevel)> = Vec::new();
+        // let mut tier4: Vec<(ClauseId, DecisionLevel)> = Vec::new();
+        // let mut peak_at: usize = 0;
+        // let mut peak_level: DecisionLevel = 0;
         // let mut max_required: DecisionLevel = 0;
-        let mut has_progress: bool = false;
+        // let mut has_progress: bool = false;
         let mut young_best: DecisionLevel = DecisionLevel::MAX;
 
         for (i, c) in clause
@@ -855,6 +856,10 @@ impl ClauseDBIF for ClauseDB {
             .skip(1)
             .filter(|(_, c)| !c.is_dead())
         {
+            if let Some(diff) = last_restart.checked_sub(c.refered_at) {
+                c.reference_distance *= 0.8;
+                c.reference_distance += 0.2 * diff as f64;
+            }
             let len = c.len();
             // let lbd_g = asg.literal_block_distance(&c.lits);
             let new_lbd = asg.literal_block_distance_current(&c.lits);
@@ -868,74 +873,61 @@ impl ClauseDBIF for ClauseDB {
                 c.turn_off(FlagClause::YOUNG);
                 young_best = young_best.min(lbd_l);
             }
-            if lbd_l >= peak_level {
-                peak_at = peak_at.max(c.refered_at);
-                peak_level = lbd_l;
-            }
-            // if !in_span {
-            //     if len <= 4 || lbd_l <= 3 {
-            //         continue;
-            //     } else {
-            //         tier4.push(ClauseId::from(i));
-            //     }
-            //     continue;
-            // }
             num_alives += 1;
             if len <= 5 {
                 ntier1 += 1;
-                has_progress |= young;
                 continue;
             }
             if lbd_l <= 4 {
                 ntier2 += 1;
-                has_progress |= young;
                 continue;
             }
-            // if !in_span {
-            //     tier4.push((ClauseId::from(i), lbd_l));
-            //     continue;
-            // }
-            if !c.is(FlagClause::LEARNT)
-                || c.is(FlagClause::ASSIGN_REASON)
-                || (c.is(FlagClause::BEST_PROPAGATOR)/* && lbd_l <= 5 */)
+            if !c.is(FlagClause::LEARNT) || c.is(FlagClause::ASSIGN_REASON)
+            // || (c.is(FlagClause::BEST_PROPAGATOR)/* && lbd_l <= 5 */)
             {
                 continue;
             }
-            if young && lbd_l < 8 {
-                tier4.push((ClauseId::from(i), lbd_l));
-                continue;
-            }
-            tier3.push((ClauseId::from(i), c.refered_at, lbd_l as DecisionLevel));
+            tier3.push((
+                ClauseId::from(i),
+                c.reference_distance,
+                lbd_l as DecisionLevel,
+            ));
         }
-        if has_progress {
-            // if we got progress, we don't need to care much; just trim old ones.
-            let threshold = peak_at.saturating_sub(1000);
-            for (c, t, l) in tier3.into_iter().rev() {
-                if t < threshold && l >= 5 {
-                    self.remove_clause(c);
-                }
-            }
-        } else {
-            // Otherwise, help movements to new directions
-            let threshold = peak_level;
-            for (c, _, l) in tier3.into_iter().rev() {
-                if l > threshold {
-                    self.remove_clause(c);
-                }
-            }
-        }
-        if !in_span && false {
-            for (c, _) in tier4.into_iter() {
+        let threshold = (*num_reduction as f64 + 1.0).log2();
+        for (c, t, _) in tier3.into_iter().rev() {
+            if t >= threshold {
                 self.remove_clause(c);
             }
-        } else {
-            let threshold = if has_progress { 6 } else { 8 };
-            for (c, l) in tier4.into_iter() {
-                if l >= threshold {
-                    self.remove_clause(c);
-                }
-            }
         }
+        // if has_progress {
+        //     // if we got progress, we don't need to care much; just trim old ones.
+        //     let threshold = peak_at.saturating_sub(1000);
+        //     for (c, t, l) in tier3.into_iter().rev() {
+        //         if t < threshold && l >= 5 {
+        //             self.remove_clause(c);
+        //         }
+        //     }
+        // } else {
+        //     // Otherwise, help movements to new directions
+        //     let threshold = peak_level;
+        //     for (c, _, l) in tier3.into_iter().rev() {
+        //         if l > threshold {
+        //             self.remove_clause(c);
+        //         }
+        //     }
+        // }
+        // if !in_span && false {
+        //     for (c, _) in tier4.into_iter() {
+        //         self.remove_clause(c);
+        //     }
+        // } else {
+        //     let threshold = if has_progress { 6 } else { 8 };
+        //     for (c, l) in tier4.into_iter() {
+        //         if l >= threshold {
+        //             self.remove_clause(c);
+        //         }
+        //     }
+        // }
         debug_assert!(num_alives > 0);
         self.tier1_clauses.update(ntier1 as f64 / num_alives as f64);
         self.tier2_clauses.update(ntier2 as f64 / num_alives as f64);
