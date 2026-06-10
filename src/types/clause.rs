@@ -19,6 +19,10 @@ pub struct Clause {
     pub search_from: u16,
     /// Sum of activated (used as propagated) duration
     pub(crate) refered_at: usize,
+    /// last vivified time in conflicts
+    pub(crate) vivify_age: usize,
+    ///
+    pub(crate) lbd: DecisionLevel,
 }
 
 /// API for Clause, providing literal accessors.
@@ -50,6 +54,8 @@ impl Default for Clause {
             flags: FlagClause::empty(),
             search_from: 2,
             refered_at: 0,
+            vivify_age: 0,
+            lbd: DecisionLevel::MAX,
         }
     }
 }

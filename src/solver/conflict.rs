@@ -208,6 +208,7 @@ pub fn handle_conflict(
             if bt_drift.is_none() {
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
             }
+            cdb[cid].turn_on(FlagClause::YOUNG);
             ret = (cid, 1);
         }
         RefClause::Clause(cid) => {
@@ -217,6 +218,7 @@ pub fn handle_conflict(
                 cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
                 // cdb[cid].activated = cdb[cid].activated.max(1);
             }
+            cdb[cid].turn_on(FlagClause::YOUNG);
             // lbd should be calculated at conflict level, where all literals are assigned.
             // But since vars hold the last level even after unassignment,
             // we can have postponed the calculation.

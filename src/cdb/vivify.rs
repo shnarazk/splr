@@ -23,7 +23,8 @@ impl VivifyIF for ClauseDB {
                 SolverError::RootLevelConflict(cc)
             })?;
         }
-        let mut clauses: Vec<SortKey<ClauseId>> = select_targets(self, NUM_TARGETS);
+        let mut clauses: Vec<SortKey<ClauseId>> =
+            select_targets(self, asg.num_conflict, NUM_TARGETS);
         state[Stat::Vivification] += 1;
         if clauses.is_empty() {
             return Ok(());
@@ -52,7 +53,6 @@ impl VivifyIF for ClauseDB {
             if c.is_dead() {
                 continue;
             }
-            c.turn_off(FlagClause::TO_VIVIFY);
             let is_learnt = c.is(FlagClause::LEARNT);
             c.vivified();
             let clits = c.iter().copied().collect::<Vec<Lit>>();
@@ -173,21 +173,33 @@ impl VivifyIF for ClauseDB {
     }
 }
 
-fn select_targets(cdb: &mut ClauseDB, len: Option<usize>) -> Vec<SortKey<ClauseId>> {
-    let mut skips = 0;
+fn select_targets(
+    cdb: &mut ClauseDB,
+    older_than: usize,
+    len: Option<usize>,
+) -> Vec<SortKey<ClauseId>> {
+    // let mut skips = 0;
     let mut clauses: Vec<SortKey<ClauseId>> = cdb
         .iter()
         .enumerate()
         .skip(1)
         .filter_map(|(i, c)| {
-            c.to_vivify().and_then(|r| {
-                if r == 0.0 {
-                    skips += 1;
-                    None
-                } else {
-                    Some(SortKey::new_invert(ClauseId::from(i), r))
-                }
-            })
+            if c.refered_at + 100_000 * (1 + c.vivify_age) < older_than {
+                Some(SortKey::new_invert(
+                    ClauseId::from(i),
+                    -(c.refered_at as f64),
+                ))
+            } else {
+                None
+            }
+            // c.to_vivify().and_then(|r| {
+            //     if r == 0.0 {
+            //         skips += 1;
+            //         None
+            //     } else {
+            //         Some(SortKey::new_invert(ClauseId::from(i), r))
+            //     }
+            // })
         })
         .collect::<Vec<_>>();
     // if skips < clauses.len() {
@@ -312,5 +324,8 @@ impl Clause {
         (!self.is_dead() && self.is(FlagClause::TO_VIVIFY)).then(|| self.len() as f64)
     }
     /// clear flags about vivification
-    fn vivified(&mut self) {}
+    fn vivified(&mut self) {
+        self.turn_off(FlagClause::TO_VIVIFY);
+        self.vivify_age += 1;
+    }
 }
