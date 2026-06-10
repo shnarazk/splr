@@ -35,6 +35,7 @@ macro_rules! RESTART {
         }
         $cdb.handle(SolverEvent::Restart);
         $state.handle(SolverEvent::Restart);
+        $state.last_restart = $asg.num_conflict;
         $asg.clear_asserted_literals($cdb)
     }};
     ($asg: expr, $cdb: expr, $state: expr, $_: expr) => {
@@ -45,6 +46,7 @@ macro_rules! RESTART {
         }
         $cdb.handle(SolverEvent::Restart);
         $state.handle(SolverEvent::Restart);
+        $state.last_restart = $asg.num_conflict;
     };
 }
 
@@ -223,14 +225,14 @@ impl SolveIF for Solver {
 
 /// table of (RephaseTarget, span length, next index)
 const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 8] = [
-    (RephaseTarget::Best, 400, 1),
-    (RephaseTarget::Walk, 2000, 2),
-    (RephaseTarget::False, 400, 3),
-    (RephaseTarget::Walk, 2000, 4),
-    (RephaseTarget::True, 400, 5),
-    (RephaseTarget::Walk, 2000, 6),
-    (RephaseTarget::Inverted, 400, 7),
-    (RephaseTarget::Walk, 2000, 0),
+    (RephaseTarget::Best, 20, 1),
+    (RephaseTarget::Walk, 100, 2),
+    (RephaseTarget::False, 20, 3),
+    (RephaseTarget::Walk, 100, 4),
+    (RephaseTarget::True, 20, 5),
+    (RephaseTarget::Walk, 100, 6),
+    (RephaseTarget::Inverted, 20, 7),
+    (RephaseTarget::Walk, 100, 0),
     // (RephaseTarget::Random, 4, 0),
 ];
 
@@ -260,7 +262,7 @@ fn search(
             state.search_mode_ratio.0.update(0.0);
             state.search_mode_ratio.1.update(0.0);
             reduction_pressure = 0;
-            cdb.reduce(asg, $in_span)
+            cdb.reduce(asg, state.last_restart)
         }};
     }
     macro_rules! to_lrb {

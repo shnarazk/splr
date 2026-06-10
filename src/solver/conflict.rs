@@ -219,6 +219,7 @@ pub fn handle_conflict(
                 // cdb[cid].activated = cdb[cid].activated.max(1);
             }
             cdb[cid].turn_on(FlagClause::YOUNG);
+            cdb[cid].reference_distance = 8.0;
             // lbd should be calculated at conflict level, where all literals are assigned.
             // But since vars hold the last level even after unassignment,
             // we can have postponed the calculation.
@@ -425,6 +426,8 @@ fn conflict_analyze(
                     }
                 }
                 cdb[cid].refered_at = asg.num_conflict;
+                cdb[cid].reference_distance *= 0.8;
+                cdb[cid].reference_distance += 0.2 * (asg.num_conflict - state.last_restart) as f64;
             }
             AssignReason::Decision(_) | AssignReason::None => {}
         }
