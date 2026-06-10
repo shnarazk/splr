@@ -5,10 +5,7 @@ use {
         property,
         watch_cache::*,
     },
-    crate::{
-        assign::{self, AssignIF},
-        types::*,
-    },
+    crate::{assign::AssignIF, types::*},
     std::{
         collections::HashMap,
         num::NonZeroU32,
@@ -40,8 +37,6 @@ pub struct ClauseDB {
     certification_store: CertificationStore,
     /// a number of clauses to emit out-of-memory exception
     soft_limit: usize,
-    /// last clause reduction
-    last_reduction: usize,
 
     //
     //## LBD
@@ -82,7 +77,6 @@ impl Default for ClauseDB {
             freelist: Vec::new(),
             certification_store: CertificationStore::default(),
             soft_limit: 0, // 248_000_000
-            last_reduction: 0,
             lbd_temp: Vec::new(),
             lbd: Ema2::default_extended(),
             num_clause: 0,
@@ -316,6 +310,9 @@ impl ClauseDBIF for ClauseDB {
             debug_assert!(c.lits.is_empty()); // c.lits.clear();
             std::mem::swap(&mut c.lits, vec);
             c.search_from = 2;
+            c.refered_at = 0;
+            c.vivify_age = 0;
+            c.lbd = DecisionLevel::MAX;
         } else {
             cid = ClauseId::from(self.clause.len());
             let mut c = Clause {
@@ -832,7 +829,6 @@ impl ClauseDBIF for ClauseDB {
     fn reduce(&mut self, asg: &mut impl AssignIF, in_span: bool) {
         let ClauseDB {
             clause,
-            last_reduction,
             num_reduction,
             num_lbd2,
             ..
@@ -840,15 +836,18 @@ impl ClauseDBIF for ClauseDB {
         *num_lbd2 = 0;
         *num_reduction += 1;
 
-        let mut nlearnts: usize = 0;
+        let mut num_alives: usize = 0;
         // tier 1 group: the small clauses under the best assignment
         let mut ntier1: usize = 0;
         // tier 2 group: the small clauses under the best assignment
         let mut ntier2: usize = 0;
-        let mut tier3: Vec<(ClauseId, usize)> = Vec::new();
-        let mut tier4: Vec<ClauseId> = Vec::new();
-        let mut newst_target: DecisionLevel = DecisionLevel::MAX;
-        let mut slope_beg: usize = if in_span { 0 } else { usize::MAX };
+        let mut tier3: Vec<(ClauseId, usize, DecisionLevel)> = Vec::new();
+        let mut tier4: Vec<(ClauseId, DecisionLevel)> = Vec::new();
+        let mut peak_at: usize = 0;
+        let mut peak_level: DecisionLevel = 0;
+        // let mut max_required: DecisionLevel = 0;
+        let mut has_progress: bool = false;
+        let mut young_best: DecisionLevel = DecisionLevel::MAX;
 
         for (i, c) in clause
             .iter_mut()
@@ -856,69 +855,104 @@ impl ClauseDBIF for ClauseDB {
             .skip(1)
             .filter(|(_, c)| !c.is_dead())
         {
-            let lbd_g = asg.literal_block_distance(&c.lits);
-            let lbd_l = asg.literal_block_distance_current(&c.lits);
-            if in_span && lbd_l <= newst_target {
-                newst_target = lbd_l;
-                if c.refered_at > slope_beg {
-                    slope_beg = c.refered_at;
-                }
-            }
-            if lbd_g <= 2 {
+            let len = c.len();
+            // let lbd_g = asg.literal_block_distance(&c.lits);
+            let new_lbd = asg.literal_block_distance_current(&c.lits);
+            let lbd_l = new_lbd; // c.lbd.min(new_lbd);
+            c.lbd = new_lbd;
+            if lbd_l <= 2 {
                 *num_lbd2 += 1;
             }
-            if !c.is(FlagClause::LEARNT) {
+            let young = c.is(FlagClause::YOUNG);
+            if young {
+                c.turn_off(FlagClause::YOUNG);
+                young_best = young_best.min(lbd_l);
+            }
+            if lbd_l >= peak_level {
+                peak_at = peak_at.max(c.refered_at);
+                peak_level = lbd_l;
+            }
+            // if !in_span {
+            //     if len <= 4 || lbd_l <= 3 {
+            //         continue;
+            //     } else {
+            //         tier4.push(ClauseId::from(i));
+            //     }
+            //     continue;
+            // }
+            num_alives += 1;
+            if len <= 5 {
+                ntier1 += 1;
+                has_progress |= young;
                 continue;
             }
-            nlearnts += 1;
-            match (lbd_g <= 2, lbd_l <= 5) {
-                (false, false) => (),
-                (false, true) => {
-                    ntier2 += 1;
-                    continue;
+            if lbd_l <= 4 {
+                ntier2 += 1;
+                has_progress |= young;
+                continue;
+            }
+            // if !in_span {
+            //     tier4.push((ClauseId::from(i), lbd_l));
+            //     continue;
+            // }
+            if !c.is(FlagClause::LEARNT)
+                || c.is(FlagClause::ASSIGN_REASON)
+                || (c.is(FlagClause::BEST_PROPAGATOR)/* && lbd_l <= 5 */)
+            {
+                continue;
+            }
+            if young && lbd_l < 8 {
+                tier4.push((ClauseId::from(i), lbd_l));
+                continue;
+            }
+            tier3.push((ClauseId::from(i), c.refered_at, lbd_l as DecisionLevel));
+        }
+        if has_progress {
+            // if we got progress, we don't need to care much; just trim old ones.
+            let threshold = peak_at.saturating_sub(1000);
+            for (c, t, l) in tier3.into_iter().rev() {
+                if t < threshold && l >= 5 {
+                    self.remove_clause(c);
                 }
-                (true, false) => {
-                    ntier1 += 1;
-                    continue;
-                }
-                (true, true) => {
-                    ntier1 += 1;
-                    ntier2 += 1;
-                    if c.refered_at < *last_reduction {
-                        c.turn_on(FlagClause::TO_VIVIFY);
-                    }
-                    continue;
+            }
+        } else {
+            // Otherwise, help movements to new directions
+            let threshold = peak_level;
+            for (c, _, l) in tier3.into_iter().rev() {
+                if l > threshold {
+                    self.remove_clause(c);
                 }
             }
-            c.turn_on(FlagClause::TO_VIVIFY);
-            if !in_span && lbd_g <= 5 {
-                continue;
-            }
-            if c.is(FlagClause::ASSIGN_REASON) {
-                continue;
-            }
-            if lbd_l >= 12 {
-                tier4.push(ClauseId::from(i));
-                continue;
-            }
-            tier3.push((ClauseId::from(i), c.refered_at));
         }
-        if in_span {
-            let now = asg.derefer(assign::property::Tusize::NumConflict);
-            slope_beg = slope_beg.saturating_sub(1 * (now - slope_beg));
-        }
-        for c in tier4.into_iter() {
-            self.remove_clause(c);
-        }
-        for (c, t) in tier3.into_iter() {
-            if t >= slope_beg {
-                continue;
+        if !in_span && false {
+            for (c, _) in tier4.into_iter() {
+                self.remove_clause(c);
             }
-            self.remove_clause(c);
+        } else {
+            let threshold = if has_progress { 6 } else { 8 };
+            for (c, l) in tier4.into_iter() {
+                if l >= threshold {
+                    self.remove_clause(c);
+                }
+            }
         }
-        if nlearnts > 0 {
-            self.tier1_clauses.update(ntier1 as f64 / nlearnts as f64);
-            self.tier2_clauses.update((ntier2) as f64 / nlearnts as f64);
+        debug_assert!(num_alives > 0);
+        self.tier1_clauses.update(ntier1 as f64 / num_alives as f64);
+        self.tier2_clauses.update(ntier2 as f64 / num_alives as f64);
+    }
+    fn save_best_assign_reasons(&mut self, asg: &impl AssignIF, clear: bool) {
+        if clear {
+            for c in self.clause.iter_mut().skip(1) {
+                c.turn_off(FlagClause::BEST_PROPAGATOR);
+            }
+        }
+        for l in asg.stack_iter() {
+            match asg.reason(l.vi()) {
+                AssignReason::Implication(cid) => {
+                    self[cid].turn_on(FlagClause::BEST_PROPAGATOR);
+                }
+                _ => {}
+            }
         }
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {

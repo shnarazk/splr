@@ -13,6 +13,7 @@ use {
         state::{Stat, State, StateIF},
         types::*,
     },
+    std::cmp::Ordering,
 };
 
 /// API to [`solve`](`crate::solver::SolveIF::solve`) SAT problems.
@@ -221,12 +222,15 @@ impl SolveIF for Solver {
 }
 
 /// table of (RephaseTarget, span length, next index)
-const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 5] = [
-    (RephaseTarget::Best, 500, 1),
-    (RephaseTarget::False, 400, 2),
-    (RephaseTarget::True, 400, 3),
-    (RephaseTarget::Walk, 500, 4),
-    (RephaseTarget::Inverted, 400, 0),
+const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 8] = [
+    (RephaseTarget::Best, 400, 1),
+    (RephaseTarget::Walk, 2000, 2),
+    (RephaseTarget::False, 400, 3),
+    (RephaseTarget::Walk, 2000, 4),
+    (RephaseTarget::True, 400, 5),
+    (RephaseTarget::Walk, 2000, 6),
+    (RephaseTarget::Inverted, 400, 7),
+    (RephaseTarget::Walk, 2000, 0),
     // (RephaseTarget::Random, 4, 0),
 ];
 
@@ -237,8 +241,10 @@ fn search(
     state: &mut State,
 ) -> Result<bool, SolverError> {
     let mut span_len: usize = 1;
-    let mut processing_pressure: usize = 0;
-    let processing_interval: usize = 80_000;
+    let mut vivificatioen_pressure: usize = 0;
+    let vivificatioen_interval: usize = 8_000;
+    let mut elimination_pressure: usize = 0;
+    let elimination_interval: usize = 80_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
     let mut reduction_pressure: usize = 0;
@@ -303,7 +309,12 @@ fn search(
                 state.core_size = core;
             } else {
                 assign_peak = 0;
+                let pre = state.core_size;
                 state.core_size = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+                cdb.save_best_assign_reasons(asg, true);
+                if pre < state.core_size {
+                    to_vmtf!();
+                }
             }
         };
     }
@@ -341,19 +352,28 @@ fn search(
             lbd_l = asg.literal_block_distance_current(&cdb[cid].lits);
             cdb.lbd.update(lbd_g as f64);
         }
-        // not use '<=' to avoid an oscilation
-        if assign_peak < asg.stack_len() {
-            assign_peak = asg.stack_len();
-            state.core_size = asg.save_best_phases();
-            state.flush("");
-            state.flush(format!("core: {}", state.core_size));
+        match asg.stack_len().cmp(&assign_peak) {
+            Ordering::Less => {}
+            Ordering::Equal => {
+                // Do not update best_phases here to avoid an oscilation
+                cdb.save_best_assign_reasons(asg, false);
+            }
+            Ordering::Greater => {
+                assign_peak = asg.stack_len();
+                state.core_size = asg.save_best_phases();
+                cdb.save_best_assign_reasons(asg, false);
+                state.flush("");
+                state.flush(format!("core: {}", state.core_size));
+            }
         }
-        processing_pressure += 1;
+        elimination_pressure += 1;
+        vivificatioen_pressure += 1;
         progress_pressure += 1;
-        reduction_pressure += (lbd_g <= lbd_l) as usize;
+        reduction_pressure += (4 < lbd_l) as usize;
+        // reduction_pressure += 1;
         rephase_rotation_pressure += 1;
         span_len += 1;
-        if reduction_pressure > span_scale * 8 {
+        if reduction_pressure >= span_scale * 256 {
             reduce!(true);
         }
         if state.span_manager.span_ended(span_len / span_scale) {
@@ -361,23 +381,29 @@ fn search(
             let new_segment = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, state, new_segment);
             let unasserted_pre = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+            if reduction_pressure >= 1024 * 16 {
+                reduce!(true);
+            }
             RESTART!(asg, cdb, state)?;
-            if processing_pressure >= processing_interval {
+            if vivificatioen_pressure >= vivificatioen_interval {
                 if cfg!(feature = "clause_vivification") {
                     cdb.vivify(asg, state)?;
                 }
+                vivificatioen_pressure = 0;
+            }
+            if elimination_pressure >= elimination_interval {
                 if cfg!(feature = "clause_elimination") {
                     let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                     state.flush("clause subsumption, ");
                     elim.simplify(asg, cdb, state, false)?;
                     asg.eliminated.append(elim.eliminated_lits());
                 }
-                processing_pressure = 0;
+                elimination_pressure = 0;
             }
             let unasserted_now = asg.derefer(assign::property::Tusize::NumUnassertedVar);
             if unasserted_now != unasserted_pre {
                 update_core!(unasserted_pre - unasserted_now);
-                to_vmtf!();
+                // to_vmtf!();
             }
             if cfg!(feature = "rephase") {
                 match asg.activity_scheme {
