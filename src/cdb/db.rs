@@ -844,11 +844,7 @@ impl ClauseDBIF for ClauseDB {
         let mut ntier2: usize = 0;
         let mut tier3: Vec<(ClauseId, f64, DecisionLevel)> = Vec::new();
         // let mut tier4: Vec<(ClauseId, DecisionLevel)> = Vec::new();
-        // let mut peak_at: usize = 0;
-        // let mut peak_level: DecisionLevel = 0;
-        // let mut max_required: DecisionLevel = 0;
         // let mut has_progress: bool = false;
-        let mut young_best: DecisionLevel = DecisionLevel::MAX;
 
         for (i, c) in clause
             .iter_mut()
@@ -862,23 +858,21 @@ impl ClauseDBIF for ClauseDB {
             }
             let len = c.len();
             // let lbd_g = asg.literal_block_distance(&c.lits);
-            let new_lbd = asg.literal_block_distance_current(&c.lits);
-            let lbd_l = new_lbd; // c.lbd.min(new_lbd);
-            c.lbd = new_lbd;
-            if lbd_l <= 2 {
+            let lbd = asg.literal_block_distance_current(&c.lits);
+            // c.lbd = lbd;
+            if lbd <= 2 {
                 *num_lbd2 += 1;
             }
             let young = c.is(FlagClause::YOUNG);
             if young {
                 c.turn_off(FlagClause::YOUNG);
-                young_best = young_best.min(lbd_l);
             }
             num_alives += 1;
             if len <= 5 {
                 ntier1 += 1;
                 continue;
             }
-            if lbd_l <= 4 {
+            if lbd <= 4 {
                 ntier2 += 1;
                 continue;
             }
@@ -887,48 +881,14 @@ impl ClauseDBIF for ClauseDB {
             {
                 continue;
             }
-            tier3.push((
-                ClauseId::from(i),
-                c.reference_distance,
-                lbd_l as DecisionLevel,
-            ));
+            tier3.push((ClauseId::from(i), c.reference_distance, lbd));
         }
         let threshold = (*num_reduction as f64 + 1.0).log2();
-        for (c, t, _) in tier3.into_iter().rev() {
+        for (c, t, _) in tier3.into_iter() {
             if t >= threshold {
                 self.remove_clause(c);
             }
         }
-        // if has_progress {
-        //     // if we got progress, we don't need to care much; just trim old ones.
-        //     let threshold = peak_at.saturating_sub(1000);
-        //     for (c, t, l) in tier3.into_iter().rev() {
-        //         if t < threshold && l >= 5 {
-        //             self.remove_clause(c);
-        //         }
-        //     }
-        // } else {
-        //     // Otherwise, help movements to new directions
-        //     let threshold = peak_level;
-        //     for (c, _, l) in tier3.into_iter().rev() {
-        //         if l > threshold {
-        //             self.remove_clause(c);
-        //         }
-        //     }
-        // }
-        // if !in_span && false {
-        //     for (c, _) in tier4.into_iter() {
-        //         self.remove_clause(c);
-        //     }
-        // } else {
-        //     let threshold = if has_progress { 6 } else { 8 };
-        //     for (c, l) in tier4.into_iter() {
-        //         if l >= threshold {
-        //             self.remove_clause(c);
-        //         }
-        //     }
-        // }
-        debug_assert!(num_alives > 0);
         self.tier1_clauses.update(ntier1 as f64 / num_alives as f64);
         self.tier2_clauses.update(ntier2 as f64 / num_alives as f64);
     }
