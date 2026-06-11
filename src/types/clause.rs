@@ -22,8 +22,6 @@ pub struct Clause {
     pub(crate) reference_distance: f64,
     /// last vivified time in conflicts
     pub(crate) vivify_age: usize,
-    ///
-    pub(crate) lbd: DecisionLevel,
 }
 
 /// API for Clause, providing literal accessors.
@@ -57,7 +55,6 @@ impl Default for Clause {
             refered_at: 0,
             reference_distance: 0.0,
             vivify_age: 0,
-            lbd: DecisionLevel::MAX,
         }
     }
 }
