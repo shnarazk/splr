@@ -313,7 +313,6 @@ impl ClauseDBIF for ClauseDB {
             c.refered_at = 0;
             c.reference_distance = 0.0;
             c.vivify_age = 0;
-            c.lbd = DecisionLevel::MAX;
         } else {
             cid = ClauseId::from(self.clause.len());
             let mut c = Clause {
@@ -913,11 +912,8 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         for l in asg.stack_iter() {
-            match asg.reason(l.vi()) {
-                AssignReason::Implication(cid) => {
-                    self[cid].turn_on(FlagClause::BEST_PROPAGATOR);
-                }
-                _ => {}
+            if let AssignReason::Implication(cid) = asg.reason(l.vi()) {
+                self[cid].turn_on(FlagClause::BEST_PROPAGATOR);
             }
         }
     }
