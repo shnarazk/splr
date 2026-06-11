@@ -832,6 +832,14 @@ impl ClauseDBIF for ClauseDB {
             clause,
             num_reduction,
             num_lbd2,
+
+            certification_store,
+            binary_link,
+            watch_cache,
+            num_bi_clause,
+            num_clause,
+            num_learnt,
+            freelist,
             ..
         } = self;
         *num_lbd2 = 0;
@@ -842,9 +850,10 @@ impl ClauseDBIF for ClauseDB {
         let mut ntier1: usize = 0;
         // tier 2 group: the small clauses under the best assignment
         let mut ntier2: usize = 0;
-        let mut tier3: Vec<(ClauseId, f64, DecisionLevel)> = Vec::new();
+        // let mut tier3: Vec<(ClauseId, f64, DecisionLevel)> = Vec::new();
         // let mut tier4: Vec<(ClauseId, DecisionLevel)> = Vec::new();
         // let mut has_progress: bool = false;
+        let threshold = (*num_reduction as f64 + 1.0).log2();
 
         for (i, c) in clause
             .iter_mut()
@@ -881,14 +890,37 @@ impl ClauseDBIF for ClauseDB {
             {
                 continue;
             }
-            tier3.push((ClauseId::from(i), c.reference_distance, lbd));
-        }
-        let threshold = (*num_reduction as f64 + 1.0).log2();
-        for (c, t, _) in tier3.into_iter() {
-            if t >= threshold {
-                self.remove_clause(c);
+            // tier3.push((ClauseId::from(i), c.reference_distance, lbd));
+            if c.reference_distance >= threshold {
+                remove_clause_fn(
+                    certification_store,
+                    binary_link,
+                    watch_cache,
+                    num_bi_clause,
+                    num_clause,
+                    num_learnt,
+                    ClauseId::from(i),
+                    c,
+                );
+                freelist.push(ClauseId::from(i));
             }
         }
+        // for (cid, t, _) in tier3.into_iter() {
+        //     if t >= threshold {
+        //         // self.remove_clause(cid);
+        //         remove_clause_fn(
+        //             certification_store,
+        //             binary_link,
+        //             watch_cache,
+        //             num_bi_clause,
+        //             num_clause,
+        //             num_learnt,
+        //             cid,
+        //             &mut clause[cid.ordinal.get() as usize],
+        //         );
+        //         freelist.push(cid);
+        //     }
+        // }
         self.tier1_clauses.update(ntier1 as f64 / num_alives as f64);
         self.tier2_clauses.update(ntier2 as f64 / num_alives as f64);
     }
