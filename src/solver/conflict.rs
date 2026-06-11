@@ -219,7 +219,7 @@ pub fn handle_conflict(
                 // cdb[cid].activated = cdb[cid].activated.max(1);
             }
             cdb[cid].turn_on(FlagClause::YOUNG);
-            cdb[cid].reference_distance = 8.0;
+            cdb[cid].reference_distance = 0.0;
             // lbd should be calculated at conflict level, where all literals are assigned.
             // But since vars hold the last level even after unassignment,
             // we can have postponed the calculation.
