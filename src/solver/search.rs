@@ -262,7 +262,11 @@ fn search(
             state.search_mode_ratio.0.update(0.0);
             state.search_mode_ratio.1.update(0.0);
             reduction_pressure = 0;
-            cdb.reduce(asg, state.last_restart)
+            cdb.reduce(
+                asg,
+                state.last_restart,
+                state.span_manager.envelop_index() as f64 + 0.0,
+            )
         }};
     }
     macro_rules! to_lrb {

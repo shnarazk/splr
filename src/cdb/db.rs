@@ -827,7 +827,7 @@ impl ClauseDBIF for ClauseDB {
         c.is(FlagClause::LEARNT)
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, last_restart: usize) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, last_restart: usize, retain_depth: f64) {
         let ClauseDB {
             clause,
             num_reduction,
@@ -850,10 +850,8 @@ impl ClauseDBIF for ClauseDB {
         let mut ntier1: usize = 0;
         // tier 2 group: the small clauses under the best assignment
         let mut ntier2: usize = 0;
-        // let mut tier3: Vec<(ClauseId, f64, DecisionLevel)> = Vec::new();
-        // let mut tier4: Vec<(ClauseId, DecisionLevel)> = Vec::new();
         // let mut has_progress: bool = false;
-        let threshold = (*num_reduction as f64 + 1.0).log2();
+        // let threshold = (*num_reduction as f64).log2();
 
         for (i, c) in clause
             .iter_mut()
@@ -866,7 +864,6 @@ impl ClauseDBIF for ClauseDB {
                 c.reference_distance += 0.2 * diff as f64;
             }
             let len = c.len();
-            // let lbd_g = asg.literal_block_distance(&c.lits);
             let lbd = asg.literal_block_distance_current(&c.lits);
             // c.lbd = lbd;
             if lbd <= 2 {
@@ -877,11 +874,11 @@ impl ClauseDBIF for ClauseDB {
                 c.turn_off(FlagClause::YOUNG);
             }
             num_alives += 1;
-            if len <= 5 {
+            if len <= 4 {
                 ntier1 += 1;
                 continue;
             }
-            if lbd <= 4 {
+            if lbd <= 3 {
                 ntier2 += 1;
                 continue;
             }
@@ -890,8 +887,9 @@ impl ClauseDBIF for ClauseDB {
             {
                 continue;
             }
-            // tier3.push((ClauseId::from(i), c.reference_distance, lbd));
-            if c.reference_distance >= threshold {
+            if c.reference_distance > retain_depth
+            /* threshold */
+            {
                 remove_clause_fn(
                     certification_store,
                     binary_link,
@@ -905,22 +903,6 @@ impl ClauseDBIF for ClauseDB {
                 freelist.push(ClauseId::from(i));
             }
         }
-        // for (cid, t, _) in tier3.into_iter() {
-        //     if t >= threshold {
-        //         // self.remove_clause(cid);
-        //         remove_clause_fn(
-        //             certification_store,
-        //             binary_link,
-        //             watch_cache,
-        //             num_bi_clause,
-        //             num_clause,
-        //             num_learnt,
-        //             cid,
-        //             &mut clause[cid.ordinal.get() as usize],
-        //         );
-        //         freelist.push(cid);
-        //     }
-        // }
         self.tier1_clauses.update(ntier1 as f64 / num_alives as f64);
         self.tier2_clauses.update(ntier2 as f64 / num_alives as f64);
     }
