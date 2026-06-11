@@ -425,9 +425,12 @@ fn conflict_analyze(
                         trace!(q, " -- ignore flagged already");
                     }
                 }
+                if cdb[cid].refered_at < state.last_restart {
+                    cdb[cid].reference_distance *= 0.8;
+                    cdb[cid].reference_distance +=
+                        0.2 * (asg.num_conflict - state.last_restart) as f64;
+                }
                 cdb[cid].refered_at = asg.num_conflict;
-                cdb[cid].reference_distance *= 0.8;
-                cdb[cid].reference_distance += 0.2 * (asg.num_conflict - state.last_restart) as f64;
             }
             AssignReason::Decision(_) | AssignReason::None => {}
         }
