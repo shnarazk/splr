@@ -258,15 +258,11 @@ fn search(
     let mut span_scale: usize = luby_scale;
 
     macro_rules! reduce {
-        ($in_span: expr) => {{
+        () => {{
             state.search_mode_ratio.0.update(0.0);
             state.search_mode_ratio.1.update(0.0);
             reduction_pressure = 0;
-            cdb.reduce(
-                asg,
-                state.last_restart,
-                state.span_manager.envelop_index() as f64 + 0.0,
-            )
+            cdb.reduce(asg)
         }};
     }
     macro_rules! to_lrb {
@@ -377,16 +373,13 @@ fn search(
         rephase_rotation_pressure += 1;
         span_len += 1;
         if reduction_pressure >= 8192 * state.span_manager.envelop_index() {
-            reduce!(false);
+            reduce!();
         }
         if state.span_manager.span_ended(span_len / span_scale) {
             span_len = 0;
             let new_segment = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, state, new_segment);
             let unasserted_pre = asg.derefer(assign::property::Tusize::NumUnassertedVar);
-            // if reduction_pressure >= 1024 * 16 {
-            //     reduce!(true);
-            // }
             RESTART!(asg, cdb, state)?;
             if vivificatioen_pressure >= vivificatioen_interval {
                 if cfg!(feature = "clause_vivification") {

@@ -826,12 +826,11 @@ impl ClauseDBIF for ClauseDB {
         c.is(FlagClause::LEARNT)
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, _last_restart: usize, _retain_depth: f64) {
+    fn reduce(&mut self, asg: &mut impl AssignIF) {
         let ClauseDB {
             clause,
             num_reduction,
             num_lbd2,
-
             certification_store,
             binary_link,
             watch_cache,
@@ -843,55 +842,20 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         *num_lbd2 = 0;
         *num_reduction += 1;
-
         let mut num_alives: usize = 0;
         // tier 1 group: the small clauses under the best assignment
         let mut ntier1: usize = 0;
         // tier 2 group: the small clauses under the best assignment
         let mut ntier2: usize = 0;
         let now = asg.derefer(crate::assign::property::Tusize::NumConflict);
-
         for (i, c) in clause
             .iter_mut()
             .enumerate()
             .skip(1)
             .filter(|(_, c)| !c.is_dead())
         {
-            // if retain_depth > 0.0 && c.refered_at < last_restart {
-            //     c.reference_distance *= 0.8;
-            //     c.reference_distance += 0.2 * (now - c.refered_at) as f64;
-            //     c.refered_at = now;
-            // }
             num_alives += 1;
-            let lbd = asg.literal_block_distance_current(&c.lits) as usize;
-            // if i.is_multiple_of(2000) && lbd <= 10 {
-            //     println!(
-            //         "{i:>9}: lbd:{:>3}, rate:{:>4.2}, age: {:>3}",
-            //         lbd, c.reference_rate, c.vivify_age,
-            //     );
-            // }
-            // if lbd <= 2 {
-            //     *num_lbd2 += 1;
-            //     ntier1 += 1;
-            //     continue;
-            // }
-            // let young = c.is(FlagClause::YOUNG);
-            // if young {
-            //     c.turn_off(FlagClause::YOUNG);
-            // }
-            // if lbd == 3 && c.len() <= 8 {
-            //     ntier2 += 1;
-            //     continue;
-            // }
-            // if c.len() <= 5 {
-            //     ntier2 += 1;
-            //     continue;
-            // }
-            // if lbd <= 8 && c.reference_distance <= 4.0 * retain_depth {
-            //     ntier2 += 1;
-            //     continue;
-            // }
-            match lbd {
+            match asg.literal_block_distance_current(&c.lits) {
                 0 | 1 | 2 => {
                     *num_lbd2 += 1;
                     ntier1 += 1;
@@ -915,12 +879,10 @@ impl ClauseDBIF for ClauseDB {
                 }
                 _ => {}
             }
-            if !c.is(FlagClause::LEARNT) || c.is(FlagClause::ASSIGN_REASON)
-            // || c.is(FlagClause::BEST_PROPAGATOR)
-            {
+            if !c.is(FlagClause::LEARNT) || c.is(FlagClause::ASSIGN_REASON) {
                 continue;
             }
-            if c.reference_rate >= 2.0 || c.len() <= 5 || c.referred_at + 2 >= now {
+            if c.reference_rate >= 2.0 || c.len() <= 5 || c.referred_at + 4 >= now {
                 continue;
             }
             remove_clause_fn(
