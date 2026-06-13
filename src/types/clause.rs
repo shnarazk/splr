@@ -18,10 +18,11 @@ pub struct Clause {
     /// Since it's just a hint, we don't need u32 or usize.
     pub search_from: u16,
     /// Sum of activated (used as propagated) duration
-    pub(crate) refered_at: usize,
-    pub(crate) reference_distance: f64,
+    pub(crate) referred_at: usize,
+    pub(crate) reference_rate: f64,
     /// last vivified time in conflicts
     pub(crate) vivify_age: usize,
+    pub(crate) referred: usize,
 }
 
 /// API for Clause, providing literal accessors.
@@ -52,9 +53,10 @@ impl Default for Clause {
             lits: vec![],
             flags: FlagClause::empty(),
             search_from: 2,
-            refered_at: 0,
-            reference_distance: 0.0,
+            referred_at: 0,
+            reference_rate: 1.0,
             vivify_age: 0,
+            referred: 0,
         }
     }
 }

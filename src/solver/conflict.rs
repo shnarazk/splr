@@ -219,11 +219,11 @@ pub fn handle_conflict(
                 // cdb[cid].activated = cdb[cid].activated.max(1);
             }
             cdb[cid].turn_on(FlagClause::YOUNG);
-            cdb[cid].reference_distance = 0.0;
+            cdb[cid].reference_rate = 1.0;
             // lbd should be calculated at conflict level, where all literals are assigned.
             // But since vars hold the last level even after unassignment,
             // we can have postponed the calculation.
-            let d = asg.literal_block_distance(&cdb[cid].lits);
+            let d = asg.literal_block_distance_current(&cdb[cid].lits);
             ret = (cid, d);
         }
         RefClause::RegisteredClause(cid) => {
@@ -243,7 +243,7 @@ pub fn handle_conflict(
             //     }
             //     panic!("here we are!");
             // }
-            ret = (cid, asg.literal_block_distance(&cdb[cid].lits));
+            ret = (cid, asg.literal_block_distance_current(&cdb[cid].lits));
             if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
             }
@@ -425,12 +425,8 @@ fn conflict_analyze(
                         trace!(q, " -- ignore flagged already");
                     }
                 }
-                if cdb[cid].refered_at < state.last_restart {
-                    cdb[cid].reference_distance *= 0.8;
-                    cdb[cid].reference_distance +=
-                        0.2 * (asg.num_conflict - state.last_restart) as f64;
-                }
-                cdb[cid].refered_at = asg.num_conflict;
+                cdb[cid].referred_at = asg.num_conflict;
+                cdb[cid].referred += 1;
             }
             AssignReason::Decision(_) | AssignReason::None => {}
         }
