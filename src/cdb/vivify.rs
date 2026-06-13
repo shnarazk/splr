@@ -39,7 +39,7 @@ impl VivifyIF for ClauseDB {
             if c.is_dead() {
                 continue;
             }
-            if c.referred_at + 20_000 * (1 + c.vivify_age) > asg.num_conflict {
+            if c.referred_at + 20_000 * (1 + c.vivify_age) > asg.num_conflict || c.vivify_age >= 8 {
                 continue;
             }
             let c = &mut self[cid];
