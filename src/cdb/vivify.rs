@@ -7,7 +7,7 @@ use crate::{
     types::*,
 };
 
-const VIVIFY_LIMIT: usize = 40_000;
+const VIVIFY_LIMIT: usize = 400_000;
 
 pub trait VivifyIF {
     fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent;
@@ -16,15 +16,13 @@ pub trait VivifyIF {
 impl VivifyIF for ClauseDB {
     /// vivify clauses under `asg`
     fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent {
-        const NUM_TARGETS: Option<usize> = Some(VIVIFY_LIMIT);
         if asg.remains() {
             asg.propagate_sandbox(self).map_err(|cc| {
                 state.log(None, "By vivifier");
                 SolverError::RootLevelConflict(cc)
             })?;
         }
-        let mut clauses: Vec<SortKey<ClauseId>> =
-            select_targets(self, asg.num_conflict, NUM_TARGETS);
+        let mut clauses: Vec<SortKey<ClauseId>> = select_targets(self, asg.num_conflict, None);
         state[Stat::Vivification] += 1;
         if clauses.is_empty() {
             return Ok(());
@@ -64,7 +62,9 @@ impl VivifyIF for ClauseDB {
                 to_display = num_check + display_step;
             }
             num_check += 1;
-            // debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
+            if VIVIFY_LIMIT < num_check {
+                continue;
+            } // debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
             let mut decisions: Vec<Lit> = Vec::new();
             for lit in clits.iter().copied() {
                 // assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
@@ -142,9 +142,6 @@ impl VivifyIF for ClauseDB {
                     }
                 }
             }
-            if VIVIFY_LIMIT < num_check {
-                break;
-            }
         }
         asg.backtrack_sandbox();
         if asg.remains() {
@@ -184,10 +181,10 @@ fn select_targets(
         .enumerate()
         .skip(1)
         .filter_map(|(i, c)| {
-            if c.refered_at + 100_000 * (1 + c.vivify_age) < older_than {
+            if c.referred_at + 20_000 * (1 + c.vivify_age) < older_than {
                 Some(SortKey::new_invert(
                     ClauseId::from(i),
-                    -(c.refered_at as f64),
+                    -(c.referred_at as f64),
                 ))
             } else {
                 None
@@ -327,5 +324,8 @@ impl Clause {
     fn vivified(&mut self) {
         self.turn_off(FlagClause::TO_VIVIFY);
         self.vivify_age += 1;
+        self.reference_rate *= 0.8;
+        self.reference_rate += 0.2 * self.referred as f64;
+        self.referred = 0;
     }
 }

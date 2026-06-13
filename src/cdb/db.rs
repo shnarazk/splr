@@ -310,8 +310,8 @@ impl ClauseDBIF for ClauseDB {
             debug_assert!(c.lits.is_empty()); // c.lits.clear();
             std::mem::swap(&mut c.lits, vec);
             c.search_from = 2;
-            c.refered_at = 0;
-            c.reference_distance = 0.0;
+            c.referred_at = 0;
+            c.reference_rate = 1.0;
             c.vivify_age = 0;
         } else {
             cid = ClauseId::from(self.clause.len());
@@ -826,7 +826,7 @@ impl ClauseDBIF for ClauseDB {
         c.is(FlagClause::LEARNT)
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, last_restart: usize, retain_depth: f64) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, _last_restart: usize, _retain_depth: f64) {
         let ClauseDB {
             clause,
             num_reduction,
@@ -849,8 +849,7 @@ impl ClauseDBIF for ClauseDB {
         let mut ntier1: usize = 0;
         // tier 2 group: the small clauses under the best assignment
         let mut ntier2: usize = 0;
-        // let mut has_progress: bool = false;
-        // let threshold = (*num_reduction as f64).log2();
+        // let now = asg.derefer(assign::property::Tusize::NumConflict);
 
         for (i, c) in clause
             .iter_mut()
@@ -858,49 +857,83 @@ impl ClauseDBIF for ClauseDB {
             .skip(1)
             .filter(|(_, c)| !c.is_dead())
         {
-            if let Some(diff) = last_restart.checked_sub(c.refered_at) {
-                c.reference_distance *= 0.8;
-                c.reference_distance += 0.2 * diff as f64;
-            }
-            let len = c.len();
-            let lbd = asg.literal_block_distance_current(&c.lits);
-            // c.lbd = lbd;
-            if lbd <= 2 {
-                *num_lbd2 += 1;
-            }
-            let young = c.is(FlagClause::YOUNG);
-            if young {
-                c.turn_off(FlagClause::YOUNG);
-            }
+            // if retain_depth > 0.0 && c.refered_at < last_restart {
+            //     c.reference_distance *= 0.8;
+            //     c.reference_distance += 0.2 * (now - c.refered_at) as f64;
+            //     c.refered_at = now;
+            // }
             num_alives += 1;
-            if len <= 4 {
-                ntier1 += 1;
-                continue;
-            }
-            if lbd <= 3 {
-                ntier2 += 1;
-                continue;
+            let lbd = asg.literal_block_distance_current(&c.lits) as usize;
+            // if i.is_multiple_of(2000) && lbd <= 10 {
+            //     println!(
+            //         "{i:>9}: lbd:{:>3}, rate:{:>4.2}, age: {:>3}",
+            //         lbd, c.reference_rate, c.vivify_age,
+            //     );
+            // }
+            // if lbd <= 2 {
+            //     *num_lbd2 += 1;
+            //     ntier1 += 1;
+            //     continue;
+            // }
+            // let young = c.is(FlagClause::YOUNG);
+            // if young {
+            //     c.turn_off(FlagClause::YOUNG);
+            // }
+            // if lbd == 3 && c.len() <= 8 {
+            //     ntier2 += 1;
+            //     continue;
+            // }
+            // if c.len() <= 5 {
+            //     ntier2 += 1;
+            //     continue;
+            // }
+            // if lbd <= 8 && c.reference_distance <= 4.0 * retain_depth {
+            //     ntier2 += 1;
+            //     continue;
+            // }
+            match lbd {
+                0 | 1 | 2 => {
+                    *num_lbd2 += 1;
+                    ntier1 += 1;
+                    continue;
+                }
+                3 => {
+                    ntier1 += 1;
+                    continue;
+                }
+                4 if c.reference_rate > 0.3 => {
+                    ntier2 += 1;
+                    continue;
+                }
+                5 if c.reference_rate > 0.5 => {
+                    ntier2 += 1;
+                    continue;
+                }
+                6 if c.reference_rate > 0.7 => {
+                    ntier2 += 1;
+                    continue;
+                }
+                _ => {}
             }
             if !c.is(FlagClause::LEARNT) || c.is(FlagClause::ASSIGN_REASON)
-            // || (c.is(FlagClause::BEST_PROPAGATOR)/* && lbd_l <= 5 */)
+            // || c.is(FlagClause::BEST_PROPAGATOR)
             {
                 continue;
             }
-            if c.reference_distance > retain_depth
-            /* threshold */
-            {
-                remove_clause_fn(
-                    certification_store,
-                    binary_link,
-                    watch_cache,
-                    num_bi_clause,
-                    num_clause,
-                    num_learnt,
-                    ClauseId::from(i),
-                    c,
-                );
-                freelist.push(ClauseId::from(i));
+            if lbd <= 10 && c.reference_rate >= 1.0 {
+                continue;
             }
+            remove_clause_fn(
+                certification_store,
+                binary_link,
+                watch_cache,
+                num_bi_clause,
+                num_clause,
+                num_learnt,
+                ClauseId::from(i),
+                c,
+            );
+            freelist.push(ClauseId::from(i));
         }
         self.tier1_clauses.update(ntier1 as f64 / num_alives as f64);
         self.tier2_clauses.update(ntier2 as f64 / num_alives as f64);

@@ -339,8 +339,7 @@ fn search(
             return Err(SolverError::RootLevelConflict(cc));
         }
         asg.update_activity_tick();
-        let (cid, lbd_g) = handle_conflict(asg, cdb, state, &cc)?;
-        let lbd_l: DecisionLevel;
+        let (cid, lbd) = handle_conflict(asg, cdb, state, &cc)?;
         if cid == ClauseId::default() {
             match asg.activity_scheme {
                 VarActivityScheme::LRB => {
@@ -353,10 +352,8 @@ fn search(
                 }
             }
             update_core!(1);
-            lbd_l = 0;
         } else {
-            lbd_l = asg.literal_block_distance_current(&cdb[cid].lits);
-            cdb.lbd.update(lbd_g as f64);
+            cdb.lbd.update(lbd as f64);
         }
         match asg.stack_len().cmp(&assign_peak) {
             Ordering::Less => {}
@@ -375,21 +372,21 @@ fn search(
         elimination_pressure += 1;
         vivificatioen_pressure += 1;
         progress_pressure += 1;
-        reduction_pressure += (4 < lbd_l) as usize;
+        reduction_pressure += 1;
         // reduction_pressure += 1;
         rephase_rotation_pressure += 1;
         span_len += 1;
-        if reduction_pressure >= span_scale * 256 {
-            reduce!(true);
+        if reduction_pressure >= 8192 * state.span_manager.envelop_index() {
+            reduce!(false);
         }
         if state.span_manager.span_ended(span_len / span_scale) {
             span_len = 0;
             let new_segment = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, state, new_segment);
             let unasserted_pre = asg.derefer(assign::property::Tusize::NumUnassertedVar);
-            if reduction_pressure >= 1024 * 16 {
-                reduce!(true);
-            }
+            // if reduction_pressure >= 1024 * 16 {
+            //     reduce!(true);
+            // }
             RESTART!(asg, cdb, state)?;
             if vivificatioen_pressure >= vivificatioen_interval {
                 if cfg!(feature = "clause_vivification") {
