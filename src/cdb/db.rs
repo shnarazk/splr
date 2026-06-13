@@ -849,7 +849,7 @@ impl ClauseDBIF for ClauseDB {
         let mut ntier1: usize = 0;
         // tier 2 group: the small clauses under the best assignment
         let mut ntier2: usize = 0;
-        // let now = asg.derefer(assign::property::Tusize::NumConflict);
+        let now = asg.derefer(crate::assign::property::Tusize::NumConflict);
 
         for (i, c) in clause
             .iter_mut()
@@ -901,15 +901,15 @@ impl ClauseDBIF for ClauseDB {
                     ntier1 += 1;
                     continue;
                 }
-                4 if c.reference_rate > 0.3 => {
+                4 if c.reference_rate >= 0.1 => {
                     ntier2 += 1;
                     continue;
                 }
-                5 if c.reference_rate > 0.5 => {
+                5 if c.reference_rate >= 0.5 => {
                     ntier2 += 1;
                     continue;
                 }
-                6 if c.reference_rate > 0.7 => {
+                6 if c.reference_rate >= 0.8 => {
                     ntier2 += 1;
                     continue;
                 }
@@ -920,7 +920,7 @@ impl ClauseDBIF for ClauseDB {
             {
                 continue;
             }
-            if lbd <= 10 && c.reference_rate >= 1.0 {
+            if c.reference_rate >= 2.0 || c.len() <= 5 || c.referred_at + 2 >= now {
                 continue;
             }
             remove_clause_fn(
