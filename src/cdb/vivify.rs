@@ -7,8 +7,6 @@ use crate::{
     types::*,
 };
 
-const VIVIFY_LIMIT: usize = 400_000;
-
 pub trait VivifyIF {
     fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent;
 }
@@ -22,12 +20,6 @@ impl VivifyIF for ClauseDB {
                 SolverError::RootLevelConflict(cc)
             })?;
         }
-        let mut clauses: Vec<SortKey<ClauseId>> = select_targets(self, asg.num_conflict, None);
-        state[Stat::Vivification] += 1;
-        if clauses.is_empty() {
-            return Ok(());
-        }
-        let num_target = clauses.len();
         // This is a reusable vector to reduce memory consumption,
         // the key is the number of invocation
         let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
@@ -36,35 +28,51 @@ impl VivifyIF for ClauseDB {
         let mut num_shrink = 0;
         let mut num_assert = 0;
         let mut to_display = 0;
-        'next_clause: while let Some(cp) = clauses.pop() {
+        state[Stat::Vivification] += 1;
+        // Inlined target selection (formerly `select_targets`).
+        // Pick clauses that haven't been vivified recently. We deliberately
+        // do NOT sort the candidates: the per-clause filter in the loop below
+        // decides which ones are actually worth processing.
+        'next_clause: for i in 1..self.clause.len() {
+            let cid = ClauseId::from(i);
+            let c = &mut self[cid];
+            if c.is_dead() {
+                continue;
+            }
+            if c.referred_at + 20_000 * (1 + c.vivify_age) > asg.num_conflict {
+                continue;
+            }
+            let c = &mut self[cid];
+            let used = c.referred;
+            c.vivified();
+            // Skip clauses that are unlikely to be improved by vivification.
+            // Empirically success concentrates on clauses
+            // that are not too short and have a moderate LBD; outside this band
+            // the success rate collapses, so skipping them saves work without
+            // losing many improvable clauses.
+            if used == 0 || c.len() < 8 || 12 < asg.literal_block_distance_current(&c.lits) {
+                continue;
+            }
+            let is_learnt = c.is(FlagClause::LEARNT);
+            let clits = c.iter().copied().collect::<Vec<Lit>>();
+            if to_display <= num_check {
+                state.flush("");
+                state.flush(format!(
+                    "clause vivifying(assert:{num_assert} shorten:{num_shrink}, check:{num_check})..."
+                ));
+                to_display = num_check + display_step;
+            }
+            num_check += 1;
+            // debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
+            // Build a clean environment
+            // debug_assert!(asg.stack_is_empty() || !asg.remains());
+            // debug_assert_eq!(asg.root_level(), asg.decision_level());
             asg.backtrack_sandbox();
             debug_assert_eq!(asg.decision_level(), asg.root_level());
             if asg.remains() {
                 asg.propagate_sandbox(self)
                     .map_err(SolverError::RootLevelConflict)?;
             }
-
-            // debug_assert!(asg.stack_is_empty() || !asg.remains());
-            // debug_assert_eq!(asg.root_level(), asg.decision_level());
-            let cid = cp.to();
-            let c = &mut self[cid];
-            if c.is_dead() {
-                continue;
-            }
-            let is_learnt = c.is(FlagClause::LEARNT);
-            c.vivified();
-            let clits = c.iter().copied().collect::<Vec<Lit>>();
-            if to_display <= num_check {
-                state.flush("");
-                state.flush(format!(
-                    "clause vivifying(assert:{num_assert} shorten:{num_shrink}, check:{num_check}/{num_target})..."
-                ));
-                to_display = num_check + display_step;
-            }
-            num_check += 1;
-            if VIVIFY_LIMIT < num_check {
-                continue;
-            } // debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
             let mut decisions: Vec<Lit> = Vec::new();
             for lit in clits.iter().copied() {
                 // assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
@@ -168,47 +176,6 @@ impl VivifyIF for ClauseDB {
         state[Stat::VivifiedVar] += num_assert;
         Ok(())
     }
-}
-
-fn select_targets(
-    cdb: &mut ClauseDB,
-    older_than: usize,
-    len: Option<usize>,
-) -> Vec<SortKey<ClauseId>> {
-    // let mut skips = 0;
-    let mut clauses: Vec<SortKey<ClauseId>> = cdb
-        .iter()
-        .enumerate()
-        .skip(1)
-        .filter_map(|(i, c)| {
-            if c.referred_at + 20_000 * (1 + c.vivify_age) < older_than {
-                Some(SortKey::new_invert(
-                    ClauseId::from(i),
-                    -(c.referred_at as f64),
-                ))
-            } else {
-                None
-            }
-            // c.to_vivify().and_then(|r| {
-            //     if r == 0.0 {
-            //         skips += 1;
-            //         None
-            //     } else {
-            //         Some(SortKey::new_invert(ClauseId::from(i), r))
-            //     }
-            // })
-        })
-        .collect::<Vec<_>>();
-    // if skips < clauses.len() {
-    //     return vec![];
-    // }
-    if let Some(max_len) = len
-        && max_len < clauses.len()
-    {
-        clauses.sort();
-        clauses.truncate(max_len);
-    }
-    clauses
 }
 
 impl AssignStack {
