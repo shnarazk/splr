@@ -224,16 +224,13 @@ impl SolveIF for Solver {
 }
 
 /// table of (RephaseTarget, span length, next index)
-const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 8] = [
-    (RephaseTarget::Best, 20, 1),
-    (RephaseTarget::Walk, 100, 2),
-    (RephaseTarget::False, 20, 3),
-    (RephaseTarget::Walk, 100, 4),
-    (RephaseTarget::True, 20, 5),
-    (RephaseTarget::Walk, 100, 6),
-    (RephaseTarget::Inverted, 20, 7),
-    (RephaseTarget::Walk, 100, 0),
-    // (RephaseTarget::Random, 4, 0),
+const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 6] = [
+    (RephaseTarget::False, 20, 1),
+    (RephaseTarget::Walk, 60, 2),
+    (RephaseTarget::True, 20, 3),
+    (RephaseTarget::Best, 80, 4),
+    (RephaseTarget::Inverted, 20, 5),
+    (RephaseTarget::Walk, 60, 0),
 ];
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
@@ -372,7 +369,7 @@ fn search(
         // reduction_pressure += 1;
         rephase_rotation_pressure += 1;
         span_len += 1;
-        if reduction_pressure >= 8192 * state.span_manager.envelop_index() {
+        if reduction_pressure >= 4096 * state.span_manager.envelop_index() {
             reduce!();
         }
         if state.span_manager.span_ended(span_len / span_scale) {
@@ -382,7 +379,7 @@ fn search(
             let unasserted_pre = asg.derefer(assign::property::Tusize::NumUnassertedVar);
             RESTART!(asg, cdb, state)?;
             if vivificatioen_pressure >= vivificatioen_interval {
-                if cfg!(feature = "clause_vivification") {
+                if cfg!(feature = "clause_vivification") && current_phase.0 == RephaseTarget::Walk {
                     cdb.vivify(asg, state)?;
                 }
                 vivificatioen_pressure = 0;
