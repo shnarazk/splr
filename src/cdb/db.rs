@@ -827,9 +827,9 @@ impl ClauseDBIF for ClauseDB {
     }
     /// reduce the number of 'learnt' or *removable* clauses.
     fn reduce(&mut self, asg: &mut impl AssignIF) {
+        self.num_reduction += 1;
         let ClauseDB {
             clause,
-            num_reduction,
             num_lbd2,
             certification_store,
             binary_link,
@@ -841,7 +841,6 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         *num_lbd2 = 0;
-        *num_reduction += 1;
         let mut num_alives: usize = 0;
         // tier 1 group: the small clauses under the best assignment
         let mut ntier1: usize = 0;
@@ -855,25 +854,31 @@ impl ClauseDBIF for ClauseDB {
             .filter(|(_, c)| !c.is_dead())
         {
             num_alives += 1;
-            match asg.literal_block_distance_current(&c.lits) {
+            match asg
+                .literal_block_distance_current(&c.lits)
+                .min(c.len() as DecisionLevel - 1)
+            {
                 0 | 1 | 2 => {
                     *num_lbd2 += 1;
-                    ntier1 += 1;
                     continue;
                 }
-                3 => {
+                3 if c.reference_rate >= 0.01 => {
                     ntier1 += 1;
                     continue;
                 }
                 4 if c.reference_rate >= 0.1 => {
+                    ntier1 += 1;
+                    continue;
+                }
+                5 if c.reference_rate >= 2.0 => {
                     ntier2 += 1;
                     continue;
                 }
-                5 if c.reference_rate >= 0.5 => {
+                6 if c.reference_rate >= 4.0 => {
                     ntier2 += 1;
                     continue;
                 }
-                6 if c.reference_rate >= 0.8 => {
+                7 if c.reference_rate >= 8.0 => {
                     ntier2 += 1;
                     continue;
                 }
@@ -882,7 +887,7 @@ impl ClauseDBIF for ClauseDB {
             if !c.is(FlagClause::LEARNT) || c.is(FlagClause::ASSIGN_REASON) {
                 continue;
             }
-            if c.reference_rate >= 2.0 || c.len() <= 5 || c.referred_at + 4 >= now {
+            if c.reference_rate >= 16.0 || c.referred_at + 4 >= now {
                 continue;
             }
             remove_clause_fn(
