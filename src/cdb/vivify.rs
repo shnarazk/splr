@@ -43,14 +43,15 @@ impl VivifyIF for ClauseDB {
                 continue;
             }
             let c = &mut self[cid];
-            let used = c.referred;
             c.vivified();
             // Skip clauses that are unlikely to be improved by vivification.
             // Empirically success concentrates on clauses
             // that are not too short and have a moderate LBD; outside this band
             // the success rate collapses, so skipping them saves work without
             // losing many improvable clauses.
-            if used == 0 || c.len() < 8 || 12 < asg.literal_block_distance_current(&c.lits) {
+            if c.len() < 9_usize.saturating_sub(c.vivify_age)
+                || 12 < asg.literal_block_distance_current(&c.lits)
+            {
                 continue;
             }
             let is_learnt = c.is(FlagClause::LEARNT);
