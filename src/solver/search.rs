@@ -259,7 +259,7 @@ fn search(
             state.search_mode_ratio.0.update(0.0);
             state.search_mode_ratio.1.update(0.0);
             reduction_pressure = 0;
-            cdb.reduce(asg)
+            cdb.reduce(asg, state.last_restart)
         }};
     }
     macro_rules! to_lrb {
@@ -369,7 +369,7 @@ fn search(
         // reduction_pressure += 1;
         rephase_rotation_pressure += 1;
         span_len += 1;
-        if reduction_pressure >= 4096 * state.span_manager.envelop_index() {
+        if reduction_pressure >= 80_000 {
             reduce!();
         }
         if state.span_manager.span_ended(span_len / span_scale) {
@@ -379,6 +379,7 @@ fn search(
             let unasserted_pre = asg.derefer(assign::property::Tusize::NumUnassertedVar);
             RESTART!(asg, cdb, state)?;
             if vivificatioen_pressure >= vivificatioen_interval {
+                reduce!();
                 if cfg!(feature = "clause_vivification") && current_phase.0 == RephaseTarget::Walk {
                     cdb.vivify(asg, state)?;
                 }
