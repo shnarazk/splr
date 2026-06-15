@@ -49,12 +49,15 @@ impl VivifyIF for ClauseDB {
             // that are not too short and have a moderate LBD; outside this band
             // the success rate collapses, so skipping them saves work without
             // losing many improvable clauses.
-            if c.len() < 9_usize.saturating_sub(c.vivify_age)
+            if c.len() < 9_usize.saturating_sub(c.vivify_age).max(3)
                 || 12 < asg.literal_block_distance_current(&c.lits)
             {
                 continue;
             }
             let is_learnt = c.is(FlagClause::LEARNT);
+            let vivify_age = c.vivify_age;
+            let referred_at = c.referred_at;
+            let reference_rate = c.reference_rate;
             let clits = c.iter().copied().collect::<Vec<Lit>>();
             if to_display <= num_check {
                 state.flush("");
@@ -140,7 +143,12 @@ impl VivifyIF for ClauseDB {
                                     num_assert += 1;
                                 }
                                 _ => {
-                                    self.new_clause(&mut vec, is_learnt);
+                                    if let Some(cid) = self.new_clause(&mut vec, is_learnt).is_new()
+                                    {
+                                        self[cid].referred_at = referred_at;
+                                        self[cid].reference_rate = reference_rate;
+                                        self[cid].vivify_age = vivify_age;
+                                    }
                                     self.remove_clause(cid);
                                     num_shrink += 1;
                                 }
