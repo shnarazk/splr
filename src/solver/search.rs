@@ -420,9 +420,9 @@ fn search(
             // shorter spans → higher α (fast learning before the next restart),
             // longer spans  → lower  α (stable estimates over more conflicts).
             if asg.activity_scheme == VarActivityScheme::LRB {
-                let span = state.span_manager.current_span() as f64;
-                let adaptive_lr = (state.config.vrw_learning_rate / span.sqrt())
-                    .clamp(1e-4, state.config.vrw_learning_rate);
+                let span = (state.span_manager.current_span() * luby_scale) as f64;
+                let _adaptive_lr = (state.config.vrw_learning_rate / span.sqrt()).clamp(0.0, 1.0);
+                let adaptive_lr = 1.0 / (span_scale as f64);
                 asg.set_learning_rate(adaptive_lr);
             }
         }
