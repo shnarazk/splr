@@ -826,7 +826,7 @@ impl ClauseDBIF for ClauseDB {
         c.is(FlagClause::LEARNT)
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF) {
+    fn reduce(&mut self, asg: &mut impl AssignIF, last_restart: usize) {
         self.num_reduction += 1;
         let ClauseDB {
             clause,
@@ -846,7 +846,7 @@ impl ClauseDBIF for ClauseDB {
         let mut ntier1: usize = 0;
         // tier 2 group: the small clauses under the best assignment
         let mut ntier2: usize = 0;
-        let now = asg.derefer(crate::assign::property::Tusize::NumConflict);
+        let _now = asg.derefer(crate::assign::property::Tusize::NumConflict);
         for (i, c) in clause
             .iter_mut()
             .enumerate()
@@ -854,10 +854,10 @@ impl ClauseDBIF for ClauseDB {
             .filter(|(_, c)| !c.is_dead())
         {
             num_alives += 1;
-            match asg
-                .literal_block_distance_current(&c.lits)
-                .min(c.len() as DecisionLevel - 1)
-            {
+            // match asg
+            //     .literal_block_distance_current(&c.lits)
+            //     .min((c.len() as DecisionLevel).saturating_sub(2))
+            match asg.literal_block_distance_current(&c.lits) {
                 0 | 1 | 2 => {
                     *num_lbd2 += 1;
                     continue;
@@ -884,10 +884,14 @@ impl ClauseDBIF for ClauseDB {
                 }
                 _ => {}
             }
+            if c.len() <= 3 {
+                ntier1 += 1;
+                continue;
+            }
             if !c.is(FlagClause::LEARNT) || c.is(FlagClause::ASSIGN_REASON) {
                 continue;
             }
-            if c.reference_rate >= 16.0 || c.referred_at + 4 >= now {
+            if c.reference_rate >= 16.0 || c.referred_at >= last_restart {
                 continue;
             }
             remove_clause_fn(
