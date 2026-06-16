@@ -366,10 +366,9 @@ fn search(
         vivificatioen_pressure += 1;
         progress_pressure += 1;
         reduction_pressure += 1;
-        // reduction_pressure += 1;
         rephase_rotation_pressure += 1;
         span_len += 1;
-        if reduction_pressure >= 80_000 {
+        if reduction_pressure >= 40_000 {
             reduce!();
         }
         if state.span_manager.span_ended(span_len / span_scale) {
@@ -379,8 +378,8 @@ fn search(
             let unasserted_pre = asg.derefer(assign::property::Tusize::NumUnassertedVar);
             RESTART!(asg, cdb, state)?;
             if vivificatioen_pressure >= vivificatioen_interval {
-                reduce!();
                 if cfg!(feature = "clause_vivification") && current_phase.0 == RephaseTarget::Walk {
+                    reduce!();
                     cdb.vivify(asg, state)?;
                 }
                 vivificatioen_pressure = 0;
