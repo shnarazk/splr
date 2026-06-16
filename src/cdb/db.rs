@@ -858,7 +858,7 @@ impl ClauseDBIF for ClauseDB {
             //     .literal_block_distance_current(&c.lits)
             //     .min((c.len() as DecisionLevel).saturating_sub(2))
             match asg.literal_block_distance_current(&c.lits) {
-                0 | 1 | 2 => {
+                0..=2 => {
                     *num_lbd2 += 1;
                     continue;
                 }
