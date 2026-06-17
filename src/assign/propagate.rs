@@ -250,6 +250,13 @@ impl PropagateIF for AssignStack {
                                 (v.last_conflict + i + self.num_propagation).is_multiple_of(2)
                             }
                             RephaseTarget::Inverted => !v.assign.unwrap(),
+                            RephaseTarget::Polarity => {
+                                if self.rng.next_f64() < v.polarity.abs().min(0.95) {
+                                    v.polarity > 0.0
+                                } else {
+                                    self.rng.next_f64() >= 0.5
+                                }
+                            }
                         },
                     );
                 } else {

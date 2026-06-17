@@ -224,13 +224,9 @@ impl SolveIF for Solver {
 }
 
 /// table of (RephaseTarget, span length, next index)
-const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 6] = [
-    (RephaseTarget::False, 20, 1),
-    (RephaseTarget::Walk, 60, 2),
-    (RephaseTarget::True, 20, 3),
-    (RephaseTarget::Best, 80, 4),
-    (RephaseTarget::Inverted, 20, 5),
-    (RephaseTarget::Walk, 60, 0),
+const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 2] = [
+    (RephaseTarget::Walk, 80, 1),
+    (RephaseTarget::Polarity, 80, 0),
 ];
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
@@ -378,7 +374,9 @@ fn search(
             let unasserted_pre = asg.derefer(assign::property::Tusize::NumUnassertedVar);
             RESTART!(asg, cdb, state)?;
             if vivificatioen_pressure >= vivificatioen_interval {
-                if cfg!(feature = "clause_vivification") && current_phase.0 == RephaseTarget::Walk {
+                if cfg!(feature = "clause_vivification")
+                /* && current_phase.0 == RephaseTarget::Polarity */
+                {
                     reduce!();
                     cdb.vivify(asg, state)?;
                 }

@@ -14,6 +14,7 @@ pub enum RephaseTarget {
     True,
     Random,
     Inverted,
+    Polarity,
 }
 
 impl RephaseTarget {
@@ -26,6 +27,7 @@ impl RephaseTarget {
             RephaseTarget::True => "⊤",
             RephaseTarget::Random => "∼",
             RephaseTarget::Inverted => "¬",
+            RephaseTarget::Polarity => "φ",
         }
     }
 }
@@ -110,9 +112,12 @@ impl VarSelectIF for AssignStack {
                 && v.level > self.root_level
             {
                 self.best_phases[vi] = (Some(b), v.level);
+                v.polarity *= 0.8;
+                v.polarity *= 0.2 * if b { 1.0 } else { -1.0 };
                 alives += 1;
             } else {
                 self.best_phases[vi] = (None, DecisionLevel::MAX);
+                v.polarity *= 0.8;
             }
         }
         self.num_vars - alives - self.num_asserted_vars - self.num_eliminated_vars
