@@ -19,9 +19,11 @@ pub struct Clause {
     pub search_from: u16,
     /// Sum of activated (used as propagated) duration
     pub(crate) referred_at: usize,
+    /// The average number of references in a vivification interval
     pub(crate) reference_rate: f64,
     /// last vivified time in conflicts
     pub(crate) vivify_age: usize,
+    /// The number of referrences in conflict analysis
     pub(crate) referred: usize,
 }
 
