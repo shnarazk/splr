@@ -291,14 +291,8 @@ impl AssignStack {
 }
 
 impl Clause {
-    /// return `Some(value)` if the clause should try vivification.
-    /// smaller value is better.
-    fn to_vivify(&self) -> Option<f64> {
-        (!self.is_dead() && self.is(FlagClause::TO_VIVIFY)).then(|| self.len() as f64)
-    }
     /// clear flags about vivification
     fn vivified(&mut self) {
-        self.turn_off(FlagClause::TO_VIVIFY);
         self.vivify_age += 1;
         self.reference_rate *= 0.8;
         self.reference_rate += 0.2 * self.referred as f64;
