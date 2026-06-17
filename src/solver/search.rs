@@ -415,11 +415,11 @@ fn search(
             }
             if new_segment == Some(true) {
                 span_scale = luby_scale * state.span_manager.envelop_index();
-                // Adapt LRB learning rate to the upcoming Luby span length:
+                // Adapt LRB learning rate to the upcoming Luby envelope height:
                 // shorter spans → higher α (fast learning before the next restart),
                 // longer spans  → lower  α (stable estimates over more conflicts).
-                let span = (state.span_manager.envelop_index() * luby_scale) as f64;
-                let adaptive_lr = (1.0 / span.sqrt()).clamp(0.0, 1.0);
+                let span: f64 = (state.span_manager.envelop_index() * luby_scale) as f64;
+                let adaptive_lr: f64 = 1.0 / span.sqrt();
                 asg.set_learning_rate(adaptive_lr);
             }
         }
