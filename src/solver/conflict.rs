@@ -215,7 +215,6 @@ pub fn handle_conflict(
             if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
                 asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
                 cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
-                // cdb[cid].activated = cdb[cid].activated.max(1);
             }
             cdb[cid].reference_rate = 1.0;
             // lbd should be calculated at conflict level, where all literals are assigned.

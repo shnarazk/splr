@@ -846,7 +846,6 @@ impl ClauseDBIF for ClauseDB {
         let mut ntier1: usize = 0;
         // tier 2 group: the small clauses under the best assignment
         let mut ntier2: usize = 0;
-        let _now = asg.derefer(crate::assign::property::Tusize::NumConflict);
         for (i, c) in clause
             .iter_mut()
             .enumerate()
@@ -854,9 +853,6 @@ impl ClauseDBIF for ClauseDB {
             .filter(|(_, c)| !c.is_dead())
         {
             num_alives += 1;
-            // match asg
-            //     .literal_block_distance_current(&c.lits)
-            //     .min((c.len() as DecisionLevel).saturating_sub(2))
             match asg.literal_block_distance_current(&c.lits) {
                 0..=2 => {
                     *num_lbd2 += 1;
