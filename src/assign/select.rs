@@ -61,7 +61,8 @@ pub trait VarSelectIF {
     fn rebuild_order(&mut self);
     /// save the current assignments as the best phases.
     /// return the core size.
-    fn save_best_phases(&mut self) -> usize;
+    fn save_best_phases(&mut self, new_best: bool) -> usize;
+    fn clear_best_phases(&mut self);
 }
 
 impl VarSelectIF for AssignStack {
@@ -105,22 +106,33 @@ impl VarSelectIF for AssignStack {
             }
         }
     }
-    fn save_best_phases(&mut self) -> usize {
+    fn save_best_phases(&mut self, new_best: bool) -> usize {
         let mut alives: usize = 0;
         for (vi, v) in self.var.iter_mut().enumerate().skip(1) {
             if let Some(b) = v.assign
                 && v.level > self.root_level
+                && !v.is(FlagVar::ELIMINATED)
             {
-                self.best_phases[vi] = (Some(b), v.level);
-                v.polarity *= 0.8;
-                v.polarity *= 0.2 * if b { 1.0 } else { -1.0 };
+                if new_best {
+                    self.best_phases[vi] = (Some(b), v.level);
+                }
+                v.polarity *= 0.9;
+                v.polarity += 0.1 * if b { 1.0 } else { -1.0 };
                 alives += 1;
             } else {
-                self.best_phases[vi] = (None, DecisionLevel::MAX);
-                v.polarity *= 0.8;
+                if new_best {
+                    self.best_phases[vi] = (None, DecisionLevel::MAX);
+                }
             }
         }
         self.num_vars - alives - self.num_asserted_vars - self.num_eliminated_vars
+    }
+    fn clear_best_phases(&mut self) {
+        for (vi, v) in self.var.iter_mut().enumerate().skip(1) {
+            if v.level > self.root_level && !v.is(FlagVar::ELIMINATED) {
+                self.best_phases[vi] = (None, DecisionLevel::MAX);
+            }
+        }
     }
 }
 
