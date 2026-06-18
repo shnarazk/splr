@@ -8,18 +8,22 @@ use crate::{
 };
 
 pub trait VivifyIF {
-    fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent;
+    fn vivify(
+        &mut self,
+        asg: &mut AssignStack,
+        state: &mut State,
+        skip_evaluation: bool,
+    ) -> MaybeInconsistent;
 }
 
 impl VivifyIF for ClauseDB {
     /// vivify clauses under `asg`
-    fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent {
-        if asg.remains() {
-            asg.propagate_sandbox(self).map_err(|cc| {
-                state.log(None, "By vivifier");
-                SolverError::RootLevelConflict(cc)
-            })?;
-        }
+    fn vivify(
+        &mut self,
+        asg: &mut AssignStack,
+        state: &mut State,
+        skip_evaluation: bool,
+    ) -> MaybeInconsistent {
         // This is a reusable vector to reduce memory consumption,
         // the key is the number of invocation
         let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
@@ -29,6 +33,12 @@ impl VivifyIF for ClauseDB {
         let mut num_assert = 0;
         let mut to_display = 0;
         state[Stat::Vivification] += 1;
+        if !skip_evaluation && asg.remains() {
+            asg.propagate_sandbox(self).map_err(|cc| {
+                state.log(None, "By vivifier");
+                SolverError::RootLevelConflict(cc)
+            })?;
+        }
         // Inlined target selection (formerly `select_targets`).
         // Pick clauses that haven't been vivified recently. We deliberately
         // do NOT sort the candidates: the per-clause filter in the loop below
@@ -39,7 +49,7 @@ impl VivifyIF for ClauseDB {
             if c.is_dead() {
                 continue;
             }
-            if c.referred_at + 20_000 * (1 + c.vivify_age) > asg.num_conflict || c.vivify_age >= 8 {
+            if c.referred_at + 20_000 * (1 + c.vivify_age) > asg.num_conflict {
                 continue;
             }
             let c = &mut self[cid];
@@ -49,7 +59,9 @@ impl VivifyIF for ClauseDB {
             // that are not too short and have a moderate LBD; outside this band
             // the success rate collapses, so skipping them saves work without
             // losing many improvable clauses.
-            if c.len() < 9_usize.saturating_sub(c.vivify_age).max(3)
+            if skip_evaluation
+                || c.vivify_age >= 6
+                || c.len() < 9_usize.saturating_sub(c.vivify_age)
                 || 12 < asg.literal_block_distance_current(&c.lits)
             {
                 continue;
@@ -159,6 +171,9 @@ impl VivifyIF for ClauseDB {
                     }
                 }
             }
+        }
+        if skip_evaluation {
+            return Ok(());
         }
         asg.backtrack_sandbox();
         if asg.remains() {
