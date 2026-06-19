@@ -878,7 +878,10 @@ impl ClauseDBIF for ClauseDB {
                     ntier2 += 1;
                     continue;
                 }
-                _ => {}
+                _ if c.reference_rate >= 16.0 => {
+                    continue;
+                }
+                _ => (),
             }
             if c.len() <= 3 {
                 ntier1 += 1;
@@ -887,7 +890,7 @@ impl ClauseDBIF for ClauseDB {
             if !c.is(FlagClause::LEARNT) || c.is(FlagClause::ASSIGN_REASON) {
                 continue;
             }
-            if c.reference_rate >= 16.0 || c.referred_at >= last_restart {
+            if c.referred_at >= last_restart {
                 continue;
             }
             remove_clause_fn(
