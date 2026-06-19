@@ -76,7 +76,7 @@ impl SolveIF for Solver {
         #[cfg(feature = "clause_vivification")]
         {
             state.flush("vivifying...");
-            if cdb.vivify(asg, state, false).is_err() {
+            if cdb.vivify(asg, state, true).is_err() {
                 state.log(None, "By vivifier as a pre-possessor");
                 return Ok(Certificate::UNSAT);
             }
