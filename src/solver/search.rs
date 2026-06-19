@@ -76,7 +76,7 @@ impl SolveIF for Solver {
         #[cfg(feature = "clause_vivification")]
         {
             state.flush("vivifying...");
-            if cdb.vivify(asg, state).is_err() {
+            if cdb.vivify(asg, state, false).is_err() {
                 state.log(None, "By vivifier as a pre-possessor");
                 return Ok(Certificate::UNSAT);
             }
@@ -224,11 +224,26 @@ impl SolveIF for Solver {
 }
 
 /// table of (RephaseTarget, span length, next index)
-const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 2] = [
-    (RephaseTarget::Walk, 80, 1),
-    (RephaseTarget::Polarity, 80, 0),
+const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 8] = [
+    (RephaseTarget::True, 100, 1),
+    (RephaseTarget::False, 100, 2),
+    (RephaseTarget::Polarity, 4, 4),
+    (RephaseTarget::Polarity, 4, 4),
+    (RephaseTarget::Walk, 4, 2),
+    (RephaseTarget::Polarity, 4, 6),
+    (RephaseTarget::Best, 1, 0),
+    (RephaseTarget::Polarity, 4, 5),
 ];
-
+const _REPHASE_ROTATION: [(RephaseTarget, usize, usize); 4] = [
+    // (RephaseTarget::False, 10, 1),
+    // (RephaseTarget::True, 10, 2),
+    (RephaseTarget::Walk, 40, 2),
+    (RephaseTarget::Polarity, 40, 2),
+    (RephaseTarget::Best, 10, 0),
+    (RephaseTarget::Walk, 80, 0),
+    // (RephaseTarget::Inverted, 20, 3),
+    // (RephaseTarget::Polarity, 10, 0),
+];
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
 fn search(
     asg: &mut AssignStack,
@@ -236,26 +251,35 @@ fn search(
     state: &mut State,
 ) -> Result<bool, SolverError> {
     let mut span_len: usize = 1;
-    let mut vivificatioen_pressure: usize = 0;
-    let vivificatioen_interval: usize = 8_000;
     let mut elimination_pressure: usize = 0;
     let elimination_interval: usize = 80_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
     let mut reduction_pressure: usize = 0;
+    let reduction_interval: usize = 40_000;
     let mut rephase_rotation_pressure: usize = 0;
     let mut current_phase: &(RephaseTarget, usize, usize) = &REPHASE_ROTATION[0];
-    let vmtf_interval: usize = 20;
+    let vmtf_interval: usize = 10;
     let mut assign_peak: usize = 0;
     let luby_scale: usize = 64;
     let mut span_scale: usize = luby_scale;
 
     macro_rules! reduce {
-        () => {{
+        ($vivify: expr) => {{
             state.search_mode_ratio.0.update(0.0);
             state.search_mode_ratio.1.update(0.0);
             reduction_pressure = 0;
-            cdb.reduce(asg, state.last_restart)
+            if cfg!(feature = "clause_vivification") {
+                cdb.vivify(asg, state, $vivify)?;
+            }
+            cdb.reduce(
+                asg,
+                if $vivify {
+                    state.last_restart
+                } else {
+                    asg.num_conflict.saturating_sub(reduction_interval)
+                },
+            );
         }};
     }
     macro_rules! to_lrb {
@@ -274,6 +298,7 @@ fn search(
         () => {
             if asg.activity_scheme != VarActivityScheme::VMTF {
                 asg.activity_scheme = VarActivityScheme::VMTF;
+                asg.phase_mode = RephaseTarget::Polarity;
                 // asg.phase_mode = RephaseTarget::Walk;
                 // asg.phase_mode = RephaseTarget::Best;
                 asg.set_learning_rate(0.0); // Don't change this
@@ -284,16 +309,19 @@ fn search(
     }
     macro_rules! rotate_rephase_mode {
         () => {
-            current_phase = &REPHASE_ROTATION[current_phase.2];
-            asg.phase_mode = current_phase.0;
-            rephase_rotation_pressure = 0;
-            // if current_phase.2 == 0 {
-            //     to_vmtf!();
-            // } else {
-            //     current_phase = &REPHASE_ROTATION[current_phase.2];
-            //     asg.phase_mode = current_phase.0;
-            //     rephase_rotation_pressure = 0;
-            // }
+            // current_phase = &REPHASE_ROTATION[current_phase.2];
+            // asg.phase_mode = current_phase.0;
+            // rephase_rotation_pressure = 0;
+            if current_phase.2 == 0 {
+                // asg.clear_best_phases();
+                // state.core_size = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+                // assign_peak = 0;
+                // to_vmtf!();
+            } else {
+                current_phase = &REPHASE_ROTATION[current_phase.2];
+                asg.phase_mode = current_phase.0;
+                rephase_rotation_pressure = 0;
+            }
         };
     }
     macro_rules! update_core {
@@ -302,6 +330,7 @@ fn search(
             if let Some(core) = asg.check_best_phases() {
                 assign_peak = assign_peak.saturating_sub(2 * $n);
                 state.core_size = core;
+                to_vmtf!();
             } else {
                 assign_peak = 0;
                 let pre = state.core_size;
@@ -347,25 +376,41 @@ fn search(
         match asg.stack_len().cmp(&assign_peak) {
             Ordering::Less => {}
             Ordering::Equal => {
-                // Do not update best_phases here to avoid an oscilation
+                // Do not update best_phases as new_best here to avoid an oscilation
+                state.core_size = asg.save_best_phases(false);
                 cdb.save_best_assign_reasons(asg, false);
             }
             Ordering::Greater => {
                 assign_peak = asg.stack_len();
-                state.core_size = asg.save_best_phases();
+                state.core_size = asg.save_best_phases(true);
                 cdb.save_best_assign_reasons(asg, false);
                 state.flush("");
                 state.flush(format!("core: {}", state.core_size));
+                // if state.core_size < 10 {
+                //     for (i, v) in asg.var_iter().enumerate().skip(1) {
+                //         if !v.is(FlagVar::ELIMINATED) && v.level > 0 {
+                //             println!(
+                //                 "{:>4}: {:>2}| {:>6.3}",
+                //                 i,
+                //                 match v.assign {
+                //                     None => 0,
+                //                     Some(false) => -1,
+                //                     Some(true) => 1,
+                //                 },
+                //                 v.polarity
+                //             );
+                //         }
+                //     }
+                // }
             }
         }
         elimination_pressure += 1;
-        vivificatioen_pressure += 1;
         progress_pressure += 1;
         reduction_pressure += 1;
         rephase_rotation_pressure += 1;
         span_len += 1;
-        if reduction_pressure >= 40_000 {
-            reduce!();
+        if reduction_pressure >= reduction_interval {
+            reduce!(false);
         }
         if state.span_manager.span_ended(span_len / span_scale) {
             span_len = 0;
@@ -373,14 +418,8 @@ fn search(
             dump_stage(asg, state, new_segment);
             let unasserted_pre = asg.derefer(assign::property::Tusize::NumUnassertedVar);
             RESTART!(asg, cdb, state)?;
-            if vivificatioen_pressure >= vivificatioen_interval {
-                if cfg!(feature = "clause_vivification")
-                /* && current_phase.0 == RephaseTarget::Polarity */
-                {
-                    reduce!();
-                    cdb.vivify(asg, state)?;
-                }
-                vivificatioen_pressure = 0;
+            if reduction_pressure >= reduction_interval {
+                reduce!(true);
             }
             if elimination_pressure >= elimination_interval {
                 if cfg!(feature = "clause_elimination") {
@@ -411,7 +450,7 @@ fn search(
                     _ => (),
                 }
             }
-            if new_segment == Some(true) {
+            if new_segment.is_some() {
                 span_scale = luby_scale * state.span_manager.envelop_index();
                 // Adapt LRB learning rate to the upcoming Luby envelope height:
                 // shorter spans → higher α (fast learning before the next restart),
@@ -419,6 +458,8 @@ fn search(
                 let span: f64 = (state.span_manager.envelop_index() * luby_scale) as f64;
                 let adaptive_lr: f64 = 1.0 / span.sqrt();
                 asg.set_learning_rate(adaptive_lr);
+            } else {
+                asg.rescale_learning_rate(0.9);
             }
         }
         if progress_pressure >= progress_interval {
