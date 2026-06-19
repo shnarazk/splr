@@ -116,8 +116,6 @@ impl VarSelectIF for AssignStack {
                 if new_best {
                     self.best_phases[vi] = (Some(b), v.level);
                 }
-                v.polarity *= 0.9;
-                v.polarity += 0.1 * if b { 1.0 } else { -1.0 };
                 alives += 1;
             } else {
                 if new_best {
