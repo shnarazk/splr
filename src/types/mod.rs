@@ -62,6 +62,7 @@ pub trait ActivityIF<Ix> {
     fn set_learning_rate(&mut self, learning_rate: f64);
     /// update internal counter.
     fn update_activity_tick(&mut self);
+    fn rescale_learning_rate(&mut self, scaling: f64);
 }
 
 /// API for object instantiation based on `Configuration` and `CNFDescription`.

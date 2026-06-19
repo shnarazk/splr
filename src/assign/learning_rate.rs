@@ -58,6 +58,10 @@ impl ActivityIF<VarId> for AssignStack {
         self.activity_stay_rate = 1.0 - scaling;
         self.activity_learning_rate = scaling;
     }
+    fn rescale_learning_rate(&mut self, scaling: f64) {
+        self.activity_learning_rate *= scaling;
+        self.activity_stay_rate = 1.0 - self.activity_learning_rate;
+    }
     // Note: `update_rewards` should be called before `cancel_until`
     #[inline]
     fn update_activity_tick(&mut self) {
