@@ -22,7 +22,7 @@ impl VivifyIF for ClauseDB {
         &mut self,
         asg: &mut AssignStack,
         state: &mut State,
-        skip_evaluation: bool,
+        eval: bool,
     ) -> MaybeInconsistent {
         // This is a reusable vector to reduce memory consumption,
         // the key is the number of invocation
@@ -33,7 +33,7 @@ impl VivifyIF for ClauseDB {
         let mut num_assert = 0;
         let mut to_display = 0;
         state[Stat::Vivification] += 1;
-        if !skip_evaluation && asg.remains() {
+        if eval && asg.remains() {
             asg.propagate_sandbox(self).map_err(|cc| {
                 state.log(None, "By vivifier");
                 SolverError::RootLevelConflict(cc)
@@ -59,7 +59,7 @@ impl VivifyIF for ClauseDB {
             // that are not too short and have a moderate LBD; outside this band
             // the success rate collapses, so skipping them saves work without
             // losing many improvable clauses.
-            if skip_evaluation
+            if !eval
                 || c.vivify_age >= 6
                 || c.len() < 9_usize.saturating_sub(c.vivify_age)
                 || 12 < asg.literal_block_distance_current(&c.lits)
@@ -172,7 +172,7 @@ impl VivifyIF for ClauseDB {
                 }
             }
         }
-        if skip_evaluation {
+        if !eval {
             return Ok(());
         }
         asg.backtrack_sandbox();
