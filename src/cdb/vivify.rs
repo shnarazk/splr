@@ -49,11 +49,15 @@ impl VivifyIF for ClauseDB {
             if c.is_dead() {
                 continue;
             }
-            if c.referred_at + 20_000 * (1 + c.vivify_age) > asg.num_conflict {
+            let span: f64 = 20_000.0 * (1.0 + c.vivify_age as f64);
+            if c.referred_at + span as usize > asg.num_conflict {
                 continue;
             }
             let c = &mut self[cid];
-            c.vivified();
+            c.update_reference_rate();
+            if eval {
+                c.vivify_age += 1;
+            }
             // Skip clauses that are unlikely to be improved by vivification.
             // Empirically success concentrates on clauses
             // that are not too short and have a moderate LBD; outside this band
@@ -65,6 +69,9 @@ impl VivifyIF for ClauseDB {
                 || 12 < asg.literal_block_distance_current(&c.lits)
             {
                 continue;
+            }
+            if !eval {
+                c.vivify_age += 1;
             }
             let is_learnt = c.is(FlagClause::LEARNT);
             let vivify_age = c.vivify_age;
@@ -307,8 +314,7 @@ impl AssignStack {
 
 impl Clause {
     /// clear flags about vivification
-    fn vivified(&mut self) {
-        self.vivify_age += 1;
+    fn update_reference_rate(&mut self) {
         self.reference_rate *= 0.8;
         self.reference_rate += 0.2 * self.referred as f64;
         self.referred = 0;
