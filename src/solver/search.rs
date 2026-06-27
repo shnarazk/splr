@@ -249,6 +249,8 @@ fn search(
     let mut reduction_pressure: usize = 0;
     let reduction_interval: usize = 40_000;
     let mut rephase_rotation_pressure: usize = 0;
+    let mut vivification_pressure: usize = 0;
+    let vivification_interval: usize = 80_000;
     let mut current_phase: &(RephaseTarget, usize, usize) = &REPHASE_ROTATION[0];
     let vmtf_interval: usize = 20;
     let mut assign_peak: usize = 0;
@@ -260,7 +262,7 @@ fn search(
             state.search_mode_ratio.0.update(0.0);
             state.search_mode_ratio.1.update(0.0);
             reduction_pressure = 0;
-            cdb.reduce(asg, state.last_restart);
+            cdb.reduce(asg);
         }};
     }
     macro_rules! to_lrb {
@@ -393,6 +395,7 @@ fn search(
         progress_pressure += 1;
         reduction_pressure += 1;
         rephase_rotation_pressure += 1;
+        vivification_pressure += 1;
         span_len += 1;
         // Don't check with `>= 1 * reduction_interval`. It prevents `reduce!(true)`.
         if reduction_pressure > reduction_interval {
@@ -404,16 +407,13 @@ fn search(
             dump_stage(asg, state, new_segment);
             let unasserted_pre = asg.derefer(assign::property::Tusize::NumUnassertedVar);
             RESTART!(asg, cdb, state)?;
-            // if reduction_pressure > reduction_interval {
-            //   reduce!();
-            // }
-            // if reduction_pressure >= reduction_interval {
-            //     reduce!();
-            // }
-            if elimination_pressure >= elimination_interval {
+            if vivification_pressure >= vivification_interval {
                 if cfg!(feature = "clause_vivification") {
                     cdb.vivify(asg, state, true)?;
                 }
+                vivification_pressure = 0;
+            }
+            if elimination_pressure >= elimination_interval {
                 if cfg!(feature = "clause_elimination") {
                     let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                     state.flush("clause subsumption, ");

@@ -831,7 +831,7 @@ impl ClauseDBIF for ClauseDB {
         c.is(FlagClause::LEARNT)
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, last_restart: usize) {
+    fn reduce(&mut self, asg: &mut impl AssignIF) {
         self.num_reduction += 1;
         let ClauseDB {
             clause,
@@ -863,8 +863,7 @@ impl ClauseDBIF for ClauseDB {
             .filter(|(_, c)| !c.is_dead())
         {
             num_alives += 1;
-            let _is_new = c.lbd == DecisionLevel::MAX;
-            let _referred = c.update_reference_rate(num_conflict);
+            c.update_reference_rate(num_conflict);
             match c.lbd {
                 0..=2 => {
                     *num_lbd2 += 1;
@@ -963,17 +962,17 @@ impl ClauseDBIF for ClauseDB {
         self.tier1_clauses.update(ntier1 as f64 / num_alives as f64);
         self.tier2_clauses.update(ntier2 as f64 / num_alives as f64);
     }
-    fn save_best_assign_reasons(&mut self, asg: &impl AssignIF, clear: bool) {
-        if clear {
-            for c in self.clause.iter_mut().skip(1) {
-                c.turn_off(FlagClause::BEST_PROPAGATOR);
-            }
-        }
-        for l in asg.stack_iter() {
-            if let AssignReason::Implication(cid) = asg.reason(l.vi()) {
-                self[cid].turn_on(FlagClause::BEST_PROPAGATOR);
-            }
-        }
+    fn save_best_assign_reasons(&mut self, _asg: &impl AssignIF, _clear: bool) {
+        // if clear {
+        //     for c in self.clause.iter_mut().skip(1) {
+        //         c.turn_off(FlagClause::BEST_PROPAGATOR);
+        //     }
+        // }
+        // for l in asg.stack_iter() {
+        //     if let AssignReason::Implication(cid) = asg.reason(l.vi()) {
+        //         self[cid].turn_on(FlagClause::BEST_PROPAGATOR);
+        //     }
+        // }
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);

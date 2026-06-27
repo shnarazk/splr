@@ -61,11 +61,7 @@ impl VivifyIF for ClauseDB {
             // the success rate collapses, so skipping them saves work without
             // losing many improvable clauses.
             let lbd = asg.literal_block_distance_current(&c.lits);
-            if
-            // || !(lbd <= 6 && !c.is(FlagClause::REFERRED))
-            // || (c.vivify_age >= 8 && !c.is(FlagClause::REFERRED))
-            // || c.len() < 9_usize.saturating_sub(c.vivify_at)
-            6 < lbd {
+            if 6 < lbd {
                 continue;
             }
             c.vivify_age += 1;

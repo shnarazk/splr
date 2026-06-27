@@ -17,15 +17,17 @@ pub struct Clause {
     /// the index from which `propagate` starts searching an un-falsified literal.
     /// Since it's just a hint, we don't need u32 or usize.
     pub search_from: u16,
+    /// The number of referrences in conflict analysis
+    pub(crate) referred: usize,
     /// Sum of activated (used as propagated) duration
     pub(crate) referred_at: usize,
     /// The average number of references in a vivification interval
     pub(crate) reference_rate: f64,
     /// last vivified time in conflicts
     pub(crate) vivify_age: usize,
+    // last vivified time in conflict
     pub(crate) vivify_at: usize,
-    /// The number of referrences in conflict analysis
-    pub(crate) referred: usize,
+    /// the minimal lbd of this clause so far
     pub(crate) lbd: DecisionLevel,
 }
 
@@ -59,11 +61,11 @@ impl Default for Clause {
             lits: vec![],
             flags: FlagClause::empty(),
             search_from: 2,
+            referred: 0,
             referred_at: 0,
             reference_rate: 1.0,
             vivify_age: 0,
             vivify_at: 0,
-            referred: 0,
             lbd: DecisionLevel::MAX,
         }
     }
@@ -227,7 +229,6 @@ impl ClauseIF for Clause {
             let referred = self.referred >= 1;
             self.reference_rate *= 0.9;
             self.reference_rate += 0.1 * self.referred as f64;
-            // self.set(FlagClause::REFERRED, referred);
             self.referred = 0;
             referred
         } else {
