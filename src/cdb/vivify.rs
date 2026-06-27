@@ -22,7 +22,7 @@ impl VivifyIF for ClauseDB {
         &mut self,
         asg: &mut AssignStack,
         state: &mut State,
-        eval: bool,
+        _eval: bool,
     ) -> MaybeInconsistent {
         // This is a reusable vector to reduce memory consumption,
         // the key is the number of invocation
@@ -33,7 +33,7 @@ impl VivifyIF for ClauseDB {
         let mut num_assert = 0;
         let mut to_display = 0;
         state[Stat::Vivification] += 1;
-        if eval && asg.remains() {
+        if asg.remains() {
             asg.propagate_sandbox(self).map_err(|cc| {
                 state.log(None, "By vivifier");
                 SolverError::RootLevelConflict(cc)
@@ -49,32 +49,28 @@ impl VivifyIF for ClauseDB {
             if c.is_dead() {
                 continue;
             }
-            let span: f64 = 20_000.0 * (1.0 + c.vivify_age as f64);
-            if c.referred_at + span as usize > asg.num_conflict {
+            let span: usize = 4_000 * (c.vivify_age + 1);
+            if c.vivify_at + span > asg.num_conflict || c.vivify_age > 8 {
                 continue;
             }
             let c = &mut self[cid];
-            c.update_reference_rate();
-            if eval {
-                c.vivify_age += 1;
-            }
+            // c.update_reference_rate(asg.num_conflict);
             // Skip clauses that are unlikely to be improved by vivification.
             // Empirically success concentrates on clauses
             // that are not too short and have a moderate LBD; outside this band
             // the success rate collapses, so skipping them saves work without
             // losing many improvable clauses.
-            if !eval
-                || c.vivify_age >= 6
-                || c.len() < 9_usize.saturating_sub(c.vivify_age)
-                || 12 < asg.literal_block_distance_current(&c.lits)
-            {
+            let lbd = asg.literal_block_distance_current(&c.lits);
+            if
+            // || !(lbd <= 6 && !c.is(FlagClause::REFERRED))
+            // || (c.vivify_age >= 8 && !c.is(FlagClause::REFERRED))
+            // || c.len() < 9_usize.saturating_sub(c.vivify_at)
+            6 < lbd {
                 continue;
             }
-            if !eval {
-                c.vivify_age += 1;
-            }
+            c.vivify_age += 1;
             let is_learnt = c.is(FlagClause::LEARNT);
-            let vivify_age = c.vivify_age;
+            let vivify_at = c.vivify_at;
             let referred_at = c.referred_at;
             let reference_rate = c.reference_rate;
             let clits = c.iter().copied().collect::<Vec<Lit>>();
@@ -166,7 +162,7 @@ impl VivifyIF for ClauseDB {
                                     {
                                         self[cid].referred_at = referred_at;
                                         self[cid].reference_rate = reference_rate;
-                                        self[cid].vivify_age = vivify_age;
+                                        self[cid].vivify_at = vivify_at;
                                     }
                                     self.remove_clause(cid);
                                     num_shrink += 1;
@@ -178,9 +174,6 @@ impl VivifyIF for ClauseDB {
                     }
                 }
             }
-        }
-        if !eval {
-            return Ok(());
         }
         asg.backtrack_sandbox();
         if asg.remains() {
@@ -309,14 +302,5 @@ impl AssignStack {
             "res: {learnt:?} from: {decisions:?} and trail: {assumes:?}"
         );
         learnt
-    }
-}
-
-impl Clause {
-    /// clear flags about vivification
-    fn update_reference_rate(&mut self) {
-        self.reference_rate *= 0.8;
-        self.reference_rate += 0.2 * self.referred as f64;
-        self.referred = 0;
     }
 }

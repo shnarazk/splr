@@ -237,8 +237,8 @@ impl PropagateIF for AssignStack {
                 if cfg!(feature = "rephase")
                 // && self.num_conflict - v.last_conflict <= 1000
                 {
-                    v.polarity *= 0.99;
-                    v.polarity += 0.01 * if v.assign.unwrap() { 1.0 } else { -1.0 };
+                    v.polarity *= 0.999;
+                    v.polarity += 0.001 * if v.assign.unwrap() { 1.0 } else { -1.0 };
                     v.set(
                         FlagVar::PHASE,
                         match self.phase_mode {
@@ -253,7 +253,7 @@ impl PropagateIF for AssignStack {
                             }
                             RephaseTarget::Inverted => !v.assign.unwrap(),
                             RephaseTarget::Polarity => {
-                                if self.rng.next_f64() <= v.polarity.abs() * 0.9 {
+                                if self.rng.next_f64() <= v.polarity.abs().powf(1.1) {
                                     v.assign.unwrap()
                                 } else {
                                     !v.assign.unwrap()

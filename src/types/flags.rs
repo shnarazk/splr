@@ -27,6 +27,8 @@ bitflags! {
         const ASSIGN_REASON   = 0b0000_1000;
         /// used in the best assignments
         const BEST_PROPAGATOR = 0b0010_0000;
+        /// a var is checked during in the current conflict analysis.
+        const REFERRED        = 0b0010_0000;
     }
 }
 
@@ -35,18 +37,18 @@ bitflags! {
     #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
     pub struct FlagVar: u8 {
         /// * the previous assigned value of a Var.
-        const PHASE        = 0b0000_0001;
+        const PHASE      = 0b0000_0001;
         /// used in conflict analyze
-        const USED         = 0b0000_0010;
+        const USED       = 0b0000_0010;
         /// a var is eliminated and managed by eliminator.
-        const ELIMINATED   = 0b0000_0100;
+        const ELIMINATED = 0b0000_0100;
         /// a clause or var is enqueued for eliminator.
-        const ENQUEUED     = 0b0000_1000;
+        const ENQUEUED   = 0b0000_1000;
         /// a var is checked during in the current conflict analysis.
-        const CA_SEEN      = 0b0001_0000;
+        const CA_SEEN    = 0b0001_0000;
 
         #[cfg(feature = "trace_propagation")]
         /// check propagation
-        const PROPAGATED   = 0b0010_0000;
+        const PROPAGATED = 0b0010_0000;
     }
 }

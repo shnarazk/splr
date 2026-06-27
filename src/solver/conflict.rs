@@ -424,6 +424,9 @@ fn conflict_analyze(
                 }
                 cdb[cid].referred_at = asg.num_conflict;
                 cdb[cid].referred += 1;
+                cdb[cid].lbd = cdb[cid]
+                    .lbd
+                    .min(asg.literal_block_distance_current(&cdb[cid].lits));
             }
             AssignReason::Decision(_) | AssignReason::None => {}
         }

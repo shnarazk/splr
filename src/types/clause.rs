@@ -23,8 +23,10 @@ pub struct Clause {
     pub(crate) reference_rate: f64,
     /// last vivified time in conflicts
     pub(crate) vivify_age: usize,
+    pub(crate) vivify_at: usize,
     /// The number of referrences in conflict analysis
     pub(crate) referred: usize,
+    pub(crate) lbd: DecisionLevel,
 }
 
 /// API for Clause, providing literal accessors.
@@ -47,6 +49,8 @@ pub trait ClauseIF {
     fn len(&self) -> usize;
     /// return true is this is a unit clause under `asg`.
     fn is_unit_under(&self, asg: &impl AssignIF) -> bool;
+    /// update reference_rate and return `true` if referred.
+    fn update_reference_rate(&mut self, base: usize) -> bool;
 }
 
 impl Default for Clause {
@@ -58,7 +62,9 @@ impl Default for Clause {
             referred_at: 0,
             reference_rate: 1.0,
             vivify_age: 0,
+            vivify_at: 0,
             referred: 0,
+            lbd: DecisionLevel::MAX,
         }
     }
 }
@@ -214,6 +220,19 @@ impl ClauseIF for Clause {
             .filter(|l| asg.assigned(**l).is_some())
             .all(|l| asg.assigned(*l) == Some(false));
         unassigned == 1 && all_others_false
+    }
+    fn update_reference_rate(&mut self, base: usize) -> bool {
+        let span: usize = 10_000; //  * (1.0 + self.vivify_age as f64).powf(1.0);
+        if self.referred_at + span <= base {
+            let referred = self.referred >= 1;
+            self.reference_rate *= 0.9;
+            self.reference_rate += 0.1 * self.referred as f64;
+            // self.set(FlagClause::REFERRED, referred);
+            self.referred = 0;
+            referred
+        } else {
+            true
+        }
     }
 }
 

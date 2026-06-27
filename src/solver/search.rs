@@ -225,25 +225,16 @@ impl SolveIF for Solver {
 
 /// table of (RephaseTarget, span length, next index)
 const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 8] = [
-    (RephaseTarget::True, 100, 1),
-    (RephaseTarget::False, 100, 2),
-    (RephaseTarget::Polarity, 4, 4),
-    (RephaseTarget::Polarity, 4, 4),
-    (RephaseTarget::Walk, 4, 2),
-    (RephaseTarget::Polarity, 4, 6),
-    (RephaseTarget::Best, 1, 0),
-    (RephaseTarget::Polarity, 4, 5),
-];
-const _REPHASE_ROTATION: [(RephaseTarget, usize, usize); 4] = [
-    // (RephaseTarget::False, 10, 1),
-    // (RephaseTarget::True, 10, 2),
-    (RephaseTarget::Walk, 40, 2),
-    (RephaseTarget::Polarity, 40, 2),
-    (RephaseTarget::Best, 10, 0),
+    (RephaseTarget::Polarity, 80, 1),
+    (RephaseTarget::False, 20, 2),
+    (RephaseTarget::True, 20, 3),
+    (RephaseTarget::Best, 20, 4),
     (RephaseTarget::Walk, 80, 0),
-    // (RephaseTarget::Inverted, 20, 3),
-    // (RephaseTarget::Polarity, 10, 0),
+    (RephaseTarget::Walk, 0, 0),
+    (RephaseTarget::Polarity, 0, 0),
+    (RephaseTarget::Polarity, 0, 0),
 ];
+
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
 fn search(
     asg: &mut AssignStack,
@@ -259,34 +250,26 @@ fn search(
     let reduction_interval: usize = 40_000;
     let mut rephase_rotation_pressure: usize = 0;
     let mut current_phase: &(RephaseTarget, usize, usize) = &REPHASE_ROTATION[0];
-    let vmtf_interval: usize = 10;
+    let vmtf_interval: usize = 20;
     let mut assign_peak: usize = 0;
-    let luby_scale: usize = 64;
+    let luby_scale: usize = 256;
     let mut span_scale: usize = luby_scale;
 
     macro_rules! reduce {
-        ($vivify: expr) => {{
+        () => {{
             state.search_mode_ratio.0.update(0.0);
             state.search_mode_ratio.1.update(0.0);
             reduction_pressure = 0;
-            if cfg!(feature = "clause_vivification") {
-                cdb.vivify(asg, state, $vivify)?;
-            }
-            cdb.reduce(
-                asg,
-                if $vivify {
-                    state.last_restart
-                } else {
-                    asg.num_conflict.saturating_sub(reduction_interval)
-                },
-            );
+            cdb.reduce(asg, state.last_restart);
         }};
     }
     macro_rules! to_lrb {
         () => {
             if asg.activity_scheme != VarActivityScheme::LRB {
                 asg.activity_scheme = VarActivityScheme::LRB;
-                asg.set_learning_rate(state.config.vrw_learning_rate);
+                let span: f64 = (state.span_manager.envelop_index() * luby_scale) as f64;
+                let adaptive_lr: f64 = 1.0 / span.sqrt();
+                asg.set_learning_rate(adaptive_lr);
                 asg.rebuild_order();
             }
             current_phase = &REPHASE_ROTATION[0];
@@ -298,9 +281,7 @@ fn search(
         () => {
             if asg.activity_scheme != VarActivityScheme::VMTF {
                 asg.activity_scheme = VarActivityScheme::VMTF;
-                asg.phase_mode = RephaseTarget::Polarity;
-                // asg.phase_mode = RephaseTarget::Walk;
-                // asg.phase_mode = RephaseTarget::Best;
+                asg.phase_mode = RephaseTarget::Walk;
                 asg.set_learning_rate(0.0); // Don't change this
                 asg.rebuild_order();
                 rephase_rotation_pressure = 0;
@@ -309,19 +290,22 @@ fn search(
     }
     macro_rules! rotate_rephase_mode {
         () => {
-            // current_phase = &REPHASE_ROTATION[current_phase.2];
-            // asg.phase_mode = current_phase.0;
-            // rephase_rotation_pressure = 0;
-            if current_phase.2 == 0 {
-                // asg.clear_best_phases();
-                // state.core_size = asg.derefer(assign::property::Tusize::NumUnassertedVar);
-                // assign_peak = 0;
-                // to_vmtf!();
-            } else {
-                current_phase = &REPHASE_ROTATION[current_phase.2];
-                asg.phase_mode = current_phase.0;
-                rephase_rotation_pressure = 0;
-            }
+            current_phase = &REPHASE_ROTATION[current_phase.2];
+            asg.phase_mode = current_phase.0;
+            rephase_rotation_pressure = 0;
+            // if current_phase.2 == 0 {
+            //     current_phase = &REPHASE_ROTATION[current_phase.2];
+            //     asg.phase_mode = current_phase.0;
+            //     rephase_rotation_pressure = 0;
+            //     // asg.clear_best_phases();
+            //     // state.core_size = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+            //     // assign_peak = 0;
+            //     // to_vmtf!();
+            // } else {
+            //     current_phase = &REPHASE_ROTATION[current_phase.2];
+            //     asg.phase_mode = current_phase.0;
+            //     rephase_rotation_pressure = 0;
+            // }
         };
     }
     macro_rules! update_core {
@@ -372,6 +356,7 @@ fn search(
             update_core!(1);
         } else {
             cdb.lbd.update(lbd as f64);
+            cdb[cid].lbd = DecisionLevel::MAX;
         }
         match asg.stack_len().cmp(&assign_peak) {
             Ordering::Less => {}
@@ -409,8 +394,9 @@ fn search(
         reduction_pressure += 1;
         rephase_rotation_pressure += 1;
         span_len += 1;
-        if reduction_pressure >= reduction_interval {
-            reduce!(false);
+        // Don't check with `>= 1 * reduction_interval`. It prevents `reduce!(true)`.
+        if reduction_pressure > reduction_interval {
+            reduce!();
         }
         if state.span_manager.span_ended(span_len / span_scale) {
             span_len = 0;
@@ -418,10 +404,16 @@ fn search(
             dump_stage(asg, state, new_segment);
             let unasserted_pre = asg.derefer(assign::property::Tusize::NumUnassertedVar);
             RESTART!(asg, cdb, state)?;
-            if reduction_pressure >= reduction_interval {
-                reduce!(true);
-            }
+            // if reduction_pressure > reduction_interval {
+            //   reduce!();
+            // }
+            // if reduction_pressure >= reduction_interval {
+            //     reduce!();
+            // }
             if elimination_pressure >= elimination_interval {
+                if cfg!(feature = "clause_vivification") {
+                    cdb.vivify(asg, state, true)?;
+                }
                 if cfg!(feature = "clause_elimination") {
                     let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                     state.flush("clause subsumption, ");

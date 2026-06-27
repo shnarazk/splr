@@ -1,3 +1,5 @@
+use crate::assign;
+
 use {
     super::{
         BinaryLinkDB, CertificationStore, ClauseDBIF, ClauseId, RefClause,
@@ -66,6 +68,7 @@ pub struct ClauseDB {
     pub(crate) tier1_clauses: Ema,
     /// the ratio of pretty good learnt clauses
     pub(crate) tier2_clauses: Ema,
+    pub(crate) last_reduction_at: usize,
 }
 
 impl Default for ClauseDB {
@@ -88,6 +91,7 @@ impl Default for ClauseDB {
             num_reregistration: 0,
             tier1_clauses: Ema::default(),
             tier2_clauses: Ema::default(),
+            last_reduction_at: 0,
         }
     }
 }
@@ -313,6 +317,7 @@ impl ClauseDBIF for ClauseDB {
             c.referred_at = 0;
             c.reference_rate = 1.0;
             c.vivify_age = 0;
+            c.vivify_at = 0;
         } else {
             cid = ClauseId::from(self.clause.len());
             let mut c = Clause {
@@ -841,11 +846,16 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         *num_lbd2 = 0;
+        let num_conflict = asg.derefer(assign::property::Tusize::NumConflict);
         let mut num_alives: usize = 0;
         // tier 1 group: the small clauses under the best assignment
         let mut ntier1: usize = 0;
         // tier 2 group: the small clauses under the best assignment
-        let mut ntier2: usize = 0;
+        let mut ntier2: usize = 10_000;
+        let mut cands: Vec<SortKey<usize>> = Vec::new();
+        let thr: f64 = 1.0;
+        let scale: f64 = 2.0;
+        let cutoff: DecisionLevel = 3;
         for (i, c) in clause
             .iter_mut()
             .enumerate()
@@ -853,45 +863,25 @@ impl ClauseDBIF for ClauseDB {
             .filter(|(_, c)| !c.is_dead())
         {
             num_alives += 1;
-            match asg.literal_block_distance_current(&c.lits) {
+            let _is_new = c.lbd == DecisionLevel::MAX;
+            let _referred = c.update_reference_rate(num_conflict);
+            match c.lbd {
                 0..=2 => {
                     *num_lbd2 += 1;
                     continue;
                 }
-                3 if c.reference_rate >= 0.01 => {
+                n @ (3..=5) if c.reference_rate >= scale.powf((n - cutoff) as f64) * thr => {
                     ntier1 += 1;
                     continue;
                 }
-                4 if c.reference_rate >= 0.1 => {
-                    ntier1 += 1;
+                _ if !c.is(FlagClause::LEARNT) || c.is(FlagClause::ASSIGN_REASON) => {
                     continue;
                 }
-                5 if c.reference_rate >= 2.0 => {
-                    ntier2 += 1;
-                    continue;
-                }
-                6 if c.reference_rate >= 4.0 => {
-                    ntier2 += 1;
-                    continue;
-                }
-                7 if c.reference_rate >= 8.0 => {
-                    ntier2 += 1;
-                    continue;
-                }
-                _ if c.reference_rate >= 16.0 => {
+                n @ (6..) if c.reference_rate >= scale.powf((n - cutoff) as f64) * thr => {
+                    cands.push(SortKey::new(i, c.len() as f64));
                     continue;
                 }
                 _ => (),
-            }
-            if c.len() <= 3 {
-                ntier1 += 1;
-                continue;
-            }
-            if !c.is(FlagClause::LEARNT) || c.is(FlagClause::ASSIGN_REASON) {
-                continue;
-            }
-            if c.referred_at >= last_restart {
-                continue;
             }
             remove_clause_fn(
                 certification_store,
@@ -904,7 +894,72 @@ impl ClauseDBIF for ClauseDB {
                 c,
             );
             freelist.push(ClauseId::from(i));
+            /* match c.len() {
+                0..=5 => {
+                    *num_lbd2 += 1;
+                    continue;
+                }
+                6..=8 if c.reference_rate >= 0.0001 => {
+                    ntier1 += 1;
+                    continue;
+                }
+                9 | 10 if c.reference_rate >= 0.001 => {
+                    ntier2 += 1;
+                    continue;
+                }
+                11 | 12 if c.reference_rate >= 0.01 => {
+                    ntier2 += 1;
+                    continue;
+                }
+                _ if c.lbd <= 6 && c.reference_rate >= 1.0 => {
+                    continue;
+                }
+                _ if c.referred_at >= *last_reduction_at /* && referred */ => {
+                    continue;
+                }
+                _ if !c.is(FlagClause::LEARNT) || c.is(FlagClause::ASSIGN_REASON) => {
+                    continue;
+                }
+                _ => {
+                    remove_clause_fn(
+                        certification_store,
+                        binary_link,
+                        watch_cache,
+                        num_bi_clause,
+                        num_clause,
+                        num_learnt,
+                        ClauseId::from(i),
+                        c,
+                    );
+                    freelist.push(ClauseId::from(i));
+                }
+            }
+            */
         }
+        if cands.len() > ntier2 {
+            cands.sort_unstable();
+            for cid in cands
+                .iter() // .skip(ntier1)
+                .skip(ntier2)
+            {
+                let c = &mut clause[cid.to()];
+                let cid = ClauseId::from(cid.to());
+                remove_clause_fn(
+                    certification_store,
+                    binary_link,
+                    watch_cache,
+                    num_bi_clause,
+                    num_clause,
+                    num_learnt,
+                    cid,
+                    c,
+                );
+                freelist.push(cid);
+            }
+        } else {
+            ntier2 = cands.len();
+        }
+        self.last_reduction_at = num_conflict;
         self.tier1_clauses.update(ntier1 as f64 / num_alives as f64);
         self.tier2_clauses.update(ntier2 as f64 / num_alives as f64);
     }
