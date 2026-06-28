@@ -224,15 +224,12 @@ impl SolveIF for Solver {
 }
 
 /// table of (RephaseTarget, span length, next index)
-const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 8] = [
+const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 5] = [
     (RephaseTarget::Polarity, 80, 1),
     (RephaseTarget::False, 20, 2),
     (RephaseTarget::True, 20, 3),
     (RephaseTarget::Best, 20, 4),
     (RephaseTarget::Walk, 80, 0),
-    (RephaseTarget::Walk, 0, 0),
-    (RephaseTarget::Polarity, 0, 0),
-    (RephaseTarget::Polarity, 0, 0),
 ];
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.

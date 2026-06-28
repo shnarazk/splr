@@ -50,7 +50,7 @@ impl VivifyIF for ClauseDB {
                 continue;
             }
             let span: usize = 4_000 * (c.vivify_age + 1);
-            if c.vivify_at + span > asg.num_conflict || c.vivify_age > 8 {
+            if c.vivify_at.max(c.referred_at) + span > asg.num_conflict {
                 continue;
             }
             let c = &mut self[cid];
@@ -60,11 +60,11 @@ impl VivifyIF for ClauseDB {
             // that are not too short and have a moderate LBD; outside this band
             // the success rate collapses, so skipping them saves work without
             // losing many improvable clauses.
-            let lbd = asg.literal_block_distance_current(&c.lits);
-            if 6 < lbd {
+            if 6 < c.lbd {
                 continue;
             }
             c.vivify_age += 1;
+            c.vivify_at = asg.num_conflict;
             let is_learnt = c.is(FlagClause::LEARNT);
             let vivify_at = c.vivify_at;
             let referred_at = c.referred_at;
