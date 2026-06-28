@@ -248,9 +248,7 @@ impl PropagateIF for AssignStack {
                             RephaseTarget::Best => {
                                 self.best_phases[vi].0.unwrap_or(v.assign.unwrap())
                             }
-                            RephaseTarget::Random => {
-                                (v.last_conflict + i + self.num_propagation).is_multiple_of(2)
-                            }
+                            RephaseTarget::Random => self.rng.next_bool(),
                             RephaseTarget::Inverted => !v.assign.unwrap(),
                             RephaseTarget::Polarity => {
                                 if self.rng.next_f64() <= v.polarity.abs().powf(1.1) {
