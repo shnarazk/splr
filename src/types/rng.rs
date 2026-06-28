@@ -36,6 +36,10 @@ impl SplitMix64 {
         // Use the top 53 bits to fill the mantissa of an f64.
         (self.next_u64() >> 11) as f64 / ((1u64 << 53) as f64)
     }
+    /// Return a pseudo-random `bool`.
+    pub fn next_bool(&mut self) -> bool {
+        self.next_u64().is_multiple_of(2)
+    }
     /// Return a pseudo-random `usize` in the half-open range `[0, bound)`.
     /// Returns `0` when `bound` is `0`.
     pub fn below(&mut self, bound: usize) -> usize {
