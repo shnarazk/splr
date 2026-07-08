@@ -19,10 +19,11 @@ pub struct Clause {
     pub search_from: u16,
     /// The number of referrences in conflict analysis
     pub(crate) referred: usize,
-    /// Sum of activated (used as propagated) duration
     pub(crate) referred_at: usize,
+    /// Sum of activated (used as propagated) duration
+    pub(crate) born_at: usize,
     /// The average number of references in a vivification interval
-    pub(crate) reference_rate: f64,
+    pub(crate) reference_distance_sum: usize,
     /// last vivified time in conflicts
     pub(crate) vivify_age: usize,
     // last vivified time in conflict
@@ -51,8 +52,10 @@ pub trait ClauseIF {
     fn len(&self) -> usize;
     /// return true is this is a unit clause under `asg`.
     fn is_unit_under(&self, asg: &impl AssignIF) -> bool;
-    /// update reference_rate and return `true` if referred.
-    fn update_reference_rate(&mut self, base: usize) -> bool;
+    /// update reference_distance.
+    fn update_reference(&mut self, now: usize, literal_distance: usize);
+    /// return reference distance as `f64`
+    fn reference_distance(&self) -> f64;
 }
 
 impl Default for Clause {
@@ -63,7 +66,8 @@ impl Default for Clause {
             search_from: 2,
             referred: 0,
             referred_at: 0,
-            reference_rate: 1.0,
+            born_at: 0,
+            reference_distance_sum: 0,
             vivify_age: 0,
             vivify_at: 0,
             lbd: DecisionLevel::MAX,
@@ -223,17 +227,13 @@ impl ClauseIF for Clause {
             .all(|l| asg.assigned(*l) == Some(false));
         unassigned == 1 && all_others_false
     }
-    fn update_reference_rate(&mut self, base: usize) -> bool {
-        let span: usize = 10_000; //  * (1.0 + self.vivify_age as f64).powf(1.0);
-        if self.referred_at + span <= base {
-            let referred = self.referred >= 1;
-            self.reference_rate *= 0.9;
-            self.reference_rate += 0.1 * self.referred as f64;
-            self.referred = 0;
-            referred
-        } else {
-            true
-        }
+    fn update_reference(&mut self, now: usize, literal_distance: usize) {
+        self.referred += 1;
+        self.referred_at = now;
+        self.reference_distance_sum += literal_distance;
+    }
+    fn reference_distance(&self) -> f64 {
+        self.reference_distance_sum as f64 / (1 + self.referred) as f64
     }
 }
 
