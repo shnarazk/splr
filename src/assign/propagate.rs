@@ -251,7 +251,7 @@ impl PropagateIF for AssignStack {
                             RephaseTarget::Random => self.rng.next_bool(),
                             RephaseTarget::Inverted => !v.assign.unwrap(),
                             RephaseTarget::Polarity => {
-                                if self.rng.next_f64() <= v.polarity.abs().powf(1.1) {
+                                if self.rng.next_f64() <= v.polarity.abs().powf(1.2) {
                                     v.assign.unwrap()
                                 } else {
                                     !v.assign.unwrap()

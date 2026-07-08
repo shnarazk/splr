@@ -216,7 +216,6 @@ pub fn handle_conflict(
                 asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
                 cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
             }
-            cdb[cid].reference_rate = 1.0;
             // lbd should be calculated at conflict level, where all literals are assigned.
             // But since vars hold the last level even after unassignment,
             // we can have postponed the calculation.
@@ -422,8 +421,7 @@ fn conflict_analyze(
                         trace!(q, " -- ignore flagged already");
                     }
                 }
-                cdb[cid].referred_at = asg.num_conflict;
-                cdb[cid].referred += 1;
+                cdb[cid].update_reference(asg.num_conflict, dl as usize);
                 cdb[cid].lbd = cdb[cid]
                     .lbd
                     .min(asg.literal_block_distance_current(&cdb[cid].lits));

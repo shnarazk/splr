@@ -123,6 +123,8 @@ pub struct State {
     pub core_size: usize,
     /// the last restart in conflicts
     pub last_restart: usize,
+    /// the last assertion in conflicts
+    pub last_assertion: usize,
 
     #[cfg(feature = "chrono_BT")]
     /// chronoBT threshold
@@ -167,6 +169,7 @@ impl Default for State {
             bt_drift_average: Ema::default().with_span(1000),
             core_size: 0,
             last_restart: 0,
+            last_assertion: 0,
 
             #[cfg(feature = "chrono_BT")]
             chrono_bt_threshold: 100,

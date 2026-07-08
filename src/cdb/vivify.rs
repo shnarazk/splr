@@ -49,8 +49,8 @@ impl VivifyIF for ClauseDB {
             if c.is_dead() {
                 continue;
             }
-            let span: usize = 4_000 * (c.vivify_age + 1);
-            if c.vivify_at.max(c.referred_at) + span > asg.num_conflict {
+            let span: usize = 4_000 * c.len() * 2_usize.pow(c.vivify_age as u32 + 1);
+            if c.vivify_at.max(c.born_at) + span > asg.num_conflict {
                 continue;
             }
             let c = &mut self[cid];
@@ -60,15 +60,20 @@ impl VivifyIF for ClauseDB {
             // that are not too short and have a moderate LBD; outside this band
             // the success rate collapses, so skipping them saves work without
             // losing many improvable clauses.
-            if 6 < c.lbd {
-                continue;
-            }
-            c.vivify_age += 1;
+            // if 6 < c.lbd {
+            //     continue;
+            // }
+            // if c.vivify_age > 6 {
+            //     continue;
+            // }
+            // assert!(!c.is(FlagClause::ASSIGN_REASON));
             c.vivify_at = asg.num_conflict;
             let is_learnt = c.is(FlagClause::LEARNT);
+            let lbd = c.lbd;
             let vivify_at = c.vivify_at;
-            let referred_at = c.referred_at;
-            let reference_rate = c.reference_rate;
+            c.vivify_age += 1;
+            let born_at = c.born_at;
+            let reference_dist = c.reference_distance_sum;
             let clits = c.iter().copied().collect::<Vec<Lit>>();
             if to_display <= num_check {
                 state.flush("");
@@ -156,9 +161,10 @@ impl VivifyIF for ClauseDB {
                                 _ => {
                                     if let Some(cid) = self.new_clause(&mut vec, is_learnt).is_new()
                                     {
-                                        self[cid].referred_at = referred_at;
-                                        self[cid].reference_rate = reference_rate;
+                                        self[cid].born_at = born_at;
+                                        self[cid].reference_distance_sum = reference_dist;
                                         self[cid].vivify_at = vivify_at;
+                                        self[cid].lbd = lbd.min(decisions.len() as DecisionLevel);
                                     }
                                     self.remove_clause(cid);
                                     num_shrink += 1;
