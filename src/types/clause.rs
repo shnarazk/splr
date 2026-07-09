@@ -23,7 +23,7 @@ pub struct Clause {
     /// Sum of activated (used as propagated) duration
     pub(crate) born_at: usize,
     /// The average number of references in a vivification interval
-    pub(crate) reference_distance_sum: usize,
+    pub(crate) reference_height: usize,
     /// last vivified time in conflicts
     pub(crate) vivify_age: usize,
     // last vivified time in conflict
@@ -67,7 +67,7 @@ impl Default for Clause {
             referred: 0,
             referred_at: 0,
             born_at: 0,
-            reference_distance_sum: 0,
+            reference_height: 0,
             vivify_age: 0,
             vivify_at: 0,
             lbd: DecisionLevel::MAX,
@@ -230,10 +230,15 @@ impl ClauseIF for Clause {
     fn update_reference(&mut self, now: usize, literal_distance: usize) {
         self.referred += 1;
         self.referred_at = now;
-        self.reference_distance_sum += literal_distance;
+        if self.reference_height == 0 {
+            self.reference_height = literal_distance;
+        }
+        self.reference_height = self.reference_height.min(literal_distance);
+        // self.reference_distance_sum += literal_distance;
     }
     fn reference_distance(&self) -> f64 {
-        self.reference_distance_sum as f64 / (1 + self.referred) as f64
+        self.reference_height as f64
+        // self.reference_distance_sum as f64 / (1 + self.referred) as f64
     }
 }
 

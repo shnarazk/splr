@@ -251,7 +251,7 @@ fn search(
     let mut current_phase: &(RephaseTarget, usize, usize) = &REPHASE_ROTATION[0];
     let vmtf_interval: usize = 20;
     let mut assign_peak: usize = 0;
-    let luby_scale: usize = 256;
+    let luby_scale: usize = 80;
     let mut span_scale: usize = luby_scale;
 
     macro_rules! reduce {
@@ -259,7 +259,7 @@ fn search(
             state.search_mode_ratio.0.update(0.0);
             state.search_mode_ratio.1.update(0.0);
             reduction_pressure = 0;
-            cdb.reduce(asg, state.span_manager.current_segment());
+            cdb.reduce(asg, state.b_lvl.get_slow());
         }};
     }
     macro_rules! to_lrb {
@@ -398,8 +398,6 @@ fn search(
         span_len += 1;
         // Don't check with `>= 1 * reduction_interval`. It prevents `reduce!(true)`.
         if reduction_pressure > reduction_interval {
-            state.flush("");
-            state.flush(format!("{:>9}", state.span_manager.current_segment()));
             reduce!();
         }
         if state.span_manager.span_ended(span_len / span_scale) {
@@ -408,8 +406,6 @@ fn search(
             dump_stage(asg, state, new_segment);
             RESTART!(asg, cdb, state)?;
             // if reduction_pressure > reduction_interval {
-            //     state.flush("");
-            //     state.flush(format!("{:>9}", state.span_manager.current_segment()));
             //     reduce!();
             // }
             if vivification_pressure >= vivification_interval {

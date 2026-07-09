@@ -95,9 +95,8 @@ pub fn eliminate_var(
                             // the merged clause might be a duplicated clause.
                             elim.add_cid_occur(asg, ci, &mut cdb[ci], true);
                             cdb[ci].born_at = cdb[*p].born_at.max(cdb[*n].born_at);
-                            cdb[ci].reference_distance_sum = cdb[*p]
-                                .reference_distance_sum
-                                .min(cdb[*n].reference_distance_sum);
+                            cdb[ci].reference_height =
+                                cdb[*p].reference_height.min(cdb[*n].reference_height);
                             cdb[ci].lbd = cdb[*p].lbd.max(cdb[*n].lbd);
 
                             #[cfg(feature = "trace_elimination")]
