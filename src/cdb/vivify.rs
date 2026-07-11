@@ -49,7 +49,7 @@ impl VivifyIF for ClauseDB {
             if c.is_dead() {
                 continue;
             }
-            let span: usize = 4_000 * c.len() * 2_usize.pow(c.vivify_age as u32 + 1);
+            let span: usize = 5_000 * c.len() * 2_usize.pow(c.vivify_age as u32 + 1);
             if c.vivify_at.max(c.born_at) + span > asg.num_conflict {
                 continue;
             }
@@ -73,7 +73,7 @@ impl VivifyIF for ClauseDB {
             let vivify_at = c.vivify_at;
             c.vivify_age += 1;
             let born_at = c.born_at;
-            let reference_dist = c.reference_height;
+            let reference_height = c.reference_height;
             let clits = c.iter().copied().collect::<Vec<Lit>>();
             if to_display <= num_check {
                 state.flush("");
@@ -162,7 +162,7 @@ impl VivifyIF for ClauseDB {
                                     if let Some(cid) = self.new_clause(&mut vec, is_learnt).is_new()
                                     {
                                         self[cid].born_at = born_at;
-                                        self[cid].reference_height = reference_dist;
+                                        self[cid].reference_height = reference_height / 2;
                                         self[cid].vivify_at = vivify_at;
                                         self[cid].lbd = lbd.min(decisions.len() as DecisionLevel);
                                     }

@@ -259,7 +259,7 @@ fn search(
             state.search_mode_ratio.0.update(0.0);
             state.search_mode_ratio.1.update(0.0);
             reduction_pressure = 0;
-            cdb.reduce(asg, state.b_lvl.get_slow());
+            cdb.reduce(asg, state);
         }};
     }
     macro_rules! to_lrb {

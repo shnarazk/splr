@@ -43,6 +43,8 @@ pub trait AssignIF:
 {
     /// return root level.
     fn root_level(&self) -> DecisionLevel;
+    /// return current conflict index.
+    fn current_conflict_index(&self) -> usize;
     /// return a literal in the stack.
     fn stack(&self, i: usize) -> Lit;
     /// return literals in the range of stack.

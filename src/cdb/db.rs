@@ -5,7 +5,7 @@ use {
         property,
         watch_cache::*,
     },
-    crate::{assign::AssignIF, types::*},
+    crate::{assign::AssignIF, state::State, types::*},
     std::{
         collections::HashMap,
         num::NonZeroU32,
@@ -831,7 +831,7 @@ impl ClauseDBIF for ClauseDB {
         c.is(FlagClause::LEARNT)
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, b_lvl: f64) {
+    fn reduce(&mut self, _asg: &mut impl AssignIF, state: &State) {
         self.num_reduction += 1;
         let ClauseDB {
             clause,
@@ -845,15 +845,27 @@ impl ClauseDBIF for ClauseDB {
             freelist,
             ..
         } = self;
+        let depth: f64 = 0.6 * state.b_lvl.get_slow();
+        let (total, targets) = clause
+            .iter()
+            .skip(1)
+            .filter(|c| {
+                !c.is_dead() && c.is(FlagClause::LEARNT) && !c.is(FlagClause::ASSIGN_REASON)
+            })
+            .fold((0, 0), |(total, target), c| {
+                (
+                    total + 1,
+                    target + (c.reference_height as f64 + c.lbd as f64 <= depth) as usize,
+                )
+            });
+        if targets as f64 > 0.5 * total as f64 {
+            return;
+        }
         *num_lbd2 = 0;
         let mut num_alives: usize = 0;
-        let mut reserved: Vec<SortKey<usize>> = Vec::new();
-        // let mut tier2: Vec<SortKey<usize>> = Vec::new();
         let mut ntier1: usize = 0;
         let mut ntier2: usize = 0;
         let mut survived: usize = 0;
-        let _lits_index = |lits: &[Lit]| lits.iter().map(|l| asg.activity(l.vi())).sum::<f64>();
-        let depth = (b_lvl / 2.0).min(16.0);
         for (i, c) in clause
             .iter_mut()
             .enumerate()
@@ -867,23 +879,21 @@ impl ClauseDBIF for ClauseDB {
             }
             if c.is(FlagClause::ASSIGN_REASON) {
                 *num_lbd2 += (c.lbd <= 2) as usize;
-                c.reference_height += c.lbd.ilog2() as usize;
+                c.reference_height += c.lbd.ilog2() as DecisionLevel;
                 continue;
             }
-            let d: f64 = c.reference_distance();
-            if d <= depth {
+            // Don't introduce any length-based crteria!
+            // Clause lengths without context make result worse.
+            if c.reference_height as f64 + c.lbd as f64 <= depth {
                 match c.lbd {
                     0..=2 => *num_lbd2 += 1,
                     3..=6 => ntier1 += 1,
                     _ => ntier2 += 1,
                 }
-                c.reference_height += c.lbd.ilog2() as usize;
+                if targets >= 20_000 {
+                    c.reference_height += c.lbd.ilog2() as DecisionLevel;
+                }
                 survived += 1;
-                continue;
-            }
-            // Note: assert!(c.len() > 2)
-            if d <= depth + 1.0 || c.len() <= 3 {
-                reserved.push(SortKey::new(i, c.lbd as f64));
                 continue;
             }
             remove_clause_fn(
@@ -897,50 +907,6 @@ impl ClauseDBIF for ClauseDB {
                 c,
             );
             freelist.push(ClauseId::from(i));
-        }
-        if survived < 40_000 {
-            reserved.sort_unstable();
-            for i in reserved.iter().take(survived) {
-                let c = &mut clause[i.to()];
-                match c.lbd {
-                    0..=2 => *num_lbd2 += 1,
-                    3..=6 => ntier1 += 1,
-                    _ => ntier2 += 1,
-                }
-                c.reference_height += c.lbd.ilog2() as usize;
-                survived += 1;
-            }
-            for i in reserved.iter().skip(survived) {
-                let c = &mut clause[i.to()];
-                let cid = ClauseId::from(i.to());
-                remove_clause_fn(
-                    certification_store,
-                    binary_link,
-                    watch_cache,
-                    num_bi_clause,
-                    num_clause,
-                    num_learnt,
-                    cid,
-                    c,
-                );
-                freelist.push(cid);
-            }
-        } else {
-            for i in reserved {
-                let c = &mut clause[i.to()];
-                let cid = ClauseId::from(i.to());
-                remove_clause_fn(
-                    certification_store,
-                    binary_link,
-                    watch_cache,
-                    num_bi_clause,
-                    num_clause,
-                    num_learnt,
-                    cid,
-                    c,
-                );
-                freelist.push(cid);
-            }
         }
         self.last_reduction_count = survived;
         self.tier1_clauses.update(ntier1 as f64 / num_alives as f64);

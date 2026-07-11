@@ -22,8 +22,8 @@ pub struct Clause {
     pub(crate) referred_at: usize,
     /// Sum of activated (used as propagated) duration
     pub(crate) born_at: usize,
-    /// The average number of references in a vivification interval
-    pub(crate) reference_height: usize,
+    /// The minimal decision level at which a conflict occured by this clause
+    pub(crate) reference_height: DecisionLevel,
     /// last vivified time in conflicts
     pub(crate) vivify_age: usize,
     // last vivified time in conflict
@@ -53,9 +53,7 @@ pub trait ClauseIF {
     /// return true is this is a unit clause under `asg`.
     fn is_unit_under(&self, asg: &impl AssignIF) -> bool;
     /// update reference_distance.
-    fn update_reference(&mut self, now: usize, literal_distance: usize);
-    /// return reference distance as `f64`
-    fn reference_distance(&self) -> f64;
+    fn update_reference(&mut self, asg: &impl AssignIF);
 }
 
 impl Default for Clause {
@@ -227,18 +225,14 @@ impl ClauseIF for Clause {
             .all(|l| asg.assigned(*l) == Some(false));
         unassigned == 1 && all_others_false
     }
-    fn update_reference(&mut self, now: usize, literal_distance: usize) {
+    fn update_reference(&mut self, asg: &impl AssignIF) {
         self.referred += 1;
-        self.referred_at = now;
+        self.referred_at = asg.current_conflict_index();
+        let level = asg.decision_level();
         if self.reference_height == 0 {
-            self.reference_height = literal_distance;
+            self.reference_height = level;
         }
-        self.reference_height = self.reference_height.min(literal_distance);
-        // self.reference_distance_sum += literal_distance;
-    }
-    fn reference_distance(&self) -> f64 {
-        self.reference_height as f64
-        // self.reference_distance_sum as f64 / (1 + self.referred) as f64
+        self.reference_height = self.reference_height.min(level);
     }
 }
 

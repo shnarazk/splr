@@ -134,11 +134,22 @@ pub fn handle_conflict(
                 }
             }
             AssignReason::Implication(r) => {
+                let mut cs = Vec::new();
                 for l in cdb[r].iter() {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
                         asg.reward_at_analysis(vi);
                         bumped.push(vi);
+                    }
+                    if let AssignReason::Implication(ci) = asg.reason(l.vi()) {
+                        cs.push((asg.level(l.vi()), ci));
+                    }
+                }
+                for (lvl, ci) in cs.into_iter() {
+                    if cdb[ci].reference_height == 0 {
+                        cdb[ci].reference_height = lvl;
+                    } else {
+                        cdb[ci].reference_height = cdb[ci].reference_height.min(lvl);
                     }
                 }
             }
@@ -421,7 +432,7 @@ fn conflict_analyze(
                         trace!(q, " -- ignore flagged already");
                     }
                 }
-                cdb[cid].update_reference(asg.num_conflict, dl as usize);
+                cdb[cid].update_reference(asg);
                 cdb[cid].lbd = cdb[cid]
                     .lbd
                     .min(asg.literal_block_distance_current(&cdb[cid].lits));
