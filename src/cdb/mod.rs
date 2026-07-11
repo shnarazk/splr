@@ -23,7 +23,7 @@ pub use self::{
 };
 
 use {
-    crate::{assign::AssignIF, types::*},
+    crate::{assign::AssignIF, state::State, types::*},
     std::{
         ops::IndexMut,
         slice::{Iter, IterMut},
@@ -103,7 +103,7 @@ pub trait ClauseDBIF:
     /// reduce learnt clauses
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn reduce(&mut self, asg: &mut impl AssignIF, b_lvl: f64);
+    fn reduce(&mut self, asg: &mut impl AssignIF, state: &State);
     /// turn `FlagClause::BEST_PROPAGATOR` of 'used clauses' on
     fn save_best_assign_reasons(&mut self, asg: &impl AssignIF, clear: bool);
     /// update flags.

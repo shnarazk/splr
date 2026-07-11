@@ -204,6 +204,9 @@ impl AssignIF for AssignStack {
     fn root_level(&self) -> DecisionLevel {
         self.root_level
     }
+    fn current_conflict_index(&self) -> usize {
+        self.num_conflict
+    }
     fn stack(&self, i: usize) -> Lit {
         self.trail[i]
     }
