@@ -878,7 +878,7 @@ impl fmt::Display for State {
         if width < vclen + fnlen + 1 {
             write!(f, "{fname:<width$} |time:{tm:>9.2}")
         } else {
-            write!(f, "{fname}{:>w$} |time:{tm:>9.2}", &vc, w = width - fnlen,)
+            write!(f, "{fname}{:>w$} |time:{tm:>9.2}", vc, w = width - fnlen,)
         }
     }
 }

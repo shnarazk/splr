@@ -198,14 +198,14 @@ fn main() {
         None if from_file => println!(
             "{}A valid assignment set for {}{} is found in {}",
             green,
-            &args.problem.to_str().unwrap(),
+            args.problem.to_str().unwrap(),
             RESET,
-            &args.assign.unwrap().to_str().unwrap(),
+            args.assign.unwrap().to_str().unwrap(),
         ),
         None => println!(
             "{}A valid assignment set for {}.{}",
             green,
-            &args.problem.to_str().unwrap(),
+            args.problem.to_str().unwrap(),
             RESET,
         ),
     }
