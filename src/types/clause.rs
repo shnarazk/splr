@@ -17,11 +17,8 @@ pub struct Clause {
     /// the index from which `propagate` starts searching an un-falsified literal.
     /// Since it's just a hint, we don't need u32 or usize.
     pub search_from: u16,
-    /// The number of referrences in conflict analysis
-    pub(crate) referred: usize,
+    /// The last reference time in conflict analysis
     pub(crate) referred_at: usize,
-    /// Sum of activated (used as propagated) duration
-    pub(crate) born_at: usize,
     /// The minimal decision level at which a conflict occured by this clause
     pub(crate) reference_height: DecisionLevel,
     /// last vivified time in conflicts
@@ -62,9 +59,7 @@ impl Default for Clause {
             lits: vec![],
             flags: FlagClause::empty(),
             search_from: 2,
-            referred: 0,
             referred_at: 0,
-            born_at: 0,
             reference_height: DecisionLevel::MAX,
             vivify_age: 0,
             vivify_at: 0,
@@ -226,7 +221,6 @@ impl ClauseIF for Clause {
         unassigned == 1 && all_others_false
     }
     fn update_reference(&mut self, asg: &impl AssignIF) {
-        self.referred += 1;
         self.referred_at = asg.current_conflict_index();
         let level = asg.decision_level();
         self.reference_height = self.reference_height.min(level);

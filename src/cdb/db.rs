@@ -333,7 +333,6 @@ impl ClauseDBIF for ClauseDB {
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
         c.search_from = 2;
         c.lbd = DecisionLevel::MAX;
-        c.born_at = 0;
         c.vivify_age = 0;
         c.vivify_at = 0;
         c.reference_height = DecisionLevel::MAX;

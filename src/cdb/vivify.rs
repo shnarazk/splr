@@ -41,7 +41,7 @@ impl VivifyIF for ClauseDB {
                 continue;
             }
             let span: usize = 10_000 * c.len() * 2_usize.pow(c.vivify_age as u32 + 1);
-            if c.vivify_at.max(c.born_at) + span > asg.num_conflict
+            if c.vivify_at + span > asg.num_conflict
                 || (c.referred_at <= c.vivify_at && (c.is(FlagClause::LEARNT) || c.vivify_age != 0))
             {
                 continue;
@@ -57,11 +57,11 @@ impl VivifyIF for ClauseDB {
             // assert!(!c.is(FlagClause::ASSIGN_REASON));
             c.vivify_at = asg.num_conflict;
             c.vivify_age += 1;
+            let vivify_age = c.vivify_age;
             let is_learnt = c.is(FlagClause::LEARNT);
             let lbd = c.lbd;
             let vivify_at = c.vivify_at;
             c.vivify_age += 1;
-            let born_at = c.born_at;
             let reference_height = c.reference_height;
             let clits = c.iter().copied().collect::<Vec<Lit>>();
             if to_display <= num_check {
@@ -148,9 +148,9 @@ impl VivifyIF for ClauseDB {
                                 _ => {
                                     if let Some(cid) = self.new_clause(&mut vec, is_learnt).is_new()
                                     {
-                                        self[cid].born_at = born_at;
                                         self[cid].reference_height = reference_height;
                                         self[cid].vivify_at = vivify_at;
+                                        self[cid].vivify_age = vivify_age;
                                         self[cid].lbd = lbd.min(decisions.len() as DecisionLevel);
                                     }
                                     self.remove_clause(cid);
