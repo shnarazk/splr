@@ -357,7 +357,6 @@ fn search(
         } else {
             cdb.lbd.update(lbd as f64);
             cdb[cid].lbd = DecisionLevel::MAX;
-            cdb[cid].born_at = asg.num_conflict;
         }
         match asg.stack_len().cmp(&assign_peak) {
             Ordering::Less => {}
