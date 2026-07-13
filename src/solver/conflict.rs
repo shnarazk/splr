@@ -146,11 +146,7 @@ pub fn handle_conflict(
                     }
                 }
                 for (lvl, ci) in cs.into_iter() {
-                    if cdb[ci].reference_height == 0 {
-                        cdb[ci].reference_height = lvl;
-                    } else {
-                        cdb[ci].reference_height = cdb[ci].reference_height.min(lvl);
-                    }
+                    cdb[ci].reference_height = cdb[ci].reference_height.min(lvl);
                 }
             }
             AssignReason::Decision(_) => (),

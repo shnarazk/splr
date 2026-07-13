@@ -65,7 +65,7 @@ impl Default for Clause {
             referred: 0,
             referred_at: 0,
             born_at: 0,
-            reference_height: 0,
+            reference_height: DecisionLevel::MAX,
             vivify_age: 0,
             vivify_at: 0,
             lbd: DecisionLevel::MAX,
@@ -229,9 +229,6 @@ impl ClauseIF for Clause {
         self.referred += 1;
         self.referred_at = asg.current_conflict_index();
         let level = asg.decision_level();
-        if self.reference_height == 0 {
-            self.reference_height = level;
-        }
         self.reference_height = self.reference_height.min(level);
     }
 }

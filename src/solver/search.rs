@@ -76,7 +76,7 @@ impl SolveIF for Solver {
         #[cfg(feature = "clause_vivification")]
         {
             state.flush("vivifying...");
-            if cdb.vivify(asg, state, true).is_err() {
+            if cdb.vivify(asg, state).is_err() {
                 state.log(None, "By vivifier as a pre-possessor");
                 return Ok(Certificate::UNSAT);
             }
@@ -225,11 +225,11 @@ impl SolveIF for Solver {
 
 /// table of (RephaseTarget, span length, next index)
 const REPHASE_ROTATION: [(RephaseTarget, usize, usize); 5] = [
-    (RephaseTarget::Polarity, 80, 1),
-    (RephaseTarget::False, 20, 2),
-    (RephaseTarget::True, 20, 3),
-    (RephaseTarget::Best, 20, 4),
-    (RephaseTarget::Walk, 80, 0),
+    (RephaseTarget::Polarity, 8, 1),
+    (RephaseTarget::False, 2, 2),
+    (RephaseTarget::True, 2, 3),
+    (RephaseTarget::Best, 2, 4),
+    (RephaseTarget::Walk, 8, 0),
 ];
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
@@ -244,14 +244,14 @@ fn search(
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
     let mut reduction_pressure: usize = 0;
-    let reduction_interval: usize = 40_000;
+    let reduction_interval: usize = 80_000;
     let mut rephase_rotation_pressure: usize = 0;
     let mut vivification_pressure: usize = 0;
-    let vivification_interval: usize = 40_000;
+    let vivification_interval: usize = 20_000;
     let mut current_phase: &(RephaseTarget, usize, usize) = &REPHASE_ROTATION[0];
     let vmtf_interval: usize = 20;
     let mut assign_peak: usize = 0;
-    let luby_scale: usize = 80;
+    let luby_scale: usize = 32;
     let mut span_scale: usize = luby_scale;
 
     macro_rules! reduce {
@@ -410,7 +410,7 @@ fn search(
             // }
             if vivification_pressure >= vivification_interval {
                 if cfg!(feature = "clause_vivification") {
-                    cdb.vivify(asg, state, true)?;
+                    cdb.vivify(asg, state)?;
                 }
                 vivification_pressure = 0;
             }
