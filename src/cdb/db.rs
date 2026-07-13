@@ -67,7 +67,6 @@ pub struct ClauseDB {
     pub(crate) tier1_clauses: Ema,
     /// the ratio of pretty good learnt clauses
     pub(crate) tier2_clauses: Ema,
-    // pub(crate) last_reduction_count: usize,
 }
 
 impl Default for ClauseDB {
@@ -90,7 +89,6 @@ impl Default for ClauseDB {
             num_reregistration: 0,
             tier1_clauses: Ema::default(),
             tier2_clauses: Ema::default(),
-            // last_reduction_count: 0,
         }
     }
 }
@@ -832,17 +830,13 @@ impl ClauseDBIF for ClauseDB {
     }
     /// reduce the number of 'learnt' or *removable* clauses.
     fn reduce(&mut self, asg: &impl AssignIF, state: &State) {
-        macro_rules! _height {
+        macro_rules! height {
             ($c: expr) => {
-                // $c.reference_height as f64
-                ($c.reference_height + ($c.lbd as f64)) as f64
+                $c.reference_height + $c.lbd
             };
         }
         let conflict_index: usize = asg.current_conflict_index();
-        let _distance: DecisionLevel =
-            2 + (state.c_lvl.get_slow() - state.b_lvl.get_slow()) as DecisionLevel;
-        let _height: f64 = state.b_lvl.get_slow();
-        let udist: DecisionLevel =
+        let effective_height: DecisionLevel =
             (0.25 * (state.c_lvl.get_slow() + state.b_lvl.get_slow())) as DecisionLevel;
         self.num_reduction += 1;
         let ClauseDB {
@@ -857,24 +851,10 @@ impl ClauseDBIF for ClauseDB {
             freelist,
             ..
         } = self;
-        // let depth: f64 = 6.0 + state.b_lvl.get_slow().log2();
-        // let (total, targets) = clause
-        //     .iter()
-        //     .skip(1)
-        //     .filter(|c| {
-        //         !c.is_dead() && c.is(FlagClause::LEARNT) && !c.is(FlagClause::ASSIGN_REASON)
-        //     })
-        //     .fold((0, 0), |(total, target), c| {
-        //         (total + 1, target + (height!(c) <= depth) as usize)
-        //     });
-        // if targets as f64 > 0.5 * total as f64 {
-        //     return;
-        // }
         *num_lbd2 = 0;
         let mut num_alives: usize = 0;
         let mut ntier1: usize = 0;
         let mut ntier2: usize = 0;
-        // let mut survived: usize = 0;
         for (i, c) in clause
             .iter_mut()
             .enumerate()
@@ -895,9 +875,7 @@ impl ClauseDBIF for ClauseDB {
             }
             // Don't introduce any length-based crteria!
             // Clause lengths without context make result worse.
-            if c.reference_height + c.lbd <= udist
-            // height!(c) <= height
-            //     && c.lbd <= distance
+            if height!(c) <= effective_height
                 && (c.reference_height <= 4 || (conflict_index - c.referred_at) <= 800_000)
             {
                 match c.lbd {
@@ -905,13 +883,6 @@ impl ClauseDBIF for ClauseDB {
                     3..=6 => ntier1 += 1,
                     _ => ntier2 += 1,
                 }
-                // c.reference_height *= 1.1;
-                // c.reference_height += 1.0;
-                // c.reference_height += c.lbd as f64;
-                // if targets >= 20_000 {
-                //     c.reference_height += (c.lbd as f64).log2();
-                // }
-                // survived += 1;
                 continue;
             }
             remove_clause_fn(
@@ -926,7 +897,6 @@ impl ClauseDBIF for ClauseDB {
             );
             freelist.push(ClauseId::from(i));
         }
-        // self.last_reduction_count = survived;
         self.tier1_clauses.update(ntier1 as f64 / num_alives as f64);
         self.tier2_clauses.update(ntier2 as f64 / num_alives as f64);
     }

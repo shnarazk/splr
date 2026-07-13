@@ -47,15 +47,6 @@ impl VivifyIF for ClauseDB {
                 continue;
             }
             num_check += 1;
-            // if !num_check.is_multiple_of(db_skip) && c.reference_height > 0.0 {
-            //     continue;
-            // }
-            // if c.reference_height > 0.0 {
-            //     continue;
-            // }
-            // if c.reference_height > 2.0 * c.lbd as f64 {
-            //     continue;
-            // }
             let c = &mut self[cid];
             // c.update_reference_rate(asg.num_conflict);
             // Skip clauses that are unlikely to be improved by vivification.
@@ -63,12 +54,6 @@ impl VivifyIF for ClauseDB {
             // that are not too short and have a moderate LBD; outside this band
             // the success rate collapses, so skipping them saves work without
             // losing many improvable clauses.
-            // if 6 < c.lbd {
-            //     continue;
-            // }
-            // if c.vivify_age > 6 {
-            //     continue;
-            // }
             // assert!(!c.is(FlagClause::ASSIGN_REASON));
             c.vivify_at = asg.num_conflict;
             c.vivify_age += 1;
