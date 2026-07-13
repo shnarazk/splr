@@ -618,7 +618,7 @@ fn lit_level(
                 cdb[cid].lit0(),
                 lit,
                 cid,
-                &cdb[cid]
+                cdb[cid]
             );
             // assert!(
             //     !bag.contains(&lit),

@@ -206,7 +206,7 @@ impl PropagateIF for AssignStack {
                 self.var[l.vi()].assign.is_some(),
                 "cancel_until found unassigned var in trail {}{:?}",
                 l.vi(),
-                &self.var[l.vi()],
+                self.var[l.vi()],
             );
             let vi = l.vi();
             #[cfg(feature = "trace_propagation")]

@@ -390,7 +390,7 @@ impl fmt::Display for AssignStack {
                 f,
                 "ASG:: trail({}):[(0, {:?})]\n      level: {}, asserted: {}, eliminated: {}",
                 self.trail.len(),
-                &v,
+                v,
                 levels,
                 self.num_asserted_vars,
                 self.num_eliminated_vars,
