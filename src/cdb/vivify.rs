@@ -57,11 +57,9 @@ impl VivifyIF for ClauseDB {
             // assert!(!c.is(FlagClause::ASSIGN_REASON));
             c.vivify_at = asg.num_conflict;
             c.vivify_age += 1;
-            let vivify_age = c.vivify_age;
             let is_learnt = c.is(FlagClause::LEARNT);
             let lbd = c.lbd;
             let vivify_at = c.vivify_at;
-            c.vivify_age += 1;
             let reference_height = c.reference_height;
             let clits = c.iter().copied().collect::<Vec<Lit>>();
             if to_display <= num_check {
@@ -150,7 +148,6 @@ impl VivifyIF for ClauseDB {
                                     {
                                         self[cid].reference_height = reference_height;
                                         self[cid].vivify_at = vivify_at;
-                                        self[cid].vivify_age = vivify_age;
                                         self[cid].lbd = lbd.min(decisions.len() as DecisionLevel);
                                     }
                                     self.remove_clause(cid);
