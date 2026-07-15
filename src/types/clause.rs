@@ -50,7 +50,7 @@ pub trait ClauseIF {
     /// return true is this is a unit clause under `asg`.
     fn is_unit_under(&self, asg: &impl AssignIF) -> bool;
     /// update reference_distance.
-    fn update_reference(&mut self, asg: &impl AssignIF);
+    fn update_reference(&mut self, asg: &mut impl AssignIF);
 }
 
 impl Default for Clause {
@@ -220,9 +220,10 @@ impl ClauseIF for Clause {
             .all(|l| asg.assigned(*l) == Some(false));
         unassigned == 1 && all_others_false
     }
-    fn update_reference(&mut self, asg: &impl AssignIF) {
+    fn update_reference(&mut self, asg: &mut impl AssignIF) {
         self.referred_at = asg.current_conflict_index();
         let level = asg.decision_level();
+        self.lbd = self.lbd.min(asg.literal_block_distance_current(&self.lits));
         self.reference_height = self.reference_height.min(level);
     }
 }

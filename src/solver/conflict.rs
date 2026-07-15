@@ -142,11 +142,11 @@ pub fn handle_conflict(
                         bumped.push(vi);
                     }
                     if let AssignReason::Implication(ci) = asg.reason(l.vi()) {
-                        cs.push((asg.level(l.vi()), ci));
+                        cs.push(ci);
                     }
                 }
-                for (lvl, ci) in cs.into_iter() {
-                    cdb[ci].reference_height = cdb[ci].reference_height.min(lvl);
+                for ci in cs.into_iter() {
+                    cdb[ci].update_reference(asg);
                 }
             }
             AssignReason::Decision(_) => (),
@@ -429,9 +429,6 @@ fn conflict_analyze(
                     }
                 }
                 cdb[cid].update_reference(asg);
-                cdb[cid].lbd = cdb[cid]
-                    .lbd
-                    .min(asg.literal_block_distance_current(&cdb[cid].lits));
             }
             AssignReason::Decision(_) | AssignReason::None => {}
         }
