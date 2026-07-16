@@ -79,7 +79,7 @@ impl StageManager {
     pub fn envelop_index(&self) -> usize {
         self.envelope_hight
     }
-    /// returns the scaling factor used in the current span
+    /// returns the current segment length
     pub fn current_segment_length(&self) -> usize {
         self.luby_iter.segment_len() as usize
     }

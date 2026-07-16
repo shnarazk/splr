@@ -829,14 +829,21 @@ impl ClauseDBIF for ClauseDB {
     }
     /// reduce the number of 'learnt' or *removable* clauses.
     fn reduce(&mut self, asg: &impl AssignIF, state: &State) {
-        macro_rules! height {
+        macro_rules! _height {
             ($c: expr) => {
                 $c.reference_height + $c.lbd
             };
         }
         let conflict_index: usize = asg.current_conflict_index();
-        let effective_height: DecisionLevel =
-            (0.25 * (state.c_lvl.get_slow() + state.b_lvl.get_slow())) as DecisionLevel;
+        // let effective_height: DecisionLevel = 12 as DecisionLevel;
+        // let effective_height: DecisionLevel =
+        //     (state.span_manager.current_segment_length() + 6) as DecisionLevel;
+        // let effective_height: DecisionLevel = (state.span_manager.current_segment_length() as f64
+        //     + state.c_lvl.get_slow().log2())
+        //     as DecisionLevel;
+        // let effective_height: DecisionLevel =
+        //     (0.25 * (state.c_lvl.get_slow() + state.b_lvl.get_slow())) as DecisionLevel;
+        let _ffective_height: DecisionLevel = state.b_lvl.get_slow() as DecisionLevel;
         self.num_reduction += 1;
         let ClauseDB {
             clause,
@@ -874,8 +881,13 @@ impl ClauseDBIF for ClauseDB {
             }
             // Don't introduce any length-based crteria!
             // Clause lengths without context make result worse.
-            if height!(c) <= effective_height
-                && (c.reference_height <= 4 || (conflict_index - c.referred_at) <= 800_000)
+            // if height!(c) <= effective_height && (conflict_index - c.referred_at) <= 8_000
+            if (c.lbd <= 2 && conflict_index - c.referred_at <= 16_384)
+                || (c.lbd <= 6 && conflict_index - c.referred_at <= 8192)
+                || (c.reference_height <= 10 && conflict_index - c.referred_at <= 1024)
+                || c.len() <= 4
+                || (c.lbd <= 4 && c.vivify_age == 0)
+            // 160_000 / c.len().ilog2() as usize
             {
                 match c.lbd {
                     0..=2 => *num_lbd2 += 1,
