@@ -882,12 +882,12 @@ impl ClauseDBIF for ClauseDB {
             // Don't introduce any length-based crteria!
             // Clause lengths without context make result worse.
             // if height!(c) <= effective_height && (conflict_index - c.referred_at) <= 8_000
-            if (c.lbd <= 2 && conflict_index - c.referred_at <= 16_384)
+            if (c.lbd <= 2 && conflict_index - c.referred_at <= 8 * 8192)
+                || (c.lbd <= 4 && conflict_index - c.referred_at <= 4 * 8192)
                 || (c.lbd <= 6 && conflict_index - c.referred_at <= 8192)
-                || (c.reference_height <= 10 && conflict_index - c.referred_at <= 1024)
                 || c.len() <= 4
-                || (c.lbd <= 4 && c.vivify_age == 0)
-            // 160_000 / c.len().ilog2() as usize
+                || (c.vivify_age == 0
+                    && c.reference_height <= state.c_lvl.get_slow().powf(0.8) as DecisionLevel)
             {
                 match c.lbd {
                     0..=2 => *num_lbd2 += 1,

@@ -265,6 +265,7 @@ fn search(
     cdb: &mut ClauseDB,
     state: &mut State,
 ) -> Result<bool, SolverError> {
+    let mut rng: SplitMix64 = SplitMix64::new(state.cnf.num_of_variables as u64);
     let mut span_len: usize = 1;
     let mut elimination_pressure: usize = 0;
     let elimination_interval: usize = 80_000;
@@ -277,7 +278,7 @@ fn search(
     let vivification_interval: usize = 10_000;
     let mut current_phase: &(RephaseTarget, usize) = &REPHASE_ROTATION[0];
     let mut assign_peak: usize = 0;
-    let luby_scale: usize = 2048 * 8;
+    let luby_scale: usize = 2048 * 4;
     let mut span_scale: usize = luby_scale;
 
     macro_rules! reduce {
@@ -435,27 +436,56 @@ fn search(
 
         if state.span_manager.span_ended(span_len / span_scale) {
             span_len = 0;
-            if cfg!(feature = "rephase") {
-                // rephase_rotation_pressure = 0;
-                rotate_rephase_mode!();
-                if asg.activity_scheme == VarActivityScheme::VMTF {
-                    asg.activity_scheme = VarActivityScheme::LRB;
-                    let span: f64 = (state.span_manager.envelop_index() * luby_scale) as f64;
-                    let adaptive_lr: f64 = 1.0 / span.sqrt();
-                    asg.set_learning_rate(adaptive_lr);
-                    asg.rebuild_order();
-                } else {
-                    asg.activity_scheme = VarActivityScheme::VMTF;
-                    // let span: f64 = (state.span_manager.envelop_index() * luby_scale) as f64;
-                    // let adaptive_lr: f64 = 1.0 / span.sqrt();
-                    // asg.set_learning_rate(adaptive_lr);
-                    asg.set_learning_rate(0.0);
-                    asg.rebuild_order();
-                }
-            }
             let new_segment = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, state, new_segment);
             let _conflict_index = asg.current_conflict_index();
+            if cfg!(feature = "rephase") {
+                // rephase_rotation_pressure = 0;
+                rotate_rephase_mode!();
+                match rng.next_f64() {
+                    0.0..0.5 if state.span_manager.current_span() >= 256 => {
+                        asg.phase_mode = RephaseTarget::Walk;
+                    }
+                    0.5..1.0 if state.span_manager.current_span() >= 256 => {
+                        asg.phase_mode = RephaseTarget::Polarity;
+                    }
+                    0.0..0.4 => {
+                        asg.phase_mode = RephaseTarget::Best;
+                    }
+                    0.4..0.65 => {
+                        asg.phase_mode = RephaseTarget::False;
+                    }
+                    0.65..0.9 => {
+                        asg.phase_mode = RephaseTarget::True;
+                    }
+                    0.9..0.95 => {
+                        asg.phase_mode = RephaseTarget::Random;
+                    }
+                    0.95..1.0 => {
+                        asg.phase_mode = RephaseTarget::Inverted;
+                    }
+                    _ => {
+                        asg.phase_mode = RephaseTarget::Walk;
+                    }
+                }
+                match rng.next_f64() {
+                    0.0..0.2 if asg.activity_scheme != VarActivityScheme::VMTF => {
+                        asg.activity_scheme = VarActivityScheme::VMTF;
+                        // let span: f64 = (state.span_manager.envelop_index() * luby_scale) as f64;
+                        // let adaptive_lr: f64 = 1.0 / span.sqrt();
+                        // asg.set_learning_rate(adaptive_lr);
+                        asg.set_learning_rate(0.0);
+                        asg.rebuild_order();
+                    }
+                    0.2..1.0 if asg.activity_scheme != VarActivityScheme::LRB => {
+                        asg.activity_scheme = VarActivityScheme::LRB;
+                        let span: f64 = (state.span_manager.envelop_index() * luby_scale) as f64;
+                        let adaptive_lr: f64 = 1.0 / span.sqrt();
+                        asg.set_learning_rate(adaptive_lr);
+                    }
+                    _ => (),
+                }
+            }
             // for l in asg.stack_iter() {
             //     if let AssignReason::Implication(cid) = asg.reason(l.vi()) {
             //         cdb[cid].referred_at = conflict_index;
