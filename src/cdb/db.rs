@@ -835,15 +835,6 @@ impl ClauseDBIF for ClauseDB {
             };
         }
         let conflict_index: usize = asg.current_conflict_index();
-        // let effective_height: DecisionLevel = 12 as DecisionLevel;
-        // let effective_height: DecisionLevel =
-        //     (state.span_manager.current_segment_length() + 6) as DecisionLevel;
-        // let effective_height: DecisionLevel = (state.span_manager.current_segment_length() as f64
-        //     + state.c_lvl.get_slow().log2())
-        //     as DecisionLevel;
-        // let effective_height: DecisionLevel =
-        //     (0.25 * (state.c_lvl.get_slow() + state.b_lvl.get_slow())) as DecisionLevel;
-        let _ffective_height: DecisionLevel = state.b_lvl.get_slow() as DecisionLevel;
         self.num_reduction += 1;
         let ClauseDB {
             clause,
@@ -881,7 +872,6 @@ impl ClauseDBIF for ClauseDB {
             }
             // Don't introduce any length-based crteria!
             // Clause lengths without context make result worse.
-            // if height!(c) <= effective_height && (conflict_index - c.referred_at) <= 8_000
             if (c.lbd <= 2 && conflict_index - c.referred_at <= 8 * 8192)
                 || (c.lbd <= 4 && conflict_index - c.referred_at <= 4 * 8192)
                 || (c.lbd <= 6 && conflict_index - c.referred_at <= 8192)
