@@ -877,7 +877,7 @@ impl ClauseDBIF for ClauseDB {
                 || (c.lbd <= 6 && conflict_index - c.referred_at <= 8192)
                 || c.len() <= 4
                 || (c.vivify_age == 0
-                    && c.reference_height <= state.c_lvl.get_slow().powf(0.8) as DecisionLevel)
+                    && c.reference_height <= state.c_lvl.get_slow().powf(0.75) as DecisionLevel)
             {
                 match c.lbd {
                     0..=2 => *num_lbd2 += 1,

@@ -241,6 +241,7 @@ fn search(
     let mut assign_peak: usize = 0;
     let luby_scale: usize = 2048 * 4;
     let mut span_scale: usize = luby_scale;
+    let adaptive_lr: f64 = 1.0 / (luby_scale as f64).sqrt();
 
     macro_rules! reduce {
         () => {
@@ -392,8 +393,6 @@ fn search(
                 match rng.next_f64() {
                     0.0..0.2 if asg.activity_scheme != VarActivityScheme::VMTF => {
                         asg.activity_scheme = VarActivityScheme::VMTF;
-                        // let span: f64 = (state.span_manager.envelop_index() * luby_scale) as f64;
-                        // let adaptive_lr: f64 = 1.0 / span.sqrt();
                         // asg.set_learning_rate(adaptive_lr);
                         asg.set_learning_rate(0.0);
                         asg.rebuild_order();
@@ -403,9 +402,8 @@ fn search(
                         // shorter spans → higher α (fast learning before the next restart),
                         // longer spans  → lower  α (stable estimates over more conflicts).
                         asg.activity_scheme = VarActivityScheme::LRB;
-                        let span: f64 = (state.span_manager.envelop_index() * luby_scale) as f64;
-                        let adaptive_lr: f64 = 1.0 / span.sqrt();
                         asg.set_learning_rate(adaptive_lr);
+                        asg.rebuild_order();
                     }
                     _ => (),
                 }
