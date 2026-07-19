@@ -153,6 +153,8 @@ impl PropagateIF for AssignStack {
 
         self.var[vi].level = lv;
         self.var[vi].reason = reason;
+        self.var[vi].polarity *= 0.999;
+        self.var[vi].polarity += 0.001 * if l.as_bool() { 1.0 } else { -1.0 };
         self.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
@@ -237,8 +239,6 @@ impl PropagateIF for AssignStack {
                 if cfg!(feature = "rephase")
                 // && self.num_conflict - v.last_conflict <= 1000
                 {
-                    v.polarity *= 0.999;
-                    v.polarity += 0.001 * if v.assign.unwrap() { 1.0 } else { -1.0 };
                     v.set(
                         FlagVar::PHASE,
                         match self.phase_mode {
