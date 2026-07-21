@@ -231,16 +231,11 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut rng: SplitMix64 = SplitMix64::new(state.cnf.num_of_variables as u64);
     let mut span_len: usize = 1;
-    let mut elimination_pressure: usize = 0;
-    let elimination_interval: usize = 80_000;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
     let mut reduction_pressure: usize = 0;
-    let mut vivification_pressure: usize = 0;
-    let vivification_interval: usize = 10_000;
     let mut assign_peak: usize = 0;
     let luby_scale: usize = 2048 * 4;
-    // let mut adaptive_lr: f64 = 1.0 / (luby_scale as f64).sqrt();
 
     macro_rules! reduce {
         () => {
@@ -333,28 +328,20 @@ fn search(
                 // }
             }
         }
-        elimination_pressure += 1;
         progress_pressure += 1;
         reduction_pressure += 1;
-        vivification_pressure += 1;
         span_len += 1;
         if reduction_pressure >= 4 * luby_scale {
             RESTART!(asg, cdb, state)?;
             reduce!();
-            if true || vivification_pressure >= vivification_interval {
-                if cfg!(feature = "clause_vivification") {
-                    cdb.vivify(asg, state)?;
-                }
-                vivification_pressure = 0;
+            if cfg!(feature = "clause_vivification") {
+                cdb.vivify(asg, state)?;
             }
-            if true || elimination_pressure >= elimination_interval {
-                if cfg!(feature = "clause_elimination") {
-                    let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-                    state.flush("clause subsumption, ");
-                    elim.simplify(asg, cdb, state, false)?;
-                    asg.eliminated.append(elim.eliminated_lits());
-                }
-                elimination_pressure = 0;
+            if cfg!(feature = "clause_elimination") {
+                let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+                state.flush("clause subsumption, ");
+                elim.simplify(asg, cdb, state, false)?;
+                asg.eliminated.append(elim.eliminated_lits());
             }
         }
 
@@ -397,13 +384,11 @@ fn search(
                         // asg.set_learning_rate(0.0);
                         asg.rebuild_order();
                     }
-                    0.2..1.0 => {
-                        if asg.activity_scheme != VarActivityScheme::LRB {
-                            asg.activity_scheme = VarActivityScheme::LRB;
-                            asg.rebuild_order();
-                        }
+                    0.2..1.0 if asg.activity_scheme != VarActivityScheme::LRB => {
+                        asg.activity_scheme = VarActivityScheme::LRB;
                         // Adapt LRB learning rate to the upcoming Luby envelope height:
                         // asg.set_learning_rate(adaptive_lr);
+                        asg.rebuild_order();
                     }
                     _ => (),
                 }
