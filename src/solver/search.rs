@@ -240,8 +240,7 @@ fn search(
     let vivification_interval: usize = 10_000;
     let mut assign_peak: usize = 0;
     let luby_scale: usize = 2048 * 4;
-    let mut span_scale: usize = luby_scale;
-    let adaptive_lr: f64 = 1.0 / (luby_scale as f64).sqrt();
+    // let mut adaptive_lr: f64 = 1.0 / (luby_scale as f64).sqrt();
 
     macro_rules! reduce {
         () => {
@@ -301,6 +300,7 @@ fn search(
         } else {
             cdb.lbd.update(lbd as f64);
             cdb[cid].lbd = lbd;
+            cdb[cid].referred_at = asg.current_conflict_index();
         }
         match asg.stack_len().cmp(&assign_peak) {
             Ordering::Less => {}
@@ -338,16 +338,16 @@ fn search(
         reduction_pressure += 1;
         vivification_pressure += 1;
         span_len += 1;
-        if reduction_pressure >= luby_scale {
+        if reduction_pressure >= 4 * luby_scale {
             RESTART!(asg, cdb, state)?;
             reduce!();
-            if vivification_pressure >= vivification_interval {
+            if true || vivification_pressure >= vivification_interval {
                 if cfg!(feature = "clause_vivification") {
                     cdb.vivify(asg, state)?;
                 }
                 vivification_pressure = 0;
             }
-            if elimination_pressure >= elimination_interval {
+            if true || elimination_pressure >= elimination_interval {
                 if cfg!(feature = "clause_elimination") {
                     let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
                     state.flush("clause subsumption, ");
@@ -358,34 +358,34 @@ fn search(
             }
         }
 
-        if state.span_manager.span_ended(span_len / span_scale) {
+        if state.span_manager.span_ended(span_len / luby_scale) {
             span_len = 0;
             let new_segment = state.span_manager.prepare_new_span(span_len);
             dump_stage(asg, state, new_segment);
             let _conflict_index = asg.current_conflict_index();
             if cfg!(feature = "rephase") {
                 match rng.next_f64() {
-                    0.0..0.5 if state.span_manager.current_span() >= 256 => {
+                    0.0..0.25 => {
                         asg.phase_mode = RephaseTarget::Walk;
                     }
-                    0.5..1.0 if state.span_manager.current_span() >= 256 => {
-                        asg.phase_mode = RephaseTarget::Polarity;
-                    }
-                    0.0..0.4 => {
+                    0.25..0.45 => {
                         asg.phase_mode = RephaseTarget::Best;
                     }
-                    0.4..0.65 => {
+                    0.45..0.6 => {
+                        asg.phase_mode = RephaseTarget::Polarity;
+                    }
+                    0.6..0.75 => {
                         asg.phase_mode = RephaseTarget::False;
                     }
-                    0.65..0.9 => {
+                    0.75..0.9 => {
                         asg.phase_mode = RephaseTarget::True;
                     }
-                    0.9..0.95 => {
+                    0.9..1.0 => {
                         asg.phase_mode = RephaseTarget::Random;
                     }
-                    0.95..1.0 => {
-                        asg.phase_mode = RephaseTarget::Inverted;
-                    }
+                    // 0.95..1.0 => {
+                    //     asg.phase_mode = RephaseTarget::Inverted;
+                    // }
                     _ => {
                         asg.phase_mode = RephaseTarget::Walk;
                     }
@@ -394,22 +394,25 @@ fn search(
                     0.0..0.2 if asg.activity_scheme != VarActivityScheme::VMTF => {
                         asg.activity_scheme = VarActivityScheme::VMTF;
                         // asg.set_learning_rate(adaptive_lr);
-                        asg.set_learning_rate(0.0);
+                        // asg.set_learning_rate(0.0);
                         asg.rebuild_order();
                     }
-                    0.2..1.0 if asg.activity_scheme != VarActivityScheme::LRB => {
+                    0.2..1.0 => {
+                        if asg.activity_scheme != VarActivityScheme::LRB {
+                            asg.activity_scheme = VarActivityScheme::LRB;
+                            asg.rebuild_order();
+                        }
                         // Adapt LRB learning rate to the upcoming Luby envelope height:
-                        // shorter spans → higher α (fast learning before the next restart),
-                        // longer spans  → lower  α (stable estimates over more conflicts).
-                        asg.activity_scheme = VarActivityScheme::LRB;
-                        asg.set_learning_rate(adaptive_lr);
-                        asg.rebuild_order();
+                        // asg.set_learning_rate(adaptive_lr);
                     }
                     _ => (),
                 }
             }
+            // span_scale = luby_scale * state.span_manager.current_span();
             if new_segment.is_some() {
-                span_scale = luby_scale * state.span_manager.envelop_index();
+                let span_scale = luby_scale * state.span_manager.envelop_index();
+                let adaptive_lr = 1.0 / (span_scale as f64).sqrt();
+                asg.set_learning_rate(adaptive_lr);
             }
         }
         let unasserted_now = asg.derefer(assign::property::Tusize::NumUnassertedVar);
