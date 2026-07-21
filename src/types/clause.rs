@@ -21,12 +21,15 @@ pub struct Clause {
     pub(crate) referred_at: usize,
     /// The minimal decision level at which a conflict occured by this clause
     pub(crate) reference_height: DecisionLevel,
+    pub(crate) referred: usize,
     /// last vivified time in conflicts
     pub(crate) vivify_age: usize,
     // last vivified time in conflict
     pub(crate) vivify_at: usize,
     /// the minimal lbd of this clause so far
     pub(crate) lbd: DecisionLevel,
+    /// the age in rudece count
+    pub(crate) age: usize,
 }
 
 /// API for Clause, providing literal accessors.
@@ -61,9 +64,11 @@ impl Default for Clause {
             search_from: 2,
             referred_at: 0,
             reference_height: DecisionLevel::MAX,
+            referred: 0,
             vivify_age: 0,
             vivify_at: 0,
             lbd: DecisionLevel::MAX,
+            age: 0,
         }
     }
 }
@@ -221,6 +226,7 @@ impl ClauseIF for Clause {
         unassigned == 1 && all_others_false
     }
     fn update_reference(&mut self, asg: &mut impl AssignIF) {
+        self.referred += 1;
         self.referred_at = asg.current_conflict_index();
         let level = asg.decision_level();
         self.lbd = self.lbd.min(asg.literal_block_distance_current(&self.lits));

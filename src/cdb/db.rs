@@ -332,10 +332,13 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
         c.search_from = 2;
+        c.age = 0;
         c.lbd = DecisionLevel::MAX;
         c.vivify_age = 0;
         c.vivify_at = 0;
         c.reference_height = DecisionLevel::MAX;
+        c.referred = 0;
+        c.turn_on(FlagClause::YOUNG);
         let len2 = c.lits.len() == 2;
         *num_clause += 1;
         if learnt {
@@ -828,7 +831,7 @@ impl ClauseDBIF for ClauseDB {
         c.is(FlagClause::LEARNT)
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &impl AssignIF, state: &State) {
+    fn reduce(&mut self, asg: &impl AssignIF, _state: &State) {
         macro_rules! _height {
             ($c: expr) => {
                 $c.reference_height + $c.lbd
@@ -852,6 +855,7 @@ impl ClauseDBIF for ClauseDB {
         let mut num_alives: usize = 0;
         let mut ntier1: usize = 0;
         let mut ntier2: usize = 0;
+        let mut saved: Vec<(usize, usize, usize, usize)> = Vec::new();
         for (i, c) in clause
             .iter_mut()
             .enumerate()
@@ -859,6 +863,10 @@ impl ClauseDBIF for ClauseDB {
             .filter(|(_, c)| !c.is_dead())
         {
             num_alives += 1;
+            let young = c.is(FlagClause::YOUNG);
+            if young {
+                c.turn_off(FlagClause::YOUNG);
+            }
             if !c.is(FlagClause::LEARNT) {
                 *num_lbd2 += (c.lbd <= 2) as usize;
                 continue;
@@ -872,13 +880,14 @@ impl ClauseDBIF for ClauseDB {
             }
             // Don't introduce any length-based crteria!
             // Clause lengths without context make result worse.
-            if (c.lbd <= 2 && conflict_index - c.referred_at <= 8 * 8192)
-                || (c.lbd <= 4 && conflict_index - c.referred_at <= 4 * 8192)
-                || (c.lbd <= 6 && conflict_index - c.referred_at <= 8192)
-                || c.len() <= 4
-                || (c.vivify_age == 0
-                    && c.reference_height <= state.c_lvl.get_slow().powf(0.75) as DecisionLevel)
-            {
+            if c.lbd <= 8 && c.referred > 0 || c.referred >= 16 {
+                if c.lbd <= 4 {
+                    c.referred -= 1;
+                } else {
+                    // c.referred -= 1;
+                    c.referred /= 2;
+                }
+                c.age += 1;
                 match c.lbd {
                     0..=2 => *num_lbd2 += 1,
                     3..=6 => ntier1 += 1,
@@ -886,6 +895,11 @@ impl ClauseDBIF for ClauseDB {
                 }
                 continue;
             }
+            // let life = conflict_index - c.referred_at;
+            // if c.lbd <= 4 && life <= 16 * 8192 {
+            //     // saved.push((life / 8192, c.lbd as usize, c.len(), i));
+            //     continue;
+            // }
             remove_clause_fn(
                 certification_store,
                 binary_link,
@@ -897,6 +911,32 @@ impl ClauseDBIF for ClauseDB {
                 c,
             );
             freelist.push(ClauseId::from(i));
+        }
+        saved.sort_unstable();
+        let keep = saved.len() / 2;
+        for (i, (_, _, _, cid)) in saved.into_iter().enumerate() {
+            let c = &mut clause[cid];
+            if i < keep {
+                c.age += 1;
+                c.referred /= 2;
+                match c.lbd {
+                    0..=2 => *num_lbd2 += 1,
+                    3..=6 => ntier1 += 1,
+                    _ => ntier2 += 1,
+                }
+            } else {
+                remove_clause_fn(
+                    certification_store,
+                    binary_link,
+                    watch_cache,
+                    num_bi_clause,
+                    num_clause,
+                    num_learnt,
+                    ClauseId::from(cid),
+                    c,
+                );
+                freelist.push(ClauseId::from(cid));
+            }
         }
         self.tier1_clauses.update(ntier1 as f64 / num_alives as f64);
         self.tier2_clauses.update(ntier2 as f64 / num_alives as f64);

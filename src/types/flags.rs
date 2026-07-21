@@ -27,6 +27,8 @@ bitflags! {
         const ASSIGN_REASON   = 0b0000_1000;
         // /// used in the best assignments
         // const BEST_PROPAGATOR = 0b0010_0000;
+        /// a clause is young
+        const YOUNG           = 0b0001_0000;
     }
 }
 
