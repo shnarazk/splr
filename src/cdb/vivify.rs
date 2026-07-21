@@ -59,8 +59,10 @@ impl VivifyIF for ClauseDB {
             c.vivify_age += 1;
             let is_learnt = c.is(FlagClause::LEARNT);
             let lbd = c.lbd;
+            let referred = c.referred;
+            let referred_at = c.referred_at;
+            let vivify_age = c.vivify_age;
             let vivify_at = c.vivify_at;
-            let reference_height = c.reference_height;
             let clits = c.iter().copied().collect::<Vec<Lit>>();
             if to_display <= num_check {
                 state.flush("");
@@ -146,9 +148,11 @@ impl VivifyIF for ClauseDB {
                                 _ => {
                                     if let Some(cid) = self.new_clause(&mut vec, is_learnt).is_new()
                                     {
-                                        self[cid].reference_height = reference_height;
-                                        self[cid].vivify_at = vivify_at;
                                         self[cid].lbd = lbd.min(decisions.len() as DecisionLevel);
+                                        self[cid].referred = referred;
+                                        self[cid].referred_at = referred_at;
+                                        self[cid].vivify_age = vivify_age;
+                                        self[cid].vivify_at = vivify_at;
                                     }
                                     self.remove_clause(cid);
                                     num_shrink += 1;
