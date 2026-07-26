@@ -61,7 +61,6 @@ impl VivifyIF for ClauseDB {
             let lbd = c.lbd;
             let reference_height = c.reference_height;
             let referred_at: usize = c.referred_at;
-            let vivify_age: usize = c.vivify_age;
             let vivify_at = c.vivify_at;
             let clits = c.iter().copied().collect::<Vec<Lit>>();
             if to_display <= num_check {
@@ -151,7 +150,7 @@ impl VivifyIF for ClauseDB {
                                         self[cid].reference_height = reference_height;
                                         self[cid].lbd = lbd.min(decisions.len() as DecisionLevel);
                                         self[cid].referred_at = referred_at;
-                                        self[cid].vivify_age = vivify_age;
+                                        self[cid].vivify_age = 0;
                                         self[cid].vivify_at = vivify_at;
                                     }
                                     self.remove_clause(cid);

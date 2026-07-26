@@ -94,11 +94,11 @@ pub fn eliminate_var(
                         RefClause::Clause(ci) => {
                             // the merged clause might be a duplicated clause.
                             elim.add_cid_occur(asg, ci, &mut cdb[ci], true);
-                            cdb[ci].lbd = cdb[*p].lbd.max(cdb[*n].lbd);
+                            cdb[ci].lbd = cdb[*p].lbd.min(cdb[*n].lbd);
                             cdb[ci].reference_height =
                                 cdb[*p].reference_height.min(cdb[*n].reference_height);
                             cdb[ci].referred_at = cdb[*p].referred_at.max(cdb[*n].referred_at);
-                            cdb[ci].vivify_age = cdb[*p].vivify_age.min(cdb[*n].vivify_age);
+                            cdb[ci].vivify_age = 0;
                             cdb[ci].vivify_at = cdb[*p].vivify_at.max(cdb[*n].vivify_at);
 
                             #[cfg(feature = "trace_elimination")]
