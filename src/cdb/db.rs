@@ -865,9 +865,6 @@ impl ClauseDBIF for ClauseDB {
             }
             if c.is(FlagClause::ASSIGN_REASON) {
                 *num_lbd2 += (c.lbd <= 2) as usize;
-                // c.reference_height += 1.0;
-                // c.reference_height += c.lbd as f64;
-                // c.reference_height += (c.lbd as f64).log2();
                 continue;
             }
             // Don't introduce any length-based crteria!

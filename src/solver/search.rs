@@ -328,20 +328,6 @@ fn search(
         }
         progress_pressure += 1;
         span_len += 1;
-        // if reduction_pressure >= 4 * luby_scale {
-        //     RESTART!(asg, cdb, state)?;
-        //     reduce!();
-        //     if cfg!(feature = "clause_vivification") {
-        //         cdb.vivify(asg, state)?;
-        //     }
-        //     if cfg!(feature = "clause_elimination") {
-        //         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
-        //         state.flush("clause subsumption, ");
-        //         elim.simplify(asg, cdb, state, false)?;
-        //         asg.eliminated.append(elim.eliminated_lits());
-        //     }
-        // }
-
         if state.span_manager.span_ended(span_len / luby_scale) {
             span_len = 0;
             let new_segment = state.span_manager.prepare_new_span(span_len);
@@ -401,7 +387,6 @@ fn search(
                     _ => (),
                 }
             }
-            // span_scale = luby_scale * state.span_manager.current_span();
             if new_segment.is_some() {
                 let span_scale = luby_scale * state.span_manager.envelop_index();
                 let adaptive_lr = 1.0 / (span_scale as f64).sqrt();
