@@ -872,7 +872,12 @@ impl ClauseDBIF for ClauseDB {
             }
             // Don't introduce any length-based crteria!
             // Clause lengths without context make result worse.
-            if c.lbd <= 8 && c.referred > 0 || c.referred >= 16 {
+            if c.lbd <= 2 && c.referred >= 1
+                || c.lbd <= 3 && c.referred >= 2
+                || c.lbd <= 4 && c.referred >= 4
+                || c.lbd <= 5 && c.referred >= 16
+                || c.referred >= 256
+            {
                 if c.lbd <= 4 {
                     c.referred -= 1;
                 } else {

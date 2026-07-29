@@ -331,7 +331,24 @@ fn search(
         progress_pressure += 1;
         reduction_pressure += 1;
         span_len += 1;
-        if reduction_pressure >= 4 * luby_scale {
+        // if reduction_pressure >= 4 * luby_scale {
+        //     RESTART!(asg, cdb, state)?;
+        //     reduce!();
+        //     if cfg!(feature = "clause_vivification") {
+        //         cdb.vivify(asg, state)?;
+        //     }
+        //     if cfg!(feature = "clause_elimination") {
+        //         let mut elim = Eliminator::instantiate(&state.config, &state.cnf);
+        //         state.flush("clause subsumption, ");
+        //         elim.simplify(asg, cdb, state, false)?;
+        //         asg.eliminated.append(elim.eliminated_lits());
+        //     }
+        // }
+
+        if state.span_manager.span_ended(span_len / luby_scale) {
+            span_len = 0;
+            let new_segment = state.span_manager.prepare_new_span(span_len);
+            dump_stage(asg, state, new_segment);
             RESTART!(asg, cdb, state)?;
             reduce!();
             if cfg!(feature = "clause_vivification") {
@@ -343,24 +360,18 @@ fn search(
                 elim.simplify(asg, cdb, state, false)?;
                 asg.eliminated.append(elim.eliminated_lits());
             }
-        }
-
-        if state.span_manager.span_ended(span_len / luby_scale) {
-            span_len = 0;
-            let new_segment = state.span_manager.prepare_new_span(span_len);
-            dump_stage(asg, state, new_segment);
             let _conflict_index = asg.current_conflict_index();
             if cfg!(feature = "rephase") {
                 match rng.next_f64() {
-                    0.0..0.25 => {
+                    0.0..0.45 => {
                         asg.phase_mode = RephaseTarget::Walk;
                     }
-                    0.25..0.45 => {
+                    0.45..0.6 => {
                         asg.phase_mode = RephaseTarget::Best;
                     }
-                    0.45..0.6 => {
-                        asg.phase_mode = RephaseTarget::Polarity;
-                    }
+                    // 0.45..0.6 => {
+                    //     asg.phase_mode = RephaseTarget::Polarity;
+                    // }
                     0.6..0.75 => {
                         asg.phase_mode = RephaseTarget::False;
                     }
