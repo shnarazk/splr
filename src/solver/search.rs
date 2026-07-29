@@ -233,7 +233,6 @@ fn search(
     let mut span_len: usize = 1;
     let mut progress_pressure: usize = 0;
     let progress_interval: usize = 10_000;
-    let mut reduction_pressure: usize = 0;
     let mut assign_peak: usize = 0;
     let luby_scale: usize = 2048 * 4;
 
@@ -241,7 +240,6 @@ fn search(
         () => {
             state.search_mode_ratio.0.update(0.0);
             state.search_mode_ratio.1.update(0.0);
-            reduction_pressure = 0;
             cdb.reduce(asg, state);
         };
     }
@@ -329,7 +327,6 @@ fn search(
             }
         }
         progress_pressure += 1;
-        reduction_pressure += 1;
         span_len += 1;
         // if reduction_pressure >= 4 * luby_scale {
         //     RESTART!(asg, cdb, state)?;
