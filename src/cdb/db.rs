@@ -967,6 +967,10 @@ impl ClauseDBIF for ClauseDB {
         }
     }
 
+    fn num_learnt_clauses(&self) -> usize {
+        self.num_learnt
+    }
+
     #[cfg(not(feature = "no_IO"))]
     /// dump all active clauses and assertions as a CNF file.
     fn dump_cnf(&self, asg: &impl AssignIF, fname: &Path) {

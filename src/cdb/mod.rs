@@ -125,6 +125,9 @@ pub trait ClauseDBIF:
     /// minimize a clause.
     fn minimize_with_bi_clauses(&mut self, asg: &impl AssignIF, vec: &mut Vec<Lit>);
 
+    // stats
+    fn num_learnt_clauses(&self) -> usize;
+
     //
     //## for debug
     //

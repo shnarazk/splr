@@ -267,7 +267,22 @@ impl PropagateIF for AssignStack {
 
             unset_assign!(self, vi);
             if let AssignReason::Implication(cid) = self.var[vi].reason {
+                let num_learnt: usize = cdb.num_learnt_clauses();
+                let lbd = cdb[cid].lbd;
                 cdb[cid].turn_off(FlagClause::ASSIGN_REASON);
+                if cdb[cid].is(FlagClause::LEARNT)
+                    && cdb[cid].referred <= 1
+                    && (num_learnt >= 800_000 && lbd > 10
+                        || num_learnt >= 400_000 && lbd > 14
+                        || num_learnt >= 200_000 && lbd > 18
+                        || num_learnt >= 100_000 && lbd > 22)
+                {
+                    cdb.remove_clause(cid);
+                    #[cfg(feature = "trail_saving")]
+                    {
+                        self.clear_saved_trail();
+                    }
+                }
             }
             self.var[vi].reason = AssignReason::None;
 
