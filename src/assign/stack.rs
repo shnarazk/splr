@@ -89,6 +89,9 @@ pub struct AssignStack {
     pub(super) activity_stay_rate: f64,
     /// its diff
     pub(super) activity_learning_rate: f64,
+
+    //## Misc
+    pub(super) rng: SplitMix64,
 }
 
 impl Default for AssignStack {
@@ -133,6 +136,7 @@ impl Default for AssignStack {
 
             activity_scheme: VarActivityScheme::default(),
             activity_learning_rate: 0.06,
+            rng: SplitMix64::new(0),
         }
     }
 }
@@ -171,6 +175,7 @@ impl Instantiate for AssignStack {
             activity_stay_rate: 1.0 - config.vrw_learning_rate,
 
             activity_learning_rate: config.vrw_learning_rate,
+            rng: SplitMix64::new((cnf.num_of_variables + cnf.num_of_clauses) as u64),
 
             ..AssignStack::default()
         }
@@ -198,6 +203,9 @@ impl Instantiate for AssignStack {
 impl AssignIF for AssignStack {
     fn root_level(&self) -> DecisionLevel {
         self.root_level
+    }
+    fn current_conflict_index(&self) -> usize {
+        self.num_conflict
     }
     fn stack(&self, i: usize) -> Lit {
         self.trail[i]
@@ -382,7 +390,7 @@ impl fmt::Display for AssignStack {
                 f,
                 "ASG:: trail({}):[(0, {:?})]\n      level: {}, asserted: {}, eliminated: {}",
                 self.trail.len(),
-                &v,
+                v,
                 levels,
                 self.num_asserted_vars,
                 self.num_eliminated_vars,

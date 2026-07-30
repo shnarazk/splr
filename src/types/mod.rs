@@ -15,12 +15,16 @@ pub mod idx;
 pub mod lit;
 /// methods on binary link, namely binary clause
 pub mod luby;
+/// a deterministic pseudo-random number generator
+pub mod rng;
 /// methods on f64 sort
 pub mod sort_key;
 /// methods on Var
 pub mod var;
 
-pub use self::{clause::*, cnf::*, ema::*, flags::*, idx::*, lit::*, luby::*, sort_key::*, var::*};
+pub use self::{
+    clause::*, cnf::*, ema::*, flags::*, idx::*, lit::*, luby::*, rng::*, sort_key::*, var::*,
+};
 
 pub use crate::{assign::AssignReason, config::Config, solver::SolverEvent};
 
@@ -58,6 +62,7 @@ pub trait ActivityIF<Ix> {
     fn set_learning_rate(&mut self, learning_rate: f64);
     /// update internal counter.
     fn update_activity_tick(&mut self);
+    fn rescale_learning_rate(&mut self, scaling: f64);
 }
 
 /// API for object instantiation based on `Configuration` and `CNFDescription`.

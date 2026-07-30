@@ -14,21 +14,22 @@ pub trait VivifyIF {
 impl VivifyIF for ClauseDB {
     /// vivify clauses under `asg`
     fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent {
+        // This is a reusable vector to reduce memory consumption,
+        // the key is the number of invocation
+        // let db_skip: usize = 1 + self.num_clause / 1_000_000;
+        let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
+        let display_step: usize = 1000;
+        let mut num_check: usize = 0;
+        let mut num_shrink: usize = 0;
+        let mut num_assert: usize = 0;
+        let mut to_display: usize = display_step;
+        state[Stat::Vivification] += 1;
         if asg.remains() {
             asg.propagate_sandbox(self).map_err(|cc| {
                 state.log(None, "By vivifier");
                 SolverError::RootLevelConflict(cc)
             })?;
         }
-        // This is a reusable vector to reduce memory consumption,
-        // the key is the number of invocation
-        let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
-        let display_step: usize = 1000;
-        let mut num_check = 0;
-        let mut num_shrink = 0;
-        let mut num_assert = 0;
-        let mut to_display = 0;
-        state[Stat::Vivification] += 1;
         // Inlined target selection (formerly `select_targets`).
         // Pick clauses that haven't been vivified recently. We deliberately
         // do NOT sort the candidates: the per-clause filter in the loop below
@@ -39,25 +40,29 @@ impl VivifyIF for ClauseDB {
             if c.is_dead() {
                 continue;
             }
-            if c.referred_at + 20_000 * (1 + c.vivify_age) > asg.num_conflict || c.vivify_age >= 8 {
+            let span: usize = 10_000 * c.len() * 2_usize.pow(c.vivify_age as u32 + 1);
+            if c.vivify_at + span > asg.num_conflict
+                || (c.referred_at <= c.vivify_at && (c.is(FlagClause::LEARNT) || c.vivify_age != 0))
+            {
                 continue;
             }
+            num_check += 1;
             let c = &mut self[cid];
-            c.vivified();
+            // c.update_reference_rate(asg.num_conflict);
             // Skip clauses that are unlikely to be improved by vivification.
             // Empirically success concentrates on clauses
             // that are not too short and have a moderate LBD; outside this band
             // the success rate collapses, so skipping them saves work without
             // losing many improvable clauses.
-            if c.len() < 9_usize.saturating_sub(c.vivify_age).max(3)
-                || 12 < asg.literal_block_distance_current(&c.lits)
-            {
-                continue;
-            }
+            // assert!(!c.is(FlagClause::ASSIGN_REASON));
+            c.vivify_at = asg.num_conflict;
+            c.vivify_age += 1;
             let is_learnt = c.is(FlagClause::LEARNT);
-            let vivify_age = c.vivify_age;
+            let lbd = c.lbd;
+            let referred = c.referred;
             let referred_at = c.referred_at;
-            let reference_rate = c.reference_rate;
+            let vivify_age = c.vivify_age;
+            let vivify_at = c.vivify_at;
             let clits = c.iter().copied().collect::<Vec<Lit>>();
             if to_display <= num_check {
                 state.flush("");
@@ -66,7 +71,6 @@ impl VivifyIF for ClauseDB {
                 ));
                 to_display = num_check + display_step;
             }
-            num_check += 1;
             // debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
             // Build a clean environment
             // debug_assert!(asg.stack_is_empty() || !asg.remains());
@@ -131,7 +135,6 @@ impl VivifyIF for ClauseDB {
                             }
                             match vec.len() {
                                 0 => {
-                                    state.flush("");
                                     state[Stat::VivifiedClause] += num_shrink;
                                     state[Stat::VivifiedVar] += num_assert;
                                     state.log(None, "RootLevelConflict By vivify");
@@ -145,9 +148,11 @@ impl VivifyIF for ClauseDB {
                                 _ => {
                                     if let Some(cid) = self.new_clause(&mut vec, is_learnt).is_new()
                                     {
+                                        self[cid].lbd = lbd.min(decisions.len() as DecisionLevel);
+                                        self[cid].referred = referred;
                                         self[cid].referred_at = referred_at;
-                                        self[cid].reference_rate = reference_rate;
                                         self[cid].vivify_age = vivify_age;
+                                        self[cid].vivify_at = vivify_at;
                                     }
                                     self.remove_clause(cid);
                                     num_shrink += 1;
@@ -287,15 +292,5 @@ impl AssignStack {
             "res: {learnt:?} from: {decisions:?} and trail: {assumes:?}"
         );
         learnt
-    }
-}
-
-impl Clause {
-    /// clear flags about vivification
-    fn vivified(&mut self) {
-        self.vivify_age += 1;
-        self.reference_rate *= 0.8;
-        self.reference_rate += 0.2 * self.referred as f64;
-        self.referred = 0;
     }
 }

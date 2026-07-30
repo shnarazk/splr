@@ -25,6 +25,11 @@ pub struct Var {
     pub(crate) reward: f64,
     /// the last conflict by this
     pub(crate) last_conflict: usize,
+    /// phase bias at the best assignments
+    /// -  1.0: `true` always
+    /// -  0.0: no bias
+    /// - -1.0: `false` always
+    pub(crate) polarity: f64,
 }
 
 impl Default for Var {
@@ -38,6 +43,7 @@ impl Default for Var {
             flags: FlagVar::empty(),
             reward: 0.0,
             last_conflict: 0,
+            polarity: 0.0,
         }
     }
 }

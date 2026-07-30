@@ -153,6 +153,8 @@ impl PropagateIF for AssignStack {
 
         self.var[vi].level = lv;
         self.var[vi].reason = reason;
+        self.var[vi].polarity *= 0.999;
+        self.var[vi].polarity += 0.001 * if l.as_bool() { 1.0 } else { -1.0 };
         self.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
@@ -206,7 +208,7 @@ impl PropagateIF for AssignStack {
                 self.var[l.vi()].assign.is_some(),
                 "cancel_until found unassigned var in trail {}{:?}",
                 l.vi(),
-                &self.var[l.vi()],
+                self.var[l.vi()],
             );
             let vi = l.vi();
             #[cfg(feature = "trace_propagation")]
@@ -246,10 +248,16 @@ impl PropagateIF for AssignStack {
                             RephaseTarget::Best => {
                                 self.best_phases[vi].0.unwrap_or(v.assign.unwrap())
                             }
-                            RephaseTarget::Random => {
-                                (v.last_conflict + i + self.num_propagation).is_multiple_of(2)
-                            }
+                            RephaseTarget::Random => self.rng.next_bool(),
                             RephaseTarget::Inverted => !v.assign.unwrap(),
+                            RephaseTarget::Polarity => {
+                                if self.rng.next_f64() <= v.polarity.abs().powf(1.2) {
+                                    v.assign.unwrap()
+                                } else {
+                                    !v.assign.unwrap()
+                                    // self.rng.next_f64() >= 0.5
+                                }
+                            }
                         },
                     );
                 } else {
@@ -259,7 +267,22 @@ impl PropagateIF for AssignStack {
 
             unset_assign!(self, vi);
             if let AssignReason::Implication(cid) = self.var[vi].reason {
+                let num_learnt: usize = cdb.num_learnt_clauses();
+                let lbd = cdb[cid].lbd;
                 cdb[cid].turn_off(FlagClause::ASSIGN_REASON);
+                if cdb[cid].is(FlagClause::LEARNT)
+                    && cdb[cid].referred <= 1
+                    && (num_learnt >= 800_000 && lbd > 10
+                        || num_learnt >= 400_000 && lbd > 14
+                        || num_learnt >= 200_000 && lbd > 18
+                        || num_learnt >= 100_000 && lbd > 22)
+                {
+                    cdb.remove_clause(cid);
+                    #[cfg(feature = "trail_saving")]
+                    {
+                        self.clear_saved_trail();
+                    }
+                }
             }
             self.var[vi].reason = AssignReason::None;
 

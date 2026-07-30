@@ -123,6 +123,8 @@ pub struct State {
     pub core_size: usize,
     /// the last restart in conflicts
     pub last_restart: usize,
+    /// the last assertion in conflicts
+    pub last_assertion: usize,
 
     #[cfg(feature = "chrono_BT")]
     /// chronoBT threshold
@@ -167,6 +169,7 @@ impl Default for State {
             bt_drift_average: Ema::default().with_span(1000),
             core_size: 0,
             last_restart: 0,
+            last_assertion: 0,
 
             #[cfg(feature = "chrono_BT")]
             chrono_bt_threshold: 100,
@@ -605,14 +608,14 @@ impl StateIF for State {
             {
                 match asg.activity_scheme() {
                     VarActivityScheme::LRB => {
-                        if self.span_manager.current_span() >= 4098 {
+                        if self.span_manager.current_span() >= 16 {
                             "Long LRB"
                         } else {
                             "     LRB"
                         }
                     }
                     VarActivityScheme::VMTF => {
-                        if self.span_manager.current_span() >= 4098 {
+                        if self.span_manager.current_span() >= 16 {
                             "LongVMTF"
                         } else {
                             "    VMTF"
@@ -875,7 +878,7 @@ impl fmt::Display for State {
         if width < vclen + fnlen + 1 {
             write!(f, "{fname:<width$} |time:{tm:>9.2}")
         } else {
-            write!(f, "{fname}{:>w$} |time:{tm:>9.2}", &vc, w = width - fnlen,)
+            write!(f, "{fname}{:>w$} |time:{tm:>9.2}", vc, w = width - fnlen,)
         }
     }
 }

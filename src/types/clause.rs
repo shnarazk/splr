@@ -17,14 +17,16 @@ pub struct Clause {
     /// the index from which `propagate` starts searching an un-falsified literal.
     /// Since it's just a hint, we don't need u32 or usize.
     pub search_from: u16,
-    /// Sum of activated (used as propagated) duration
+    /// the minimal lbd of this clause so far
+    pub(crate) lbd: DecisionLevel,
+    ///the count of references in conflict analysis
+    pub(crate) referred: usize,
+    /// The last reference time in conflict analysis
     pub(crate) referred_at: usize,
-    /// The average number of references in a vivification interval
-    pub(crate) reference_rate: f64,
     /// last vivified time in conflicts
     pub(crate) vivify_age: usize,
-    /// The number of referrences in conflict analysis
-    pub(crate) referred: usize,
+    // last vivified time in conflict
+    pub(crate) vivify_at: usize,
 }
 
 /// API for Clause, providing literal accessors.
@@ -47,6 +49,8 @@ pub trait ClauseIF {
     fn len(&self) -> usize;
     /// return true is this is a unit clause under `asg`.
     fn is_unit_under(&self, asg: &impl AssignIF) -> bool;
+    /// update reference_distance.
+    fn update_reference(&mut self, asg: &mut impl AssignIF);
 }
 
 impl Default for Clause {
@@ -55,10 +59,11 @@ impl Default for Clause {
             lits: vec![],
             flags: FlagClause::empty(),
             search_from: 2,
-            referred_at: 0,
-            reference_rate: 1.0,
-            vivify_age: 0,
+            lbd: DecisionLevel::MAX,
             referred: 0,
+            referred_at: 0,
+            vivify_age: 0,
+            vivify_at: 0,
         }
     }
 }
@@ -214,6 +219,11 @@ impl ClauseIF for Clause {
             .filter(|l| asg.assigned(**l).is_some())
             .all(|l| asg.assigned(*l) == Some(false));
         unassigned == 1 && all_others_false
+    }
+    fn update_reference(&mut self, asg: &mut impl AssignIF) {
+        self.referred += 1;
+        self.referred_at = asg.current_conflict_index();
+        self.lbd = self.lbd.min(asg.literal_block_distance_current(&self.lits));
     }
 }
 

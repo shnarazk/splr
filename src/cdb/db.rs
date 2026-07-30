@@ -14,6 +14,7 @@ use {
     },
 };
 
+use std::f64;
 #[cfg(not(feature = "no_IO"))]
 use std::{fs::File, io::Write, path::Path};
 
@@ -309,10 +310,6 @@ impl ClauseDBIF for ClauseDB {
             c.flags = FlagClause::empty();
             debug_assert!(c.lits.is_empty()); // c.lits.clear();
             std::mem::swap(&mut c.lits, vec);
-            c.search_from = 2;
-            c.referred_at = 0;
-            c.reference_rate = 1.0;
-            c.vivify_age = 0;
         } else {
             cid = ClauseId::from(self.clause.len());
             let mut c = Clause {
@@ -334,6 +331,12 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         let c = &mut clause[NonZeroU32::get(cid.ordinal) as usize];
+        c.search_from = 2;
+        c.lbd = DecisionLevel::MAX;
+        c.referred = 0;
+        // c.referred_at = 0;
+        c.vivify_age = 0;
+        c.vivify_at = 0;
         let len2 = c.lits.len() == 2;
         *num_clause += 1;
         if learnt {
@@ -826,7 +829,7 @@ impl ClauseDBIF for ClauseDB {
         c.is(FlagClause::LEARNT)
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, asg: &mut impl AssignIF, last_restart: usize) {
+    fn reduce(&mut self) {
         self.num_reduction += 1;
         let ClauseDB {
             clause,
@@ -842,9 +845,7 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         *num_lbd2 = 0;
         let mut num_alives: usize = 0;
-        // tier 1 group: the small clauses under the best assignment
         let mut ntier1: usize = 0;
-        // tier 2 group: the small clauses under the best assignment
         let mut ntier2: usize = 0;
         for (i, c) in clause
             .iter_mut()
@@ -853,41 +854,32 @@ impl ClauseDBIF for ClauseDB {
             .filter(|(_, c)| !c.is_dead())
         {
             num_alives += 1;
-            match asg.literal_block_distance_current(&c.lits) {
-                0..=2 => {
-                    *num_lbd2 += 1;
-                    continue;
-                }
-                3 if c.reference_rate >= 0.01 => {
-                    ntier1 += 1;
-                    continue;
-                }
-                4 if c.reference_rate >= 0.1 => {
-                    ntier1 += 1;
-                    continue;
-                }
-                5 if c.reference_rate >= 2.0 => {
-                    ntier2 += 1;
-                    continue;
-                }
-                6 if c.reference_rate >= 4.0 => {
-                    ntier2 += 1;
-                    continue;
-                }
-                7 if c.reference_rate >= 8.0 => {
-                    ntier2 += 1;
-                    continue;
-                }
-                _ => {}
-            }
-            if c.len() <= 3 {
-                ntier1 += 1;
+            if !c.is(FlagClause::LEARNT) {
+                *num_lbd2 += (c.lbd <= 2) as usize;
                 continue;
             }
-            if !c.is(FlagClause::LEARNT) || c.is(FlagClause::ASSIGN_REASON) {
+            if c.is(FlagClause::ASSIGN_REASON) {
+                *num_lbd2 += (c.lbd <= 2) as usize;
                 continue;
             }
-            if c.reference_rate >= 16.0 || c.referred_at >= last_restart {
+            // Don't introduce any length-based crteria!
+            // Clause lengths without context make result worse.
+            if c.lbd <= 2 && c.referred >= 1
+                || c.lbd <= 3 && c.referred >= 2
+                || c.lbd <= 4 && c.referred >= 4
+                || c.lbd <= 5 && c.referred >= 16
+                || c.referred >= 256
+            {
+                if c.lbd <= 4 {
+                    c.referred -= 1;
+                } else {
+                    c.referred /= 2;
+                }
+                match c.lbd {
+                    0..=2 => *num_lbd2 += 1,
+                    3..=6 => ntier1 += 1,
+                    _ => ntier2 += 1,
+                }
                 continue;
             }
             remove_clause_fn(
@@ -905,17 +897,17 @@ impl ClauseDBIF for ClauseDB {
         self.tier1_clauses.update(ntier1 as f64 / num_alives as f64);
         self.tier2_clauses.update(ntier2 as f64 / num_alives as f64);
     }
-    fn save_best_assign_reasons(&mut self, asg: &impl AssignIF, clear: bool) {
-        if clear {
-            for c in self.clause.iter_mut().skip(1) {
-                c.turn_off(FlagClause::BEST_PROPAGATOR);
-            }
-        }
-        for l in asg.stack_iter() {
-            if let AssignReason::Implication(cid) = asg.reason(l.vi()) {
-                self[cid].turn_on(FlagClause::BEST_PROPAGATOR);
-            }
-        }
+    fn save_best_assign_reasons(&mut self, _asg: &impl AssignIF, _clear: bool) {
+        // if clear {
+        //     for c in self.clause.iter_mut().skip(1) {
+        //         c.turn_off(FlagClause::BEST_PROPAGATOR);
+        //     }
+        // }
+        // for l in asg.stack_iter() {
+        //     if let AssignReason::Implication(cid) = asg.reason(l.vi()) {
+        //         self[cid].turn_on(FlagClause::BEST_PROPAGATOR);
+        //     }
+        // }
     }
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);
@@ -970,6 +962,10 @@ impl ClauseDBIF for ClauseDB {
             self.lbd_temp[l0.vi()] = key;
             vec.retain(|l| self.lbd_temp[l.vi()] == key);
         }
+    }
+
+    fn num_learnt_clauses(&self) -> usize {
+        self.num_learnt
     }
 
     #[cfg(not(feature = "no_IO"))]

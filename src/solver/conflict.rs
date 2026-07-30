@@ -134,12 +134,19 @@ pub fn handle_conflict(
                 }
             }
             AssignReason::Implication(r) => {
+                let mut cs = Vec::new();
                 for l in cdb[r].iter() {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
                         asg.reward_at_analysis(vi);
                         bumped.push(vi);
                     }
+                    if let AssignReason::Implication(ci) = asg.reason(l.vi()) {
+                        cs.push(ci);
+                    }
+                }
+                for ci in cs.into_iter() {
+                    cdb[ci].update_reference(asg);
                 }
             }
             AssignReason::Decision(_) => (),
@@ -216,7 +223,6 @@ pub fn handle_conflict(
                 asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
                 cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
             }
-            cdb[cid].reference_rate = 1.0;
             // lbd should be calculated at conflict level, where all literals are assigned.
             // But since vars hold the last level even after unassignment,
             // we can have postponed the calculation.
@@ -422,8 +428,7 @@ fn conflict_analyze(
                         trace!(q, " -- ignore flagged already");
                     }
                 }
-                cdb[cid].referred_at = asg.num_conflict;
-                cdb[cid].referred += 1;
+                cdb[cid].update_reference(asg);
             }
             AssignReason::Decision(_) | AssignReason::None => {}
         }
@@ -610,7 +615,7 @@ fn lit_level(
                 cdb[cid].lit0(),
                 lit,
                 cid,
-                &cdb[cid]
+                cdb[cid]
             );
             // assert!(
             //     !bag.contains(&lit),
