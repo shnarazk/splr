@@ -240,7 +240,7 @@ fn search(
         () => {
             state.search_mode_ratio.0.update(0.0);
             state.search_mode_ratio.1.update(0.0);
-            cdb.reduce(asg, state);
+            cdb.reduce();
         };
     }
     macro_rules! update_core {
@@ -249,15 +249,10 @@ fn search(
             if let Some(core) = asg.check_best_phases() {
                 assign_peak = assign_peak.saturating_sub(2 * $n);
                 state.core_size = core;
-                // to_vmtf!();
             } else {
                 assign_peak = 0;
-                // let pre = state.core_size;
                 state.core_size = asg.derefer(assign::property::Tusize::NumUnassertedVar);
                 cdb.save_best_assign_reasons(asg, true);
-                // if pre < state.core_size {
-                //     to_vmtf!();
-                // }
             }
         };
     }
@@ -343,7 +338,6 @@ fn search(
                 elim.simplify(asg, cdb, state, false)?;
                 asg.eliminated.append(elim.eliminated_lits());
             }
-            let _conflict_index = asg.current_conflict_index();
             if cfg!(feature = "rephase") {
                 match rng.next_f64() {
                     0.0..0.45 => {
@@ -374,20 +368,18 @@ fn search(
                 match rng.next_f64() {
                     0.0..0.2 if asg.activity_scheme != VarActivityScheme::VMTF => {
                         asg.activity_scheme = VarActivityScheme::VMTF;
-                        // asg.set_learning_rate(adaptive_lr);
                         // asg.set_learning_rate(0.0);
                         asg.rebuild_order();
                     }
                     0.2..1.0 if asg.activity_scheme != VarActivityScheme::LRB => {
                         asg.activity_scheme = VarActivityScheme::LRB;
-                        // Adapt LRB learning rate to the upcoming Luby envelope height:
-                        // asg.set_learning_rate(adaptive_lr);
                         asg.rebuild_order();
                     }
                     _ => (),
                 }
             }
             if new_segment.is_some() {
+                // Adapt LRB learning rate to the upcoming Luby envelope height:
                 let span_scale = luby_scale * state.span_manager.envelop_index();
                 let adaptive_lr = 1.0 / (span_scale as f64).sqrt();
                 asg.set_learning_rate(adaptive_lr);

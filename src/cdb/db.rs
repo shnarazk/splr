@@ -5,7 +5,7 @@ use {
         property,
         watch_cache::*,
     },
-    crate::{assign::AssignIF, state::State, types::*},
+    crate::{assign::AssignIF, types::*},
     std::{
         collections::HashMap,
         num::NonZeroU32,
@@ -829,12 +829,7 @@ impl ClauseDBIF for ClauseDB {
         c.is(FlagClause::LEARNT)
     }
     /// reduce the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, _asg: &impl AssignIF, _state: &State) {
-        macro_rules! _height {
-            ($c: expr) => {
-                $c.reference_height + $c.lbd
-            };
-        }
+    fn reduce(&mut self) {
         self.num_reduction += 1;
         let ClauseDB {
             clause,
