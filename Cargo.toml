@@ -14,7 +14,7 @@ default-run = "splr"
 rust-version = "1.97"
 
 [dependencies]
-bitflags = "^2.8"
+bitflags = "^2.13"
 instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
 
 [features]
