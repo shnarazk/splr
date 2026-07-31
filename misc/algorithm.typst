@@ -2,7 +2,7 @@
 #set text(
   font: ((name: "New Computer Modern", covers: "latin-in-cjk"), "Hiragino Mincho Pro"),
   size: 11pt)
-#let title = [Search algorithms in Splr]
+#let title = [Search algorithms in Splr-0.19]
 
 #pseudocode-list(booktabs: true, hooks: 0.2em, line-gap: 6pt, stroke: 0.3pt, title: strong[Search in Splr-0.19])[
   + *let* $n: "int" <- 0$ #sym.triangle.stroked.r Luby counter
@@ -14,14 +14,17 @@
     + *if* _decision level_ $= 0$ *then*
       + *return* UNSAT
     + `ConflictAnalysis`()
-    + `BackTrack`()
+    + `BackTrack`()  -- _Large clauses might be removed _
     + $i <- i + 1$
     + *if* $i < "Luby"(n)$ *then*
       + *continue*
     + $i <- 0$
     + $n <- n + 1$
     + `Restart`()
-    + run `Reduce`, `Vivify`, `Eliminate`, and `ChangeRephaseTarget` periodically
+    + `Reduce`()
+    + `Vivify`()
+    + `Eliminate`()
+    + `SelectRephaseScheme`()
   + *return* SAT
 ]
 
