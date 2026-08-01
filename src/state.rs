@@ -117,8 +117,6 @@ pub struct State {
     pub b_lvl: Ema2,
     /// EMA of conflicting levels
     pub c_lvl: Ema2,
-    /// EMA of backtrack level drift caused by chrono_BT or BT_deepen
-    pub bt_drift_average: Ema,
     /// The unreachable core size
     pub core_size: usize,
     /// the last restart in conflicts
@@ -166,7 +164,6 @@ impl Default for State {
             ),
             b_lvl: Ema2::default_extended(),
             c_lvl: Ema2::default_extended(),
-            bt_drift_average: Ema::default().with_span(1000),
             core_size: 0,
             last_restart: 0,
             last_assertion: 0,

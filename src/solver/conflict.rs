@@ -1,16 +1,12 @@
 //! Conflict Analysis
 
-#[cfg(feature = "trail_saving")]
-use crate::assign::TrailSavingIF;
-
 use {
     super::State,
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF, VarActivityScheme, VarManipulateIF},
+        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
     },
-    std::collections::HashSet,
 };
 
 /// returns:
@@ -154,51 +150,7 @@ pub fn handle_conflict(
         }
     }
 
-    // learnt clause quality based backtrack strategy switching
-    // Idea: If the learned clause is low quality, don’t trust it to justify a large backjump; use CBT/limited-backjump instead.
-    let bt_drift: Option<bool> = if cfg!(feature = "chrono_BT")
-        && assign_level > 0
-        && asg
-            .len_upto(conflicting_level)
-            .saturating_sub(asg.len_upto(assign_level))
-            >= 40
-    {
-        Some(true)
-    } else if cfg!(feature = "BT_deepen")
-        && asg.activity_scheme != VarActivityScheme::VMTF
-        && assign_level > 0
-        && new_learnt.len() > 2
-        && new_learnt
-            .iter()
-            .map(|l| asg.level(l.vi()))
-            .collect::<HashSet<_>>()
-            .len() as f64
-            >= 2.5 * cdb.lbd.get().max(3.0)
-    {
-        Some(false)
-    } else {
-        None
-    };
-    if let Some(b) = bt_drift {
-        if b {
-            asg.cancel_until(cdb, conflicting_level - 1);
-            state.bt_drift_average.update(1.0);
-        } else {
-            asg.cancel_until(cdb, assign_level - 1);
-            state.bt_drift_average.update(-1.0);
-        }
-        #[cfg(feature = "trail_saving")]
-        {
-            asg.clear_saved_trail();
-        }
-        #[cfg(feature = "chrono_BT")]
-        {
-            state.num_chrono_bt += 1;
-        }
-    } else {
-        asg.cancel_until(cdb, assign_level);
-        state.bt_drift_average.update(0.0);
-    }
+    asg.cancel_until(cdb, assign_level);
     // debug_assert_eq!(asg.assigned(l0), None);
     // debug_assert_eq!(
     //     new_learnt.iter().skip(1).map(|l| asg.level(l.vi())).max(),
@@ -210,19 +162,14 @@ pub fn handle_conflict(
             debug_assert_eq!(l0, cdb[cid].lit0());
             debug_assert_eq!(l1, cdb[cid].lit1());
             debug_assert_eq!(asg.assigned(l0), None);
-            debug_assert!(bt_drift.is_some() || asg.assigned(l1) == Some(false));
 
-            if bt_drift.is_none() {
-                asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
-            }
+            asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
             ret = (cid, 1);
         }
         RefClause::Clause(cid) => {
             debug_assert_eq!(cdb[cid].lit0(), l0);
-            if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
-                asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
-                cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
-            }
+            asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
+            cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
             // lbd should be calculated at conflict level, where all literals are assigned.
             // But since vars hold the last level even after unassignment,
             // we can have postponed the calculation.
@@ -236,7 +183,6 @@ pub fn handle_conflict(
                     || (l0 == cdb[cid].lit1() && l1 == cdb[cid].lit0())
             );
             debug_assert_eq!(asg.assigned(l0), None);
-            debug_assert!(bt_drift.is_some() || asg.assigned(l1) == Some(false));
             // if bt_drift.is_none() && asg.assigned(l1) != Some(false) {
             //     dbg!(cc);
             //     dbg!(asg.decision_level());
@@ -247,9 +193,7 @@ pub fn handle_conflict(
             //     panic!("here we are!");
             // }
             ret = (cid, asg.literal_block_distance_current(&cdb[cid].lits));
-            if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
-                asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
-            }
+            asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
         }
         RefClause::Dead => unreachable!("handle_conflict::RefClause::Dead"),
         RefClause::EmptyClause => unreachable!("handle_conflict::RefClause::EmptyClause"),
