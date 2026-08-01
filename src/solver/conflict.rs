@@ -150,6 +150,18 @@ pub fn handle_conflict(
         }
     }
 
+    // Certify the new learnt clause *before* backjumping: `cancel_until` may
+    // instantly drop reason clauses that are no longer locked (see
+    // `PropagateIF::cancel_until`), which are exactly the clauses that
+    // `conflict_analyze` just resolved through to build `new_learnt`. If those
+    // clauses were deleted (and their DRAT `d` line emitted) before this new
+    // clause is added, the RUP/RAT justification for the new clause can lose
+    // its natural witness and become unverifiable. Registering the clause
+    // first (and thus writing its `a` line first) preserves the standard
+    // "certify before you garbage-collect what justified it" invariant.
+    // `new_clause` itself has no dependency on assignment/trail state, so
+    // this reordering doesn't change its behavior.
+    let ref_clause = cdb.new_clause(new_learnt, true);
     asg.cancel_until(cdb, assign_level);
     // debug_assert_eq!(asg.assigned(l0), None);
     // debug_assert_eq!(
@@ -157,7 +169,7 @@ pub fn handle_conflict(
     //     Some(assign_level)
     // );
     let ret: (ClauseId, DecisionLevel);
-    match cdb.new_clause(new_learnt, true) {
+    match ref_clause {
         RefClause::Clause(cid) if learnt_len == 2 => {
             debug_assert_eq!(l0, cdb[cid].lit0());
             debug_assert_eq!(l1, cdb[cid].lit1());

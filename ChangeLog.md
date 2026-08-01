@@ -20,6 +20,7 @@
 - Remove feature 'suppress_reason_chain'
 - Remove feature 'trace_equivalency'
 - Remove feature 'two_mode_reduction'
+- Remove feature 'BT_deepen' (replaced by instant reduction)
 - rename feature 'debug_propagation' to 'trace_propagation'
 - Remove src/solver/restart.rs
 
