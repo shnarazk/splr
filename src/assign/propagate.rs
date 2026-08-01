@@ -267,9 +267,9 @@ impl PropagateIF for AssignStack {
 
             unset_assign!(self, vi);
             if let AssignReason::Implication(cid) = self.var[vi].reason {
+                cdb[cid].turn_off(FlagClause::ASSIGN_REASON);
                 let num_learnt: usize = cdb.num_learnt_clauses();
                 let lbd = cdb[cid].lbd;
-                cdb[cid].turn_off(FlagClause::ASSIGN_REASON);
                 if cdb[cid].is(FlagClause::LEARNT)
                     && cdb[cid].referred <= 1
                     && (num_learnt >= 800_000 && lbd > 10
