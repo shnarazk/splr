@@ -23,7 +23,6 @@ default = [
     "unsafe_access",
     # "chrono_BT",
     "trail_saving",
-    # "BT_deepen",
 
     ### Heuristics
     "reason_side_rewarding",
@@ -38,7 +37,6 @@ default = [
     # "platform_wasm"
 ]
 
-BT_deepen = []                   # backtrack drift
 chrono_BT = []                  # NOT WORK
 clause_elimination = []         # pre(in)-processor setting
 clause_vivification = []        # pre(in)-processor setting
