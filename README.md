@@ -22,50 +22,50 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 
 #### Version 0.19.0
 
-- All satisfiable answers were checked by `dmcr` (src/bin/dmcr)
+- All satisfiable problems were checked by `dmcr` (src/bin/dmcr)
 - All unsatisfiable problems were checked by `drat-trim`
 
-| # | target CNF used in SAT Competition 2025  |time (s)|ret| cert|
+| # | CNF picked from SAT Competition 2025     |time (s)|ret|result|
 |--:|:-----------------------------------------|-------:|:-:|:---:|
 |  1|`04648cef5bed430ab6429991fa9e107d-ramsey_`|        |124|  -- |
-|  2|`0c0430a68f147be18ab3fded07f30fdb-oddball`| 1275.05| 10|     |
-|  3|`0ccb0f855352783a972be45188bf3164-SCPC-50`|   58.96| 20|     |
-|  4|`0e1d562093d5f4fc9013cf4a14a03f70-Break_1`|   26.39| 10|     |
+|  2|`0c0430a68f147be18ab3fded07f30fdb-oddball`| 1275.05| 10|  ✅ |
+|  3|`0ccb0f855352783a972be45188bf3164-SCPC-50`|   58.96| 20|  ✅ |
+|  4|`0e1d562093d5f4fc9013cf4a14a03f70-Break_1`|   26.39| 10|  ✅ |
 |  5|`110f8eb8b9b80204fe955ea0973bbb00-clqcl_3`|        |124|  -- |
-|  6|`24bde22f729a988fb2394b644cb60d39-SC25_Ti`|    8.28| 10|     |
+|  6|`24bde22f729a988fb2394b644cb60d39-SC25_Ti`|    8.28| 10|  ✅ |
 |  7|`2d0c041c0fe72dc32527bfbf34f63e61-1702235`|        |124|  -- |
 |  8|`35b9091b90bd28a492c9556d6fc4348d-bp4_TCO`|        |124|  -- |
 |  9|`35ec95b9b2398fb522db178855016ae0-MVRound`|        |124|  -- |
 | 10|`46a8727e27d848faafd83a990c2e01a7-case8.n`|        |124|  -- |
 | 11|`482295be38dc1d63a16f3cf649ef7ef6-myciel6`| 2717.34| 20|     |
-| 12|`53c21f3e78f060883026b5a12ba691d8-maximum`|   64.57| 10|     |
-| 13|`57b478982ee9aba245ba792452b18fe3-VanDerW`| 1053.83| 10|     |
+| 12|`53c21f3e78f060883026b5a12ba691d8-maximum`|   64.57| 10|  ✅ |
+| 13|`57b478982ee9aba245ba792452b18fe3-VanDerW`| 1053.83| 10|  ✅ |
 | 14|`6147e666b75f603a4c4490d21ab654cd-hid-uns`|  302.72| 20|     |
 | 15|`65f7145996bbec02b90bd0fa64a20502-test_v7`|        |124|  -- |
-| 16|`68e33d998466bbdd4bfb7249a5790e4f-arles_t`|    2.81| 20|     |
+| 16|`68e33d998466bbdd4bfb7249a5790e4f-arles_t`|    2.81| 20|  ✅ |
 | 17|`83aa254f7d17e1df7bee19322ac4752b-1.norma`|        |124|  -- |
-| 18|`8e62c5d47920ffe36052f86177403e70-SC25_Ti`|    9.38| 10|     |
+| 18|`8e62c5d47920ffe36052f86177403e70-SC25_Ti`|    9.38| 10|  ✅ |
 | 19|`908433870bee8ba2c86f266d0b002fdb-MVRound`|        |124|  -- |
-| 20|`918d9e7c2e197312517736421d728958-SCPC-50`|  102.29| 20|     |
+| 20|`918d9e7c2e197312517736421d728958-SCPC-50`|  102.29| 20|  ❌ |
 | 21|`91c429adc2dc8430461b6d87a9aef335-16_16_b`| 4947.19| 20|     |
 | 22|`967b58fea99a99b8da592d3e2fe7139b-dubois5`|        |124|  -- |
 | 23|`98a9352230efc411c092f1dcdcdedcfc-bp4_BC0`|        |124|  -- |
 | 24|`9b5f767eb5c14eb888d51acf70e045c8-uniqinv`| 2449.26| 20|     |
-| 25|`a0bcdaffb0ea36b678899fd86bdc7f18-arles_t`|    0.68| 20|     |
-| 26|`a1fdd60d2570f47fb14956ac9e96951f-oddball`|   30.05| 20|     |
-| 27|`a70883771fd1c210d94a916d52510a3a-gm28spa`|   38.26| 20|     |
-| 28|`b3d3680b3287a989ce61a6db1054efd2-case20.`|  465.27| 10|     |
-| 29|`b9ed6fd14f4fc969ec966a4b54c36872-n320p5q`|   30.48| 10|     |
-| 30|`c21096fa2f550785c33dc862d83bc941-case17.`|  574.20| 10|     |
+| 25|`a0bcdaffb0ea36b678899fd86bdc7f18-arles_t`|    0.68| 20|  ✅ |
+| 26|`a1fdd60d2570f47fb14956ac9e96951f-oddball`|   30.05| 20|  ✅ |
+| 27|`a70883771fd1c210d94a916d52510a3a-gm28spa`|   38.26| 20|  ✅ |
+| 28|`b3d3680b3287a989ce61a6db1054efd2-case20.`|  465.27| 10|  ✅ |
+| 29|`b9ed6fd14f4fc969ec966a4b54c36872-n320p5q`|   30.48| 10|  ✅ |
+| 30|`c21096fa2f550785c33dc862d83bc941-case17.`|  574.20| 10|  ✅ |
 | 31|`cb950b9accfb53eb98f77b0f995ac0ae-rphp5_0`|        |124|  -- |
 | 32|`d5928883c1e1f70764a31a83aa419eaf-oski15a`|        |124|  -- |
 | 33|`d8666a18cf3a32af0a606099f0070b4b-7.norma`|        |124|  -- |
-| 34|`ddf9620410e6a4351f64c745670ef5d4-oddball`| 1196.09| 10|     |
-| 35|`e23edb67db2d1dfdbfe2f4c02d09c6c7-14.norm`| 1126.33| 10|     |
+| 34|`ddf9620410e6a4351f64c745670ef5d4-oddball`| 1196.09| 10|  ✅ |
+| 35|`e23edb67db2d1dfdbfe2f4c02d09c6c7-14.norm`| 1126.33| 10|  ✅ |
 | 36|`e430acf720b63044e5c825a00a76b0eb-rphp_p2`|        |124|  -- |
 | 37|`e442248e155eb81a811edd1deca8a2cd-sudoku-`|        |124|  -- |
-| 38|`f17dfbed8c18716a41b231702e127524-SC25_Ti`|  136.75| 10|     |
-| 39|`f25a1df88f89c6bcbe2602fa7f6e816b-1-TC-25`| 1312.74| 10|     |
+| 38|`f17dfbed8c18716a41b231702e127524-SC25_Ti`|  136.75| 10|  ✅ |
+| 39|`f25a1df88f89c6bcbe2602fa7f6e816b-1-TC-25`| 1312.74| 10|  ✅ |
 | 40|`f33a6163305d6559043b7438a692dea9-simon-r`|        |124|  -- |
 
 - splr    , med:    136.75, max:   4947.19,total except 17 timeouts:17928.92
