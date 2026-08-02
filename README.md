@@ -37,20 +37,20 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 |  8|`35b9091b90bd28a492c9556d6fc4348d-bp4_TCO`|        |124|  -- |
 |  9|`35ec95b9b2398fb522db178855016ae0-MVRound`|        |124|  -- |
 | 10|`46a8727e27d848faafd83a990c2e01a7-case8.n`|        |124|  -- |
-| 11|`482295be38dc1d63a16f3cf649ef7ef6-myciel6`| 2717.34| 20|     |
+| 11|`482295be38dc1d63a16f3cf649ef7ef6-myciel6`| 2717.34| 20|  ✅ |
 | 12|`53c21f3e78f060883026b5a12ba691d8-maximum`|   64.57| 10|  ✅ |
 | 13|`57b478982ee9aba245ba792452b18fe3-VanDerW`| 1053.83| 10|  ✅ |
-| 14|`6147e666b75f603a4c4490d21ab654cd-hid-uns`|  302.72| 20|     |
+| 14|`6147e666b75f603a4c4490d21ab654cd-hid-uns`|  302.72| 20|  ✅ |
 | 15|`65f7145996bbec02b90bd0fa64a20502-test_v7`|        |124|  -- |
 | 16|`68e33d998466bbdd4bfb7249a5790e4f-arles_t`|    2.81| 20|  ✅ |
 | 17|`83aa254f7d17e1df7bee19322ac4752b-1.norma`|        |124|  -- |
 | 18|`8e62c5d47920ffe36052f86177403e70-SC25_Ti`|    9.38| 10|  ✅ |
 | 19|`908433870bee8ba2c86f266d0b002fdb-MVRound`|        |124|  -- |
-| 20|`918d9e7c2e197312517736421d728958-SCPC-50`|  102.29| 20|  ❌ |
-| 21|`91c429adc2dc8430461b6d87a9aef335-16_16_b`| 4947.19| 20|     |
+| 20|`918d9e7c2e197312517736421d728958-SCPC-50`|  102.29| 20|  ✅ |
+| 21|`91c429adc2dc8430461b6d87a9aef335-16_16_b`| 4947.19| 20|  ✅ |
 | 22|`967b58fea99a99b8da592d3e2fe7139b-dubois5`|        |124|  -- |
 | 23|`98a9352230efc411c092f1dcdcdedcfc-bp4_BC0`|        |124|  -- |
-| 24|`9b5f767eb5c14eb888d51acf70e045c8-uniqinv`| 2449.26| 20|     |
+| 24|`9b5f767eb5c14eb888d51acf70e045c8-uniqinv`| 2449.26| 20|  ✅ |
 | 25|`a0bcdaffb0ea36b678899fd86bdc7f18-arles_t`|    0.68| 20|  ✅ |
 | 26|`a1fdd60d2570f47fb14956ac9e96951f-oddball`|   30.05| 20|  ✅ |
 | 27|`a70883771fd1c210d94a916d52510a3a-gm28spa`|   38.26| 20|  ✅ |
