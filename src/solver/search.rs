@@ -322,6 +322,9 @@ fn search(
             }
         }
         progress_pressure += 1;
+        if span_len == luby_scale {
+            asg.phase_mode = RephaseTarget::Walk;
+        }
         span_len += 1;
         if state.span_manager.span_ended(span_len / luby_scale) {
             span_len = 0;
@@ -340,25 +343,25 @@ fn search(
             }
             if cfg!(feature = "rephase") {
                 match rng.next_f64() {
-                    0.0..0.45 => {
-                        asg.phase_mode = RephaseTarget::Walk;
-                    }
-                    0.45..0.6 => {
-                        asg.phase_mode = RephaseTarget::Best;
-                    }
-                    // 0.45..0.6 => {
-                    //     asg.phase_mode = RephaseTarget::Polarity;
-                    // }
-                    0.6..0.75 => {
+                    0.0..0.15 => {
                         asg.phase_mode = RephaseTarget::False;
                     }
-                    0.75..0.9 => {
+                    0.15..0.3 => {
                         asg.phase_mode = RephaseTarget::True;
                     }
-                    0.9..1.0 => {
+                    0.3..0.4 => {
                         asg.phase_mode = RephaseTarget::Random;
                     }
-                    // 0.95..1.0 => {
+                    0.4..0.9 => {
+                        asg.phase_mode = RephaseTarget::Best;
+                    }
+                    // 0.6..0.9 => {
+                    //     asg.phase_mode = RephaseTarget::Walk;
+                    // }
+                    0.9..1.0 => {
+                        asg.phase_mode = RephaseTarget::Polarity;
+                    }
+                    // 0.9..1.0 => {
                     //     asg.phase_mode = RephaseTarget::Inverted;
                     // }
                     _ => {
@@ -366,12 +369,12 @@ fn search(
                     }
                 }
                 match rng.next_f64() {
-                    0.0..0.2 if asg.activity_scheme != VarActivityScheme::VMTF => {
+                    0.0..0.3 if asg.activity_scheme != VarActivityScheme::VMTF => {
                         asg.activity_scheme = VarActivityScheme::VMTF;
                         // asg.set_learning_rate(0.0);
                         asg.rebuild_order();
                     }
-                    0.2..1.0 if asg.activity_scheme != VarActivityScheme::LRB => {
+                    0.3..1.0 if asg.activity_scheme != VarActivityScheme::LRB => {
                         asg.activity_scheme = VarActivityScheme::LRB;
                         asg.rebuild_order();
                     }
