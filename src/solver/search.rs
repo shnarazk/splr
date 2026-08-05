@@ -302,23 +302,6 @@ fn search(
                 state.core_size = asg.save_best_phases(true);
                 cdb.save_best_assign_reasons(asg, false);
                 state.flush("");
-                state.flush(format!("core: {}", state.core_size));
-                // if state.core_size < 10 {
-                //     for (i, v) in asg.var_iter().enumerate().skip(1) {
-                //         if !v.is(FlagVar::ELIMINATED) && v.level > 0 {
-                //             println!(
-                //                 "{:>4}: {:>2}| {:>6.3}",
-                //                 i,
-                //                 match v.assign {
-                //                     None => 0,
-                //                     Some(false) => -1,
-                //                     Some(true) => 1,
-                //                 },
-                //                 v.polarity
-                //             );
-                //         }
-                //     }
-                // }
             }
         }
         progress_pressure += 1;
