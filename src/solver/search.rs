@@ -332,19 +332,14 @@ fn search(
                     0.15..0.3 => {
                         asg.phase_mode = RephaseTarget::True;
                     }
-                    0.3..0.4 => {
+                    0.3..0.45 => {
                         asg.phase_mode = RephaseTarget::Random;
                     }
-                    0.4..0.9 => {
+                    0.45..1.0 => {
                         asg.phase_mode = RephaseTarget::Best;
                     }
-                    // 0.6..0.9 => {
-                    //     asg.phase_mode = RephaseTarget::Walk;
-                    // }
-                    0.9..1.0 => {
-                        asg.phase_mode = RephaseTarget::Polarity;
-                    }
                     // 0.9..1.0 => {
+                    //     asg.phase_mode = RephaseTarget::Polarity;
                     //     asg.phase_mode = RephaseTarget::Inverted;
                     // }
                     _ => {
