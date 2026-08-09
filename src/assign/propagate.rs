@@ -272,7 +272,9 @@ impl PropagateIF for AssignStack {
                 let lbd = cdb[cid].lbd;
                 if cdb[cid].is(FlagClause::LEARNT)
                     && cdb[cid].referred <= 1
-                    && (num_learnt >= 800_000 && lbd > 10
+                    && (num_learnt >= 3_200_000 && lbd > 8
+                        || num_learnt >= 1_600_000 && lbd > 9
+                        || num_learnt >= 800_000 && lbd > 10
                         || num_learnt >= 400_000 && lbd > 14
                         || num_learnt >= 200_000 && lbd > 18
                         || num_learnt >= 100_000 && lbd > 22)

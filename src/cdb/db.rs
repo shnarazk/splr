@@ -869,6 +869,7 @@ impl ClauseDBIF for ClauseDB {
                 || c.lbd <= 4 && c.referred >= 4
                 || c.lbd <= 5 && c.referred >= 16
                 || c.referred >= 256
+                || c.len() <= 3
             {
                 if c.lbd <= 4 {
                     c.referred -= 1;

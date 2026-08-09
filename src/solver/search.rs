@@ -235,6 +235,8 @@ fn search(
     let progress_interval: usize = 10_000;
     let mut assign_peak: usize = 0;
     let luby_scale: usize = 2048 * 4;
+    // let mut break_point: usize = state.span_manager.current_span() * luby_scale / 4;
+    let mut good_progress: bool = false;
 
     macro_rules! reduce {
         () => {
@@ -283,11 +285,13 @@ fn search(
                     state.search_mode_ratio.1.update(1.0);
                 }
             }
+            good_progress = true;
             update_core!(1);
         } else {
             cdb.lbd.update(lbd as f64);
             cdb[cid].lbd = lbd;
             cdb[cid].referred_at = asg.current_conflict_index();
+            good_progress |= cdb[cid].len() <= 2;
         }
         match asg.stack_len().cmp(&assign_peak) {
             Ordering::Less => {}
@@ -302,13 +306,20 @@ fn search(
             }
         }
         progress_pressure += 1;
-        if span_len == luby_scale {
-            asg.phase_mode = RephaseTarget::Walk;
-        }
+        // if span_len == break_point {
+        //     asg.phase_mode = if asg.phase_mode == RephaseTarget::Random {
+        //         RephaseTarget::Walk
+        //     } else {
+        //         RephaseTarget::True
+        //     };
+        // } else if span_len == 2 * break_point && asg.phase_mode == RephaseTarget::True {
+        //     asg.phase_mode = RephaseTarget::Best;
+        // }
         span_len += 1;
         if state.span_manager.span_ended(span_len / luby_scale) {
             span_len = 0;
             let new_segment = state.span_manager.prepare_new_span(span_len);
+            // break_point = state.span_manager.current_span() * luby_scale / 4;
             dump_stage(asg, state, new_segment);
             RESTART!(asg, cdb, state)?;
             reduce!();
@@ -322,27 +333,36 @@ fn search(
                 asg.eliminated.append(elim.eliminated_lits());
             }
             if cfg!(feature = "rephase") {
-                match rng.next_f64() {
-                    0.0..0.15 => {
-                        asg.phase_mode = RephaseTarget::False;
+                asg.phase_mode = match rng.next_f64() {
+                    0.0..0.5 if asg.phase_mode != RephaseTarget::False || good_progress => {
+                        RephaseTarget::False
                     }
-                    0.15..0.3 => {
-                        asg.phase_mode = RephaseTarget::True;
+                    0.5..1.0 if asg.phase_mode != RephaseTarget::True || good_progress => {
+                        RephaseTarget::True
                     }
-                    0.3..0.45 => {
-                        asg.phase_mode = RephaseTarget::Random;
-                    }
-                    0.45..1.0 => {
-                        asg.phase_mode = RephaseTarget::Best;
-                    }
-                    // 0.9..1.0 => {
-                    //     asg.phase_mode = RephaseTarget::Polarity;
-                    //     asg.phase_mode = RephaseTarget::Inverted;
-                    // }
-                    _ => {
-                        asg.phase_mode = RephaseTarget::Walk;
-                    }
-                }
+                    _ => RephaseTarget::Best,
+                };
+                // match rng.next_f64() {
+                //     0.0..0.75 => {
+                //         asg.phase_mode = RephaseTarget::False;
+                //     }
+                //     // 0.3..0.6 => {
+                //     //     asg.phase_mode = RephaseTarget::True;
+                //     // }
+                //     // 0.3..0.45 => {
+                //     //     asg.phase_mode = RephaseTarget::Random;
+                //     // }
+                //     // 0.6..1.0 => {
+                //     //     asg.phase_mode = RephaseTarget::Best;
+                //     // }
+                //     // 0.9..1.0 => {
+                //     //     asg.phase_mode = RephaseTarget::Polarity;
+                //     //     asg.phase_mode = RephaseTarget::Inverted;
+                //     // }
+                //     _ => {
+                //         asg.phase_mode = RephaseTarget::Walk;
+                //     }
+                // }
                 match rng.next_f64() {
                     0.0..0.3 if asg.activity_scheme != VarActivityScheme::VMTF => {
                         asg.activity_scheme = VarActivityScheme::VMTF;
@@ -356,6 +376,7 @@ fn search(
                     _ => (),
                 }
             }
+            good_progress = false;
             if new_segment.is_some() {
                 // Adapt LRB learning rate to the upcoming Luby envelope height:
                 let span_scale = luby_scale * state.span_manager.envelop_index();
