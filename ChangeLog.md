@@ -3,7 +3,7 @@
 - Adopt two decision literal select heuristics:
     - *Variable Move To queue First*
     - *LearningRate-Based Rewarding* 
-- Adopt rephasing modes: Walk, Best, False(Original), True(Inverted), Random, Flipped, Polarity
+- Adopt rephasing modes: Walk, Best, False(Original), True(Inverted), Random, Flipped, Waver
 - Revise `ClauseDB::reduce` to remove much more clauses and can run at any decision level
 - `cancel_until` also reduces lagre clauses
 - Switch to the O(1) Luby iterator. Now Luby sequence is used as the

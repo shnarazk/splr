@@ -236,7 +236,7 @@ fn search(
     let luby_scale: usize = 2048 * 4;
     // let mut break_point: usize = state.span_manager.current_span() * luby_scale / 4;
     let mut has_progress: bool = false;
-    asg.phase_mode = RephaseTarget::PolarityBest;
+    asg.phase_mode = RephaseTarget::Trust;
 
     macro_rules! reduce {
         () => {
@@ -286,8 +286,7 @@ fn search(
                 }
             }
             update_core!(1);
-            has_progress =
-                [RephaseTarget::Polarity, RephaseTarget::PolarityBest].contains(&asg.phase_mode);
+            has_progress = [RephaseTarget::Waver, RephaseTarget::Trust].contains(&asg.phase_mode);
         } else {
             cdb.lbd.update(lbd as f64);
             cdb[cid].lbd = lbd;
@@ -328,17 +327,17 @@ fn search(
                     asg.phase_mode = RephaseTarget::True;
                 }
                 RephaseTarget::True => {
-                    asg.phase_mode = RephaseTarget::Polarity;
+                    asg.phase_mode = RephaseTarget::Waver;
                 }
-                RephaseTarget::Polarity => {
-                    asg.phase_mode = RephaseTarget::PolarityBest;
+                RephaseTarget::Waver => {
+                    asg.phase_mode = RephaseTarget::Trust;
                 }
-                RephaseTarget::PolarityBest if has_progress => {
+                RephaseTarget::Trust if has_progress => {
                     asg.phase_mode = RephaseTarget::False;
                     has_progress = false;
                 }
-                RephaseTarget::PolarityBest => {
-                    asg.phase_mode = RephaseTarget::Polarity;
+                RephaseTarget::Trust => {
+                    asg.phase_mode = RephaseTarget::Waver;
                 }
                 _ => unreachable!(),
             };
