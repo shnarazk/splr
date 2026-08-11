@@ -258,6 +258,15 @@ impl PropagateIF for AssignStack {
                                     // self.rng.next_f64() >= 0.5
                                 }
                             }
+                            RephaseTarget::PolarityBest => {
+                                if self.rng.next_f64() <= v.polarity.abs().powf(1.2) {
+                                    // v.assign.unwrap()
+                                    self.best_phases[vi].0.unwrap_or(v.assign.unwrap())
+                                } else {
+                                    // self.best_phases[vi].0.unwrap_or(v.assign.unwrap())
+                                    v.assign.unwrap()
+                                }
+                            }
                         },
                     );
                 } else {

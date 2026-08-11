@@ -15,6 +15,7 @@ pub enum RephaseTarget {
     Random,
     Inverted,
     Polarity,
+    PolarityBest,
 }
 
 impl RephaseTarget {
@@ -28,6 +29,7 @@ impl RephaseTarget {
             RephaseTarget::Random => "∼",
             RephaseTarget::Inverted => "¬",
             RephaseTarget::Polarity => "φ",
+            RephaseTarget::PolarityBest => "Φ",
         }
     }
 }
