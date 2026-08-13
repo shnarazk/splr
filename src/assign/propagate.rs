@@ -239,32 +239,62 @@ impl PropagateIF for AssignStack {
                 if cfg!(feature = "rephase")
                 // && self.num_conflict - v.last_conflict <= 1000
                 {
+                    let scale: f64 = 4.0;
                     v.set(
                         FlagVar::PHASE,
                         match self.phase_mode {
-                            RephaseTarget::Walk => v.assign.unwrap(),
-                            RephaseTarget::False => false,
-                            RephaseTarget::True => true,
-                            RephaseTarget::Best => {
-                                self.best_phases[vi].0.unwrap_or(v.assign.unwrap())
+                            RephaseTarget::Walk => {
+                                if self.rng.next_f64() <= v.polarity.abs().powf(scale) {
+                                    v.polarity >= 0.0
+                                } else {
+                                    v.assign.unwrap()
+                                }
                             }
-                            RephaseTarget::Random => self.rng.next_bool(),
+                            RephaseTarget::False => {
+                                if self.rng.next_f64() <= v.polarity.abs().powf(scale) {
+                                    v.polarity >= 0.0
+                                } else {
+                                    false
+                                }
+                            }
+                            RephaseTarget::True => {
+                                if self.rng.next_f64() <= v.polarity.abs().powf(scale) {
+                                    v.polarity >= 0.0
+                                } else {
+                                    true
+                                }
+                            }
+                            RephaseTarget::Best => {
+                                if self.rng.next_f64() <= v.polarity.abs().powf(scale) {
+                                    v.polarity >= 0.0
+                                } else if let Some(b) = self.best_phases[vi].0 {
+                                    b
+                                } else {
+                                    self.rng.next_bool()
+                                }
+                            }
+                            RephaseTarget::Random => {
+                                if self.rng.next_f64() <= v.polarity.abs().powf(scale) {
+                                    v.polarity >= 0.0
+                                } else {
+                                    self.rng.next_bool()
+                                }
+                            }
                             RephaseTarget::Inverted => !v.assign.unwrap(),
                             RephaseTarget::Waver => {
-                                if self.rng.next_f64() <= v.polarity.abs().powf(1.2) {
-                                    v.assign.unwrap()
+                                if self.rng.next_f64() <= v.polarity.abs().powf(scale) {
+                                    v.polarity >= 0.0
                                 } else {
-                                    !v.assign.unwrap()
-                                    // self.rng.next_f64() >= 0.5
+                                    v.assign.unwrap()
                                 }
                             }
                             RephaseTarget::Trust => {
-                                if self.rng.next_f64() <= v.polarity.abs().powf(1.2) {
-                                    // v.assign.unwrap()
-                                    self.best_phases[vi].0.unwrap_or(v.assign.unwrap())
+                                if self.rng.next_f64() <= v.polarity.abs().powf(scale) {
+                                    v.polarity >= 0.0
+                                } else if let Some(b) = self.best_phases[vi].0 {
+                                    b
                                 } else {
-                                    // self.best_phases[vi].0.unwrap_or(v.assign.unwrap())
-                                    v.assign.unwrap()
+                                    self.rng.next_bool()
                                 }
                             }
                         },
