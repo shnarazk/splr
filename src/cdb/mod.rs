@@ -104,7 +104,10 @@ pub trait ClauseDBIF:
     /// # CAVEAT
     /// *precondition*: decision level == 0.
     fn reduce(&mut self);
-    /// update flags. Return `true` if it's learnt.
+    /// turn `FlagClause::BEST_PROPAGATOR` of 'used clauses' on
+    fn save_best_assign_reasons(&mut self, asg: &impl AssignIF, clear: bool);
+    /// update flags.
+    /// return `true` if it's learnt.
     fn update_at_analysis(&mut self, cid: ClauseId) -> bool;
     /// record an asserted literal to unsat certification.
     fn certificate_add_assertion(&mut self, lit: Lit);

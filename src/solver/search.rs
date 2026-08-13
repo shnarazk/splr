@@ -252,6 +252,7 @@ fn search(
             } else {
                 assign_peak = 0;
                 state.core_size = asg.derefer(assign::property::Tusize::NumUnassertedVar);
+                cdb.save_best_assign_reasons(asg, true);
             }
         };
     }
@@ -294,10 +295,12 @@ fn search(
             Ordering::Equal => {
                 // Do not update best_phases as new_best here to avoid an oscilation
                 state.core_size = asg.save_best_phases(false);
+                cdb.save_best_assign_reasons(asg, false);
             }
             Ordering::Greater => {
                 assign_peak = asg.stack_len();
                 state.core_size = asg.save_best_phases(true);
+                cdb.save_best_assign_reasons(asg, false);
                 state.flush("");
             }
         }
@@ -370,11 +373,12 @@ fn search(
         }
         if progress_pressure >= progress_interval {
             state.progress(asg, cdb);
-            let Some(p) = state.elapsed() else {
+            if let Some(p) = state.elapsed() {
+                if 1.0 <= p {
+                    return Err(SolverError::TimeOut);
+                }
+            } else {
                 return Err(SolverError::UndescribedError);
-            };
-            if 1.0 <= p {
-                return Err(SolverError::TimeOut);
             }
             progress_pressure = 0;
         }
