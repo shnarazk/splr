@@ -897,18 +897,6 @@ impl ClauseDBIF for ClauseDB {
         self.tier1_clauses.update(ntier1 as f64 / num_alives as f64);
         self.tier2_clauses.update(ntier2 as f64 / num_alives as f64);
     }
-    fn save_best_assign_reasons(&mut self, _asg: &impl AssignIF, _clear: bool) {
-        // if clear {
-        //     for c in self.clause.iter_mut().skip(1) {
-        //         c.turn_off(FlagClause::BEST_PROPAGATOR);
-        //     }
-        // }
-        // for l in asg.stack_iter() {
-        //     if let AssignReason::Implication(cid) = asg.reason(l.vi()) {
-        //         self[cid].turn_on(FlagClause::BEST_PROPAGATOR);
-        //     }
-        // }
-    }
     fn certificate_add_assertion(&mut self, lit: Lit) {
         self.certification_store.add_clause(&[lit]);
     }
