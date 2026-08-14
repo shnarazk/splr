@@ -153,8 +153,6 @@ impl PropagateIF for AssignStack {
 
         self.var[vi].level = lv;
         self.var[vi].reason = reason;
-        self.var[vi].polarity *= 0.999;
-        self.var[vi].polarity += 0.001 * if l.as_bool() { 1.0 } else { -1.0 };
         self.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
@@ -243,6 +241,13 @@ impl PropagateIF for AssignStack {
                         FlagVar::PHASE,
                         match self.phase_mode {
                             RephaseTarget::Walk => v.assign.unwrap(),
+                            // {
+                            //     if self.rng.next_f64() <= v.polarity.abs() {
+                            //         v.polarity > 0.0
+                            //     } else {
+                            //         v.assign.unwrap()
+                            //     }
+                            // }
                             RephaseTarget::False => false,
                             RephaseTarget::True => true,
                             RephaseTarget::Best => {
@@ -251,11 +256,10 @@ impl PropagateIF for AssignStack {
                             RephaseTarget::Random => self.rng.next_bool(),
                             RephaseTarget::Inverted => !v.assign.unwrap(),
                             RephaseTarget::Polarity => {
-                                if self.rng.next_f64() <= v.polarity.abs().powf(1.2) {
-                                    v.assign.unwrap()
+                                if self.rng.next_f64() <= v.polarity.abs() {
+                                    v.polarity > 0.0
                                 } else {
-                                    !v.assign.unwrap()
-                                    // self.rng.next_f64() >= 0.5
+                                    v.assign.unwrap()
                                 }
                             }
                         },
@@ -358,7 +362,13 @@ impl PropagateIF for AssignStack {
                     self.conflict_interval_average.0.update(f);
                     self.conflict_interval_average.1.update(f);
                 } */
-                self.var[$lit.vi()].last_conflict = self.num_conflict;
+                let vi = $lit.vi();
+                self.var[vi].last_conflict = self.num_conflict;
+                self.var[vi].polarity *= 0.99;
+                self.var[vi].polarity += 0.01 * if $lit.as_bool() { 1.0 } else { -1.0 };
+                // if self.var[vi].polarity.abs() > 0.6 {
+                //     println!("vi:{:>8}:: p: {:>7.4}", vi, self.var[vi].polarity);
+                // }
                 return Err(($lit, $reason));
             };
         }

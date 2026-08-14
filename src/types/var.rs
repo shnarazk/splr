@@ -25,7 +25,7 @@ pub struct Var {
     pub(crate) reward: f64,
     /// the last conflict by this
     pub(crate) last_conflict: usize,
-    /// phase bias at the best assignments
+    /// phase bias by the recent conflicts
     /// -  1.0: `true` always
     /// -  0.0: no bias
     /// - -1.0: `false` always
