@@ -5,26 +5,28 @@
 #let title = [Search algorithms in Splr-0.19]
 
 #pseudocode-list(booktabs: true, hooks: 0.2em, line-gap: 6pt, stroke: 0.3pt, title: strong[Search in Splr-0.19])[
-  + *let* $n: "int" <- 0$ #sym.triangle.stroked.r Luby counter
-  + *let* $i: "int" <- 0$ #sym.triangle.stroked.r step counter
+  + *let* $l: "Luby" <- "Luby"."new"()$
+  + *let* $i: "int" <- 0$
   + *while* _there is an unassignd or unpropagated var_ *do*
-    + `SelectDecisionVar`($o$)
-    + *if* `BCP`() $!=$ conflict *then*
+    + `SelectDecisionVar`()
+    + *if* `BCP`() $!=$ CONFLICT *then*
       + *continue*
     + *if* _decision level_ $= 0$ *then*
       + *return* UNSAT
     + `ConflictAnalysis`()
-    + `BackTrack`()  -- _Large clauses might be removed _
+    + `BackTrack`()
     + $i <- i + 1$
-    + *if* $i < "Luby"(n)$ *then*
-      + *continue*
-    + $i <- 0$
-    + $n <- n + 1$
-    + `Restart`()
-    + `Reduce`()
-    + `Vivify`()
-    + `Eliminate`()
-    + `SelectRephaseScheme`()
+    + *if* $i = 8196$ *then*
+      +  `UseDefaultRephaseScheme`()
+    + *if* $i >= l."value"$ *then*
+      + $i <- 0$
+      + $l$.`next`()
+      + `Restart`()
+      + `Reduce`()
+      + `Vivify`()
+      + `Eliminate`()
+      + `SelectRephaseScheme`()
+      + `SelectVarActivityScheme`()
   + *return* SAT
 ]
 
