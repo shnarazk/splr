@@ -25,50 +25,50 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 - All satisfiable problems were checked by `dmcr` (src/bin/dmcr)
 - All unsatisfiable problems were checked by `drat-trim`
 
-| # | CNF picked from SAT Competition 2025     |time (s)|ret|result|
-|--:|:-----------------------------------------|-------:|:-:|:---:|
-|  1|`04648cef5bed430ab6429991fa9e107d-ramsey_3_6_19.norma`|        |124| |
-|  2|`0c0430a68f147be18ab3fded07f30fdb-oddball_53_5_tto_zp`| 1159.27| 10| |
-|  3|`0ccb0f855352783a972be45188bf3164-SCPC-500-12.cnf`    |   76.68| 20| |
-|  4|`0e1d562093d5f4fc9013cf4a14a03f70-Break_12_50.xml.cnf`|   12.19| 10| |
-|  5|`110f8eb8b9b80204fe955ea0973bbb00-clqcl_30_7_6.normal`|        |124| |
-|  6|`24bde22f729a988fb2394b644cb60d39-SC25_Timetable_C_48`|   12.00| 10| |
-|  7|`2d0c041c0fe72dc32527bfbf34f63e61-170223547.cnf`      |        |124| |
-|  8|`35b9091b90bd28a492c9556d6fc4348d-bp4_TCO_CSO_ZR.norm`|  606.28| 10| |
-|  9|`35ec95b9b2398fb522db178855016ae0-MVRoundRobin_n14_d1`|        |124| |
-| 10|`46a8727e27d848faafd83a990c2e01a7-case8.normalised.cn`|        |124| |
-| 11|`482295be38dc1d63a16f3cf649ef7ef6-myciel6-cn.used-as.`| 4296.87| 20| |
-| 12|`53c21f3e78f060883026b5a12ba691d8-maximum_constrained`|   14.02| 10| |
-| 13|`57b478982ee9aba245ba792452b18fe3-VanDerWaerden_pd_2-`|  334.90| 10| |
-| 14|`6147e666b75f603a4c4490d21ab654cd-hid-uns-enc-6-1-0-0`|  790.16| 20| |
-| 15|`65f7145996bbec02b90bd0fa64a20502-test_v7_r12_vr10_c1`|        |124| |
-| 16|`68e33d998466bbdd4bfb7249a5790e4f-arles_thres10_p10_r`|    0.02| 20| |
-| 17|`83aa254f7d17e1df7bee19322ac4752b-1.normalised.cnf`   |        |124| |
-| 18|`8e62c5d47920ffe36052f86177403e70-SC25_Timetable_C_39`|   26.73| 10| |
-| 19|`908433870bee8ba2c86f266d0b002fdb-MVRoundRobin_n20_d1`|        |124| |
-| 20|`918d9e7c2e197312517736421d728958-SCPC-500-1.cnf`     |  118.29| 20| |
-| 21|`91c429adc2dc8430461b6d87a9aef335-16_16_booth_wallace`|        |124| |
-| 22|`967b58fea99a99b8da592d3e2fe7139b-dubois50.cnf.mis-99`|        |124| |
-| 23|`98a9352230efc411c092f1dcdcdedcfc-bp4_BC012_IXA_LPI_F`|        |124| |
-| 24|`9b5f767eb5c14eb888d51acf70e045c8-uniqinv40prop.cnf`  | 2606.99| 20| |
-| 25|`a0bcdaffb0ea36b678899fd86bdc7f18-arles_thres10_p10_r`|    0.03| 20| |
-| 26|`a1fdd60d2570f47fb14956ac9e96951f-oddball_22_5_ttf.no`|   29.45| 20| |
-| 27|`a70883771fd1c210d94a916d52510a3a-gm28sparrc.cnf`     |   15.67| 20| |
-| 28|`b3d3680b3287a989ce61a6db1054efd2-case20.normalised.c`|   34.24| 10| |
-| 29|`b9ed6fd14f4fc969ec966a4b54c36872-n320p5q2_n.apx_16.c`|   67.38| 10| |
-| 30|`c21096fa2f550785c33dc862d83bc941-case17.normalised.c`|  441.79| 10| |
-| 31|`cb950b9accfb53eb98f77b0f995ac0ae-rphp5_050_shuffled.`|        |124| |
-| 32|`d5928883c1e1f70764a31a83aa419eaf-oski15a01b42s_opt.c`|        |124| |
-| 33|`d8666a18cf3a32af0a606099f0070b4b-7.normalised.cnf`   |        |124| |
-| 34|`ddf9620410e6a4351f64c745670ef5d4-oddball_57_5_tto_zp`| 1432.37| 10| |
-| 35|`e23edb67db2d1dfdbfe2f4c02d09c6c7-14.normalised.cnf`  | 1010.25| 10| |
-| 36|`e430acf720b63044e5c825a00a76b0eb-rphp_p25_r25.cnf`   |        |124| |
-| 37|`e442248e155eb81a811edd1deca8a2cd-sudoku-N30-23.cnf`  |        |124| |
-| 38|`f17dfbed8c18716a41b231702e127524-SC25_Timetable_C_40`|  667.20| 10| |
-| 39|`f25a1df88f89c6bcbe2602fa7f6e816b-1-TC-256-K-63.sanit`|  399.84| 10| |
-| 40|`f33a6163305d6559043b7438a692dea9-simon-r17-1.sanitiz`| 2991.86| 10| |
+| # | CNF picked from [SAT Competition 2025](https://satcompetition.github.io/2021/) |time (s)|ret|result|
+|--:|:-----------------------------------------------------|-------:|:-:|:--:|
+|  1|`04648cef5bed430ab6429991fa9e107d-ramsey_3_6_19.norma`|   TO   |124| -- |
+|  2|`0c0430a68f147be18ab3fded07f30fdb-oddball_53_5_tto_zp`| 1159.27| 10| ✅ |
+|  3|`0ccb0f855352783a972be45188bf3164-SCPC-500-12.cnf`    |   76.68| 20| ✅ |
+|  4|`0e1d562093d5f4fc9013cf4a14a03f70-Break_12_50.xml.cnf`|   12.19| 10| ✅ |
+|  5|`110f8eb8b9b80204fe955ea0973bbb00-clqcl_30_7_6.normal`|   TO   |124| -- |
+|  6|`24bde22f729a988fb2394b644cb60d39-SC25_Timetable_C_48`|   12.00| 10| ✅ |
+|  7|`2d0c041c0fe72dc32527bfbf34f63e61-170223547.cnf`      |   TO   |124| -- |
+|  8|`35b9091b90bd28a492c9556d6fc4348d-bp4_TCO_CSO_ZR.norm`|  606.28| 10| ✅ |
+|  9|`35ec95b9b2398fb522db178855016ae0-MVRoundRobin_n14_d1`|   TO   |124| -- |
+| 10|`46a8727e27d848faafd83a990c2e01a7-case8.normalised.cn`|   TO   |124| -- |
+| 11|`482295be38dc1d63a16f3cf649ef7ef6-myciel6-cn.used-as.`| 4296.87| 20| ✅ |
+| 12|`53c21f3e78f060883026b5a12ba691d8-maximum_constrained`|   14.02| 10| ✅ |
+| 13|`57b478982ee9aba245ba792452b18fe3-VanDerWaerden_pd_2-`|  334.90| 10| ✅ |
+| 14|`6147e666b75f603a4c4490d21ab654cd-hid-uns-enc-6-1-0-0`|  790.16| 20| ✅ |
+| 15|`65f7145996bbec02b90bd0fa64a20502-test_v7_r12_vr10_c1`|   TO   |124| -- |
+| 16|`68e33d998466bbdd4bfb7249a5790e4f-arles_thres10_p10_r`|    0.02| 20| ✅ |
+| 17|`83aa254f7d17e1df7bee19322ac4752b-1.normalised.cnf`   |   TO   |124| -- |
+| 18|`8e62c5d47920ffe36052f86177403e70-SC25_Timetable_C_39`|   26.73| 10| ✅ |
+| 19|`908433870bee8ba2c86f266d0b002fdb-MVRoundRobin_n20_d1`|   TO   |124| -- |
+| 20|`918d9e7c2e197312517736421d728958-SCPC-500-1.cnf`     |  118.29| 20| ✅ |
+| 21|`91c429adc2dc8430461b6d87a9aef335-16_16_booth_wallace`|   TO   |124| -- |
+| 22|`967b58fea99a99b8da592d3e2fe7139b-dubois50.cnf.mis-99`|   TO   |124| -- |
+| 23|`98a9352230efc411c092f1dcdcdedcfc-bp4_BC012_IXA_LPI_F`|   TO   |124| -- |
+| 24|`9b5f767eb5c14eb888d51acf70e045c8-uniqinv40prop.cnf`  | 2606.99| 20| ✅ |
+| 25|`a0bcdaffb0ea36b678899fd86bdc7f18-arles_thres10_p10_r`|    0.03| 20| ✅ |
+| 26|`a1fdd60d2570f47fb14956ac9e96951f-oddball_22_5_ttf.no`|   29.45| 20| ✅ |
+| 27|`a70883771fd1c210d94a916d52510a3a-gm28sparrc.cnf`     |   15.67| 20| ✅ |
+| 28|`b3d3680b3287a989ce61a6db1054efd2-case20.normalised.c`|   34.24| 10| ✅ |
+| 29|`b9ed6fd14f4fc969ec966a4b54c36872-n320p5q2_n.apx_16.c`|   67.38| 10| ✅ |
+| 30|`c21096fa2f550785c33dc862d83bc941-case17.normalised.c`|  441.79| 10| ✅ |
+| 31|`cb950b9accfb53eb98f77b0f995ac0ae-rphp5_050_shuffled.`|   TO   |124| -- |
+| 32|`d5928883c1e1f70764a31a83aa419eaf-oski15a01b42s_opt.c`|   TO   |124| -- |
+| 33|`d8666a18cf3a32af0a606099f0070b4b-7.normalised.cnf`   |   TO   |124| -- |
+| 34|`ddf9620410e6a4351f64c745670ef5d4-oddball_57_5_tto_zp`| 1432.37| 10| ✅ |
+| 35|`e23edb67db2d1dfdbfe2f4c02d09c6c7-14.normalised.cnf`  | 1010.25| 10| ✅ |
+| 36|`e430acf720b63044e5c825a00a76b0eb-rphp_p25_r25.cnf`   |   TO   |124| -- |
+| 37|`e442248e155eb81a811edd1deca8a2cd-sudoku-N30-23.cnf`  |   TO   |124| -- |
+| 38|`f17dfbed8c18716a41b231702e127524-SC25_Timetable_C_40`|  667.20| 10| ✅ |
+| 39|`f25a1df88f89c6bcbe2602fa7f6e816b-1-TC-256-K-63.sanit`|  399.84| 10| ✅ |
+| 40|`f33a6163305d6559043b7438a692dea9-simon-r17-1.sanitiz`| 2991.86| 10| ✅ |
 
-"splr"    , med:    226.59, max:   4296.87,total except 16 timeouts:17144.50
+med:    226.59, max:   4296.87,total except 16 timeouts:17144.50
 
 #### Version 0.17.0
 
