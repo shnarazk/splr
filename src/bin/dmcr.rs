@@ -159,10 +159,10 @@ fn main() {
                     args.problem.to_str().unwrap(),
                     RESET
                 );
-                return;
+                std::process::exit(1);
             }
         } else {
-            return;
+            std::process::exit(1);
         }
         found = true;
     }
@@ -175,39 +175,48 @@ fn main() {
                     args.problem.to_str().unwrap(),
                     RESET,
                 );
-                return;
+                std::process::exit(1);
             }
             found = true;
             from_file = false;
         } else {
-            return;
+            std::process::exit(1);
         }
     }
     if !found {
         println!("There's no assign file.");
-        return;
+        std::process::exit(1);
     }
     match s.validate() {
-        Some(v) => println!(
-            "{}An invalid assignment set for {}{} due to {:?}.",
-            red,
-            args.problem.to_str().unwrap(),
-            RESET,
-            v,
-        ),
-        None if from_file => println!(
-            "{}A valid assignment set for {}{} is found in {}",
-            green,
-            args.problem.to_str().unwrap(),
-            RESET,
-            args.assign.unwrap().to_str().unwrap(),
-        ),
-        None => println!(
-            "{}A valid assignment set for {}.{}",
-            green,
-            args.problem.to_str().unwrap(),
-            RESET,
-        ),
+        Some(v) => {
+            println!(
+                "{}An invalid assignment set for {}{} due to {:?}.",
+                red,
+                args.problem.to_str().unwrap(),
+                RESET,
+                v,
+            );
+            std::process::exit(1);
+        }
+        None if from_file => {
+            println!(
+                "{}A valid assignment set for {}{} is found in {}",
+                green,
+                args.problem.to_str().unwrap(),
+                RESET,
+                args.assign.unwrap().to_str().unwrap(),
+            );
+            std::process::exit(0);
+        }
+        None => {
+            println!(
+                "{}A valid assignment set for {}.{}",
+                green,
+                args.problem.to_str().unwrap(),
+                RESET,
+            );
+            std::process::exit(0);
+        }
     }
 }
 
