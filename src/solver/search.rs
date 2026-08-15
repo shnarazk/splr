@@ -303,22 +303,6 @@ fn search(
                 cdb.save_best_assign_reasons(asg, false);
                 state.flush("");
                 state.flush(format!("core: {}", state.core_size));
-                // if state.core_size < 10 {
-                //     for (i, v) in asg.var_iter().enumerate().skip(1) {
-                //         if !v.is(FlagVar::ELIMINATED) && v.level > 0 {
-                //             println!(
-                //                 "{:>4}: {:>2}| {:>6.3}",
-                //                 i,
-                //                 match v.assign {
-                //                     None => 0,
-                //                     Some(false) => -1,
-                //                     Some(true) => 1,
-                //                 },
-                //                 v.polarity
-                //             );
-                //         }
-                //     }
-                // }
             }
         }
         progress_pressure += 1;
@@ -355,15 +339,9 @@ fn search(
                     0.4..0.9 => {
                         asg.phase_mode = RephaseTarget::Best;
                     }
-                    // 0.6..0.9 => {
-                    //     asg.phase_mode = RephaseTarget::Walk;
-                    // }
                     0.9..1.0 => {
                         asg.phase_mode = RephaseTarget::Polarity;
                     }
-                    // 0.9..1.0 => {
-                    //     asg.phase_mode = RephaseTarget::Inverted;
-                    // }
                     _ => {
                         asg.phase_mode = RephaseTarget::Walk;
                     }
