@@ -1,10 +1,11 @@
 ## A modern SAT Solver for Propositional Logic in Rust
 
-Splr is a modern SAT solver in [Rust](https://www.rust-lang.org), based on [Glucose 4.1](https://www.labri.fr/perso/lsimon/glucose/), inspired by [Kissat](https://github.com/arminbiere/kissat).
+Splr is a modern SAT solver in [Rust](https://www.rust-lang.org), based on [Glucose 4.1](https://www.labri.fr/perso/lsimon/glucose/) and [Kissat](https://github.com/arminbiere/kissat).
 It adopts, or adopted, various research results on modern SAT solvers:
 
 - _CDCL_, _watch literals_, _LBD_ and so on from Kissat, Glucose, [Minisat](http://minisat.se) and the ancestors
-- Luby series based restart control. The current implementation has $O(1)$ time complexity and $O(1)$ space complexity.
+- Luby series based restart control. The current implementation of the Luby series has $O(1)$ time complexity and $O(1)$ space complexity.
+  [Its correctness is proved in Lean4](https://github.com/shnarazk/LubySequence).
 - Glucose-like _dynamic blocking/forcing restarts_
 - pre/in-processor to simplify the given CNF
 - branching variable selections based on _Learning Rate Based Branching_ with _Reason Side Rewarding_ or EVSIDS and _Variable Move To the quest First_, VMTF

@@ -6,7 +6,7 @@
 - Adopt rephasing modes: Walk, Best, False(Original), True(Inverted), Random, Flipped, Polarity
 - Revise `ClauseDB::reduce` to remove much more clauses and can run at any decision level
 - `cancel_until` also reduces lagre clauses
-- Switch to the O(1) Luby iterator. Now Luby sequence is used as the
+- Switch to [the O(1) Luby iterator, whose correctness was proved in Lean4](https://github.com/shnarazk/LubySequence). Now Luby sequence is used as the
   trigger for restarts, clause reduction, clause elimination, clause vivification, and changing rephasing mode
 - Remove feature 'assign_rate'
 - Remove feature 'bi_clause_completion'
