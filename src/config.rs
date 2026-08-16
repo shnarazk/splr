@@ -214,15 +214,15 @@ impl Config {
                 #[cfg(feature = "chrono_BT")]
                 "chrono BT",
                 #[cfg(feature = "clause_elimination")]
-                "stage-based clause elimination",
+                "Luby-based clause elimination",
                 #[cfg(feature = "clause_vivification")]
-                "stage-based clause vivification",
+                "Luby-based clause vivification",
                 #[cfg(feature = "EMA_calibration")]
                 "EMA calibration",
                 #[cfg(feature = "reason_side_rewarding")]
                 "reason-side rewarding",
                 #[cfg(feature = "rephase")]
-                "stage-based re-phasing",
+                "Luby-based re-phasing",
                 #[cfg(feature = "trail_saving")]
                 "trail saving",
                 #[cfg(feature = "unsafe_access")]
