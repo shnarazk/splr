@@ -52,20 +52,6 @@ pub struct Config {
     pub use_certification: bool,
 
     //
-    //## clause management
-    //
-    // clause reward decay rate
-    pub crw_dcy_rat: f64,
-    // clause reduction LBD threshold for mode 2: exploration
-    pub cls_rdc_lbd: u16,
-
-    //
-    //## restart
-    //
-    // LBD trend threshold to trigger a restart
-    pub rst_lbd_thr: f64,
-
-    //
     //## eliminator
     //
     pub enable_eliminator: bool,
@@ -77,16 +63,6 @@ pub struct Config {
 
     /// Max #cls for var elimination
     pub elm_var_occ: usize,
-
-    //
-    //## vivifier
-    //
-
-    //
-    //## learning-rate-based var rewarding:
-    //
-    /// Var Reward Decay Rate
-    pub vrw_learning_rate: f64,
 }
 
 impl Default for Config {
@@ -106,17 +82,10 @@ impl Default for Config {
             show_cdb_heatmap: false,
             show_journal: false,
             use_certification: false,
-
-            crw_dcy_rat: 0.95,
-            cls_rdc_lbd: 5,
-            rst_lbd_thr: 1.05,
-
             enable_eliminator: cfg!(feature = "clause_elimination"),
             elm_cls_lim: 64,
             elm_grw_lim: 0,
             elm_var_occ: 20000,
-
-            vrw_learning_rate: 0.25,
         }
     }
 }
@@ -139,8 +108,8 @@ impl Config {
                 let flags = [
                     "no-color", "quiet", "certify", "heatmap", "journal", "help", "version",
                 ];
-                let options_usize = ["cl", "crl", "stat", "ecl", "evl", "evo"];
-                let options_f64 = ["timeout", "cdr", "rlt", "vlr"];
+                let options_usize = ["cl", "stat", "ecl", "evl", "evo"];
+                let options_f64 = ["timeout"];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = stripped.split('=').collect();
                 match seg.len() {
@@ -162,7 +131,6 @@ impl Config {
                                 if let Ok(val) = str.parse::<usize>() {
                                     match name {
                                         "cl" => self.c_cls_lim = val,
-                                        "crl" => self.cls_rdc_lbd = val as u16,
                                         "ecl" => self.elm_cls_lim = val,
                                         "evl" => self.elm_grw_lim = val,
                                         "evo" => self.elm_var_occ = val,
@@ -179,9 +147,6 @@ impl Config {
                                 if let Ok(val) = str.parse::<f64>() {
                                     match name {
                                         "timeout" => self.c_timeout = val,
-                                        "cdr" => self.crw_dcy_rat = val,
-                                        "rlt" => self.rst_lbd_thr = val,
-                                        "vlr" => self.vrw_learning_rate = val,
                                         _ => panic!("invalid option: {name}"),
                                     }
                                 } else {
@@ -311,13 +276,9 @@ FLAGS:
   -V, --version             Prints version information
 OPTIONS:
       --cl <c-cls-lim>      Soft limit of #clauses (6MC/GB){:>10}
-      --cdr <crw-dcy-rat>   Clause reward decay rate          {:>10.2}
-      --crl <clr-rdc-lbd>   LBD for clause reduction       {:>10}
       --ecl <elm-cls-lim>   Max #lit for clause subsume    {:>10}
       --evl <elm-grw-lim>   Grow limit of #cls in var elim.{:>10}
       --evo <elm-var-occ>   Max #cls for var elimination   {:>10}
-      --rlt <rst-lbd-thr>   LBD trend threshold to restart    {:>10.2}
-      --vlr <vrw-lrn-rat>   Var reward learning rate          {:>10.2}
   -o, --dir <io-outdir>     Output directory                {:>10}
   -p, --proof <io-pfile>    DRAT Cert. filename                 {:>10}
   -r, --result <io-rfile>   Result filename/stdout              {:>10}
@@ -326,13 +287,9 @@ ARGS:
   <cnf-file>    DIMACS CNF file
 ",
         config.c_cls_lim,
-        config.crw_dcy_rat,
-        config.cls_rdc_lbd,
         config.elm_cls_lim,
         config.elm_grw_lim,
         config.elm_var_occ,
-        config.rst_lbd_thr,
-        config.vrw_learning_rate,
         config.io_odir.to_string_lossy(),
         config.io_pfile.to_string_lossy(),
         config.io_rfile.to_string_lossy(),
@@ -371,28 +328,5 @@ impl Config {
     #[allow(unused_mut)]
     pub fn override_args(mut self) -> Config {
         self
-    }
-}
-
-pub mod property {
-    use super::Config;
-    use crate::types::*;
-
-    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    pub enum Tf64 {
-        ClauseRewardDecayRate,
-        VarRewardLearningRate,
-    }
-
-    pub const F64S: [Tf64; 2] = [Tf64::ClauseRewardDecayRate, Tf64::VarRewardLearningRate];
-
-    impl PropertyDereference<Tf64, f64> for Config {
-        #[inline]
-        fn derefer(&self, k: Tf64) -> f64 {
-            match k {
-                Tf64::ClauseRewardDecayRate => self.crw_dcy_rat,
-                Tf64::VarRewardLearningRate => self.vrw_learning_rate,
-            }
-        }
     }
 }

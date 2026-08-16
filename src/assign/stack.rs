@@ -1,8 +1,8 @@
 //! main struct AssignStack
 use {
     super::{
-        AssignIF, RephaseTarget, Var,
         heap::{VarHeapIF, VarIdHeap},
+        AssignIF, RephaseTarget, Var,
     },
     crate::{assign::learning_rate::VarActivityScheme, cdb::ClauseDBIF, types::*},
     std::{
@@ -156,7 +156,7 @@ impl From<&mut AssignStack> for Vec<i32> {
 }
 
 impl Instantiate for AssignStack {
-    fn instantiate(config: &Config, cnf: &CNFDescription) -> AssignStack {
+    fn instantiate(_config: &Config, cnf: &CNFDescription) -> AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
             trail: Vec::with_capacity(nv),
@@ -172,9 +172,9 @@ impl Instantiate for AssignStack {
 
             lbd_temp: vec![0; nv + 1],
 
-            activity_stay_rate: 1.0 - config.vrw_learning_rate,
+            activity_stay_rate: 0.9,
 
-            activity_learning_rate: config.vrw_learning_rate,
+            activity_learning_rate: 0.1,
             rng: SplitMix64::new((cnf.num_of_variables + cnf.num_of_clauses) as u64),
 
             ..AssignStack::default()
@@ -249,7 +249,11 @@ impl AssignIF for AssignStack {
             lits.iter()
                 .map(|l| {
                     let i = i32::from(l);
-                    if i < 0 { -2 * i } else { 2 * i + 1 }
+                    if i < 0 {
+                        -2 * i
+                    } else {
+                        2 * i + 1
+                    }
                 })
                 .collect::<Vec<_>>(),
         );

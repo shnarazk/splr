@@ -214,9 +214,6 @@ impl Instantiate for ClauseDB {
             certification_store: CertificationStore::instantiate(config, cnf),
             soft_limit: config.c_cls_lim,
             lbd: Ema2::default_extended(),
-
-            // activity_stay_rate: config.crw_dcy_rat,
-            // activity_learning_rate: 1.0 - config.crw_dcy_rat,
             lbd_temp: vec![0; nv + 1],
             ..ClauseDB::default()
         }

@@ -4,7 +4,7 @@ use {
     splr::{
         Config, EmaIF, PropertyDereference, PropertyReference, SolverError, VERSION, assign,
         cdb::{self, ClauseDBIF},
-        config::{self, CERTIFICATION_DEFAULT_FILENAME},
+        config::CERTIFICATION_DEFAULT_FILENAME,
         solver::*,
         state::{self, LogF64Id, LogUsizeId},
     },
@@ -303,16 +303,6 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(format!("c     Strategy|mode:  generic, time:{tm:9.2},\n").as_bytes())?;
     out.write_all("c \n".as_bytes())?;
-    for key in &config::property::F64S {
-        out.write_all(
-            format!(
-                "c   config::{:<27}{:>19.3}\n",
-                format!("{key:?}"),
-                s.state.config.derefer(*key),
-            )
-            .as_bytes(),
-        )?;
-    }
     for key in &assign::property::USIZES {
         out.write_all(
             format!(
