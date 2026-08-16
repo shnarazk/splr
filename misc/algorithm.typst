@@ -7,7 +7,7 @@
 #pseudocode-list(booktabs: true, hooks: 0.2em, line-gap: 6pt, stroke: 0.3pt, title: strong[Main search loop in Splr-0.19 (src/solver/search.rs)])[
   + *Output:* satifiability of the given CNF
   + *begin*
-    + *let* $l: "Luby" <- "Luby"."new"()$;
+    + *let* $l: "Luby" <- "Luby"."new"("scale": 8192)$;
     + *let* $i: "int" <- 0$;
     + *while* _there is an unassignd or unpropagated var_ *do*
       + `SelectDecisionVar`();
@@ -18,7 +18,7 @@
       + `ConflictAnalysis`();
       + `BackTrack`();
       + $i <- i + 1$;
-      + *if* $i = 8196$ *then*
+      + *if* $i = 8192$ *then*
         +  `SelectRephaseScheme`([WALK]);
       + *if* $i >= l."value"$ *then*
         + $i <- 0$;
