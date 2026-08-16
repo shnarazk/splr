@@ -550,7 +550,7 @@ impl StateIF for State {
         );
         self[LogUsizeId::StageSegment] = stg_segment;
         println!(
-            "\x1B[2K    Conflict|cLvl:{}, bLvl:{}, #RST:{}, /cpr:{}",
+            "\x1B[2K    Conflict|cLvl:{}, bLvl:{},  LBD:{}, /cpr:{}",
             fm!(
                 "{:>9.2}",
                 self,
@@ -565,7 +565,7 @@ impl StateIF for State {
                 self.b_lvl.get_slow(),
                 0.01
             ),
-            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
+            fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get_fast(), 0.01),
             fm!(
                 "{:>9.2}",
                 self,
@@ -575,8 +575,8 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K    Learning| LBD:{}, ti1%:{}, ti2%:{}, /dpc:{}",
-            fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get_fast(), 0.01),
+            "\x1B[2K  Luby stage|#spn:{}, ti1%:{}, ti2%:{}, /dpc:{}",
+            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
             fm!(
                 "{:>9.2}",
                 self,
