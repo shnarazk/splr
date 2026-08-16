@@ -2,32 +2,34 @@
 #set text(
   font: ((name: "New Computer Modern", covers: "latin-in-cjk"), "Hiragino Mincho Pro"),
   size: 11pt)
-#let title = [Search algorithms in Splr-0.19]
+#let title = [Main search loop in Splr-0.19 (src/solver/search.rs)]
 
-#pseudocode-list(booktabs: true, hooks: 0.2em, line-gap: 6pt, stroke: 0.3pt, title: strong[Search in Splr-0.19])[
-  + *let* $l: "Luby" <- "Luby"."new"()$
-  + *let* $i: "int" <- 0$
-  + *while* _there is an unassignd or unpropagated var_ *do*
-    + `SelectDecisionVar`()
-    + *if* `BCP`() $!=$ CONFLICT *then*
-      + *continue*
-    + *if* _decision level_ $= 0$ *then*
-      + *return* UNSAT
-    + `ConflictAnalysis`()
-    + `BackTrack`()
-    + $i <- i + 1$
-    + *if* $i = 8196$ *then*
-      +  `UseDefaultRephaseScheme`()
-    + *if* $i >= l."value"$ *then*
-      + $i <- 0$
-      + $l$.`next`()
-      + `Restart`()
-      + `Reduce`()
-      + `Vivify`()
-      + `Eliminate`()
-      + `SelectRephaseScheme`()
-      + `SelectVarActivityScheme`()
-  + *return* SAT
+#pseudocode-list(booktabs: true, hooks: 0.2em, line-gap: 6pt, stroke: 0.3pt, title: strong[Main search loop in Splr-0.19 (src/solver/search.rs)])[
+  + *Output:* satifiability of the given CNF
+  + *begin*
+    + *let* $l: "Luby" <- "Luby"."new"()$;
+    + *let* $i: "int" <- 0$;
+    + *while* _there is an unassignd or unpropagated var_ *do*
+      + `SelectDecisionVar`();
+      + *if* `BCP`() $!=$ CONFLICT *then*
+        + *continue*;
+      + *if* _decision level_ $= 0$ *then*
+        + *return* UNSAT;
+      + `ConflictAnalysis`();
+      + `BackTrack`();
+      + $i <- i + 1$;
+      + *if* $i = 8196$ *then*
+        +  `SelectRephaseScheme`([WALK]);
+      + *if* $i >= l."value"$ *then*
+        + $i <- 0$;
+        + $l$.`next`();
+        + `Restart`();
+        + `Reduce`();
+        + `Vivify`();
+        + `Eliminate`();
+        + `SelectRephaseScheme`([FALSE, TRUE, RANDOM, BEST, POLARITY]);
+        + `SelectVarActivityScheme`([LRB, VMTF]);
+    + *return* SAT:
 ]
 
 #pagebreak()

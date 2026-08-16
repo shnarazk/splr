@@ -392,7 +392,7 @@ Splr-0.17.0 adopts the following features by default:
 
 The following figure explains the flow used in the latest Splr.
 
-![search algorithm in Splr 0.17](https://user-images.githubusercontent.com/997855/215309646-1bfe3ea5-dcc3-42ee-9d76-99e1b07610c4.png)
+![search algorithm in Splr 0.19](https://github.com/user-attachments/assets/a2662e11-6772-4a8a-9cd4-c467950b4f25)
 
 I use the following terms here:
 - _a stage_ -- a span in which solver uses the same restart parameters
