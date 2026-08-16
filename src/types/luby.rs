@@ -3,7 +3,7 @@ use std::fmt;
 
 #[derive(Clone, Debug)]
 pub struct LubySegment {
-    pub as_n: usize,
+    pub sequence_index: usize,
     pub seg_index: u32,
     pub ix_in_seg: u32,
 }
@@ -11,7 +11,7 @@ pub struct LubySegment {
 impl Default for LubySegment {
     fn default() -> Self {
         LubySegment {
-            as_n: 0,
+            sequence_index: 0,
             seg_index: 1,
             ix_in_seg: 0,
         }
@@ -23,7 +23,7 @@ impl fmt::Display for LubySegment {
         write!(
             f,
             "Luby[n: {}, seg:{}, ix:{}]",
-            self.as_n, self.seg_index, self.ix_in_seg
+            self.sequence_index, self.seg_index, self.ix_in_seg
         )
     }
 }
@@ -38,20 +38,20 @@ impl LubySegment {
     pub fn to_next(&self) -> Self {
         if self.ix_in_seg + 1 == self.segment_len() {
             Self {
-                as_n: self.as_n + 1,
+                sequence_index: self.sequence_index + 1,
                 seg_index: self.seg_index + 1,
                 ix_in_seg: 0,
             }
         } else {
             Self {
-                as_n: self.as_n + 1,
+                sequence_index: self.sequence_index + 1,
                 seg_index: self.seg_index,
                 ix_in_seg: self.ix_in_seg + 1,
             }
         }
     }
     pub fn shift(&mut self) -> &mut Self {
-        self.as_n += 1;
+        self.sequence_index += 1;
         if self.ix_in_seg + 1 == self.segment_len() {
             self.seg_index += 1;
             self.ix_in_seg = 0;
@@ -61,7 +61,7 @@ impl LubySegment {
         self
     }
     pub fn reset(&mut self) {
-        self.as_n = 0;
+        self.sequence_index = 0;
         self.seg_index = 1;
         self.ix_in_seg = 0;
     }
