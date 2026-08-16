@@ -475,10 +475,10 @@ impl StateIF for State {
         let cdb_num_learnt = cdb.derefer(cdb::property::Tusize::NumLearnt);
         let cdb_tier1 = cdb.refer(cdb::property::TEma::Tier1ClauseRatio);
         let cdb_tier2 = cdb.refer(cdb::property::TEma::Tier2ClauseRatio);
-
-        let rst_num_rst: usize = self[Stat::Restart];
         let rst_lbd: &EmaView = cdb.refer(cdb::property::TEma::LBD);
+
         let stg_segment: usize = self.span_manager.current_segment();
+        self.record[LogUsizeId::Restart] = self[Stat::Restart];
 
         self.progress_cnt += 1;
         // print!("\x1B[9A\x1B[1G");
@@ -575,8 +575,13 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K  Luby stage|#spn:{}, ti1%:{}, ti2%:{}, /dpc:{}",
-            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
+            "\x1B[2K  Luby stage| idx:{}, ti1%:{}, ti2%:{}, /dpc:{}",
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::SequenceIndex,
+                self.span_manager.sequence_index()
+            ),
             fm!(
                 "{:>9.2}",
                 self,
@@ -964,6 +969,7 @@ pub enum LogUsizeId {
     //
     //## Luby segment
     //
+    SequenceIndex,
     LubySpan,
     StageCycle,
     StageSegment,
