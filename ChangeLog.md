@@ -21,6 +21,7 @@
 - Remove feature 'two_mode_reduction'
 - Remove feature 'BT_deepen' (replaced by instant reduction)
 - Rename feature 'debug_propagation' to 'trace_propagation'
+- Remove options: `--cdr`, `--crl`, `--cr1`, `--cr2`, `--rlt`, `--vdr`, `--vds`
 - Remove src/solver/restart.rs
 
 ## 0.18.0, 2026-03-14
