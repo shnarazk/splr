@@ -1,11 +1,11 @@
-## 0.19.0, 2026-08-XX
+## 0.19.0, 2026-08-22
 
 - Adopt two decision literal select heuristics:
     - *Variable Move To queue First*
     - *LearningRate-Based Rewarding* 
 - Adopt rephasing modes: Walk, Best, False(Original), True(Inverted), Random, Flipped, Polarity
 - Revise `ClauseDB::reduce` to remove much more clauses and can run at any decision level
-- `cancel_until` also reduces lagre clauses
+- `cancel_until` also reduces lagre clauses during `cancel_until`
 - Switch to [the O(1) Luby iterator, whose correctness was proved in Lean4](https://github.com/shnarazk/LubySequence). Now Luby sequence is used as the
   trigger for restarts, clause reduction, clause elimination, clause vivification, and changing rephasing mode
 - Remove feature 'assign_rate'
@@ -20,7 +20,7 @@
 - Remove feature 'trace_equivalency'
 - Remove feature 'two_mode_reduction'
 - Remove feature 'BT_deepen' (replaced by instant reduction)
-- rename feature 'debug_propagation' to 'trace_propagation'
+- Rename feature 'debug_propagation' to 'trace_propagation'
 - Remove src/solver/restart.rs
 
 ## 0.18.0, 2026-03-14
