@@ -4,7 +4,7 @@ use {
     splr::{
         Config, EmaIF, PropertyDereference, PropertyReference, SolverError, VERSION, assign,
         cdb::{self, ClauseDBIF},
-        config::{self, CERTIFICATION_DEFAULT_FILENAME},
+        config::CERTIFICATION_DEFAULT_FILENAME,
         solver::*,
         state::{self, LogF64Id, LogUsizeId},
     },
@@ -273,29 +273,29 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c     Conflict|entg:{:>9.4}, cLvl:{:>9.4}, bLvl:{:>9.4}, /cpr:{:>9.2},\n",
-            state[LogF64Id::LiteralBlockEntanglement],
+            "c     Conflict|cLvl:{:>9.4}, bLvl:{:>9.4}, #RST:{:>9}, /cpr:{:>9.2},\n",
             state[LogF64Id::CLevel],
             state[LogF64Id::BLevel],
+            state[LogUsizeId::RemainingVar],
             state[LogF64Id::ConflictPerRestart],
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c      Learing|avrg:{:>9.4}, trnd:{:>9.4}, #RST:{:>9}, /dpc:{:>9.2},\n",
+            "c      Learing| LBD:{:>9.4}, ti1%:{:>9.4}, ti2%:{:>9.2}, /dpc:{:>9.2},\n",
             state[LogF64Id::EmaLBD],
-            state[LogF64Id::TrendLBD],
-            state[LogUsizeId::Restart],
+            state[LogF64Id::Tier1ClauseRatio],
+            state[LogF64Id::Tier2ClauseRatio],
             state[LogF64Id::DecisionPerConflict],
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c         misc|vivC:{:>9}, subC:{:>9}, core:{:>9}, /ppc:{:>9.2},\n",
-            state[LogUsizeId::VivifiedClause],
-            state[LogUsizeId::SubsumedClause],
+            "c         misc| LRB:{:>9.2}, VMTF:{:>9.2}, core:{:>9}, /ppc:{:>9.2},\n",
+            state[LogF64Id::ConflictDistanceAverage0],
+            state[LogF64Id::ConflictDistanceAverage1],
             state[LogUsizeId::UnreachableCore],
             state[LogF64Id::PropagationPerConflict],
         )
@@ -303,16 +303,6 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(format!("c     Strategy|mode:  generic, time:{tm:9.2},\n").as_bytes())?;
     out.write_all("c \n".as_bytes())?;
-    for key in &config::property::F64S {
-        out.write_all(
-            format!(
-                "c   config::{:<27}{:>19.3}\n",
-                format!("{key:?}"),
-                s.state.config.derefer(*key),
-            )
-            .as_bytes(),
-        )?;
-    }
     for key in &assign::property::USIZES {
         out.write_all(
             format!(
@@ -343,12 +333,12 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             .as_bytes(),
         )?;
     }
-    for key in &cdb::property::F64S {
+    for key in &cdb::property::EMAS {
         out.write_all(
             format!(
                 "c   clause::{:<27}{:>19.3}\n",
                 format!("{key:?}"),
-                s.cdb.derefer(*key),
+                s.cdb.refer(key.clone()).get(),
             )
             .as_bytes(),
         )?;
@@ -384,7 +374,10 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
         )?;
     }
     {
-        let heatmap = s.cdb.clause_heatmap();
+        let heatmap = {
+            let Solver { asg, cdb, .. } = s;
+            cdb.clause_heatmap(asg)
+        };
         for (i, l) in heatmap.iter().enumerate() {
             let columns = l
                 .iter()

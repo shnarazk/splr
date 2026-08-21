@@ -7,8 +7,6 @@ use crate::{
     types::*,
 };
 
-const VIVIFY_LIMIT: usize = 20_000;
-
 pub trait VivifyIF {
     fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent;
 }
@@ -16,55 +14,73 @@ pub trait VivifyIF {
 impl VivifyIF for ClauseDB {
     /// vivify clauses under `asg`
     fn vivify(&mut self, asg: &mut AssignStack, state: &mut State) -> MaybeInconsistent {
-        const NUM_TARGETS: Option<usize> = Some(VIVIFY_LIMIT);
+        // This is a reusable vector to reduce memory consumption,
+        // the key is the number of invocation
+        // let db_skip: usize = 1 + self.num_clause / 1_000_000;
+        let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
+        let display_step: usize = 1000;
+        let mut num_check: usize = 0;
+        let mut num_shrink: usize = 0;
+        let mut num_assert: usize = 0;
+        let mut to_display: usize = display_step;
+        state[Stat::Vivification] += 1;
         if asg.remains() {
             asg.propagate_sandbox(self).map_err(|cc| {
                 state.log(None, "By vivifier");
                 SolverError::RootLevelConflict(cc)
             })?;
         }
-        let mut clauses: Vec<OrderedProxy<ClauseId>> =
-            select_targets(asg, self, state, state[Stat::Restart] == 0, NUM_TARGETS);
-        state[Stat::Vivification] += 1;
-        if clauses.is_empty() {
-            return Ok(());
-        }
-        let num_target = clauses.len();
-        // This is a reusable vector to reduce memory consumption,
-        // the key is the number of invocation
-        let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
-        let display_step: usize = 1000;
-        let mut num_check = 0;
-        let mut num_shrink = 0;
-        let mut num_assert = 0;
-        let mut to_display = 0;
-        'next_clause: while let Some(cp) = clauses.pop() {
+        // Inlined target selection (formerly `select_targets`).
+        // Pick clauses that haven't been vivified recently. We deliberately
+        // do NOT sort the candidates: the per-clause filter in the loop below
+        // decides which ones are actually worth processing.
+        'next_clause: for i in 1..self.clause.len() {
+            let cid = ClauseId::from(i);
+            let c = &mut self[cid];
+            if c.is_dead() {
+                continue;
+            }
+            let span: usize = 10_000 * c.len() * 2_usize.pow(c.vivify_age as u32 + 1);
+            if c.vivify_at + span > asg.num_conflict
+                || (c.referred_at <= c.vivify_at && (c.is(FlagClause::LEARNT) || c.vivify_age != 0))
+            {
+                continue;
+            }
+            num_check += 1;
+            let c = &mut self[cid];
+            // c.update_reference_rate(asg.num_conflict);
+            // Skip clauses that are unlikely to be improved by vivification.
+            // Empirically success concentrates on clauses
+            // that are not too short and have a moderate LBD; outside this band
+            // the success rate collapses, so skipping them saves work without
+            // losing many improvable clauses.
+            // assert!(!c.is(FlagClause::ASSIGN_REASON));
+            c.vivify_at = asg.num_conflict;
+            c.vivify_age += 1;
+            let is_learnt = c.is(FlagClause::LEARNT);
+            let lbd = c.lbd;
+            let referred = c.referred;
+            let referred_at = c.referred_at;
+            let vivify_age = c.vivify_age;
+            let vivify_at = c.vivify_at;
+            let clits = c.iter().copied().collect::<Vec<Lit>>();
+            if to_display <= num_check {
+                state.flush("");
+                state.flush(format!(
+                    "clause vivifying(assert:{num_assert} shorten:{num_shrink}, check:{num_check})..."
+                ));
+                to_display = num_check + display_step;
+            }
+            // debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
+            // Build a clean environment
+            // debug_assert!(asg.stack_is_empty() || !asg.remains());
+            // debug_assert_eq!(asg.root_level(), asg.decision_level());
             asg.backtrack_sandbox();
             debug_assert_eq!(asg.decision_level(), asg.root_level());
             if asg.remains() {
                 asg.propagate_sandbox(self)
                     .map_err(SolverError::RootLevelConflict)?;
             }
-
-            // debug_assert!(asg.stack_is_empty() || !asg.remains());
-            // debug_assert_eq!(asg.root_level(), asg.decision_level());
-            let cid = cp.to();
-            let c = &mut self[cid];
-            if c.is_dead() {
-                continue;
-            }
-            let is_learnt = c.is(FlagClause::LEARNT);
-            c.vivified();
-            let clits = c.iter().copied().collect::<Vec<Lit>>();
-            if to_display <= num_check {
-                state.flush("");
-                state.flush(format!(
-                    "clause vivifying(assert:{num_assert} shorten:{num_shrink}, check:{num_check}/{num_target})..."
-                ));
-                to_display = num_check + display_step;
-            }
-            num_check += 1;
-            // debug_assert!(clits.iter().all(|l| !clits.contains(&!*l)));
             let mut decisions: Vec<Lit> = Vec::new();
             for lit in clits.iter().copied() {
                 // assert!(!asg.var(lit.vi()).is(FlagVar::ELIMINATED));
@@ -119,7 +135,6 @@ impl VivifyIF for ClauseDB {
                             }
                             match vec.len() {
                                 0 => {
-                                    state.flush("");
                                     state[Stat::VivifiedClause] += num_shrink;
                                     state[Stat::VivifiedVar] += num_assert;
                                     state.log(None, "RootLevelConflict By vivify");
@@ -127,18 +142,18 @@ impl VivifyIF for ClauseDB {
                                 }
                                 1 => {
                                     self.certificate_add_assertion(vec[0]);
-                                    asg.assign_at_root_level(vec[0])?;
+                                    asg.assign_at_root_level(self, vec[0])?;
                                     num_assert += 1;
                                 }
                                 _ => {
-                                    #[cfg(feature = "clause_rewarding")]
-                                    if let Some(ci) =
-                                        self.new_clause(asg, &mut vec, is_learnt).is_new()
+                                    if let Some(cid) = self.new_clause(&mut vec, is_learnt).is_new()
                                     {
-                                        self.set_activity(ci, cp.value());
+                                        self[cid].lbd = lbd.min(decisions.len() as DecisionLevel);
+                                        self[cid].referred = referred;
+                                        self[cid].referred_at = referred_at;
+                                        self[cid].vivify_age = vivify_age;
+                                        self[cid].vivify_at = vivify_at;
                                     }
-                                    #[cfg(not(feature = "clause_rewarding"))]
-                                    self.new_clause(asg, &mut vec, is_learnt);
                                     self.remove_clause(cid);
                                     num_shrink += 1;
                                 }
@@ -148,9 +163,6 @@ impl VivifyIF for ClauseDB {
                         //## Rule 4
                     }
                 }
-            }
-            if VIVIFY_LIMIT < num_check {
-                break;
             }
         }
         asg.backtrack_sandbox();
@@ -177,64 +189,6 @@ impl VivifyIF for ClauseDB {
         state[Stat::VivifiedClause] += num_shrink;
         state[Stat::VivifiedVar] += num_assert;
         Ok(())
-    }
-}
-
-fn select_targets(
-    asg: &mut AssignStack,
-    cdb: &mut ClauseDB,
-    state: &State,
-    initial_stage: bool,
-    len: Option<usize>,
-) -> Vec<OrderedProxy<ClauseId>> {
-    if initial_stage {
-        let mut seen: Vec<Option<OrderedProxy<ClauseId>>> = vec![None; 2 * (asg.num_vars + 1)];
-        for (i, c) in cdb.iter().enumerate().skip(1) {
-            if let Some(rank) = c.to_vivify(None) {
-                let p = &mut seen[usize::from(c.lit0())];
-                if p.as_ref().map_or(0.0, |r| r.value()) < rank {
-                    *p = Some(OrderedProxy::new(ClauseId::from(i), rank));
-                }
-            }
-        }
-        let mut clauses = seen.iter().filter_map(|p| p.clone()).collect::<Vec<_>>();
-        if let Some(max_len) = len
-            && 10 * max_len < clauses.len()
-        {
-            clauses.sort();
-            clauses.truncate(max_len);
-        }
-
-        clauses
-    } else {
-        let n = state[Stat::Vivification] % 32;
-        let mut skips = 0;
-        let mut clauses: Vec<OrderedProxy<ClauseId>> = cdb
-            .iter()
-            .enumerate()
-            .skip(1)
-            .filter_map(|(i, c)| {
-                c.to_vivify(Some(n as u16)).and_then(|r| {
-                    if r == 0.0 {
-                        skips += 1;
-                        None
-                    } else {
-                        Some(OrderedProxy::new_invert(ClauseId::from(i), r))
-                    }
-                })
-            })
-            .collect::<Vec<_>>();
-        // if skips < clauses.len() {
-        //     return vec![];
-        // }
-        if let Some(max_len) = len
-            && max_len < clauses.len()
-        {
-            clauses.sort();
-            clauses.truncate(max_len);
-        }
-
-        clauses
     }
 }
 
@@ -338,36 +292,5 @@ impl AssignStack {
             "res: {learnt:?} from: {decisions:?} and trail: {assumes:?}"
         );
         learnt
-    }
-}
-
-impl Clause {
-    /// return `true` if the clause should try vivification.
-    /// smaller is better.
-    fn to_vivify(&self, initial_stage: Option<u16>) -> Option<f64> {
-        if let Some(n) = initial_stage {
-            if n == 0 {
-                (
-                    !self.is_dead() && self.rank <= 4
-                    // && (self.rank as usize) * 2 <= self.len()
-                    // && self.is(FlagClause::LEARNT)
-                )
-                .then(|| -((self.len() as f64 - self.rank as f64) / self.rank as f64))
-            } else {
-                (!self.is_dead() && self.rank == n && self.used >= 4).then(|| {
-                    if (self.rank as usize) < self.len() {
-                        -(self.len() as f64) / self.rank as f64
-                    } else {
-                        0.0
-                    }
-                })
-            }
-        } else {
-            (!self.is_dead()).then(|| self.len() as f64)
-        }
-    }
-    /// clear flags about vivification
-    fn vivified(&mut self) {
-        self.used = 0;
     }
 }

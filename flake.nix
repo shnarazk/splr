@@ -2,7 +2,9 @@
   description = "A modern SAT solver in Rust";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs";
   inputs.sat-bench.url = "github:shnarazk/SAT-bench";
-  outputs = { self, nixpkgs, sat-bench }:
+  inputs.home.url = "github:shnarazk/flakes";
+
+  outputs = { self, nixpkgs, sat-bench, home }:
   {
     packages = builtins.listToAttrs
       (map
@@ -13,11 +15,11 @@
             value = {
                default =
                  rustPlatform.buildRustPackage rec {
-                   version = "0.17.4-20250128";
+                   version = "0.19.0-20260831";
                    name = "splr-${version}";
                    pname = "splr";
                    src = self;
-                   cargoHash = "sha256-Mbd15EIej0903yh6LWUmegpfujZScKMXedqgNBjjM30=";
+                   cargoHash = "sha256-0000000000000000000000000000000000000000000=";
                    buildInputs = rustc.buildInputs ++ lib.optional stdenv.isDarwin [ libiconv ];
                    buildPhase = "cargo build --release";
                    installPhase = ''
@@ -38,12 +40,15 @@
             name = system;
             value = mkShell {
                 packages = [
-                  bashInteractive
+                  cargo-watch
+                  drat-trim
+                  home.packages.${system}.kissat
+                  # nixpkgs.lldb_19
                   samply
                   tokei
-                  # cargo-watch
-                  # nixpkgs.lldb_19
                   sat-bench.packages.${system}.default
+                  tinymist
+                  typst
                 ];
             };
           }

@@ -113,7 +113,7 @@ fn strengthen_clause(
             elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
             cdb.remove_clause(cid);
             match asg.assigned(l0) {
-                None => asg.assign_at_root_level(l0),
+                None => asg.assign_at_root_level(cdb, l0),
                 Some(true) => Ok(()),
                 Some(false) => Err(SolverError::RootLevelConflict((l0, asg.reason(l0.vi())))),
             }

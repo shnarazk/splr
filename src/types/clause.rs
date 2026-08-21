@@ -8,32 +8,25 @@ use {
 };
 
 /// A representation of 'clause'
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Debug)]
 pub struct Clause {
     /// The literals in a clause.
     pub(crate) lits: Vec<Lit>,
     /// Flags (8 bits)
     pub(crate) flags: FlagClause,
-    /// A static clause evaluation criterion like LBD, NDD, or something.
-    pub rank: u16,
-    /// The number of propagation.
-    pub used: u16,
     /// the index from which `propagate` starts searching an un-falsified literal.
     /// Since it's just a hint, we don't need u32 or usize.
     pub search_from: u16,
-
-    #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
-    /// the number of conflicts at which this clause was used in `conflict_analyze`
-    timestamp: usize,
-
-    #[cfg(feature = "clause_rewarding")]
-    /// A dynamic clause evaluation criterion based on the number of references.
-    reward: f64,
-
-    #[cfg(feature = "boundary_check")]
-    pub birth: usize,
-    #[cfg(feature = "boundary_check")]
-    pub moved_at: Propagate,
+    /// the minimal lbd of this clause so far
+    pub(crate) lbd: DecisionLevel,
+    ///the count of references in conflict analysis
+    pub(crate) referred: usize,
+    /// The last reference time in conflict analysis
+    pub(crate) referred_at: usize,
+    /// last vivified time in conflicts
+    pub(crate) vivify_age: usize,
+    // last vivified time in conflict
+    pub(crate) vivify_at: usize,
 }
 
 /// API for Clause, providing literal accessors.
@@ -56,12 +49,8 @@ pub trait ClauseIF {
     fn len(&self) -> usize;
     /// return true is this is a unit clause under `asg`.
     fn is_unit_under(&self, asg: &impl AssignIF) -> bool;
-
-    #[cfg(feature = "boundary_check")]
-    /// return timestamp.
-    fn timestamp(&self) -> usize;
-    #[cfg(feature = "boundary_check")]
-    fn set_birth(&mut self, time: usize);
+    /// update reference_distance.
+    fn update_reference(&mut self, asg: &mut impl AssignIF);
 }
 
 impl Default for Clause {
@@ -69,20 +58,12 @@ impl Default for Clause {
         Clause {
             lits: vec![],
             flags: FlagClause::empty(),
-            rank: 0,
-            used: 0,
             search_from: 2,
-
-            #[cfg(any(feature = "boundary_check", feature = "clause_rewarding"))]
-            timestamp: 0,
-
-            #[cfg(feature = "clause_rewarding")]
-            reward: 0.0,
-
-            #[cfg(feature = "boundary_check")]
-            birth: 0,
-            #[cfg(feature = "boundary_check")]
-            moved_at: Propagate::None,
+            lbd: DecisionLevel::MAX,
+            referred: 0,
+            referred_at: 0,
+            vivify_age: 0,
+            vivify_at: 0,
         }
     }
 }
@@ -239,15 +220,10 @@ impl ClauseIF for Clause {
             .all(|l| asg.assigned(*l) == Some(false));
         unassigned == 1 && all_others_false
     }
-
-    #[cfg(feature = "boundary_check")]
-    /// return timestamp.
-    fn timestamp(&self) -> usize {
-        self.timestamp
-    }
-    #[cfg(feature = "boundary_check")]
-    fn set_birth(&mut self, time: usize) {
-        self.birth = time;
+    fn update_reference(&mut self, asg: &mut impl AssignIF) {
+        self.referred += 1;
+        self.referred_at = asg.current_conflict_index();
+        self.lbd = self.lbd.min(asg.literal_block_distance_current(&self.lits));
     }
 }
 
@@ -276,19 +252,6 @@ impl FlagIF for Clause {
 }
 
 impl fmt::Display for Clause {
-    #[cfg(feature = "boundary_check")]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let st = |flag, mes| if self.is(flag) { mes } else { "" };
-        write!(
-            f,
-            "{{{:?}b{}{}{}}}",
-            i32s(&self.lits),
-            self.birth,
-            st(FlagClause::LEARNT, ", learnt"),
-            st(FlagClause::ENQUEUED, ", enqueued"),
-        )
-    }
-    #[cfg(not(feature = "boundary_check"))]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
@@ -298,33 +261,6 @@ impl fmt::Display for Clause {
             st(FlagClause::LEARNT, ", learnt"),
             st(FlagClause::ENQUEUED, ", enqueued"),
         )
-    }
-}
-
-impl Clause {
-    /// update rank field with the present LBD.
-    // If it's big enough, skip the loop.
-    pub fn update_lbd(&mut self, asg: &impl AssignIF, lbd_temp: &mut [usize]) -> usize {
-        if 8192 <= self.lits.len() {
-            self.rank = u16::MAX;
-            return u16::MAX as usize;
-        }
-        let key: usize = lbd_temp[0] + 1;
-        lbd_temp[0] = key;
-        let mut cnt = 0;
-        for l in &self.lits {
-            let lv = asg.level(l.vi());
-            if lv == 0 {
-                continue;
-            }
-            let p = &mut lbd_temp[lv as usize];
-            if *p != key {
-                *p = key;
-                cnt += 1;
-            }
-        }
-        self.rank = cnt;
-        cnt as usize
     }
 }
 

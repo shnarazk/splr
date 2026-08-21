@@ -174,18 +174,16 @@ impl TryFrom<&Path> for Solver {
 
 impl SatSolverIF for Solver {
     fn add_assignment(&mut self, val: i32) -> Result<&mut Solver, SolverError> {
-        if val == 0 || self.asg.num_vars < val.unsigned_abs() as usize {
+        let Solver { asg, cdb, .. } = self;
+        if val == 0 || asg.num_vars < val.unsigned_abs() as usize {
             return Err(SolverError::InvalidLiteral);
         }
         let lit = Lit::from(val);
-        self.cdb.certificate_add_assertion(lit);
-        match self.asg.assigned(lit) {
-            None => self.asg.assign_at_root_level(lit).map(|_| self),
+        cdb.certificate_add_assertion(lit);
+        match asg.assigned(lit) {
+            None => asg.assign_at_root_level(cdb, lit).map(|_| self),
             Some(true) => Ok(self),
-            Some(false) => Err(SolverError::RootLevelConflict((
-                lit,
-                self.asg.reason(lit.vi()),
-            ))),
+            Some(false) => Err(SolverError::RootLevelConflict((lit, asg.reason(lit.vi())))),
         }
     }
     fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver, SolverError>
@@ -275,10 +273,10 @@ impl Solver {
             1 => {
                 let l0 = lits[0];
                 cdb.certificate_add_assertion(l0);
-                asg.assign_at_root_level(l0)
+                asg.assign_at_root_level(cdb, l0)
                     .map_or(RefClause::EmptyClause, |_| RefClause::UnitClause(l0))
             }
-            _ => cdb.new_clause(asg, lits, false),
+            _ => cdb.new_clause(lits, false),
         }
     }
     #[cfg(not(feature = "no_IO"))]

@@ -1,10 +1,5 @@
 //! Conflict Analysis
 
-#[cfg(feature = "boundary_check")]
-use crate::assign::DebugReportIF;
-#[cfg(feature = "trail_saving")]
-use crate::assign::TrailSavingIF;
-
 use {
     super::State,
     crate::{
@@ -12,7 +7,6 @@ use {
         cdb::{ClauseDB, ClauseDBIF},
         types::*,
     },
-    std::collections::HashSet,
 };
 
 /// returns:
@@ -25,7 +19,7 @@ pub fn handle_conflict(
     cdb: &mut ClauseDB,
     state: &mut State,
     cc: &ConflictContext,
-) -> Result<u16, SolverError> {
+) -> Result<(ClauseId, DecisionLevel), SolverError> {
     // `conflicting_level` should be calculated from cc.1 instead of cc.0.
     // Because the conflicting_literal has two values assigned at different levels.
     // We need larger one.
@@ -57,39 +51,29 @@ pub fn handle_conflict(
                 .iter()
                 .filter(|l| asg.level(l.vi()) == conflicting_level)
                 .count()
-            {
-                if let Some(second_level) = c
+                && let Some(second_level) = c
                     .iter()
                     .map(|l| asg.level(l.vi()))
                     .filter(|l| *l < conflicting_level)
                     .max()
-                {
-                    debug_assert!(0 < second_level);
-                    asg.cancel_until(second_level);
-                    return Ok(c.rank);
-                }
+            {
+                debug_assert!(0 < second_level);
+                let rank = c.rank;
+                asg.cancel_until(cdb, second_level);
+                return Ok(rank);
             }
         }
         _ => {
             panic!();
         }
     }
-    asg.cancel_until(conflicting_level);
+    asg.cancel_until(cdb, conflicting_level);
     asg.handle(SolverEvent::Conflict);
 
     let assign_level = conflict_analyze(asg, cdb, state, cc).max(asg.root_level());
     let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
     if learnt_len == 0 {
-        #[cfg(feature = "boundary_check")]
-        {
-            println!(
-                "empty learnt at {}({}) by {:?}",
-                cl,
-                asg.reason(asg.decision_vi(cl)).is_none(),
-                asg.dump(asg, &cdb[ci]),
-            );
-        }
         return Err(SolverError::EmptyClause);
     }
     let l0 = new_learnt[0];
@@ -108,13 +92,11 @@ pub fn handle_conflict(
             _ => {
                 // dump to certified even if it's a literal.
                 cdb.certificate_add_assertion(l0);
-                if asg.assign_at_root_level(l0).is_err() {
+                if asg.assign_at_root_level(cdb, l0).is_err() {
                     unreachable!("handle_conflict::root_level_conflict_by_assertion");
                 }
-                let vi = l0.vi();
-                state.restart.handle(SolverEvent::Assert(vi));
-                cdb.handle(SolverEvent::Assert(vi));
-                return Ok(0);
+                cdb.handle(SolverEvent::Assert(l0.vi()));
+                return Ok((ClauseId::default(), 0));
             }
         }
     }
@@ -148,12 +130,19 @@ pub fn handle_conflict(
                 }
             }
             AssignReason::Implication(r) => {
+                let mut cs = Vec::new();
                 for l in cdb[r].iter() {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
                         asg.reward_at_analysis(vi);
                         bumped.push(vi);
                     }
+                    if let AssignReason::Implication(ci) = asg.reason(l.vi()) {
+                        cs.push(ci);
+                    }
+                }
+                for ci in cs.into_iter() {
+                    cdb[ci].update_reference(asg);
                 }
             }
             AssignReason::Decision(_) => (),
@@ -161,84 +150,43 @@ pub fn handle_conflict(
         }
     }
 
-    // learnt clause quality based backtrack strategy switching
-    // Idea: If the learned clause is low quality, don’t trust it to justify a large backjump; use CBT/limited-backjump instead.
-    let bt_drift: Option<bool> = if cfg!(feature = "chrono_BT")
-        && assign_level > 0
-        && asg
-            .len_upto(conflicting_level)
-            .saturating_sub(asg.len_upto(assign_level))
-            >= 40
-    {
-        Some(true)
-    } else if cfg!(feature = "BT_deepen")
-        && assign_level > 0
-        && new_learnt.len() > 2
-        && new_learnt
-            .iter()
-            .map(|l| asg.level(l.vi()))
-            .collect::<HashSet<_>>()
-            .len() as f64
-            >= 2.5 * cdb.lbd.get().max(3.0)
-    {
-        Some(false)
-    } else {
-        None
-    };
-    if let Some(b) = bt_drift {
-        if b {
-            asg.cancel_until(conflicting_level - 1);
-            state.bt_drift_average.update(1.0);
-        } else {
-            asg.cancel_until(assign_level - 1);
-            state.bt_drift_average.update(-1.0);
-        }
-        #[cfg(feature = "trail_saving")]
-        {
-            asg.clear_saved_trail();
-        }
-        #[cfg(feature = "chrono_BT")]
-        {
-            state.num_chrono_bt += 1;
-        }
-    } else {
-        asg.cancel_until(assign_level);
-        state.bt_drift_average.update(0.0);
-    }
+    // Certify the new learnt clause *before* backjumping: `cancel_until` may
+    // instantly drop reason clauses that are no longer locked (see
+    // `PropagateIF::cancel_until`), which are exactly the clauses that
+    // `conflict_analyze` just resolved through to build `new_learnt`. If those
+    // clauses were deleted (and their DRAT `d` line emitted) before this new
+    // clause is added, the RUP/RAT justification for the new clause can lose
+    // its natural witness and become unverifiable. Registering the clause
+    // first (and thus writing its `a` line first) preserves the standard
+    // "certify before you garbage-collect what justified it" invariant.
+    // `new_clause` itself has no dependency on assignment/trail state, so
+    // this reordering doesn't change its behavior.
+    let ref_clause = cdb.new_clause(new_learnt, true);
+    asg.cancel_until(cdb, assign_level);
     // debug_assert_eq!(asg.assigned(l0), None);
     // debug_assert_eq!(
     //     new_learnt.iter().skip(1).map(|l| asg.level(l.vi())).max(),
     //     Some(assign_level)
     // );
-    let rank: u16;
-    match cdb.new_clause(asg, new_learnt, true) {
+    let ret: (ClauseId, DecisionLevel);
+    match ref_clause {
         RefClause::Clause(cid) if learnt_len == 2 => {
-            #[cfg(feature = "boundary_check")]
-            cdb[cid].set_birth(asg.num_conflict);
-
             debug_assert_eq!(l0, cdb[cid].lit0());
             debug_assert_eq!(l1, cdb[cid].lit1());
             debug_assert_eq!(asg.assigned(l0), None);
-            debug_assert!(bt_drift.is_some() || asg.assigned(l1) == Some(false));
 
-            if bt_drift.is_none() {
-                asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
-                cdb[cid].used = cdb[cid].used.saturating_add(1);
-            }
-            rank = 1;
-            #[cfg(feature = "bi_clause_completion")]
-            cdb.complete_bi_clauses(asg);
+            asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
+            ret = (cid, 1);
         }
         RefClause::Clause(cid) => {
-            #[cfg(feature = "boundary_check")]
-            cdb[cid].set_birth(asg.num_conflict);
-
             debug_assert_eq!(cdb[cid].lit0(), l0);
-            if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
-                asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
-                cdb[cid].used = cdb[cid].used.saturating_add(1);
-            }
-            rank = cdb[cid].rank;
+            asg.assign_by_implication(l0, AssignReason::Implication(cid), assign_level);
+            cdb[cid].turn_on(FlagClause::ASSIGN_REASON);
+            // lbd should be calculated at conflict level, where all literals are assigned.
+            // But since vars hold the last level even after unassignment,
+            // we can have postponed the calculation.
+            let d = asg.literal_block_distance_current(&cdb[cid].lits);
+            ret = (cid, d);
         }
         RefClause::RegisteredClause(cid) => {
             debug_assert_eq!(learnt_len, 2);
@@ -247,7 +195,6 @@ pub fn handle_conflict(
                     || (l0 == cdb[cid].lit1() && l1 == cdb[cid].lit0())
             );
             debug_assert_eq!(asg.assigned(l0), None);
-            debug_assert!(bt_drift.is_some() || asg.assigned(l1) == Some(false));
             // if bt_drift.is_none() && asg.assigned(l1) != Some(false) {
             //     dbg!(cc);
             //     dbg!(asg.decision_level());
@@ -257,11 +204,8 @@ pub fn handle_conflict(
             //     }
             //     panic!("here we are!");
             // }
-            rank = 1;
-            if bt_drift.is_none_or(|up1| up1 && cdb[cid].is_unit_under(&*asg)) {
-                asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
-                cdb[cid].used = cdb[cid].used.saturating_add(1);
-            }
+            ret = (cid, asg.literal_block_distance_current(&cdb[cid].lits));
+            asg.assign_by_implication(l0, AssignReason::BinaryLink(!l1), assign_level);
         }
         RefClause::Dead => unreachable!("handle_conflict::RefClause::Dead"),
         RefClause::EmptyClause => unreachable!("handle_conflict::RefClause::EmptyClause"),
@@ -269,10 +213,7 @@ pub fn handle_conflict(
     }
     state.c_lvl.update(conflicting_level as f64);
     state.b_lvl.update(assign_level as f64);
-    state
-        .e_mode
-        .update(conflicting_level as f64 - assign_level as f64);
-    Ok(rank)
+    Ok(ret)
 }
 
 ///
@@ -341,26 +282,6 @@ fn conflict_analyze(
             asg.var_mut($vi).turn_on(FlagVar::CA_SEEN);
         };
     }
-    macro_rules! boundary_check {
-        ($condition: expr, $($arg: expr),+) => {
-            #[cfg(feature = "boundary_check")]
-            {
-                if !$condition {
-                    dbg!(cc);
-                    dbg!(dl);
-                    tracer(asg, cdb);
-                    println!("Learnt clause so far: {}",
-                             learnt.report(asg)
-                             .iter()
-                             .map(|r| format!("  {:?}", r))
-                             .collect::<Vec<String>>()
-                             .join("\n")
-                    );
-                    panic!($($arg),*);
-                }
-            }
-        };
-    }
 
     {
         trace_lit!("- handle conflicting literal", p);
@@ -376,8 +297,9 @@ fn conflict_analyze(
         }
     }
     let mut trail_index = asg.stack_len() - 1;
-    let mut max_lbd: u16 = 0;
-    let mut cid_with_max_lbd: Option<ClauseId> = None;
+    if let AssignReason::Implication(cid) = cc.1 {
+        cdb.update_at_analysis(cid);
+    }
     loop {
         match reason {
             AssignReason::BinaryLink(l) => {
@@ -418,13 +340,9 @@ fn conflict_analyze(
                 );
                 debug_assert!(!cdb[cid].is_dead() && 2 < cdb[cid].len());
                 // if !cdb.update_at_analysis(asg, cid) {
-                if !cdb[cid].is(FlagClause::LEARNT) {
-                    cdb[cid].used = cdb[cid].used.saturating_add(1);
-                }
-                if max_lbd < cdb[cid].rank {
-                    max_lbd = cdb[cid].rank;
-                    cid_with_max_lbd = Some(cid);
-                }
+                // if !cdb[cid].is(FlagClause::LEARNT) {
+                //     cdb[cid].used = cdb[cid].used.saturating_add(1);
+                // }
                 for q in cdb[cid].iter().skip(1) {
                     let vi = q.vi();
                     debug_assert!(asg.var(vi).assign.is_some());
@@ -466,21 +384,9 @@ fn conflict_analyze(
                         trace!(q, " -- ignore flagged already");
                     }
                 }
+                cdb[cid].update_reference(asg);
             }
-            AssignReason::Decision(_) | AssignReason::None => {
-                boundary_check!(
-                    false,
-                    "found a strange var {:?}:: path_cnt {}\nDecisionMap\n{}",
-                    reason,
-                    path_cnt,
-                    asg.stack_iter()
-                        .skip(trail_index)
-                        .filter(|l| matches!(asg.reason(l.vi()), AssignReason::Decision(_)))
-                        .map(|l| format!("{:?}", l.report(asg)))
-                        .collect::<Vec<String>>()
-                        .join("\n")
-                );
-            }
+            AssignReason::Decision(_) | AssignReason::None => {}
         }
         //
         // set the index of the next literal to trail_index
@@ -488,23 +394,13 @@ fn conflict_analyze(
         #[allow(clippy::blocks_in_conditions)]
         while {
             let vi = asg.stack(trail_index).vi();
-            boundary_check!(
-                0 < vi && vi < asg.num_vars,
-                "trail[{}] has an invalid var index {}",
-                trail_index,
-                asg.stack(trail_index)
-            );
+
             let lvl = asg.level(vi);
             let v = asg.var(vi);
             !v.is(FlagVar::CA_SEEN) || lvl != dl
         } {
             trace_lit!(asg.stack(trail_index), "skip, not flagged");
-            boundary_check!(
-                0 < trail_index,
-                "Broke the bottom:: path_cnt {} scanned to {}",
-                path_cnt,
-                asg.stack_len() - trail_index
-            );
+
             trail_index -= 1;
         }
         p = asg.stack(trail_index);
@@ -521,12 +417,10 @@ fn conflict_analyze(
         trail_index -= 1;
         reason = asg.reason(p.vi());
     }
-    if let Some(cid) = cid_with_max_lbd {
-        cdb.update_at_analysis(asg, cid);
-    }
     // debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);
     learnt[0] = !p;
+    // asg.var_mut(p.vi()).turn_off(FlagVar::USED);
     trace!(
         "appending {}, the final (but not minimized) learnt is {:?}",
         learnt[0], learnt
@@ -622,7 +516,7 @@ impl Lit {
                             // if asg.reason(vi) != AssignReason::default() && levels[lv as usize] {
                             if matches!(
                                 asg.reason(vi),
-                                AssignReason::BinaryLink(_) | AssignReason::Implication(_)
+                                AssignReason::BinaryLink(_) | AssignReason::Implication(_,)
                             ) && levels[lv as usize]
                             {
                                 asg.var_mut(vi).turn_on(FlagVar::CA_SEEN);
@@ -677,7 +571,7 @@ fn lit_level(
                 cdb[cid].lit0(),
                 lit,
                 cid,
-                &cdb[cid]
+                cdb[cid]
             );
             // assert!(
             //     !bag.contains(&lit),
@@ -722,41 +616,4 @@ fn dumper(asg: &AssignStack, cdb: &ClauseDB, bag: &[Lit]) -> String {
         .unwrap();
     }
     s
-}
-
-#[cfg(feature = "boundary_check")]
-fn tracer(asg: &AssignStack, cdb: &ClauseDB) {
-    use std::io::{self, Write};
-    loop {
-        let mut input = String::new();
-        print!("cid(or 0 for quit): ");
-        std::io::stdout().flush().expect("IO error");
-        io::stdin().read_line(&mut input).expect("IO error");
-        if input.is_empty() {
-            break;
-        }
-        let Ok(cid) = input.trim().parse::<usize>() else {
-            continue;
-        };
-        if cid == 0 {
-            break;
-        }
-        println!(
-            "{}",
-            cdb[ClauseId::from(cid)]
-                .report(asg)
-                .iter()
-                .map(|r| format!(
-                    " {}{:?}",
-                    asg.var(Lit::from(r.lit).vi())
-                        .is(FlagVar::CA_SEEN)
-                        .then(|| "S")
-                        .unwrap_or(" "),
-                    r
-                ))
-                .collect::<Vec<String>>()
-                .join("\n"),
-        );
-    }
-    panic!("done");
 }
