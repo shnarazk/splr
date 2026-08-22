@@ -10,12 +10,7 @@ mod stage;
 /// Module `validate` implements a model checker.
 mod validate;
 
-pub use self::{
-    build::SatSolverIF,
-    search::SolveIF,
-    stage::StageManager,
-    validate::ValidateIF,
-};
+pub use self::{build::SatSolverIF, search::SolveIF, stage::StageManager, validate::ValidateIF};
 
 use crate::{assign::AssignStack, cdb::ClauseDB, state::*, types::*};
 
@@ -232,5 +227,21 @@ mod tests {
             vec![-3i32],
         );
         sat!(vec![&v1, &v2, &v3, &v4, &v5]); // : Vec<&[i32]>
+    }
+    #[test]
+    fn test_on_issue298() {
+        // let mut s = Solver::default();
+        let mut s = Solver::instantiate(&Config::default(), &CNFDescription::default());
+        for _ in 0..3 {
+            s.add_var();
+        }
+        s.state.cnf.num_of_variables = s.state.target.num_of_variables;
+        // assert_eq!(s.state.cnf.num_of_variables, 3);
+        s.add_clause([1, 2]).unwrap();
+        s.add_clause([1, 3]).unwrap();
+        s.add_clause([2, 3]).unwrap();
+        s.add_clause([-1, -2, -3]).unwrap();
+        s.add_clause([2]).unwrap();
+        assert_eq!(s.solve().unwrap(), Certificate::SAT(vec![1, 2, -3]));
     }
 }
