@@ -15,12 +15,12 @@
             value = {
                default =
                  rustPlatform.buildRustPackage rec {
-                   version = "0.19.0-20260831";
+                   version = "0.19.0-20260822";
                    name = "splr-${version}";
                    pname = "splr";
                    src = self;
-                   cargoHash = "sha256-0000000000000000000000000000000000000000000=";
-                   buildInputs = rustc.buildInputs ++ lib.optional stdenv.isDarwin [ libiconv ];
+                   cargoHash = "sha256-b2c6cKB8kXEeSmuLaL1MvcMYzPnTykaPm95LmgxdqX8=";
+                   buildInputs = rustc.buildInputs ++ lib.optional stdenv.hostPlatform.isDarwin [ libiconv ];
                    buildPhase = "cargo build --release";
                    installPhase = ''
                      mkdir -p $out/bin;
