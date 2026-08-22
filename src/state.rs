@@ -99,8 +99,6 @@ pub struct State {
     pub stats: [usize; Stat::EndOfStatIndex as usize],
     /// StageManager
     pub span_manager: StageManager,
-    /// problem description
-    pub target: CNFDescription,
     /// strategy adjustment interval in conflict
     pub reflection_interval: usize,
 
@@ -151,7 +149,6 @@ impl Default for State {
             cnf: CNFDescription::default(),
             stats: [0; Stat::EndOfStatIndex as usize],
             span_manager: StageManager::default(),
-            target: CNFDescription::default(),
             reflection_interval: 10_000,
 
             search_mode_ratio: (
@@ -212,7 +209,6 @@ impl Instantiate for State {
             config: config.clone(),
             cnf: cnf.clone(),
             span_manager: StageManager::new(),
-            target: cnf.clone(),
             time_limit: config.c_timeout,
             progress_report_rows: PROGRESS_REPORT_ROWS
                 + CDB_HEATMAP_ROWS * (config.show_cdb_heatmap as usize),
@@ -222,7 +218,7 @@ impl Instantiate for State {
     fn handle(&mut self, e: SolverEvent) {
         match e {
             SolverEvent::NewVar => {
-                self.target.num_of_variables += 1;
+                self.cnf.num_of_variables += 1;
             }
             SolverEvent::Assert(_) => (),
             SolverEvent::Conflict => (),
@@ -858,13 +854,10 @@ impl State {
 impl fmt::Display for State {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let tm: f64 = (self.start.elapsed().as_millis() as f64) / 1_000.0;
-        let vc = format!(
-            "{},{}",
-            self.target.num_of_variables, self.target.num_of_clauses,
-        );
+        let vc = format!("{},{}", self.cnf.num_of_variables, self.cnf.num_of_clauses,);
         let vclen = vc.len();
         let width = 59;
-        let mut fname = match &self.target.pathname {
+        let mut fname = match &self.cnf.pathname {
             CNFIndicator::Void => "(no cnf)".to_string(),
             CNFIndicator::File(f) => f.to_string(),
             CNFIndicator::LitVec(n) => format!("(embedded {n} element vector)"),

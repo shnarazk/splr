@@ -235,8 +235,7 @@ mod tests {
         for _ in 0..3 {
             s.add_var();
         }
-        s.state.cnf.num_of_variables = s.state.target.num_of_variables;
-        // assert_eq!(s.state.cnf.num_of_variables, 3);
+        assert_eq!(s.state.cnf.num_of_variables, 3);
         s.add_clause([1, 2]).unwrap();
         s.add_clause([1, 3]).unwrap();
         s.add_clause([2, 3]).unwrap();
