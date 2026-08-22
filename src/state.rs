@@ -1,9 +1,4 @@
 /// Module `state` is a collection of internal data.
-#[cfg(feature = "platform_wasm")]
-use instant::{Duration, Instant};
-#[cfg(not(feature = "platform_wasm"))]
-use std::time::{Duration, Instant};
-
 use {
     crate::{
         assign::{self, AssignIF, VarActivityScheme},
@@ -16,6 +11,7 @@ use {
         fmt,
         io::{Write, stdout},
         ops::{Index, IndexMut},
+        time::{Duration, Instant},
     },
 };
 const PROGRESS_REPORT_ROWS: usize = 7;
