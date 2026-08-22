@@ -237,8 +237,8 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
                 .file_name()
                 .map_or(Cow::from("file with strange chars"), |f| f
                     .to_string_lossy()),
-            state.target.num_of_variables,
-            state.target.num_of_clauses,
+            state.cnf.num_of_variables,
+            state.cnf.num_of_clauses,
         )
         .as_bytes(),
     )?;
