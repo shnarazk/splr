@@ -418,11 +418,11 @@
         "nixpkgs": "nixpkgs_12"
       },
       "locked": {
-        "lastModified": 1786965022,
-        "narHash": "sha256-JKncpwDqRijTOOUEWoHM/he6Ynt/NamsEg6+C59PAhk=",
+        "lastModified": 1790117758,
+        "narHash": "sha256-qR8xYZIh2eBcoVNKBBUUsm5iGowajuaE0Vf66nhei5w=",
         "owner": "shnarazk",
         "repo": "SAT-bench",
-        "rev": "940fbba63701cb14e0720b5902a580cecebf7aca",
+        "rev": "119e08ca2612fab1187242056dad294f45afe77c",
         "type": "github"
       },
       "original": {
