@@ -1,3 +1,7 @@
+## 0.20.0, 202X-XX-XX
+
+- Remove feature 'platform_wasm'
+
 ## 0.19.0, 2026-08-22
 
 - Adopt two decision literal select heuristics:
