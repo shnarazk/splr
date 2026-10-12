@@ -5,6 +5,7 @@
 [
   {
     "label": "Build & Run with v360(UNSAT)",
+    "sourceLanguages": ["rust"],
     "build": {
       "command": "cargo",
       "args": ["build"]
