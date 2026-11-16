@@ -316,7 +316,7 @@ impl Solver {
                 Err(e) => panic!("{}", e),
             }
         }
-        debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
+        debug_assert_eq!(self.asg.num_vars, self.state.cnf.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
         Ok(self)
     }
@@ -345,7 +345,7 @@ impl Solver {
                 return Err(SolverError::EmptyClause);
             }
         }
-        debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
+        debug_assert_eq!(self.asg.num_vars, self.state.cnf.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
         Ok(self)
     }
